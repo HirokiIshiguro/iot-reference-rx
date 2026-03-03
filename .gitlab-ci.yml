@@ -162,6 +162,7 @@ flash_app:
       python "$env:CI_PROJECT_DIR\tools\uart_download.py" `
         --rsu "$env:CI_PROJECT_DIR\userprog.rsu" `
         --port $env:UART_PORT --baud $env:UART_BAUD `
+        --no-wait-for-ready `
         --timeout 300
     - Write-Host "FLASH APP SUCCESS"
 

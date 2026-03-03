@@ -43,8 +43,8 @@ def parse_args():
                         help="Total timeout in seconds (default: 300)")
     parser.add_argument("--no-hw-flow", action="store_true",
                         help="Disable hardware flow control (use timing-based)")
-    parser.add_argument("--wait-for-ready", action="store_true", default=True,
-                        help="Wait for boot_loader ready message (default: True)")
+    parser.add_argument("--no-wait-for-ready", action="store_true",
+                        help="Skip waiting for boot_loader ready message")
     parser.add_argument("--ready-timeout", type=int, default=60,
                         help="Timeout for boot_loader ready message (default: 60s)")
     parser.add_argument("--diag", action="store_true",
@@ -175,7 +175,7 @@ def main():
         dl.open()
 
         # Wait for boot_loader ready message
-        if args.wait_for_ready:
+        if not args.no_wait_for_ready:
             print(f"Waiting for boot_loader ready message (timeout: {args.ready_timeout}s)...")
             if not dl.wait_for_message(MSG_SEND_VIA_UART, args.ready_timeout):
                 print("ERROR: Boot_loader did not send ready message.")
@@ -183,6 +183,8 @@ def main():
                 print("  Check: Is boot_loader running? Is UART connected?")
                 sys.exit(1)
             print("Boot_loader ready. Starting transfer...")
+        else:
+            print("Skipping ready message wait (--no-wait-for-ready)")
 
         # Small delay after ready message
         time.sleep(0.5)
