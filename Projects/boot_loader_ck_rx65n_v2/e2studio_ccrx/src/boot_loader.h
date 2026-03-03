@@ -42,7 +42,7 @@ Macro definitions
 #define BL_UPDATE_MODE                      (0)  /* 0:Disable 1:Enable */
 
 /* Does an image exist on the main side? */
-#define BL_INITIAL_IMAGE_INSTALL            (0)  /* 0:Disable 1:Enable */
+#define BL_INITIAL_IMAGE_INSTALL            (1)  /* 0:Disable 1:Enable */
 
 /* Verify main area */
 #define BL_ERASE_BUFFER_AREA_AFTER_VERIFIED (0)  /* 0:Disable 1:Enable */
