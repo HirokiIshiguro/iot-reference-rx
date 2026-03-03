@@ -137,6 +137,7 @@ flash_app:
     - hw-ck-rx65n-v1
   resource_group: ck-rx65n-device
   needs:
+    - build
     - flash_boot_loader
   script:
     - Write-Host "=== Flash $env:APP_PROJECT ==="
