@@ -14,9 +14,9 @@ stages:
 
 # --- Variables ---
 variables:
-  # e2studio
-  E2STUDIO_PATH: "C:/Renesas/RA/e2studio_v2025-12_fsp_v6.3.0/eclipse/e2studioIDE.exe"
-  # TODO: Update to e2 studio 2025-04 if available. Current rx72n-envision-kit uses 2025-12.
+  # e2studio headless build
+  E2STUDIO_CLI: "C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe"
+  E2STUDIO_WORKSPACE: "%TEMP%/e2ws_iot_ref"
 
   # CC-RX compiler
   CCRX_PATH: "C:/Renesas/RX/3_7_0/bin"
@@ -32,8 +32,7 @@ variables:
   # TODO: Confirm interface type (FINE / SWD / E2 Lite) after hardware setup
 
   # UART
-  # TODO: Update after hardware setup (Step 2)
-  UART_PORT: "TBD"
+  UART_PORT: "COM9"
   UART_BAUD: "115200"
 
   # AWS IoT Core
@@ -58,16 +57,33 @@ build:
   stage: build
   tags:
     - run_ishiguro_machine
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
   script:
     - echo "=== Build ${APP_PROJECT} and ${BL_PROJECT} ==="
-    - echo "TODO - Implement headless build (Step 3)"
-    - echo "Placeholder for e2studio headless build or GNU Make + CC-RX"
+    # Verify submodules
+    - if not exist "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h" (echo ERROR - submodules not initialized && exit /b 1)
+    # Clean workspace
+    - if exist "%E2STUDIO_WORKSPACE%" rmdir /s /q "%E2STUDIO_WORKSPACE%"
+    # Import and build both projects
+    - >-
+      "%E2STUDIO_CLI%" -nosplash
+      -application org.eclipse.cdt.managedbuilder.core.headlessbuild
+      -data "%E2STUDIO_WORKSPACE%"
+      -import "%CD%\%APP_PROJECT_DIR%"
+      -import "%CD%\%BL_PROJECT_DIR%"
+      -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug"
+      -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug"
+      -no-indexer
+    # Verify outputs
+    - if not exist "%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot" (echo ERROR - app .mot missing && exit /b 1)
+    - if not exist "%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot" (echo ERROR - bootloader .mot missing && exit /b 1)
+    - echo "BUILD SUCCESS"
   artifacts:
     paths:
       - "${APP_PROJECT_DIR}/HardwareDebug/*.mot"
       - "${BL_PROJECT_DIR}/HardwareDebug/*.mot"
     expire_in: 7 days
-  allow_failure: true  # Remove after Step 3 is complete
 
 # --- Flash Stage ---
 flash_boot_loader:

@@ -65,19 +65,52 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 
 ### Software Requirements
 
-| Tool | Version |
-|------|---------|
-| IDE | e2 studio 2025-04 以降 |
-| CC-RX | V3.07.00 |
-| GCC (alternative) | GCC for Renesas RX v8.3.0.202411 |
-| Code generator | RX Smart Configurator（e2 studio 同梱） |
+| Tool | Version | Path (Runner) |
+|------|---------|---------------|
+| e2studio-cli | e2 studio 2025-12 | `C:\Renesas\e2_studio_2025_12\eclipse\e2studio-cli.exe` |
+| CC-RX | V3.07.00 (evaluation) | `C:\Program Files (x86)\Renesas\RX\3_7_0\bin\ccrx.exe` |
+| GCC (alternative) | GCC for Renesas RX v8.3.0.202411 | — |
+| Code generator | RX Smart Configurator（e2 studio 同梱） | — |
+
+**注意:** CC-RX は評価版（残り51日）。期限切れ後はリンクサイズ制限 (128KB) が適用される。
+
+### Git Submodules
+
+このリポジトリは多数の Git サブモジュール（FreeRTOS-Kernel, mbedtls, coreMQTT 等）を含む。
+**クローン・チェックアウト時は必ず `--recursive` を使うこと。**
+
+```bash
+git clone --recursive <url>
+# 既存クローンでサブモジュール未初期化の場合:
+git submodule update --init --recursive
+```
+
+サブモジュール未初期化の場合、headless ビルドで `FreeRTOS.h` が見つからないエラーになる。
 
 ### Build Targets
 
 | Project | Directory | Output | Description |
 |---------|-----------|--------|-------------|
-| aws_ether_ck_rx65n_v2 | `Projects/aws_ether_ck_rx65n_v2/e2studio_ccrx/` | `.mot` | Ethernet + AWS IoT デモ（PubSub, OTA） |
-| boot_loader_ck_rx65n_v2 | `Projects/boot_loader_ck_rx65n_v2/e2studio_ccrx/` | `.mot` | OTA 用デュアルバンクブートローダ |
+| aws_ether_ck_rx65n_v2 | `Projects/aws_ether_ck_rx65n_v2/e2studio_ccrx/` | `.mot` (1.0MB) | Ethernet + AWS IoT デモ（PubSub, OTA） |
+| boot_loader_ck_rx65n_v2 | `Projects/boot_loader_ck_rx65n_v2/e2studio_ccrx/` | `.mot` (92KB) | OTA 用デュアルバンクブートローダ |
+
+### Headless Build（CLI）
+
+```bash
+# 前提: サブモジュール初期化済み
+e2studio-cli.exe -nosplash \
+  -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
+  -data <workspace> \
+  -import <app_project_dir> \
+  -import <bl_project_dir> \
+  -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug" \
+  -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug" \
+  -no-indexer
+```
+
+- ビルドスクリプト: `tools/build_headless.bat`
+- ワークスペースは一時ディレクトリ（`%TEMP%\e2ws_iot_ref`）を使用
+- リンクリソース (`AWS_IOT_MCU_ROOT = ${PARENT-3-PROJECT_LOC}`) はサブモジュール初期化後に正常解決
 
 ### Demo Configuration
 
@@ -96,17 +129,19 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 - MCU: RX65N (RXv2 コア, 2MB コードフラッシュ, 640KB RAM)
 - Ethernet: オンボード（LAN8720, RMII）
 - デバッガ: E2 emulator Lite（オンボード）
-- UART: SCI チャネル（要確認: COM ポート番号は接続後に特定）
+- UART: COM9（USB シリアル デバイス、SCI チャネル要確認）
+- ボーレート: 115200bps（V1 はオンボード USB シリアルチップ。V2 以降で FTDI に置換され 921600bps 対応）
+- E2 Lite: 「Renesas USB Development Tools」として認識（COM ポートとしては表示されない）
 
-### Runner 接続情報（未確定 — Step 2 で更新）
+### Runner 接続情報
 
 | Item | Value |
 |------|-------|
-| E2 Lite COM port | TBD |
-| UART COM port | TBD |
-| UART baud rate | TBD |
-| Runner tag | TBD |
-| Ethernet | Runner マシンと同一 LAN |
+| UART COM port | COM9 |
+| UART baud rate | 115200 (要確認: ファームウェア設定依存) |
+| E2 Lite | Renesas USB Development Tools（デバイスマネージャー） |
+| Runner tag | run_ishiguro_machine (hw-ck-rx65n-v1 追加予定) |
+| Ethernet | Runner マシンと同一 LAN に接続済み |
 
 ## AWS IoT Core
 
@@ -130,9 +165,9 @@ iot-reference-rx では littlefs + データフラッシュにクレデンシャ
 
 | Step | Goal | Status |
 |------|------|--------|
-| 1 | GitLab リポジトリ作成・初期セットアップ | In progress |
-| 2 | ハードウェアセットアップ（人間作業） | Planned |
-| 3 | ビルド環境構築（headless build） | Planned |
+| 1 | GitLab リポジトリ作成・初期セットアップ | Done (MR !1) |
+| 2 | ハードウェアセットアップ（人間作業） | Done (COM9 確定) |
+| 3 | ビルド環境構築（headless build） | Done |
 | 4 | フラッシュ書き込み自動化（rfp-cli） | Planned |
 | 5 | AWS IoT Core セットアップ | Planned |
 | 6 | MQTT PubSub 動作確認 | Planned |
