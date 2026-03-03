@@ -177,19 +177,56 @@ rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
 
 ## AWS IoT Core
 
-### Thing 情報（未確定 — Step 5 で更新）
+### Thing 情報
 
 | Item | Value |
 |------|-------|
-| Thing name | ck-rx65n-01（予定） |
-| Endpoint | TBD |
-| Certificate | TBD |
-| Policy | TBD |
+| Thing name | ck-rx65n-01 |
+| Policy | ck-rx65n-policy |
+| Endpoint | プロジェクト CI/CD Variables `AWS_IOT_ENDPOINT` に設定 |
+| Certificate | プロジェクト CI/CD Variables `AWS_IOT_CERT` (File 型) に設定 |
+| Private Key | プロジェクト CI/CD Variables `AWS_IOT_PRIVKEY` (File 型) に設定 |
+
+### AWS リソース作成
+
+```bash
+# AWS CLI で Thing + 証明書 + ポリシーを一括作成
+./tools/aws_setup.sh [THING_NAME] [POLICY_NAME]
+# デフォルト: ck-rx65n-01, ck-rx65n-policy
+```
+
+出力ファイル: `certs/ck-rx65n-01-cert.pem`, `certs/ck-rx65n-01-privkey.pem`
 
 ### Credential Provisioning
 
 iot-reference-rx では littlefs + データフラッシュにクレデンシャルを格納する方式を採用。
-初回書き込み時に CLI 経由でプロビジョニングする手順は Getting_Started_Guide.md Step 3 を参照。
+UART CLI 経由でプロビジョニングする。
+
+```bash
+# 手動（Tera Term）: Getting_Started_Guide.md Step 3 を参照
+# 自動（Python スクリプト）:
+python tools/provision.py \
+  --port COM9 --baud 115200 \
+  --thing-name ck-rx65n-01 \
+  --endpoint <endpoint> \
+  --cert certs/ck-rx65n-01-cert.pem \
+  --key certs/ck-rx65n-01-privkey.pem
+```
+
+**注意:** `flash_boot_loader` は `-erase-chip` でデータフラッシュも消去するため、
+フラッシュ書き込みの度に再プロビジョニングが必要。CI/CD では provision ステージで自動実行。
+
+### CI/CD Variables（プロジェクトレベル）
+
+AWS クレデンシャルは **iot-reference-rx プロジェクト** の CI/CD Variables に設定。
+`/oss` グループレベルではなくプロジェクトレベルに限定し、他プロジェクトへの漏洩を防止。
+
+| Variable | Type | Description | Masked | Protected |
+|----------|------|-------------|--------|-----------|
+| `AWS_IOT_ENDPOINT` | Variable | AWS IoT Data-ATS エンドポイント | Yes | Yes |
+| `AWS_IOT_THING_NAME` | Variable | Thing 名 | No | Yes |
+| `AWS_IOT_CERT` | File | デバイス証明書 (PEM) | No | Yes |
+| `AWS_IOT_PRIVKEY` | File | 秘密鍵 (PEM) | No | Yes |
 
 ## CI/CD Pipeline
 
@@ -201,7 +238,7 @@ iot-reference-rx では littlefs + データフラッシュにクレデンシャ
 | 2 | ハードウェアセットアップ（人間作業） | Done (COM6 確定) |
 | 3 | ビルド環境構築（headless build） | Done |
 | 4 | フラッシュ書き込み自動化（rfp-cli） | Done |
-| 5 | AWS IoT Core セットアップ | Planned |
+| 5 | AWS IoT Core セットアップ | Done |
 | 6 | MQTT PubSub 動作確認 | Planned |
 | 7 | OTA テスト | Planned |
 | 8 | CI/CD パイプライン統合 | Planned |
@@ -244,6 +281,15 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 | [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
 
 ## Changelog / 変更履歴
+
+### 2026-03-03: Step 5 — AWS IoT Core setup
+
+- tools/aws_setup.sh 作成（AWS CLI で Thing + 証明書 + ポリシーを一括作成）
+- tools/iot_policy.json 作成（開発用 IoT ポリシー）
+- tools/provision.py 作成（pyserial で UART CLI 経由の自動プロビジョニング）
+- .gitlab-ci.yml に provision ステージ追加（flash → provision → test）
+- AWS クレデンシャルをプロジェクトレベル CI/CD Variables で管理する方針を確定
+- CLAUDE.md に AWS IoT Core セクション・プロビジョニング手順を追記
 
 ### 2026-03-03: Step 4 — Flash automation
 
