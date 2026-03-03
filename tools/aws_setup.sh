@@ -22,13 +22,6 @@
 
 set -euo pipefail
 
-# Detect python command (python3 on Linux/macOS, python on Windows)
-if command -v python3 &>/dev/null; then
-    PYTHON=python3
-else
-    PYTHON=python
-fi
-
 THING_NAME="${1:-ck-rx65n-01}"
 POLICY_NAME="${2:-ck-rx65n-policy}"
 CERTS_DIR="certs"
@@ -57,14 +50,14 @@ echo "Thing created: ${THING_NAME}"
 # --- Step 2: Create certificate + keys ---
 echo ""
 echo "=== Step 2: Create certificate and keys ==="
-CERT_OUTPUT=$(aws iot create-keys-and-certificate \
+CERT_ARN=$(aws iot create-keys-and-certificate \
     --set-as-active \
     --certificate-pem-outfile "${CERTS_DIR}/${THING_NAME}-cert.pem" \
     --private-key-outfile "${CERTS_DIR}/${THING_NAME}-privkey.pem" \
-    --public-key-outfile "${CERTS_DIR}/${THING_NAME}-pubkey.pem")
+    --public-key-outfile "${CERTS_DIR}/${THING_NAME}-pubkey.pem" \
+    --query 'certificateArn' --output text)
 
-CERT_ARN=$(echo "${CERT_OUTPUT}" | $PYTHON -c "import sys,json; print(json.load(sys.stdin)['certificateArn'])")
-CERT_ID=$(echo "${CERT_OUTPUT}" | $PYTHON -c "import sys,json; print(json.load(sys.stdin)['certificateId'])")
+CERT_ID=$(echo "${CERT_ARN}" | sed 's|.*/||')
 
 echo "Certificate ARN: ${CERT_ARN}"
 echo "Certificate ID:  ${CERT_ID}"
@@ -107,7 +100,7 @@ echo "Certificate attached to thing"
 echo ""
 echo "=== Step 6: Get IoT endpoint ==="
 ENDPOINT=$(aws iot describe-endpoint --endpoint-type iot:Data-ATS \
-    | $PYTHON -c "import sys,json; print(json.load(sys.stdin)['endpointAddress'])")
+    --query 'endpointAddress' --output text)
 echo "Endpoint: ${ENDPOINT}"
 
 # --- Summary ---
