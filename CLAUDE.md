@@ -142,28 +142,28 @@ e2studio-cli.exe -nosplash \
 |------|-------|
 | UART COM port | COM9 |
 | UART baud rate | 115200 |
-| E2 Lite S/N | OBE110008 or OBE110020 (要確認: hardware-config 参照) |
+| E2 Lite S/N | **OBE110020** |
 | Runner tag | run_ishiguro_machine, hw-ck-rx65n-v1 |
 | Ethernet | Runner マシンと同一 LAN に接続済み |
 
 ### rfp-cli フラッシュ書き込み
 
-E2 Lite 経由で FINE インタフェースを使用。E2L_SERIAL は CI/CD Variables に設定する。
+E2 Lite 経由で FINE インタフェースを使用。E2L_SERIAL (`OBE110020`) は CI/CD Variables に設定する。
 
 ```bash
 RFP_CLI="C:\Program Files (x86)\Renesas Electronics\Programming Tools\Renesas Flash Programmer V3.22\rfp-cli.exe"
 
 # チップ全消去（BANKSEL リセット + データフラッシュ消去）
-rfp-cli -d RX65x -t "e2l:<serial>" -if fine -s 500K \
+rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
   -auth id FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -erase-chip -noquery
 
 # boot_loader 書き込み
-rfp-cli -d RX65x -t "e2l:<serial>" -if fine -s 500K \
+rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
   -auth id FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF \
   -p boot_loader_ck_rx65n_v2.mot -run -noquery
 
 # app 書き込み（boot_loader 領域を保持）
-rfp-cli -d RX65x -t "e2l:<serial>" -if fine -s 500K \
+rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
   -auth id FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF \
   -file aws_ether_ck_rx65n_v2.mot -auto -noerase -run -noquery
 ```
