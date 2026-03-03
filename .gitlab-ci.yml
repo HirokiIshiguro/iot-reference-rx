@@ -2,7 +2,7 @@
 # Phase 8a: CK-RX65N (V1) — ビルド → フラッシュ → テスト自動化
 #
 # Runner requirements:
-#   - Tag: run_ishiguro_machine (Shell executor on Windows)
+#   - Tag: run_ishiguro_machine (Shell executor on Windows, pwsh)
 #   - Tag: hw-ck-rx65n-v1 (CK-RX65N V1 board connected)
 #   - E2 emulator Lite + UART port available
 #   - Ethernet: board connected to LAN with internet access
@@ -22,7 +22,7 @@ variables:
 
   # e2studio headless build
   E2STUDIO_CLI: "C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe"
-  E2STUDIO_WORKSPACE: "%TEMP%/e2ws_iot_ref"
+  E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref"
 
   # CC-RX compiler
   CCRX_PATH: "C:/Renesas/RX/3_7_0/bin"
@@ -72,25 +72,25 @@ build:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   script:
-    - echo "=== Build ${APP_PROJECT} and ${BL_PROJECT} ==="
+    - Write-Host "=== Build $env:APP_PROJECT and $env:BL_PROJECT ==="
     # Verify submodules
-    - if not exist "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h" (echo ERROR - submodules not initialized && exit /b 1)
+    - if (-not (Test-Path "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h")) { Write-Error "submodules not initialized"; exit 1 }
     # Clean workspace
-    - if exist "%E2STUDIO_WORKSPACE%" rmdir /s /q "%E2STUDIO_WORKSPACE%"
+    - if (Test-Path $env:E2STUDIO_WORKSPACE) { Remove-Item -Recurse -Force $env:E2STUDIO_WORKSPACE }
     # Import and build both projects
-    - >-
-      "%E2STUDIO_CLI%" -nosplash
-      -application org.eclipse.cdt.managedbuilder.core.headlessbuild
-      -data "%E2STUDIO_WORKSPACE%"
-      -import "%CD%\%APP_PROJECT_DIR%"
-      -import "%CD%\%BL_PROJECT_DIR%"
-      -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug"
-      -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug"
-      -no-indexer
+    - |
+      & "$env:E2STUDIO_CLI" -nosplash `
+        -application org.eclipse.cdt.managedbuilder.core.headlessbuild `
+        -data "$env:E2STUDIO_WORKSPACE" `
+        -import "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR" `
+        -import "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR" `
+        -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug" `
+        -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug" `
+        -no-indexer
     # Verify outputs
-    - if not exist "%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot" (echo ERROR - app .mot missing && exit /b 1)
-    - if not exist "%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot" (echo ERROR - bootloader .mot missing && exit /b 1)
-    - echo "BUILD SUCCESS"
+    - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot")) { Write-Error "bootloader .mot missing"; exit 1 }
+    - Write-Host "BUILD SUCCESS"
   artifacts:
     paths:
       - "${APP_PROJECT_DIR}/HardwareDebug/*.mot"
@@ -107,25 +107,25 @@ flash_boot_loader:
   needs:
     - build
   script:
-    - echo "=== Flash boot_loader ==="
+    - Write-Host "=== Flash boot_loader ==="
     # Verify E2L_SERIAL is configured
-    - if "%E2L_SERIAL%"=="" (echo ERROR - E2L_SERIAL not set. Configure in CI/CD Variables && exit /b 1)
+    - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set. Configure in CI/CD Variables"; exit 1 }
     # Verify .mot file exists (from build artifacts)
-    - if not exist "%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot" (echo ERROR - boot_loader .mot not found && exit /b 1)
+    - if (-not (Test-Path "$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot")) { Write-Error "boot_loader .mot not found"; exit 1 }
     # Step 1: Erase chip (resets BANKSEL, clears all flash including data flash)
-    - echo "Erasing chip..."
-    - >-
-      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
-      -auth id %RFP_AUTH%
-      -erase-chip -noquery
+    - Write-Host "Erasing chip..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -erase-chip -noquery
     # Step 2: Write boot_loader
-    - echo "Writing boot_loader..."
-    - >-
-      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
-      -auth id %RFP_AUTH%
-      -p "%CD%\%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot"
-      -run -noquery
-    - echo "FLASH BOOT_LOADER SUCCESS"
+    - Write-Host "Writing boot_loader..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -p "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot" `
+        -run -noquery
+    - Write-Host "FLASH BOOT_LOADER SUCCESS"
   rules:
     - when: manual
   allow_failure: true
@@ -139,19 +139,19 @@ flash_app:
   needs:
     - flash_boot_loader
   script:
-    - echo "=== Flash ${APP_PROJECT} ==="
+    - Write-Host "=== Flash $env:APP_PROJECT ==="
     # Verify E2L_SERIAL is configured
-    - if "%E2L_SERIAL%"=="" (echo ERROR - E2L_SERIAL not set. Configure in CI/CD Variables && exit /b 1)
+    - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set. Configure in CI/CD Variables"; exit 1 }
     # Verify .mot file exists (from build artifacts)
-    - if not exist "%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot" (echo ERROR - app .mot not found && exit /b 1)
+    - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot not found"; exit 1 }
     # Write app (no erase — preserves boot_loader region)
-    - echo "Writing app (noerase)..."
-    - >-
-      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
-      -auth id %RFP_AUTH%
-      -file "%CD%\%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot"
-      -auto -noerase -run -noquery
-    - echo "FLASH APP SUCCESS"
+    - Write-Host "Writing app (noerase)..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -file "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
+        -auto -noerase -run -noquery
+    - Write-Host "FLASH APP SUCCESS"
   rules:
     - when: manual
   allow_failure: true
@@ -166,25 +166,25 @@ provision:
   needs:
     - flash_app
   script:
-    - echo "=== Provision AWS IoT credentials ==="
+    - Write-Host "=== Provision AWS IoT credentials ==="
     # Verify required variables
-    - if "%AWS_IOT_THING_NAME%"=="" (echo ERROR - AWS_IOT_THING_NAME not set && exit /b 1)
-    - if "%AWS_IOT_ENDPOINT%"=="" (echo ERROR - AWS_IOT_ENDPOINT not set && exit /b 1)
+    - if (-not $env:AWS_IOT_THING_NAME) { Write-Error "AWS_IOT_THING_NAME not set"; exit 1 }
+    - if (-not $env:AWS_IOT_ENDPOINT) { Write-Error "AWS_IOT_ENDPOINT not set"; exit 1 }
     # AWS_IOT_CERT and AWS_IOT_PRIVKEY are File-type CI/CD Variables
     # GitLab expands them to temporary file paths at runtime
-    - if "%AWS_IOT_CERT%"=="" (echo ERROR - AWS_IOT_CERT not set && exit /b 1)
-    - if "%AWS_IOT_PRIVKEY%"=="" (echo ERROR - AWS_IOT_PRIVKEY not set && exit /b 1)
+    - if (-not $env:AWS_IOT_CERT) { Write-Error "AWS_IOT_CERT not set"; exit 1 }
+    - if (-not $env:AWS_IOT_PRIVKEY) { Write-Error "AWS_IOT_PRIVKEY not set"; exit 1 }
     # Install pyserial if needed
     - pip install pyserial --quiet
     # Run provisioning script
-    - >-
-      python tools/provision.py
-      --port %UART_PORT% --baud %UART_BAUD%
-      --thing-name %AWS_IOT_THING_NAME%
-      --endpoint %AWS_IOT_ENDPOINT%
-      --cert %AWS_IOT_CERT%
-      --key %AWS_IOT_PRIVKEY%
-      --format
+    - |
+      python tools/provision.py `
+        --port $env:UART_PORT --baud $env:UART_BAUD `
+        --thing-name $env:AWS_IOT_THING_NAME `
+        --endpoint $env:AWS_IOT_ENDPOINT `
+        --cert $env:AWS_IOT_CERT `
+        --key $env:AWS_IOT_PRIVKEY `
+        --format
   rules:
     - when: manual
   allow_failure: true
@@ -199,8 +199,8 @@ test_mqtt:
   needs:
     - provision
   script:
-    - echo "=== MQTT PubSub Test ==="
-    - echo "TODO - Implement MQTT connectivity test (Step 6)"
+    - Write-Host "=== MQTT PubSub Test ==="
+    - Write-Host "TODO - Implement MQTT connectivity test (Step 6)"
   rules:
     - if: $RUN_AWS_TESTS == "true"
       when: always
@@ -216,8 +216,8 @@ test_ota:
   needs:
     - test_mqtt
   script:
-    - echo "=== OTA Update Test ==="
-    - echo "TODO - Implement OTA test (Step 7)"
+    - Write-Host "=== OTA Update Test ==="
+    - Write-Host "TODO - Implement OTA test (Step 7)"
   rules:
     - if: $RUN_OTA_TEST == "true"
       when: always
