@@ -8,6 +8,7 @@ doc/html/*
 doc/output/*
 doc/tag/*
 **/doc*/
+!docs/
 doxygen_warnings.txt
 
 # Ignore IDE-specific files
