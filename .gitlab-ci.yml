@@ -150,20 +150,17 @@ flash_app:
     - build
     - flash_boot_loader
   script:
-    - Write-Host "=== Download app via UART (RSU) ==="
-    # Verify UART port is configured
-    - if (-not $env:UART_PORT) { Write-Error "UART_PORT not set. Configure in CI/CD Variables"; exit 1 }
-    # Verify .rsu file exists (from build artifacts)
-    - if (-not (Test-Path "userprog.rsu")) { Write-Error "userprog.rsu not found"; exit 1 }
-    # Install pyserial
-    - pip install pyserial --quiet
-    # Download RSU via UART to boot_loader
+    - Write-Host "=== Flash app via rfp-cli ==="
+    # Verify E2L_SERIAL is configured
+    - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set. Configure in CI/CD Variables"; exit 1 }
+    # Verify .mot file exists (from build artifacts)
+    - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot not found"; exit 1 }
+    # Write app .mot via E2 Lite (no erase — boot_loader area preserved from flash_boot_loader)
     - |
-      python "$env:CI_PROJECT_DIR\tools\uart_download.py" `
-        --rsu "$env:CI_PROJECT_DIR\userprog.rsu" `
-        --port $env:UART_PORT --baud $env:UART_BAUD `
-        --no-wait-for-ready --no-hw-flow `
-        --timeout 300
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -file "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
+        -auto -noerase -run -noquery
     - Write-Host "FLASH APP SUCCESS"
 
 # --- Provision Stage ---
