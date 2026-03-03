@@ -58,3 +58,6 @@
 [submodule "Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c"]
 	path = Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c
 	url = https://github.com/aws/aws-iot-core-mqtt-file-streams-embedded-c.git
+[submodule "tools/provisioning"]
+	path = tools/provisioning
+	url = https://shelty2.servegame.com/oss/experiment/generic/scripts/python/provisioning.git
