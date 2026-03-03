@@ -27,9 +27,13 @@ variables:
   BL_PROJECT: "boot_loader_ck_rx65n_v2"
   BL_PROJECT_DIR: "Projects/boot_loader_ck_rx65n_v2/e2studio_ccrx"
 
-  # Flash tool
-  RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Renesas Flash Programmer V3/rfp-cli.exe"
-  # TODO: Confirm interface type (FINE / SWD / E2 Lite) after hardware setup
+  # Flash tool (Renesas Flash Programmer V3.22)
+  RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
+  # E2 Lite serial — set in GitLab CI/CD Variables (Settings > CI/CD > Variables)
+  # Run: rfp-cli -d RX65x -t e2l -if fine -list-tools  to find available S/Ns
+  E2L_SERIAL: "${E2L_SERIAL}"
+  RFP_SPEED: "500K"
+  RFP_AUTH: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 
   # UART
   UART_PORT: "COM9"
@@ -96,10 +100,27 @@ flash_boot_loader:
     - build
   script:
     - echo "=== Flash boot_loader ==="
-    - echo "TODO - Implement rfp-cli flash (Step 4)"
+    # Verify E2L_SERIAL is configured
+    - if "%E2L_SERIAL%"=="" (echo ERROR - E2L_SERIAL not set. Configure in CI/CD Variables && exit /b 1)
+    # Verify .mot file exists (from build artifacts)
+    - if not exist "%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot" (echo ERROR - boot_loader .mot not found && exit /b 1)
+    # Step 1: Erase chip (resets BANKSEL, clears all flash including data flash)
+    - echo "Erasing chip..."
+    - >-
+      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
+      -auth id %RFP_AUTH%
+      -erase-chip -noquery
+    # Step 2: Write boot_loader
+    - echo "Writing boot_loader..."
+    - >-
+      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
+      -auth id %RFP_AUTH%
+      -p "%CD%\%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot"
+      -run -noquery
+    - echo "FLASH BOOT_LOADER SUCCESS"
   rules:
     - when: manual
-  allow_failure: true  # Remove after Step 4 is complete
+  allow_failure: true
 
 flash_app:
   stage: flash
@@ -111,10 +132,21 @@ flash_app:
     - flash_boot_loader
   script:
     - echo "=== Flash ${APP_PROJECT} ==="
-    - echo "TODO - Implement rfp-cli flash or UART download (Step 4)"
+    # Verify E2L_SERIAL is configured
+    - if "%E2L_SERIAL%"=="" (echo ERROR - E2L_SERIAL not set. Configure in CI/CD Variables && exit /b 1)
+    # Verify .mot file exists (from build artifacts)
+    - if not exist "%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot" (echo ERROR - app .mot not found && exit /b 1)
+    # Write app (no erase — preserves boot_loader region)
+    - echo "Writing app (noerase)..."
+    - >-
+      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
+      -auth id %RFP_AUTH%
+      -file "%CD%\%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot"
+      -auto -noerase -run -noquery
+    - echo "FLASH APP SUCCESS"
   rules:
     - when: manual
-  allow_failure: true  # Remove after Step 4 is complete
+  allow_failure: true
 
 # --- Test Stage ---
 test_mqtt:
