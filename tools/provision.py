@@ -27,6 +27,7 @@ Dependencies:
 """
 
 import argparse
+import re
 import sys
 import time
 
@@ -35,6 +36,29 @@ try:
 except ImportError:
     print("ERROR: pyserial not installed. Run: pip install pyserial")
     sys.exit(1)
+
+
+def mask_sensitive_output(text):
+    """Mask PRIVATE KEY body in text before printing to stdout/pipeline logs.
+
+    PEM headers/footers are shown, but base64 body is partially masked.
+    Certificates (CERTIFICATE) are public information and not masked.
+    """
+    def _mask_pem_body(match):
+        header = match.group(1)
+        body = match.group(2)
+        footer = match.group(3)
+        body_stripped = body.strip()
+        if len(body_stripped) > 48:
+            masked_body = body_stripped[:20] + "...***MASKED***..." + body_stripped[-20:]
+        else:
+            masked_body = "***MASKED***"
+        return f"{header}\n{masked_body}\n{footer}"
+
+    return re.sub(
+        r'(-----BEGIN [A-Z ]*PRIVATE KEY-----)\s*(.*?)\s*(-----END [A-Z ]*PRIVATE KEY-----)',
+        _mask_pem_body, text, flags=re.DOTALL
+    )
 
 
 DEFAULT_CHAR_DELAY = 0.002   # 2ms between characters (safe for 115200bps)
@@ -66,7 +90,7 @@ def send_command(ser, command, char_delay, line_delay, expect_ok=True):
     response = ser.read(ser.in_waiting or 1024).decode('ascii', errors='replace')
 
     if expect_ok and 'Error' in response:
-        print(f"  ERROR in response: {response.strip()}")
+        print(f"  ERROR in response: {mask_sensitive_output(response.strip())}")
         return False
 
     return response
@@ -106,10 +130,10 @@ def send_pem_command(ser, key_name, pem_path, char_delay, line_delay):
         print(f"  OK")
         return True
     elif 'Error' in response:
-        print(f"  ERROR: {response.strip()}")
+        print(f"  ERROR: {mask_sensitive_output(response.strip())}")
         return False
     else:
-        print(f"  Response: {response.strip()}")
+        print(f"  Response: {mask_sensitive_output(response.strip())}")
         return True  # Might be OK without explicit "OK" text
 
 
@@ -122,7 +146,7 @@ def wait_for_boot(ser, timeout):
         if ser.in_waiting:
             data = ser.read(ser.in_waiting).decode('ascii', errors='replace')
             collected += data
-            sys.stdout.write(data)
+            sys.stdout.write(mask_sensitive_output(data))
             sys.stdout.flush()
         time.sleep(0.1)
     return collected
@@ -145,7 +169,7 @@ def enter_cli_mode(ser, char_delay, line_delay, timeout):
         if ser.in_waiting:
             data = ser.read(ser.in_waiting).decode('ascii', errors='replace')
             collected += data
-            sys.stdout.write(data)
+            sys.stdout.write(mask_sensitive_output(data))
             sys.stdout.flush()
             if '>' in collected or 'CLI' in collected:
                 print("\nCLI mode entered successfully")
@@ -230,7 +254,7 @@ def provision(args):
         # Step 8: Commit to data flash
         print(f"\n--- Commit to data flash ---")
         resp = send_command(ser, 'conf commit', char_delay, line_delay * 3)
-        print(f"  {resp.strip() if resp else 'No response'}")
+        print(f"  {mask_sensitive_output(resp.strip()) if resp else 'No response'}")
 
         # Step 9: Reset device
         if not args.no_reset:
