@@ -91,10 +91,23 @@ build:
     - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot")) { Write-Error "bootloader .mot missing"; exit 1 }
     - Write-Host "BUILD SUCCESS"
+    # Generate RSU from app .mot (signed with ECDSA P-256)
+    - Write-Host "=== Generate RSU ==="
+    - pip install pycryptodome --quiet
+    - |
+      python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
+        -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
+        -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
+        -o "$env:CI_PROJECT_DIR\userprog.rsu" `
+        -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
+        -vt ecdsa -ff RTOS
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.rsu")) { Write-Error "RSU generation failed"; exit 1 }
+    - Write-Host "RSU generation SUCCESS"
   artifacts:
     paths:
       - "${APP_PROJECT_DIR}/HardwareDebug/*.mot"
       - "${BL_PROJECT_DIR}/HardwareDebug/*.mot"
+      - userprog.rsu
     expire_in: 7 days
 
 # --- Flash Stage ---
@@ -140,18 +153,19 @@ flash_app:
     - build
     - flash_boot_loader
   script:
-    - Write-Host "=== Flash $env:APP_PROJECT ==="
-    # Verify E2L_SERIAL is configured
-    - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set. Configure in CI/CD Variables"; exit 1 }
-    # Verify .mot file exists (from build artifacts)
-    - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot not found"; exit 1 }
-    # Write app (no erase — preserves boot_loader region)
-    - Write-Host "Writing app (noerase)..."
+    - Write-Host "=== Download app via UART (RSU) ==="
+    # Verify UART port is configured
+    - if (-not $env:UART_PORT) { Write-Error "UART_PORT not set. Configure in CI/CD Variables"; exit 1 }
+    # Verify .rsu file exists (from build artifacts)
+    - if (-not (Test-Path "userprog.rsu")) { Write-Error "userprog.rsu not found"; exit 1 }
+    # Install pyserial
+    - pip install pyserial --quiet
+    # Download RSU via UART to boot_loader
     - |
-      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
-        -auth id $env:RFP_AUTH `
-        -file "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
-        -auto -noerase -run -noquery
+      python "$env:CI_PROJECT_DIR\tools\uart_download.py" `
+        --rsu "$env:CI_PROJECT_DIR\userprog.rsu" `
+        --port $env:UART_PORT --baud $env:UART_BAUD `
+        --timeout 300
     - Write-Host "FLASH APP SUCCESS"
   rules:
     - when: manual
