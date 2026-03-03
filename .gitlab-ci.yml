@@ -15,6 +15,11 @@ stages:
 
 # --- Variables ---
 variables:
+  # Windows 260文字パス長制限の回避 (FreeRTOS-Cellular-Interface 等)
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: "core.longpaths"
+  GIT_CONFIG_VALUE_0: "true"
+
   # e2studio headless build
   E2STUDIO_CLI: "C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe"
   E2STUDIO_WORKSPACE: "%TEMP%/e2ws_iot_ref"
