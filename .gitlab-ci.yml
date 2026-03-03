@@ -98,7 +98,7 @@ build:
       python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
         -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
         -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
-        -o "$env:CI_PROJECT_DIR\userprog.rsu" `
+        -o "$env:CI_PROJECT_DIR\userprog" `
         -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
         -vt ecdsa -ff RTOS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.rsu")) { Write-Error "RSU generation failed"; exit 1 }
@@ -139,9 +139,6 @@ flash_boot_loader:
         -p "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot" `
         -run -noquery
     - Write-Host "FLASH BOOT_LOADER SUCCESS"
-  rules:
-    - when: manual
-  allow_failure: true
 
 flash_app:
   stage: flash
@@ -167,9 +164,6 @@ flash_app:
         --port $env:UART_PORT --baud $env:UART_BAUD `
         --timeout 300
     - Write-Host "FLASH APP SUCCESS"
-  rules:
-    - when: manual
-  allow_failure: true
 
 # --- Provision Stage ---
 provision:
