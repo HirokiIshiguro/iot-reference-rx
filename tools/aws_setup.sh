@@ -22,6 +22,13 @@
 
 set -euo pipefail
 
+# Detect python command (python3 on Linux/macOS, python on Windows)
+if command -v python3 &>/dev/null; then
+    PYTHON=python3
+else
+    PYTHON=python
+fi
+
 THING_NAME="${1:-ck-rx65n-01}"
 POLICY_NAME="${2:-ck-rx65n-policy}"
 CERTS_DIR="certs"
@@ -56,8 +63,8 @@ CERT_OUTPUT=$(aws iot create-keys-and-certificate \
     --private-key-outfile "${CERTS_DIR}/${THING_NAME}-privkey.pem" \
     --public-key-outfile "${CERTS_DIR}/${THING_NAME}-pubkey.pem")
 
-CERT_ARN=$(echo "${CERT_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['certificateArn'])")
-CERT_ID=$(echo "${CERT_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['certificateId'])")
+CERT_ARN=$(echo "${CERT_OUTPUT}" | $PYTHON -c "import sys,json; print(json.load(sys.stdin)['certificateArn'])")
+CERT_ID=$(echo "${CERT_OUTPUT}" | $PYTHON -c "import sys,json; print(json.load(sys.stdin)['certificateId'])")
 
 echo "Certificate ARN: ${CERT_ARN}"
 echo "Certificate ID:  ${CERT_ID}"
@@ -100,7 +107,7 @@ echo "Certificate attached to thing"
 echo ""
 echo "=== Step 6: Get IoT endpoint ==="
 ENDPOINT=$(aws iot describe-endpoint --endpoint-type iot:Data-ATS \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['endpointAddress'])")
+    | $PYTHON -c "import sys,json; print(json.load(sys.stdin)['endpointAddress'])")
 echo "Endpoint: ${ENDPOINT}"
 
 # --- Summary ---
