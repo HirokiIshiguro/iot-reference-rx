@@ -69,6 +69,7 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 |------|---------|---------------|
 | e2studio-cli | e2 studio 2025-12 | `C:\Renesas\e2_studio_2025_12\eclipse\e2studio-cli.exe` |
 | CC-RX | V3.07.00 (evaluation) | `C:\Program Files (x86)\Renesas\RX\3_7_0\bin\ccrx.exe` |
+| rfp-cli | V1.15 (Package V3.22) | `C:\Program Files (x86)\Renesas Electronics\Programming Tools\Renesas Flash Programmer V3.22\rfp-cli.exe` |
 | GCC (alternative) | GCC for Renesas RX v8.3.0.202411 | — |
 | Code generator | RX Smart Configurator（e2 studio 同梱） | — |
 
@@ -135,13 +136,44 @@ e2studio-cli.exe -nosplash \
 
 ### Runner 接続情報
 
+> 詳細なハードウェア構成は [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config/-/blob/main/CLAUDE.md) を参照。
+
 | Item | Value |
 |------|-------|
-| UART COM port | COM9 |
-| UART baud rate | 115200 (要確認: ファームウェア設定依存) |
-| E2 Lite | Renesas USB Development Tools（デバイスマネージャー） |
-| Runner tag | run_ishiguro_machine (hw-ck-rx65n-v1 追加予定) |
+| E2 Lite USB | **J14** (USB DEBUG, Micro-B) |
+| E2 Lite S/N | **OBE110020** |
+| UART USB | **J20** (USB SER, Micro-B) |
+| UART COM port | COM9 (115200bps) |
+| Runner tag | run_ishiguro_machine, hw-ck-rx65n-v1 |
 | Ethernet | Runner マシンと同一 LAN に接続済み |
+
+### rfp-cli フラッシュ書き込み
+
+E2 Lite 経由で FINE インタフェースを使用。J14 (USB DEBUG) に USB ケーブルを接続。
+E2L_SERIAL (`OBE110020`) は `/oss` グループ CI/CD Variables (`E2L_SERIAL_CK_RX65N_J14`) に設定済み。
+
+```bash
+RFP_CLI="C:\Program Files (x86)\Renesas Electronics\Programming Tools\Renesas Flash Programmer V3.22\rfp-cli.exe"
+
+# チップ全消去（BANKSEL リセット + データフラッシュ消去）
+rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
+  -auth id FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -erase-chip -noquery
+
+# boot_loader 書き込み
+rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
+  -auth id FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF \
+  -p boot_loader_ck_rx65n_v2.mot -run -noquery
+
+# app 書き込み（boot_loader 領域を保持）
+rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
+  -auth id FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF \
+  -file aws_ether_ck_rx65n_v2.mot -auto -noerase -run -noquery
+```
+
+**注意:**
+- `-erase-chip` はデータフラッシュも消去 → プロビジョニング済みの場合は `-range-exclude` を検討
+- E2 Lite 接続時は `-run` 必須（RES# ホールド問題回避）
+- 速度は 500K で安定動作確認後、1500K に上げることも可能
 
 ## AWS IoT Core
 
@@ -168,7 +200,7 @@ iot-reference-rx では littlefs + データフラッシュにクレデンシャ
 | 1 | GitLab リポジトリ作成・初期セットアップ | Done (MR !1) |
 | 2 | ハードウェアセットアップ（人間作業） | Done (COM9 確定) |
 | 3 | ビルド環境構築（headless build） | Done |
-| 4 | フラッシュ書き込み自動化（rfp-cli） | Planned |
+| 4 | フラッシュ書き込み自動化（rfp-cli） | Done |
 | 5 | AWS IoT Core セットアップ | Planned |
 | 6 | MQTT PubSub 動作確認 | Planned |
 | 7 | OTA テスト | Planned |
@@ -209,8 +241,19 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 | [rx72n-envision-kit](https://shelty2.servegame.com/oss/import/github/renesas/rx72n-envision-kit) | Phase 8 の親プロジェクト。移植先 |
 | [OTA ナレッジベース](https://shelty2.servegame.com/oss/experiment/embedded/mcu/elemental/ota) | MCU OTA 技術全般のナレッジ |
 | [AWS IoT Core ナレッジ](https://shelty2.servegame.com/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
+| [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
 
 ## Changelog / 変更履歴
+
+### 2026-03-03: Step 4 — Flash automation
+
+- rfp-cli V3.22 で E2 Lite 2台 (OBE110008, OBE110020) を検出
+- .gitlab-ci.yml の flash_boot_loader / flash_app ジョブを rfp-cli コマンドで実装
+- E2L_SERIAL を CI/CD Variables から参照する方式に変更
+- CLAUDE.md に rfp-cli フラッシュ手順を追記
+- hardware-config プロジェクトへの参照リンクを追加
+- CI/CD Variables にコネクタ名サフィックスを追加 (E2L_SERIAL_CK_RX65N_J14, UART_PORT_CK_RX65N_J20)
+- Runner 接続情報に USB コネクタ名 (J14, J20) を追記
 
 ### 2026-03-03: Initial setup
 
