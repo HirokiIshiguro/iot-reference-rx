@@ -1,0 +1,136 @@
+# iot-reference-rx CI/CD Pipeline
+# Phase 8a: CK-RX65N (V1) — ビルド → フラッシュ → テスト自動化
+#
+# Runner requirements:
+#   - Tag: run_ishiguro_machine (Shell executor on Windows)
+#   - Tag: hw-ck-rx65n-v1 (CK-RX65N V1 board connected)
+#   - E2 emulator Lite + UART port available
+#   - Ethernet: board connected to LAN with internet access
+
+stages:
+  - build
+  - flash
+  - test
+
+# --- Variables ---
+variables:
+  # e2studio
+  E2STUDIO_PATH: "C:/Renesas/RA/e2studio_v2025-12_fsp_v6.3.0/eclipse/e2studioIDE.exe"
+  # TODO: Update to e2 studio 2025-04 if available. Current rx72n-envision-kit uses 2025-12.
+
+  # CC-RX compiler
+  CCRX_PATH: "C:/Renesas/RX/3_7_0/bin"
+
+  # Projects
+  APP_PROJECT: "aws_ether_ck_rx65n_v2"
+  APP_PROJECT_DIR: "Projects/aws_ether_ck_rx65n_v2/e2studio_ccrx"
+  BL_PROJECT: "boot_loader_ck_rx65n_v2"
+  BL_PROJECT_DIR: "Projects/boot_loader_ck_rx65n_v2/e2studio_ccrx"
+
+  # Flash tool
+  RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Renesas Flash Programmer V3/rfp-cli.exe"
+  # TODO: Confirm interface type (FINE / SWD / E2 Lite) after hardware setup
+
+  # UART
+  # TODO: Update after hardware setup (Step 2)
+  UART_PORT: "TBD"
+  UART_BAUD: "115200"
+
+  # AWS IoT Core
+  # TODO: Update after AWS setup (Step 5)
+  AWS_IOT_ENDPOINT: "TBD"
+  AWS_IOT_THING_NAME: "ck-rx65n-01"
+
+  # Test flags
+  RUN_AWS_TESTS: "false"
+  RUN_OTA_TEST: "false"
+
+# Disable MR pipelines — branch pipeline only
+workflow:
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      when: never
+    - if: $CI_COMMIT_BRANCH
+      when: always
+
+# --- Build Stage ---
+build:
+  stage: build
+  tags:
+    - run_ishiguro_machine
+  script:
+    - echo "=== Build ${APP_PROJECT} and ${BL_PROJECT} ==="
+    - echo "TODO - Implement headless build (Step 3)"
+    - echo "Placeholder for e2studio headless build or GNU Make + CC-RX"
+  artifacts:
+    paths:
+      - "${APP_PROJECT_DIR}/HardwareDebug/*.mot"
+      - "${BL_PROJECT_DIR}/HardwareDebug/*.mot"
+    expire_in: 7 days
+  allow_failure: true  # Remove after Step 3 is complete
+
+# --- Flash Stage ---
+flash_boot_loader:
+  stage: flash
+  tags:
+    - run_ishiguro_machine
+    - hw-ck-rx65n-v1
+  resource_group: ck-rx65n-device
+  needs:
+    - build
+  script:
+    - echo "=== Flash boot_loader ==="
+    - echo "TODO - Implement rfp-cli flash (Step 4)"
+  rules:
+    - when: manual
+  allow_failure: true  # Remove after Step 4 is complete
+
+flash_app:
+  stage: flash
+  tags:
+    - run_ishiguro_machine
+    - hw-ck-rx65n-v1
+  resource_group: ck-rx65n-device
+  needs:
+    - flash_boot_loader
+  script:
+    - echo "=== Flash ${APP_PROJECT} ==="
+    - echo "TODO - Implement rfp-cli flash or UART download (Step 4)"
+  rules:
+    - when: manual
+  allow_failure: true  # Remove after Step 4 is complete
+
+# --- Test Stage ---
+test_mqtt:
+  stage: test
+  tags:
+    - run_ishiguro_machine
+    - hw-ck-rx65n-v1
+  resource_group: ck-rx65n-device
+  needs:
+    - flash_app
+  script:
+    - echo "=== MQTT PubSub Test ==="
+    - echo "TODO - Implement MQTT connectivity test (Step 6)"
+  rules:
+    - if: $RUN_AWS_TESTS == "true"
+      when: always
+    - when: manual
+  allow_failure: true  # Remove after Step 6 is complete
+
+test_ota:
+  stage: test
+  tags:
+    - run_ishiguro_machine
+    - hw-ck-rx65n-v1
+  resource_group: ck-rx65n-device
+  needs:
+    - test_mqtt
+  script:
+    - echo "=== OTA Update Test ==="
+    - echo "TODO - Implement OTA test (Step 7)"
+  rules:
+    - if: $RUN_OTA_TEST == "true"
+      when: always
+    - when: manual
+  allow_failure: true  # Remove after Step 7 is complete
