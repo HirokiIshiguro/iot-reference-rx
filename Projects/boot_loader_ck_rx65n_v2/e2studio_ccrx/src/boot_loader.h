@@ -59,7 +59,7 @@ Typedef definitions
 /* Flash Buffer */
 typedef struct st_bl_buf
 {
-    uint8_t  buf[BL_FLASH_BUF_SIZE+8];
+    uint8_t  buf[BL_FLASH_BUF_SIZE+4096];
     uint32_t cnt;
     uint32_t total;
 } st_flash_buf_t;
