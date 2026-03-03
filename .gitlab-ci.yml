@@ -29,14 +29,16 @@ variables:
 
   # Flash tool (Renesas Flash Programmer V3.22)
   RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
-  # E2 Lite serial — set E2L_SERIAL_CK_RX65N in /oss group CI/CD Variables
+  # E2 Lite serial — set E2L_SERIAL_CK_RX65N_J14 in /oss group CI/CD Variables
+  # J14 = USB DEBUG connector on CK-RX65N V1
   # Run: rfp-cli -d RX65x -t e2l -if fine -list-tools  to find available S/Ns
-  E2L_SERIAL: "${E2L_SERIAL_CK_RX65N}"
+  E2L_SERIAL: "${E2L_SERIAL_CK_RX65N_J14}"
   RFP_SPEED: "500K"
   RFP_AUTH: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 
-  # UART — set UART_PORT_CK_RX65N in /oss group CI/CD Variables
-  UART_PORT: "${UART_PORT_CK_RX65N}"
+  # UART — set UART_PORT_CK_RX65N_J20 in /oss group CI/CD Variables
+  # J20 = USB SER connector on CK-RX65N V1
+  UART_PORT: "${UART_PORT_CK_RX65N_J20}"
   UART_BAUD: "115200"
 
   # AWS IoT Core
