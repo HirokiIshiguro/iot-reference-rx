@@ -221,12 +221,16 @@ python tools/provision.py \
 AWS クレデンシャルは **iot-reference-rx プロジェクト** の CI/CD Variables に設定。
 `/oss` グループレベルではなくプロジェクトレベルに限定し、他プロジェクトへの漏洩を防止。
 
+**Protected は全て No** — Protected 変数はフィーチャーブランチ（非Protected ブランチ）の
+パイプラインで参照できないため。代わりに **Project-based pipeline visibility を OFF** にして
+パイプラインログをプロジェクトメンバーのみに制限することで秘密情報を保護する。
+
 | Variable | Type | Description | Masked | Protected |
 |----------|------|-------------|--------|-----------|
-| `AWS_IOT_ENDPOINT` | Variable | AWS IoT Data-ATS エンドポイント | Yes | Yes |
-| `AWS_IOT_THING_NAME` | Variable | Thing 名 | No | Yes |
-| `AWS_IOT_CERT` | File | デバイス証明書 (PEM) | No | Yes |
-| `AWS_IOT_PRIVKEY` | File | 秘密鍵 (PEM) | No | Yes |
+| `AWS_IOT_ENDPOINT` | Variable | AWS IoT Data-ATS エンドポイント | Yes | No |
+| `AWS_IOT_THING_NAME` | Variable | Thing 名 | No | No |
+| `AWS_IOT_CERT` | File | デバイス証明書 (PEM) | No | No |
+| `AWS_IOT_PRIVKEY` | File | 秘密鍵 (PEM) | No | No |
 
 ## CI/CD Pipeline
 
