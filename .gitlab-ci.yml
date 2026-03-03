@@ -10,6 +10,7 @@
 stages:
   - build
   - flash
+  - provision
   - test
 
 # --- Variables ---
@@ -41,10 +42,10 @@ variables:
   UART_PORT: "${UART_PORT_CK_RX65N_J20}"
   UART_BAUD: "115200"
 
-  # AWS IoT Core
-  # TODO: Update after AWS setup (Step 5)
-  AWS_IOT_ENDPOINT: "TBD"
-  AWS_IOT_THING_NAME: "ck-rx65n-01"
+  # AWS IoT Core — set in project-level CI/CD Variables
+  # (NOT /oss group level — credentials must stay project-scoped)
+  AWS_IOT_ENDPOINT: "${AWS_IOT_ENDPOINT}"
+  AWS_IOT_THING_NAME: "${AWS_IOT_THING_NAME}"
 
   # Test flags
   RUN_AWS_TESTS: "false"
@@ -150,6 +151,39 @@ flash_app:
     - when: manual
   allow_failure: true
 
+# --- Provision Stage ---
+provision:
+  stage: provision
+  tags:
+    - run_ishiguro_machine
+    - hw-ck-rx65n-v1
+  resource_group: ck-rx65n-device
+  needs:
+    - flash_app
+  script:
+    - echo "=== Provision AWS IoT credentials ==="
+    # Verify required variables
+    - if "%AWS_IOT_THING_NAME%"=="" (echo ERROR - AWS_IOT_THING_NAME not set && exit /b 1)
+    - if "%AWS_IOT_ENDPOINT%"=="" (echo ERROR - AWS_IOT_ENDPOINT not set && exit /b 1)
+    # AWS_IOT_CERT and AWS_IOT_PRIVKEY are File-type CI/CD Variables
+    # GitLab expands them to temporary file paths at runtime
+    - if "%AWS_IOT_CERT%"=="" (echo ERROR - AWS_IOT_CERT not set && exit /b 1)
+    - if "%AWS_IOT_PRIVKEY%"=="" (echo ERROR - AWS_IOT_PRIVKEY not set && exit /b 1)
+    # Install pyserial if needed
+    - pip install pyserial --quiet
+    # Run provisioning script
+    - >-
+      python tools/provision.py
+      --port %UART_PORT% --baud %UART_BAUD%
+      --thing-name %AWS_IOT_THING_NAME%
+      --endpoint %AWS_IOT_ENDPOINT%
+      --cert %AWS_IOT_CERT%
+      --key %AWS_IOT_PRIVKEY%
+      --format
+  rules:
+    - when: manual
+  allow_failure: true
+
 # --- Test Stage ---
 test_mqtt:
   stage: test
@@ -158,7 +192,7 @@ test_mqtt:
     - hw-ck-rx65n-v1
   resource_group: ck-rx65n-device
   needs:
-    - flash_app
+    - provision
   script:
     - echo "=== MQTT PubSub Test ==="
     - echo "TODO - Implement MQTT connectivity test (Step 6)"
