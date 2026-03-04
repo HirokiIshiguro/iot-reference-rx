@@ -49,8 +49,13 @@ variables:
 
   # AWS IoT Core — set in project-level CI/CD Variables
   # (NOT /oss group level — credentials must stay project-scoped)
-  AWS_IOT_ENDPOINT: "${AWS_IOT_ENDPOINT}"
-  AWS_IOT_THING_NAME: "${AWS_IOT_THING_NAME}"
+  # DO NOT re-declare here — self-referencing variables cause GitLab
+  # to produce literal "${VAR}" instead of expanding them.
+  # Required project-level CI/CD Variables:
+  #   AWS_IOT_ENDPOINT   — AWS IoT Core endpoint URL
+  #   AWS_IOT_THING_NAME — Thing name (e.g., ck-rx65n-01)
+  #   AWS_IOT_CERT       — Device certificate (File type)
+  #   AWS_IOT_PRIVKEY    — Device private key (File type)
 
   # Test flags
   RUN_AWS_TESTS: "false"
@@ -165,6 +170,7 @@ provision:
   resource_group: ck-rx65n-device
   needs:
     - flash
+    - build    # need userprog.mot artifact for rfp-cli reset
   script:
     - Write-Host "=== Provision AWS IoT credentials ==="
     # Verify required variables
@@ -177,10 +183,12 @@ provision:
     # Install pyserial if needed
     - pip install pyserial --quiet
     # Reset device to open CLI window (~10s after boot)
+    # NOTE: rfp-cli -run without -p is "No operation". Must include -p to actually reset.
     - Write-Host "Resetting device to open CLI window..."
     - |
       & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
         -auth id $env:RFP_AUTH `
+        -p "$env:CI_PROJECT_DIR\userprog.mot" `
         -run -noquery
     # Run provisioning script (connects to UART during boot CLI window)
     - |
