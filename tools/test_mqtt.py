@@ -7,12 +7,13 @@ Monitors UART output after device boot to verify:
 2. Topic subscription succeeds
 3. At least one publish succeeds
 
-Usage:
+Usage (CI — device reset by rfp-cli beforehand):
+    python tools/test_mqtt.py --port COM9 --baud 115200 --timeout 120 --no-reset
+
+Usage (standalone — sends UART 'reset' command):
     python tools/test_mqtt.py --port COM9 --baud 115200 --timeout 120
 
 The device must already be provisioned with valid AWS IoT credentials.
-This script resets the device via DTR toggle, then monitors UART output
-for success markers.
 
 Exit codes:
     0 — All checks passed
@@ -53,18 +54,22 @@ ERROR_PATTERNS = [
     "Failed to connect to MQTT broker",
     "Connection to the broker failed, all attempts exhausted",
     "Failed to subscribe to topic",
+    "DHCP failed",
+    "Network connection failed",
+    "TLS connection failed",
+    "DNS resolution failed",
 ]
 
 
 def reset_device_via_uart(ser):
     """Send 'reset' command via UART to trigger software reset.
 
-    This works because the FreeRTOS CLI accepts 'reset' at any time
-    (same method used by provision.py after writing credentials).
+    This works ONLY if the FreeRTOS CLI is still active (within ~10s of boot,
+    or if CLI mode was entered and no reset has been sent yet).
     """
-    print("Resetting device via UART 'reset' command...")
+    print("Attempting device reset via UART 'reset' command...")
     ser.reset_input_buffer()
-    # Send reset command
+    # Send reset command character by character
     for ch in "reset":
         ser.write(ch.encode("ascii"))
         time.sleep(0.002)
@@ -72,21 +77,31 @@ def reset_device_via_uart(ser):
     time.sleep(0.5)
     # Drain any immediate response
     if ser.in_waiting:
-        ser.read(ser.in_waiting)
+        resp = ser.read(ser.in_waiting).decode("ascii", errors="replace")
+        print(f"  Reset response: {resp.strip()[:80]}")
     # Wait for device to actually reset and start booting
-    print("Waiting for device reboot (3s)...")
-    time.sleep(3.0)
+    print("Waiting for device reboot (5s)...")
+    time.sleep(5.0)
     ser.reset_input_buffer()
 
 
-def monitor_uart(port, baud, timeout, verbose=False):
+def monitor_uart(port, baud, timeout, skip_reset=False):
     """Monitor UART output and check for MQTT success markers.
 
+    All UART output is printed for CI visibility.
+
+    Args:
+        port: Serial port name (e.g., COM9)
+        baud: Baud rate
+        timeout: Total monitoring timeout in seconds
+        skip_reset: If True, skip UART reset (device reset by external tool)
+
     Returns:
-        dict with results for each marker
+        tuple of (results dict, errors list)
     """
     results = {m["name"]: False for m in MARKERS}
     errors = []
+    total_bytes = 0
 
     try:
         ser = serial.Serial(
@@ -101,8 +116,11 @@ def monitor_uart(port, baud, timeout, verbose=False):
         print(f"ERROR: Cannot open {port}: {e}")
         return results, [str(e)]
 
-    # Reset device via UART to get fresh boot + MQTT connection
-    reset_device_via_uart(ser)
+    if not skip_reset:
+        reset_device_via_uart(ser)
+    else:
+        print("Skipping UART reset (device reset by external tool)")
+        print("Starting UART monitoring immediately...")
 
     print(f"Monitoring UART ({port} @ {baud}bps, timeout={timeout}s)")
     print("=" * 60)
@@ -110,6 +128,7 @@ def monitor_uart(port, baud, timeout, verbose=False):
     start = time.time()
     collected = ""
     all_required_found = False
+    last_progress = start
 
     try:
         while time.time() - start < timeout:
@@ -117,52 +136,53 @@ def monitor_uart(port, baud, timeout, verbose=False):
                 try:
                     data = ser.read(ser.in_waiting).decode("ascii", errors="replace")
                 except serial.SerialException:
+                    print("ERROR: Serial port read failed")
                     break
+                total_bytes += len(data)
                 collected += data
 
-                # Print UART output (line by line for readability)
-                if verbose:
-                    sys.stdout.write(data)
-                    sys.stdout.flush()
-                else:
-                    # Print only key lines
-                    for line in data.split("\n"):
-                        line = line.strip()
-                        if not line:
-                            continue
-                        # Print lines matching markers or errors
-                        for m in MARKERS:
-                            if m["pattern"] in line:
-                                print(f"  [FOUND] {m['name']}: {line[:120]}")
-                        for ep in ERROR_PATTERNS:
-                            if ep in line:
-                                print(f"  [ERROR] {line[:120]}")
+                # Always print UART output for CI visibility
+                sys.stdout.write(data)
+                sys.stdout.flush()
 
                 # Check markers
                 for m in MARKERS:
                     if not results[m["name"]] and m["pattern"] in collected:
                         results[m["name"]] = True
+                        elapsed = time.time() - start
+                        print(f"\n  >>> [FOUND] {m['name']} at {elapsed:.1f}s <<<")
 
                 # Check error patterns
                 for ep in ERROR_PATTERNS:
                     if ep in collected and ep not in errors:
                         errors.append(ep)
+                        print(f"\n  >>> [ERROR DETECTED] {ep} <<<")
 
                 # Early exit if all required markers found
                 all_required_found = all(
                     results[m["name"]] for m in MARKERS if m["required"]
                 )
                 if all_required_found:
+                    print("\n\nAll required markers found!")
                     # Wait a bit more to collect any additional output
                     time.sleep(2)
                     if ser.in_waiting:
                         extra = ser.read(ser.in_waiting).decode(
                             "ascii", errors="replace"
                         )
-                        if verbose:
-                            sys.stdout.write(extra)
-                            sys.stdout.flush()
+                        sys.stdout.write(extra)
+                        sys.stdout.flush()
                     break
+            else:
+                # Print progress every 15 seconds when no data
+                now = time.time()
+                if now - last_progress >= 15:
+                    elapsed = now - start
+                    print(
+                        f"  [WAITING] {elapsed:.0f}s elapsed, "
+                        f"{total_bytes} bytes received so far..."
+                    )
+                    last_progress = now
 
             time.sleep(0.1)
     finally:
@@ -171,6 +191,17 @@ def monitor_uart(port, baud, timeout, verbose=False):
     elapsed = time.time() - start
     print("=" * 60)
     print(f"Monitoring completed in {elapsed:.1f}s")
+    print(f"Total UART bytes received: {total_bytes}")
+
+    # Diagnostics for zero-data scenario
+    if total_bytes == 0:
+        print("\nDIAGNOSTIC: Zero bytes received from UART.")
+        print("  Possible causes:")
+        print(f"  - Serial port {port} not connected or wrong port")
+        print(f"  - Device not powered or not running")
+        print(f"  - Baud rate mismatch (expected {baud})")
+        print(f"  - USB-Serial bridge (RL78/G1C) needs power cycle")
+        print(f"  - Device stuck in boot_loader (no valid app image)")
 
     return results, errors
 
@@ -190,7 +221,9 @@ def main():
         help="Timeout in seconds to wait for MQTT connection (default: 120)",
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Print all UART output"
+        "--no-reset",
+        action="store_true",
+        help="Skip UART reset (use when device is reset by rfp-cli or other tool)",
     )
 
     args = parser.parse_args()
@@ -198,12 +231,16 @@ def main():
     print("=" * 60)
     print("iot-reference-rx MQTT Connectivity Test")
     print("=" * 60)
-    print(f"Port:    {args.port}")
-    print(f"Baud:    {args.baud}")
-    print(f"Timeout: {args.timeout}s")
+    print(f"Port:       {args.port}")
+    print(f"Baud:       {args.baud}")
+    print(f"Timeout:    {args.timeout}s")
+    print(f"UART reset: {'disabled (--no-reset)' if args.no_reset else 'enabled'}")
     print("=" * 60)
 
-    results, errors = monitor_uart(args.port, args.baud, args.timeout, args.verbose)
+    results, errors = monitor_uart(
+        args.port, args.baud, args.timeout,
+        skip_reset=args.no_reset,
+    )
 
     # Print results
     print("\n--- Test Results ---")
@@ -216,7 +253,7 @@ def main():
             all_passed = False
 
     if errors:
-        print(f"\n--- Errors detected ---")
+        print("\n--- Errors detected ---")
         for e in errors:
             print(f"  [!] {e}")
         all_passed = False

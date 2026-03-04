@@ -204,16 +204,26 @@ test_mqtt:
   resource_group: ck-rx65n-device
   needs:
     - provision
+    - build    # need userprog.mot artifact for rfp-cli reset
   script:
     - Write-Host "=== MQTT PubSub Test ==="
     # Install pyserial if needed
     - pip install pyserial --quiet
-    # test_mqtt.py resets device via UART 'reset' command, then monitors
-    # for MQTT connection/subscribe/publish success within 120s
+    # Reset device via rfp-cli (re-flash + run) for reliable hardware reset.
+    # UART 'reset' command doesn't work after CLI window closes (~10s post-boot).
+    # rfp-cli '-run' alone is a no-op; must include '-p' to actually reset.
+    - Write-Host "Resetting device via rfp-cli..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -p "$env:CI_PROJECT_DIR\userprog.mot" `
+        -run -noquery
+    # Monitor UART for MQTT success markers from fresh boot
+    # --no-reset: device already reset by rfp-cli above
     - |
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
-        --timeout 120
+        --timeout 120 --no-reset
   rules:
     - if: $RUN_AWS_TESTS == "true"
       when: always
