@@ -214,8 +214,9 @@ test_mqtt:
     - python -m serial.tools.list_ports -v
     - Write-Host "--- UART_PORT=$env:UART_PORT ---"
     # Monitor UART for MQTT success markers.
-    # --reset-cmd: opens serial port FIRST, then runs rfp-cli to flash + reset.
-    # This ensures early boot_loader output is not lost between reset and monitoring.
+    # --reset-cmd: runs rfp-cli FIRST, then opens serial port.
+    # Previous approach (port open first) caused 0-byte issue due to
+    # USB suspend / stale handle during long rfp-cli operation (~2.5 min).
     # rfp-cli uses E2 Lite (J14) which is independent of UART (J20/COM port).
     - |
       $rfp_cmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
