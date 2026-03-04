@@ -91,27 +91,33 @@ build:
     - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot")) { Write-Error "bootloader .mot missing"; exit 1 }
     - Write-Host "BUILD SUCCESS"
-    # Generate RSU from app .mot (signed with ECDSA P-256)
-    - Write-Host "=== Generate RSU ==="
+    # Generate combined .mot (boot_loader + app) and .rsu (signed app for OTA)
+    # See R01AN7662JJ0100 Section 4.2.3(3)
+    - Write-Host "=== Generate initial firmware (userprog.mot + userprog.rsu) ==="
     - pip install pycryptodome --quiet
     - |
       python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
         -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
         -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
         -o "$env:CI_PROJECT_DIR\userprog" `
+        -ibp "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot" `
         -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
         -vt ecdsa -ff RTOS
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.rsu")) { Write-Error "RSU generation failed"; exit 1 }
-    - Write-Host "RSU generation SUCCESS"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.mot")) { Write-Error "userprog.mot generation failed"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.rsu")) { Write-Error "userprog.rsu generation failed"; exit 1 }
+    - Write-Host "Image generation SUCCESS"
   artifacts:
     paths:
       - "${APP_PROJECT_DIR}/HardwareDebug/*.mot"
       - "${BL_PROJECT_DIR}/HardwareDebug/*.mot"
+      - userprog.mot
       - userprog.rsu
     expire_in: 7 days
 
 # --- Flash Stage ---
-flash_boot_loader:
+# Combined boot_loader + app write using userprog.mot from image-gen.py
+# See R01AN7662JJ0100 Section 4.2.3
+flash:
   stage: flash
   tags:
     - run_ishiguro_machine
@@ -120,48 +126,25 @@ flash_boot_loader:
   needs:
     - build
   script:
-    - Write-Host "=== Flash boot_loader ==="
+    - Write-Host "=== Flash initial firmware (boot_loader + app) ==="
     # Verify E2L_SERIAL is configured
     - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set. Configure in CI/CD Variables"; exit 1 }
-    # Verify .mot file exists (from build artifacts)
-    - if (-not (Test-Path "$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot")) { Write-Error "boot_loader .mot not found"; exit 1 }
+    # Verify userprog.mot exists (combined image from build artifacts)
+    - if (-not (Test-Path "userprog.mot")) { Write-Error "userprog.mot not found"; exit 1 }
     # Step 1: Erase chip (resets BANKSEL, clears all flash including data flash)
     - Write-Host "Erasing chip..."
     - |
       & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
         -auth id $env:RFP_AUTH `
         -erase-chip -noquery
-    # Step 2: Write boot_loader
-    - Write-Host "Writing boot_loader..."
+    # Step 2: Write combined boot_loader + app
+    - Write-Host "Writing userprog.mot..."
     - |
       & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
         -auth id $env:RFP_AUTH `
-        -p "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot" `
+        -p "$env:CI_PROJECT_DIR\userprog.mot" `
         -run -noquery
-    - Write-Host "FLASH BOOT_LOADER SUCCESS"
-
-flash_app:
-  stage: flash
-  tags:
-    - run_ishiguro_machine
-    - hw-ck-rx65n-v1
-  resource_group: ck-rx65n-device
-  needs:
-    - build
-    - flash_boot_loader
-  script:
-    - Write-Host "=== Flash app via rfp-cli ==="
-    # Verify E2L_SERIAL is configured
-    - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set. Configure in CI/CD Variables"; exit 1 }
-    # Verify .mot file exists (from build artifacts)
-    - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot not found"; exit 1 }
-    # Write app .mot via E2 Lite (no erase — boot_loader area preserved from flash_boot_loader)
-    - |
-      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
-        -auth id $env:RFP_AUTH `
-        -file "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
-        -auto -noerase -run -noquery
-    - Write-Host "FLASH APP SUCCESS"
+    - Write-Host "FLASH SUCCESS"
 
 # --- Provision Stage ---
 provision:
@@ -171,7 +154,7 @@ provision:
     - hw-ck-rx65n-v1
   resource_group: ck-rx65n-device
   needs:
-    - flash_app
+    - flash
   script:
     - Write-Host "=== Provision AWS IoT credentials ==="
     # Verify required variables
