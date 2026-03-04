@@ -176,7 +176,13 @@ provision:
     - if (-not $env:AWS_IOT_PRIVKEY) { Write-Error "AWS_IOT_PRIVKEY not set"; exit 1 }
     # Install pyserial if needed
     - pip install pyserial --quiet
-    # Run provisioning script
+    # Reset device to open CLI window (~10s after boot)
+    - Write-Host "Resetting device to open CLI window..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -run -noquery
+    # Run provisioning script (connects to UART during boot CLI window)
     - |
       python tools/provision.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
