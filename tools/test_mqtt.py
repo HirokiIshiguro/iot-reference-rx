@@ -56,6 +56,29 @@ ERROR_PATTERNS = [
 ]
 
 
+def reset_device_via_uart(ser):
+    """Send 'reset' command via UART to trigger software reset.
+
+    This works because the FreeRTOS CLI accepts 'reset' at any time
+    (same method used by provision.py after writing credentials).
+    """
+    print("Resetting device via UART 'reset' command...")
+    ser.reset_input_buffer()
+    # Send reset command
+    for ch in "reset":
+        ser.write(ch.encode("ascii"))
+        time.sleep(0.002)
+    ser.write(b"\r\n")
+    time.sleep(0.5)
+    # Drain any immediate response
+    if ser.in_waiting:
+        ser.read(ser.in_waiting)
+    # Wait for device to actually reset and start booting
+    print("Waiting for device reboot (3s)...")
+    time.sleep(3.0)
+    ser.reset_input_buffer()
+
+
 def monitor_uart(port, baud, timeout, verbose=False):
     """Monitor UART output and check for MQTT success markers.
 
@@ -77,6 +100,9 @@ def monitor_uart(port, baud, timeout, verbose=False):
     except serial.SerialException as e:
         print(f"ERROR: Cannot open {port}: {e}")
         return results, [str(e)]
+
+    # Reset device via UART to get fresh boot + MQTT connection
+    reset_device_via_uart(ser)
 
     print(f"Monitoring UART ({port} @ {baud}bps, timeout={timeout}s)")
     print("=" * 60)

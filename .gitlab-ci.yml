@@ -206,16 +206,10 @@ test_mqtt:
     - provision
   script:
     - Write-Host "=== MQTT PubSub Test ==="
-    # Reset device to start fresh MQTT connection
-    - Write-Host "Resetting device..."
-    - |
-      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
-        -auth id $env:RFP_AUTH `
-        -run -noquery
     # Install pyserial if needed
     - pip install pyserial --quiet
-    # Monitor UART for MQTT connection success markers
-    # Expects: MQTT connect → subscribe → publish within 120s
+    # test_mqtt.py resets device via UART 'reset' command, then monitors
+    # for MQTT connection/subscribe/publish success within 120s
     - |
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
