@@ -16,12 +16,15 @@ Usage (standalone — sends UART 'reset' command):
 
 The device must already be provisioned with valid AWS IoT credentials.
 
-Key design: When --reset-cmd is provided, the reset command is executed FIRST,
-then the serial port is opened AFTER. This avoids USB suspend / stale handle
-issues that occur when the serial port is idle during long rfp-cli operations
-(~2.5 min for erase + write). Since rfp-cli's device reset happens at the
-very end (after programming completes), opening the serial port immediately
-after subprocess.run() returns captures boot_loader output from the start.
+Key design: When --reset-cmd is provided:
+1. The external command (rfp-cli) runs FIRST with the serial port closed.
+   This avoids USB suspend / stale handle issues during the long flash
+   operation (~2.5 min for erase + write).
+2. After rfp-cli completes, the serial port is opened. By this time the
+   device has already booted, so boot messages are lost.
+3. A UART 'reset' command is sent via the CLI to trigger a software reboot.
+   This allows the monitoring loop to capture the full boot sequence and
+   MQTT connection output from the beginning.
 
 Exit codes:
     0 — All checks passed
@@ -29,6 +32,7 @@ Exit codes:
 """
 
 import argparse
+import re
 import subprocess
 import sys
 import time
@@ -183,25 +187,29 @@ def quick_listen(ser, port, duration=5):
 def reset_device_via_uart(ser):
     """Send 'reset' command via UART to trigger software reset.
 
-    This works ONLY if the FreeRTOS CLI is still active (within ~10s of boot,
-    or if CLI mode was entered and no reset has been sent yet).
+    The FreeRTOS CLI 'reset' command prints "Resetting !", waits 1 second
+    (vTaskDelay(1000)), then writes SWRR=0xA501 to trigger a hardware reset.
+
+    After reset, boot_loader starts and outputs diagnostic messages.
+    This function does NOT clear the input buffer after reset so that the
+    caller's monitoring loop captures boot_loader output.
     """
-    print("Attempting device reset via UART 'reset' command...")
+    print("Sending UART 'reset' command...")
     ser.reset_input_buffer()
-    # Send reset command character by character
+    # Send reset command character by character (avoid echo buffer issues)
     for ch in "reset":
         ser.write(ch.encode("ascii"))
         time.sleep(0.002)
     ser.write(b"\r\n")
-    time.sleep(0.5)
-    # Drain any immediate response
+    # Wait for "Resetting !" response + 1s delay before actual reset
+    time.sleep(2.0)
     if ser.in_waiting:
         resp = ser.read(ser.in_waiting).decode("ascii", errors="replace")
         print(f"  Reset response: {resp.strip()[:80]}")
-    # Wait for device to actually reset and start booting
-    print("Waiting for device reboot (5s)...")
-    time.sleep(5.0)
-    ser.reset_input_buffer()
+    # Wait for device to complete reset and boot_loader to start
+    # Don't clear buffer — monitoring loop will capture boot messages
+    print("Waiting for device reboot (3s)...")
+    time.sleep(3.0)
 
 
 def reset_device_via_command(reset_cmd):
@@ -228,9 +236,11 @@ def reset_device_via_command(reset_cmd):
                     print(f"  [reset-cmd] {line}")
         if result.stderr:
             # Show only non-progress-bar lines from stderr
+            # Progress bars look like: "42% [=====>     ]"
+            progress_re = re.compile(r"^\d+%\s*\[")
             for line in result.stderr.strip().split("\n"):
                 stripped = line.strip()
-                if stripped and not stripped.startswith(("%", "[==")):
+                if stripped and not progress_re.match(stripped):
                     print(f"  [reset-cmd stderr] {stripped}")
         if result.returncode != 0:
             print(f"  WARNING: Reset command exited with code {result.returncode}")
@@ -250,12 +260,12 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
 
     All UART output is printed for CI visibility.
 
-    Key design: When --reset-cmd is provided, the reset command runs FIRST,
-    then the serial port is opened AFTER. This avoids USB suspend / stale
-    handle issues from keeping the port open during long rfp-cli operations.
-    rfp-cli's device reset happens at the very end (after erase + write),
-    so opening the port immediately after subprocess.run() returns still
-    captures boot_loader output.
+    Key design: When --reset-cmd is provided:
+    1. External command (rfp-cli) runs with serial port closed to avoid
+       USB suspend / stale handle issues during the long flash operation.
+    2. After rfp-cli, serial port is opened (device already booted by now).
+    3. UART 'reset' command is sent to trigger software reboot.
+    4. Monitoring loop captures full boot sequence + MQTT output.
 
     Args:
         port: Serial port name (e.g., COM6)
@@ -283,16 +293,20 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
     if ser is None:
         return results, [f"Cannot open {port}"]
 
-    # Step 3: If using UART reset (no external command), send now
-    if not reset_cmd and not skip_reset:
-        reset_device_via_uart(ser)
-    elif skip_reset:
+    # Step 3: Reset device to capture boot output from the beginning
+    if skip_reset:
         print("Skipping device reset")
+        # Only probe when not resetting (device should already be running)
+        probe_serial_port(ser, port)
+    else:
+        if reset_cmd:
+            # Device already booted after rfp-cli — boot messages were missed.
+            # Send UART 'reset' to reboot and capture output from start.
+            print("Device already booted after rfp-cli.")
+            print("Sending UART 'reset' to reboot and capture full output...")
+        reset_device_via_uart(ser)
 
-    # Step 4: Quick probe — send CR to check if device responds
-    probe_serial_port(ser, port)
-
-    # Step 5: Monitor UART
+    # Step 4: Monitor UART
     print(f"Monitoring UART ({port} @ {baud}bps, timeout={timeout}s)")
     print("=" * 60)
 
@@ -441,7 +455,7 @@ def main():
     print(f"Baud:       {args.baud}")
     print(f"Timeout:    {args.timeout}s")
     if args.reset_cmd:
-        print(f"Reset:      external command (before port open)")
+        print(f"Reset:      external command + UART 'reset' for boot capture")
     elif args.no_reset:
         print(f"Reset:      disabled (--no-reset)")
     else:
