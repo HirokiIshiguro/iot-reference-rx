@@ -206,12 +206,25 @@ test_mqtt:
     - provision
   script:
     - Write-Host "=== MQTT PubSub Test ==="
-    - Write-Host "TODO - Implement MQTT connectivity test (Step 6)"
+    # Reset device to start fresh MQTT connection
+    - Write-Host "Resetting device..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -run -noquery
+    # Install pyserial if needed
+    - pip install pyserial --quiet
+    # Monitor UART for MQTT connection success markers
+    # Expects: MQTT connect → subscribe → publish within 120s
+    - |
+      python tools/test_mqtt.py `
+        --port $env:UART_PORT --baud $env:UART_BAUD `
+        --timeout 120
   rules:
     - if: $RUN_AWS_TESTS == "true"
       when: always
     - when: manual
-  allow_failure: true  # Remove after Step 6 is complete
+  allow_failure: true
 
 test_ota:
   stage: test
