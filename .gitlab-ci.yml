@@ -209,6 +209,10 @@ test_mqtt:
     - Write-Host "=== MQTT PubSub Test ==="
     # Install pyserial if needed
     - pip install pyserial --quiet
+    # Diagnostic: list available COM ports (helps identify if UART_PORT is correct)
+    - Write-Host "--- Available COM ports ---"
+    - python -m serial.tools.list_ports -v
+    - Write-Host "--- UART_PORT=$env:UART_PORT ---"
     # Reset device via rfp-cli (re-flash + run) for reliable hardware reset.
     # UART 'reset' command doesn't work after CLI window closes (~10s post-boot).
     # rfp-cli '-run' alone is a no-op; must include '-p' to actually reset.
