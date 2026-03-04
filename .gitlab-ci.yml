@@ -213,21 +213,17 @@ test_mqtt:
     - Write-Host "--- Available COM ports ---"
     - python -m serial.tools.list_ports -v
     - Write-Host "--- UART_PORT=$env:UART_PORT ---"
-    # Reset device via rfp-cli (re-flash + run) for reliable hardware reset.
-    # UART 'reset' command doesn't work after CLI window closes (~10s post-boot).
-    # rfp-cli '-run' alone is a no-op; must include '-p' to actually reset.
-    - Write-Host "Resetting device via rfp-cli..."
+    # Monitor UART for MQTT success markers.
+    # --reset-cmd: opens serial port FIRST, then runs rfp-cli to flash + reset.
+    # This ensures early boot_loader output is not lost between reset and monitoring.
+    # rfp-cli uses E2 Lite (J14) which is independent of UART (J20/COM port).
     - |
-      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
-        -auth id $env:RFP_AUTH `
-        -p "$env:CI_PROJECT_DIR\userprog.mot" `
-        -run -noquery
-    # Monitor UART for MQTT success markers from fresh boot
-    # --no-reset: device already reset by rfp-cli above
-    - |
+      $rfp_cmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
+        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
-        --timeout 120 --no-reset
+        --timeout 120 `
+        --reset-cmd "$rfp_cmd"
   rules:
     - if: $RUN_AWS_TESTS == "true"
       when: always

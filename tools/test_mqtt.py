@@ -7,13 +7,18 @@ Monitors UART output after device boot to verify:
 2. Topic subscription succeeds
 3. At least one publish succeeds
 
-Usage (CI — device reset by rfp-cli beforehand):
-    python tools/test_mqtt.py --port COM9 --baud 115200 --timeout 120 --no-reset
+Usage (CI — reset device via external command while UART is open):
+    python tools/test_mqtt.py --port COM6 --timeout 120 \
+        --reset-cmd "rfp-cli -d RX65x -t e2l:XXX -if fine -p userprog.mot -run -noquery"
 
 Usage (standalone — sends UART 'reset' command):
-    python tools/test_mqtt.py --port COM9 --baud 115200 --timeout 120
+    python tools/test_mqtt.py --port COM6 --timeout 120
 
 The device must already be provisioned with valid AWS IoT credentials.
+
+Key design: When --reset-cmd is provided, the serial port is opened FIRST,
+then the reset command is executed. This ensures no boot_loader or early app
+output is lost between device reset and UART monitoring start.
 
 Exit codes:
     0 — All checks passed
@@ -21,6 +26,7 @@ Exit codes:
 """
 
 import argparse
+import subprocess
 import sys
 import time
 
@@ -49,6 +55,16 @@ MARKERS = [
     },
 ]
 
+# Boot loader markers (informational, not required for pass)
+BOOT_MARKERS = [
+    "BootLoader",
+    "execute image",
+    "send image",
+    "error occurred",
+    "software reset",
+    "activating image",
+]
+
 # Error patterns that indicate failure
 ERROR_PATTERNS = [
     "Failed to connect to MQTT broker",
@@ -58,6 +74,7 @@ ERROR_PATTERNS = [
     "Network connection failed",
     "TLS connection failed",
     "DNS resolution failed",
+    "error occurred. please reset your board",
 ]
 
 
@@ -85,16 +102,58 @@ def reset_device_via_uart(ser):
     ser.reset_input_buffer()
 
 
-def monitor_uart(port, baud, timeout, skip_reset=False):
+def reset_device_via_command(reset_cmd):
+    """Run an external command to reset the device (e.g., rfp-cli).
+
+    This is called AFTER the serial port is already open, so any UART
+    output from the device after reset will be captured.
+
+    Returns:
+        True if command succeeded, False otherwise
+    """
+    print(f"Running reset command: {reset_cmd}")
+    try:
+        result = subprocess.run(
+            reset_cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        # Print command output for CI visibility
+        if result.stdout:
+            for line in result.stdout.strip().split("\n"):
+                print(f"  [reset-cmd] {line}")
+        if result.stderr:
+            for line in result.stderr.strip().split("\n"):
+                print(f"  [reset-cmd stderr] {line}")
+        if result.returncode != 0:
+            print(f"  WARNING: Reset command exited with code {result.returncode}")
+            return False
+        print("  Reset command completed successfully")
+        return True
+    except subprocess.TimeoutExpired:
+        print("  ERROR: Reset command timed out (120s)")
+        return False
+    except Exception as e:
+        print(f"  ERROR: Reset command failed: {e}")
+        return False
+
+
+def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
     """Monitor UART output and check for MQTT success markers.
 
     All UART output is printed for CI visibility.
 
+    Key design: Serial port is opened BEFORE any device reset, so early
+    boot messages (boot_loader banner, etc.) are not lost.
+
     Args:
-        port: Serial port name (e.g., COM9)
+        port: Serial port name (e.g., COM6)
         baud: Baud rate
         timeout: Total monitoring timeout in seconds
-        skip_reset: If True, skip UART reset (device reset by external tool)
+        reset_cmd: External command to reset device (run after port open)
+        skip_reset: If True, skip all reset methods
 
     Returns:
         tuple of (results dict, errors list)
@@ -103,6 +162,7 @@ def monitor_uart(port, baud, timeout, skip_reset=False):
     errors = []
     total_bytes = 0
 
+    # Step 1: Open serial port FIRST (before any device reset)
     try:
         ser = serial.Serial(
             port=port,
@@ -116,12 +176,22 @@ def monitor_uart(port, baud, timeout, skip_reset=False):
         print(f"ERROR: Cannot open {port}: {e}")
         return results, [str(e)]
 
-    if not skip_reset:
+    print(f"Serial port {port} opened (capturing starts now)")
+
+    # Step 2: Reset the device (while serial port is already open)
+    if reset_cmd:
+        # Drain any stale data
+        ser.reset_input_buffer()
+        # Run external reset command (e.g., rfp-cli)
+        if not reset_device_via_command(reset_cmd):
+            print("WARNING: Reset command failed, continuing to monitor anyway...")
+    elif not skip_reset:
         reset_device_via_uart(ser)
     else:
-        print("Skipping UART reset (device reset by external tool)")
+        print("Skipping device reset")
         print("Starting UART monitoring immediately...")
 
+    # Step 3: Monitor UART
     print(f"Monitoring UART ({port} @ {baud}bps, timeout={timeout}s)")
     print("=" * 60)
 
@@ -129,6 +199,7 @@ def monitor_uart(port, baud, timeout, skip_reset=False):
     collected = ""
     all_required_found = False
     last_progress = start
+    boot_seen = False
 
     try:
         while time.time() - start < timeout:
@@ -144,6 +215,15 @@ def monitor_uart(port, baud, timeout, skip_reset=False):
                 # Always print UART output for CI visibility
                 sys.stdout.write(data)
                 sys.stdout.flush()
+
+                # Check boot loader markers (informational)
+                if not boot_seen:
+                    for bm in BOOT_MARKERS:
+                        if bm in collected:
+                            boot_seen = True
+                            elapsed = time.time() - start
+                            print(f"\n  >>> [BOOT] Boot loader activity detected at {elapsed:.1f}s <<<")
+                            break
 
                 # Check markers
                 for m in MARKERS:
@@ -202,6 +282,8 @@ def monitor_uart(port, baud, timeout, skip_reset=False):
         print(f"  - Baud rate mismatch (expected {baud})")
         print(f"  - USB-Serial bridge (RL78/G1C) needs power cycle")
         print(f"  - Device stuck in boot_loader (no valid app image)")
+        if reset_cmd:
+            print(f"  - Reset command may not have properly started the device")
 
     return results, errors
 
@@ -210,7 +292,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Test MQTT connectivity for CK-RX65N"
     )
-    parser.add_argument("--port", required=True, help="Serial port (e.g., COM9)")
+    parser.add_argument("--port", required=True, help="Serial port (e.g., COM6)")
     parser.add_argument(
         "--baud", type=int, default=115200, help="Baud rate (default: 115200)"
     )
@@ -223,7 +305,15 @@ def main():
     parser.add_argument(
         "--no-reset",
         action="store_true",
-        help="Skip UART reset (use when device is reset by rfp-cli or other tool)",
+        help="Skip all device reset (just monitor UART)",
+    )
+    parser.add_argument(
+        "--reset-cmd",
+        type=str,
+        default=None,
+        help="External command to reset device (e.g., rfp-cli). "
+             "Serial port is opened BEFORE this command runs to capture "
+             "all boot output.",
     )
 
     args = parser.parse_args()
@@ -234,11 +324,17 @@ def main():
     print(f"Port:       {args.port}")
     print(f"Baud:       {args.baud}")
     print(f"Timeout:    {args.timeout}s")
-    print(f"UART reset: {'disabled (--no-reset)' if args.no_reset else 'enabled'}")
+    if args.reset_cmd:
+        print(f"Reset:      external command")
+    elif args.no_reset:
+        print(f"Reset:      disabled (--no-reset)")
+    else:
+        print(f"Reset:      UART 'reset' command")
     print("=" * 60)
 
     results, errors = monitor_uart(
         args.port, args.baud, args.timeout,
+        reset_cmd=args.reset_cmd,
         skip_reset=args.no_reset,
     )
 
