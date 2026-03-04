@@ -7,7 +7,7 @@ Monitors UART output after device boot to verify:
 2. Topic subscription succeeds
 3. At least one publish succeeds
 
-Usage (CI — reset device via external command while UART is open):
+Usage (CI — reset device via external command):
     python tools/test_mqtt.py --port COM6 --timeout 120 \
         --reset-cmd "rfp-cli -d RX65x -t e2l:XXX -if fine -p userprog.mot -run -noquery"
 
@@ -16,9 +16,12 @@ Usage (standalone — sends UART 'reset' command):
 
 The device must already be provisioned with valid AWS IoT credentials.
 
-Key design: When --reset-cmd is provided, the serial port is opened FIRST,
-then the reset command is executed. This ensures no boot_loader or early app
-output is lost between device reset and UART monitoring start.
+Key design: When --reset-cmd is provided, the reset command is executed FIRST,
+then the serial port is opened AFTER. This avoids USB suspend / stale handle
+issues that occur when the serial port is idle during long rfp-cli operations
+(~2.5 min for erase + write). Since rfp-cli's device reset happens at the
+very end (after programming completes), opening the serial port immediately
+after subprocess.run() returns captures boot_loader output from the start.
 
 Exit codes:
     0 — All checks passed
@@ -32,9 +35,13 @@ import time
 
 try:
     import serial
+    import serial.tools.list_ports
 except ImportError:
     print("ERROR: pyserial not installed. Run: pip install pyserial")
     sys.exit(1)
+
+# Renesas RL78/G1C USB-Serial bridge VID:PID
+RL78_G1C_VID_PID = "045B:8111"
 
 # Success markers to detect in UART output (in expected order)
 MARKERS = [
@@ -78,6 +85,101 @@ ERROR_PATTERNS = [
 ]
 
 
+def list_renesas_ports():
+    """List all Renesas RL78/G1C USB-Serial ports.
+
+    Returns:
+        list of (port, description, hwid) tuples
+    """
+    ports = []
+    for port_info in serial.tools.list_ports.comports():
+        if RL78_G1C_VID_PID in port_info.hwid.upper():
+            ports.append((port_info.device, port_info.description, port_info.hwid))
+    return ports
+
+
+def open_serial_port(port, baud):
+    """Open a serial port with diagnostic output.
+
+    Returns:
+        serial.Serial instance or None on failure
+    """
+    try:
+        ser = serial.Serial(
+            port=port,
+            baudrate=baud,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=0.5,
+        )
+    except serial.SerialException as e:
+        print(f"ERROR: Cannot open {port}: {e}")
+        return None
+
+    # Print serial port diagnostics
+    print(f"Serial port {port} opened @ {baud}bps")
+    try:
+        print(f"  DSR={ser.dsr}, CTS={ser.cts}, CD={ser.cd}, RI={ser.ri}")
+    except (serial.SerialException, OSError):
+        print("  (serial line status not available)")
+
+    return ser
+
+
+def probe_serial_port(ser, port):
+    """Send CR to serial port and check for echo/response.
+
+    This tests if the device is actively communicating on this port.
+    Works when the FreeRTOS CLI is active (within ~10s of boot).
+
+    Returns:
+        Number of bytes received in response
+    """
+    print(f"  Probing {port} (sending CR)...")
+    try:
+        ser.reset_input_buffer()
+        ser.write(b"\r\n")
+        time.sleep(0.5)
+        if ser.in_waiting:
+            data = ser.read(ser.in_waiting)
+            text = data.decode("ascii", errors="replace").strip()
+            print(f"  Probe response ({len(data)} bytes): {text[:80]}")
+            return len(data)
+        else:
+            print(f"  Probe: no response")
+            return 0
+    except serial.SerialException as e:
+        print(f"  Probe error: {e}")
+        return 0
+
+
+def quick_listen(ser, port, duration=5):
+    """Listen on a serial port for a short duration.
+
+    Returns:
+        Data received (str), or empty string
+    """
+    print(f"  Quick listen on {port} ({duration}s)...")
+    collected = ""
+    start = time.time()
+    try:
+        while time.time() - start < duration:
+            if ser.in_waiting:
+                data = ser.read(ser.in_waiting).decode("ascii", errors="replace")
+                collected += data
+                sys.stdout.write(data)
+                sys.stdout.flush()
+            time.sleep(0.1)
+    except serial.SerialException as e:
+        print(f"  Listen error: {e}")
+    if collected:
+        print(f"\n  Quick listen: received {len(collected)} bytes")
+    else:
+        print(f"  Quick listen: 0 bytes")
+    return collected
+
+
 def reset_device_via_uart(ser):
     """Send 'reset' command via UART to trigger software reset.
 
@@ -105,9 +207,6 @@ def reset_device_via_uart(ser):
 def reset_device_via_command(reset_cmd):
     """Run an external command to reset the device (e.g., rfp-cli).
 
-    This is called AFTER the serial port is already open, so any UART
-    output from the device after reset will be captured.
-
     Returns:
         True if command succeeded, False otherwise
     """
@@ -118,22 +217,28 @@ def reset_device_via_command(reset_cmd):
             shell=True,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,
         )
-        # Print command output for CI visibility
+        # Print command output for CI visibility (condensed)
         if result.stdout:
-            for line in result.stdout.strip().split("\n"):
-                print(f"  [reset-cmd] {line}")
+            lines = result.stdout.strip().split("\n")
+            # Show key lines only (skip progress bars)
+            for line in lines:
+                if line.strip():
+                    print(f"  [reset-cmd] {line}")
         if result.stderr:
+            # Show only non-progress-bar lines from stderr
             for line in result.stderr.strip().split("\n"):
-                print(f"  [reset-cmd stderr] {line}")
+                stripped = line.strip()
+                if stripped and not stripped.startswith(("%", "[==")):
+                    print(f"  [reset-cmd stderr] {stripped}")
         if result.returncode != 0:
             print(f"  WARNING: Reset command exited with code {result.returncode}")
             return False
         print("  Reset command completed successfully")
         return True
     except subprocess.TimeoutExpired:
-        print("  ERROR: Reset command timed out (120s)")
+        print("  ERROR: Reset command timed out (300s)")
         return False
     except Exception as e:
         print(f"  ERROR: Reset command failed: {e}")
@@ -145,14 +250,18 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
 
     All UART output is printed for CI visibility.
 
-    Key design: Serial port is opened BEFORE any device reset, so early
-    boot messages (boot_loader banner, etc.) are not lost.
+    Key design: When --reset-cmd is provided, the reset command runs FIRST,
+    then the serial port is opened AFTER. This avoids USB suspend / stale
+    handle issues from keeping the port open during long rfp-cli operations.
+    rfp-cli's device reset happens at the very end (after erase + write),
+    so opening the port immediately after subprocess.run() returns still
+    captures boot_loader output.
 
     Args:
         port: Serial port name (e.g., COM6)
         baud: Baud rate
         timeout: Total monitoring timeout in seconds
-        reset_cmd: External command to reset device (run after port open)
+        reset_cmd: External command to reset device (runs before port open)
         skip_reset: If True, skip all reset methods
 
     Returns:
@@ -162,36 +271,28 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
     errors = []
     total_bytes = 0
 
-    # Step 1: Open serial port FIRST (before any device reset)
-    try:
-        ser = serial.Serial(
-            port=port,
-            baudrate=baud,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0.5,
-        )
-    except serial.SerialException as e:
-        print(f"ERROR: Cannot open {port}: {e}")
-        return results, [str(e)]
-
-    print(f"Serial port {port} opened (capturing starts now)")
-
-    # Step 2: Reset the device (while serial port is already open)
+    # Step 1: Run external reset command BEFORE opening serial port
     if reset_cmd:
-        # Drain any stale data
-        ser.reset_input_buffer()
-        # Run external reset command (e.g., rfp-cli)
         if not reset_device_via_command(reset_cmd):
             print("WARNING: Reset command failed, continuing to monitor anyway...")
-    elif not skip_reset:
-        reset_device_via_uart(ser)
-    else:
-        print("Skipping device reset")
-        print("Starting UART monitoring immediately...")
+        # Brief pause for device to start booting
+        time.sleep(0.5)
 
-    # Step 3: Monitor UART
+    # Step 2: Open serial port (fresh handle, no USB suspend issues)
+    ser = open_serial_port(port, baud)
+    if ser is None:
+        return results, [f"Cannot open {port}"]
+
+    # Step 3: If using UART reset (no external command), send now
+    if not reset_cmd and not skip_reset:
+        reset_device_via_uart(ser)
+    elif skip_reset:
+        print("Skipping device reset")
+
+    # Step 4: Quick probe — send CR to check if device responds
+    probe_serial_port(ser, port)
+
+    # Step 5: Monitor UART
     print(f"Monitoring UART ({port} @ {baud}bps, timeout={timeout}s)")
     print("=" * 60)
 
@@ -282,8 +383,24 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
         print(f"  - Baud rate mismatch (expected {baud})")
         print(f"  - USB-Serial bridge (RL78/G1C) needs power cycle")
         print(f"  - Device stuck in boot_loader (no valid app image)")
+        print(f"  - Image signature verification failed in boot_loader")
         if reset_cmd:
             print(f"  - Reset command may not have properly started the device")
+
+        # Try alternative Renesas RL78/G1C ports
+        print(f"\n--- Scanning alternative Renesas ports ---")
+        alt_ports = list_renesas_ports()
+        for alt_port, alt_desc, alt_hwid in alt_ports:
+            if alt_port == port:
+                print(f"  {alt_port}: (primary port, already tested)")
+                continue
+            print(f"  {alt_port}: {alt_desc} [{alt_hwid}]")
+            alt_ser = open_serial_port(alt_port, baud)
+            if alt_ser:
+                probe_serial_port(alt_ser, alt_port)
+                quick_listen(alt_ser, alt_port, duration=5)
+                alt_ser.close()
+                print(f"  {alt_port}: closed")
 
     return results, errors
 
@@ -312,8 +429,7 @@ def main():
         type=str,
         default=None,
         help="External command to reset device (e.g., rfp-cli). "
-             "Serial port is opened BEFORE this command runs to capture "
-             "all boot output.",
+             "Command runs BEFORE serial port is opened.",
     )
 
     args = parser.parse_args()
@@ -325,12 +441,24 @@ def main():
     print(f"Baud:       {args.baud}")
     print(f"Timeout:    {args.timeout}s")
     if args.reset_cmd:
-        print(f"Reset:      external command")
+        print(f"Reset:      external command (before port open)")
     elif args.no_reset:
         print(f"Reset:      disabled (--no-reset)")
     else:
         print(f"Reset:      UART 'reset' command")
     print("=" * 60)
+
+    # List all available Renesas RL78/G1C ports
+    rl78_ports = list_renesas_ports()
+    if rl78_ports:
+        print(f"\nRenesas RL78/G1C ports detected:")
+        for p, d, h in rl78_ports:
+            marker = " <-- primary" if p == args.port else ""
+            print(f"  {p}: {d}{marker}")
+            print(f"       {h}")
+    else:
+        print(f"\nWARNING: No Renesas RL78/G1C ports detected!")
+    print()
 
     results, errors = monitor_uart(
         args.port, args.baud, args.timeout,
