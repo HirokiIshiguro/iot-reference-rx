@@ -93,8 +93,10 @@ build:
     - Write-Host "BUILD SUCCESS"
     # Generate combined .mot (boot_loader + app) and .rsu (signed app for OTA)
     # See R01AN7662JJ0100 Section 4.2.3(3)
+    # image-gen.py with -ibp generates .mot only; without -ibp generates .rsu only
     - Write-Host "=== Generate initial firmware (userprog.mot + userprog.rsu) ==="
     - pip install pycryptodome --quiet
+    # (1) Generate userprog.mot — combined boot_loader + app for initial programming
     - |
       python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
         -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
@@ -104,6 +106,14 @@ build:
         -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
         -vt ecdsa -ff RTOS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.mot")) { Write-Error "userprog.mot generation failed"; exit 1 }
+    # (2) Generate userprog.rsu — signed app image for OTA update
+    - |
+      python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
+        -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
+        -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
+        -o "$env:CI_PROJECT_DIR\userprog" `
+        -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
+        -vt ecdsa -ff RTOS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.rsu")) { Write-Error "userprog.rsu generation failed"; exit 1 }
     - Write-Host "Image generation SUCCESS"
   artifacts:
