@@ -211,7 +211,8 @@ test_mqtt:
     - hw-ck-rx65n-v1
   resource_group: ck-rx65n-device
   needs:
-    - provision
+    - job: provision
+      optional: true    # allow test_mqtt without provisioning (UART capture still works)
     - build    # need userprog.mot artifact for rfp-cli reset
   script:
     - Write-Host "=== MQTT PubSub Test ==="
