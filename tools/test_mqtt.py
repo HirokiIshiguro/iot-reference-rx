@@ -32,10 +32,16 @@ Exit codes:
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
 import time
+
+# Force unbuffered stdout for CI environments (GitLab Runner)
+# Without this, all output gets same timestamp in CI logs.
+if not sys.stdout.isatty():
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
 
 try:
     import serial
@@ -187,21 +193,29 @@ def quick_listen(ser, port, duration=5):
 def wait_for_cli(ser, max_retries=10, interval=2.0):
     """Wait for FreeRTOS CLI to become responsive on UART.
 
-    Sends CR and checks for any response. Retries with interval between
-    attempts. After rfp-cli resets the device, boot_loader and FreeRTOS
-    initialization may take several seconds before the CLI task starts.
+    The firmware has a boot window (~10s) where the user must type 'CLI'
+    to enter CLI mode. This function sends 'CLI' followed by CR to enter
+    CLI mode, then checks for any response. Retries with interval.
 
     Returns:
         True if CLI responded, False if all retries exhausted
     """
     print(f"Waiting for CLI to become responsive (max {max_retries * interval:.0f}s)...")
+    sys.stdout.flush()
     for attempt in range(max_retries):
         ser.reset_input_buffer()
-        ser.write(b"\r\n")
+        # Send 'CLI' to enter CLI mode (required during boot window)
+        # On subsequent attempts, just send CR to check for prompt
+        if attempt < 3:
+            cmd = b"CLI\r\n"
+        else:
+            cmd = b"\r\n"
+        ser.write(cmd)
         time.sleep(0.5)
         if ser.in_waiting:
             data = ser.read(ser.in_waiting).decode("ascii", errors="replace")
             print(f"  CLI responded on attempt {attempt + 1}: {data.strip()[:80]}")
+            sys.stdout.flush()
             return True
         # Also check if device is outputting anything (boot messages etc.)
         time.sleep(interval - 0.5)
@@ -209,9 +223,12 @@ def wait_for_cli(ser, max_retries=10, interval=2.0):
             data = ser.read(ser.in_waiting).decode("ascii", errors="replace")
             print(f"  Device output on attempt {attempt + 1} ({len(data)} bytes): "
                   f"{data.strip()[:80]}")
+            sys.stdout.flush()
             return True
         print(f"  Attempt {attempt + 1}/{max_retries}: no response")
+        sys.stdout.flush()
     print("  WARNING: CLI did not respond after all retries")
+    sys.stdout.flush()
     return False
 
 
@@ -326,8 +343,12 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
     if reset_cmd:
         if not reset_device_via_command(reset_cmd):
             print("WARNING: Reset command failed, continuing to monitor anyway...")
-        # Brief pause for device to start booting
-        time.sleep(0.5)
+        # Wait for RL78/G1C USB-Serial bridge to switch from debug (FINE)
+        # back to UART bridge mode after rfp-cli disconnects from E2 Lite.
+        # Without this delay, opening COM port too quickly results in a
+        # broken handle that never receives data.
+        print("Waiting 5s for USB-Serial bridge recovery...")
+        time.sleep(5.0)
 
     # Step 2: Open serial port (fresh handle, no USB suspend issues)
     ser = open_serial_port(port, baud)
@@ -345,7 +366,18 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, skip_reset=False):
             # Send UART 'reset' to reboot and capture output from start.
             print("Device already booted after rfp-cli.")
             print("Sending UART 'reset' to reboot and capture full output...")
-        reset_device_via_uart(ser)
+        cli_ready = reset_device_via_uart(ser)
+        if not cli_ready and reset_cmd:
+            # CLI never responded — serial handle may be broken after
+            # RL78/G1C debug-to-UART switch. Close and reopen port.
+            print("Reopening serial port (recovery attempt)...")
+            ser.close()
+            time.sleep(2.0)
+            ser = open_serial_port(port, baud)
+            if ser is None:
+                return results, [f"Cannot reopen {port}"]
+            # Try one more time after port recovery
+            reset_device_via_uart(ser)
 
     # Step 4: Monitor UART
     print(f"Monitoring UART ({port} @ {baud}bps, timeout={timeout}s)")
