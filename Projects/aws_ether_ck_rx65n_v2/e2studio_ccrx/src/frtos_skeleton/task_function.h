@@ -12,4 +12,7 @@
 #ifndef TASK_FUNCTION_H_
 #define TASK_FUNCTION_H_
 
+#include "freertos_object_init.h"
+
+
 #endif /* TASK_FUNCTION_H_ */

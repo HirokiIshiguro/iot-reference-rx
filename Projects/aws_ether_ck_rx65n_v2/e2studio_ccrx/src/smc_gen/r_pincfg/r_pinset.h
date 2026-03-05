@@ -17,6 +17,7 @@
 Includes
 ***********************************************************************************************************************/
 #include "r_ether_rx_pinset.h"
+#include "r_irq_rx_pinset.h"
 #include "r_s12ad_rx_pinset.h"
 #include "r_sci_rx_pinset.h"
 
