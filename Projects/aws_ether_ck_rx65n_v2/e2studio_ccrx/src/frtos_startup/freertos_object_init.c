@@ -12,8 +12,9 @@
 /***********************************************************************************************************************
  * Includes   <System Includes> , "Project Includes"
  **********************************************************************************************************************/
-#include "FreeRTOS.h"
 #include "freertos_start.h"
+#include "../frtos_skeleton/task_function.h"
+
 /***********************************************************************************************************************
  * Macro definitions
  **********************************************************************************************************************/
@@ -25,8 +26,10 @@
 /***********************************************************************************************************************
  * Private global variables and functions
  **********************************************************************************************************************/
-void Kernel_Object_init (void);
-void Object_init_manual (void);
+
+/* Start user code for user variables and functions initialization. Do not edit comment generated here */
+/* End user code. Do not edit comment generated here */
+
 /***********************************************************************************************************************
  * Function Name: Kernel_Object_init
  * Description  : This function initializes FreeRTOS objects.
@@ -48,6 +51,8 @@ void Kernel_Object_init(void)
     /************** stream buffer creation *************************/
 
     /************** message buffer creation *********************/
+    /* Start user code for user initialization for Kernel_Object_init. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
 
 } /* End of function Kernel_Object_init()*/
 
@@ -60,4 +65,9 @@ void Kernel_Object_init(void)
 void Object_init_manual(void)
 {
     /************** task creation ****************************/
+    /* Start user code for user initialization for Object_init_manual. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
 } /* End of function Object_init_manual()*/
+
+/* Start user code for others. Do not edit comment generated here */
+/* End user code. Do not edit comment generated here */

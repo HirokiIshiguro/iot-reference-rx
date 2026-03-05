@@ -73,8 +73,8 @@ void R_ETHER_PinSet_ETHERC0_RMII()
     PORT7.PMR.BIT.B1 = 1U;
 
     /* Set ET0_LINKSTA pin */
-    MPC.PA5PFS.BYTE = 0x11U;
-    PORTA.PMR.BIT.B5 = 1U;
+    MPC.P54PFS.BYTE = 0x11U;
+    PORT5.PMR.BIT.B4 = 1U;
 
     R_BSP_RegisterProtectEnable(BSP_REG_PROTECT_MPC);
 }
