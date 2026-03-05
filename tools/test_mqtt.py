@@ -184,16 +184,56 @@ def quick_listen(ser, port, duration=5):
     return collected
 
 
+def wait_for_cli(ser, max_retries=10, interval=2.0):
+    """Wait for FreeRTOS CLI to become responsive on UART.
+
+    Sends CR and checks for any response. Retries with interval between
+    attempts. After rfp-cli resets the device, boot_loader and FreeRTOS
+    initialization may take several seconds before the CLI task starts.
+
+    Returns:
+        True if CLI responded, False if all retries exhausted
+    """
+    print(f"Waiting for CLI to become responsive (max {max_retries * interval:.0f}s)...")
+    for attempt in range(max_retries):
+        ser.reset_input_buffer()
+        ser.write(b"\r\n")
+        time.sleep(0.5)
+        if ser.in_waiting:
+            data = ser.read(ser.in_waiting).decode("ascii", errors="replace")
+            print(f"  CLI responded on attempt {attempt + 1}: {data.strip()[:80]}")
+            return True
+        # Also check if device is outputting anything (boot messages etc.)
+        time.sleep(interval - 0.5)
+        if ser.in_waiting:
+            data = ser.read(ser.in_waiting).decode("ascii", errors="replace")
+            print(f"  Device output on attempt {attempt + 1} ({len(data)} bytes): "
+                  f"{data.strip()[:80]}")
+            return True
+        print(f"  Attempt {attempt + 1}/{max_retries}: no response")
+    print("  WARNING: CLI did not respond after all retries")
+    return False
+
+
 def reset_device_via_uart(ser):
     """Send 'reset' command via UART to trigger software reset.
 
     The FreeRTOS CLI 'reset' command prints "Resetting !", waits 1 second
     (vTaskDelay(1000)), then writes SWRR=0xA501 to trigger a hardware reset.
 
-    After reset, boot_loader starts and outputs diagnostic messages.
-    This function does NOT clear the input buffer after reset so that the
-    caller's monitoring loop captures boot_loader output.
+    First waits for CLI to become responsive (with retries), then sends
+    the reset command. After reset, boot_loader starts and outputs
+    diagnostic messages. Does NOT clear the input buffer after reset so
+    that the caller's monitoring loop captures boot_loader output.
+
+    Returns:
+        True if reset was sent (CLI responded), False otherwise
     """
+    # Wait for CLI to be ready before sending reset
+    cli_ready = wait_for_cli(ser)
+    if not cli_ready:
+        print("Sending 'reset' anyway as last resort...")
+
     print("Sending UART 'reset' command...")
     ser.reset_input_buffer()
     # Send reset command character by character (avoid echo buffer issues)
@@ -208,8 +248,9 @@ def reset_device_via_uart(ser):
         print(f"  Reset response: {resp.strip()[:80]}")
     # Wait for device to complete reset and boot_loader to start
     # Don't clear buffer — monitoring loop will capture boot messages
-    print("Waiting for device reboot (3s)...")
-    time.sleep(3.0)
+    print("Waiting for device reboot (5s)...")
+    time.sleep(5.0)
+    return cli_ready
 
 
 def reset_device_via_command(reset_cmd):
