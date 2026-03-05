@@ -206,7 +206,7 @@ UART CLI 経由でプロビジョニングする。
 # 手動（Tera Term）: Getting_Started_Guide.md Step 3 を参照
 # 自動（Python スクリプト）:
 python tools/provision.py \
-  --port COM9 --baud 115200 \
+  --port COM6 --baud 115200 \
   --thing-name ck-rx65n-01 \
   --endpoint <endpoint> \
   --cert certs/ck-rx65n-01-cert.pem \
