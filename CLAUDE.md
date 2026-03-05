@@ -284,7 +284,37 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 | [AWS IoT Core ナレッジ](https://shelty2.servegame.com/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
 | [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
 
+## Known Pitfalls / 既知の注意事項
+
+### Smart Configurator 再生成時のベクタアドレス巻き戻り
+
+**重要:** Smart Configurator でコード再生成すると `.cproject` のリンカセクション設定が
+デフォルト値に上書きされる。デュアルバンクブートローダ使用時は以下のアドレスが必須:
+
+| Section | Default (NG) | Dual Bank (正) |
+|---------|-------------|----------------|
+| EXCEPTVECT | 0xFFFFFF80 | **0xFFFEFF80** |
+| RESETVECT | 0xFFFFFFFC | **0xFFFEFFFC** |
+
+SC 再生成後は **必ず** `.cproject` の `-start` オプションで上記アドレスを確認すること。
+参照: R01AN7662JJ0100 Section 4.2.3(1)
+
+### CK-RX65N J16 ジャンパ
+
+| 設定 | 用途 |
+|------|------|
+| 1-2 (DEBUG) | E2 Lite デバッグ・rfp-cli フラッシュ書き込み |
+| 2-3 (RUN) | ファームウェア単独実行 |
+
+CI/CD では flash (J16=DEBUG) → test (J16=RUN?) の切り替えが課題。要検討。
+
 ## Changelog / 変更履歴
+
+### 2026-03-05: Vector address fix
+
+- SC 再生成 (4851f3fa) で巻き戻されたベクタアドレスを再修正
+- UART COM ポートを COM9 → COM6 に修正（J20 抜き差しで確認）
+- R01AN7662JJ0100 マニュアル精査で J16 ジャンパ設定の重要性を確認
 
 ### 2026-03-03: Step 5 — AWS IoT Core setup
 
