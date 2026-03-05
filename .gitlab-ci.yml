@@ -2,7 +2,7 @@
 # Phase 8a: CK-RX65N (V1) — ビルド → フラッシュ → テスト自動化
 #
 # Runner requirements:
-#   - Tag: run_ishiguro_machine (Shell executor on Windows)
+#   - Tag: run_ishiguro_machine (Shell executor on Windows, pwsh)
 #   - Tag: hw-ck-rx65n-v1 (CK-RX65N V1 board connected)
 #   - E2 emulator Lite + UART port available
 #   - Ethernet: board connected to LAN with internet access
@@ -10,13 +10,19 @@
 stages:
   - build
   - flash
+  - provision
   - test
 
 # --- Variables ---
 variables:
+  # Windows 260文字パス長制限の回避 (FreeRTOS-Cellular-Interface 等)
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: "core.longpaths"
+  GIT_CONFIG_VALUE_0: "true"
+
   # e2studio headless build
   E2STUDIO_CLI: "C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe"
-  E2STUDIO_WORKSPACE: "%TEMP%/e2ws_iot_ref"
+  E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref"
 
   # CC-RX compiler
   CCRX_PATH: "C:/Renesas/RX/3_7_0/bin"
@@ -41,10 +47,19 @@ variables:
   UART_PORT: "${UART_PORT_CK_RX65N_J20}"
   UART_BAUD: "115200"
 
-  # AWS IoT Core
-  # TODO: Update after AWS setup (Step 5)
-  AWS_IOT_ENDPOINT: "TBD"
-  AWS_IOT_THING_NAME: "ck-rx65n-01"
+  # AWS IoT Core — set in project-level CI/CD Variables
+  # (NOT /oss group level — credentials must stay project-scoped)
+  # DO NOT re-declare here — self-referencing variables cause GitLab
+  # to produce literal "${VAR}" instead of expanding them.
+  # Required project-level CI/CD Variables:
+  #   AWS_IOT_ENDPOINT   — AWS IoT Core endpoint URL
+  #   AWS_IOT_THING_NAME — Thing name (e.g., ck-rx65n-01)
+  #   AWS_IOT_CERT       — Device certificate (File type)
+  #   AWS_IOT_PRIVKEY    — Device private key (File type)
+
+  # Ethernet MAC address (rewrite FreeRTOSConfig.h before build)
+  # Set MAC_ADDR_CK_RX65N in /oss group CI/CD Variables
+  MAC_ADDR: "${MAC_ADDR_CK_RX65N}"
 
   # Test flags
   RUN_AWS_TESTS: "false"
@@ -66,33 +81,76 @@ build:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   script:
-    - echo "=== Build ${APP_PROJECT} and ${BL_PROJECT} ==="
+    - Write-Host "=== Build $env:APP_PROJECT and $env:BL_PROJECT ==="
+    # MAC address rewrite (using hardware-config script)
+    - |
+      if ($env:MAC_ADDR) {
+        Write-Host "=== Set MAC address: $env:MAC_ADDR ==="
+        $hcDir = "C:\tmp\hardware-config"
+        if (-not (Test-Path "$hcDir\scripts\set_mac_address.py")) {
+          if (Test-Path $hcDir) { Remove-Item -Recurse -Force $hcDir }
+          git clone --depth 1 "$env:CI_SERVER_URL/oss/infra/hardware-config.git" $hcDir
+        }
+        python "$hcDir\scripts\set_mac_address.py" --mac $env:MAC_ADDR `
+          "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\src\frtos_config\FreeRTOSConfig.h"
+      } else {
+        Write-Host "[WARN] MAC_ADDR not set, using source default"
+      }
     # Verify submodules
-    - if not exist "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h" (echo ERROR - submodules not initialized && exit /b 1)
+    - if (-not (Test-Path "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h")) { Write-Error "submodules not initialized"; exit 1 }
     # Clean workspace
-    - if exist "%E2STUDIO_WORKSPACE%" rmdir /s /q "%E2STUDIO_WORKSPACE%"
+    - if (Test-Path $env:E2STUDIO_WORKSPACE) { Remove-Item -Recurse -Force $env:E2STUDIO_WORKSPACE }
     # Import and build both projects
-    - >-
-      "%E2STUDIO_CLI%" -nosplash
-      -application org.eclipse.cdt.managedbuilder.core.headlessbuild
-      -data "%E2STUDIO_WORKSPACE%"
-      -import "%CD%\%APP_PROJECT_DIR%"
-      -import "%CD%\%BL_PROJECT_DIR%"
-      -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug"
-      -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug"
-      -no-indexer
+    - |
+      & "$env:E2STUDIO_CLI" -nosplash `
+        -application org.eclipse.cdt.managedbuilder.core.headlessbuild `
+        -data "$env:E2STUDIO_WORKSPACE" `
+        -import "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR" `
+        -import "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR" `
+        -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug" `
+        -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug" `
+        -no-indexer
     # Verify outputs
-    - if not exist "%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot" (echo ERROR - app .mot missing && exit /b 1)
-    - if not exist "%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot" (echo ERROR - bootloader .mot missing && exit /b 1)
-    - echo "BUILD SUCCESS"
+    - if (-not (Test-Path "$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot")) { Write-Error "app .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot")) { Write-Error "bootloader .mot missing"; exit 1 }
+    - Write-Host "BUILD SUCCESS"
+    # Generate combined .mot (boot_loader + app) and .rsu (signed app for OTA)
+    # See R01AN7662JJ0100 Section 4.2.3(3)
+    # image-gen.py with -ibp generates .mot only; without -ibp generates .rsu only
+    - Write-Host "=== Generate initial firmware (userprog.mot + userprog.rsu) ==="
+    - pip install pycryptodome --quiet
+    # (1) Generate userprog.mot — combined boot_loader + app for initial programming
+    - |
+      python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
+        -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
+        -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
+        -o "$env:CI_PROJECT_DIR\userprog" `
+        -ibp "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot" `
+        -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
+        -vt ecdsa -ff RTOS
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.mot")) { Write-Error "userprog.mot generation failed"; exit 1 }
+    # (2) Generate userprog.rsu — signed app image for OTA update
+    - |
+      python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
+        -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
+        -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
+        -o "$env:CI_PROJECT_DIR\userprog" `
+        -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
+        -vt ecdsa -ff RTOS
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.rsu")) { Write-Error "userprog.rsu generation failed"; exit 1 }
+    - Write-Host "Image generation SUCCESS"
   artifacts:
     paths:
       - "${APP_PROJECT_DIR}/HardwareDebug/*.mot"
       - "${BL_PROJECT_DIR}/HardwareDebug/*.mot"
+      - userprog.mot
+      - userprog.rsu
     expire_in: 7 days
 
 # --- Flash Stage ---
-flash_boot_loader:
+# Combined boot_loader + app write using userprog.mot from image-gen.py
+# See R01AN7662JJ0100 Section 4.2.3
+flash:
   stage: flash
   tags:
     - run_ishiguro_machine
@@ -101,51 +159,64 @@ flash_boot_loader:
   needs:
     - build
   script:
-    - echo "=== Flash boot_loader ==="
+    - Write-Host "=== Flash initial firmware (boot_loader + app) ==="
     # Verify E2L_SERIAL is configured
-    - if "%E2L_SERIAL%"=="" (echo ERROR - E2L_SERIAL not set. Configure in CI/CD Variables && exit /b 1)
-    # Verify .mot file exists (from build artifacts)
-    - if not exist "%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot" (echo ERROR - boot_loader .mot not found && exit /b 1)
+    - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set. Configure in CI/CD Variables"; exit 1 }
+    # Verify userprog.mot exists (combined image from build artifacts)
+    - if (-not (Test-Path "userprog.mot")) { Write-Error "userprog.mot not found"; exit 1 }
     # Step 1: Erase chip (resets BANKSEL, clears all flash including data flash)
-    - echo "Erasing chip..."
-    - >-
-      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
-      -auth id %RFP_AUTH%
-      -erase-chip -noquery
-    # Step 2: Write boot_loader
-    - echo "Writing boot_loader..."
-    - >-
-      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
-      -auth id %RFP_AUTH%
-      -p "%CD%\%BL_PROJECT_DIR%\HardwareDebug\boot_loader_ck_rx65n_v2.mot"
-      -run -noquery
-    - echo "FLASH BOOT_LOADER SUCCESS"
-  rules:
-    - when: manual
-  allow_failure: true
+    - Write-Host "Erasing chip..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -erase-chip -noquery
+    # Step 2: Write combined boot_loader + app
+    - Write-Host "Writing userprog.mot..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -p "$env:CI_PROJECT_DIR\userprog.mot" `
+        -run -noquery
+    - Write-Host "FLASH SUCCESS"
 
-flash_app:
-  stage: flash
+# --- Provision Stage ---
+provision:
+  stage: provision
   tags:
     - run_ishiguro_machine
     - hw-ck-rx65n-v1
   resource_group: ck-rx65n-device
   needs:
-    - flash_boot_loader
+    - flash
+    - build    # need userprog.mot artifact for rfp-cli reset
   script:
-    - echo "=== Flash ${APP_PROJECT} ==="
-    # Verify E2L_SERIAL is configured
-    - if "%E2L_SERIAL%"=="" (echo ERROR - E2L_SERIAL not set. Configure in CI/CD Variables && exit /b 1)
-    # Verify .mot file exists (from build artifacts)
-    - if not exist "%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot" (echo ERROR - app .mot not found && exit /b 1)
-    # Write app (no erase — preserves boot_loader region)
-    - echo "Writing app (noerase)..."
-    - >-
-      "%RFP_CLI%" -d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s %RFP_SPEED%
-      -auth id %RFP_AUTH%
-      -file "%CD%\%APP_PROJECT_DIR%\HardwareDebug\aws_ether_ck_rx65n_v2.mot"
-      -auto -noerase -run -noquery
-    - echo "FLASH APP SUCCESS"
+    - Write-Host "=== Provision AWS IoT credentials ==="
+    # Verify required variables
+    - if (-not $env:AWS_IOT_THING_NAME) { Write-Error "AWS_IOT_THING_NAME not set"; exit 1 }
+    - if (-not $env:AWS_IOT_ENDPOINT) { Write-Error "AWS_IOT_ENDPOINT not set"; exit 1 }
+    # AWS_IOT_CERT and AWS_IOT_PRIVKEY are File-type CI/CD Variables
+    # GitLab expands them to temporary file paths at runtime
+    - if (-not $env:AWS_IOT_CERT) { Write-Error "AWS_IOT_CERT not set"; exit 1 }
+    - if (-not $env:AWS_IOT_PRIVKEY) { Write-Error "AWS_IOT_PRIVKEY not set"; exit 1 }
+    # Install pyserial if needed
+    - pip install pyserial --quiet
+    # Reset device to open CLI window (~10s after boot)
+    # NOTE: rfp-cli -run without -p is "No operation". Must include -p to actually reset.
+    - Write-Host "Resetting device to open CLI window..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -p "$env:CI_PROJECT_DIR\userprog.mot" `
+        -run -noquery
+    # Run provisioning script (connects to UART during boot CLI window)
+    - |
+      python tools/provision.py `
+        --port $env:UART_PORT --baud $env:UART_BAUD `
+        --thing-name $env:AWS_IOT_THING_NAME `
+        --endpoint $env:AWS_IOT_ENDPOINT `
+        --cert $env:AWS_IOT_CERT `
+        --key $env:AWS_IOT_PRIVKEY `
+        --format
   rules:
     - when: manual
   allow_failure: true
@@ -158,15 +229,33 @@ test_mqtt:
     - hw-ck-rx65n-v1
   resource_group: ck-rx65n-device
   needs:
-    - flash_app
+    - flash
+    - build    # need userprog.mot artifact for rfp-cli reset
   script:
-    - echo "=== MQTT PubSub Test ==="
-    - echo "TODO - Implement MQTT connectivity test (Step 6)"
+    - Write-Host "=== MQTT PubSub Test ==="
+    # Install pyserial if needed
+    - pip install pyserial --quiet
+    # Diagnostic: list available COM ports (helps identify if UART_PORT is correct)
+    - Write-Host "--- Available COM ports ---"
+    - python -m serial.tools.list_ports -v
+    - Write-Host "--- UART_PORT=$env:UART_PORT ---"
+    # Monitor UART for MQTT success markers.
+    # --reset-cmd: runs rfp-cli FIRST, then opens serial port.
+    # Previous approach (port open first) caused 0-byte issue due to
+    # USB suspend / stale handle during long rfp-cli operation (~2.5 min).
+    # rfp-cli uses E2 Lite (J14) which is independent of UART (J20/COM port).
+    - |
+      $rfp_cmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
+        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
+      python tools/test_mqtt.py `
+        --port $env:UART_PORT --baud $env:UART_BAUD `
+        --timeout 120 `
+        --reset-cmd "$rfp_cmd"
   rules:
     - if: $RUN_AWS_TESTS == "true"
       when: always
     - when: manual
-  allow_failure: true  # Remove after Step 6 is complete
+  allow_failure: true
 
 test_ota:
   stage: test
@@ -177,8 +266,8 @@ test_ota:
   needs:
     - test_mqtt
   script:
-    - echo "=== OTA Update Test ==="
-    - echo "TODO - Implement OTA test (Step 7)"
+    - Write-Host "=== OTA Update Test ==="
+    - Write-Host "TODO - Implement OTA test (Step 7)"
   rules:
     - if: $RUN_OTA_TEST == "true"
       when: always

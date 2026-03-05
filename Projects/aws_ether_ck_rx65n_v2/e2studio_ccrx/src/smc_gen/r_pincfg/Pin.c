@@ -53,8 +53,8 @@ void R_Pins_Create(void)
     MPC.P93PFS.BYTE = 0x80U;
 
     /* Set ET0_LINKSTA pin */
-    MPC.PA5PFS.BYTE = 0x11U;
-    PORTA.PMR.BYTE |= 0x20U;
+    MPC.P54PFS.BYTE = 0x11U;
+    PORT5.PMR.BYTE |= 0x10U;
 
     /* Set ET0_MDC pin */
     MPC.P72PFS.BYTE = 0x11U;
@@ -63,6 +63,11 @@ void R_Pins_Create(void)
     /* Set ET0_MDIO pin */
     MPC.P71PFS.BYTE = 0x11U;
     PORT7.PMR.BYTE |= 0x02U;
+
+    /* Set IRQ2 pin */
+    MPC.PD2PFS.BYTE = 0x40U;
+    PORTD.PMR.BYTE &= 0xFBU;
+    PORTD.PDR.BYTE &= 0xFBU;
 
     /* Set REF50CK0 pin */
     MPC.P76PFS.BYTE = 0x12U;

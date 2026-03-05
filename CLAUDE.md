@@ -177,19 +177,60 @@ rfp-cli -d RX65x -t "e2l:OBE110020" -if fine -s 500K \
 
 ## AWS IoT Core
 
-### Thing 情報（未確定 — Step 5 で更新）
+### Thing 情報
 
 | Item | Value |
 |------|-------|
-| Thing name | ck-rx65n-01（予定） |
-| Endpoint | TBD |
-| Certificate | TBD |
-| Policy | TBD |
+| Thing name | ck-rx65n-01 |
+| Policy | ck-rx65n-policy |
+| Endpoint | プロジェクト CI/CD Variables `AWS_IOT_ENDPOINT` に設定 |
+| Certificate | プロジェクト CI/CD Variables `AWS_IOT_CERT` (File 型) に設定 |
+| Private Key | プロジェクト CI/CD Variables `AWS_IOT_PRIVKEY` (File 型) に設定 |
+
+### AWS リソース作成
+
+```bash
+# AWS CLI で Thing + 証明書 + ポリシーを一括作成
+./tools/aws_setup.sh [THING_NAME] [POLICY_NAME]
+# デフォルト: ck-rx65n-01, ck-rx65n-policy
+```
+
+出力ファイル: `certs/ck-rx65n-01-cert.pem`, `certs/ck-rx65n-01-privkey.pem`
 
 ### Credential Provisioning
 
 iot-reference-rx では littlefs + データフラッシュにクレデンシャルを格納する方式を採用。
-初回書き込み時に CLI 経由でプロビジョニングする手順は Getting_Started_Guide.md Step 3 を参照。
+UART CLI 経由でプロビジョニングする。
+
+```bash
+# 手動（Tera Term）: Getting_Started_Guide.md Step 3 を参照
+# 自動（Python スクリプト）:
+python tools/provision.py \
+  --port COM6 --baud 115200 \
+  --thing-name ck-rx65n-01 \
+  --endpoint <endpoint> \
+  --cert certs/ck-rx65n-01-cert.pem \
+  --key certs/ck-rx65n-01-privkey.pem
+```
+
+**注意:** `flash_boot_loader` は `-erase-chip` でデータフラッシュも消去するため、
+フラッシュ書き込みの度に再プロビジョニングが必要。CI/CD では provision ステージで自動実行。
+
+### CI/CD Variables（プロジェクトレベル）
+
+AWS クレデンシャルは **iot-reference-rx プロジェクト** の CI/CD Variables に設定。
+`/oss` グループレベルではなくプロジェクトレベルに限定し、他プロジェクトへの漏洩を防止。
+
+**Protected は全て No** — Protected 変数はフィーチャーブランチ（非Protected ブランチ）の
+パイプラインで参照できないため。代わりに **Project-based pipeline visibility を OFF** にして
+パイプラインログをプロジェクトメンバーのみに制限することで秘密情報を保護する。
+
+| Variable | Type | Description | Masked | Protected |
+|----------|------|-------------|--------|-----------|
+| `AWS_IOT_ENDPOINT` | Variable | AWS IoT Data-ATS エンドポイント | Yes | No |
+| `AWS_IOT_THING_NAME` | Variable | Thing 名 | No | No |
+| `AWS_IOT_CERT` | File | デバイス証明書 (PEM) | No | No |
+| `AWS_IOT_PRIVKEY` | File | 秘密鍵 (PEM) | No | No |
 
 ## CI/CD Pipeline
 
@@ -201,7 +242,7 @@ iot-reference-rx では littlefs + データフラッシュにクレデンシャ
 | 2 | ハードウェアセットアップ（人間作業） | Done (COM6 確定) |
 | 3 | ビルド環境構築（headless build） | Done |
 | 4 | フラッシュ書き込み自動化（rfp-cli） | Done |
-| 5 | AWS IoT Core セットアップ | Planned |
+| 5 | AWS IoT Core セットアップ | Done |
 | 6 | MQTT PubSub 動作確認 | Planned |
 | 7 | OTA テスト | Planned |
 | 8 | CI/CD パイプライン統合 | Planned |
@@ -243,7 +284,48 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 | [AWS IoT Core ナレッジ](https://shelty2.servegame.com/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
 | [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
 
+## Known Pitfalls / 既知の注意事項
+
+### Smart Configurator 再生成時のベクタアドレス巻き戻り
+
+**重要:** Smart Configurator でコード再生成すると `.cproject` のリンカセクション設定が
+デフォルト値に上書きされる。デュアルバンクブートローダ使用時は以下のアドレスが必須:
+
+| Section | Default (NG) | Dual Bank (正) |
+|---------|-------------|----------------|
+| EXCEPTVECT | 0xFFFFFF80 | **0xFFFEFF80** |
+| RESETVECT | 0xFFFFFFFC | **0xFFFEFFFC** |
+
+SC 再生成後は **必ず** `.cproject` の `-start` オプションで上記アドレスを確認すること。
+参照: R01AN7662JJ0100 Section 4.2.3(1)
+
+### CK-RX65N J16 ジャンパ
+
+| 設定 | 用途 |
+|------|------|
+| 1-2 (DEBUG) | E2 Lite デバッグ・rfp-cli フラッシュ書き込み |
+| 2-3 (RUN) | ファームウェア単独実行（マニュアル記載） |
+
+**実測結果:** J16=DEBUG (1-2) のまま rfp-cli `-run` でアプリが正常起動する。
+J16 切り替え・電源 OFF/ON いずれも不要。**CI/CD では J16=DEBUG 固定で問題なし。**
+（R01AN7662JJ0100 トラブルシューティング No.4 の記載はベクタアドレスが正しければ該当しない）
+
 ## Changelog / 変更履歴
+
+### 2026-03-05: Vector address fix
+
+- SC 再生成 (4851f3fa) で巻き戻されたベクタアドレスを再修正
+- UART COM ポートを COM9 → COM6 に修正（J20 抜き差しで確認）
+- R01AN7662JJ0100 マニュアル精査で J16 ジャンパ設定の重要性を確認
+
+### 2026-03-03: Step 5 — AWS IoT Core setup
+
+- tools/aws_setup.sh 作成（AWS CLI で Thing + 証明書 + ポリシーを一括作成）
+- tools/iot_policy.json 作成（開発用 IoT ポリシー）
+- tools/provision.py 作成（pyserial で UART CLI 経由の自動プロビジョニング）
+- .gitlab-ci.yml に provision ステージ追加（flash → provision → test）
+- AWS クレデンシャルをプロジェクトレベル CI/CD Variables で管理する方針を確定
+- CLAUDE.md に AWS IoT Core セクション・プロビジョニング手順を追記
 
 ### 2026-03-03: Step 4 — Flash automation
 

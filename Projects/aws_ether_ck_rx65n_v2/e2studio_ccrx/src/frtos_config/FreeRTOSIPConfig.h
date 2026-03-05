@@ -141,18 +141,18 @@ out the application messages. */
  * receive an options field of 312 bytes, the fixed part of the DHCP packet is
  * 240 bytes, and the IP/UDP headers take 28 bytes.
  */
-#define ipconfigUSE_DHCP                           ipconfigENABLE
+#define ipconfigUSE_DHCP                           1
 
 /* During the DHCP process, the driver will call an application hook
  * if 'ipconfigUSE_DHCP_HOOK' is non-zero.  It lets the application decide
  * if the DHCP offer shall be accepted.
  */
-#define ipconfigUSE_DHCP_HOOK                      ipconfigDISABLE
+#define ipconfigUSE_DHCP_HOOK                      0
 
 /* Include support for FreeRTOS_SendPingRequest() and
  * FreeRTOS_SendPingRequestIPv6()
  */
-#define ipconfigSUPPORT_OUTGOING_PINGS             ipconfigDISABLE
+#define ipconfigSUPPORT_OUTGOING_PINGS             0
 
 /* Enables the APIs that are backward compatible with single end point IPv4
  * version V3.x.x or older.
@@ -162,6 +162,6 @@ out the application messages. */
 /* Include support for the IPv6 protocol.
  * If disabled, the application must enable IPv4.
  */
-#define ipconfigUSE_IPv6    ipconfigDISABLE
+#define ipconfigUSE_IPv6    0
 
 #endif /* FREERTOS_IP_CONFIG_H */

@@ -239,6 +239,9 @@ extern void vOutputString( const char * pcMessage );
  * to and from a real network connection on the host PC.  See the
  * configNETWORK_INTERFACE_TO_USE definition above for information on how to
  * configure the real network connection to use. */
+/* MAC address — default value (sample).
+ * CI/CD pipeline rewrites this via set_mac_address.py using
+ * MAC_ADDR_CK_RX65N variable.  See: oss/infra/hardware-config#1 */
 #define configMAC_ADDR0                      0x74
 #define configMAC_ADDR1                      0x90
 #define configMAC_ADDR2                      0x50
