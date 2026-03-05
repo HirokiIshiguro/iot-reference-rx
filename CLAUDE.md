@@ -130,7 +130,7 @@ e2studio-cli.exe -nosplash \
 - MCU: RX65N (RXv2 コア, 2MB コードフラッシュ, 640KB RAM)
 - Ethernet: オンボード（LAN8720, RMII）
 - デバッガ: E2 emulator Lite（オンボード）
-- UART: COM9（USB シリアル デバイス、SCI チャネル要確認）
+- UART: COM6（USB シリアル デバイス、VID:045B PID:8111 SER=0000000000001）
 - ボーレート: 115200bps（V1 はオンボード USB シリアルチップ。V2 以降で FTDI に置換され 921600bps 対応）
 - E2 Lite: 「Renesas USB Development Tools」として認識（COM ポートとしては表示されない）
 
@@ -143,7 +143,7 @@ e2studio-cli.exe -nosplash \
 | E2 Lite USB | **J14** (USB DEBUG, Micro-B) |
 | E2 Lite S/N | **OBE110020** |
 | UART USB | **J20** (USB SER, Micro-B) |
-| UART COM port | COM9 (115200bps) |
+| UART COM port | COM6 (115200bps) |
 | Runner tag | run_ishiguro_machine, hw-ck-rx65n-v1 |
 | Ethernet | Runner マシンと同一 LAN に接続済み |
 
@@ -198,7 +198,7 @@ iot-reference-rx では littlefs + データフラッシュにクレデンシャ
 | Step | Goal | Status |
 |------|------|--------|
 | 1 | GitLab リポジトリ作成・初期セットアップ | Done (MR !1) |
-| 2 | ハードウェアセットアップ（人間作業） | Done (COM9 確定) |
+| 2 | ハードウェアセットアップ（人間作業） | Done (COM6 確定) |
 | 3 | ビルド環境構築（headless build） | Done |
 | 4 | フラッシュ書き込み自動化（rfp-cli） | Done |
 | 5 | AWS IoT Core セットアップ | Planned |
