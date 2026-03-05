@@ -239,12 +239,15 @@ extern void vOutputString( const char * pcMessage );
  * to and from a real network connection on the host PC.  See the
  * configNETWORK_INTERFACE_TO_USE definition above for information on how to
  * configure the real network connection to use. */
+/* CK-RX65N V1 MAC address (from sticker on LAN connector)
+ * See: oss/infra/hardware-config Issue #1
+ * TODO: Move to CI/CD variable for multi-board support */
 #define configMAC_ADDR0                      0x74
 #define configMAC_ADDR1                      0x90
 #define configMAC_ADDR2                      0x50
-#define configMAC_ADDR3                      0x00
-#define configMAC_ADDR4                      0x79
-#define configMAC_ADDR5                      0x03
+#define configMAC_ADDR3                      0x10
+#define configMAC_ADDR4                      0xa5
+#define configMAC_ADDR5                      0xa8
 
 /* Default IP address configuration.  Used in ipconfigUSE_DHCP is set to 0, or
  * ipconfigUSE_DHCP is set to 1 but a DNS server cannot be contacted. */
