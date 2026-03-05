@@ -57,6 +57,10 @@ variables:
   #   AWS_IOT_CERT       — Device certificate (File type)
   #   AWS_IOT_PRIVKEY    — Device private key (File type)
 
+  # Ethernet MAC address (rewrite FreeRTOSConfig.h before build)
+  # Set MAC_ADDR_CK_RX65N in /oss group CI/CD Variables
+  MAC_ADDR: "${MAC_ADDR_CK_RX65N}"
+
   # Test flags
   RUN_AWS_TESTS: "false"
   RUN_OTA_TEST: "false"
@@ -78,6 +82,20 @@ build:
     GIT_SUBMODULE_STRATEGY: recursive
   script:
     - Write-Host "=== Build $env:APP_PROJECT and $env:BL_PROJECT ==="
+    # MAC address rewrite (using hardware-config script)
+    - |
+      if ($env:MAC_ADDR) {
+        Write-Host "=== Set MAC address: $env:MAC_ADDR ==="
+        $hcDir = "C:\tmp\hardware-config"
+        if (-not (Test-Path "$hcDir\scripts\set_mac_address.py")) {
+          if (Test-Path $hcDir) { Remove-Item -Recurse -Force $hcDir }
+          git clone --depth 1 "$env:CI_SERVER_URL/oss/infra/hardware-config.git" $hcDir
+        }
+        python "$hcDir\scripts\set_mac_address.py" --mac $env:MAC_ADDR `
+          "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\src\frtos_config\FreeRTOSConfig.h"
+      } else {
+        Write-Host "[WARN] MAC_ADDR not set, using source default"
+      }
     # Verify submodules
     - if (-not (Test-Path "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h")) { Write-Error "submodules not initialized"; exit 1 }
     # Clean workspace
