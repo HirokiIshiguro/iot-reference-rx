@@ -217,6 +217,16 @@ provision:
         --cert $env:AWS_IOT_CERT `
         --key $env:AWS_IOT_PRIVKEY `
         --format
+    # Reset device so it boots fresh with provisioned credentials.
+    # Without this, the device stays in its current state (CLI window closed,
+    # MQTT sequence already completed) and test_mqtt cannot observe the markers.
+    - Write-Host "Resetting device with provisioned credentials..."
+    - |
+      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -p "$env:CI_PROJECT_DIR\userprog.mot" `
+        -run -noquery
+    - Write-Host "PROVISION SUCCESS — device rebooting with credentials"
   rules:
     - when: manual
   allow_failure: true
@@ -230,7 +240,9 @@ test_mqtt:
   resource_group: ck-rx65n-device
   needs:
     - flash
-    - build    # need userprog.mot artifact for rfp-cli reset
+    - build
+    - job: provision
+      optional: true    # test_mqtt can run without provision (manual trigger)
   script:
     - Write-Host "=== MQTT PubSub Test ==="
     # Install pyserial if needed
@@ -240,9 +252,9 @@ test_mqtt:
     - python -m serial.tools.list_ports -v
     - Write-Host "--- UART_PORT=$env:UART_PORT ---"
     # Monitor UART for MQTT success markers.
-    # Device is already running after provision stage (bootloader + app + credentials).
-    # Use UART reset only (--reset-cmd not needed).
-    # UART reset sends 'reset' command to trigger software reboot.
+    # After provision stage, device has been reset via rfp-cli and is booting fresh.
+    # test_mqtt.py sends UART 'reset' command (via CLI window) to trigger a clean
+    # reboot and capture the full MQTT connection sequence from the beginning.
     - |
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
