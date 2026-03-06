@@ -62,7 +62,6 @@ variables:
   MAC_ADDR: "${MAC_ADDR_CK_RX65N}"
 
   # Test flags
-  RUN_AWS_TESTS: "false"
   RUN_OTA_TEST: "false"
 
 # Disable MR pipelines — branch pipeline only
@@ -217,8 +216,6 @@ provision:
         --cert $env:AWS_IOT_CERT `
         --key $env:AWS_IOT_PRIVKEY `
         --format
-  rules:
-    - when: manual
   allow_failure: true
 
 # --- Test Stage ---
@@ -257,10 +254,6 @@ test_mqtt:
         --port $env:UART_PORT --baud $env:UART_BAUD `
         --timeout 120 `
         --reset-cmd $resetCmd
-  rules:
-    - if: $RUN_AWS_TESTS == "true"
-      when: always
-    - when: manual
   allow_failure: true
 
 test_ota:
