@@ -240,17 +240,12 @@ test_mqtt:
     - python -m serial.tools.list_ports -v
     - Write-Host "--- UART_PORT=$env:UART_PORT ---"
     # Monitor UART for MQTT success markers.
-    # --reset-cmd: runs rfp-cli FIRST, then opens serial port.
-    # Previous approach (port open first) caused 0-byte issue due to
-    # USB suspend / stale handle during long rfp-cli operation (~2.5 min).
-    # rfp-cli uses E2 Lite (J14) which is independent of UART (J20/COM port).
+    # Device is already running after provision stage (bootloader + app + credentials loaded).
+    # Use UART-only reset (no rfp-cli needed) to preserve provisioned credentials in data flash.
     - |
-      $rfp_cmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
-        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
-        --timeout 120 `
-        --reset-cmd "$rfp_cmd"
+        --timeout 120
   rules:
     - if: $RUN_AWS_TESTS == "true"
       when: always
