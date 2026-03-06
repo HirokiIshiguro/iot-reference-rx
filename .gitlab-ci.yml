@@ -62,7 +62,6 @@ variables:
   MAC_ADDR: "${MAC_ADDR_CK_RX65N}"
 
   # Test flags
-  RUN_AWS_TESTS: "false"
   RUN_OTA_TEST: "false"
 
 # Disable MR pipelines — branch pipeline only
@@ -217,8 +216,6 @@ provision:
         --cert $env:AWS_IOT_CERT `
         --key $env:AWS_IOT_PRIVKEY `
         --format
-  rules:
-    - when: manual
   allow_failure: true
 
 # --- Test Stage ---
@@ -230,7 +227,9 @@ test_mqtt:
   resource_group: ck-rx65n-device
   needs:
     - flash
-    - build    # need userprog.mot artifact for rfp-cli reset
+    - build
+    - job: provision
+      optional: true    # test_mqtt can run without provision (manual trigger)
   script:
     - Write-Host "=== MQTT PubSub Test ==="
     # Install pyserial if needed
@@ -240,21 +239,21 @@ test_mqtt:
     - python -m serial.tools.list_ports -v
     - Write-Host "--- UART_PORT=$env:UART_PORT ---"
     # Monitor UART for MQTT success markers.
-    # --reset-cmd: runs rfp-cli FIRST, then opens serial port.
-    # Previous approach (port open first) caused 0-byte issue due to
-    # USB suspend / stale handle during long rfp-cli operation (~2.5 min).
-    # rfp-cli uses E2 Lite (J14) which is independent of UART (J20/COM port).
+    # test_mqtt.py uses --reset-cmd to:
+    #   1. Close serial port (avoid USB handle issues during rfp-cli)
+    #   2. rfp-cli re-writes code flash + run (data flash with credentials preserved)
+    #   3. Open serial port immediately after reset
+    #   4. Send 'CLI' to enter CLI mode during boot window (~10s)
+    #   5. Send 'reset' for clean reboot with UART output enabled
+    #   6. Monitor for MQTT success markers
+    # This must happen within the same job to catch the 10-second CLI boot window.
     - |
-      $rfp_cmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
+      $resetCmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
         $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
         --timeout 120 `
-        --reset-cmd "$rfp_cmd"
-  rules:
-    - if: $RUN_AWS_TESTS == "true"
-      when: always
-    - when: manual
+        --reset-cmd $resetCmd
   allow_failure: true
 
 test_ota:
