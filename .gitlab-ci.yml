@@ -251,7 +251,7 @@ test_mqtt:
     #   6. Monitor for MQTT success markers
     # This must happen within the same job to catch the 10-second CLI boot window.
     - |
-      $resetCmd = '& "{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
+      $resetCmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
         $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
