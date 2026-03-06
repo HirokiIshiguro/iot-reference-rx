@@ -1514,7 +1514,7 @@
           <Option>-debug</Option>
           <Option>-outcode=utf8</Option>
           <Option>-goptimize</Option>
-          <Option>-optimize=0</Option>
+          <Option>-optimize=2</Option>
           <Option>-nologo</Option>
           <Option>-lang=c99</Option>
           <Option>-lang=cpp</Option>
