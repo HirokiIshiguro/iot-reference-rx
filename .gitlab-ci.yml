@@ -292,10 +292,54 @@ test_ota:
   needs:
     - test_mqtt
   script:
-    - Write-Host "=== OTA Update Test ==="
-    - Write-Host "TODO - Implement OTA test (Step 7)"
+    - Write-Host "=== OTA Update Test (observability contract) ==="
+    - pip install pyserial --quiet
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\test_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      $meta = [ordered]@{
+        step = "step7-3"
+        started_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+        commit_sha = $env:CI_COMMIT_SHA
+        job_id = $env:CI_JOB_ID
+        pipeline_id = $env:CI_PIPELINE_ID
+        uart_port = $env:UART_PORT
+        uart_baud = $env:UART_BAUD
+        planned_runtime_outputs = @(
+          "ota_uart_raw.log",
+          "ota_summary.json"
+        )
+        generated_now = @(
+          "ota_job_meta.json",
+          "serial_ports.txt",
+          "test_ota_help.txt",
+          "README.txt"
+        )
+        note = "Step 7-3 defines OTA markers, failure classes, and artifact paths. Live OTA execution remains for issue #7."
+      }
+
+      @'
+Planned live OTA artifacts:
+- ota_uart_raw.log: per-line UTC + relative timestamps from tools/test_ota.py --raw-log
+- ota_summary.json: success/classification/marker summary from tools/test_ota.py --summary-json
+- serial_ports.txt: serial port inventory captured before the test
+- ota_job_meta.json: CI job metadata and start/end timestamps
+'@ | Set-Content -Encoding UTF8 "$artifactDir\README.txt"
+
+      python tools/test_ota.py --help 2>&1 | Tee-Object -FilePath "$artifactDir\test_ota_help.txt"
+      python -m serial.tools.list_ports -v 2>&1 | Tee-Object -FilePath "$artifactDir\serial_ports.txt"
+
+      $meta.ended_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+      $meta | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$artifactDir\ota_job_meta.json"
+    - Write-Host "Observability artifacts prepared in artifacts/test_ota"
   rules:
     - if: $RUN_OTA_TEST == "true"
       when: always
     - when: manual
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_ota/
+    expire_in: 7 days
   allow_failure: true  # Remove after Step 7 is complete
