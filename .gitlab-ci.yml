@@ -68,6 +68,17 @@ variables:
   # Test flags
   RUN_OTA_TEST: "false"
 
+  # OTA test (manual Step 7-5)
+  # These defaults match the validated 2026-03-08 happy path and can be
+  # overridden per project/runner if the AWS environment changes.
+  AWS_DEFAULT_REGION: "ap-northeast-1"
+  OTA_S3_BUCKET: "rx65n-ota"
+  OTA_SERVICE_ROLE_ARN: "arn:aws:iam::094025684215:role/rx72n-ota-service-role"
+  OTA_SIGNING_PROFILE: "rx65n_ota_profile_testkey"
+  OTA_CANDIDATE_VERSION: "0.9.3"
+  OTA_OBSERVE_TIMEOUT: "180"
+  E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_ota"
+
 # Disable MR pipelines — branch pipeline only
 workflow:
   rules:
@@ -225,16 +236,11 @@ provision:
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog_codesign_cert.pem")) { Write-Error "userprog_codesign_cert.pem not found"; exit 1 }
     # Install pyserial if needed
     - pip install pyserial --quiet
-    # Reset device to open CLI window (~10s after boot)
-    # NOTE: rfp-cli -run without -p is "No operation". Must include -p to actually reset.
-    - Write-Host "Resetting device to open CLI window..."
+    # Run provisioning script with an external reset command so the script
+    # itself catches the CLI boot window immediately after reset.
     - |
-      & "$env:RFP_CLI" -d RX65x -t "e2l:$env:E2L_SERIAL" -if fine -s $env:RFP_SPEED `
-        -auth id $env:RFP_AUTH `
-        -p "$env:CI_PROJECT_DIR\userprog.mot" `
-        -run -noquery
-    # Run provisioning script (connects to UART during boot CLI window)
-    - |
+      $resetCmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -v "{4}\userprog.mot" -run -noquery' -f `
+        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
       python tools/provision.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
         --thing-name $env:AWS_IOT_THING_NAME `
@@ -242,7 +248,8 @@ provision:
         --cert $env:AWS_IOT_CERT `
         --key $env:AWS_IOT_PRIVKEY `
         --code-sign-cert "$env:CI_PROJECT_DIR\userprog_codesign_cert.pem" `
-        --format
+        --format `
+        --reset-cmd $resetCmd
   allow_failure: true
 
 # --- Test Stage ---
@@ -268,14 +275,14 @@ test_mqtt:
     # Monitor UART for MQTT success markers.
     # test_mqtt.py uses --reset-cmd to:
     #   1. Close serial port (avoid USB handle issues during rfp-cli)
-    #   2. rfp-cli re-writes code flash + run (data flash with credentials preserved)
+    #   2. rfp-cli verify + run to reset the target without re-writing flash
     #   3. Open serial port immediately after reset
     #   4. Send 'CLI' to enter CLI mode during boot window (~10s)
     #   5. Send 'reset' for clean reboot with UART output enabled
     #   6. Monitor for MQTT success markers
     # This must happen within the same job to catch the 10-second CLI boot window.
     - |
-      $resetCmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -p "{4}\userprog.mot" -run -noquery' -f `
+      $resetCmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -v "{4}\userprog.mot" -run -noquery' -f `
         $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
       python tools/test_mqtt.py `
         --port $env:UART_PORT --baud $env:UART_BAUD `
@@ -285,6 +292,7 @@ test_mqtt:
 
 test_ota:
   stage: test
+  timeout: 45 min
   tags:
     - run_ishiguro_machine
     - hw-ck-rx65n-v1
@@ -292,46 +300,150 @@ test_ota:
   needs:
     - test_mqtt
   script:
-    - Write-Host "=== OTA Update Test (observability contract) ==="
-    - pip install pyserial --quiet
+    - Write-Host "=== OTA Update Test (manual live run) ==="
+    - pip install pyserial pycryptodome cryptography --quiet
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\test_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      New-Item -ItemType Directory -Force -Path "$artifactDir\candidate" | Out-Null
+
+      if (-not $env:AWS_IOT_THING_NAME) { Write-Error "AWS_IOT_THING_NAME not set"; exit 1 }
+      if (-not $env:OTA_S3_BUCKET) { Write-Error "OTA_S3_BUCKET not set"; exit 1 }
+      if (-not $env:OTA_SERVICE_ROLE_ARN) { Write-Error "OTA_SERVICE_ROLE_ARN not set"; exit 1 }
+      if (-not $env:OTA_SIGNING_PROFILE) { Write-Error "OTA_SIGNING_PROFILE not set"; exit 1 }
+      if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set"; exit 1 }
+      if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.mot")) { Write-Error "userprog.mot not found"; exit 1 }
 
       $meta = [ordered]@{
-        step = "step7-3"
+        step = "step7-5"
         started_at_utc = (Get-Date).ToUniversalTime().ToString("o")
         commit_sha = $env:CI_COMMIT_SHA
         job_id = $env:CI_JOB_ID
         pipeline_id = $env:CI_PIPELINE_ID
         uart_port = $env:UART_PORT
         uart_baud = $env:UART_BAUD
+        ota_candidate_version = $env:OTA_CANDIDATE_VERSION
+        ota_bucket = $env:OTA_S3_BUCKET
+        ota_signing_profile = $env:OTA_SIGNING_PROFILE
+        ota_service_role_arn = $env:OTA_SERVICE_ROLE_ARN
         planned_runtime_outputs = @(
+          "candidate\*.rsu",
+          "candidate\*_codesign_cert.pem",
+          "build_ota_candidate.log",
+          "create_ota_console.log",
+          "create_ota_input.json",
+          "create_ota_output.json",
+          "ota_s3_put_output.json",
+          "ota_update_status.json",
+          "signing_job.json",
           "ota_uart_raw.log",
-          "ota_summary.json"
+          "ota_summary.json",
+          "test_ota_console.log",
+          "job_execution.json"
         )
         generated_now = @(
-          "ota_job_meta.json",
+          "ci_job_meta.json",
           "serial_ports.txt",
-          "test_ota_help.txt",
+          "create_ota_help.txt",
           "README.txt"
         )
-        note = "Step 7-3 defines OTA markers, failure classes, and artifact paths. Live OTA execution remains for issue #7."
+        note = "Step 7-5 manual job builds a higher OTA candidate, creates an AWS IoT OTA job, and observes the live UART sequence."
       }
 
-      @'
-Planned live OTA artifacts:
-- ota_uart_raw.log: per-line UTC + relative timestamps from tools/test_ota.py --raw-log
-- ota_summary.json: success/classification/marker summary from tools/test_ota.py --summary-json
-- serial_ports.txt: serial port inventory captured before the test
-- ota_job_meta.json: CI job metadata and start/end timestamps
-'@ | Set-Content -Encoding UTF8 "$artifactDir\README.txt"
+      $readmeLines = @(
+        'Manual OTA artifacts:',
+        '- candidate\*.rsu: OTA candidate image built with a higher app version than baseline',
+        '- candidate\*_codesign_cert.pem: public certificate generated from the OTA signing key used for the candidate build',
+        '- build_ota_candidate.log: candidate build transcript',
+        '- create_ota_input.json: input used for aws iot create-ota-update',
+        '- create_ota_output.json: create-ota-update response',
+        '- ota_s3_put_output.json: uploaded S3 object metadata',
+        '- ota_update_status.json: final get-ota-update payload after CREATE_COMPLETE/FAILED',
+        '- signing_job.json: aws signer describe-signing-job output',
+        '- ota_job_meta.json: OTA update ID / job ID / S3 object metadata from tools/create_ota_update.py',
+        '- ota_uart_raw.log: per-line UTC + relative timestamps from tools/test_ota.py --raw-log',
+        '- ota_summary.json: success/classification/marker summary from tools/test_ota.py --summary-json',
+        '- test_ota_console.log: stdout/stderr from the live UART observer',
+        '- job_execution.json: aws iot describe-job-execution output after observation',
+        '- serial_ports.txt: serial port inventory captured before the test',
+        '- ci_job_meta.json: CI job metadata and start/end timestamps'
+      )
+      $readmeLines | Set-Content -Encoding UTF8 "$artifactDir\README.txt"
 
-      python tools/test_ota.py --help 2>&1 | Tee-Object -FilePath "$artifactDir\test_ota_help.txt"
+      python tools/create_ota_update.py --help 2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_help.txt"
       python -m serial.tools.list_ports -v 2>&1 | Tee-Object -FilePath "$artifactDir\serial_ports.txt"
 
+      $env:OTA_SIGNING_KEY_PATH = $env:OTA_SIGNING_KEY
+      if (-not $env:OTA_SIGNING_KEY_PATH) {
+        $env:OTA_SIGNING_KEY_PATH = "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey"
+        Write-Host "[WARN] OTA_SIGNING_KEY not set, using repository test key (development only)"
+      } elseif (-not (Test-Path $env:OTA_SIGNING_KEY_PATH)) {
+        Write-Error "OTA signing key not found: $env:OTA_SIGNING_KEY_PATH"
+        exit 1
+      }
+
+      $candidateVersionUnderscore = $env:OTA_CANDIDATE_VERSION -replace '\.', '_'
+      $candidatePrefix = "$artifactDir\candidate\$env:AWS_IOT_THING_NAME" + "_" + $candidateVersionUnderscore
+      $candidateCodeSignCert = "$artifactDir\candidate\$env:AWS_IOT_THING_NAME" + "_codesign_cert.pem"
+      python tools/build_ota_candidate.py `
+        --repo-root $env:CI_PROJECT_DIR `
+        --version $env:OTA_CANDIDATE_VERSION `
+        --output-prefix $candidatePrefix `
+        --signing-key $env:OTA_SIGNING_KEY_PATH `
+        --e2studio-cli $env:E2STUDIO_CLI `
+        --workspace $env:E2STUDIO_WORKSPACE_OTA `
+        --code-sign-cert-out $candidateCodeSignCert `
+        2>&1 | Tee-Object -FilePath "$artifactDir\build_ota_candidate.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      $candidateRsu = "$candidatePrefix.rsu"
+      if (-not (Test-Path $candidateRsu)) {
+        Write-Error "OTA candidate .rsu missing: $candidateRsu"
+        exit 1
+      }
+
+      python tools/create_ota_update.py `
+        --artifact-dir $artifactDir `
+        --thing-name $env:AWS_IOT_THING_NAME `
+        --input-rsu $candidateRsu `
+        --file-version $env:OTA_CANDIDATE_VERSION `
+        --bucket $env:OTA_S3_BUCKET `
+        --signing-profile $env:OTA_SIGNING_PROFILE `
+        --role-arn $env:OTA_SERVICE_ROLE_ARN `
+        --region $env:AWS_DEFAULT_REGION `
+        2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      $resetCmd = '"{0}" -d RX65x -t "e2l:{1}" -if fine -s {2} -auth id {3} -v "{4}\userprog.mot" -run -noquery' -f `
+        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH, $env:CI_PROJECT_DIR
+
+      $testOtaExit = 0
+      python tools/test_ota.py `
+        --port $env:UART_PORT --baud $env:UART_BAUD `
+        --timeout $env:OTA_OBSERVE_TIMEOUT `
+        --expected-version $env:OTA_CANDIDATE_VERSION `
+        --reset-cmd $resetCmd `
+        --raw-log "$artifactDir\ota_uart_raw.log" `
+        --summary-json "$artifactDir\ota_summary.json" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\test_ota_console.log"
+      if ($LASTEXITCODE -ne 0) { $testOtaExit = $LASTEXITCODE }
+
+      $otaMetaPath = "$artifactDir\ota_job_meta.json"
+      if (Test-Path $otaMetaPath) {
+        $otaMeta = Get-Content $otaMetaPath | ConvertFrom-Json
+        if ($otaMeta.aws_iot_job_id) {
+          aws iot describe-job-execution `
+            --job-id $otaMeta.aws_iot_job_id `
+            --thing-name $env:AWS_IOT_THING_NAME `
+            --region $env:AWS_DEFAULT_REGION `
+            --output json `
+            2>&1 | Tee-Object -FilePath "$artifactDir\job_execution.json"
+        }
+      }
+
       $meta.ended_at_utc = (Get-Date).ToUniversalTime().ToString("o")
-      $meta | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$artifactDir\ota_job_meta.json"
+      $meta | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$artifactDir\ci_job_meta.json"
+      if ($testOtaExit -ne 0) { exit $testOtaExit }
     - Write-Host "Observability artifacts prepared in artifacts/test_ota"
   rules:
     - if: $RUN_OTA_TEST == "true"

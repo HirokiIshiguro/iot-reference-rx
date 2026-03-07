@@ -25,6 +25,11 @@ from pathlib import Path
 # Force unbuffered stdout for CI environments.
 if not sys.stdout.isatty():
     sys.stdout = os.fdopen(sys.stdout.fileno(), "w", buffering=1)
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(errors="backslashreplace")
+    except Exception:
+        pass
 
 try:
     import serial
