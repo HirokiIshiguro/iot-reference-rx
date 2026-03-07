@@ -85,7 +85,7 @@
  * (0) : OTA demo is disabled
  * (1) : OTA over MQTT demo is enabled
  */
-#define ENABLE_OTA_UPDATE_DEMO              (0)
+#define ENABLE_OTA_UPDATE_DEMO              (1)
 
 #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
 	#error "Fleet Provisioning demo is not supported!"

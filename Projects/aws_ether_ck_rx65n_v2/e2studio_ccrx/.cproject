@@ -21,8 +21,8 @@
 				<deviceConfiguration core="" device="R5F565NE" family="rx" modes="bank.dual" package="HxFB"/>
 			</storageModule>
 			<storageModule moduleId="com.renesas.cdt.managedbuild.core.boardInfo">
-				<option id="board.id" value="CK-RX65N-V2"/>
-				<option id="board.name" value="CK-RX65N-V2"/>
+				<option id="board.id" value="CK-RX65N"/>
+				<option id="board.name" value="CK-RX65N"/>
 				<option id="board.device" value="R5F565NEHxFB"/>
 			</storageModule>
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
