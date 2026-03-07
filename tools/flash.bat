@@ -48,10 +48,11 @@ echo APP_MOT:    %APP_MOT%
 echo ============================================================
 
 REM --- Verify prerequisites ---
-if not exist "%RFP_CLI%" (
-    echo ERROR: rfp-cli not found: %RFP_CLI%
-    exit /b 1
-)
+if exist "%RFP_CLI%" goto rfp_cli_ok
+echo ERROR: rfp-cli not found: %RFP_CLI%
+exit /b 1
+
+:rfp_cli_ok
 if not exist "%BL_MOT%" (
     echo ERROR: boot_loader .mot not found: %BL_MOT%
     echo Run build_headless.bat first.
