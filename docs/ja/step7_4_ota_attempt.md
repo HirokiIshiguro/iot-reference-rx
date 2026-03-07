@@ -238,3 +238,7 @@ Retry order should be:
 - A second batch parsing bug was found later in the prerequisite check for
   `rfp-cli`: `Program Files (x86)` in `%RFP_CLI%` broke `if (...)` parsing.
   This was fixed by removing the grouped block from that check.
+- A third issue remained: `flash.bat` still returned after Step 1 on this host.
+  The durable fix was to make `flash.bat` a thin wrapper and move the actual
+  flash sequence into `tools/flash.ps1`, which now completes Step 1-3 and prints
+  `FLASH SUCCESS`.
