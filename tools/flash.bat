@@ -38,9 +38,6 @@ REM --- File paths ---
 set "BL_MOT=%REPO_ROOT%\Projects\boot_loader_ck_rx65n_v2\e2studio_ccrx\HardwareDebug\boot_loader_ck_rx65n_v2.mot"
 set "APP_MOT=%REPO_ROOT%\Projects\aws_ether_ck_rx65n_v2\e2studio_ccrx\HardwareDebug\aws_ether_ck_rx65n_v2.mot"
 
-REM --- rfp-cli common options ---
-set "RFP_COMMON=-d RX65x -t "e2l:%E2L_SERIAL%" -if fine -s 500K -auth id FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
-
 echo ============================================================
 echo iot-reference-rx flash (CK-RX65N V1)
 echo ============================================================
