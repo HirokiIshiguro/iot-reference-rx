@@ -42,6 +42,11 @@ import time
 # Without this, all output gets same timestamp in CI logs.
 if not sys.stdout.isatty():
     sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(errors="backslashreplace")
+    except Exception:
+        pass
 
 try:
     import serial
