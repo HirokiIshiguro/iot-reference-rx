@@ -18,6 +18,11 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 本プロジェクトでは CK-RX65N **V1** を使用。V2 との主な違い:
 - Ethernet 回路は同一（V2 のコードがそのまま V1 で動作）
 - V2 で追加された Cellular (RYZ014A) / Wi-Fi (DA16600) モジュールは V1 では未搭載
+- シリアル配線が異なる
+  - V1 (`CK-RX65N_V1.03.bdf`): `SERIAL (J20) = SCI5` (`TXD5=pin67/PC3`, `RXD5=pin70/PC2`)
+  - V2 (`CK-RX65N-V2_V1.01.bdf`): `SERIAL = SCI1` (`TXD1=pin31`, `RXD1=pin29`), `USBC = SCI5`
+  - 現在の `aws_ether_ck_rx65n_v2` / `boot_loader_ck_rx65n_v2` の CCRX 設定は
+    `BSP_CFG_SCI_UART_TERMINAL_CHANNEL=5` を使用するため、**V1 実機では CLI は J20 に出る**
 - **本プロジェクトでは Ethernet 接続のみを対象とするため、V1 で問題なし**
 
 ## Goals / 目標
@@ -303,6 +308,20 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 
 SC 再生成後は **必ず** `.cproject` の `-start` オプションで上記アドレスを確認すること。
 参照: R01AN7662JJ0100 Section 4.2.3(1)
+
+### Smart Configurator / FIT モジュール運用
+
+- RX FIT モジュールはローカルの FIT module cache
+  `%USERPROFILE%\\.eclipse\\com.renesas.platform_download\\FITModules\\`
+  から解決される
+- 必要バージョンの FIT モジュールが欠けていると、Smart Configurator が
+  一部コードを生成しないまま通ることがある
+- CK-RX65N V1/V2 を切り替える場合は、少なくとも以下の board metadata を揃える
+  - `.scfg`
+  - `.settings/com.renesas.smc.e2studio.qe.xml`
+  - `.cproject`
+- 2026-03-07 時点で CCRX の `aws_ether_ck_rx65n_v2` と
+  `boot_loader_ck_rx65n_v2` は V1 (`CK-RX65N`) に揃えて管理する
 
 ### CK-RX65N J16 ジャンパ
 

@@ -16,7 +16,7 @@
     <Segment id="Device">
         <Setting id="Series" value="RX600"/>
         <Setting id="Group" value="RX65N"/>
-        <Setting id="Board" value="CK-RX65N-V2"/>
+        <Setting id="Board" value="CK-RX65N"/>
         <Setting id="PartNo" value="R5F565NEHxFB"/>
         <Setting id="PinCount" value="144"/>
     </Segment>
