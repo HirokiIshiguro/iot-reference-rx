@@ -197,7 +197,9 @@ least the following path is now confirmed on the real target:
 
 ## Result
 
-This Step 7-4 attempt failed before provisioning or OTA execution.
+This Step 7-4 attempt initially failed before provisioning or OTA execution,
+but the final rerun in the same branch succeeded after the signer trust path
+and provisioning timing were corrected.
 
 The first blocker was:
 
@@ -230,16 +232,98 @@ expected post-provision baseline:
 - `python tools/test_mqtt.py --port COM6 --baud 115200 --timeout 45` passed
 - UART logs showed OTA task startup and `Waiting for OTA job...`
 
-## Next Step
+Subsequent OTA reruns exposed two independent blockers that were masked earlier
+by the wrong E2 Lite selection:
 
-Retry order should be:
+- `codesigncert` mismatch:
+  the device was provisioned with `userprog_codesign_cert.pem` generated from the
+  repository test key, while AWS Signer profile `rx65n_ota_profile20` was using
+  ACM certificate `f7bf6fc9-4f70-4c5c-a09e-724f81c677cb`. This caused
+  `otaPal_CheckFileSignature: R_FWUP_VerifyImage ...` and
+  `OTA job failed at OtaAgentEventCloseFile`.
+- same-version OTA candidate:
+  after reprovisioning the ACM public certificate into `codesigncert`,
+  signature verification passed and the image reached self-test, but the device
+  logged `Version of new image is identical, or application has rolled-back to initial version.`
+  followed by `Image self-test passed!` and `OTA is failed!`.
+  The OTA job metadata said `fileVersion = 0.9.3`, but the app source still had
+  `APP_VERSION_BUILD = 2`, so the generated candidate booted as `0.9.2`.
+
+To make candidate generation reproducible without leaving the workspace on the
+OTA version, this branch adds:
+
+```powershell
+python tools/build_ota_candidate.py `
+  --repo-root C:\codex\tmp_iot_reference_rx_step7_4 `
+  --version 0.9.3 `
+  --output-prefix C:\codex\step7_4_run\ota_093\ck-rx65n-01_0_9_3
+```
+
+The helper temporarily overrides `APP_VERSION_{MAJOR,MINOR,BUILD}` in
+`demo_config.h`, runs the headless build, generates the `.rsu`, and restores the
+original source file afterwards.
+
+## Final Successful Rerun
+
+The final blocker turned out to be a trust-anchor mismatch between the
+boot loader and AWS Signer.
+
+- `boot_loader_ck_rx65n_v2` verifies images with the PEM embedded in
+  `src/key/code_signer_public_key.h`
+- that public key matches `tools/test_keys/secp256r1.privatekey` and the
+  generated `userprog_codesign_cert.pem`
+- AWS Signer profile `rx65n_ota_profile20` used ACM certificate
+  `f7bf6fc9-4f70-4c5c-a09e-724f81c677cb`, so reboot-time boot loader
+  verification rolled the image back even when app-side close-file
+  verification passed
+
+The successful rerun used this corrected setup:
+
+- imported `userprog_codesign_cert.pem` + `secp256r1.privatekey` into ACM as
+  `arn:aws:acm:ap-northeast-1:094025684215:certificate/fb9f57c0-71d6-464a-ac7e-4ec1b7aab3bc`
+- created AWS Signer profile `rx65n_ota_profile_testkey`
+- reprovisioned the device with
+  `C:\codex\step7_4_run\baseline\userprog_codesign_cert.pem`
+- used `tools/build_ota_candidate.py` to generate a true `0.9.3` OTA
+  candidate while restoring the workspace back to `0.9.2` afterwards
+- added `tools/provision.py --reset-cmd` so the script can force a fresh boot
+  window before trying to enter CLI mode after flash
+
+Successful OTA rerun details:
+
+- OTA update: `ck-rx65n-ota-1772905631`
+- job: `AFR_OTA-ck-rx65n-ota-1772905631`
+- signer job: `bf055aed-52d8-459c-8c7c-386c79d6aebc`
+- OTA update state: `CREATE_COMPLETE`
+- job execution state for `ck-rx65n-01`: `SUCCEEDED`
+- observability artifacts:
+  - `C:\codex\step7_4_run\ota_093\run_20260308_024711\ota_uart_raw.log`
+  - `C:\codex\step7_4_run\ota_093\run_20260308_024711\ota_summary.json`
+  - `C:\codex\step7_4_run\ota_093\run_20260308_024711\test_ota_console.log`
+
+Key UART observations from the successful run:
+
+- baseline booted as `Application version 0.9.2`
+- OTA download completed and close-file signature verification passed
+- device entered self-test mode and bank swap completed
+- boot loader reboot log showed `verify install area main [sig-sha256-ecdsa]...OK`
+- rebooted app reported `Application version 0.9.3`
+- OTA agent logged `New image has higher version than current image, accepted!`
+
+## Follow-up
+
+The verified retry order is now:
 
 1. keep only CK-RX65N connected
 2. confirm `rfp-cli -d RX65x -t e2l -if fine -list-tools` returns `OBE110020`
 3. write the combined initial image `userprog.mot` on `e2l:OBE110020`
 4. verify app-side UART/CLI with `python tools/test_mqtt.py --port COM6 --baud 115200 --timeout 45`
 5. reprovision credentials if app flash used `-erase-chip`
-6. create an OTA Job and observe it with `tools/test_ota.py`
+6. provision `codesigncert` with the public certificate that matches the
+   boot loader trust anchor and the AWS Signer profile in use
+7. build an OTA candidate whose app binary version is higher than baseline
+8. create an OTA Job with `rx65n_ota_profile_testkey`
+9. observe it with `tools/test_ota.py`
 
 ## Notes
 
