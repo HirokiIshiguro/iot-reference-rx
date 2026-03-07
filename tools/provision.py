@@ -29,6 +29,7 @@ Dependencies:
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 
@@ -178,6 +179,17 @@ def provision(args):
         print(f"Code Sign:  {args.code_sign_cert}")
     print("=" * 60)
 
+    if args.reset_cmd:
+        print(f"Reset cmd:  {args.reset_cmd}")
+    print("=" * 60)
+
+    if args.reset_cmd:
+        print("Running external reset command before opening serial...")
+        result = subprocess.run(args.reset_cmd, shell=True)
+        if result.returncode != 0:
+            print(f"ERROR: reset command failed with exit code {result.returncode}")
+            return 1
+
     # Open serial port
     try:
         ser = serial.Serial(
@@ -295,6 +307,8 @@ def main():
                         help=f'Delay after each command in seconds (default: {DEFAULT_LINE_DELAY})')
     parser.add_argument('--boot-wait', type=float, default=DEFAULT_BOOT_WAIT,
                         help=f'Seconds to wait for boot messages (default: {DEFAULT_BOOT_WAIT})')
+    parser.add_argument('--reset-cmd',
+                        help='External reset/run command executed before opening UART')
     parser.add_argument('--format', action='store_true',
                         help='Format data flash before provisioning')
     parser.add_argument('--no-reset', action='store_true',
