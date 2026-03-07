@@ -5,11 +5,11 @@ Date: 2026-03-07 JST
 ## Scope
 
 Issue #6 asks for one OTA happy-path run on the runner-connected CK-RX65N board.
-This attempt did not reach OTA execution. The initial working theory was a
-`flash -> UART recovery` blocker, but later investigation showed that some manual
-flash trials likely used the wrong E2 Lite serial (`OBE110008`). Per the runner
-hardware inventory, CK-RX65N V1 is `OBE110020` and `OBE110008` belongs to the
-RX72N Envision Kit, so the UART blocker must be revalidated with the correct tool.
+This attempt did not reach OTA execution. Early manual trials mixed in the wrong
+E2 Lite serial (`OBE110008`), but later validation with the correct CK-RX65N tool
+(`OBE110020`) proved that the boot loader and UART path are alive. The remaining
+work is to bring the app path back up on the same correct target and continue with
+provisioning and OTA execution.
 
 ## Baseline
 
@@ -174,11 +174,32 @@ valid CK-RX65N result. The previous UART-silent observations need one clean reru
 with `OBE110020` before issue #8-style board/UART recovery is treated as the
 confirmed blocker.
 
+### 8. Validation with the correct CK-RX65N E2 Lite
+
+With only CK-RX65N connected and `OBE110020` selected, the boot loader was flashed
+again and `COM6` was observed with `miniterm`.
+
+Observed result:
+
+- `rfp-cli -d RX65x -t e2l -if fine -list-tools` returned only `OBE110020`
+- `boot_loader_ck_rx65n_v2.mot` flash succeeded with `e2l:OBE110020`
+- `miniterm COM6 115200` showed the expected banner:
+
+```text
+==== RX65N : BootLoader [dual bank] ====
+send image(*.rsu) via UART.
+```
+
+This clears the earlier suspicion that the CK board's UART path was dead. At
+least the following path is now confirmed on the real target:
+
+- `J14 / OBE110020 -> RX65N flash/write -> boot_loader execution -> J20 / COM6 UART output`
+
 ## Result
 
 This Step 7-4 attempt failed before provisioning or OTA execution.
 
-The first blocker to clear is:
+The first blocker was:
 
 - correct target selection (`OBE110020` for CK-RX65N V1)
 
@@ -188,11 +209,13 @@ Rationale:
 - image generation succeeded
 - AWS preflight resources existed
 - later hardware checks established `OBE110020 = CK-RX65N V1`
-- `OBE110008` is not the current CK target and should not be used for retry
+- `OBE110008` is not the CK target and should not be used for retry
+- `OBE110020` + `boot_loader_ck_rx65n_v2.mot` + `miniterm COM6` produced the
+  expected boot loader banner
 
-The earlier UART-silent observations are still useful as failure history, but they
-no longer justify concluding that the active blocker is inside the CK board/UART
-path. The next rerun must first use `OBE110020` consistently.
+The earlier UART-silent observations remain valid as history of a mis-targeted
+trial, but they no longer justify treating `board/UART dead` as the active
+Step 7-4 blocker. The active next step is to rerun the app path on `OBE110020`.
 
 ## Next Step
 
@@ -200,11 +223,12 @@ Retry order should be:
 
 1. keep only CK-RX65N connected
 2. confirm `rfp-cli -d RX65x -t e2l -if fine -list-tools` returns `OBE110020`
-3. rerun `boot_loader`-only flash and `miniterm COM6 115200` using `e2l:OBE110020`
-4. rerun combined / separate flash with `e2l:OBE110020` if needed
-5. only if COM6 is still silent after a correct-target rerun, treat the next
-   investigation as J20/SCI5 path or board-side UART hardware
-6. then continue with provisioning and OTA Job creation
+3. rerun separate flash on `e2l:OBE110020`
+   - `boot_loader_ck_rx65n_v2.mot`
+   - `aws_ether_ck_rx65n_v2.mot`
+4. verify app-side UART/CLI with `python tools/test_mqtt.py --port COM6 --baud 115200 --timeout 45`
+5. reprovision credentials if app flash used `-erase-chip`
+6. then continue with OTA Job creation and `tools/test_ota.py`-based observation
 
 ## Notes
 
