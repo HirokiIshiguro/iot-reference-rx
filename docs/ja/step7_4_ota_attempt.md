@@ -235,3 +235,6 @@ Retry order should be:
 - `tools/flash.bat` had a batch parsing bug caused by an unused quoted variable.
   That was fixed during this branch so the manual flash helper itself no longer
   aborts before invoking `rfp-cli`.
+- A second batch parsing bug was found later in the prerequisite check for
+  `rfp-cli`: `Program Files (x86)` in `%RFP_CLI%` broke `if (...)` parsing.
+  This was fixed by removing the grouped block from that check.
