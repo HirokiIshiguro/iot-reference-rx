@@ -5,9 +5,11 @@ Date: 2026-03-07 JST
 ## Scope
 
 Issue #6 asks for one OTA happy-path run on the runner-connected CK-RX65N board.
-This attempt did not reach OTA execution. The failure was narrowed to one blocker:
-the UART console stayed at `0 byte` after flash, so provisioning and OTA logs could
-not be captured.
+This attempt did not reach OTA execution. The initial working theory was a
+`flash -> UART recovery` blocker, but later investigation showed that some manual
+flash trials likely used the wrong E2 Lite serial (`OBE110008`). Per the runner
+hardware inventory, CK-RX65N V1 is `OBE110020` and `OBE110008` belongs to the
+RX72N Envision Kit, so the UART blocker must be revalidated with the correct tool.
 
 ## Baseline
 
@@ -16,6 +18,8 @@ not be captured.
 - UART probe targets: `COM6` (expected J20), `COM7` (alternate probe)
 - E2 Lite selection rule: use the device currently returned by
   `rfp-cli -d RX65x -t e2l -if fine -list-tools`
+- Post-check correction: with only CK-RX65N connected, current `rfp-cli -list-tools`
+  returns `OBE110020`
 
 ## AWS Preflight
 
@@ -150,43 +154,57 @@ Observed result:
 - no `send image(*.rsu) via UART.`
 - no text output at all on `COM6`
 
-This makes the blocker stronger than an MQTT or OTA application-level failure.
+This made the blocker look stronger than an MQTT or OTA application-level failure,
+but the conclusion is only valid if the flash commands targeted the CK-RX65N board.
+
+### 7. Post-attempt correction: E2 Lite mapping
+
+Additional hardware mapping checks after the initial attempt showed:
+
+- with only CK-RX65N connected, unplugging `J20` removes `COM6`
+- with only CK-RX65N connected, `rfp-cli -d RX65x -t e2l -if fine -list-tools`
+  returns `OBE110020`
+- `rfp-cli ... -t "e2l:OBE110008"` now fails with
+  `E3000201: Cannot find the specified tool`
+- runner hardware inventory also maps `OBE110020 = CK-RX65N V1` and
+  `OBE110008 = RX72N Envision Kit`
+
+Therefore, any Step 7-4 flash/UART observation taken with `OBE110008` is not a
+valid CK-RX65N result. The previous UART-silent observations need one clean rerun
+with `OBE110020` before issue #8-style board/UART recovery is treated as the
+confirmed blocker.
 
 ## Result
 
 This Step 7-4 attempt failed before provisioning or OTA execution.
 
-The single blocker is:
+The first blocker to clear is:
 
-- `flash -> UART recovery` boundary
+- correct target selection (`OBE110020` for CK-RX65N V1)
 
 Rationale:
 
 - build succeeded
 - image generation succeeded
-- both flash strategies succeeded according to `rfp-cli`
 - AWS preflight resources existed
-- UART stayed at `0 byte`, so the board could not be provisioned or observed
-- even `boot_loader`-only flash plus direct terminal observation produced no UART text
-- J16=`RUN` and hardware reset also did not restore output
+- later hardware checks established `OBE110020 = CK-RX65N V1`
+- `OBE110008` is not the current CK target and should not be used for retry
 
-This matches the symptom family already tracked in issue #8 more closely than an
-AWS-side configuration failure, and it weakens the hypothesis that only the
-application/OTA layer is at fault.
+The earlier UART-silent observations are still useful as failure history, but they
+no longer justify concluding that the active blocker is inside the CK board/UART
+path. The next rerun must first use `OBE110020` consistently.
 
 ## Next Step
 
-Do not spend the next retry on AWS setup first.
-
 Retry order should be:
 
-1. verify board-to-host mapping explicitly
-   - unplug J20 and confirm `COM6` disappears
-   - unplug J14 and confirm `rfp-cli -list-tools` loses the current E2 Lite serial
-2. if mapping is correct, treat the next investigation as J20/SCI5 path or board-side
-   UART hardware rather than OTA logic
-3. only after UART visibility is back, rerun `test_mqtt.py`
-4. then continue with provisioning and OTA Job creation
+1. keep only CK-RX65N connected
+2. confirm `rfp-cli -d RX65x -t e2l -if fine -list-tools` returns `OBE110020`
+3. rerun `boot_loader`-only flash and `miniterm COM6 115200` using `e2l:OBE110020`
+4. rerun combined / separate flash with `e2l:OBE110020` if needed
+5. only if COM6 is still silent after a correct-target rerun, treat the next
+   investigation as J20/SCI5 path or board-side UART hardware
+6. then continue with provisioning and OTA Job creation
 
 ## Notes
 
