@@ -56,6 +56,10 @@ variables:
   #   AWS_IOT_THING_NAME — Thing name (e.g., ck-rx65n-01)
   #   AWS_IOT_CERT       — Device certificate (File type)
   #   AWS_IOT_PRIVKEY    — Device private key (File type)
+  # Optional project-level CI/CD Variables:
+  #   OTA_SIGNING_KEY    — OTA code signing private key (File type, PEM)
+  #                        If unset, the repository test key is used for
+  #                        development-only image generation.
 
   # Ethernet MAC address (rewrite FreeRTOSConfig.h before build)
   # Set MAC_ADDR_CK_RX65N in /oss group CI/CD Variables
@@ -117,7 +121,27 @@ build:
     # See R01AN7662JJ0100 Section 4.2.3(3)
     # image-gen.py with -ibp generates .mot only; without -ibp generates .rsu only
     - Write-Host "=== Generate initial firmware (userprog.mot + userprog.rsu) ==="
-    - pip install pycryptodome --quiet
+    - pip install pycryptodome cryptography --quiet
+    - |
+      $env:OTA_SIGNING_KEY_PATH = $env:OTA_SIGNING_KEY
+      if (-not $env:OTA_SIGNING_KEY_PATH) {
+        $env:OTA_SIGNING_KEY_PATH = "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey"
+        Write-Host "[WARN] OTA_SIGNING_KEY not set, using repository test key (development only)"
+      } else {
+        Write-Host "Using OTA_SIGNING_KEY from CI/CD Variables"
+      }
+      if (-not (Test-Path $env:OTA_SIGNING_KEY_PATH)) {
+        Write-Error "OTA signing key not found: $env:OTA_SIGNING_KEY_PATH"
+        exit 1
+      }
+      $env:OTA_CODE_SIGN_CERT_PATH = "$env:CI_PROJECT_DIR\userprog_codesign_cert.pem"
+      python tools/generate_signer_cert.py `
+        --key $env:OTA_SIGNING_KEY_PATH `
+        --out $env:OTA_CODE_SIGN_CERT_PATH
+      if (-not (Test-Path $env:OTA_CODE_SIGN_CERT_PATH)) {
+        Write-Error "code signing certificate generation failed"
+        exit 1
+      }
     # (1) Generate userprog.mot — combined boot_loader + app for initial programming
     - |
       python "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\image-gen.py" `
@@ -125,7 +149,7 @@ build:
         -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
         -o "$env:CI_PROJECT_DIR\userprog" `
         -ibp "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\HardwareDebug\boot_loader_ck_rx65n_v2.mot" `
-        -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
+        -key "$env:OTA_SIGNING_KEY_PATH" `
         -vt ecdsa -ff RTOS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.mot")) { Write-Error "userprog.mot generation failed"; exit 1 }
     # (2) Generate userprog.rsu — signed app image for OTA update
@@ -134,7 +158,7 @@ build:
         -iup "$env:CI_PROJECT_DIR\$env:APP_PROJECT_DIR\HardwareDebug\aws_ether_ck_rx65n_v2.mot" `
         -ip "$env:CI_PROJECT_DIR\$env:BL_PROJECT_DIR\src\smc_gen\r_fwup\tool\RX65N_DualBank_ImageGenerator_PRM.csv" `
         -o "$env:CI_PROJECT_DIR\userprog" `
-        -key "$env:CI_PROJECT_DIR\tools\test_keys\secp256r1.privatekey" `
+        -key "$env:OTA_SIGNING_KEY_PATH" `
         -vt ecdsa -ff RTOS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog.rsu")) { Write-Error "userprog.rsu generation failed"; exit 1 }
     - Write-Host "Image generation SUCCESS"
@@ -144,6 +168,7 @@ build:
       - "${BL_PROJECT_DIR}/HardwareDebug/*.mot"
       - userprog.mot
       - userprog.rsu
+      - userprog_codesign_cert.pem
     expire_in: 7 days
 
 # --- Flash Stage ---
@@ -197,6 +222,7 @@ provision:
     # GitLab expands them to temporary file paths at runtime
     - if (-not $env:AWS_IOT_CERT) { Write-Error "AWS_IOT_CERT not set"; exit 1 }
     - if (-not $env:AWS_IOT_PRIVKEY) { Write-Error "AWS_IOT_PRIVKEY not set"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\userprog_codesign_cert.pem")) { Write-Error "userprog_codesign_cert.pem not found"; exit 1 }
     # Install pyserial if needed
     - pip install pyserial --quiet
     # Reset device to open CLI window (~10s after boot)
@@ -215,6 +241,7 @@ provision:
         --endpoint $env:AWS_IOT_ENDPOINT `
         --cert $env:AWS_IOT_CERT `
         --key $env:AWS_IOT_PRIVKEY `
+        --code-sign-cert "$env:CI_PROJECT_DIR\userprog_codesign_cert.pem" `
         --format
   allow_failure: true
 

@@ -12,7 +12,8 @@ Usage:
         --thing-name ck-rx65n-01 \
         --endpoint xxxxx-ats.iot.ap-northeast-1.amazonaws.com \
         --cert certs/ck-rx65n-01-cert.pem \
-        --key certs/ck-rx65n-01-privkey.pem
+        --key certs/ck-rx65n-01-privkey.pem \
+        --code-sign-cert certs/ota-signer-cert.pem
 
 PEM file handling:
     The FreeRTOS CLI accumulates characters until \\r\\n.
@@ -173,6 +174,8 @@ def provision(args):
     print(f"Endpoint:   {args.endpoint}")
     print(f"Cert:       {args.cert}")
     print(f"Key:        {args.key}")
+    if args.code_sign_cert:
+        print(f"Code Sign:  {args.code_sign_cert}")
     print("=" * 60)
 
     # Open serial port
@@ -233,12 +236,21 @@ def provision(args):
             print("ERROR: Failed to set private key")
             return 1
 
-        # Step 8: Commit to data flash
+        # Step 8: Set code signing certificate
+        if args.code_sign_cert:
+            print(f"\n--- Set code signing certificate ---")
+            if not send_pem_command(ser, 'codesigncert', args.code_sign_cert, char_delay, line_delay):
+                print("ERROR: Failed to set code signing certificate")
+                return 1
+        else:
+            print("\nWARNING: No code signing certificate provided; OTA signature verification will fail")
+
+        # Step 9: Commit to data flash
         print(f"\n--- Commit to data flash ---")
         resp = send_command(ser, 'conf commit', char_delay, line_delay * 3)
         print(f"  {mask_sensitive_output(resp.strip()) if resp else 'No response'}")
 
-        # Step 9: Reset device
+        # Step 10: Reset device
         if not args.no_reset:
             print(f"\n--- Reset device ---")
             send_command(ser, 'reset', char_delay, line_delay, expect_ok=False)
@@ -275,6 +287,8 @@ def main():
                         help='Path to device certificate PEM file')
     parser.add_argument('--key', required=True,
                         help='Path to device private key PEM file')
+    parser.add_argument('--code-sign-cert',
+                        help='Path to OTA code signing certificate PEM file')
     parser.add_argument('--char-delay', type=float, default=DEFAULT_CHAR_DELAY,
                         help=f'Delay between characters in seconds (default: {DEFAULT_CHAR_DELAY})')
     parser.add_argument('--line-delay', type=float, default=DEFAULT_LINE_DELAY,
