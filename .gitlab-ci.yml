@@ -78,7 +78,8 @@ variables:
   OTA_SERVICE_ROLE_ARN: "arn:aws:iam::094025684215:role/rx72n-ota-service-role"
   OTA_SIGNING_PROFILE: "rx65n_ota_profile_testkey"
   OTA_CANDIDATE_VERSION: "0.9.3"
-  OTA_OBSERVE_TIMEOUT: "180"
+  # OTA candidate download + bank swap + post-update reboot can exceed 180s.
+  OTA_OBSERVE_TIMEOUT: "240"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_ota"
 
 # Disable MR pipelines — branch pipeline only
