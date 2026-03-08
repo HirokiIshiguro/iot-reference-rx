@@ -250,7 +250,6 @@ provision:
         --code-sign-cert "$env:CI_PROJECT_DIR\userprog_codesign_cert.pem" `
         --format `
         --reset-cmd $resetCmd
-  allow_failure: true
 
 # --- Test Stage ---
 test_mqtt:
@@ -262,8 +261,7 @@ test_mqtt:
   needs:
     - flash
     - build
-    - job: provision
-      optional: true    # test_mqtt can run without provision (manual trigger)
+    - provision
   script:
     - Write-Host "=== MQTT PubSub Test ==="
     # Install pyserial if needed
@@ -288,7 +286,6 @@ test_mqtt:
         --port $env:UART_PORT --baud $env:UART_BAUD `
         --timeout 120 `
         --reset-cmd $resetCmd
-  allow_failure: true
 
 test_ota:
   stage: test
