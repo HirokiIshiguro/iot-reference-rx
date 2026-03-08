@@ -25,6 +25,11 @@ from pathlib import Path
 # Force unbuffered stdout for CI environments.
 if not sys.stdout.isatty():
     sys.stdout = os.fdopen(sys.stdout.fileno(), "w", buffering=1)
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(errors="backslashreplace")
+    except Exception:
+        pass
 
 try:
     import serial
@@ -66,11 +71,11 @@ MARKERS = [
     Marker("download_started", "download_started", r"Starting The Download\.", True),
     Marker("file_block_received", "downloading", r"Received File Block event Received", False),
     Marker("block_downloaded", "downloading", r"Downloaded block \d+ of \d+\.", True),
-    Marker("close_file", "close_file", r"Close file event Received", True),
-    Marker("activate_image", "activate_image", r"Activate Image event Received", True),
+    Marker("close_file", "close_file", r"Close file event Received", False),
+    Marker("activate_image", "activate_image", r"Activate Image event Received", False),
     Marker("ota_completed", "activate_image", r"OTA Completed successfully!", False),
     Marker("software_reset", "reboot", r"software reset\.\.\.", False),
-    Marker("selfcheck_mode", "self_test", r"OTA image is in selfcheck mode\.", True),
+    Marker("selfcheck_mode", "self_test", r"OTA image is in selfcheck mode\.", False),
     Marker("image_state_testing", "self_test", r"Testing\.", False),
     Marker("image_self_test_passed", "self_test", r"Image self-test passed!", False),
     Marker(
@@ -437,14 +442,17 @@ def ensure_parent(path_str):
     return path
 
 
-def append_timestamped_log(log_file, elapsed, text):
+def append_timestamped_log(log_file, elapsed, text, force_newline=False):
     if log_file is None:
         return
+    if text == "":
+        return
     now = datetime.now(timezone.utc).isoformat()
+    if force_newline and not text.endswith(("\n", "\r")):
+        text = text + "\n"
     with log_file.open("a", encoding="utf-8") as handle:
-        for line in text.splitlines(True):
-            prefix = f"[{now}][+{elapsed:07.3f}s] "
-            handle.write(prefix + line)
+        prefix = f"[{now}][+{elapsed:07.3f}s] "
+        handle.write(prefix + text)
 
 
 def parse_logged_line(line):
@@ -524,8 +532,6 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None, ski
 
                 total_bytes += len(data)
                 elapsed = time.time() - start
-                append_timestamped_log(raw_log_file, elapsed, data)
-
                 full_text = partial_line + data
                 lines = full_text.splitlines(True)
                 if lines and not lines[-1].endswith(("\n", "\r")):
@@ -534,6 +540,7 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None, ski
                     partial_line = ""
 
                 for line in lines:
+                    append_timestamped_log(raw_log_file, elapsed, line)
                     sys.stdout.write(f"[+{elapsed:07.3f}s] {line}")
                     analyzer.consume_line(line, elapsed)
                 sys.stdout.flush()
@@ -569,7 +576,7 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None, ski
 
     if partial_line:
         elapsed = time.time() - start
-        append_timestamped_log(raw_log_file, elapsed, partial_line)
+        append_timestamped_log(raw_log_file, elapsed, partial_line, force_newline=True)
         sys.stdout.write(f"[+{elapsed:07.3f}s] {partial_line}\n")
         analyzer.consume_line(partial_line, elapsed)
         sys.stdout.flush()
