@@ -66,9 +66,11 @@ variables:
   MAC_ADDR: "${MAC_ADDR_CK_RX65N}"
 
   # Test flags
-  RUN_OTA_TEST: "false"
+  # Step 8 follow-up: run OTA automatically by default on branch pipelines.
+  # Set RUN_OTA_TEST=false to keep test_ota as a manual fallback job.
+  RUN_OTA_TEST: "true"
 
-  # OTA test (manual Step 7-5)
+  # OTA test (Step 7-5 manual job, Step 8 follow-up default auto)
   # These defaults match the validated 2026-03-08 happy path and can be
   # overridden per project/runner if the AWS environment changes.
   AWS_DEFAULT_REGION: "ap-northeast-1"
@@ -450,9 +452,9 @@ test_ota:
       if ($testOtaExit -ne 0) { exit $testOtaExit }
     - Write-Host "Observability artifacts prepared in artifacts/test_ota"
   rules:
-    - if: $RUN_OTA_TEST == "true"
-      when: always
-    - when: manual
+    - if: $RUN_OTA_TEST == "false"
+      when: manual
+    - when: always
   artifacts:
     when: always
     paths:
