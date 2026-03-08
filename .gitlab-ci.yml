@@ -433,12 +433,18 @@ test_ota:
       if (Test-Path $otaMetaPath) {
         $otaMeta = Get-Content $otaMetaPath | ConvertFrom-Json
         if ($otaMeta.aws_iot_job_id) {
-          aws iot describe-job-execution `
+          $jobExecutionRaw = aws iot describe-job-execution `
             --job-id $otaMeta.aws_iot_job_id `
             --thing-name $env:AWS_IOT_THING_NAME `
             --region $env:AWS_DEFAULT_REGION `
-            --output json `
-            2>&1 | Tee-Object -FilePath "$artifactDir\job_execution.json"
+            --output json 2>&1 | Out-String
+          if ($jobExecutionRaw) { Write-Host $jobExecutionRaw.TrimEnd() }
+          $jsonStart = $jobExecutionRaw.IndexOf('{')
+          if ($jsonStart -ge 0) {
+            $jobExecutionRaw.Substring($jsonStart).Trim() | Set-Content -Encoding UTF8 "$artifactDir\job_execution.json"
+          } else {
+            $jobExecutionRaw.Trim() | Set-Content -Encoding UTF8 "$artifactDir\job_execution.json"
+          }
         }
       }
 
