@@ -268,7 +268,7 @@ manual OTA job 用の追加入力 / 既定値:
 | 5 | AWS IoT Core セットアップ | Done |
 | 6 | MQTT PubSub 動作確認 | Done |
 | 7 | OTA テスト | In Progress (Step 7-1 to 7-5) |
-| 8 | CI/CD パイプライン統合 | In Progress (workflow integrated; hard gate pending) |
+| 8 | CI/CD パイプライン統合 | In Progress (baseline gate validated on branch; merge pending) |
 
 ### Step 7-3: OTA observability contract
 
@@ -396,22 +396,49 @@ happy path 判定メモ:
 
 - `.gitlab-ci.yml` は `build -> flash -> provision -> test_mqtt -> test_ota` を 1 本に統合済み
 - `test_ota` は `RUN_OTA_TEST=true` で branch pipeline 上の自動実行に切り替え可能だが、既定では manual
-- `provision`, `test_mqtt`, `test_ota` はまだ `allow_failure: true` で、hardware gate としては未確定
+- `provision`, `test_mqtt` は branch `codex/step8-pipeline-integration` で blocking 化を検証済み
+- `test_ota` は引き続き manual + `allow_failure: true`
 - project-based pipeline visibility を OFF にしているため、外部 API / 非メンバーから pipeline/job の状態は公開確認できない
+
+観測済み証跡:
+
+- `main` pipeline `#416`
+  - commit `4e49551f`
+  - `build` job `#1720` success
+  - `flash` job `#1721` success
+  - `provision` job `#1722` success (`allow_failure: true`)
+  - `test_mqtt` job `#1723` success (`allow_failure: true`)
+- branch `codex/step8-pipeline-integration` pipeline `#417`
+  - commit `b51d1f3`
+  - `build` job `#1725` success
+  - `flash` job `#1726` success
+  - `provision` job `#1727` success (`allow_failure: true`)
+  - `test_mqtt` job `#1728` success (`allow_failure: true`)
+- branch `codex/step8-pipeline-integration` pipeline `#418`
+  - commit `acb7e16`
+  - `build` job `#1730` success
+  - `flash` job `#1731` success
+  - `provision` job `#1732` success (`allow_failure: false`)
+  - `test_mqtt` job `#1733` success (`allow_failure: false`)
+
+補足:
+
+- protected `main` に対する API 経由の pipeline 再実行は権限不足で拒否された
+- したがって Step 8 の最終確認は **MR merge 後の `main` push pipeline** を正本とする
 
 Step 8 を Close するための完了条件:
 
-1. 現行 `main` で `build` / `flash` / `provision` / `test_mqtt` の直列実行成功を複数回記録する
-2. `provision` と `test_mqtt` の `allow_failure: true` を外しても branch pipeline の安定性を落とさないことを確認する
+1. branch で検証した blocking 設定を `main` に merge する
+2. merge 後の `main` pipeline で `build` / `flash` / `provision` / `test_mqtt` の success を再確認する
 3. `test_ota` は当面 manual live job のまま運用し、連続成功実績が揃ってから自動実行範囲を広げる
 4. 採番済み pipeline / job / artifact の証跡を `CLAUDE.md` に追記し、再現可能な運用記録として残す
 
 推奨実行順:
 
-1. `main` で baseline pipeline を再実行し、`build` / `flash` / `provision` / `test_mqtt` の success を採番付きで記録する
-2. 同条件で 2-3 回の再現成功が取れたら、`provision` と `test_mqtt` の hard gate 化を判断する
+1. `codex/step8-pipeline-integration` を MR 化して merge する
+2. merge 後の `main` pipeline を 1 回確認し、blocking 化された `provision` / `test_mqtt` の success を採番付きで記録する
 3. `test_ota` は別枠で manual run を継続し、既存メモどおり「追加 recovery なしで 3 回以上 success」を満たしたら `RUN_OTA_TEST` の既定運用を再検討する
-4. Step 7 を Done、Step 8 を Done へ更新するのは上記証跡が揃った時点とする
+4. Step 8 を Done へ更新するのは上記 `main` 証跡が揃った時点とする
 
 ### Phase 8b: RX72N Envision Kit 移植
 
