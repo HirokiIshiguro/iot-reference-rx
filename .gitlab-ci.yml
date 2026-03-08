@@ -298,6 +298,7 @@ test_ota:
     - hw-ck-rx65n-v1
   resource_group: ck-rx65n-device
   needs:
+    - build
     - test_mqtt
   script:
     - Write-Host "=== OTA Update Test (manual live run) ==="
