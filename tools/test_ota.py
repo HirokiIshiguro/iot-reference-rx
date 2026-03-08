@@ -315,6 +315,7 @@ class OtaLogAnalyzer:
         }
         self.error_state = {}
         self.versions_seen = []
+        self.version_events = []
         self.total_lines = 0
         self.last_progress_stage = None
         self.last_observed_at = 0.0
@@ -337,6 +338,13 @@ class OtaLogAnalyzer:
                 version_match = VERSION_RE.search(stripped)
                 if version_match:
                     version = ".".join(version_match.groups())
+                    self.version_events.append(
+                        {
+                            "version": version,
+                            "seen_at": round(elapsed, 3),
+                            "line": stripped,
+                        }
+                    )
                     if version not in self.versions_seen:
                         self.versions_seen.append(version)
             if self.last_progress_stage is None or STAGE_ORDER[marker.stage] >= STAGE_ORDER.get(self.last_progress_stage, 0):
@@ -357,17 +365,51 @@ class OtaLogAnalyzer:
     def has_marker(self, marker_id):
         return self.marker_state[marker_id]["hits"] > 0
 
+    def marker_seen_at(self, marker_id):
+        return self.marker_state[marker_id]["first_seen_at"]
+
+    def version_seen_after(self, version, elapsed_threshold):
+        return any(
+            event["version"] == version and event["seen_at"] is not None and event["seen_at"] >= elapsed_threshold
+            for event in self.version_events
+        )
+
+    def observed_reboot_into_new_image(self):
+        activate_at = self.marker_seen_at("activate_image")
+        if activate_at is None:
+            return False
+
+        if self.has_marker("selfcheck_mode") or self.has_marker("image_self_test_passed") or self.has_marker("image_committed"):
+            return True
+
+        bootloader_at = self.marker_seen_at("bootloader")
+        if bootloader_at is not None and bootloader_at >= activate_at:
+            return True
+
+        if self.expected_version:
+            return self.version_seen_after(self.expected_version, activate_at)
+
+        baseline_version = self.version_events[0]["version"] if self.version_events else None
+        return any(
+            event["seen_at"] >= activate_at and event["version"] != baseline_version
+            for event in self.version_events
+        )
+
     def first_error(self):
         if not self.error_state:
             return None
         return min(self.error_state.values(), key=lambda item: item["first_seen_at"])
 
     def is_success(self):
-        required_ok = all(
-            state["hits"] > 0
-            for state in self.marker_state.values()
-            if state["required"]
+        required_markers = (
+            "job_received",
+            "download_started",
+            "block_downloaded",
+            "close_file",
+            "activate_image",
+            "image_accepted",
         )
+        required_ok = all(self.has_marker(marker_id) for marker_id in required_markers)
         if not required_ok or self.first_error() is not None:
             return False
 
@@ -377,7 +419,7 @@ class OtaLogAnalyzer:
         elif len(self.versions_seen) < 2:
             return False
 
-        return True
+        return self.observed_reboot_into_new_image()
 
     def classify_timeout(self, total_bytes):
         if total_bytes == 0 or self.total_lines == 0:
@@ -390,7 +432,7 @@ class OtaLogAnalyzer:
             return "download_incomplete"
         if not self.has_marker("activate_image"):
             return "close_or_signature_phase"
-        if not self.has_marker("selfcheck_mode"):
+        if not self.observed_reboot_into_new_image():
             return "reboot_or_selfcheck_missing"
         if not self.has_marker("image_accepted"):
             return "acceptance_not_observed"
@@ -422,6 +464,7 @@ class OtaLogAnalyzer:
             "last_progress_stage": self.last_progress_stage,
             "expected_version": self.expected_version,
             "versions_seen": self.versions_seen,
+            "version_events": self.version_events,
             "total_lines": self.total_lines,
             "total_bytes": total_bytes,
             "duration_seconds": duration_seconds,
