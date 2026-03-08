@@ -430,9 +430,9 @@ test_ota:
 
       $otaMetaPath = "$artifactDir\ota_job_meta.json"
       if (Test-Path $otaMetaPath) {
-        $otaMeta = Get-Content $otaMetaPath | ConvertFrom-Json
+        $otaMeta = Get-Content -Raw $otaMetaPath | ConvertFrom-Json
         if ($otaMeta.aws_iot_job_id) {
-          $jobExecutionRaw = aws iot describe-job-execution `
+          $jobExecutionRaw = & aws iot describe-job-execution `
             --job-id $otaMeta.aws_iot_job_id `
             --thing-name $env:AWS_IOT_THING_NAME `
             --region $env:AWS_DEFAULT_REGION `
