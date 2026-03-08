@@ -268,7 +268,7 @@ manual OTA job 用の追加入力 / 既定値:
 | 5 | AWS IoT Core セットアップ | Done |
 | 6 | MQTT PubSub 動作確認 | Done |
 | 7 | OTA テスト | In Progress (Step 7-1 to 7-5) |
-| 8 | CI/CD パイプライン統合 | Planned |
+| 8 | CI/CD パイプライン統合 | In Progress (workflow integrated; hard gate pending) |
 
 ### Step 7-3: OTA observability contract
 
@@ -287,10 +287,10 @@ manual OTA job 用の追加入力 / 既定値:
 | job_received | `Received OTA Job.` | **Yes** |
 | download_started | `Request File Block event Received`, `Starting The Download.` | `Starting The Download.` が **Yes** |
 | downloading | `Received File Block event Received`, `Downloaded block N of M.` | `Downloaded block N of M.` が **Yes** |
-| close_file | `Close file event Received` | **Yes** |
-| activate_image | `Activate Image event Received` | **Yes** |
+| close_file | `Close file event Received` | No |
+| activate_image | `Activate Image event Received` | No |
 | reboot | `software reset...`, boot loader banner (`BootLoader`) | No |
-| self_test | `OTA image is in selfcheck mode.` | **Yes** |
+| self_test | `OTA image is in selfcheck mode.` | No |
 | accepted | `New image has higher version than current image, accepted!` | **Yes** |
 | accepted (optional) | `Accepted and committed final image.`, `Successful to erase the buffer area` | No |
 
@@ -315,8 +315,9 @@ manual OTA job 用の追加入力 / 既定値:
 #### Success rule / 成功判定
 
 - required marker を全て観測する
-  - `job_received`, `download_started`, `block_downloaded`, `close_file`,
-    `activate_image`, `selfcheck_mode`, `image_accepted`
+  - `job_received`, `download_started`, `block_downloaded`, `image_accepted`
+- `close_file`, `activate_image`, `selfcheck_mode` は観測できれば progress 補助情報として扱う
+  - live UART では欠落するケースがあり、単独では失敗条件にしない
 - fatal な error classification を 1 件も出さない
 - `--expected-version` を指定した場合は、その version が `Application version` に出る
 - `--expected-version` 未指定の場合は、OTA 前後で **2 つの異なる version** を観測する
@@ -388,6 +389,29 @@ happy path 判定メモ:
 - issue #8 系の UART / power-cycle 問題が routine recovery に落ち着く
 - AWS の bucket / signer profile / service role の前提が安定している
 - `allow_failure: true` を外しても branch pipeline の信頼性を下げない
+
+### Step 8: CI/CD pipeline integration
+
+2026-03-08 時点の実装状態:
+
+- `.gitlab-ci.yml` は `build -> flash -> provision -> test_mqtt -> test_ota` を 1 本に統合済み
+- `test_ota` は `RUN_OTA_TEST=true` で branch pipeline 上の自動実行に切り替え可能だが、既定では manual
+- `provision`, `test_mqtt`, `test_ota` はまだ `allow_failure: true` で、hardware gate としては未確定
+- project-based pipeline visibility を OFF にしているため、外部 API / 非メンバーから pipeline/job の状態は公開確認できない
+
+Step 8 を Close するための完了条件:
+
+1. 現行 `main` で `build` / `flash` / `provision` / `test_mqtt` の直列実行成功を複数回記録する
+2. `provision` と `test_mqtt` の `allow_failure: true` を外しても branch pipeline の安定性を落とさないことを確認する
+3. `test_ota` は当面 manual live job のまま運用し、連続成功実績が揃ってから自動実行範囲を広げる
+4. 採番済み pipeline / job / artifact の証跡を `CLAUDE.md` に追記し、再現可能な運用記録として残す
+
+推奨実行順:
+
+1. `main` で baseline pipeline を再実行し、`build` / `flash` / `provision` / `test_mqtt` の success を採番付きで記録する
+2. 同条件で 2-3 回の再現成功が取れたら、`provision` と `test_mqtt` の hard gate 化を判断する
+3. `test_ota` は別枠で manual run を継続し、既存メモどおり「追加 recovery なしで 3 回以上 success」を満たしたら `RUN_OTA_TEST` の既定運用を再検討する
+4. Step 7 を Done、Step 8 を Done へ更新するのは上記証跡が揃った時点とする
 
 ### Phase 8b: RX72N Envision Kit 移植
 
