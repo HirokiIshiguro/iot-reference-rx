@@ -16,15 +16,15 @@ If the signature verification passes, the firmware starts.
 
 | Compiler | RAM size | ROM size |
 |----------|----------|----------|
-| CC-RX    | 5KB      | 30KB    |
-| GCC      | 11KB     | 42KB    |
+| CC-RX    | 5KB      | 30KB     |
+| GCC      | 11KB     | 42KB     |
 
 ### Confirmed Operation Environment
 
 | Compiler | Version  | Details |
 |----------|----------|---------|
 | CC-RX    | V3.07.00 | Optimization: Level 2 |
-| GCC      | GCC for Renesas RX v8.3.0.202411 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
+| GCC      | GCC for Renesas RX v14.2.0.202505 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
 
 ## Bootloader design policy
 
@@ -44,6 +44,6 @@ The bootloader project needs to register a public key for firmware signature ver
 
 * The procedure for registering the public key are provided in the special application note (document number: R01AN7662).  
   Please check the following webpage:
-  * <https://www.renesas.com/document/apn/rx-family-how-implement-freertos-ota-using-amazon-web-services-202406-lts-version-rev100>  
+  * <https://www.renesas.com/document/apn/25574449>
 * Refer to Section 4.2.2 of the application note to register the public key to the project.
 * Also, For software setup instructions, see [**Getting Started Guide: step 4-2**](../../Getting_Started_Guide.md#step-4-2-run-pubsubmqtt-with-over-the-airota-update-sample-project).

@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2017-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_hash_rx.c
- * Version      : 1.20
+ * Version      : 1.22
  * Description  : Interface definition for the r_tsip_hash_rx TSIP module.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
@@ -43,6 +30,8 @@
  *         : 24.05.2023 1.18     Added support for RX26T
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -667,92 +656,6 @@ e_tsip_err_t R_TSIP_GetCurrentHashDigestValue(tsip_sha_md5_handle_t *handle, uin
  End of function R_TSIP_GetCurrentHashDigestValue
  *******************************/
 #endif /* TSIP_MD5 | TSIP_SHA_1 | TSIP_SHA_256 != 0 */
-
-#if TSIP_SHA_1_HMAC
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateSha1HmacKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate SHA-1 HMAC user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key SHA-1 HMAC key encrypted and MAC.
-* @param[out]    key_index SHA-1 HMAC key user key generation information (17 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateShaHmacKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateSha1HmacKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_hmac_sha_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(0); /* SHA-1 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateShaHmacKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_HMAC_SHA1;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateSha1HmacKeyIndex
- *******************************/
-#endif /* TSIP_SHA_1_HMAC */
-
-#if TSIP_SHA_256_HMAC
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateSha256HmacKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate SHA-256 HMAC user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key SHA-256 HMAC key encrypted and MAC.
-* @param[out]    key_index SHA-256 HMAC key user key generation information (17 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateShaHmacKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateSha256HmacKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_hmac_sha_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(2); /* SHA-256 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateShaHmacKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_HMAC_SHA256;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateSha256HmacKeyIndex
- *******************************/
-#endif /* TSIP_SHA_256_HMAC */
 
 #if TSIP_SHA_1_HMAC
 /***********************************************************************************************************************

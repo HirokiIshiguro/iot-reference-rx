@@ -5,12 +5,12 @@ r_flash_rx
 
 Document Number 
 ---------------
-r01an2184ej0521
-r01an2184jj0521
+r01an2184ej0522
+r01an2184jj0522
 
 Version
 -------
-v5.21
+v5.22
 
 Overview
 --------
@@ -106,7 +106,7 @@ Peripherals Used Directly
 
 Required Packages
 -----------------
-* r_bsp      V7.51
+* r_bsp      V7.52
 
 How to add to your project
 --------------------------
@@ -137,8 +137,8 @@ How to add to your project
 
 Toolchain(s) Used
 -----------------
-* Renesas RXC 3.06.00
-* GNU GNURX 8.03.00.202405
+* Renesas RXC 3.07.00
+* GNU GNURX 8.03.00.202411
 * IAR ICCRX 5.10.01
 
 
@@ -150,9 +150,9 @@ r_flash_rx
 |
 +---doc
 |   +-- en
-|   |   +-- r01an2184ej0521-rx-flash.pdf
+|   |   +-- r01an2184ej0522-rx-flash.pdf
 |   +-- ja
-|       +-- r01an2184jj0521-rx-flash.pdf
+|       +-- r01an2184jj0522-rx-flash.pdf
 |
 +---ref
 |   +-- r_flash_rx_config_reference.h

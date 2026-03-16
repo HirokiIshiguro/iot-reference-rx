@@ -56,7 +56,7 @@
 #endif
 
 #ifndef LIBRARY_LOG_LEVEL
-    #define LIBRARY_LOG_LEVEL    LOG_ERROR
+    #define LIBRARY_LOG_LEVEL    (LOG_ERROR)
 #endif
 
 #include "logging_stack.h"
@@ -74,7 +74,7 @@
 * <b>Possible values:</b> Any positive integer.<br>
 * <b>Default value:</b> 10
 */
-#define pkcs11configMAX_NUM_OBJECTS    8
+#define pkcs11configMAX_NUM_OBJECTS    (8)
 
 /**
 * @brief Set to 1 if a PAL destroy object is implemented.
@@ -85,7 +85,7 @@
 * <b>Possible values:</b> `0` or `1`<br>
 * <b>Default value:</b> `0`
 */
-#define pkcs11configPAL_DESTROY_SUPPORTED    1
+#define pkcs11configPAL_DESTROY_SUPPORTED    (1)
 
 /**
 * @brief Set to 1 if OTA image verification via PKCS #11 module is supported.
@@ -96,7 +96,7 @@
 * <b>Possible values:</b> `0` or `1`<br>
 * <b>Default value:</b> `0`
 */
-#define pkcs11configOTA_SUPPORTED    1
+#define pkcs11configOTA_SUPPORTED    (1)
 
 /**
  * @brief Malloc API used by iot_pkcs11.h
@@ -104,7 +104,7 @@
  * <br><b>Possible values:</b> Any platform-specific function for allocating memory.<br>
  * <b>Default value:</b> The standard C `"malloc"` function
  */
-#define pkcs11configPKCS11_MALLOC    pvPortMalloc
+#define pkcs11configPKCS11_MALLOC    (pvPortMalloc)
 
 /**
  * @brief Free API used by iot_pkcs11.h
@@ -112,7 +112,7 @@
  * <br><b>Possible values:</b> Any platform-specific function for freeing memory.<br>
  * <b>Default value:</b> The standard C `"free"` function
  */
-#define pkcs11configPKCS11_FREE    vPortFree
+#define pkcs11configPKCS11_FREE    (vPortFree)
 
 /**
 * @brief The PKCS #11 label for device private key.
@@ -183,7 +183,7 @@
 * <b>Default value:</b> `Claim Cert`
 */
 #ifndef pkcs11configLABEL_CLAIM_CERTIFICATE
-	#define pkcs11configLABEL_CLAIM_CERTIFICATE    "Claim Cert"
+    #define pkcs11configLABEL_CLAIM_CERTIFICATE    "Claim Cert"
 #endif
 
 
@@ -200,7 +200,7 @@
 * <b>Default value:</b> `Claim Key`
 */
 #ifndef pkcs11configLABEL_CLAIM_PRIVATE_KEY
-	#define pkcs11configLABEL_CLAIM_PRIVATE_KEY    "Claim Key"
+    #define pkcs11configLABEL_CLAIM_PRIVATE_KEY    "Claim Key"
 #endif
 
 #define PKCS11_TEST_LABEL_DEVICE_PRIVATE_KEY_FOR_TLS     pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS

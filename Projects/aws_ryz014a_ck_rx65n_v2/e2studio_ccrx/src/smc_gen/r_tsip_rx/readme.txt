@@ -5,12 +5,12 @@ r_tsip_rx
 
 Document Number
 ---------------
-R20AN0371JJ0121-RX-TSIP-SECURITY
-R20AN0371EJ0121-RX-TSIP-SECURITY
+R20AN0371JJ0122-RX-TSIP-SECURITY
+R20AN0371EJ0122-RX-TSIP-SECURITY
 
 Version
 -------
-v1.21
+v1.22
 
 Overview
 --------
@@ -25,7 +25,7 @@ Features
 --------
 * Strongly Key Management.
 * Hardware acceralator for AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA and ECC.
-* Cooperate with SSL/TLS.
+* Cooperate with SSL/TLS and SSH.
 * Supports True Random Number Generating.
 * Supports secure boot and secure firmware update.
 
@@ -96,7 +96,7 @@ Refer to "Adding Firmware Integration Technology Modules to CS+ Projects (R01AN1
 Toolchain(s) Used
 -----------------
 * Renesas RXC 3.06.00
-* GNU GNURX 8.03.00.202311
+* GNU GNURX 8.03.00.202405
 * IAR ICCRX 5.10.01
 
 File Structure
@@ -107,9 +107,9 @@ r_tsip_rx
 |
 +---doc
 |   +---ja
-|   |    r20an0371jj0121-rx-tsip-security.pdf
+|   |    r20an0371jj0122-rx-tsip-security.pdf
 |   +---en
-|        r20an0371ej0121-rx-tsip-security.pdf
+|        r20an0371ej0122-rx-tsip-security.pdf
 |
 +---src
     |
@@ -117,6 +117,7 @@ r_tsip_rx
         |   
         +---rx231_rx23w
         |   +   r_tsip_aes_rx.c
+        |   |   r_tsip_key_injection_rx.c
         |   |   r_tsip_rx.c
         |   |   r_tsip_rx_private.c
         |   |   r_tsip_rx_private.h
@@ -132,6 +133,7 @@ r_tsip_rx
         |
         +---rx26t
         |   +   r_tsip_aes_rx.c
+        |   |   r_tsip_key_injection_rx.c
         |   |   r_tsip_rx.c
         |   |   r_tsip_rx_private.c
         |   |   r_tsip_rx_private.h
@@ -147,6 +149,7 @@ r_tsip_rx
         |
         +---rx66t_rx72t
         |   +   r_tsip_aes_rx.c
+        |   |   r_tsip_key_injection_rx.c
         |   |   r_tsip_rx.c
         |   |   r_tsip_rx_private.c
         |   |   r_tsip_rx_private.h
@@ -165,6 +168,7 @@ r_tsip_rx
         |   |   r_tsip_arc4_rx.c
         |   |   r_tsip_ecc_rx.c
         |   |   r_tsip_hash_rx.c
+        |   |   r_tsip_key_injection_rx.c
         |   |   r_tsip_rsa_rx.c
         |   |   r_tsip_rx.c
         |   |   r_tsip_rx_private.c
@@ -186,6 +190,7 @@ r_tsip_rx
         |   |   r_tsip_arc4_rx.c
         |   |   r_tsip_ecc_rx.c
         |   |   r_tsip_hash_rx.c
+        |   |   r_tsip_key_injection_rx.c
         |   |   r_tsip_rsa_rx.c
         |   |   r_tsip_rx.c
         |   |   r_tsip_rx_private.c
@@ -207,6 +212,7 @@ r_tsip_rx
             |   r_tsip_arc4_rx.c
             |   r_tsip_ecc_rx.c
             |   r_tsip_hash_rx.c
+            |   r_tsip_key_injection_rx.c
             |   r_tsip_rsa_rx.c
             |   r_tsip_rx.c
             |   r_tsip_rx_private.c

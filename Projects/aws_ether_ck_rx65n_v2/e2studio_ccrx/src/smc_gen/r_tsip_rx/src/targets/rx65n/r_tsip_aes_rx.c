@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2017-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_aes_rx.c
- * Version      : 1.21
+ * Version      : 1.22
  * Description  : Interface definition for the r_tsip_aes_rx TSIP module.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
@@ -44,6 +31,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -139,80 +128,6 @@ uint32_t g_aes256ccmdec_private_id;
  *********************************************************************************************************************/
 static e_tsip_err_t prepare_gcm_iv(uint8_t *ivec, uint32_t ivec_len, tsip_aes_key_index_t *key_index,
         uint32_t key_index_word_size, uint32_t *hashed_ivec);
-
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateAes128KeyIndex
-*******************************************************************************************************************/ /**
-* @details       The API for outputting User Key Generation Information of AES128 bit.
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information (13 words) of AES128 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateAes128KeyIndexSub()
-* @note          None
-*/
-TSIP_SEC_P_SECURE_BOOT_ERASE
-e_tsip_err_t R_TSIP_GenerateAes128KeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv, uint8_t *encrypted_key,
-        tsip_aes_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateAes128KeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_AES128;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/******************************************
- End of function R_TSIP_GenerateAes128KeyIndex
- ******************************************/
-TSIP_SEC_DEFAULT
-
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateAes256KeyIndex
-*******************************************************************************************************************/ /**
-* @details       The API for outputting User Key Generation Information of AES128 bit.
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information (17 words) of AES256 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateAes256KeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateAes256KeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv, uint8_t *encrypted_key,
-        tsip_aes_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateAes256KeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_AES256;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/******************************************
- End of function R_TSIP_GenerateAes256KeyIndex
- ******************************************/
 
 /***********************************************************************************************************************
 * Function Name: R_TSIP_UpdateAes128KeyIndex

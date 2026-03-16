@@ -1,24 +1,11 @@
-/***********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No 
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all 
- * applicable laws, including copyright laws. 
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, 
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM 
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES 
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS 
- * SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of 
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the 
- * following link:
- * http://www.renesas.com/disclaimer 
+/*
+ * Copyright (C) 2016 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2016 Renesas Electronics Corporation. All rights reserved.    
- ***********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /***********************************************************************************************************************
  * File Name    : r_ether_rx_private.h
- * Version      : 1.20
+ * Version      : 1.24
  * Device       : RX63N/RX65N/RX64M/RX71M/RX72M/RX72N
  * Tool-Chain   : RX Family C Compiler
  * H/W Platform : 
@@ -39,6 +26,7 @@
  *         : 22.11.2019 1.20     Added changes for RX72N.
  *         :                     Added changes for RX66N.
  *         :                     Deleted support for RX63N.
+ *         : 20.03.2025 1.24     Changed the disclaimer in program sources
   ***********************************************************************************************************************/
 
 /* Guards against multiple inclusion */

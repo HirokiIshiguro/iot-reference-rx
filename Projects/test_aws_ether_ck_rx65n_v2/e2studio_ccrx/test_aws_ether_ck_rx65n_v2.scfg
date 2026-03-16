@@ -7,7 +7,7 @@
                 <option id="com.renesas.smc.toolchain.option.language" key="com.renesas.smc.toolchain.option.language.c"/>
                 <option id="com.renesas.smc.toolchain.option.buildArtefactType" key="com.renesas.smc.toolchain.option.buildArtefactType.exe"/>
                 <option id="com.renesas.smc.toolchain.option.rtos" key="com.renesas.smc.toolchain.option.rtos.freertoslts">
-                    <item id="com.renesas.smc.toolchain.option.rtos.freertoslts" value="202406.01-LTS-rx-1.1.1"/>
+                    <item id="com.renesas.smc.toolchain.option.rtos.freertoslts" value="202406.03-LTS-rx-1.2.0"/>
                 </option>
                 <option id="com.renesas.smc.toolchain.option.dual" key="com.renesas.smc.toolchain.option.dual.true"/>
             </toolchain>
@@ -618,7 +618,7 @@
     </tool>
     <tool id="SWComponent" version="1.0.0.0">
         <configuration inuse="true" name="r_byteq">
-            <component description="Dependency : r_bsp version(s) 7.20&#10;This module allocates a queue control block in an Open() call to handle indexing for buffers provided by the user application. Additional functions are provided to put and get data from the buffer queue, inspect the number of bytes available or in use, and to flush the queue. There is no limit to the number of queues supported, and queue control blocks can be allocated statically at build time or dynamically at run time." detailDescription="Byte-based circular buffer library." display="r_byteq" id="r_byteq2.10" version="2.10">
+            <component description="Dependency : r_bsp version(s) 7.52&#10;This module allocates a queue control block in an Open() call to handle indexing for buffers provided by the user application. Additional functions are provided to put and get data from the buffer queue, inspect the number of bytes available or in use, and to flush the queue. There is no limit to the number of queues supported, and queue control blocks can be allocated statically at build time or dynamically at run time." detailDescription="Byte-based circular buffer library." display="r_byteq" id="r_byteq2.11" version="2.11">
                 <gridItem id="BYTEQ_CFG_PARAM_CHECKING_ENABLE" selectedIndex="0"/>
                 <gridItem id="BYTEQ_CFG_USE_HEAP_FOR_CTRL_BLKS" selectedIndex="0"/>
                 <gridItem id="BYTEQ_CFG_MAX_CTRL_BLKS" selectedIndex="32"/>
@@ -626,10 +626,9 @@
                 <gridItem id="BYTEQ_CFG_CRITICAL_SECTION" selectedIndex="0"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_ether_rx">
-            <component description="Dependency : r_bsp version(s) 5.52&#10;The Ethernet fit module provides a method to send and receive Ethernet / IEEE802.3 frame using Ethernet controller (ETHERC), Ethernet DMA controller (EDMAC)." detailDescription="Ethernet Driver." display="r_ether_rx" id="r_ether_rx1.23" version="1.23">
+            <component description="Dependency : r_bsp version(s) 5.52, 7.52&#10;The Ethernet fit module provides a method to send and receive Ethernet / IEEE802.3 frame using Ethernet controller (ETHERC), Ethernet DMA controller (EDMAC)." detailDescription="Ethernet Driver." display="r_ether_rx" id="r_ether_rx1.24" version="1.24">
                 <gridItem id="CLKOUT25M" selectedIndex="0"/>
                 <gridItem id="ET0_TX_CLK" selectedIndex="0"/>
                 <gridItem id="ET0_RX_CLK" selectedIndex="0"/>
@@ -737,10 +736,9 @@
                 <gridItem id="ETHER_CFG_PMGI_INT_PRIORTY" selectedIndex="1"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_tsip_rx">
-            <component description="Dependency : r_bsp version(s) 7.30&#10;Support functions: AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA, ECC, Random number generate, Key management, secure boot/secure firmware update." detailDescription="TSIP(Trusted Secure IP) driver." display="r_tsip_rx" id="r_tsip_rx1.21" version="1.21">
+            <component description="Dependency : r_bsp version(s) 7.30&#10;Support functions: AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA, ECC, Random number generate, Key management, secure boot/secure firmware update." detailDescription="TSIP(Trusted Secure IP) driver." display="r_tsip_rx" id="r_tsip_rx1.22" version="1.22">
                 <gridItem id="TSIP_AES_128_ECB_ENCRYPT" selectedIndex="1"/>
                 <gridItem id="TSIP_AES_256_ECB_ENCRYPT" selectedIndex="1"/>
                 <gridItem id="TSIP_AES_128_ECB_DECRYPT" selectedIndex="1"/>
@@ -798,10 +796,9 @@
                 <gridItem id="TSIP_MULTI_THREADING_UNLOCK_FUNCTION" selectedIndex="user_unlock_function"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_s12ad_rx">
-            <component description="Dependency : r_bsp version(s) 7.40&#10;This A/D driver supports the temperature sensor, internal reference voltage sensor, and all analog channels available on the MCU. Single scan and continuous scanning are supported. Group and Double Trigger modes are supported. Triggers may be synchronous, asynchronous, or initiated by software. " detailDescription="ADC Driver" display="r_s12ad_rx" id="r_s12ad_rx5.40" version="5.40">
+            <component description="Dependency : r_bsp version(s) 7.40&#10;This A/D driver supports the temperature sensor, internal reference voltage sensor, and all analog channels available on the MCU. Single scan and continuous scanning are supported. Group and Double Trigger modes are supported. Triggers may be synchronous, asynchronous, or initiated by software. " detailDescription="ADC Driver" display="r_s12ad_rx" id="r_s12ad_rx5.41" version="5.41">
                 <gridItem id="AN000" selectedIndex="0"/>
                 <gridItem id="AN001" selectedIndex="0"/>
                 <gridItem id="AN002" selectedIndex="0"/>
@@ -888,8 +885,8 @@
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="b21fee22-0910-4389-964b-11e24d883da3" inuse="true" name="FreeRTOS_Kernel">
-            <component description="Dependency: None&#10;FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." detailDescription="FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." display="FreeRTOS Kernel" id="FreeRTOS_Kernel202406.01-LTS-rx-1.1.1" version="11.1.0">
+        <configuration enable="true" exclude="false" id="019c42a5-5af2-45fc-a922-bf6285498b97" inuse="true" name="FreeRTOS_Kernel">
+            <component description="Dependency: None&#10;FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." detailDescription="FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." display="FreeRTOS Kernel" id="FreeRTOS_Kernel202406.03-LTS-rx-1.2.0" version="11.1.0">
                 <gridItem id="configENABLE_BACKWARD_COMPATIBILITY" selectedIndex="1"/>
                 <gridItem id="configUSE_PREEMPTION" selectedIndex="1"/>
                 <gridItem id="configUSE_PORT_OPTIMISED_TASK_SELECTION" selectedIndex="0"/>
@@ -993,8 +990,8 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="ddf45944-c15b-4d2b-9699-023fbfde2b76" inuse="true" name="LittleFS">
-            <component description="Dependency: None&#10;LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." detailDescription="LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." display="LittleFS" id="LittleFS202406.01-LTS-rx-1.1.1" version="2.5.1">
+        <configuration enable="true" exclude="false" id="cd0d9da8-e390-44d9-a4ef-548988740cdd" inuse="true" name="LittleFS">
+            <component description="Dependency: None&#10;LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." detailDescription="LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." display="LittleFS" id="LittleFS202406.03-LTS-rx-1.2.0" version="2.5.1">
                 <gridItem id="LFS_FLASH_READ_SIZE" selectedIndex="1"/>
                 <gridItem id="LFS_FLASH_PROGRAM_SIZE" selectedIndex="4"/>
                 <gridItem id="LFS_FLASH_BLOCK_SIZE" selectedIndex="128"/>
@@ -1003,7 +1000,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="290537ed-7371-4081-ad38-99b7176f6398" inuse="true" name="FreeRTOS Object">
+        <configuration enable="true" exclude="false" id="1ffb865b-1144-4ec5-917b-47644b388643" inuse="true" name="FreeRTOS Object">
             <allocatable id="OBJECT" name="OBJECT" type="">
                 <allocatable id="TASK" name="TASK" type="">
                     <allocatable id="TASKOBJECTLINK1" name="TASK" readonly="true" type="">
@@ -1036,12 +1033,13 @@
                     <option defaultValue="0" id="LinkNum" value=""/>
                 </allocatable>
             </allocatable>
-            <component description="This component is a part of RTOS Configurator feature that allow user to use the GUI to create and configure new object of FreeRTOS." detailDescription="" display="FreeRTOS_Object" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.object" version="202406.01-LTS-rx-1.1.1"/>
+            <component description="This component is a part of RTOS Configurator feature that allow user to use the GUI to create and configure new object of FreeRTOS." detailDescription="" display="FreeRTOS_Object" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.object" version="202406.03-LTS-rx-1.2.0"/>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="6b99ab55-77da-47fc-b2f3-5b93be5d99a4" inuse="true" name="FreeRTOS_IP">
-            <component description="Dependency: r_ether_rx&#10;FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." detailDescription="FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." display="FreeRTOS-Plus-TCP" id="FreeRTOS_IP202406.01-LTS-rx-1.1.1" version="4.2.2">
+        <configuration enable="true" exclude="false" id="0f7a658c-fde5-4064-b3bf-809ad7d634ba" inuse="true" name="FreeRTOS_IP">
+            <component description="Dependency: r_ether_rx&#10;FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." detailDescription="FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." display="FreeRTOS-Plus-TCP" id="FreeRTOS_IP202406.03-LTS-rx-1.2.0" version="4.2.4">
                 <gridItem id="ipconfigBYTE_ORDER" selectedIndex="0"/>
+                <gridItem id="ipconfigHAS_DEBUG_PRINTF" selectedIndex="0"/>
                 <gridItem id="FreeRTOS_debug_printf( MSG )" selectedIndex="configPRINTF( MSG )"/>
                 <gridItem id="ipconfigHAS_PRINTF" selectedIndex="1"/>
                 <gridItem id="FreeRTOS_printf( MSG )" selectedIndex="configPRINTF( MSG )"/>
@@ -1064,7 +1062,7 @@
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
         <configuration inuse="true" name="r_bsp">
-            <component description="Dependencies : None&#10;The r_bsp package provides a foundation for code to be built on top of. It provides startup code, iodefines, and MCU information for different boards. There are 2 folders that make up the r_bsp package. The 'mcu' folder contains files that are common to a MCU group. These files provide functionality such as easy register access, CPU functions, and a file named 'mcu_info.h' for each MCU group. The 'mcu_info.h' file has information about the MCU on the board and is configured based on the information given in r_bsp_config.h. The information in 'mcu_info.h' is used to help configure Renesas middleware that uses the r_bsp package. The 'board' folder has a folder with startup code for each supported board.  Which MCU and board is chosen is decided by the settings in 'platform.h'. The user can choose which board they are using by uncommenting the include path that applies to their board. For example, if you are using the RSK+RX64M then you would uncomment the #include &quot;./board/generic_rx64m/r_bsp.h&quot; include path. Users are encouraged to add their own boards to the 'board' directory. BSPs are configured by using the r_bsp_config.h file. Each board will have a reference configuration file named r_bsp_config_reference.h. The user should copy this file to their project, rename it to r_bsp_config.h, and use the options inside the file to configure the BSP for their project." detailDescription="Board Support Packages." display="r_bsp" id="r_bsp7.52" version="7.52">
+            <component description="Dependencies : None&#10;The r_bsp package provides a foundation for code to be built on top of. It provides startup code, iodefines, and MCU information for different boards. There are 2 folders that make up the r_bsp package. The 'mcu' folder contains files that are common to a MCU group. These files provide functionality such as easy register access, CPU functions, and a file named 'mcu_info.h' for each MCU group. The 'mcu_info.h' file has information about the MCU on the board and is configured based on the information given in r_bsp_config.h. The information in 'mcu_info.h' is used to help configure Renesas middleware that uses the r_bsp package. The 'board' folder has a folder with startup code for each supported board.  Which MCU and board is chosen is decided by the settings in 'platform.h'. The user can choose which board they are using by uncommenting the include path that applies to their board. For example, if you are using the RSK+RX64M then you would uncomment the #include &quot;./board/generic_rx64m/r_bsp.h&quot; include path. Users are encouraged to add their own boards to the 'board' directory. BSPs are configured by using the r_bsp_config.h file. Each board will have a reference configuration file named r_bsp_config_reference.h. The user should copy this file to their project, rename it to r_bsp_config.h, and use the options inside the file to configure the BSP for their project." detailDescription="Board Support Packages." display="r_bsp" id="r_bsp7.54" version="7.54">
                 <gridItem id="BSP_CFG_USER_STACK_ENABLE" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_USTACK_BYTES" selectedIndex="0x1000"/>
                 <gridItem id="BSP_CFG_ISTACK_BYTES" selectedIndex="0x400"/>
@@ -1119,12 +1117,17 @@
                 <gridItem id="BSP_CFG_INTERNAL_PERIPHERAL_BUS6_PRIORITY" selectedIndex="0"/>
                 <gridItem id="BSP_CFG_EXTERNAL_BUS_PRIORITY" selectedIndex="0"/>
                 <gridItem id="BSP_CFG_BOOTLOADER_PROJECT" selectedIndex="0"/>
+                <gridItem id="BSP_CFG_LOW_LEVEL_INTERFACE_STDIO_ENABLE" selectedIndex="1"/>
+                <gridItem id="BSP_CFG_LOW_LEVEL_INTERFACE_SBRK_ENABLE" selectedIndex="1"/>
+                <gridItem id="BSP_CFG_LOW_LEVEL_INTERFACE_REENTRANT_LIB_ENABLE" selectedIndex="1"/>
+                <gridItem id="BSP_CFG_USER_EXCLUSIVE_CONTROL_ENABLE" selectedIndex="0"/>
+                <gridItem id="BSP_CFG_USER_ENTER_CRITICAL_FUNCTION" selectedIndex="my_enter_critical_function"/>
+                <gridItem id="BSP_CFG_USER_EXIT_CRITICAL_FUNCTION" selectedIndex="my_exit_critical_function"/>
             </component>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_flash_rx">
-            <component description="Dependency : r_bsp version(s) 7.51&#10;This module allows the user to program, erase, write and blankcheck the Code and/or Data flash." detailDescription="Flash API for RX100, RX200, RX600. and RX700." display="r_flash_rx" id="r_flash_rx5.21" version="5.21">
+            <component description="Dependency : r_bsp version(s) 7.52&#10;This module allows the user to program, erase, write and blankcheck the Code and/or Data flash." detailDescription="Flash API for RX100, RX200, RX600. and RX700." display="r_flash_rx" id="r_flash_rx5.22" version="5.22">
                 <gridItem id="FLASH_CFG_PARAM_CHECKING_ENABLE" selectedIndex="1"/>
                 <gridItem id="FLASH_CFG_CODE_FLASH_ENABLE" selectedIndex="1"/>
                 <gridItem id="FLASH_CFG_DATA_FLASH_BGO" selectedIndex="1"/>
@@ -1132,10 +1135,9 @@
                 <gridItem id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" selectedIndex="1"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_sci_rx">
-            <component description="Dependency : r_bsp version(s) 7.51&#10;Dependency : r_byteq version(s) 1.40, 1.50, 1.60, 1.70, 1.71, 1.80, 1.81, 1.82, 1.90, 2.00, 2.10&#10;This module allows any number of SCI channels on the MCU to run in full duplex Asynchronous mode, single master Simple SPI mode, or master Synchronous mode simultaneously. The driver is interrupt driven and non-blocking. Transmit and receive buffer queues are used in Asynchronous mode and their sizes may be configured independently for each channel. Resources for unused channels or modes may be removed via settings in the driver's config.h file." detailDescription="SCI Driver" display="r_sci_rx" id="r_sci_rx5.40" version="5.40">
+            <component description="Dependency : r_bsp version(s) 7.52&#10;Dependency : r_byteq version(s) 1.40, 1.50, 1.60, 1.70, 1.71, 1.80, 1.81, 1.82, 1.90, 2.00, 2.10, 2.11&#10;This module allows any number of SCI channels on the MCU to run in full duplex Asynchronous mode, single master Simple SPI mode, or master Synchronous mode simultaneously. The driver is interrupt driven and non-blocking. Transmit and receive buffer queues are used in Asynchronous mode and their sizes may be configured independently for each channel. Resources for unused channels or modes may be removed via settings in the driver's config.h file." detailDescription="SCI Driver" display="r_sci_rx" id="r_sci_rx5.41" version="5.41">
                 <gridItem id="SCK0" selectedIndex="0"/>
                 <gridItem id="RXD0/SMISO0/SSCL0" selectedIndex="0"/>
                 <gridItem id="TXD0/SMOSI0/SSDA0" selectedIndex="0"/>
@@ -1412,7 +1414,6 @@
                 <gridItem id="SCI_CFG_CH10_TX_SIGNAL_TRANSITION_TIMING_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH11_TX_SIGNAL_TRANSITION_TIMING_INCLUDED" selectedIndex="0"/>
             </component>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_fwup">

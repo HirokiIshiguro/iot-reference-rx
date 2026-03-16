@@ -11,7 +11,7 @@
 	<package>
 		<type>rtosmodule</type>
 		<name>FreeRTOS_IP</name>
-		<version>4.2.2</version>
+		<version>4.2.4</version>
 		<category>rtos.library</category>
 		<function>RTOS</function>
 		<application>FreeRTOSLTSLibrary</application>

@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2024-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -53,7 +55,7 @@
 #endif
 
 #ifndef LIBRARY_LOG_LEVEL
-#define LIBRARY_LOG_LEVEL    LOG_INFO
+#define LIBRARY_LOG_LEVEL    (LOG_INFO)
 #endif
 
 #include "iot_logging_task.h"
@@ -86,10 +88,6 @@
  * (1) : OTA over MQTT demo is enabled
  */
 #define ENABLE_OTA_UPDATE_DEMO              (0)
-
-#if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
-	#error "Fleet Provisioning demo is not supported!"
-#endif
 
 /**
  * @brief Path of the file containing the provisioning claim certificate. This
@@ -172,7 +170,7 @@
 #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
     #define democonfigCLIENT_IDENTIFIER    "client"democonfigFP_DEMO_ID
 #else
-    #define democonfigCLIENT_IDENTIFIER    clientcredentialIOT_THING_NAME
+    #define democonfigCLIENT_IDENTIFIER    (clientcredentialIOT_THING_NAME)
 #endif
 #endif
 
@@ -185,7 +183,7 @@
  * Settings/Custom Endpoint, or using the describe-endpoint API.
  *
  */
-#define democonfigMQTT_BROKER_ENDPOINT     clientcredentialMQTT_BROKER_ENDPOINT
+#define democonfigMQTT_BROKER_ENDPOINT     (clientcredentialMQTT_BROKER_ENDPOINT)
 
 /**
  * @brief AWS IoT MQTT broker port number.
@@ -236,7 +234,7 @@
  * In the Windows port, this stack only holds a structure. The actual
  * stack is created by an operating system thread.
  */
-#define democonfigDEMO_STACKSIZE        configMINIMAL_STACK_SIZE * 3
+#define democonfigDEMO_STACKSIZE        (configMINIMAL_STACK_SIZE * 3)
 
 /**
  * @brief Set the stack size of the main demo task.
@@ -337,7 +335,7 @@
  * declared in the ota_appversion32.h file in the OTA library.
  */
 #ifndef APP_VERSION_MAJOR
-    #define APP_VERSION_MAJOR    0
+    #define APP_VERSION_MAJOR    (0)
 #endif
 
 /**
@@ -347,7 +345,7 @@
  * declared in the ota_appversion32.h file in the OTA library.
  */
 #ifndef APP_VERSION_MINOR
-    #define APP_VERSION_MINOR    9
+    #define APP_VERSION_MINOR    (9)
 #endif
 
 /**
@@ -357,7 +355,7 @@
  * declared in the ota_appversion32.h file in the OTA library.
  */
 #ifndef APP_VERSION_BUILD
-    #define APP_VERSION_BUILD    2
+    #define APP_VERSION_BUILD    (2)
 #endif
 
 /**
@@ -381,7 +379,7 @@
  * "-----END CERTIFICATE-----\n"
  *
  */
-#define democonfigROOT_CA_PEM                   tlsSTARFIELD_ROOT_CERTIFICATE_PEM
+#define democonfigROOT_CA_PEM                   (tlsATS1_ROOT_CERTIFICATE_PEM)
 
 /**
  * @brief The length of the queue used to hold commands for the agent.
@@ -404,5 +402,13 @@
  * updating from v202107.00(LTS#1) firmware to v202210.01(LTS#2) firmware.
  */
 #define ENABLE_CREDENTIAL_BY_CLI    (1)
+
+/**
+ * @brief The event bit to wait for starting other demos after OTA.
+ * @note After the image self-test is successful,
+ * OTA demo will set the event bit for every demo to enable the demo to run.
+ */
+#define SELF_TEST_FAILED             ((EventBits_t)(0U))
+#define SELF_TEST_PASSED             ((EventBits_t)(1U))
 
 #endif /* DEMO_CONFIG_H */

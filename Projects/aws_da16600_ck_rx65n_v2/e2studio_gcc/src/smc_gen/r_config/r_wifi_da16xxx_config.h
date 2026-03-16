@@ -1,22 +1,9 @@
 /* Generated configuration header file - do not edit */
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
- *
- * Copyright (C) 2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+/*
+* Copyright (c) 2025 Renesas Electronics Corporation and/or its affiliates
+*
+* SPDX-License-Identifier: BSD-3-Clause
+*/
 /**********************************************************************************************************************
  * File Name    : r_wifi_da16xxx_config.h
  * Description  : DA16XXX WiFi driver Configuration.
@@ -61,7 +48,7 @@
    0 = CTS(Hardware), RTS(Software)
    1 = RTS(Hardware), CTS(Software)
  */
-#define WIFI_CFG_CTS_SW_CTRL                  (1)
+#define WIFI_CFG_CTS_SW_CTRL                  (0)
 
 /* Configure CTS pin
  */
@@ -87,16 +74,16 @@
 Preprocessors that define board dependent settings and the corresponding values to be set are as follows:
 Confirmed board number          1       2      3      4      5      6      7      8      9      10     11     12     13     14     15     16
 WIFI_CFG_SCI_CHANNEL            0       2      6      1      6      0      6      2      5      5      5      5      10     11     5      1
-WIFI_CFG_SCI_PCLK_HZ (*note1)
+WIFI_CFG_SCI_PCLK_HZ (*Note1)
 WIFI_CFG_CTS_PORT               2       J      J      3      J      2      J      J      C      C      C      C      8      7      A      1
 WIFI_CFG_CTS_PIN                3       5      3      1      3      3      3      5      0      0      0      0      3      4      6      4
 WIFI_CFG_RTS_PORT               2       J      J      3      J      2      J      J      C      C      C      C      8      7      A      3
 WIFI_CFG_RTS_PIN                3       5      3      1      3      3      3      5      0      0      0      0      0      5      1      1
-WIFI_CFG_PFS_SET_VALUE (*note2) 0x0BU   0x0BU  0x0AU  0x0BU  0x0AU  0x0BU  0x0AU  0x0BU  0x0BU  0x0BU  0x0BU  0x0BU  0X2DU  0X2DU  0x0BU  0x0BU
+WIFI_CFG_PFS_SET_VALUE (*Note2) 0x0BU   0x0BU  0x0AU  0x0BU  0x0AU  0x0BU  0x0AU  0x0BU  0x0BU  0x0BU  0x0BU  0x0BU  0X2DU  0X2DU  0x0BU  0x0BU
 WIFI_CFG_RESET_PORT             D       5      F      2      5      A      5      A      B      B      D      D      4      C      B      B
 WIFI_CFG_RESET_PIN              0       5      5      0      5      1      5      1      1      1      7      7      7      0      3      2
 
-where the confirmed board numbers listed in the first row above are as follows (*note3):
+where the confirmed board numbers listed in the first row above are as follows (*Note3):
 1: RX65N Cloud Kit (PMOD),
 2: RX65N Envision Kit (PMOD),
 3: RX65N RSK (2MB) (PMOD1),
@@ -105,14 +92,14 @@ where the confirmed board numbers listed in the first row above are as follows (
 6: Cloud Kit for RX65N v1, CK-RX65N v1 (PMOD2),
 7: Cloud Kit for RX65N v2, CK-RX65N v2 (PMOD1),
 8: Cloud Kit for RX65N v2, CK-RX65N v2 (PMOD2),
-9: RX671 Target Board (PMOD),         *note4.
-10: RX66N Target Board (PMOD)         *note5.
-11: FPB-RX261 (PMOD1),                *note6
-12: EK-RX261  (PMOD1),                *note7
-13: EK-RX671  (PMOD1),                *note8
-14: EK-RX671  (PMOD2),   			  *note8
-15: FPB-RX140 (PMOD1),                *note9
-16: FPB-RX140 (PMOD2), 				  *note9
+9: RX671 Target Board (PMOD),         (*Note4)
+10: RX66N Target Board (PMOD),        (*Note5)
+11: FPB-RX261 (PMOD1),                (*Note6)
+12: EK-RX261  (PMOD1),
+13: EK-RX671  (PMOD1),
+14: EK-RX671  (PMOD2),
+15: FPB-RX140 (PMOD1),
+16: FPB-RX140 (PMOD2),
 In the above preprocessor list, please use one of the values listed on the right side.
 On the right side, each column corresponds to each confirmed board number.
 
@@ -121,40 +108,38 @@ Note1: Check Peripheral clock speed in Clocks tab on Smart Configuration.
     e.g. if PCLKB speed is 60MHz then WIFI_CFG_SCI_PCLK_HZ is 60000000).
 
 Note2: Check Pin Function Select (PSEL) of Pin Function Control Register (PxyPFS)
-    in Multi-Function Pin Controller (MPC) section of board group hardware manual.
+    In Multi-Function Pin Controller (MPC) section of board group hardware manual.
     Below is list of board group hardware manual:
     1: RX65N group: https://www.renesas.com/us/en/document/mah/rx65n-group-rx651-group-users-manualhardware-rev230
     2: RX671 group: https://www.renesas.com/tw/en/document/mah/rx671-group-users-manual-hardware-rev100
     3: RX66N group: https://www.renesas.com/us/en/document/mah/rx66n-group-users-manual-hardware-rev111
     4: RX261 group: https://www.renesas.com/en/document/mah/rx260-group-rx261-group-users-manual-hardware?r=25565706
     5: RX140 group: https://www.renesas.com/en/document/mah/rx140-group-users-manual-hardware-rev120?r=1531576
+
 Note3: List of board user's manual:
     1: RX65N Cloud Kit:    https://www.renesas.com/us/en/document/mat/uses-manual-cloud-option-board
     2: RX65N Envision Kit: https://www.renesas.com/us/en/document/mat/rx65n-envision-kit-users-manual-rev100
     3: RX65N RSK (2MB):    https://www.renesas.com/us/en/document/mat/renesas-starter-kit-rx65n-2mb-users-manual
     4: CK-RX65N v1:        https://www.renesas.com/kr/en/document/mat/ck-rx65n-v1-users-manual
-    5: RX671 Target Board: https://www.renesas.com/br/en/document/mat/target-board-rx671-users-manual-rev100
-    6: RX66N Target Board: https://www.renesas.com/us/en/document/mah/target-board-rx66n-users-manual-rev100
+    5: CK-RX65N v2:        https://www.renesas.com/kr/en/document/mat/ck-rx65n-v2-users-manual
+    6: RX671 Target Board: https://www.renesas.com/br/en/document/mat/target-board-rx671-users-manual-rev100
+    7: RX66N Target Board: https://www.renesas.com/us/en/document/mah/target-board-rx66n-users-manual-rev100
+    8: FPB-RX261          https://www.renesas.com/en/document/mat/fpb-rx261-v1-users-manual
+    9: EK-RX261:           https://www.renesas.com/en/document/mat/ek-rx261-v1-users-manual
+    10: EK-RX671 v1:        https://www.renesas.com/en/document/mat/ek-rx671-v1-users-manual
+    11: FPB-RX140:          https://www.renesas.com/en/document/mat/fpb-rx140-v1-users-manual
 
 Note4:
-When you use RX671 Target Board, you need pattern cut and so on to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1).
-Please refer to User's Manual: https://www.renesas.com/en/document/mat/target-board-rx671-users-manual-rev100
+- When you use RX671 Target Board, you need pattern cut and so on to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1).
+Please refer to User's Manual: https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus/rtk5rx6710c00000bj-target-board-rx671
 
 Note5:
-When you use RX66N Target Board, you need remodeling of the board to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1).
-Please refer to User's Manual:https://www.renesas.com/en/document/mah/target-board-rx66n-users-manual-rev100
+- When you use RX66N Target Board, you need remodeling of the board to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1).
+Please refer to User's Manual: https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus/rtk5rx66n0c00000bj-target-board-rx66n
+- RX66N Target Board not support AzureRTOS.
 
 Note6:
-When you use FPB-RX261,please refer to User's Manual:https://www.renesas.com/en/document/mat/fpb-rx261-v1-users-manual?r=25565483
-
-Note7:
-When you use EK-RX261,please refer to User's Manual:https://www.renesas.com/en/document/mat/ek-rx261-v1-users-manual
-
-Note8:
-When you use EK-RX671,please refer to User's Manual:https://www.renesas.com/en/document/mat/ek-rx671-v1-users-manual
-
-Note9:
-When you use RX140FPB,please refer to User's Manual:https://www.renesas.com/en/document/mat/fpb-rx140-v1-users-manual
+- Only support Bare metal mode.
 
 */
 
@@ -599,6 +584,45 @@ When you use RX140FPB,please refer to User's Manual:https://www.renesas.com/en/d
 #endif
 
 /* End HTTP macro definitions */
+
+/* Start OTA macro definitions */
+
+#define WIFI_CFG_OTA_SUPPORT                   (0)
+
+#if WIFI_CFG_OTA_SUPPORT == 1
+/*
+ * @brief Block size for OTA data write.
+ *
+ * Defines the size (in bytes) of each data block written to flash memory
+ * during the OTA (Over-the-Air) update process. This value determines how
+ * much data is written per write operation.
+ */
+#define WIFI_CFG_OTA_BLK_SIZE                  (128)
+
+/* Configures the certificate verification mode.
+    0: None - No authentication required; accept connections without any form of authentication.
+    1: Optional - Allow both authenticated and unauthenticated connections.
+    2: Require - Demand authentication for connections.
+ */
+#define WIFI_CFG_OTA_TLS_AUTH                  (0)
+
+#if WIFI_CFG_OTA_TLS_AUTH != 0
+
+/* Name of header file that will contain certificates (macros).
+    User must create header file.
+    Example: "cert_storage.h"
+ */
+#define WIFI_CFG_OTA_CERTS_HEADER              ""
+
+/* Root CA
+    Links to user-defined macro of the same name for Root CA
+    which user must define in application header.
+ */
+#define WIFI_CFG_OTA_ROOT_CA                   /* Root CA */
+
+#endif /* End WIFI_CFG_OTA_TLS_AUTH != 0 */
+
+#endif /* End WIFI_CFG_OTA_SUPPORT == 1 */
 
 /**********************************************************************************************************************
  Global Typedef definitions

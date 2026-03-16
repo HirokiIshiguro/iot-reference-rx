@@ -1,28 +1,30 @@
 /*
-FreeRTOS
-Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
-Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
- http://aws.amazon.com/freertos
- http://www.FreeRTOS.org
-*/
+ * FreeRTOS
+ * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * http://aws.amazon.com/freertos
+ * http://www.FreeRTOS.org
+ */
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
@@ -42,19 +44,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "mqtt_agent_task.h"
 
 st_cellular_ctrl_t cellular_ctrl;
-extern bool Connect2AP( void );
+extern bool Connect2AP ( void );
 
 bool ApplicationCounter (uint32_t xWaitTime);
 signed char vISR_Routine (void);
 extern void vStartSimplePubSubDemo (void);
-BaseType_t OtaSelfTest(void);
+BaseType_t OtaSelfTest (void);
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 0)
 void vAssignCredentials(void);
 extern int32_t xprvWriteCacheEntry(size_t KeyLength,
-        char * Key,
-        size_t ValueLength,
-        char * pvNewValue );
+                                   char *Key,
+                                   size_t ValueLength,
+                                   char *pvNewValue);
 extern BaseType_t KVStore_xCommitChanges(void);
 #endif
 
@@ -104,6 +106,8 @@ extern BaseType_t KVStore_xCommitChanges(void);
 /* The priority used by the UART command console task. */
 #define mainUART_COMMAND_CONSOLE_TASK_PRIORITY  ( 1 )
 
+EventGroupHandle_t xStartDemoEventGroup = NULL;
+
 extern int32_t littlFs_init (void);
 
 /**
@@ -146,6 +150,9 @@ void main_task(void)
     vUARTCommandConsoleStart(mainUART_COMMAND_CONSOLE_STACK_SIZE, mainUART_COMMAND_CONSOLE_TASK_PRIORITY);
 #endif
 
+    /* To wait for CLI initialization completes */
+    vTaskDelay(100);
+
     xResults = littlFs_init();
 
     xMQTTAgentInit();
@@ -154,7 +161,6 @@ void main_task(void)
     {
         xResults = vprvCacheInit();
     }
-
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 0)
     vAssignCredentials();
@@ -170,7 +176,7 @@ void main_task(void)
 
     /* Initialise cellular connection.
     r_cellular APIs are called to connect to AP. */
-    if( !Connect2AP())
+    if ( !Connect2AP())
     {
 
         configPRINTF( ( "Cellular init failed" ) );
@@ -222,6 +228,9 @@ void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
+    
+    /* Create the event group to sync among demos */
+    xStartDemoEventGroup = xEventGroupCreate();
 
     /* Start logging task. */
     xLoggingTaskInitialize(mainLOGGING_TASK_STACK_SIZE,
@@ -241,7 +250,6 @@ End of function prvMiscInitialization
  *********************************************************************************************************************/
 void vApplicationDaemonTaskStartupHook(void)
 {
-
 }
 /*****************************************************************************************
 End of function vApplicationDaemonTaskStartupHook
@@ -454,7 +462,7 @@ const char * pcApplicationHostnameHook(void)
         }
     }
 #endif
-    }
+}
 #endif
 /*****************************************************************************************
  End of function pcApplicationHostnameHook
@@ -557,5 +565,9 @@ void vAssignCredentials(void)
  *********************************************************************************************************************/
 BaseType_t OtaSelfTest(void)
 {
-	return pdTRUE;
+    return pdTRUE;
 }
+/**********************************************************************************************************************
+ End of function OtaSelfTest
+ *********************************************************************************************************************/
+

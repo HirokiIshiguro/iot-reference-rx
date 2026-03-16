@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -24,7 +26,6 @@
  * http://aws.amazon.com/freertos
  */
 
-
 #ifndef _MQTT_AGENT_TASK_H_
 #define _MQTT_AGENT_TASK_H_
 
@@ -41,7 +42,7 @@
 typedef enum MQTTAgentState
 {
     MQTT_AGENT_STATE_NONE = 0,
-    MQTT_AGENT_STATE_INITIALIZED = 1,   //Set this state when fleet provisioning demo finish and the MQTT task ready to run.
+    MQTT_AGENT_STATE_INITIALIZED = 1, // Set this state when fleet provisioning demo finish and the MQTT task ready to run.
     MQTT_AGENT_STATE_DISCONNECTED = 2,
     MQTT_AGENT_STATE_CONNECTED = 3,
     MQTT_AGENT_STATE_TERMINATED = 4,
@@ -54,14 +55,23 @@ typedef enum MQTTAgentState
  * @param[in] pvIncomingPublishCallbackContext The incoming publish callback context.
  * @param[in] pxPublishInfo Deserialized publish information.
  */
-typedef void (* IncomingPubCallback_t )( void * pvIncomingPublishCallbackContext,
-					MQTTPublishInfo_t * pxPublishInfo );
+typedef void (*IncomingPubCallback_t)(void *pvIncomingPublishCallbackContext,
+                                      MQTTPublishInfo_t *pxPublishInfo);
 
 /**
  * @brief Initialize the MQTT Agent.
  * Create the semaphore and Event group.
  */
-BaseType_t xMQTTAgentInit( void );
+/**********************************************************************************************************************
+ * Function Name: xMQTTAgentInit
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xMQTTAgentInit(void);
+
+/**********************************************************************************************************************
+ End of function xMQTTAgentInit
+ *********************************************************************************************************************/
 
 /**
  * @brief Starts the MQTT agent task.
@@ -72,9 +82,20 @@ BaseType_t xMQTTAgentInit( void );
  * @param[in] uxStackSize Stack size for MQTT agent task.
  * @param[in] uxPriority Priority of MQTT agent task.
  */
-void vStartMQTTAgent( configSTACK_DEPTH_TYPE uxStackSize,
-        UBaseType_t uxPriority  );
+/**********************************************************************************************************************
+ * Function Name: vStartMQTTAgent
+ * Description  : Starts the MQTT agent task which runs the MQTT agent
+ *                command loop.
+ * Arguments    : configSTACK_DEPTH_TYPE uxStackSize - stack size for MQTT agent task.
+ *                UBaseType_t uxPriority - priority of MQTT agent task.
+ * Return Value : void
+ *********************************************************************************************************************/
+void vStartMQTTAgent(configSTACK_DEPTH_TYPE uxStackSize,
+                     UBaseType_t uxPriority);
 
+/**********************************************************************************************************************
+ End of function vStartMQTTAgent
+ *********************************************************************************************************************/
 
 /**
  * @brief Get the current state of MQTT agent.
@@ -83,7 +104,17 @@ void vStartMQTTAgent( configSTACK_DEPTH_TYPE uxStackSize,
  *
  * @return State of the MQTT agent.
  */
-MQTTAgentState_t xGetMQTTAgentState( void );
+/**********************************************************************************************************************
+ * Function Name: xGetMQTTAgentState
+ * Description  : Get the current state of the MQTT agent.
+ * Arguments    : None.
+ * Return Value : MQTTAgentState_t - current agent state.
+ *********************************************************************************************************************/
+MQTTAgentState_t xGetMQTTAgentState(void);
+
+/**********************************************************************************************************************
+ End of function xGetMQTTAgentState
+ *********************************************************************************************************************/
 
 /**
  * @brief Set the current state of MQTT agent.
@@ -92,7 +123,17 @@ MQTTAgentState_t xGetMQTTAgentState( void );
  *
  * @param[in] xAgentState State of the MQTT agent.
  */
-void xSetMQTTAgentState( MQTTAgentState_t xAgentState );
+/**********************************************************************************************************************
+ * Function Name: xSetMQTTAgentState
+ * Description  : Set the current state of MQTT agent.
+ * Arguments    : MQTTAgentState_t xAgentState - State to set.
+ * Return Value : void
+ *********************************************************************************************************************/
+void xSetMQTTAgentState(MQTTAgentState_t xAgentState);
+
+/**********************************************************************************************************************
+ End of function xSetMQTTAgentState
+ *********************************************************************************************************************/
 
 /**
  * @brief Wait for MQTT agent to reach the desired state.
@@ -104,8 +145,19 @@ void xSetMQTTAgentState( MQTTAgentState_t xAgentState );
  *                         if the caller has to wait indefinitely.
  * @return pdTRUE if the state is reached, pdFALSE if the timeout has reached waiting for the state.
  */
-BaseType_t xWaitForMQTTAgentState( MQTTAgentState_t xStateToWait,
-                                   TickType_t xTicksToWait );
+/**********************************************************************************************************************
+ * Function Name: xWaitForMQTTAgentState
+ * Description  : Wait for the MQTT agent to reach a desired state.
+ * Arguments    : MQTTAgentState_t xStateToWait - desired state to wait for.
+ *                TickType_t xTicksToWait - ticks to wait (use portMAX_DELAY to wait indefinitely).
+ * Return Value : BaseType_t - pdTRUE if state reached, pdFALSE on timeout.
+ *********************************************************************************************************************/
+BaseType_t xWaitForMQTTAgentState(MQTTAgentState_t xStateToWait,
+                                  TickType_t xTicksToWait);
+
+/**********************************************************************************************************************
+ End of function xWaitForMQTTAgentState
+ *********************************************************************************************************************/
 
 /**
  * @brief Add a callback for the topic filter with MQTT agent.
@@ -125,11 +177,25 @@ BaseType_t xWaitForMQTTAgentState( MQTTAgentState_t xStateToWait,
  *                               MQTT agent if the connection is lost and then reconnected.
  * @return pdTRUE if the callback was added successfully. pdFALSE otherwise.
  */
-BaseType_t xAddMQTTTopicFilterCallback( const char * pcTopicFilter,
-                                        uint16_t usTopicFilterLength,
-                                        IncomingPubCallback_t pxPublishCallback,
-                                        void * pvCallbackContext,
-                                        BaseType_t xManageResubscription );
+/**********************************************************************************************************************
+ * Function Name: xAddMQTTTopicFilterCallback
+ * Description  : Register a local subscription callback for a topic filter.
+ * Arguments    : const char * pcTopicFilter - topic filter string.
+ *                uint16_t usTopicFilterLength - length of the topic filter.
+ *                IncomingPubCallback_t pxPublishCallback - callback invoked on publishes.
+ *                void * pvCallbackContext - context passed to the callback.
+ *                BaseType_t xManageResubscription - whether agent should manage resubscription.
+ * Return Value : BaseType_t - pdTRUE if added successfully, pdFALSE otherwise.
+ *********************************************************************************************************************/
+BaseType_t xAddMQTTTopicFilterCallback(const char *pcTopicFilter,
+                                       uint16_t usTopicFilterLength,
+                                       IncomingPubCallback_t pxPublishCallback,
+                                       void *pvCallbackContext,
+                                       BaseType_t xManageResubscription);
+
+/**********************************************************************************************************************
+ End of function xAddMQTTTopicFilterCallback
+ *********************************************************************************************************************/
 
 /**
  * @brief Remove a topic filter callback from the MQTT agent.
@@ -138,14 +204,39 @@ BaseType_t xAddMQTTTopicFilterCallback( const char * pcTopicFilter,
  * @param pcTopicFilter Topic filter string for which the callback needs to be removed.
  * @param usTopicFilterLength Length of the topic filter string.
  */
-void vRemoveMQTTTopicFilterCallback( const char * pcTopicFilter,
-                                     uint16_t usTopicFilterLength );
+/**********************************************************************************************************************
+ * Function Name: vRemoveMQTTTopicFilterCallback
+ * Description  : Remove a topic filter callback from the MQTT agent.
+ * Arguments    : const char * pcTopicFilter - topic filter string.
+ *                uint16_t usTopicFilterLength - length of the topic filter.
+ * Return Value : void
+ *********************************************************************************************************************/
+void vRemoveMQTTTopicFilterCallback(const char *pcTopicFilter,
+                                    uint16_t usTopicFilterLength);
 
-MQTTStatus_t MqttAgent_SubscribeSync( const char * pcTopicFilter,
-                                      uint16_t uxTopicFilterLength,
-                                      MQTTQoS_t xRequestedQoS,
-                                      IncomingPubCallback_t pxCallback,
-                                      void * pvCallbackCtx );
+/**********************************************************************************************************************
+ End of function vRemoveMQTTTopicFilterCallback
+ *********************************************************************************************************************/
 
+/**********************************************************************************************************************
+ * Function Name: MqttAgent_SubscribeSync
+ * Description  : Synchronously subscribe to a topic and register a local
+ *                callback for incoming publishes on that topic.
+ * Arguments    : const char * pcTopicFilter - topic filter to subscribe to.
+ *                uint16_t uxTopicFilterLength - length of the topic filter.
+ *                MQTTQoS_t xRequestedQoS - requested QoS.
+ *                IncomingPubCallback_t pxCallback - callback for incoming publishes.
+ *                void * pvCallbackCtx - callback context.
+ * Return Value : MQTTStatus_t - MQTTSuccess on success, otherwise an MQTT error code.
+ *********************************************************************************************************************/
+MQTTStatus_t MqttAgent_SubscribeSync(const char *pcTopicFilter,
+                                     uint16_t uxTopicFilterLength,
+                                     MQTTQoS_t xRequestedQoS,
+                                     IncomingPubCallback_t pxCallback,
+                                     void *pvCallbackCtx);
+
+/**********************************************************************************************************************
+ End of function MqttAgent_SubscribeSync
+ *********************************************************************************************************************/
 
 #endif /* ifndef _MQTT_AGENT_TASK_H_ */

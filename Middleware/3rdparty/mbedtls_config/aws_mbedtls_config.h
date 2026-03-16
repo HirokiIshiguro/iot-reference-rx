@@ -1,4 +1,4 @@
-/**
+﻿/**
  * \file aws_mbedtls_config.h
  *
  * \brief Configuration options (set of defines)
@@ -212,7 +212,7 @@
     #include <stddef.h>
 
     extern void * pvCalloc( size_t xNumElements,
-                          size_t xSize ) ;
+                            size_t xSize ) ;
     extern void vPortFree( void *pv );
     #define MBEDTLS_PLATFORM_CALLOC_MACRO pvCalloc
     #define MBEDTLS_PLATFORM_FREE_MACRO   vPortFree

@@ -31,7 +31,8 @@ The following table shows the demos and features available on CK-RX65N v2.<br>
 
 | Tags | Connectivity | Compiler  | Import project | Project generation (PG) | PubSub | OTA update | Fleet Provisioning | TLS with TSIP |TCP minimal |
 |------|--------------|-----------|----------------|-------------------------|--------|-----|-------------------|-------------|-------------|
-| [v202406.01-LTS-rx-1.1.1](https://github.com/renesas/iot-reference-rx/tree/v202406.01-LTS-rx-1.1.1)<br>* This Version | Ethernet, Cellular, Wi-Fi | CC-RX, GCC | Yes | Yes  | Yes  | Yes<BR>(Not supported for Wi-Fi)  | No  | No  | Yes |
+| [v202406.04-LTS-rx-1.2.0](https://github.com/renesas/iot-reference-rx/tree/v202406.04-LTS-rx-1.2.0)<br>* This Version | Ethernet, Cellular, Wi-Fi | CC-RX, GCC | Yes | No   | Yes  | Yes | Yes  | No  | No |
+| [v202406.01-LTS-rx-1.1.1](https://github.com/renesas/iot-reference-rx/tree/v202406.01-LTS-rx-1.1.1) | Ethernet, Cellular, Wi-Fi | CC-RX, GCC | Yes | Yes  | Yes  | Yes<BR>(Not supported for Wi-Fi)  | No  | No  | Yes |
 | [v202406.01-LTS-rx-1.1.0](https://github.com/renesas/iot-reference-rx/tree/v202406.01-LTS-rx-1.1.0) | Ethernet, Cellular, Wi-Fi | CC-RX, GCC | Yes | No  | Yes  | Yes<BR>(Not supported for Wi-Fi)  | No  | No  | No  |
 | [v202406.01-LTS-rx-1.0.1](https://github.com/renesas/iot-reference-rx/tree/v202406.01-LTS-rx-1.0.1) | Ethernet | CC-RX, GCC | Yes | Yes | Yes | No  | No | No | Yes |
 | [v202210.01-LTS-rx-1.3.2](https://github.com/renesas/iot-reference-rx/tree/v202210.01-LTS-rx-1.3.2) | Ethernet, Wi-Fi | CC-RX, GCC | Yes | Yes | Yes | Yes | Yes | Yes<BR>(PubSub and OTA for CC-RX) | Yes |
@@ -69,28 +70,28 @@ The following table indicates name and version of OSS which are used in this ref
 |----------------------------------|---------------|------------|----------------------------------------------------------------------|---------|
 | FreeRTOS Cellular Interface      | 1.4.0         | 06/30/2026 | <https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface>            | Unused  |
 | FreeRTOS Kernel                  | 11.1.0        | 06/30/2026 | <https://github.com/FreeRTOS/FreeRTOS-Kernel>                        |         |
-| FreeRTOS-Plus-TCP                | 4.2.2         | 06/30/2026 | <https://github.com/FreeRTOS/FreeRTOS-Plus-TCP>                      |         |
+| FreeRTOS-Plus-TCP                | 4.2.5         | 06/30/2026 | <https://github.com/FreeRTOS/FreeRTOS-Plus-TCP>                      |         |
 | backoffAlgorithm                 | 1.4.1         | 06/30/2026 | <https://github.com/FreeRTOS/backoffAlgorithm>                       |         |
 | coreHTTP Client                  | 3.1.1         | 06/30/2026 | <https://github.com/FreeRTOS/coreHTTP>                               | Unused  |
 | coreJSON                         | 3.3.0         | 06/30/2026 | <https://github.com/FreeRTOS/coreJSON>                               |         |
 | coreMQTT Client                  | 2.3.1         | 06/30/2026 | <https://github.com/FreeRTOS/coreMQTT>                               |         |
 | coreMQTT Agent                   | 1.3.1         | --         | <https://github.com/FreeRTOS/coreMQTT-Agent>                         |         |
-| corePKCS11                       | 3.6.1         | 06/30/2026 | <https://github.com/FreeRTOS/corePKCS11>                             |         |
+| corePKCS11                       | 3.6.3         | 06/30/2026 | <https://github.com/FreeRTOS/corePKCS11>                             |         |
 | coreSNTP                         | 1.3.1         | 06/30/2026 | <https://github.com/FreeRTOS/coreSNTP>                               | Unused  |
 | AWS IoT Device Defender          | 1.4.0         | 06/30/2026 | <https://github.com/aws/Device-Defender-for-AWS-IoT-embedded-sdk>    | Unused  |
 | AWS IoT Device Shadow            | 1.4.1         | 06/30/2026 | <https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk>      | Unused  |
-| AWS IoT Fleet Provisioning       | 1.2.1         | 06/30/2026 | <https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk> | Unused  |
+| AWS IoT Fleet Provisioning       | 1.2.1         | 06/30/2026 | <https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk> |         |
 | AWS IoT Jobs                     | 1.5.1         | 06/30/2026 | <https://github.com/aws/Jobs-for-AWS-IoT-embedded-sdk>               |         |
 | AWS SigV4                        | 1.3.0         | 06/30/2026 | <https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk>              | Unused  |
 | AWS IoT MQTT File Streams        | 1.1.0         | 06/30/2026 | <https://github.com/aws/aws-iot-core-mqtt-file-streams-embedded-c>   |         |
 | tinycbor                         | 0.5.2         | --         | <https://github.com/intel/tinycbor>                                    |         |
-| mbedtls                          | 3.6.3         | --         | <https://github.com/Mbed-TLS/mbedtls>                                     |         |
-| mbedtls_config                   | 3.6.3         | --         | --                                           |         |
+| mbedtls                          | 3.6.4         | --         | <https://github.com/Mbed-TLS/mbedtls>                                     |         |
+| mbedtls_config                   | 3.6.4         | --         | --                                           |         |
 | mbedtls_utils                    | --            | --         | --                                           |         |
 | littlefs                         | 2.5.1         | --         | <https://github.com/littlefs-project/littlefs>                   |         |
 | FreeRTOS-Plus network_transport  | --            | --         | <https://github.com/FreeRTOS/FreeRTOS/tree/main/FreeRTOS-Plus/Source/Application-Protocols/network_transport> |         |
 | FreeRTOS-Plus-CLI                | 1.0.4         | --         | <https://github.com/FreeRTOS/FreeRTOS/tree/main/FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI>                       |         |
-| mbed-crypto                      | 1.1.2         | --         | <https://github.com/renesas/mbed-crypto>                             |         |
+| FreeRTOS crypto                  | 1.1.2         | --         | <https://github.com/aws/amazon-freertos/tree/main/libraries/freertos_plus/standard/crypto>                    |         |
 | Logging Interface                | 1.1.3         | --         | <https://github.com/aws/amazon-freertos/tree/main/libraries/logging> |         |
 | pkcs11                           | 2-40-errata-1 | --         | <https://github.com/amazon-freertos/pkcs11>                          |         |
 
@@ -102,17 +103,17 @@ The following table indicates name and version of [FIT modules](https://www.rene
 
 | FIT module   | Revision of FIT module | Version of RX Driver Package |
 |--------------|---------|------------|
-|r_bsp         |7.52     |1.46        |
-|r_s12ad_rx    |5.40     |1.45 - 1.46 |
-|r_byteq       |2.10     |1.37 - 1.46 |
-|r_cellular    |1.12     |1.44 - 1.46 |
-|r_ether_rx    |1.23     |1.36 - 1.46 |
-|r_flash_rx    |5.21     |1.46        |
-|r_sci_rx      |5.40     |1.46        |
-|r_tsip_rx     |1.21     |1.44 - 1.46 |
-|r_irq_rx      |4.60     |1.46        |
-|r_fwup        |2.04     |1.45 - 1.46 |
-|r_wifi_da16xxx|1.33     | -          |
+|r_bsp         |7.54     | -          |
+|r_s12ad_rx    |5.41     |1.47        |
+|r_byteq       |2.11     |1.47        |
+|r_cellular    |1.13     |1.47        |
+|r_ether_rx    |1.24     |1.47        |
+|r_flash_rx    |5.22     |1.47        |
+|r_sci_rx      |5.41     |1.47        |
+|r_tsip_rx     |1.22     |1.47        |
+|r_irq_rx      |4.71     |1.47        |
+|r_fwup        |2.04     |1.45 - 1.47 |
+|r_wifi_da16xxx|1.40     |1.48        |
 
 ### Data Flash Usage
 
@@ -174,7 +175,12 @@ These changes will be saved in the `\Common\patches` folder and will be incorpor
     `\Common\patches\Jobs-for-AWS-IoT-embedded-sdk`
   * The AWS IoT Jobs  packaged in LTS_v202406.01 lacks "custom version string" support.  
     So as a temporary workaround, we have modified the Jobs_UpdateMsg API to allow the custom version to be used.  
-  
+* aws-iot-core-mqtt-file-streams-embedded-c
+  * It will be stored in the following folder.  
+    `\Common\patches\aws-iot-core-mqtt-file-streams-embedded-c`
+  * This fixes a build error that occurs when building the following AWS IoT MQTT File Streams source code with GCC v14.2.0.202505 or later.  
+    `MQTTFileDownloader_cbor.c`
+
 ### Configuration values changed from the default in the FIT Modules
 
 * The configuration values of the FIT modules that have been changed from the default values are listed in the table below.
@@ -432,26 +438,64 @@ The hook function *1 is called by occurring an error of a TCP_Sockets API *2 (di
 
 * This connection protocol used in this demo requires SNI (Server Name Indication).  
   For this reason, if you set the following macro to pdTRUE (disable SNI) and build, a build error will occur.
-  * democonfigDISABLE_SNI(demo_config.h)
+  * democonfigDISABLE_SNI(demo_config.h)  
+
+  If you want to disable SNI, set `democonfigDISABLE_SNI` to 1 in `demo_config.h` and comment out the following three lines.
+
+  ```c
+  #if ( democonfigDISABLE_SNI == 1 )
+    #error "It is strongly recommended to implement SNI authentication, this requirement is enforced in mbedTLS library (mbedtls_ssl_handshake). Furthermore, SNI is required for connection to AWS IoT Core MQTT broker."
+  #endif
+  ```
 
 * If you are using GCC as a compiler, please use `e2 studio 2025-04` or later.  
   If you are using a version earlier than e2 studio 2025-01, the optimization setting `-gc-sections` may be disabled when generating code.
 
-* The current implementation of "custom standard printf function" is not thread-safe, it may cause the log output to look messy or jumbled.  
-  Please disable and avoid using the stdlib `printf` function in the application code.  
-  Please use the FreeRTOS printf function `configPRINTF` instead.
-
-* The output of the `printf` and `fprintf` functions in this project is output to the same serial channel as the FreeRTOS log output.  
-  However, the current implementation of the `printf`/`fprintf` functions and the FreeRTOS log output functions are not thread-safe when used together.  
-  Do not use the stdlib `printf`/`fprintf` functions for log output in the application code. Instead, use the FreeRTOS printf function `configPRINTF`.  
-
-  If this is a problem, please consider changing the following macro in `r_bsp_config.h` to revert the output destination of the `printf`/`fprintf` function to Renesas Virtual Console in e2 studio.  
-  `#define BSP_CFG_USER_CHARPUT_ENABLED    (0)`
-
 * In `e2 studio 2025-07` or older, there is a known issue where the `FreeRTOSIPConfig.h` file will be removed when changing the package version of an import project.  
-  Please manually recover the `FreeRTOSIPConfig.h` from the `/trash` folder in e2studio Project Explorer.  
+  Please manually recover the `FreeRTOSIPConfig.h` from the `/trash` folder in e2 studio Project Explorer.  
   Please make sure to click the "Generate Code" button again after the recovery, to ensure the latest settings are applied.  
-  
+
+* Fleet Provisioning may fail if a network disconnection occurs at specific points during the provisioning process.
+  * This issue occurs under the following conditions:
+    * Before receiving the certificate from AWS
+    * Immediately after publishing
+  * A temporary workaround has been implemented to allow recovery if the same condition occurs twice in succession.
+  * This may be related to a bug currently under discussion in the [GitHub Issue#1206](https://github.com/FreeRTOS/FreeRTOS/issues/1206).  
+    (However, it has not been verified whether applying this fix will fix the problem.)  
+
+* Close Socket Function in the Cellular Project's Socket Wrapper  
+The error‑handling logic in the `CloseSocket()` function is intentionally commented out when a socket‑close error occurs.  
+File: `\Middleware\network_transport\sockets_wrapper\ports\cellular_ryz014a\TCP_socket_hook.c`  
+Users may uncomment or extend this logic as needed for their specific use cases.
+This behavior is intentional for the following reasons:
+  * To prevent excessive resets of the RYZ014A module
+  * To allow users to determine whether other sockets that are operating normally should be closed
+
+* Default Value of the Root CA Certificate  
+Projects prior to `v202406.01-LTS-rx-1.1.1` use the Starfield Cross‑signing CA as the default root CA certificate.  
+However, Starfield's CA is no longer part of the AWS certificate chain.  
+Therefore, update the project's default root CA to Amazon's root CA (`Amazon Root CA 1`) as shown below:  
+File: `\src\frtos_config\demo_config.h`  
+
+  ```c
+  #define democonfigROOT_CA_PEM    (tlsATS1_ROOT_CERTIFICATE_PEM)
+  ```
+
+* Code Generation Issue in GCC Projects When Using e2 studio 2025-12  
+If you are using e2 studio 2025-12, a build error may occur under the following conditions:  
+Projects older than `v202406.01-LTS-rx-1.1.1` may encounter this issue.
+  * When using a GCC project with code generation via the Smart Configurator  
+  * When generating a GCC project using PG  
+
+  **Required Fix**  
+    The linker script file (`\src\linker_script.ld`) must be corrected at lines 140 and 141.  
+    ![limitation1](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/readme_lim_01.png?raw=true)  
+  **After correction:**  
+
+    ```c
+    *MqttDemoExample.o(.bss.**)
+    ```
+
 </details>
 
 ## License

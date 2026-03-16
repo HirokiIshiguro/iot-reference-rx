@@ -3,6 +3,8 @@
  * Copyright (C) 2021 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2024-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -55,7 +57,7 @@
 #endif
 
 #ifndef LIBRARY_LOG_LEVEL
-    #define LIBRARY_LOG_LEVEL    LOG_INFO
+    #define LIBRARY_LOG_LEVEL    (LOG_INFO)
 #endif
 
 #include "logging_stack.h"

@@ -8,6 +8,7 @@ This document provides information about the demo with the following specificati
 * Demo Type: PubSub/MQTT
 
 > **Note:**  
+> For information about the "*PubSub/MQTT with Fleet Provisioning sample project*", see [**"ether_fleet_information.md"**](ether_fleet_information.md).  
 > For information about the "*PubSub/MQTT with Over-the-air(OTA) update sample project*", see [**"ether_ota_information.md"**](ether_ota_information.md).  
 > For more information about setting up and running the demo, see [**"Getting_Started_Guide.md"**](../../Getting_Started_Guide.md).
 
@@ -33,15 +34,15 @@ This demo performs the following tasks:
 
 | Compiler | RAM size | ROM size |
 |----------|----------|----------|
-| CC-RX    | 327KB    | 355KB    |
-| GCC      | 335KB    | 352KB    |
+| CC-RX    | 327KB    | 365KB    |
+| GCC      | 335KB    | 356KB    |
 
 ### Confirmed Operation Environment
 
 | Compiler | Version  | Details |
 |----------|----------|---------|
 | CC-RX    | V3.07.00 | Optimization: Level 2 |
-| GCC      | GCC for Renesas RX v8.3.0.202411 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
+| GCC      | GCC for Renesas RX v14.2.0.202505 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
 
 ## Explanation specific to this demo
 

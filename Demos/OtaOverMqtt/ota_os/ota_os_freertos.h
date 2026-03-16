@@ -32,7 +32,7 @@
 #endif
 
 #ifndef LIBRARY_LOG_LEVEL
-#define LIBRARY_LOG_LEVEL    LOG_INFO
+#define LIBRARY_LOG_LEVEL    (LOG_INFO)
 #endif
 
 #include "iot_logging_task.h"
@@ -61,7 +61,16 @@ typedef enum OtaOsStatus
  * @return               OtaOsStatus_t, OtaOsSuccess if success , other error
  * code on failure.
  */
-OtaOsStatus_t OtaInitEvent_FreeRTOS( void );
+/**********************************************************************************************************************
+ * Function Name: OtaInitEvent_FreeRTOS
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+OtaOsStatus_t OtaInitEvent_FreeRTOS ( void );
+
+/**********************************************************************************************************************
+ End of function OtaInitEvent_FreeRTOS
+ *********************************************************************************************************************/
 
 /**
  * @brief Sends an OTA event.
@@ -79,7 +88,17 @@ OtaOsStatus_t OtaInitEvent_FreeRTOS( void );
  * @return               OtaOsStatus_t, OtaOsSuccess if success , other error
  * code on failure.
  */
-OtaOsStatus_t OtaSendEvent_FreeRTOS( const void * pEventMsg );
+/**********************************************************************************************************************
+ * Function Name: OtaSendEvent_FreeRTOS
+ * Description  : .
+ * Argument     : pEventMsg
+ * Return Value : .
+ *********************************************************************************************************************/
+OtaOsStatus_t OtaSendEvent_FreeRTOS ( const void * pEventMsg );
+
+/**********************************************************************************************************************
+ End of function OtaSendEvent_FreeRTOS
+ *********************************************************************************************************************/
 
 /**
  * @brief Receive an OTA event.
@@ -96,7 +115,17 @@ OtaOsStatus_t OtaSendEvent_FreeRTOS( const void * pEventMsg );
  * @return               OtaOsStatus_t, OtaOsSuccess if success , other error
  * code on failure.
  */
-OtaOsStatus_t OtaReceiveEvent_FreeRTOS( void * pEventMsg );
+/**********************************************************************************************************************
+ * Function Name: OtaReceiveEvent_FreeRTOS
+ * Description  : .
+ * Argument     : pEventMsg
+ * Return Value : .
+ *********************************************************************************************************************/
+OtaOsStatus_t OtaReceiveEvent_FreeRTOS ( void * pEventMsg );
+
+/**********************************************************************************************************************
+ End of function OtaReceiveEvent_FreeRTOS
+ *********************************************************************************************************************/
 
 /**
  * @brief Deinitialize the OTA Events mechanism.
@@ -109,6 +138,15 @@ OtaOsStatus_t OtaReceiveEvent_FreeRTOS( void * pEventMsg );
  * @return               OtaOsStatus_t, OtaOsSuccess if success , other error
  * code on failure.
  */
-void OtaDeinitEvent_FreeRTOS( void );
+/**********************************************************************************************************************
+ * Function Name: OtaDeinitEvent_FreeRTOS
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+void OtaDeinitEvent_FreeRTOS ( void );
+
+/**********************************************************************************************************************
+ End of function OtaDeinitEvent_FreeRTOS
+ *********************************************************************************************************************/
 
 #endif /* ifndef _OTA_OS_FREERTOS_H_ */

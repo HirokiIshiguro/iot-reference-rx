@@ -9,15 +9,15 @@ R01AN7173EU (English version)
 
 Version
 -------
-v1.33
+v1.40
 
 Overview
 --------------------------------------------------------------------------------
 The r_wifi_da16xxx module is a wifi driver.
 
 This driver is tested and works with the following toolchain:
-  Renesas Electronics C/C++ Compiler for RX Family V3.06.00
-  GCC for Renesas RX 8.3.0.202405
+  Renesas Electronics C/C++ Compiler for RX Family V3.07.00
+  GCC for Renesas RX 14.2.0.202505
 All API calls and their supporting interface definitions are located in r_wifi_da16xxx_if.h.
 
 Features
@@ -34,6 +34,7 @@ Features
 * TLS Client Sockets (up to 2 sockets)
 * On-chip MQTT (w/TLS) Support
 * On-chip HTTP client
+* On-chip OTA service
 * Supports FreeRTOS-based user application
 * Supports Bare metal-based user application
 
@@ -70,8 +71,8 @@ Please refer to the Adding Firmware Integration Technology Modules to Projects.
 
 Toolchain(s) Used
 -----------------
-* Renesas Electronics C/C++ Compiler for RX Family V3.06.00
-* GCC for Renesas RX 8.3.0.202405
+* Renesas Electronics C/C++ Compiler for RX Family V3.07.00
+* GCC for Renesas RX 14.2.0.202505
 
 File Structure
 --------------
@@ -90,6 +91,7 @@ r_wifi_da16xxx
         r_wifi_da16xxx_mqtt.c
         r_wifi_da16xxx_os_wrap.c
         r_wifi_da16xxx_os_wrap.h
+        r_wifi_da16xxx_ota.c
         r_wifi_da16xxx_private.h
         r_wifi_da16xxx_tcp.c
         r_wifi_da16xxx_tcp_tls.c

@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2017-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_rsa_rx.c
- * Version      : 1.20
+ * Version      : 1.22
  * Description  : Interface definition for the r_tsip_rsa_rx TSIP module.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
@@ -43,6 +30,8 @@
  *         : 24.05.2023 1.18     Added support for RX26T
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -92,6 +81,7 @@ static e_tsip_err_t set_rsassapkcs_hash_data(tsip_rsa_byte_data_t *p_message_has
         uint32_t rsa_key_byte_size, uint8_t *data_buff);
 static e_tsip_err_t rsassa_emsa_pss_verify (tsip_rsa_byte_data_t * message, uint8_t hash_type, uint32_t em_bits,
         uint8_t * em);
+static e_tsip_err_t mgf1_mask(uint8_t *masked, uint8_t hash_type, uint8_t *seed, uint32_t seed_len, uint32_t mask_len);
 static uint32_t get_keyn_size(uint32_t *prsa_key_index, uint32_t key_max_size);
 static e_tsip_err_t get_rand_rsaes_pkcs(uint32_t rand_size, uint8_t *prand_data);
 
@@ -481,6 +471,68 @@ static e_tsip_err_t rsassa_emsa_pss_verify(tsip_rsa_byte_data_t *message, uint8_
 
 #if TSIP_PRV_USE_RSAES
 /***********************************************************************************************************************
+* Function Name: mgf1_mask
+*******************************************************************************************************************/ /**
+* @details       MGF1 generation and mask
+* @param[in,out] masked input data to be masked and output data
+* @param[in]     hash_type hash type
+* @param[in]     seed seed used in MGF1
+* @param[in]     seed_len length of seed
+* @param[in]     mask_len length of mask
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
+* @see           calc_hash_data()
+* @note          The seed parameter needs seed_len + 4 byte size for counter area.
+*/
+static e_tsip_err_t mgf1_mask(uint8_t *masked, uint8_t hash_type, uint8_t *seed, uint32_t seed_len, uint32_t mask_len)
+{
+    e_tsip_err_t error_code = TSIP_SUCCESS;
+    uint8_t mgf_mask[R_TSIP_RSA_2048_DATA_BYTE_SIZE] =
+    {
+        0
+    };
+    uint32_t hash_length = 0;
+    uint32_t i;
+
+    if (R_TSIP_RSA_HASH_SHA1 == hash_type)
+    {
+        hash_length = R_TSIP_SHA1_HASH_LENGTH_BYTE_SIZE;
+    }
+    else if (R_TSIP_RSA_HASH_SHA256 == hash_type)
+    {
+        hash_length = R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE;
+    }
+    else
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    memset(&seed[seed_len], 0, 4);
+    for (i = 0; i <= (mask_len / hash_length); i++)
+    {
+        if (TSIP_SUCCESS == error_code)
+        {
+            error_code = calc_hash_data(seed, &mgf_mask[i *hash_length], seed_len + 4, hash_type);
+            seed[seed_len + 3]++;
+        }
+    }
+
+    if (TSIP_SUCCESS == error_code)
+    {
+        for (i = 0; i < mask_len; i++)
+        {
+            masked[i] ^= mgf_mask[i];
+        }
+    }
+
+    return error_code;
+}
+/*******************************
+ End of function mgf1_mask
+ *******************************/
+
+/***********************************************************************************************************************
 * Function Name: get_keyn_size
 *******************************************************************************************************************/ /**
 * @details       Get key n size from RSA key index
@@ -570,234 +622,6 @@ static e_tsip_err_t get_rand_rsaes_pkcs(uint32_t rand_size, uint8_t *prand_data)
  End of function get_rand_rsaes_pkcs
  *******************************/
 #endif /* TSIP_PRV_USE_RSAES */
-
-#if TSIP_PRV_USE_RSA_1024
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateRsa1024PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate RSA Public key index data
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information of RSA1024 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateRsa1024PublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateRsa1024PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_rsa1024_public_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateRsa1024PublicKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_RSA1024_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateRsa1024PublicKeyIndex
- *******************************/
-#endif /* TSIP_PRV_USE_RSA_1024 */
-
-#if TSIP_PRV_USE_RSA_2048
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateRsa2048PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate RSA Public key index data
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information of RSA2048 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateRsa2048PublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateRsa2048PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_rsa2048_public_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateRsa2048PublicKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_RSA2048_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateRsa2048PublicKeyIndex
- *******************************/
-#endif /* TSIP_PRV_USE_RSA_2048 */
-
-#if TSIP_PRV_USE_RSA_3072
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateRsa3072PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate RSA Public key index data
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information of RSA3072 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateRsa3072PublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateRsa3072PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_rsa3072_public_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateRsa3072PublicKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_RSA3072_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateRsa3072PublicKeyIndex
- *******************************/
-#endif /* TSIP_PRV_USE_RSA_3072 */
-
-#if TSIP_PRV_USE_RSA_4096
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateRsa4096PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate RSA Public key index data
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information of RSA4096 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateRsa4096PublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateRsa4096PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_rsa4096_public_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateRsa4096PublicKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_RSA4096_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateRsa4096PublicKeyIndex
- *******************************/
-#endif /* TSIP_PRV_USE_RSA_4096 */
-
-#if TSIP_PRV_USE_RSA_1024
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateRsa1024PrivateKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate RSA Private key index data
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information of RSA1024 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateRsa1024PrivateKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_rsa1024_private_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateRsa1024PrivateKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_RSA1024_PRIVATE;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateRsa1024PrivateKeyIndex
- *******************************/
-#endif /* TSIP_PRV_USE_RSA_1024 */
-
-#if TSIP_PRV_USE_RSA_2048 || TSIP_TLS
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateRsa2048PrivateKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate RSA Private key index data
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information of RSA2048 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateRsa2048PrivateKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateRsa2048PrivateKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_rsa2048_private_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateRsa2048PrivateKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_RSA2048_PRIVATE;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateRsa2048PrivateKeyIndex
- *******************************/
-#endif /* TSIP_PRV_USE_RSA_2048 || TSIP_TLS */
 
 #if TSIP_PRV_USE_RSA_1024
 /***********************************************************************************************************************
@@ -1435,6 +1259,253 @@ e_tsip_err_t R_TSIP_RsaesPkcs1024Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_
 /*******************************
  End of function R_TSIP_RsaesPkcs1024Decrypt
  *******************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_RsaesOaep1024Encrypt
+*******************************************************************************************************************/ /**
+* @details       RSAES-OAEP Encrypt with RSA 1024bit Public key
+* @param[in]     plain plain data and plain data length
+* @param[out]    cipher cipher data and cipher data length
+* @param[in]     key_index key index information
+* @param[in]     hash_type hash type
+* @param[in]     mgf_hash_type hash type of MGF1
+* @param[in]     label label data
+* @param[in]     label_length label data length
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
+* @retval        TSIP_ERR_KEY_SET: Input illegal user Key Generation Information
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
+* @see           R_TSIP_Rsa1024ModularExponentEncryptPrivate()
+* @note          None
+*/
+e_tsip_err_t R_TSIP_RsaesOaep1024Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_byte_data_t *cipher,
+        tsip_rsa1024_public_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length)
+{
+    e_tsip_err_t ercd = TSIP_SUCCESS;
+    uint8_t input_data_arry[R_TSIP_RSA_1024_DATA_BYTE_SIZE + 4] =
+    {
+        0
+    };
+    uint8_t output_data_arry[R_TSIP_RSA_1024_DATA_BYTE_SIZE] =
+    {
+        0
+    };
+    uint32_t ptr = 0;
+    uint8_t mgf_input[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE + 4] = 
+    {
+        0
+    };
+    uint8_t l_hash[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE] =
+    {
+        0
+    };
+    uint32_t hash_length = 0;
+
+    if (R_TSIP_RSA_HASH_SHA1 == hash_type)
+    {
+        hash_length = R_TSIP_SHA1_HASH_LENGTH_BYTE_SIZE;
+    }
+    else if (R_TSIP_RSA_HASH_SHA256 == hash_type)
+    {
+        hash_length = R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE;
+    }
+    else
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    if (plain->data_length > ((R_TSIP_RSA_1024_DATA_BYTE_SIZE - (2 * hash_length)) - 2))
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    ercd = calc_hash_data(label, l_hash, label_length, hash_type);
+
+    /* EME-OAEP encoding */
+    if (TSIP_SUCCESS == ercd)
+    {
+        ptr = 1;
+        /* Casting uint32_t pointer is used for address. */
+        ercd = R_TSIP_GenerateRandomNumberPrivate((uint32_t *)&input_data_arry[ptr]);
+        ptr += 16;
+        /* Casting uint32_t pointer is used for address. */
+        ercd = R_TSIP_GenerateRandomNumberPrivate((uint32_t *)&input_data_arry[ptr]);
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        /***   RSAES-OAEP data block DB format   ***/
+        /*       (1)    | (2)  |  (3)   | (4) */
+        /* DB = [lHash] | [PS] | [0x01] | [M] */
+        ptr = 1 + hash_length;
+        memcpy(&input_data_arry[ptr], l_hash, sizeof(uint8_t) * hash_length);
+        ptr = ((R_TSIP_RSA_1024_DATA_BYTE_SIZE - plain->data_length) - 1);
+        input_data_arry[ptr] = 0x01;
+        ptr++;
+        memcpy(&input_data_arry[ptr], plain->pdata, plain->data_length);
+
+        /***   RSAES-OAEP encoded message EM format   ***/
+        /*       (1)   |  (2)         |  (3)       */
+        /* EM = [0x01] | [maskedSeed] | [maskedDB] */
+        memcpy(mgf_input, &input_data_arry[1], hash_length);
+        ercd = mgf1_mask(&input_data_arry[hash_length + 1], mgf_hash_type, mgf_input, hash_length,
+            ((R_TSIP_RSA_1024_DATA_BYTE_SIZE - hash_length) - 1));
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        ptr = hash_length + 1;
+        ercd = mgf1_mask(&input_data_arry[1], mgf_hash_type, &input_data_arry[ptr],
+            ((R_TSIP_RSA_1024_DATA_BYTE_SIZE - hash_length) - 1), hash_length);
+    }
+
+    /* RSA encryption */
+    if (TSIP_SUCCESS == ercd)
+    {
+        ercd = R_TSIP_Rsa1024ModularExponentEncryptPrivate(
+                /* Casting uint32_t pointer is used for address. */
+                (uint32_t*)&key_index->value, (uint32_t*)input_data_arry, (uint32_t*)output_data_arry);
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        memcpy(cipher->pdata, output_data_arry, R_TSIP_RSA_1024_DATA_BYTE_SIZE);
+        cipher->data_length = R_TSIP_RSA_1024_DATA_BYTE_SIZE;
+    }
+
+    return ercd;
+}
+/*******************************
+ End of function R_TSIP_RsaesOaep1024Encrypt
+ *******************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_RsaesOaep1024Decrypt
+*******************************************************************************************************************/ /**
+* @details       RSAES-OAEP Decrypt with RSA 1024bit Private key
+* @param[in]     cipher cipher data and cipher data length
+* @param[out]    plain plain data and plain data length
+* @param[in]     key_index key index information
+* @param[in]     hash_type hash type
+* @param[in]     mgf_hash_type hash type of MGF1
+* @param[in]     label label data
+* @param[in]     label_length label data length
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
+* @retval        TSIP_ERR_KEY_SET: Input illegal user Key Generation Information
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
+* @retval        TSIP_ERR_FAIL: Decryption error
+* @see           R_TSIP_Rsa1024ModularExponentDecryptPrivate()
+* @note          None
+*/
+e_tsip_err_t R_TSIP_RsaesOaep1024Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_byte_data_t *plain,
+        tsip_rsa1024_private_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length)
+{
+    e_tsip_err_t ercd = TSIP_SUCCESS;
+    uint8_t input_data_arry[R_TSIP_RSA_1024_DATA_BYTE_SIZE] =
+    {
+        0
+    };
+    uint8_t output_data_arry[R_TSIP_RSA_1024_DATA_BYTE_SIZE + 4] =
+    {
+        0
+    };
+    uint32_t ptr = 0;
+    uint8_t seed[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE + 4] = 
+    {
+        0
+    };
+    uint8_t l_hash[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE] = 
+    {
+        0
+    };
+    uint32_t hash_length = 0;
+
+    if (R_TSIP_RSA_HASH_SHA1 == hash_type)
+    {
+        hash_length = R_TSIP_SHA1_HASH_LENGTH_BYTE_SIZE;
+    }
+    else if (R_TSIP_RSA_HASH_SHA256 == hash_type)
+    {
+        hash_length = R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE;
+    }
+    else
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    if (R_TSIP_RSA_1024_DATA_BYTE_SIZE != cipher->data_length)
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    ercd = calc_hash_data(label, l_hash, label_length, hash_type);
+
+    /* RSA decryption */
+    if (TSIP_SUCCESS == ercd)
+    {
+        memcpy(input_data_arry, cipher->pdata, cipher->data_length);
+        ercd = R_TSIP_Rsa1024ModularExponentDecryptPrivate(
+                /* Casting uint32_t pointer is used for address. */
+                (uint32_t*)&key_index->value, (uint32_t*)input_data_arry, (uint32_t*)output_data_arry);
+    }
+
+    /* EME-OAEP decoding */
+    if (TSIP_SUCCESS == ercd)
+    {
+        /***   RSAES-OAEP encoded message EM format   ***/
+        /*      (1) |  (2)         |  (3)       */
+        /* EM = [Y] | [maskedSeed] | [maskedDB] */
+        if (0x00 != output_data_arry[0])
+        {
+            return TSIP_ERR_FAIL;
+        }
+
+        ptr = hash_length + 1;
+        memcpy(seed, &output_data_arry[1], hash_length);
+        ercd = mgf1_mask(seed, mgf_hash_type, &output_data_arry[ptr],
+            ((R_TSIP_RSA_1024_DATA_BYTE_SIZE - hash_length) - 1), hash_length);
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        ercd = mgf1_mask(&output_data_arry[ptr], mgf_hash_type, seed, hash_length,
+            ((R_TSIP_RSA_1024_DATA_BYTE_SIZE - hash_length) - 1));
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        /***   RSAES-OAEP data block DB format   ***/
+        /*       (1)     | (2)  |  (3)   | (4) */
+        /* DB = [lHash'] | [PS] | [0x01] | [M] */
+        if (memcmp(&output_data_arry[ptr], l_hash, sizeof(uint8_t)*hash_length))
+        {
+            return TSIP_ERR_FAIL;
+        }
+
+        for (ptr += hash_length; ptr < R_TSIP_RSA_1024_DATA_BYTE_SIZE; ptr++)
+        {
+            if (0x00 != output_data_arry[ptr])
+            {
+                break;
+            }
+        }
+        if (0x01 != output_data_arry[ptr++])
+        {
+            return TSIP_ERR_FAIL;
+        }
+
+        plain->data_length = R_TSIP_RSA_1024_DATA_BYTE_SIZE - ptr;
+        memcpy(plain->pdata, &output_data_arry[ptr], plain->data_length);
+    }
+
+    return ercd;
+}
+/*******************************
+ End of function R_TSIP_RsaesOaep1024Decrypt
+ *******************************/
 #endif /* TSIP_RSAES_1024 == 1 */
 
 #if TSIP_RSASSA_2048 == 1
@@ -1786,6 +1857,253 @@ e_tsip_err_t R_TSIP_RsaesPkcs2048Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_
 }
 /*******************************
  End of function R_TSIP_RsaesPkcs2048Decrypt
+ *******************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_RsaesOaep2048Encrypt
+*******************************************************************************************************************/ /**
+* @details       RSAES-OAEP Encrypt with RSA 2048bit Public key
+* @param[in]     plain plain data and plain data length
+* @param[out]    cipher cipher data and cipher data length
+* @param[in]     key_index key index information
+* @param[in]     hash_type hash type
+* @param[in]     mgf_hash_type hash type of MGF1
+* @param[in]     label label data
+* @param[in]     label_length label data length
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
+* @retval        TSIP_ERR_KEY_SET: Input illegal user Key Generation Information
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
+* @see           R_TSIP_Rsa2048ModularExponentEncryptPrivate()
+* @note          None
+*/
+e_tsip_err_t R_TSIP_RsaesOaep2048Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_byte_data_t *cipher,
+        tsip_rsa2048_public_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length)
+{
+    e_tsip_err_t ercd = TSIP_SUCCESS;
+    uint8_t input_data_arry[R_TSIP_RSA_2048_DATA_BYTE_SIZE + 4] =
+    {
+        0
+    };
+    uint8_t output_data_arry[R_TSIP_RSA_2048_DATA_BYTE_SIZE] =
+    {
+        0
+    };
+    uint32_t ptr = 0;
+    uint8_t mgf_input[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE + 4] = 
+    {
+        0
+    };
+    uint8_t l_hash[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE] =
+    {
+        0
+    };
+    uint32_t hash_length = 0;
+
+    if (R_TSIP_RSA_HASH_SHA1 == hash_type)
+    {
+        hash_length = R_TSIP_SHA1_HASH_LENGTH_BYTE_SIZE;
+    }
+    else if (R_TSIP_RSA_HASH_SHA256 == hash_type)
+    {
+        hash_length = R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE;
+    }
+    else
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    if (plain->data_length > ((R_TSIP_RSA_2048_DATA_BYTE_SIZE - (2 * hash_length)) - 2))
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    ercd = calc_hash_data(label, l_hash, label_length, hash_type);
+
+    /* EME-OAEP encoding */
+    if (TSIP_SUCCESS == ercd)
+    {
+        ptr = 1;
+        /* Casting uint32_t pointer is used for address. */
+        ercd = R_TSIP_GenerateRandomNumberPrivate((uint32_t *)&input_data_arry[ptr]);
+        ptr += 16;
+        /* Casting uint32_t pointer is used for address. */
+        ercd = R_TSIP_GenerateRandomNumberPrivate((uint32_t *)&input_data_arry[ptr]);
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        /***   RSAES-OAEP data block DB format   ***/
+        /*       (1)    | (2)  |  (3)   | (4) */
+        /* DB = [lHash] | [PS] | [0x01] | [M] */
+        ptr = 1 + hash_length;
+        memcpy(&input_data_arry[ptr], l_hash, sizeof(uint8_t) * hash_length);
+        ptr = ((R_TSIP_RSA_2048_DATA_BYTE_SIZE - plain->data_length) - 1);
+        input_data_arry[ptr] = 0x01;
+        ptr++;
+        memcpy(&input_data_arry[ptr], plain->pdata, plain->data_length);
+
+        /***   RSAES-OAEP encoded message EM format   ***/
+        /*       (1)   |  (2)         |  (3)       */
+        /* EM = [0x01] | [maskedSeed] | [maskedDB] */
+        memcpy(mgf_input, &input_data_arry[1], hash_length);
+        ercd = mgf1_mask(&input_data_arry[hash_length + 1], mgf_hash_type, mgf_input, hash_length,
+            ((R_TSIP_RSA_2048_DATA_BYTE_SIZE - hash_length) - 1));
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        ptr = hash_length + 1;
+        ercd = mgf1_mask(&input_data_arry[1], mgf_hash_type, &input_data_arry[ptr],
+            ((R_TSIP_RSA_2048_DATA_BYTE_SIZE - hash_length) - 1), hash_length);
+    }
+
+    /* RSA encryption */
+    if (TSIP_SUCCESS == ercd)
+    {
+        ercd = R_TSIP_Rsa2048ModularExponentEncryptPrivate(
+                /* Casting uint32_t pointer is used for address. */
+                (uint32_t*)&key_index->value, (uint32_t*)input_data_arry, (uint32_t*)output_data_arry);
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        memcpy(cipher->pdata, output_data_arry, R_TSIP_RSA_2048_DATA_BYTE_SIZE);
+        cipher->data_length = R_TSIP_RSA_2048_DATA_BYTE_SIZE;
+    }
+
+    return ercd;
+}
+/*******************************
+ End of function R_TSIP_RsaesOaep2048Encrypt
+ *******************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_RsaesOaep2048Decrypt
+*******************************************************************************************************************/ /**
+* @details       RSAES-OAEP Decrypt with RSA 2048bit Private key
+* @param[in]     cipher cipher data and cipher data length
+* @param[out]    plain plain data and plain data length
+* @param[in]     key_index key index information
+* @param[in]     hash_type hash type
+* @param[in]     mgf_hash_type hash type of MGF1
+* @param[in]     label label data
+* @param[in]     label_length label data length
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
+* @retval        TSIP_ERR_KEY_SET: Input illegal user Key Generation Information
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
+* @retval        TSIP_ERR_FAIL: Decryption error
+* @see           R_TSIP_Rsa2048ModularExponentDecryptPrivate()
+* @note          None
+*/
+e_tsip_err_t R_TSIP_RsaesOaep2048Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_byte_data_t *plain,
+        tsip_rsa2048_private_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length)
+{
+    e_tsip_err_t ercd = TSIP_SUCCESS;
+    uint8_t input_data_arry[R_TSIP_RSA_2048_DATA_BYTE_SIZE] =
+    {
+        0
+    };
+    uint8_t output_data_arry[R_TSIP_RSA_2048_DATA_BYTE_SIZE + 4] =
+    {
+        0
+    };
+    uint32_t ptr = 0;
+    uint8_t seed[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE + 4] = 
+    {
+        0
+    };
+    uint8_t l_hash[R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE] = 
+    {
+        0
+    };
+    uint32_t hash_length = 0;
+
+    if (R_TSIP_RSA_HASH_SHA1 == hash_type)
+    {
+        hash_length = R_TSIP_SHA1_HASH_LENGTH_BYTE_SIZE;
+    }
+    else if (R_TSIP_RSA_HASH_SHA256 == hash_type)
+    {
+        hash_length = R_TSIP_SHA256_HASH_LENGTH_BYTE_SIZE;
+    }
+    else
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    if (R_TSIP_RSA_2048_DATA_BYTE_SIZE != cipher->data_length)
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    ercd = calc_hash_data(label, l_hash, label_length, hash_type);
+
+    /* RSA decryption */
+    if (TSIP_SUCCESS == ercd)
+    {
+        memcpy(input_data_arry, cipher->pdata, cipher->data_length);
+        ercd = R_TSIP_Rsa2048ModularExponentDecryptPrivate(
+                /* Casting uint32_t pointer is used for address. */
+                (uint32_t*)&key_index->value, (uint32_t*)input_data_arry, (uint32_t*)output_data_arry);
+    }
+
+    /* EME-OAEP decoding */
+    if (TSIP_SUCCESS == ercd)
+    {
+        /***   RSAES-OAEP encoded message EM format   ***/
+        /*      (1) |  (2)         |  (3)       */
+        /* EM = [Y] | [maskedSeed] | [maskedDB] */
+        if (0x00 != output_data_arry[0])
+        {
+            return TSIP_ERR_FAIL;
+        }
+
+        ptr = hash_length + 1;
+        memcpy(seed, &output_data_arry[1], hash_length);
+        ercd = mgf1_mask(seed, mgf_hash_type, &output_data_arry[ptr],
+            ((R_TSIP_RSA_2048_DATA_BYTE_SIZE - hash_length) - 1), hash_length);
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        ercd = mgf1_mask(&output_data_arry[ptr], mgf_hash_type, seed, hash_length,
+            ((R_TSIP_RSA_2048_DATA_BYTE_SIZE - hash_length) - 1));
+    }
+
+    if (TSIP_SUCCESS == ercd)
+    {
+        /***   RSAES-OAEP data block DB format   ***/
+        /*       (1)     | (2)  |  (3)   | (4) */
+        /* DB = [lHash'] | [PS] | [0x01] | [M] */
+        if (memcmp(&output_data_arry[ptr], l_hash, sizeof(uint8_t)*hash_length))
+        {
+            return TSIP_ERR_FAIL;
+        }
+
+        for (ptr += hash_length; ptr < R_TSIP_RSA_2048_DATA_BYTE_SIZE; ptr++)
+        {
+            if (0x00 != output_data_arry[ptr])
+            {
+                break;
+            }
+        }
+        if (0x01 != output_data_arry[ptr++])
+        {
+            return TSIP_ERR_FAIL;
+        }
+
+        plain->data_length = R_TSIP_RSA_2048_DATA_BYTE_SIZE - ptr;
+        memcpy(plain->pdata, &output_data_arry[ptr], plain->data_length);
+    }
+
+    return ercd;
+}
+/*******************************
+ End of function R_TSIP_RsaesOaep2048Decrypt
  *******************************/
 #endif /* TSIP_RSAES_2048 == 1 */
 

@@ -46,7 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 bool ApplicationCounter (uint32_t xWaitTime);
 signed char vISR_Routine (void);
 extern void vStartSimplePubSubDemo (void);
-BaseType_t OtaSelfTest(void);
+BaseType_t OtaSelfTest (void);
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 0)
 void vAssignCredentials(void);
@@ -150,6 +150,8 @@ static const uint8_t ucDNSServerAddress[4] =
     configDNS_SERVER_ADDR3
 };
 
+EventGroupHandle_t xStartDemoEventGroup = NULL;
+
 extern int32_t littlFs_init (void);
 
 /**
@@ -191,6 +193,9 @@ void main_task(void)
     vRegisterSampleCLICommands();
     vUARTCommandConsoleStart(mainUART_COMMAND_CONSOLE_STACK_SIZE, mainUART_COMMAND_CONSOLE_TASK_PRIORITY);
 #endif
+
+    /* To wait for CLI initialization completes */
+    vTaskDelay(100);
 
     xResults = littlFs_init();
 
@@ -271,6 +276,9 @@ void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
+    
+    /* Create the event group to sync among demos */
+    xStartDemoEventGroup = xEventGroupCreate();
 
     /* Start logging task. */
     xLoggingTaskInitialize(mainLOGGING_TASK_STACK_SIZE,
@@ -608,3 +616,7 @@ BaseType_t OtaSelfTest(void)
 {
 	return pdTRUE;
 }
+/**********************************************************************************************************************
+ End of function OtaSelfTest
+ *********************************************************************************************************************/
+

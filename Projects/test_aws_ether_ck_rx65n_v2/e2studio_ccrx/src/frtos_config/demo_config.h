@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2024-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -52,12 +54,11 @@
 #endif
 
 #ifndef LIBRARY_LOG_LEVEL
-#define LIBRARY_LOG_LEVEL    LOG_INFO
+#define LIBRARY_LOG_LEVEL    (LOG_INFO)
 #endif
 
 #include "iot_logging_task.h"
 #include "logging_stack.h"
-
 //#define democonfigCLIENT_CERTIFICATE_PEM    keyCLIENT_CERTIFICATE_PEM
 //#define democonfigCLIENT_PRIVATE_KEY_PEM    keyCLIENT_PRIVATE_KEY_PEM
 //#define democonfigCLIENT_USERNAME           keyJITR_DEVICE_CERTIFICATE_AUTHORITY_PEM
@@ -96,7 +97,7 @@
 #if defined(FLEET_PROVISIONING_DEMO)
 #define democonfigROOT_CA_PEM             "...insert here..."
 #else
-#define democonfigROOT_CA_PEM               tlsSTARFIELD_ROOT_CERTIFICATE_PEM
+#define democonfigROOT_CA_PEM               (tlsATS1_ROOT_CERTIFICATE_PEM)
 #endif
 
 /**
@@ -180,7 +181,7 @@
 #if defined(FLEET_PROVISIONING_DEMO)
     #define democonfigCLIENT_IDENTIFIER    "client"democonfigFP_DEMO_ID
 #else
-    #define democonfigCLIENT_IDENTIFIER    clientcredentialIOT_THING_NAME
+    #define democonfigCLIENT_IDENTIFIER    (clientcredentialIOT_THING_NAME)
 #endif
 #endif
 
@@ -193,7 +194,7 @@
  * Settings/Custom Endpoint, or using the describe-endpoint API.
  *
  */
-#define democonfigMQTT_BROKER_ENDPOINT     clientcredentialMQTT_BROKER_ENDPOINT
+#define democonfigMQTT_BROKER_ENDPOINT     (clientcredentialMQTT_BROKER_ENDPOINT)
 
 /**
  * @brief AWS IoT MQTT broker port number.
@@ -244,7 +245,7 @@
  * In the Windows port, this stack only holds a structure. The actual
  * stack is created by an operating system thread.
  */
-#define democonfigDEMO_STACKSIZE        configMINIMAL_STACK_SIZE * 8
+#define democonfigDEMO_STACKSIZE        (configMINIMAL_STACK_SIZE * 8)
 
 /**
  * @brief Set the stack size of the main demo task.
@@ -337,7 +338,7 @@
  * @brief Certificate used for validating code signing signatures in the OTA PAL.
  */
 #ifndef otapalconfigCODE_SIGNING_CERTIFICATE
-	#define otapalconfigCODE_SIGNING_CERTIFICATE    OTA_PAL_CERTIFICATE_FILE
+    #define otapalconfigCODE_SIGNING_CERTIFICATE    (OTA_PAL_CERTIFICATE_FILE)
 #endif
 
 /**
@@ -347,7 +348,7 @@
  * declared in the ota_appversion32.h file in the OTA library.
  */
 #ifndef APP_VERSION_MAJOR
-    #define APP_VERSION_MAJOR    OTA_APP_VERSION_MAJOR
+    #define APP_VERSION_MAJOR    (OTA_APP_VERSION_MAJOR)
 #endif
 
 /**
@@ -357,7 +358,7 @@
  * declared in the ota_appversion32.h file in the OTA library.
  */
 #ifndef APP_VERSION_MINOR
-    #define APP_VERSION_MINOR    OTA_APP_VERSION_MINOR
+    #define APP_VERSION_MINOR    (OTA_APP_VERSION_MINOR)
 #endif
 
 /**
@@ -367,7 +368,7 @@
  * declared in the ota_appversion32.h file in the OTA library.
  */
 #ifndef APP_VERSION_BUILD
-    #define APP_VERSION_BUILD    OTA_APP_VERSION_BUILD
+    #define APP_VERSION_BUILD    (OTA_APP_VERSION_BUILD)
 #endif
 
 /**
@@ -394,4 +395,13 @@
 #define MQTT_AGENT_NETWORK_BUFFER_SIZE          ( 10000 )
 
 #define MQTT_COMMAND_CONTEXTS_POOL_SIZE              ( 10 )
+
+/**
+ * @brief The event bit to wait for starting other demos after OTA.
+ * @note After the image self-test is successful,
+ * OTA demo will set the event bit for every demo to enable the demo to run.
+ */
+#define SELF_TEST_FAILED             ((EventBits_t)(0U))
+#define SELF_TEST_PASSED             ((EventBits_t)(1U))
+
 #endif /* DEMO_CONFIG_H */

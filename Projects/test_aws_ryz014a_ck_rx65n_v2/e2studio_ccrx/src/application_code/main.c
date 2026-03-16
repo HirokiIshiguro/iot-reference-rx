@@ -1,28 +1,30 @@
 /*
-FreeRTOS
-Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
-Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
- http://aws.amazon.com/freertos
- http://www.FreeRTOS.org
-*/
+ * FreeRTOS
+ * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * http://aws.amazon.com/freertos
+ * http://www.FreeRTOS.org
+ */
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
@@ -43,7 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 bool ApplicationCounter (uint32_t xWaitTime);
 signed char vISR_Routine (void);
-BaseType_t OtaSelfTest(void);
+BaseType_t OtaSelfTest (void);
 
 /**
  * @brief Flag which enables OTA update task in background along with other demo tasks.
@@ -104,6 +106,8 @@ BaseType_t OtaSelfTest(void);
 
 st_cellular_ctrl_t cellular_ctrl;
 
+EventGroupHandle_t xStartDemoEventGroup = NULL;
+
 extern int32_t littlFs_init (void);
 
 /**
@@ -116,12 +120,12 @@ void vApplicationDaemonTaskStartupHook (void);
  */
 void prvMiscInitialization (void);
 
-extern void prvQualificationTestTask (void * pvParameters);
-extern void vSubscribePublishTestTask (void * pvParameters);
-extern void prvQualificationTestTask (void * pvParameters);
-extern void vSubscribePublishTestTask (void * pvParameters);
-extern void vStartOtaDemo( void );
-extern bool Connect2AP( void );
+extern void prvQualificationTestTask (void *pvParameters);
+extern void vSubscribePublishTestTask (void *pvParameters);
+extern void prvQualificationTestTask (void *pvParameters);
+extern void vSubscribePublishTestTask (void *pvParameters);
+extern void vStartOtaDemo (void);
+extern bool Connect2AP ( void );
 
 /*-----------------------------------------------------------*/
 
@@ -136,17 +140,16 @@ int RunDeviceAdvisorDemo(void)
 
     xResult = xMQTTAgentInit();
     xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
-    vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
+    vStartMQTTAgent(appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
 
     if (pdPASS == xResult)
     {
         xResult = xTaskCreate(vSubscribePublishTestTask,
-                                "TEST",
-                                appmainTEST_TASK_STACK_SIZE,
-                                NULL,
-                                appmainTEST_TASK_PRIORITY,
-                                NULL);
-
+                              "TEST",
+                              appmainTEST_TASK_STACK_SIZE,
+                              NULL,
+                              appmainTEST_TASK_PRIORITY,
+                              NULL);
     }
     return (pdPASS == xResult) ? 0 : -1;
 }
@@ -154,16 +157,23 @@ int RunDeviceAdvisorDemo(void)
 End of function RunDeviceAdvisorDemo
 ****************************************************************************************/
 
-
-int RunOtaE2eDemo( void )
+/**********************************************************************************************************************
+ * Function Name: RunOtaE2eDemo
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+int RunOtaE2eDemo(void)
 {
     xMQTTAgentInit();
-    xSetMQTTAgentState( MQTT_AGENT_STATE_INITIALIZED );
-    vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
+    xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
+    vStartMQTTAgent(appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
 
     vStartOtaDemo();
     return 0;
 }
+/**********************************************************************************************************************
+ End of function RunOtaE2eDemo
+ *********************************************************************************************************************/
 
 /**
  * @brief The application entry point from a power on reset is PowerON_Reset_PC()
@@ -180,24 +190,30 @@ void main_task(void)
 {
     int32_t xResults;
     int32_t Time2Wait = 10000;
-    extern void vRegisterSampleCLICommands (void);
-    extern void vUARTCommandConsoleStart (uint16_t usStackSize, UBaseType_t uxPriority);
+    extern void vRegisterSampleCLICommands(void);
+    extern void vUARTCommandConsoleStart(uint16_t usStackSize, UBaseType_t uxPriority);
+    extern void UserInitialization(void);
     extern TaskHandle_t xCLIHandle;
 
     /* Initialize UART for serial terminal. */
     prvMiscInitialization();
 
+    /* User initialization */
+    UserInitialization();
+
     /* Register the standard CLI commands. */
     vRegisterSampleCLICommands();
     vUARTCommandConsoleStart(mainUART_COMMAND_CONSOLE_STACK_SIZE, mainUART_COMMAND_CONSOLE_TASK_PRIORITY);
+
+    /* To wait for CLI initialization completes */
+    vTaskDelay(100);
 
     xResults = littlFs_init();
 
     if (LFS_ERR_OK == xResults)
     {
-    xResults = vprvCacheInit();
+        xResults = vprvCacheInit();
     }
-
 
     if (ApplicationCounter(Time2Wait))
     {
@@ -212,36 +228,36 @@ void main_task(void)
 
         /* Initialise cellular connection.
         r_cellular APIs are called to connect to AP. */
-        if( !Connect2AP())
+        if ( !Connect2AP() )
         {
 
-        		configPRINTF( ( "Cellular init failed" ) );
+                configPRINTF( ( "Cellular init failed" ) );
 
-		}
-		else
+        }
+        else
         {
 
-			/* We should wait for the network to be up before we run any demos. */
-				vTaskDelay(300);
+            /* We should wait for the network to be up before we run any demos. */
+                vTaskDelay(300);
 
 
-			configPRINTF(("Initialise the RTOS's TCP/IP stack\n"));
+            configPRINTF(("Initialise the RTOS's TCP/IP stack\n"));
 
 
-			#if ( OTA_E2E_TEST_ENABLED == 1 )
+            #if ( OTA_E2E_TEST_ENABLED == 1 )
 
-			RunOtaE2eDemo();
+            RunOtaE2eDemo();
 
-			#else
-			xResults = xTaskCreate(prvQualificationTestTask,
-									"TEST",
-									appmainTEST_TASK_STACK_SIZE,
-									NULL,
-									appmainTEST_TASK_PRIORITY,
-									NULL);
+            #else
+            xResults = xTaskCreate(prvQualificationTestTask,
+                                    "TEST",
+                                    appmainTEST_TASK_STACK_SIZE,
+                                    NULL,
+                                    appmainTEST_TASK_PRIORITY,
+                                    NULL);
 
-			#endif
-		}
+            #endif
+        }
     }
     while (1)
     {
@@ -261,14 +277,16 @@ End of function main_task
 void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
-    extern void CLI_Support_Settings (void);
+    extern void CLI_Support_Settings(void);
     CLI_Support_Settings();
+        
+    /* Create the event group to sync among demos */
+    xStartDemoEventGroup = xEventGroupCreate();
 
     /* Start logging task. */
     xLoggingTaskInitialize(mainLOGGING_TASK_STACK_SIZE,
-                            tskIDLE_PRIORITY + 2,
-                            mainLOGGING_MESSAGE_QUEUE_LENGTH);
-
+                           tskIDLE_PRIORITY + 2,
+                           mainLOGGING_MESSAGE_QUEUE_LENGTH);
 }
 /*****************************************************************************************
 End of function prvMiscInitialization
@@ -282,7 +300,6 @@ End of function prvMiscInitialization
  *********************************************************************************************************************/
 void vApplicationDaemonTaskStartupHook(void)
 {
-
 }
 /*****************************************************************************************
 End of function vApplicationDaemonTaskStartupHook
@@ -542,7 +559,7 @@ const char * pcApplicationHostnameHook(void)
         }
     }
 #endif
-    }
+}
 /*****************************************************************************************
 End of function pcApplicationHostnameHook
 ****************************************************************************************/
@@ -557,6 +574,9 @@ End of function pcApplicationHostnameHook
  *********************************************************************************************************************/
 BaseType_t OtaSelfTest(void)
 {
-	return pdTRUE;
+    return pdTRUE;
 }
-
+/**********************************************************************************************************************
+ End of function OtaSelfTest
+ *********************************************************************************************************************/
+ 

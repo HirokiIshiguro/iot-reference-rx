@@ -1,5 +1,6 @@
 /*
 * Copyright (c) 2023-2025 Renesas Electronics Corporation and/or its affiliates
+*
 * SPDX-License-Identifier: BSD-3-Clause
 */
 /*******************************************************************************
@@ -18,7 +19,7 @@
 /******************************************************************************
 Macro definitions
 ******************************************************************************/
-#define RTOS_USB_SUPPORT 0
+#define RTOS_USB_SUPPORT (0)
 
 /******************************************************************************
 Typedef definitions
@@ -52,7 +53,7 @@ Exported global variables
 /******************************************************************************
 Exported global functions (to be accessed by other files)
 ******************************************************************************/
-extern void Processing_Before_Start_Kernel(void);
-extern void Kernel_Object_init(void);
+extern void Processing_Before_Start_Kernel (void);
+extern void Kernel_Object_init (void);
 
 #endif /* FREERTOS_START_H_ */

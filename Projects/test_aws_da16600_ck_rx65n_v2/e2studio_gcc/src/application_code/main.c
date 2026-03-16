@@ -1,28 +1,30 @@
 /*
-FreeRTOS
-Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
-Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
- http://aws.amazon.com/freertos
- http://www.FreeRTOS.org
-*/
+ * FreeRTOS
+ * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * http://aws.amazon.com/freertos
+ * http://www.FreeRTOS.org
+ */
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
@@ -65,7 +67,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define appmainMQTT_AGENT_TASK_STACK_SIZE         ( 6144 )
 #define appmainMQTT_AGENT_TASK_PRIORITY           ( tskIDLE_PRIORITY + 2 )
 
-#define appmainTEST_TASK_STACK_SIZE               ( 6144 )
+/**
+ * @brief Stack size and priority for CLI task.
+ */
+#define appmainCLI_TASK_STACK_SIZE                ( 6144 )
+#define appmainCLI_TASK_PRIORITY                  ( tskIDLE_PRIORITY + 1 )
+
+#define appmainRUN_QUALIFICATION_TEST_SUITE       ( 1 )
+
+#define appmainRUN_DEVICE_ADVISOR_TEST_SUITE      ( 0 )
+
+#define appmainMQTT_OTA_UPDATE_TASK_STACK_SIZE    ( 4096 )
+
+#define appmainTEST_TASK_STACK_SIZE               ( 4096 )
 #define appmainTEST_TASK_PRIORITY                 ( tskIDLE_PRIORITY + 1 )
 
 /**
@@ -83,8 +97,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define mainTEST_RUNNER_TASK_STACK_SIZE           ( configMINIMAL_STACK_SIZE * 8 )
 #define UNSIGNED_SHORT_RANDOM_NUMBER_MASK         (0xFFFFUL)
 
+#define mainUART_COMMAND_CONSOLE_STACK_SIZE ( configMINIMAL_STACK_SIZE * 6UL )
+/* The priority used by the UART command console task. */
+#define mainUART_COMMAND_CONSOLE_TASK_PRIORITY  ( 1 )
+
 static bool _wifiEnable (void);
 static bool _wifiConnectAccessPoint (void);
+
+EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 extern int32_t littlFs_init (void);
 static bool ApplicationCounter (uint32_t xWaitTime);
@@ -99,11 +119,12 @@ void vApplicationDaemonTaskStartupHook (void);
 /**
  * @brief Initializes the board.
  */
-static void prvMiscInitialization (void);
+void prvMiscInitialization (void);
 
 int RunDeviceAdvisorDemo (void);
 extern void prvQualificationTestTask (void * pvParameters);
 extern void vSubscribePublishTestTask (void * pvParameters);
+extern void vStartOtaDemo (void);
 BaseType_t OtaSelfTest(void);
 
 
@@ -118,17 +139,16 @@ int RunDeviceAdvisorDemo(void)
 
     xResult = xMQTTAgentInit();
     xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
-    vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
+    vStartMQTTAgent(appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
 
     if (pdPASS == xResult)
     {
-        xResult = xTaskCreate( vSubscribePublishTestTask,
-                                "TEST",
-                                appmainTEST_TASK_STACK_SIZE,
-                                NULL,
-                                appmainTEST_TASK_PRIORITY,
-                                NULL );
-
+        xResult = xTaskCreate(vSubscribePublishTestTask,
+                              "TEST",
+                              appmainTEST_TASK_STACK_SIZE,
+                              NULL,
+                              appmainTEST_TASK_PRIORITY,
+                              NULL);
     }
     return (pdPASS == xResult) ? 0 : -1;
 }
@@ -136,6 +156,23 @@ int RunDeviceAdvisorDemo(void)
 End of function RunDeviceAdvisorDemo
 ****************************************************************************************/
 
+/**********************************************************************************************************************
+ * Function Name: RunOtaE2eDemo
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+int RunOtaE2eDemo(void)
+{
+    xMQTTAgentInit();
+    xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
+    vStartMQTTAgent(appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
+
+    vStartOtaDemo();
+    return 0;
+}
+/**********************************************************************************************************************
+ End of function RunOtaE2eDemo
+ *********************************************************************************************************************/
 
 /**
  * @brief The application entry point from a power on reset is PowerON_Reset_PC()
@@ -150,21 +187,25 @@ End of function RunDeviceAdvisorDemo
  *********************************************************************************************************************/
 void main_task(void)
 {
-    int32_t xResults; 
+    int32_t xResults;
     int32_t Time2Wait = 10000;
-    #define mainUART_COMMAND_CONSOLE_STACK_SIZE ( configMINIMAL_STACK_SIZE * 6UL )
-    /* The priority used by the UART command console task. */
-    #define mainUART_COMMAND_CONSOLE_TASK_PRIORITY  ( 1 )
-    extern void vRegisterSampleCLICommands (void);
-    extern void vUARTCommandConsoleStart (uint16_t usStackSize, UBaseType_t uxPriority);
+    extern void vRegisterSampleCLICommands(void);
+    extern void vUARTCommandConsoleStart(uint16_t usStackSize, UBaseType_t uxPriority);
+    extern void UserInitialization(void);
     extern TaskHandle_t xCLIHandle;
 
     /* Initialize UART for serial terminal. */
     prvMiscInitialization();
 
+    /* User initialization */
+    UserInitialization();
+
     /* Register the standard CLI commands. */
     vRegisterSampleCLICommands();
     vUARTCommandConsoleStart(mainUART_COMMAND_CONSOLE_STACK_SIZE, mainUART_COMMAND_CONSOLE_TASK_PRIORITY);
+
+    /* To wait for CLI initialization completes */
+    vTaskDelay(100);
 
     xResults = littlFs_init();
 
@@ -180,27 +221,30 @@ void main_task(void)
         /* For this reason, the CLI task must be deleted before executing the Demo. */
         vTaskDelete(xCLIHandle);
 
-        if (!_wifiEnable())
+        /* Initialise wi-fi connection.
+        r_wifi_da16xxx APIs are called to connect to AP. */
+        if ( !_wifiEnable())
         {
-            configPRINTF(("Wi-Fi init failed"));
+
+            configPRINTF( ( "Wi-Fi init failed" ) );
+
         }
         else
         {
 
-        #if OTA_E2E_TEST_ENABLED
+            #if ( OTA_E2E_TEST_ENABLED == 1 )
 
-        RunOtaE2eDemo();
+            RunOtaE2eDemo();
 
-        #else
-        xResults = xTaskCreate( prvQualificationTestTask,
-                                "TEST",
-                                appmainTEST_TASK_STACK_SIZE,
-                                NULL,
-                                appmainTEST_TASK_PRIORITY,
-                                NULL );
+            #else
+            xResults = xTaskCreate(prvQualificationTestTask,
+                                    "TEST",
+                                    appmainTEST_TASK_STACK_SIZE,
+                                    NULL,
+                                    appmainTEST_TASK_PRIORITY,
+                                    NULL);
 
-        #endif
-        (void) xResults;
+            #endif
         }
     }
     while (1)
@@ -218,17 +262,19 @@ End of function main_task
  * Description  : .
  * Return Value : .
  *********************************************************************************************************************/
-static void prvMiscInitialization(void)
+void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
-    extern void CLI_Support_Settings (void);
+    extern void CLI_Support_Settings(void);
     CLI_Support_Settings();
+        
+    /* Create the event group to sync among demos */
+    xStartDemoEventGroup = xEventGroupCreate();
 
     /* Start logging task. */
-    xLoggingTaskInitialize( mainLOGGING_TASK_STACK_SIZE,
-                            tskIDLE_PRIORITY + 2,
-                            mainLOGGING_MESSAGE_QUEUE_LENGTH );
-
+    xLoggingTaskInitialize(mainLOGGING_TASK_STACK_SIZE,
+                           tskIDLE_PRIORITY + 2,
+                           mainLOGGING_MESSAGE_QUEUE_LENGTH);
 }
 /*****************************************************************************************
 End of function prvMiscInitialization
@@ -242,7 +288,6 @@ End of function prvMiscInitialization
  *********************************************************************************************************************/
 void vApplicationDaemonTaskStartupHook(void)
 {
-    R_BSP_NOP();
 }
 /*****************************************************************************************
 End of function vApplicationDaemonTaskStartupHook
@@ -254,7 +299,7 @@ End of function vApplicationDaemonTaskStartupHook
  * Argument     : xWaitTime
  * Return Value : .
  *********************************************************************************************************************/
-static bool ApplicationCounter(uint32_t xWaitTime)
+bool ApplicationCounter(uint32_t xWaitTime)
 {
     TickType_t xCurrent;
     bool DEMO_TEST = pdTRUE;
@@ -387,7 +432,7 @@ End of function vApplicationGetTimerTaskMemory
  * Argument     :
  * Return Value : .
  *********************************************************************************************************************/
-    void vApplicationMallocFailedHook()
+void vApplicationMallocFailedHook()
     {
         configPRINT_STRING(("ERROR: Malloc failed to allocate memory\r\n"));
         taskDISABLE_INTERRUPTS();
@@ -395,7 +440,6 @@ End of function vApplicationGetTimerTaskMemory
         for (;;)
         {
             /* Loop forever */
-            R_BSP_NOP();
         }
     }
 /*****************************************************************************************
@@ -417,7 +461,7 @@ End of function vApplicationMallocFailedHook
  *              : pcTaskName
  * Return Value : .
  *********************************************************************************************************************/
-    void vApplicationStackOverflowHook(TaskHandle_t xTask,
+void vApplicationStackOverflowHook(TaskHandle_t xTask,
                                         char * pcTaskName)
     {
         configPRINT_STRING(("ERROR: stack overflow\r\n"));
@@ -430,7 +474,6 @@ End of function vApplicationMallocFailedHook
         for (;;)
         {
             /* Loop forever */
-            R_BSP_NOP();
         }
     }
 /*****************************************************************************************
@@ -450,53 +493,38 @@ End of function vApplicationStackOverflowHook
  *                 it retrieves thingname value from KeyValue table.
  * Return Value : .
  *********************************************************************************************************************/
-    const char * pcApplicationHostnameHook( void )
+const char * pcApplicationHostnameHook(void)
     {
-        /* This function will be called during the DHCP: the machine will be registered
-         * with an IP address plus this name. */
 #if defined(__TEST__)
         return clientcredentialIOT_THING_NAME;
 #else
-        {
-            /* The string returned by this API is stipulated to be a maximum of 32 characters. */
-            static char s_buff[32];
-            memset ( s_buff, 0x00, sizeof(s_buff) );
+    {
+        /* The string returned by this API is stipulated to be a maximum of 32 characters. */
+        static char s_buff[32];
+        memset (s_buff, 0x00, sizeof(s_buff));
 
-            size_t valueLength = prvGetCacheEntryLength(KVS_CORE_THING_NAME);
-            /* Process for thing name input by CLI. */
-            if (valueLength > 0)
+        size_t valueLength = prvGetCacheEntryLength(KVS_CORE_THING_NAME);
+
+        /* Process for thing name input by CLI. */
+        if (valueLength > 0)
+        {
+            if (valueLength > 31)
             {
-                if ( valueLength > 31 )
-                {
-                    configPRINT_STRING(("Warning: thing name with null-terminate string is longer than 32 characters.\r\n"));
-                    valueLength = 31;
-                }
-                size_t xLength = xReadEntry( KVS_CORE_THING_NAME, s_buff, valueLength );
-                if ( 0 != xLength )
-                {
-                    s_buff[valueLength] = '\0';
-                    return s_buff;
-                }
-                else
-                {
-                    valueLength = strlen(clientcredentialIOT_THING_NAME);
-                    if ( valueLength > 31 )
-                    {
-                        configPRINT_STRING(("Warning: thing name with null-terminate string is longer than 32 characters.\r\n"));
-                        valueLength = 31;
-                    }
-                    strncpy(s_buff, clientcredentialIOT_THING_NAME, valueLength);
-                    s_buff[valueLength] = '\0';
-                    return s_buff;
-                }
+                configPRINT_STRING(("Warning: thing name with null-terminate string is longer than 32 characters.\r\n"));
+                valueLength = 31;
             }
-            /* Process for thing name in aws_clientcredential.h. */
+            size_t xLength = xReadEntry(KVS_CORE_THING_NAME, s_buff, valueLength);
+            if (0 != xLength)
+            {
+                s_buff[valueLength] = '\0';
+                return s_buff;
+            }
             else
             {
                 valueLength = strlen(clientcredentialIOT_THING_NAME);
-                if ( valueLength > 31 )
+                if (valueLength > 31)
                 {
-                    configPRINT_STRING( ( "Warning: thing name with null-terminate string is longer than 32 characters.\r\n" ) );
+                    configPRINT_STRING(("Warning: thing name with null-terminate string is longer than 32 characters.\r\n"));
                     valueLength = 31;
                 }
                 strncpy(s_buff, clientcredentialIOT_THING_NAME, valueLength);
@@ -504,13 +532,32 @@ End of function vApplicationStackOverflowHook
                 return s_buff;
             }
         }
-#endif
+        /* Process for thing name in aws_clientcredential.h. */
+        else
+        {
+            valueLength = strlen(clientcredentialIOT_THING_NAME);
+            if (valueLength > 31)
+            {
+                configPRINT_STRING(("Warning: thing name with null-terminate string is longer than 32 characters.\r\n"));
+                valueLength = 31;
+            }
+            strncpy(s_buff, clientcredentialIOT_THING_NAME, valueLength);
+            s_buff[valueLength] = '\0';
+            return s_buff;
+        }
     }
+#endif
+}
 /*****************************************************************************************
 End of function pcApplicationHostnameHook
 ****************************************************************************************/
 #endif
 
+/**********************************************************************************************************************
+ * Function Name: _wifiEnable
+ * Description  : Init DA16600 Wi-Fi module.
+ * Return Value : .
+ *********************************************************************************************************************/
 static bool _wifiEnable(void)
 {
     bool ret = true;
@@ -524,10 +571,15 @@ static bool _wifiEnable(void)
 
     return ret;
 }
-/*****************************************************************************************
-End of function __wifiEnable
-****************************************************************************************/
+/**********************************************************************************************************************
+ End of function _wifiEnable
+ *********************************************************************************************************************/
 
+/**********************************************************************************************************************
+ * Function Name: _wifiConnectAccessPoint
+ * Description  : Connect DA16600 Wi-Fi module to AP.
+ * Return Value : .
+ *********************************************************************************************************************/
 static bool _wifiConnectAccessPoint(void)
 {
     bool status = true;
@@ -588,10 +640,9 @@ static bool _wifiConnectAccessPoint(void)
 
     return status;
 }
-
-/*****************************************************************************************
-End of function _wifiConnectAccessPoint
-****************************************************************************************/
+/**********************************************************************************************************************
+ End of function _wifiConnectAccessPoint
+ *********************************************************************************************************************/
 
 /**********************************************************************************************************************
  * Function Name: OtaSelfTest
@@ -602,5 +653,9 @@ End of function _wifiConnectAccessPoint
  *********************************************************************************************************************/
 BaseType_t OtaSelfTest(void)
 {
-	return pdTRUE;
+    return pdTRUE;
 }
+/**********************************************************************************************************************
+ End of function OtaSelfTest
+ *********************************************************************************************************************/
+
