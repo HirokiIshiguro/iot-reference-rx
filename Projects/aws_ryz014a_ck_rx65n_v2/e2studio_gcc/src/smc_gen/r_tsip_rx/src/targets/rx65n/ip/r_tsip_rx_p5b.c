@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -78,6 +67,7 @@
 * @param[in]     InData_PubKeyIndex
 * @param[in]     InData_PrivKeyIndex
 * @param[in]     InData_key_id
+* @param[in]     InData_DomainParam
 * @param[out]    OutData_data
 * @param[out]    OutData_Signature
 * @param[out]    OutData_KeyIndex
@@ -87,7 +77,7 @@
 * @retval        TSIP_ERR_KEY_SET
 * @note          None
 */
-e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uint32_t *InData_KeyType, uint32_t *InData_PubKeyIndex, uint32_t *InData_PrivKeyIndex, uint32_t *InData_key_id, uint32_t *OutData_data, uint32_t *OutData_Signature, uint32_t *OutData_KeyIndex)
+e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uint32_t *InData_KeyType, uint32_t *InData_PubKeyIndex, uint32_t *InData_PrivKeyIndex, uint32_t *InData_key_id, const uint32_t *InData_DomainParam, uint32_t *OutData_data, uint32_t *OutData_Signature, uint32_t *OutData_KeyIndex)
 {
     int32_t iLoop = 0u, jLoop = 0u, kLoop = 0u, oLoop1 = 0u, oLoop2 = 0u, iLoop2 = 0u;
     uint32_t KEY_ADR = 0u, OFS_ADR = 0u;
@@ -138,21 +128,9 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
     TSIP.REG_1D0H.WORD = 0x00000000u;
     if (1u == (TSIP.REG_1CH.BIT.B22))
     {
-        RX65NHU_func100(change_endian_long(0xc1fc3f3eu), change_endian_long(0xf8c2472du), change_endian_long(0xdae89757u), change_endian_long(0xa4a6b081u));
+        RX65NHU_func100(change_endian_long(0x25edac2eu), change_endian_long(0xae0b18c2u), change_endian_long(0x6350683du), change_endian_long(0xac35cf8fu));
         TSIP.REG_28H.WORD = 0x00870001u;
-        TSIP.REG_ECH.WORD = 0x0000b400u;
-        TSIP.REG_ECH.WORD = 0x00000080u;
-        TSIP.REG_E0H.WORD = 0x81010000u;
-        TSIP.REG_04H.WORD = 0x00000606u;
-        /* WAIT_LOOP */
-        while (1u != TSIP.REG_04H.BIT.B30)
-        {
-            /* waiting */
-        }
-        S_RAM[0] = change_endian_long(TSIP.REG_100H.WORD);
-        OFS_ADR = S_RAM[0];
-        RX65NHU_func100(change_endian_long(0xb6b015d7u), change_endian_long(0xde560caeu), change_endian_long(0xc688482bu), change_endian_long(0xc95bb013u));
-        RX65NHU_func004(OFS_ADR);
+        RX65NHU_func004(InData_DomainParam);
         TSIP.REG_34H.WORD = 0x00000003u;
         TSIP.REG_24H.WORD = 0x800068d0u;
         /* WAIT_LOOP */
@@ -176,7 +154,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
         }
         TSIP.REG_28H.WORD = 0x00890001u;
         RX65NHU_func103();
-        RX65NHU_func100(change_endian_long(0x95fac124u), change_endian_long(0xdf2ec162u), change_endian_long(0x10b8ba49u), change_endian_long(0x8bb4c2d4u));
+        RX65NHU_func100(change_endian_long(0xff7e52fbu), change_endian_long(0x8708b99au), change_endian_long(0x50d7df95u), change_endian_long(0x545b4dd2u));
         TSIP.REG_104H.WORD = 0x00000052u;
         TSIP.REG_C4H.WORD = 0x01000c84u;
         /* WAIT_LOOP */
@@ -194,7 +172,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX65NHU_func103();
-        RX65NHU_func100(change_endian_long(0xd4169b33u), change_endian_long(0x1c90868fu), change_endian_long(0xf9199cfau), change_endian_long(0x3ec6a902u));
+        RX65NHU_func100(change_endian_long(0xa0287637u), change_endian_long(0x8a8359a2u), change_endian_long(0x82c2018cu), change_endian_long(0x1758f126u));
         TSIP.REG_104H.WORD = 0x00000052u;
         TSIP.REG_C4H.WORD = 0x01000c84u;
         /* WAIT_LOOP */
@@ -279,7 +257,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
             /* waiting */
         }
         TSIP.REG_28H.WORD = 0x00870001u;
-        RX65NHU_func100(change_endian_long(0xae19a754u), change_endian_long(0xdf4e5a35u), change_endian_long(0xdedb4b58u), change_endian_long(0x3426ab50u));
+        RX65NHU_func100(change_endian_long(0x7b213533u), change_endian_long(0x05aeaec8u), change_endian_long(0x75f0a822u), change_endian_long(0x19cfcbe0u));
         TSIP.REG_24H.WORD = 0x0000dcd0u;
         /* WAIT_LOOP */
         while (0u != TSIP.REG_24H.BIT.B21)
@@ -305,8 +283,8 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
         {
             /* waiting */
         }
-        RX65NHU_func005(OFS_ADR);
-        RX65NHU_func025(OFS_ADR);
+        RX65NHU_func005(InData_DomainParam);
+        RX65NHU_func025(InData_DomainParam);
         TSIP.REG_34H.WORD = 0x00000400u;
         TSIP.REG_24H.WORD = 0x8000b8d0u;
         /* WAIT_LOOP */
@@ -386,7 +364,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
         }
         TSIP.REG_1CH.WORD = 0x00001f00u;
         TSIP.REG_1CH.WORD = 0x00210000u;
-        RX65NHU_func100(change_endian_long(0x1dafd49fu), change_endian_long(0x190682afu), change_endian_long(0xde5a71b9u), change_endian_long(0xb13d0fa9u));
+        RX65NHU_func100(change_endian_long(0x24930883u), change_endian_long(0x723e577bu), change_endian_long(0x25be12dbu), change_endian_long(0x1ade7fd6u));
         TSIP.REG_1CH.WORD = 0x00400000u;
         TSIP.REG_1D0H.WORD = 0x00000000u;
         if (1u == (TSIP.REG_1CH.BIT.B22))
@@ -405,11 +383,11 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
             }
             TSIP.REG_1CH.WORD = 0x00001f00u;
             TSIP.REG_1CH.WORD = 0x00210000u;
-            RX65NHU_func101(change_endian_long(0x44995c62u), change_endian_long(0x94514784u), change_endian_long(0x370d69e2u), change_endian_long(0x71288ca7u));
+            RX65NHU_func101(change_endian_long(0x20d2e893u), change_endian_long(0xcce0874bu), change_endian_long(0x1ad021beu), change_endian_long(0x16dc0ee9u));
         }
         else
         {
-            RX65NHU_func100(change_endian_long(0x25d7a1ffu), change_endian_long(0x0b68b9a2u), change_endian_long(0x6eb5527au), change_endian_long(0xe7201d4fu));
+            RX65NHU_func100(change_endian_long(0x41b8b84bu), change_endian_long(0x6e261d0cu), change_endian_long(0xa8ad8903u), change_endian_long(0x098285feu));
             TSIP.REG_24H.WORD = 0x00009cd0u;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_24H.BIT.B21)
@@ -535,9 +513,9 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
             {
                 /* waiting */
             }
-            RX65NHU_func100(change_endian_long(0x953ad98cu), change_endian_long(0x48a96800u), change_endian_long(0x232186a4u), change_endian_long(0x1f228650u));
+            RX65NHU_func100(change_endian_long(0x155b891bu), change_endian_long(0x9379b737u), change_endian_long(0x5544e9c4u), change_endian_long(0x3b6faae8u));
             RX65NHU_func103();
-            RX65NHU_func100(change_endian_long(0x78e254b3u), change_endian_long(0x6abe3c5fu), change_endian_long(0xf93300e2u), change_endian_long(0x197c5f7fu));
+            RX65NHU_func100(change_endian_long(0x4ac7c87cu), change_endian_long(0x330c98c3u), change_endian_long(0x8c5d6232u), change_endian_long(0x3d1b18f7u));
             TSIP.REG_104H.WORD = 0x00000052u;
             TSIP.REG_C4H.WORD = 0x01000c84u;
             /* WAIT_LOOP */
@@ -599,7 +577,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
             OutData_KeyIndex[9] = TSIP.REG_100H.WORD;
             OutData_KeyIndex[10] = TSIP.REG_100H.WORD;
             OutData_KeyIndex[11] = TSIP.REG_100H.WORD;
-            RX65NHU_func100(change_endian_long(0x9a6a0d80u), change_endian_long(0x1e971541u), change_endian_long(0x7a59e859u), change_endian_long(0xc215afcbu));
+            RX65NHU_func100(change_endian_long(0x42bc1a1du), change_endian_long(0x3c57f8bfu), change_endian_long(0xec441e54u), change_endian_long(0x44d7937du));
             TSIP.REG_104H.WORD = 0x00000052u;
             TSIP.REG_C4H.WORD = 0x00000c84u;
             /* WAIT_LOOP */
@@ -639,7 +617,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
             {
                 /* waiting */
             }
-            RX65NHU_func101(change_endian_long(0x2585fdd2u), change_endian_long(0x328ef470u), change_endian_long(0x66400100u), change_endian_long(0x52bce223u));
+            RX65NHU_func101(change_endian_long(0x8ac8e636u), change_endian_long(0x61558b29u), change_endian_long(0x19dbe680u), change_endian_long(0xfc6ee37cu));
         }
     }
     else
@@ -933,8 +911,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_28H.WORD = 0x00870001u;
-        OFS_ADR = 128;
-        RX65NHU_func004(OFS_ADR);
+        RX65NHU_func004(InData_DomainParam);
         TSIP.REG_34H.WORD = 0x00000003u;
         TSIP.REG_24H.WORD = 0x800068d0u;
         /* WAIT_LOOP */
@@ -990,8 +967,8 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
             /* waiting */
         }
         RX65NHU_func100(change_endian_long(0x1f96dfebu), change_endian_long(0x3d3b14cbu), change_endian_long(0x27d1c753u), change_endian_long(0x7ca3af19u));
-        RX65NHU_func005(OFS_ADR);
-        RX65NHU_func025(OFS_ADR);
+        RX65NHU_func005(InData_DomainParam);
+        RX65NHU_func025(InData_DomainParam);
         TSIP.REG_34H.WORD = 0x00000400u;
         TSIP.REG_24H.WORD = 0x8000b8d0u;
         /* WAIT_LOOP */
@@ -1596,6 +1573,6 @@ e_tsip_err_t R_TSIP_DlmsCosemQevSignatureGenerationSub(uint32_t *InData_Cmd, uin
     }
 }
 /**********************************************************************************************************************
- End of function ./input_dir/RX65NHU/RX65NHU_p5b.prc
+ End of function ./input_dir/RX65NHU/RX65NHU_p5b_r1.prc
  *********************************************************************************************************************/
 #endif /* #if TSIP_ECDH_P256 == 1 */

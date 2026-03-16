@@ -28,17 +28,17 @@ extern volatile UPDATA_DATA_FLASH_CONTROL_BLOCK update_data_flash_control_block;
  *********************************************************************************************************************/
 e_fwup_err_t ota_flash_open_function(void)
 {
-	if(update_data_flash_control_block.status == DATA_FLASH_UPDATE_STATE_UNINITIALIZE )
-	{
-	    /* Call commonapi open function for Flash */
-	    e_commonapi_err_t common_api_err = R_Demo_Common_API_Flash_Open();
-	    if (COMMONAPI_SUCCESS != common_api_err)
-	    {
-	        return (FWUP_ERR_FLASH);
-	    }
+    if (DATA_FLASH_UPDATE_STATE_UNINITIALIZE == update_data_flash_control_block.status)
+    {
+        /* Call commonapi open function for Flash */
+        e_commonapi_err_t common_api_err = R_Demo_Common_API_Flash_Open();
+        if (COMMONAPI_SUCCESS != common_api_err)
+        {
+            return (FWUP_ERR_FLASH);
+        }
 
-		LogDebug( ("ota_flash_open_function: Create and give semaphore!") );
-	}
+        LogDebug( ("ota_flash_open_function: Create and give semaphore!") );
+    }
 
     return (FWUP_SUCCESS);
 }
@@ -54,7 +54,7 @@ e_fwup_err_t ota_flash_open_function(void)
  *********************************************************************************************************************/
 void ota_flash_close_function(void)
 {
-	update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_UNINITIALIZE;
+    update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_UNINITIALIZE;
 }
 /**********************************************************************************************************************
  End of function ota_flash_close_function
@@ -76,7 +76,7 @@ e_fwup_err_t ota_flash_erase_function(uint32_t addr, uint32_t num_blocks)
 #if (FLASH_TYPE == FLASH_TYPE_1)
     blk_addr = addr;
 #else
-    if((FLASH_DF_BLOCK_0 <= addr) && (addr < FLASH_DF_BLOCK_INVALID ))
+    if ((FLASH_DF_BLOCK_0 <= addr) && (addr < FLASH_DF_BLOCK_INVALID ))
     {
         blk_addr = addr;
     }
@@ -89,21 +89,21 @@ e_fwup_err_t ota_flash_erase_function(uint32_t addr, uint32_t num_blocks)
     /* Flash access protect */
     LogDebug( ("ota_flash_erase_function: Get semaphore for flash erase...") );
 
-	xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
-	update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_ERASE_WAIT_COMPLETE;
-	flash_error_code = R_FLASH_Erase((flash_block_address_t )blk_addr, num_blocks);
+    xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
+    update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_ERASE_WAIT_COMPLETE;
+    flash_error_code = R_FLASH_Erase((flash_block_address_t )blk_addr, num_blocks);
 
     if (FLASH_SUCCESS == flash_error_code)
     {
-   		/* wait for the semaphore to be released by callback */
+        /* wait for the semaphore to be released by callback */
         xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
         xSemaphoreGive(xSemaphoreFlashAccess);
         return (FWUP_SUCCESS);
     }
     else
     {
-    	LogError( ("Flash erase: NG, at address %x, ret = %d\r\n", blk_addr, flash_error_code ) );
-    	xSemaphoreGive(xSemaphoreFlashAccess);
+        LogError( ("Flash erase: NG, at address %x, ret = %d\r\n", blk_addr, flash_error_code ) );
+        xSemaphoreGive(xSemaphoreFlashAccess);
         return (FWUP_ERR_FLASH);
     }
 
@@ -142,27 +142,27 @@ e_fwup_err_t ota_flash_erase_function(uint32_t addr, uint32_t num_blocks)
  *********************************************************************************************************************/
 e_fwup_err_t ota_flash_write_function(uint32_t src_addr, uint32_t dest_addr, uint32_t num_bytes)
 {
-	flash_err_t flash_error_code = FLASH_ERR_BUSY;
+    flash_err_t flash_error_code = FLASH_ERR_BUSY;
 
-	/* Flash access protect */
-	xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
-	update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_WRITE_WAIT_COMPLETE;
+    /* Flash access protect */
+    xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
+    update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_WRITE_WAIT_COMPLETE;
 
-	flash_error_code = R_FLASH_Write(src_addr, dest_addr, num_bytes);
+    flash_error_code = R_FLASH_Write(src_addr, dest_addr, num_bytes);
 
-	if (FLASH_SUCCESS == flash_error_code)
-	{
-		/* wait for the semaphore to be released by callback */
-		xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
-		xSemaphoreGive( xSemaphoreFlashAccess );
-		return (FWUP_SUCCESS);
-	}
-	else
-	{
-		LogError( ("ota_flash_write_function: NG, R_FLASH_Write returns %d at %X", flash_error_code, dest_addr) );
-		xSemaphoreGive(xSemaphoreFlashAccess);
-		return (FWUP_ERR_FLASH);
-	}
+    if (FLASH_SUCCESS == flash_error_code)
+    {
+        /* wait for the semaphore to be released by callback */
+        xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
+        xSemaphoreGive( xSemaphoreFlashAccess );
+        return (FWUP_SUCCESS);
+    }
+    else
+    {
+        LogError( ("ota_flash_write_function: NG, R_FLASH_Write returns %d at %X", flash_error_code, dest_addr) );
+        xSemaphoreGive(xSemaphoreFlashAccess);
+        return (FWUP_ERR_FLASH);
+    }
 }
 /**********************************************************************************************************************
  End of function ota_flash_write_function
@@ -178,10 +178,10 @@ e_fwup_err_t ota_flash_write_function(uint32_t src_addr, uint32_t dest_addr, uin
  *********************************************************************************************************************/
 e_fwup_err_t ota_flash_read_function(uint32_t buf_addr, uint32_t src_addr, uint32_t size)
 {
-	xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
-	MEMCPY((void FWUP_FAR *)buf_addr, (void FWUP_FAR *)src_addr, size);
-	xSemaphoreGive(xSemaphoreFlashAccess);
-	return (FWUP_SUCCESS);
+    xSemaphoreTake( xSemaphoreFlashAccess, portMAX_DELAY );
+    MEMCPY((void FWUP_FAR *)buf_addr, (void FWUP_FAR *)src_addr, size);
+    xSemaphoreGive(xSemaphoreFlashAccess);
+    return (FWUP_SUCCESS);
 }
 /**********************************************************************************************************************
  End of function ota_flash_read_function
@@ -196,42 +196,47 @@ e_fwup_err_t ota_flash_read_function(uint32_t buf_addr, uint32_t src_addr, uint3
  *********************************************************************************************************************/
 e_fwup_err_t ota_bank_swap_function(void)
 {
+    flash_err_t err = FLASH_ERR_BUSY;
 
-	flash_err_t err = FLASH_ERR_BUSY;
-	flash_bank_t bank_info;
-	uint8_t bank_no = 0;
+    flash_bank_t bank_info;
+    uint8_t bank_no = 0;
 
-	LogInfo( ("ota_bank_swap_function: Change startup bank...") );
+    LogInfo( ("ota_bank_swap_function: Change startup bank...") );
 
-	R_BSP_SoftwareDelay(5000, BSP_DELAY_MILLISECS);
+    R_BSP_SoftwareDelay(5000, BSP_DELAY_MILLISECS);
 
-	r_fwup_wrap_disable_interrupt();
+    r_fwup_wrap_disable_interrupt();
 
-	err = R_FLASH_Control(FLASH_CMD_BANK_TOGGLE, NULL);
-	r_fwup_wrap_enable_interrupt();
+    err = R_FLASH_Control(FLASH_CMD_BANK_TOGGLE, NULL);
+    r_fwup_wrap_enable_interrupt();
 
-	if (FLASH_SUCCESS != err)
-	{
-		LogInfo( ("ota_bank_swap_function: NG, returns %d", err) );
-		return (FWUP_ERR_FLASH);
-	}
+    if (FLASH_SUCCESS != err)
+    {
+        LogInfo( ("ota_bank_swap_function: NG, returns %d", err) );
+        return (FWUP_ERR_FLASH);
+    }
 
-	err = R_FLASH_Control(FLASH_CMD_BANK_GET, (void *)&bank_info);
-	if ( bank_info == FLASH_BANK1 )
-	{
-		bank_no = 1;
-	}
-	else if ( bank_info == FLASH_BANK0 )
-	{
-		bank_no = 0;
-	}
-	LogInfo( ("ota_bank_swap_function: The startup bank = %d", bank_no) );
+    err = R_FLASH_Control(FLASH_CMD_BANK_GET, (void *)&bank_info);
+    if (FLASH_BANK1 == bank_info)
+    {
+        bank_no = 1;
+    }
+    else if (FLASH_BANK0 == bank_info)
 
-	R_BSP_SoftwareDelay(500, BSP_DELAY_MILLISECS);
+    {
+        bank_no = 0;
+    }
+    else
+    {
+        ;
+    }
+    LogInfo( ("ota_bank_swap_function: The startup bank = %d", bank_no) );
 
-	R_BSP_SoftwareReset();
+    R_BSP_SoftwareDelay(500, BSP_DELAY_MILLISECS);
 
-	return (FWUP_SUCCESS);
+    R_BSP_SoftwareReset();
+
+    return (FWUP_SUCCESS);
 }
 /**********************************************************************************************************************
  End of function ota_bank_swap_function

@@ -3,6 +3,8 @@
  * Copyright (C) 2021 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -60,7 +62,7 @@ AfrOtaJobDocumentFields_t * pOTAFileContext = NULL;
 static int ExtractECDSASignature (const unsigned char * derSignature, size_t derSignatureLength, unsigned char * rawSignature);
 
 /* Function Name: otaPal_CreateFileForRx */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Creates OTA file for receiving
  * @param[in] pFileContext
  * @return OTA Job processing result
@@ -103,7 +105,7 @@ OtaPalJobDocProcessingResult_t otaPal_CreateFileForRx(AfrOtaJobDocumentFields_t 
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_WriteBlock */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Write OTA data blocks
  * @param[in] pFileContext
  * @param[in] ulOffset
@@ -140,6 +142,7 @@ int16_t otaPal_WriteBlock(AfrOtaJobDocumentFields_t * const pFileContext,
     {
         uint32_t  paddingsize = FLASH_CF_MIN_PGM_SIZE*((int32_t)(ulBlockSize/FLASH_CF_MIN_PGM_SIZE)+1); // cast to int32_t
         uint8_t * pBuffTmp    = pvPortMalloc(paddingsize);
+        configASSERT(pBuffTmp);
         memset(pBuffTmp, 0xFF, paddingsize);
         (void)memcpy(pBuffTmp, pData, ulBlockSize);
  
@@ -147,6 +150,7 @@ int16_t otaPal_WriteBlock(AfrOtaJobDocumentFields_t * const pFileContext,
                 ulOffset + sizeof(st_fw_header_t),
                 paddingsize);
         vPortFree(pBuffTmp);
+        pBuffTmp = NULL;
  
     }
     else
@@ -171,7 +175,7 @@ int16_t otaPal_WriteBlock(AfrOtaJobDocumentFields_t * const pFileContext,
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_CheckFileSignature */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Verify the signature of the received file
  * @param[in] pFileContext
  * @return Signature verification result
@@ -260,7 +264,7 @@ static OtaPalStatus_t otaPal_CheckFileSignature(AfrOtaJobDocumentFields_t * cons
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_CloseFile */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Close OTA file
  * @param[in] pFileContext
  * @return Close file result
@@ -283,7 +287,7 @@ OtaPalStatus_t otaPal_CloseFile(AfrOtaJobDocumentFields_t * const pFileContext)
         OtaImageState = OtaImageStateTesting;
     }
 
-    if (pFileContext != NULL)
+    if (NULL != pFileContext)
     {
         pFileContext->fileId = 0;
     }
@@ -297,7 +301,7 @@ OtaPalStatus_t otaPal_CloseFile(AfrOtaJobDocumentFields_t * const pFileContext)
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_CloseFileNoSignatureCheck */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Close OTA file without verifying the signature
  * @param[in] pFileContext
  * @return Close file result
@@ -318,7 +322,7 @@ OtaPalStatus_t otaPal_CloseFileNoSignatureCheck(AfrOtaJobDocumentFields_t * cons
 
 
 /* Function Name: otaPal_ResetDevice */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Reset the device
  * @param[in] pFileContext
  * @return Reset result
@@ -336,7 +340,7 @@ OtaPalStatus_t otaPal_ResetDevice(AfrOtaJobDocumentFields_t * const pFileContext
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_ActivateNewImage */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Activate the new OTA image
  * @param[in] pFileContext
  * @return Activation result
@@ -362,7 +366,7 @@ OtaPalStatus_t otaPal_ActivateNewImage(AfrOtaJobDocumentFields_t * const pFileCo
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_Abort */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Abort the OTA process
  * @param[in] pFileContext
  * @return Abortion result
@@ -391,7 +395,7 @@ OtaPalStatus_t otaPal_Abort(AfrOtaJobDocumentFields_t * const pFileContext)
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_SetPlatformImageState */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Set the state of the image
  * @param[in] pFileContext
  * @param[in] eState
@@ -480,7 +484,7 @@ OtaPalStatus_t otaPal_SetPlatformImageState(AfrOtaJobDocumentFields_t * const pF
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_GetPlatformImageState */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Get the state of the image
  * @param[in] pFileContext
  * @return The image state
@@ -523,7 +527,7 @@ OtaPalImageState_t otaPal_GetPlatformImageState(AfrOtaJobDocumentFields_t * cons
  *********************************************************************************************************************/
 
 /* Function Name: ExtractECDSASignature */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief .
  * @param[in]  derSignature
  * @param[in]  derSignatureLength
@@ -608,7 +612,7 @@ cleanup:
  *********************************************************************************************************************/
 
 /* Function Name: otaPal_EraseArea */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Erase FWUP area
  * @param[in] area
  * @return The erasure result

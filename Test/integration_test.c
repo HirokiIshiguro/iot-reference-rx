@@ -74,6 +74,7 @@ static NetworkContext_t xSecondNetworkContext = { 0 };
 static NetworkContext_t xNetworkContext = { 0 };
 static uint32_t ulGlobalEntryTimeMs = 0;
 
+void get_random_number(uint8_t *data, uint32_t len);
 
 
 static NetworkConnectStatus_t prvTransportNetworkConnect( void * pvNetworkContext,

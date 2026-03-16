@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -72,6 +61,7 @@
 * Function Name: R_TSIP_GenerateTlsP256EccKeyIndexSub
 *******************************************************************************************************************/ /**
 * @details       RX65NHU TLS P-256 ECC Key Generation
+* @param[in]     InData_DomainParam
 * @param[out]    OutData_KeyIndex
 * @param[out]    OutData_PubKey
 * @retval        TSIP_SUCCESS
@@ -79,7 +69,7 @@
 * @retval        TSIP_ERR_RESOURCE_CONFLICT
 * @note          None
 */
-e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, uint32_t *OutData_PubKey)
+e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(const uint32_t *InData_DomainParam, uint32_t *OutData_KeyIndex, uint32_t *OutData_PubKey)
 {
     int32_t iLoop = 0u, jLoop = 0u, kLoop = 0u, oLoop1 = 0u, oLoop2 = 0u, iLoop2 = 0u;
     uint32_t KEY_ADR = 0u, OFS_ADR = 0u;
@@ -115,8 +105,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
     TSIP.REG_100H.WORD = S_RAM[16+0 + 3];
     TSIP.REG_28H.WORD = 0x00870001u;
     TSIP.REG_ECH.WORD = 0x00000b9cu;
-    KEY_ADR = 128;
-    RX65NHU_func004(KEY_ADR);
+    RX65NHU_func004(InData_DomainParam);
     TSIP.REG_24H.WORD = 0x000084d0u;
     /* WAIT_LOOP */
     while (0u != TSIP.REG_24H.BIT.B21)
@@ -273,7 +262,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
     {
         /* waiting */
     }
-    RX65NHU_func005(KEY_ADR);
+    RX65NHU_func005(InData_DomainParam);
     RX65NHU_func100(change_endian_long(0x9070018du), change_endian_long(0x6f683202u), change_endian_long(0x07e651f9u), change_endian_long(0x9a7cc875u));
     TSIP.REG_34H.WORD = 0x00000802u;
     TSIP.REG_24H.WORD = 0x800088d0u;
@@ -636,5 +625,5 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
     }
 }
 /**********************************************************************************************************************
- End of function ./input_dir/RX65NHU/RX65NHU_pe9_r2.prc
+ End of function ./input_dir/RX65NHU/RX65NHU_pe9_r3.prc
  *********************************************************************************************************************/

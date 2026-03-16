@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -363,17 +352,15 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
             TSIP.REG_ECH.WORD = 0x0000b5c0u;
             TSIP.REG_ECH.WORD = 0x0000002fu;
             RX65NHU_func101(change_endian_long(0x5e7ae8e4u), change_endian_long(0xb1c0aff0u), change_endian_long(0xc5187d06u), change_endian_long(0xd1ef767au));
-            R_TSIP_TlsGenerateSubSub();
-
+            RX65NHU_func032();
             TSIP.REG_ECH.WORD = 0x00002c20u;
             TSIP.REG_ECH.WORD = 0x0000096bu;
             TSIP.REG_ECH.WORD = 0x0000098cu;
             TSIP.REG_ECH.WORD = 0x0000b5c0u;
             TSIP.REG_ECH.WORD = 0x0000004fu;
-            RX65NHU_func101(change_endian_long(0x0eee7519u), change_endian_long(0x60b34740u), change_endian_long(0x850c58dau), change_endian_long(0x5e5c58bfu));
-            R_TSIP_TlsGenerateSubSub();
-
-            RX65NHU_func100(change_endian_long(0x1de8ca68u), change_endian_long(0x7e565f8cu), change_endian_long(0x265a2ff6u), change_endian_long(0xc4bbbd07u));
+            RX65NHU_func101(change_endian_long(0xa5759597u), change_endian_long(0x6e250837u), change_endian_long(0xac24cdc1u), change_endian_long(0x25213fbau));
+            RX65NHU_func032();
+            RX65NHU_func100(change_endian_long(0x306d3707u), change_endian_long(0xb0d99b2eu), change_endian_long(0x3038b5a7u), change_endian_long(0xd5e6643bu));
             TSIP.REG_C4H.WORD = 0x00000885u;
             TSIP.REG_ECH.WORD = 0x00000821u;
             TSIP.REG_E0H.WORD = 0x81830001u;
@@ -407,7 +394,7 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
                 /* waiting */
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
-            RX65NHU_func102(change_endian_long(0xfbc1139fu), change_endian_long(0xcf074016u), change_endian_long(0xd6e5840au), change_endian_long(0xdf414893u));
+            RX65NHU_func102(change_endian_long(0xe76307b7u), change_endian_long(0x024694d6u), change_endian_long(0x36cd1e02u), change_endian_long(0xef6f495eu));
             TSIP.REG_1BCH.WORD = 0x00000040u;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_18H.BIT.B12)
@@ -422,6 +409,6 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
     }
 }
 /**********************************************************************************************************************
- End of function ./input_dir/RX65NHU/RX65NHU_pe6.prc
+ End of function ./input_dir/RX65NHU/RX65NHU_pe6_r1.prc
  *********************************************************************************************************************/
 #endif /* #if TSIP_TLS == 1 */

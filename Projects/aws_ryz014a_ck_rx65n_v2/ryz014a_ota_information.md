@@ -9,11 +9,15 @@ This document provides information about the demo with the following specificati
 
 > **Note:**  
 > For information about the "*PubSub/MQTT sample project*", see [**"ryz014a_pubsub_information.md"**](ryz014a_pubsub_information.md).  
+> For information about the "*PubSub/MQTT with Fleet Provisioning sample project*", see [**"ryz014a_fleet_information.md"**](ryz014a_fleet_information.md).  
 > For more information about setting up and running the demo, see [**"Getting_Started_Guide.md"**](../../Getting_Started_Guide.md).
 
-## About the PubSub Demo using Cellular connection
+## About the Over-the-air(OTA) update Demo using Cellular connection
 
 In this demo, we will use Cellular to connect to AWS and perform an OTA(Over-the-air) firmware update.
+
+* **Improved OTA Update** (v202406.01-LTS-rx-1.1.0 later)
+  * OTA firmware update via MQTT, with additional feature implementation such as firmware version checking, self-test, job cancellation and abrupt disconnect handling.
 
 ### Tasks performed
 
@@ -29,21 +33,30 @@ This demo performs the following tasks:
 | MQTT-agent task           | This task uses the MQTT agent API to communicate with the MQTT broker over the same MQTT connection.             | 6144 | 2 |
 | PubSub task               | This task uses the MQTT Agent API to send a unique MQTT payload to a unique topic over the same MQTT connection. | 2048 | 1 |
 | OTA Demo task             | This task connects to the MQTT broker, creates the MQTT Agent task and calls the Ota demo loop.                  | 2304 | 1 |
-| OTA Agent task            | This task manages the OTA firmware updates for the device.                                                       | 8192 | 2 |
+| OTA Agent task            | This task manages the OTA firmware updates for the device.                                                       | 8192 | 1 |
 
 ### Memory usage
 
-| Compiler | RAM size | ROM size |
-|----------|----------|----------|
-| CC-RX    | 344KB    | 376KB    |
-| GCC      | 352KB    | 363KB    |
+* PubSub+ OTA
+
+  | Compiler | RAM size | ROM size |
+  |----------|----------|----------|
+  | CC-RX    | 344KB    | 387KB    |
+  | GCC      | 352KB    | 368KB    |
+
+* PubSub + OTA with Fleet Provisioning
+
+  | Compiler | RAM size | ROM size |
+  |----------|----------|----------|
+  | CC-RX    | 353KB    | 409KB    |
+  | GCC      | 360KB    | 401KB    |
 
 ### Confirmed Operation Environment
 
 | Compiler | Version  | Details |
 |----------|----------|---------|
 | CC-RX    | V3.07.00 | Optimization: Level 2 |
-| GCC      | GCC for Renesas RX v8.3.0.202411 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
+| GCC      | GCC for Renesas RX v14.2.0.202505 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
 
 ## Explanation specific to this demo
 
@@ -54,7 +67,7 @@ This demo performs the following tasks:
 
 ### Software setup
 
-* For common software setup instructions, see [**Getting Started Guide: step 4-2**](../../Getting_Started_Guide.md#step-4-2-run-pubsubmqtt-with-over-the-airota-update-sample-project).
+* For common software setup instructions, see [**Getting Started Guide: step 4-3**](../../Getting_Started_Guide.md#step-4-3-run-pubsubmqtt-with-over-the-airota-update-sample-project).
 * For RYZ014A specific software setup instructions, please see [**ryz014a_pubsub_information.md: Software setup**](ryz014a_pubsub_information.md#software-setup).
 
 ## Troubleshooting

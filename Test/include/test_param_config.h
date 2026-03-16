@@ -3,6 +3,8 @@
  * Copyright (C) 2022 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -160,7 +162,7 @@
  *
  * #define MQTT_TEST_CLIENT_IDENTIFIER                "insert here."
  */
-#define MQTT_TEST_CLIENT_IDENTIFIER                IOT_THING_NAME
+#define MQTT_TEST_CLIENT_IDENTIFIER                (IOT_THING_NAME)
 
 /**
  * @brief Network buffer size specified in bytes. Must be large enough to hold the maximum
@@ -197,7 +199,7 @@
  *
  * #define OTA_PAL_TEST_CERT_TYPE OTA_ECDSA_SHA256
  */
-#define OTA_PAL_TEST_CERT_TYPE                           OTA_ECDSA_SHA256
+#define OTA_PAL_TEST_CERT_TYPE                           (OTA_ECDSA_SHA256)
 
 /**
  * @brief Path to cert for OTA test PAL. Used to verify signature.

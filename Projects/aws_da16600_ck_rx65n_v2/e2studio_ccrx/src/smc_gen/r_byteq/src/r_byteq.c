@@ -1,37 +1,25 @@
 /***********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No 
-* other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all 
-* applicable laws, including copyright laws. 
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
-* THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, 
-* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM 
-* EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES 
-* SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS 
-* SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of 
-* this software. By using this software, you agree to the additional terms and conditions found by accessing the 
-* following link:
-* http://www.renesas.com/disclaimer 
+* Copyright (c) 2013 - 2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2013 Renesas Electronics Corporation. All rights reserved.
+* SPDX-License-Identifier: BSD-3-Clause
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name    : r_byteq.c
 * Description  : Functions for using byte queues/circular buffers. 
 ************************************************************************************************************************
 * History : DD.MM.YYYY Version Description  
-*         : 24.07.2013 1.00     Initial Release
-*         : 11.21.2014 1.20     Removed dependency to BSP
-*         : 30.09.2015 1.50     Added dependency to BSP
-*         : 29.01.2016 1.60     Fixed the initial setting process in the R_LONGQ_Open function.
-*                               Fixed a program according to the Renesas coding rules.
-*         : 01.06.2018 1.70     Added the comment to while statement.
-*         : 07.02.2019 1.80     Deleted the inline expansion of the R_BYTEQ_GetVersion function.
-*         : 10.06.2020 1.81     Modified comment of API function to Doxygen style.
-*         : 31.03.2021 1.90     Updated for queue protection in R_BYTEQ_Put, R_BYTEQ_Get, R_BYTEQ_Flush,
-*                               R_BYTEQ_Used, R_BYTEQ_Unused functions.
-*         : 29.10.2021 2.00     Updated for critical section protection in R_BYTEQ_Put, R_BYTEQ_Get functions.
+*         : 24.07.2013 1.00    Initial Release
+*         : 11.21.2014 1.20    Removed dependency to BSP
+*         : 30.09.2015 1.50    Added dependency to BSP
+*         : 29.01.2016 1.60    Fixed the initial setting process in the R_LONGQ_Open function.
+*                              Fixed a program according to the Renesas coding rules.
+*         : 01.06.2018 1.70    Added the comment to while statement.
+*         : 07.02.2019 1.80    Deleted the inline expansion of the R_BYTEQ_GetVersion function.
+*         : 10.06.2020 1.81    Modified comment of API function to Doxygen style.
+*         : 31.03.2021 1.90    Updated for queue protection in R_BYTEQ_Put, R_BYTEQ_Get, R_BYTEQ_Flush,
+*                              R_BYTEQ_Used, R_BYTEQ_Unused functions.
+*         : 29.10.2021 2.00    Updated for critical section protection in R_BYTEQ_Put, R_BYTEQ_Get functions.
+*         : 15.03.2025 2.11    Updated disclaimer.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************

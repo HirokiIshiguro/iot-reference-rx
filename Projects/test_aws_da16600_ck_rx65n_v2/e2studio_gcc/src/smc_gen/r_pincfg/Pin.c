@@ -52,10 +52,6 @@ void R_Pins_Create(void)
     PORT9.PDR.BYTE &= 0xF7U;
     MPC.P93PFS.BYTE = 0x80U;
 
-    /* Set CTS6# pin */
-    MPC.PJ3PFS.BYTE = 0x0AU;
-    PORTJ.PMR.BYTE |= 0x08U;
-
     /* Set RXD5 pin */
     MPC.PC2PFS.BYTE = 0x0AU;
     PORTC.PMR.BYTE |= 0x04U;

@@ -5,9 +5,9 @@
 */
 
 /***********************************************************************************************************************
-* File Name    : user_tcp_hook_config.h
- * Description  : The custom header file for hook function configuration to reset Wi-Fi module when errors occur.
-**********************************************************************************************************************/
+ * File Name    : user_tcp_hook_config.h
+ * Description  : Configuration file for TCP socket error handling and recovery mechanisms.
+ **********************************************************************************************************************/
 
 #ifndef FRTOS_CONFIG_USER_TCP_HOOK_CONFIG_H_
 #define FRTOS_CONFIG_USER_TCP_HOOK_CONFIG_H_

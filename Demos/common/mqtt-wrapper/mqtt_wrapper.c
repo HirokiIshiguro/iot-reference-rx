@@ -23,8 +23,8 @@ static MQTTContext_t * globalCoreMqttContext = NULL;
  */
 extern MQTTAgentContext_t xGlobalMqttAgentContext;
 
-#define MAX_THING_NAME_SIZE    128U
-static char globalThingName[MAX_THING_NAME_SIZE + 1];
+#define MAX_THING_NAME_SIZE    (128U)
+static char globalThingName[MAX_THING_NAME_SIZE+1];
 static size_t globalThingNameLength = 0U;
 
 /**
@@ -38,22 +38,50 @@ struct MQTTAgentCommandContext
     void *       pArgs;
 };
 
+/**********************************************************************************************************************
+ * Function Name: mqttWrapper_setCoreMqttContext
+ * Description  : .
+ * Argument     : mqttContext
+ * Return Value : .
+ *********************************************************************************************************************/
 void mqttWrapper_setCoreMqttContext(MQTTContext_t * mqttContext)
 {
     globalCoreMqttContext = mqttContext;
 }
+/**********************************************************************************************************************
+ End of function mqttWrapper_setCoreMqttContext
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: mqttWrapper_setThingName
+ * Description  : .
+ * Arguments    : thingName
+ *              : thingNameLength
+ * Return Value : .
+ *********************************************************************************************************************/
 void mqttWrapper_setThingName(char * thingName,
-                              size_t thingNameLength)
+                            size_t thingNameLength)
 {
     configASSERT(thingNameLength <= MAX_THING_NAME_SIZE );
     memcpy(globalThingName, thingName, MAX_THING_NAME_SIZE);
     globalThingName[thingNameLength] = '\0';
     globalThingNameLength = thingNameLength;
 }
+/**********************************************************************************************************************
+ End of function mqttWrapper_setThingName
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: mqttWrapper_getThingName
+ * Description  : .
+ * Arguments    : thingNameBuffer
+ *              : thingNameLength
+ * Return Value : .
+ *********************************************************************************************************************/
 void mqttWrapper_getThingName(char *   thingNameBuffer,
-                              size_t * thingNameLength)
+                            size_t * thingNameLength)
 {
     configASSERT(globalThingName[ 0 ] != 0);
 
@@ -61,7 +89,16 @@ void mqttWrapper_getThingName(char *   thingNameBuffer,
     thingNameBuffer[globalThingNameLength] = '\0';
     *thingNameLength                       = globalThingNameLength;
 }
+/**********************************************************************************************************************
+ End of function mqttWrapper_getThingName
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: mqttWrapper_isConnected
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
 bool mqttWrapper_isConnected(void)
 {
     bool isConnected = false;
@@ -70,9 +107,20 @@ bool mqttWrapper_isConnected(void)
     isConnected = (MQTTConnected == globalCoreMqttContext->connectStatus);
     return isConnected;
 }
+/**********************************************************************************************************************
+ End of function mqttWrapper_isConnected
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: prvPublishCommandCallback
+ * Description  : .
+ * Arguments    : pCmdCallbackContext
+ *              : pReturnInfo
+ * Return Value : .
+ *********************************************************************************************************************/
 static void prvPublishCommandCallback(MQTTAgentCommandContext_t * pCmdCallbackContext,
-                                      MQTTAgentReturnInfo_t *     pReturnInfo)
+                                    MQTTAgentReturnInfo_t *     pReturnInfo)
 {
     TaskHandle_t xTaskHandle = (struct tskTaskControlBlock *) pCmdCallbackContext->xTaskToNotify;
 
@@ -87,11 +135,15 @@ static void prvPublishCommandCallback(MQTTAgentCommandContext_t * pCmdCallbackCo
 /*      } */
 
         (void) xTaskNotifyIndexed(xTaskHandle,
-                                  MQTT_AGENT_NOTIFY_IDX,
-                                  ulNotifyValue,
-                                  eSetValueWithOverwrite);
+                                MQTT_AGENT_NOTIFY_IDX,
+                                ulNotifyValue,
+                                eSetValueWithOverwrite);
     }
 }
+/**********************************************************************************************************************
+ End of function prvPublishCommandCallback
+ *********************************************************************************************************************/
+
 
 /******************************************************************************
  * Function Name: prvUnsubscribeCommandCallback
@@ -101,34 +153,43 @@ static void prvPublishCommandCallback(MQTTAgentCommandContext_t * pCmdCallbackCo
  * Return Value : None
  *****************************************************************************/
 static void prvUnsubscribeCommandCallback(MQTTAgentCommandContext_t * pCmdCallbackContext,
-                                          MQTTAgentReturnInfo_t *     pReturnInfo)
+                                        MQTTAgentReturnInfo_t *     pReturnInfo)
 {
     TaskHandle_t xTaskHandle                  = (struct tskTaskControlBlock *) pCmdCallbackContext->xTaskToNotify;
     MQTTAgentSubscribeArgs_t * pSubscribeArgs = (MQTTAgentSubscribeArgs_t *) pCmdCallbackContext->pArgs;
 
 
-    if(NULL != xTaskHandle)
+    if (NULL != xTaskHandle)
     {
         uint32_t ulNotifyValue = MQTTSuccess; /* ( pxReturnInfo->returnCode & 0xFFFFFF ); */
 
         (void) xTaskNotifyIndexed(xTaskHandle,
-                                  MQTT_AGENT_NOTIFY_IDX,
-                                  ulNotifyValue,
-                                  eSetValueWithOverwrite);
+                                MQTT_AGENT_NOTIFY_IDX,
+                                ulNotifyValue,
+                                eSetValueWithOverwrite);
 
         /* Remove the topic filter callback */
         vRemoveMQTTTopicFilterCallback(pSubscribeArgs->pSubscribeInfo->pTopicFilter,
-                                       pSubscribeArgs->pSubscribeInfo->topicFilterLength);
+                                    pSubscribeArgs->pSubscribeInfo->topicFilterLength);
     }
 }
 /******************************************************************************
  End of function prvUnsubscribeCommandCallback
  *****************************************************************************/
 
+/**********************************************************************************************************************
+ * Function Name: mqttWrapper_publish
+ * Description  : .
+ * Arguments    : topic
+ *              : topicLength
+ *              : message
+ *              : messageLength
+ * Return Value : .
+ *********************************************************************************************************************/
 bool mqttWrapper_publish(char *    topic,
-                         size_t    topicLength,
-                         uint8_t * message,
-                         size_t    messageLength)
+                        size_t    topicLength,
+                        uint8_t * message,
+                        size_t    messageLength)
 {
     bool success = false;
 
@@ -166,21 +227,21 @@ bool mqttWrapper_publish(char *    topic,
             .pCmdCompleteCallbackContext = &xCommandContext,
         };
 
-        (void) xTaskNotifyStateClearIndexed(NULL, MQTT_AGENT_NOTIFY_IDX);
+        (void)xTaskNotifyStateClearIndexed(NULL, MQTT_AGENT_NOTIFY_IDX);
 
         mqttStatus = MQTTAgent_Publish(xAgentHandle,
-                                       &pubInfo,
-                                       &xCommandParams);
+                                    &pubInfo,
+                                    &xCommandParams);
 
         if (MQTTSuccess == mqttStatus)
         {
             uint32_t ulNotifyValue = 0;
 
             if (xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX,
-                                       0x0,
-                                       0xFFFFFFFF,
-                                       &ulNotifyValue,
-                                       portMAX_DELAY))
+                                    0x0,
+                                    0xFFFFFFFF,
+                                    &ulNotifyValue,
+                                    portMAX_DELAY))
             {
                 mqttStatus = (MQTTStatus_t) (ulNotifyValue & 0x00FFFFFF);
             }
@@ -195,9 +256,20 @@ bool mqttWrapper_publish(char *    topic,
 
     return success;
 }
+/**********************************************************************************************************************
+ End of function mqttWrapper_publish
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: handleReceivedPublish
+ * Description  : .
+ * Arguments    : pvIncomingPublishCallbackContext
+ *              : pxPublishInfo
+ * Return Value : .
+ *********************************************************************************************************************/
 void handleReceivedPublish(void *              pvIncomingPublishCallbackContext,
-                           MQTTPublishInfo_t * pxPublishInfo)
+                        MQTTPublishInfo_t * pxPublishInfo)
 {
     (void) pvIncomingPublishCallbackContext;
     char *    topic          = NULL;
@@ -212,24 +284,35 @@ void handleReceivedPublish(void *              pvIncomingPublishCallbackContext,
     messageLength = pxPublishInfo->payloadLength;
 
     configPRINTF(("[INFO] Incoming PUBLISH received on topic %.*s\n",
-                 (unsigned int) topicLength, topic));
+                (unsigned int) topicLength, topic));
 
     messageHandled = otaDemo_handleIncomingMQTTMessage(topic, topicLength, message, messageLength);
 
     if (!messageHandled)
     {
         configPRINTF(("[WARN] Unhandled incoming PUBLISH received on topic %.*s\n, "
-                     "message: %.*s\n",
-                     (unsigned int) topicLength,
-                     topic,
-                     (unsigned int) messageLength,
-                     (char *) message));
+                    "message: %.*s\n",
+                    (unsigned int) topicLength,
+                    topic,
+                    (unsigned int) messageLength,
+                    (char *) message));
         configPRINTF(("\n"));
     }
 }
+/**********************************************************************************************************************
+ End of function handleReceivedPublish
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: mqttWrapper_subscribe
+ * Description  : .
+ * Arguments    : topic
+ *              : topicLength
+ * Return Value : .
+ *********************************************************************************************************************/
 bool mqttWrapper_subscribe(char * topic,
-                           size_t topicLength)
+                        size_t topicLength)
 {
     bool success = false;
 
@@ -246,7 +329,7 @@ bool mqttWrapper_subscribe(char * topic,
 
         mqttStatus = MqttAgent_SubscribeSync(topic,
                                              topicLength,
-                                             MQTTQoS0,
+                                             MQTTQoS1,
                                              handleReceivedPublish,
                                              NULL);
 
@@ -257,6 +340,10 @@ bool mqttWrapper_subscribe(char * topic,
 
     return success;
 }
+/**********************************************************************************************************************
+ End of function mqttWrapper_subscribe
+ *********************************************************************************************************************/
+
 
 /******************************************************************************
  * Function Name: mqttWrapper_unsubscribe
@@ -266,7 +353,7 @@ bool mqttWrapper_subscribe(char * topic,
  * Return Value : bool        : true if successful, false otherwise.
  *****************************************************************************/
 bool mqttWrapper_unsubscribe(char * topic,
-                             size_t topicLength)
+                            size_t topicLength)
 {
 
     configASSERT(topic);
@@ -309,10 +396,10 @@ bool mqttWrapper_unsubscribe(char * topic,
         uint32_t ulNotifyValue = 0;
 
         if (xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX,
-                                   0x0,
-                                   0xFFFFFFFF,
-                                   &ulNotifyValue,
-                                   portMAX_DELAY))
+                                0x0,
+                                0xFFFFFFFF,
+                                &ulNotifyValue,
+                                portMAX_DELAY))
         {
             xCommandStatus = (MQTTStatus_t) (ulNotifyValue & 0x00FFFFFF);
         }

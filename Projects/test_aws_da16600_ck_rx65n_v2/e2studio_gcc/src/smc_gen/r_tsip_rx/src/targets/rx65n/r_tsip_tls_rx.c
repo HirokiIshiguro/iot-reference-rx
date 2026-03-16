@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2018-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_tls_rx.c
- * Version      : 1.21
+ * Version      : 1.22
  * Description  : Interface definition for the r_tsip_tls_rx TSIP module.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
@@ -42,6 +29,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -222,42 +211,6 @@ static e_tsip_err_t gen_sign_rsa_pss(tsip_rsa2048_private_key_index_t *key_index
  *******************************/
 
 /***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateTlsRsaPublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate TLS RSA Public key index data
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information (141 words) of RSA2048 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateTlsRsaInstallDataSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateTlsRsaPublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_tls_ca_certification_public_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateTlsRsaInstallDataSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_TLS_CA_CERTIFICATION_PUBLIC_KEY;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateTlsRsaPublicKeyIndex
- *******************************/
-
-/***********************************************************************************************************************
 * Function Name: R_TSIP_UpdateTlsRsaPublicKeyIndex
 *******************************************************************************************************************/ /**
 * @details       The API for updating TLS RSA public key index
@@ -306,7 +259,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndex(tsip_tls_p256_ecc_key_index_t *tl
         uint8_t *ephemeral_ecdh_public_key)
 {
     e_tsip_err_t error_code = TSIP_SUCCESS;
-    error_code = R_TSIP_GenerateTlsP256EccKeyIndexSub(tls_p256_ecc_key_index->value,
+    error_code = R_TSIP_GenerateTlsP256EccKeyIndexSub(DomainParam_NIST_P256, tls_p256_ecc_key_index->value,
         /* Casting uint32_t pointer is used for address. */
         (uint32_t*)ephemeral_ecdh_public_key);
     if (TSIP_SUCCESS == error_code)
@@ -370,6 +323,7 @@ e_tsip_err_t R_TSIP_TlsRootCertificateVerification(uint32_t public_key_type, uin
     /* uint32_t *InData_CertificatesLength,   */&certificate_length_sub,
     /* uint32_t *InData_Signature,            */(uint32_t *) (signature),
     /* uint32_t *InData_CertificatesInfo,     */information,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PubKey,              */encrypted_root_public_key);
 
     return error_code;
@@ -432,6 +386,7 @@ e_tsip_err_t R_TSIP_TlsCertificateVerification(uint32_t public_key_type, uint32_
     /* uint32_t *InData_TBSCertificateLength, */&certificate_length_sub,
     /* uint32_t *InData_Signature,            */(uint32_t *) signature,
     /* uint32_t *InData_TBSCertificatesInfo,  */information,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PubKey               */encrypted_output_public_key);
 
     return error_code;
@@ -494,6 +449,7 @@ e_tsip_err_t R_TSIP_TlsCertificateVerificationExtension(uint32_t public_key_type
     /* uint32_t *InData_TBSCertificateLength, */&certificate_length_sub,
     /* uint32_t *InData_Signature,            */(uint32_t *) signature,
     /* uint32_t *InData_TBSCertificatesInfo,  */information,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PubKey               */encrypted_output_public_key);
 
     return error_code;
@@ -761,6 +717,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrieves(uint32_t public_ke
     /* uint32_t *InData_SKE_Message,      */(uint32_t*)server_ephemeral_ecdh_public_key,
     /* uint32_t *InData_SKE_Signature,    */(uint32_t*)server_key_exchange_signature,
     /* uint32_t *InData_PubKey,           */encrypted_public_key,
+    /* uint32_t *InData_DomainParam,      */DomainParam_NIST_P256,
     /* uint32_t *OutData_EphemeralPubKey  */encrypted_ephemeral_ecdh_public_key
     );
 
@@ -791,6 +748,7 @@ e_tsip_err_t R_TSIP_TlsGeneratePreMasterSecretWithEccP256Key(uint32_t *encrypted
     error_code = R_TSIP_TlsGeneratePreMasterSecretWithEccP256KeySub(
     /* uint32_t *InData_PubKey,               */encrypted_public_key,
     /* uint32_t *InData_KeyIndex,             */tls_p256_ecc_key_index->value,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PreMasterSecretIndex */tsip_pre_master_secret
     );
 
@@ -833,42 +791,6 @@ e_tsip_err_t R_TSIP_TlsGenerateExtendedMasterSecret(uint32_t select_cipher_suite
 }
 /*******************************
  End of function R_TSIP_TlsGenerateExtendedMasterSecret
- *******************************/
-
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateTlsSVRsaPublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate TLS RSA Public key index data for server.
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the user key encrypted with AES128-ECB mode
-* @param[out]    key_index Output the user Key Generation Information (141 words) of RSA2048 bit
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateTlsSVRsaInstallDataSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateTlsSVRsaPublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_tls_ca_certification_public_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateTlsSVRsaInstallDataSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_TLS_CA_CERTIFICATION_PUBLIC_KEY;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateTlsSVRsaPublicKeyIndex
  *******************************/
 
 /***********************************************************************************************************************
@@ -958,7 +880,7 @@ e_tsip_err_t R_TSIP_GenerateTlsSVP256EccKeyIndex(tsip_tls_p256_ecc_key_index_t *
         uint8_t *ephemeral_ecdh_public_key)
 {
     e_tsip_err_t error_code = TSIP_SUCCESS;
-    error_code = R_TSIP_GenerateTlsSVP256EccKeyIndexSub(tls_p256_ecc_key_index->value,
+    error_code = R_TSIP_GenerateTlsSVP256EccKeyIndexSub(DomainParam_NIST_P256, tls_p256_ecc_key_index->value,
         /* Casting uint32_t pointer is used for address. */
         (uint32_t*)ephemeral_ecdh_public_key);
     if (TSIP_SUCCESS == error_code)
@@ -1022,6 +944,7 @@ e_tsip_err_t R_TSIP_TlsSVRootCertificateVerification(uint32_t public_key_type, u
     /* uint32_t *InData_CertificatesLength,   */&certificate_length_sub,
     /* uint32_t *InData_Signature,            */(uint32_t *) (signature),
     /* uint32_t *InData_CertificatesInfo,     */information,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PubKey,              */encrypted_root_public_key);
 
     return error_code;
@@ -1084,6 +1007,7 @@ e_tsip_err_t R_TSIP_TlsSVCertificateVerification(uint32_t public_key_type, uint3
     /* uint32_t *InData_TBSCertificateLength, */&certificate_length_sub,
     /* uint32_t *InData_Signature,            */(uint32_t *) signature,
     /* uint32_t *InData_TBSCertificatesInfo,  */information,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PubKey               */encrypted_output_public_key);
 
     return error_code;
@@ -1146,6 +1070,7 @@ e_tsip_err_t R_TSIP_TlsSVCertificateVerificationExtension(uint32_t public_key_ty
     /* uint32_t *InData_TBSCertificateLength, */&certificate_length_sub,
     /* uint32_t *InData_Signature,            */(uint32_t *) signature,
     /* uint32_t *InData_TBSCertificatesInfo,  */information,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PubKey               */encrypted_output_public_key);
 
     return error_code;
@@ -1448,6 +1373,7 @@ e_tsip_err_t R_TSIP_TlsSVGeneratePreMasterSecretWithEccP256Key(uint32_t *ecdh_pu
     error_code = R_TSIP_TlsSVGeneratePreMasterSecretWithEccP256KeySub(
     /* uint32_t *InData_PubKey,               */ecdh_public_key,
     /* uint32_t *InData_KeyIndex,             */tls_p256_ecc_key_index->value,
+    /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
     /* uint32_t *OutData_PreMasterSecretIndex */tsip_pre_master_secret
     );
 
@@ -1506,7 +1432,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecret(uint32_t select_cipher_sui
 * @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
 * @retval        TSIP_ERR_FAIL: Internal error occurred.
 * @retval        TSIP_ERR_PARAMETER: Input parameter illegal
-* @see           R_TSIP_TlsCertificateVerificationSub()
+* @see           R_TSIP_TlsSVCertificateVerificationSub()
 * @note          None
 */
 e_tsip_err_t R_TSIP_TlsSVCertificateVerifyVerification(uint32_t *key_index,
@@ -1682,6 +1608,7 @@ e_tsip_err_t R_TSIP_TlsSVCertificateVerifyVerification(uint32_t *key_index,
         /* uint32_t *InData_TBSCertificateLength, */&certificate_length_sub,
         /* uint32_t *InData_Signature,            */p_tmp_signature_data,
         /* uint32_t *InData_TBSCertificatesInfo,  */NULL,
+        /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
         /* uint32_t *OutData_PubKey               */NULL);
     }
 
@@ -1718,6 +1645,7 @@ e_tsip_err_t R_TSIP_GenerateTls13P256EccKeyIndex(tsip_tls13_handle_t *handle, e_
     error_code = R_TSIP_GenerateTls13P256EccKeyIndexSub(
     /* uint32_t *InData_Cmd,        */&indata_cmd_sub,
     /* uint32_t *InData_Handle,     */handle->session_handle,
+    /* uint32_t *InData_DomainParam,*/DomainParam_NIST_P256,
     /* uint32_t *OutData_KeyIndex,  */key_index->value,
     /* uint32_t *OutData_PubKey     */(uint32_t*)ephemeral_ecdh_public_key
     );
@@ -1769,6 +1697,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateEcdheSharedSecret(e_tsip_tls13_mode_t mode, uin
         /* uint32_t *InData_Cmd,                    */&indata_cmd_sub,
         /* uint32_t *InData_PubKey,                 */(uint32_t*)server_public_key,
         /* uint32_t *InData_KeyIndex,               */key_index->value,
+        /* uint32_t *InData_DomainParam,            */DomainParam_NIST_P256,
         /* uint32_t *OutData_SharedSecretKeyIndex   */shared_secret_key_index->value
         );
 
@@ -3190,6 +3119,7 @@ e_tsip_err_t R_TSIP_Tls13CertificateVerifyVerification(uint32_t *key_index,
         /* uint32_t *InData_TBSCertificateLength, */&certificate_length_sub,
         /* uint32_t *InData_Signature,            */p_tmp_signature_data,
         /* uint32_t *InData_TBSCertificatesInfo,  */NULL,
+        /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
         /* uint32_t *OutData_PubKey               */NULL);
     }
 
@@ -3226,6 +3156,7 @@ e_tsip_err_t R_TSIP_GenerateTls13SVP256EccKeyIndex(tsip_tls13_handle_t *handle, 
     error_code = R_TSIP_GenerateTls13SVP256EccKeyIndexSub(
     /* uint32_t *InData_Cmd,        */&indata_cmd_sub,
     /* uint32_t *InData_Handle,     */handle->session_handle,
+    /* uint32_t *InData_DomainParam,*/DomainParam_NIST_P256,
     /* uint32_t *OutData_KeyIndex,  */key_index->value,
     /* uint32_t *OutData_PubKey     */(uint32_t*)ephemeral_ecdh_public_key
     );
@@ -3277,6 +3208,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecret(e_tsip_tls13_mode_t mode, u
         /* uint32_t *InData_Cmd,                    */&indata_cmd_sub,
         /* uint32_t *InData_PubKey,                 */(uint32_t*)client_public_key,
         /* uint32_t *InData_KeyIndex,               */key_index->value,
+        /* uint32_t *InData_DomainParam,            */DomainParam_NIST_P256,
         /* uint32_t *OutData_SharedSecretKeyIndex   */shared_secret_key_index->value
         );
 
@@ -4163,7 +4095,7 @@ e_tsip_err_t R_TSIP_Tls13SVCertificateVerifyGenerate(uint32_t *key_index,
 * @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
 * @retval        TSIP_ERR_FAIL: Internal error occurred.
 * @retval        TSIP_ERR_PARAMETER: Input parameter illegal
-* @see           R_TSIP_TlsCertificateVerificationSub()
+* @see           R_TSIP_TlsSVCertificateVerificationSub()
 * @note          None
 */
 e_tsip_err_t R_TSIP_Tls13SVCertificateVerifyVerification(uint32_t *key_index,
@@ -4309,6 +4241,7 @@ e_tsip_err_t R_TSIP_Tls13SVCertificateVerifyVerification(uint32_t *key_index,
         /* uint32_t *InData_TBSCertificateLength, */&certificate_length_sub,
         /* uint32_t *InData_Signature,            */p_tmp_signature_data,
         /* uint32_t *InData_TBSCertificatesInfo,  */NULL,
+        /* uint32_t *InData_DomainParam,          */DomainParam_NIST_P256,
         /* uint32_t *OutData_PubKey               */NULL);
     }
 

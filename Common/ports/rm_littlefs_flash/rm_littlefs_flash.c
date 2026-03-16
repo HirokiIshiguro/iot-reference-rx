@@ -80,7 +80,10 @@ fsp_err_t RM_LITTLEFS_FLASH_Open(rm_littlefs_ctrl_t * const p_ctrl, rm_littlefs_
     e_commonapi_err_t common_api_err = R_Demo_Common_API_Flash_Open();
     if (COMMONAPI_SUCCESS != common_api_err)
     {
-        while (1); /* infinite loop due to error */
+        while (1)
+        {
+            ;/* Infinite loop due to error */
+        } 
     }
 
 #if LFS_THREAD_SAFE
@@ -224,7 +227,7 @@ int rm_littlefs_flash_erase(const struct lfs_config * c, lfs_block_t block)
     update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_ERASE_WAIT_COMPLETE;
 
     flash_error_code = R_FLASH_Erase((flash_block_address_t)(rm_littlefs_flash_data_start + (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block)),
-                                     p_instance_ctrl->p_cfg->p_lfs_cfg->block_size / RM_LITTLEFS_FLASH_DATA_BLOCK_SIZE);
+                                    p_instance_ctrl->p_cfg->p_lfs_cfg->block_size / RM_LITTLEFS_FLASH_DATA_BLOCK_SIZE);
 
     if ((FLASH_SUCCESS != flash_error_code))
     {

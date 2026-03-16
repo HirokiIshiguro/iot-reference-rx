@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
- *
- * Copyright (C) 2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+/*
+* Copyright (c) 2025 Renesas Electronics Corporation and/or its affiliates
+*
+* SPDX-License-Identifier: BSD-3-Clause
+*/
 /**********************************************************************************************************************
  * File Name    : r_wifi_da16xxx_tcp.c
  * Description  : TCP protocol API functions definition for DA16XXX.
@@ -350,8 +337,20 @@ int16_t R_WIFI_DA16XXX_SendSocket (uint8_t socket_number, uint8_t WIFI_FAR * dat
         return WIFI_ERR_TAKE_MUTEX;
     }
 
-    /* Set timeout */
-    at_set_timeout(timeout_ms);
+    /* 
+     * Set timeout 
+     * default timeout in SDK is 5s (5000ms),
+     * timeout should be greater than 5 seconds
+     */
+    if (6000 <= timeout_ms)
+    {
+        at_set_timeout(timeout_ms);
+    }
+    else
+    {
+        at_set_timeout(6000);
+    }
+
     tick_tmp = os_wrap_tickcount_get();
     while (send_idx < length)
     {
@@ -580,7 +579,7 @@ wifi_err_t R_WIFI_DA16XXX_CloseSocket (uint8_t socket_number)
             break;
         }
     }
-    if ((TCP_TBL_MAX + 2 == cid) || (WIFI_SOCKET_STATUS_CONNECTED != g_sock_tbl[socket_number].status))
+    if (TCP_TBL_MAX + 2 == cid)
     {
         goto CLOSE_SOCKET;
     }
@@ -590,6 +589,10 @@ wifi_err_t R_WIFI_DA16XXX_CloseSocket (uint8_t socket_number)
     if (AT_INTERNAL_TIMEOUT == at_rep)
     {
         api_ret = WIFI_ERR_MODULE_TIMEOUT;
+        goto RETURN_ERROR;
+    }
+    else if (-745 == at_rep)
+    {
         goto RETURN_ERROR;
     }
     else if (AT_OK != at_rep)

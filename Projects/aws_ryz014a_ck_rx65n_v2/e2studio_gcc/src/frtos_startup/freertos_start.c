@@ -64,18 +64,18 @@ Exported global variables (to be accessed by other files)
 
 
 /* FreeRTOS's system timer. */
-void vApplicationSetupTimerInterrupt(void);
+void vApplicationSetupTimerInterrupt (void);
 
 /* Hook functions used by FreeRTOS. */
-void vAssertCalled(void);
-void vApplicationIdleHook(void);
-void vApplicationTickHook(void);
+void vAssertCalled (void);
+void vApplicationIdleHook (void);
+void vApplicationTickHook (void);
 
 /* FreeRTOS's processing before start the kernel. */
-void Processing_Before_Start_Kernel(void);
+void Processing_Before_Start_Kernel (void);
 
 /* Main task. */
-extern void main_task(void *pvParameters);
+extern void main_task (void *pvParameters);
 
 
 /******************************************************************************
@@ -109,7 +109,7 @@ void vApplicationSetupTimerInterrupt(void)
     CMT0.CMCR.WORD = 0x00C0; // CKS=00b,CMIE=1; PCLK/8,Compare match interrupt (CMIn) enabled @60MHz
 
     /* Set the compare match value. */
-    CMT0.CMCOR = ( unsigned short ) ( ( ( configPERIPHERAL_CLOCK_HZ / configTICK_RATE_HZ )) / 8 - 1);
+    CMT0.CMCOR = (unsigned short)( (( ( configPERIPHERAL_CLOCK_HZ / configTICK_RATE_HZ )) / 8) - 1);
 
     /* Clear counter. */
     CMT0.CMCNT = 0;
@@ -259,7 +259,7 @@ void vAssertCalled(void)
         /* Program may stop here when you stop it by debugger. In the case,
         use the debugger to set ul to a non-zero value in order to step out
         of this function to determine why it was called. */
-        while( 0 == ul )
+        while ( 0 == ul )
         {
             R_BSP_NOP();
         }
@@ -293,7 +293,7 @@ void vApplicationIdleHook(void)
 
     xTimeNow = xTaskGetTickCount();
 
-    if( ( xTimeNow - xLastPrint ) > xPrintFrequency )
+    if ( ( xTimeNow - xLastPrint ) > xPrintFrequency )
     {
         xLastPrint = xTimeNow;
     }
@@ -329,24 +329,24 @@ void Processing_Before_Start_Kernel(void)
 
 /** Make sure to manually set/clear this macro in freertos_start.h **/
 #if (RTOS_USB_SUPPORT == 1)
-	usb_rtos_err_t err = usb_rtos_configuration();
-	if (UsbRtos_Success != err)
-	{
-		while(1)
-		{
-			/** Failure of UsbRtos Configuration */
-		}
-	}
+    usb_rtos_err_t err = usb_rtos_configuration();
+    if (UsbRtos_Success != err)
+    {
+        while(1)
+        {
+            /** Failure of UsbRtos Configuration */
+        }
+    }
 #endif
 
     Kernel_Object_init();
 
     /************** task creation ****************************/
     /* Main task. */
-    ret = xTaskCreate(main_task, "MAIN_TASK", 512, NULL, 1, NULL);
+    ret = xTaskCreate(main_task, "MAIN_TASK", 2048, NULL, 1, NULL);
     if (pdPASS != ret)
     {
-        while(1)
+        while (1)
         {
             /* Failed! Task can not be created. */
         }

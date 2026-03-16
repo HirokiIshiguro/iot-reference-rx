@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_rx_if.h
- * Version      : 1.21
+ * Version      : 1.22
  * Description  : Interface definition for the r_tsip_rx module.
  *                TSIP means the "Trusted Secure IP" that is Renesas original security IP.
  *                Strong point 1:
@@ -58,6 +45,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -91,7 +80,7 @@
 
 /* Version Number of API. */
 #define TSIP_VERSION_MAJOR    (1u)
-#define TSIP_VERSION_MINOR    (21u)
+#define TSIP_VERSION_MINOR    (22u)
 
 /* Various information. */
 #define R_TSIP_SRAM_WORD_SIZE       (20u)
@@ -812,19 +801,6 @@ typedef struct tsip_tls13_handle
     uint8_t                     cipher_tag_index;
 } tsip_tls13_handle_t;
 
-/* The work area for firmware update */
-typedef struct tsip_firmware_generate_mac_resume_handle
-{
-    uint32_t iLoop;
-    uint32_t counter;
-    uint32_t previous_counter;
-    bool     use_resume_flag;
-} tsip_firmware_generate_mac_resume_handle_t;
-
-/* The callback function pointer type for R_TSIP_GenerateFirmwareMAC */
-typedef void (*TSIP_GEN_MAC_CB_FUNC_T) (TSIP_FW_CB_REQ_TYPE req_type, uint32_t iLoop, uint32_t *counter,
-        uint32_t *InData_UpProgram, uint32_t *OutData_Program, uint32_t MAX_CNT);
-
 /**********************************************************************************************************************
  External global variables
  *********************************************************************************************************************/
@@ -934,11 +910,14 @@ e_tsip_err_t R_TSIP_UpdateSha1HmacKeyIndex(uint8_t *iv, uint8_t *encrypted_key, 
 e_tsip_err_t R_TSIP_UpdateSha256HmacKeyIndex(uint8_t *iv, uint8_t *encrypted_key, tsip_hmac_sha_key_index_t *key_index);
 
 e_tsip_err_t R_TSIP_StartUpdateFirmware(void);
-e_tsip_err_t R_TSIP_GenerateFirmwareMAC(uint32_t *InData_KeyIndex, uint32_t *InData_SessionKey,
-        uint32_t *InData_UpProgram, uint32_t *InData_IV, uint32_t *OutData_Program, uint32_t MAX_CNT,
-        TSIP_GEN_MAC_CB_FUNC_T p_callback,
-        tsip_firmware_generate_mac_resume_handle_t *tsip_firmware_generate_mac_resume_handle);
-e_tsip_err_t R_TSIP_VerifyFirmwareMAC(uint32_t *InData_Program, uint32_t MAX_CNT, uint32_t *InData_MAC);
+e_tsip_err_t R_TSIP_GenerateFirmwareMACInit(uint32_t *wrapped_key_encryption_key,
+        uint8_t *encrypted_image_encryption_key, uint8_t *initial_vector);
+e_tsip_err_t R_TSIP_GenerateFirmwareMACUpdate(uint8_t *input, uint8_t *output, uint32_t input_length);
+e_tsip_err_t R_TSIP_GenerateFirmwareMACFinal(uint8_t *input, uint8_t *input_mac, uint8_t *output, uint8_t *output_mac,
+        uint32_t input_length);
+e_tsip_err_t R_TSIP_VerifyFirmwareMACInit(void);
+e_tsip_err_t R_TSIP_VerifyFirmwareMACUpdate(uint8_t *input, uint32_t input_length);
+e_tsip_err_t R_TSIP_VerifyFirmwareMACFinal(uint8_t *input, uint8_t *mac, uint32_t input_length);
 
 e_tsip_err_t R_TSIP_Aes128EcbEncryptInit(tsip_aes_handle_t *handle, tsip_aes_key_index_t *key_index);
 e_tsip_err_t R_TSIP_Aes128EcbEncryptUpdate(tsip_aes_handle_t *handle, uint8_t *plain, uint8_t *cipher,
@@ -1131,10 +1110,22 @@ e_tsip_err_t R_TSIP_RsaesPkcs1024Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_b
         tsip_rsa1024_public_key_index_t *key_index);
 e_tsip_err_t R_TSIP_RsaesPkcs1024Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_byte_data_t *plain,
         tsip_rsa1024_private_key_index_t *key_index);
+e_tsip_err_t R_TSIP_RsaesOaep1024Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_byte_data_t *cipher,
+        tsip_rsa1024_public_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length);
+e_tsip_err_t R_TSIP_RsaesOaep1024Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_byte_data_t *plain,
+        tsip_rsa1024_private_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length);
 e_tsip_err_t R_TSIP_RsaesPkcs2048Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_byte_data_t *cipher,
         tsip_rsa2048_public_key_index_t *key_index);
 e_tsip_err_t R_TSIP_RsaesPkcs2048Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_byte_data_t *plain,
         tsip_rsa2048_private_key_index_t *key_index);
+e_tsip_err_t R_TSIP_RsaesOaep2048Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_byte_data_t *cipher,
+        tsip_rsa2048_public_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length);
+e_tsip_err_t R_TSIP_RsaesOaep2048Decrypt(tsip_rsa_byte_data_t *cipher, tsip_rsa_byte_data_t *plain,
+        tsip_rsa2048_private_key_index_t *key_index, uint8_t hash_type, uint8_t mgf_hash_type, uint8_t * label,
+        uint32_t label_length);
 e_tsip_err_t R_TSIP_RsaesPkcs3072Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_byte_data_t *cipher,
         tsip_rsa3072_public_key_index_t *key_index);
 e_tsip_err_t R_TSIP_RsaesPkcs4096Encrypt(tsip_rsa_byte_data_t *plain, tsip_rsa_byte_data_t *cipher,
@@ -1216,7 +1207,7 @@ e_tsip_err_t R_TSIP_TlsSVGeneratePreMasterSecretWithEccP256Key(uint32_t *ecdh_pu
 e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecret(uint32_t select_cipher_suite, uint32_t *tsip_pre_master_secret,
         uint8_t *digest, uint32_t *extended_master_secret);
 e_tsip_err_t R_TSIP_TlsSVCertificateVerifyVerification(uint32_t *key_index,
-        e_tsip_tls_signature_scheme_type_t signature_scheme, uint8_t *handshake_massage, uint32_t handshake_massage_len,
+        e_tsip_tls_signature_scheme_type_t signature_scheme, uint8_t *handshake_message, uint32_t handshake_message_len,
         uint8_t *certificate_verify, uint32_t certificate_verify_len);
 
 e_tsip_err_t R_TSIP_EcdsaP192SignatureGenerate(tsip_ecdsa_byte_data_t *message_hash, tsip_ecdsa_byte_data_t *signature,
@@ -1248,6 +1239,11 @@ e_tsip_err_t R_TSIP_EcdhP256CalculateSharedSecretIndex(tsip_ecdh_handle_t *handl
 e_tsip_err_t R_TSIP_EcdhP256KeyDerivation(tsip_ecdh_handle_t *handle, tsip_ecdh_key_index_t *shared_secret_index,
         uint32_t key_type, uint32_t kdf_type, uint8_t *other_info, uint32_t other_info_length,
         tsip_hmac_sha_key_index_t *salt_key_index, tsip_aes_key_index_t *key_index);
+e_tsip_err_t R_TSIP_EcdhP256SshKeyDerivation(tsip_ecdh_handle_t *handle, tsip_ecdh_key_index_t *shared_secret_index,
+        uint32_t key_type, uint8_t *other_info, uint32_t other_info_length,
+        tsip_aes_key_index_t *client_write_key_index, tsip_aes_key_index_t *server_write_key_index,
+        tsip_aes_key_index_t *client_mac_key_index, tsip_aes_key_index_t *server_mac_key_index, uint8_t *client_iv,
+        uint8_t *server_iv);
 
 e_tsip_err_t R_TSIP_EcdheP512KeyAgreement(tsip_aes_key_index_t *key_index, uint8_t *receiver_public_key,
         uint8_t *sender_public_key);

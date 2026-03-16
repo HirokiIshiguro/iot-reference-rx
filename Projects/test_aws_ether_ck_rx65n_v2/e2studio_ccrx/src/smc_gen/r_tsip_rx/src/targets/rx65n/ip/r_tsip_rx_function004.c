@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -75,7 +64,7 @@
 * @param[in]     ARG1
 * @note          None
 */
-void RX65NHU_func004(uint32_t ARG1)
+void RX65NHU_func004(const uint32_t* ARG1)
 {
     int32_t iLoop = 0u, jLoop = 0u, kLoop = 0u, oLoop1 = 0u, oLoop2 = 0u, iLoop2 = 0u;
     uint32_t KEY_ADR = 0u, OFS_ADR = 0u;
@@ -116,19 +105,19 @@ void RX65NHU_func004(uint32_t ARG1)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[68+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[68+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[68+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[68+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[68];
+    TSIP.REG_100H.WORD = ARG1[69];
+    TSIP.REG_100H.WORD = ARG1[70];
+    TSIP.REG_100H.WORD = ARG1[71];
     /* WAIT_LOOP */
     while (1u != TSIP.REG_104H.BIT.B31)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[72+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[72+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[72+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[72+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[72];
+    TSIP.REG_100H.WORD = ARG1[73];
+    TSIP.REG_100H.WORD = ARG1[74];
+    TSIP.REG_100H.WORD = ARG1[75];
     TSIP.REG_00H.WORD = 0x00003223u;
     TSIP.REG_2CH.WORD = 0x00000015u;
     /* WAIT_LOOP */
@@ -142,19 +131,19 @@ void RX65NHU_func004(uint32_t ARG1)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[76+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[76+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[76+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[76+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[76];
+    TSIP.REG_100H.WORD = ARG1[77];
+    TSIP.REG_100H.WORD = ARG1[78];
+    TSIP.REG_100H.WORD = ARG1[79];
     /* WAIT_LOOP */
     while (1u != TSIP.REG_104H.BIT.B31)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[80+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[80+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[80+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[80+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[80];
+    TSIP.REG_100H.WORD = ARG1[81];
+    TSIP.REG_100H.WORD = ARG1[82];
+    TSIP.REG_100H.WORD = ARG1[83];
     TSIP.REG_00H.WORD = 0x00003223u;
     TSIP.REG_2CH.WORD = 0x0000009au;
     /* WAIT_LOOP */
@@ -168,19 +157,19 @@ void RX65NHU_func004(uint32_t ARG1)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[84+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[84+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[84+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[84+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[84];
+    TSIP.REG_100H.WORD = ARG1[85];
+    TSIP.REG_100H.WORD = ARG1[86];
+    TSIP.REG_100H.WORD = ARG1[87];
     /* WAIT_LOOP */
     while (1u != TSIP.REG_104H.BIT.B31)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[88+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[88+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[88+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[88+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[88];
+    TSIP.REG_100H.WORD = ARG1[89];
+    TSIP.REG_100H.WORD = ARG1[90];
+    TSIP.REG_100H.WORD = ARG1[91];
     TSIP.REG_00H.WORD = 0x00003223u;
     TSIP.REG_2CH.WORD = 0x0000001du;
     /* WAIT_LOOP */
@@ -194,19 +183,19 @@ void RX65NHU_func004(uint32_t ARG1)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[92+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[92+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[92+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[92+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[92];
+    TSIP.REG_100H.WORD = ARG1[93];
+    TSIP.REG_100H.WORD = ARG1[94];
+    TSIP.REG_100H.WORD = ARG1[95];
     /* WAIT_LOOP */
     while (1u != TSIP.REG_104H.BIT.B31)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[96+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[96+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[96+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[96+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[96];
+    TSIP.REG_100H.WORD = ARG1[97];
+    TSIP.REG_100H.WORD = ARG1[98];
+    TSIP.REG_100H.WORD = ARG1[99];
     TSIP.REG_00H.WORD = 0x00003223u;
     TSIP.REG_2CH.WORD = 0x0000009du;
     /* WAIT_LOOP */
@@ -220,19 +209,19 @@ void RX65NHU_func004(uint32_t ARG1)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[100+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[100+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[100+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[100+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[100];
+    TSIP.REG_100H.WORD = ARG1[101];
+    TSIP.REG_100H.WORD = ARG1[102];
+    TSIP.REG_100H.WORD = ARG1[103];
     /* WAIT_LOOP */
     while (1u != TSIP.REG_104H.BIT.B31)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[104+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[104+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[104+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[104+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[104];
+    TSIP.REG_100H.WORD = ARG1[105];
+    TSIP.REG_100H.WORD = ARG1[106];
+    TSIP.REG_100H.WORD = ARG1[107];
     TSIP.REG_00H.WORD = 0x00003223u;
     TSIP.REG_2CH.WORD = 0x00000014u;
     /* WAIT_LOOP */
@@ -246,19 +235,19 @@ void RX65NHU_func004(uint32_t ARG1)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[108+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[108+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[108+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[108+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[108];
+    TSIP.REG_100H.WORD = ARG1[109];
+    TSIP.REG_100H.WORD = ARG1[110];
+    TSIP.REG_100H.WORD = ARG1[111];
     /* WAIT_LOOP */
     while (1u != TSIP.REG_104H.BIT.B31)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[112+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[112+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[112+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[112+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[112];
+    TSIP.REG_100H.WORD = ARG1[113];
+    TSIP.REG_100H.WORD = ARG1[114];
+    TSIP.REG_100H.WORD = ARG1[115];
     TSIP.REG_00H.WORD = 0x00003223u;
     TSIP.REG_2CH.WORD = 0x0000001au;
     /* WAIT_LOOP */
@@ -274,10 +263,10 @@ void RX65NHU_func004(uint32_t ARG1)
     {
         /* waiting */
     }
-    TSIP.REG_100H.WORD = S_FLASH[116+ARG1 + 0];
-    TSIP.REG_100H.WORD = S_FLASH[116+ARG1 + 1];
-    TSIP.REG_100H.WORD = S_FLASH[116+ARG1 + 2];
-    TSIP.REG_100H.WORD = S_FLASH[116+ARG1 + 3];
+    TSIP.REG_100H.WORD = ARG1[116];
+    TSIP.REG_100H.WORD = ARG1[117];
+    TSIP.REG_100H.WORD = ARG1[118];
+    TSIP.REG_100H.WORD = ARG1[119];
     TSIP.REG_C4H.WORD = 0x00800c45u;
     TSIP.REG_00H.WORD = 0x00002213u;
     /* WAIT_LOOP */
@@ -288,5 +277,5 @@ void RX65NHU_func004(uint32_t ARG1)
     TSIP.REG_1CH.WORD = 0x00001800u;
 }
 /**********************************************************************************************************************
- End of function ./input_dir/RX65NHU/RX65NHU_func004.prc
+ End of function ./input_dir/RX65NHU/RX65NHU_func004_r1.prc
  *********************************************************************************************************************/

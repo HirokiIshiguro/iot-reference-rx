@@ -122,15 +122,6 @@
 			</matcher>
 		</filter>
 		<filter>
-			<id>1725506698775</id>
-			<name>Demos/Fleet_Provisioning_With_CSR_Demo</name>
-			<type>5</type>
-			<matcher>
-				<id>org.eclipse.ui.ide.multiFilter</id>
-				<arguments>1.0-name-matches-false-true-pkcs11_operations.c|pkcs11_operations.h</arguments>
-			</matcher>
-		</filter>
-		<filter>
 			<id>1724230921481</id>
 			<name>Demos/dev_mode_key_provisioning</name>
 			<type>10</type>
@@ -149,12 +140,12 @@
 			</matcher>
 		</filter>
 		<filter>
-			<id>1737105409983</id>
+			<id>1757561227871</id>
 			<name>Middleware/AWS</name>
 			<type>9</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
-				<arguments>1.0-name-matches-false-true-aws-iot-core-mqtt-file-streams-embedded-c|Jobs-for-AWS-IoT-embedded-sdk</arguments>
+				<arguments>1.0-name-matches-false-true-aws-iot-core-mqtt-file-streams-embedded-c|Jobs-for-AWS-IoT-embedded-sdk|Fleet-Provisioning-for-AWS-IoT-embedded-sdk</arguments>
 			</matcher>
 		</filter>
 		<filter>
@@ -263,6 +254,24 @@
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
 				<arguments>1.0-name-matches-false-true-mbedtls_bio_freertos_plus_cellular.c|mbedtls_bio_tcp_sockets_wrapper.h|mbedtls_freertos_port.c</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1757561245481</id>
+			<name>Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk</name>
+			<type>9</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-false-source</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1757561245486</id>
+			<name>Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-false-*</arguments>
 			</matcher>
 		</filter>
 		<filter>
@@ -446,6 +455,15 @@
 			</matcher>
 		</filter>
 		<filter>
+			<id>1756979337298</id>
+			<name>Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c/source</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-false-MQTTFileDownloader_cbor.c</arguments>
+			</matcher>
+		</filter>
+		<filter>
 			<id>1724227467715</id>
 			<name>Middleware/FreeRTOS/FreeRTOS-Kernel/portable</name>
 			<type>9</type>
@@ -470,6 +488,15 @@
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
 				<arguments>1.0-name-matches-false-false-cellular_ryz014a</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1762745157287</id>
+			<name>Test/FreeRTOS-Libraries-Integration-Tests/src/pkcs11</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-core_pkcs11_test.c</arguments>
 			</matcher>
 		</filter>
 		<filter>

@@ -26,11 +26,54 @@
 #include "r_fwup_wrap_com.h"
 
 /* User-defined wrapper functions */
-e_fwup_err_t ota_flash_open_function(void);
-void ota_flash_close_function(void);
-e_fwup_err_t ota_flash_erase_function(uint32_t addr, uint32_t num_blocks);
-e_fwup_err_t ota_flash_write_function(uint32_t src_addr, uint32_t dest_addr, uint32_t num_bytes);
-e_fwup_err_t ota_flash_read_function(uint32_t buf_addr, uint32_t src_addr, uint32_t size);
-e_fwup_err_t ota_bank_swap_function(void);
+/**********************************************************************************************************************
+ * Function Name: ota_flash_open_function
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+e_fwup_err_t ota_flash_open_function (void);
+
+/**********************************************************************************************************************
+ * Function Name: ota_flash_close_function
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+void ota_flash_close_function (void);
+
+/**********************************************************************************************************************
+ * Function Name: ota_flash_erase_function
+ * Description  : .
+ * Arguments    : addr
+ *              : num_blocks
+ * Return Value : .
+ *********************************************************************************************************************/
+e_fwup_err_t ota_flash_erase_function (uint32_t addr, uint32_t num_blocks);
+
+/**********************************************************************************************************************
+ * Function Name: ota_flash_write_function
+ * Description  : .
+ * Arguments    : src_addr
+ *              : dest_addr
+ *              : num_bytes
+ * Return Value : .
+ *********************************************************************************************************************/
+e_fwup_err_t ota_flash_write_function (uint32_t src_addr, uint32_t dest_addr, uint32_t num_bytes);
+
+/**********************************************************************************************************************
+ * Function Name: ota_flash_read_function
+ * Description  : .
+ * Arguments    : buf_addr
+ *              : src_addr
+ *              : size
+ * Return Value : .
+ *********************************************************************************************************************/
+e_fwup_err_t ota_flash_read_function (uint32_t buf_addr, uint32_t src_addr, uint32_t size);
+
+/**********************************************************************************************************************
+ * Function Name: ota_bank_swap_function
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+e_fwup_err_t ota_bank_swap_function (void);
 
 #endif /* APPLICATION_CODE_OTA_FWUP_WRAP_CODE_OTA_FWUP_WRAP_FLASH_H_ */

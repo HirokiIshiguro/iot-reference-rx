@@ -261,6 +261,10 @@
 /* #define UNITY_PTR_ATTRIBUTE __attribute__((far)) */
 /* #define UNITY_PTR_ATTRIBUTE near */
 
+void TEST_CacheResult( char cResult );
+void TEST_SubmitResultBuffer( void );
+void TEST_NotifyTestStart( void );
+void TEST_NotifyTestFinished( void );
 
 /* Redirect output to print task. */
 #ifndef UNITY_OUTPUT_CHAR

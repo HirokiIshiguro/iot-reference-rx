@@ -6,7 +6,6 @@ MEMORY
 	ROM : ORIGIN = 0xFFF00000, LENGTH = 1048576
 	OFS : ORIGIN = 0xFE7F5D00, LENGTH = 128
 }
-
 SECTIONS
 {
 	.exvectors 0xFFFFFF80: AT(0xFFFFFF80)
@@ -15,12 +14,11 @@ SECTIONS
 		KEEP(*(.exvectors))
 		"_exvectors_end" = .;
 	} >ROM
-
 	.fvectors 0xFFFFFFFC: AT(0xFFFFFFFC)
 	{
 		KEEP(*(.fvectors))
 	} > ROM
-
+	
 	.text 0xFFF35200 : AT(0xFFF35200)
 	{
 		*(.text)
@@ -32,14 +30,12 @@ SECTIONS
 		KEEP(*(.text.*interrupt))
 		etext = .;
 	} > ROM
-
 	.rvectors ALIGN(4):
 	{
 		_rvectors_start = .;
 		INCLUDE ../src/smc_gen/r_bsp/mcu/all/linker_script_rvectors.inc
 		_rvectors_end = .;
 	} > ROM
-
 	.init :
 	{
 		KEEP(*(.init))
@@ -55,18 +51,16 @@ SECTIONS
 		KEEP(*(SORT(.fini_array.*)))
 		__fini_array_end = .;
 	} > ROM
-
 	.fini :
 	{
 		KEEP(*(.fini))
 	} > ROM
-
 	.got :
 	{
 		*(.got)
 		*(.got.plt)
 	} > ROM
-
+	
 	.rodata 0xFFF00300: AT(0xFFF00300)
 	{
 		*(.rodata)
@@ -76,18 +70,15 @@ SECTIONS
 		*(C)
 		_erodata = .;
 	} > ROM
-
 	gcc_exceptions_table :
 	{
 		KEEP (*(.gcc_except_table))
 		*(.gcc_except_table.*)
 	} > ROM
-
 	.eh_frame_hdr :
 	{
 		*(.eh_frame_hdr)
 	} > ROM
-
 	.eh_frame :
 	{
 		*(.eh_frame)
@@ -96,7 +87,6 @@ SECTIONS
 	{
 		*(.jcr)
 	} > ROM
-
 	.tors :
 	{
 		__CTOR_LIST__ = .;
@@ -114,14 +104,12 @@ SECTIONS
 		_mdata = .; 
 		. += _edata - _data;
 	} > ROM
-
 	.pfram2 ALIGN(4):
 	{ 
 		_PFRAM2_start = .;
 		. += _RPFRAM2_end - _RPFRAM2_start;
 		_PFRAM2_end = .;
 	} > ROM
-
 	.data : AT(_mdata)
 	{
 		_data = .;
@@ -132,7 +120,6 @@ SECTIONS
 		*(D_2)
 		_edata = .;
 	} > RAM
-
 	.rpfram2 ALIGN(4): AT(_PFRAM2_start)
 	{ 
 		_RPFRAM2_start = .;
@@ -140,8 +127,7 @@ SECTIONS
 		. = ALIGN(4);
 		_RPFRAM2_end = .;
 	} > RAM
-
-	   .data_exram : AT(LOADADDR(.data)+(_edata - _data))
+	.data_exram : AT(LOADADDR(.data)+(_edata - _data))
 	{
 		PROVIDE( _mdata_exram = LOADADDR(.data_exram) );
 		_data_exram = .;
@@ -150,11 +136,9 @@ SECTIONS
 		. = ALIGN(2);
 		_edata_exram = .;
 	} > RAM2
-
 	.bss :
 	{
 		_bss = .;
-		*MqttDemoExample.o(.bss.**)
 		*(COMMON)
 		*(B)
 		*(B_1)
@@ -163,7 +147,6 @@ SECTIONS
 		. = ALIGN(128);
 		_end = .;
 	} >RAM AT>RAM
-	
 	.bss_exram :
 	{
 		_bss_exram = .;
@@ -172,14 +155,12 @@ SECTIONS
 		_ebss_exram = .;
 		_end = .;
 	} > RAM2 AT>RAM2
-	
 	C_LITTLEFS_MANAGEMENT_AREA 0x00100000 : AT(0x00100000)
 	{
 	} >DATAFLASH
 	C_USER_APPLICATION_AREA 0x00102300 : AT(0x00102300)
 	{
-	} >DATAFLASH        
-	
+	} >DATAFLASH
 	.ofs1 0xFE7F5D00: AT(0xFE7F5D00)
 	{
 		KEEP(*(.ofs1))
@@ -217,19 +198,19 @@ SECTIONS
 		. += 0x100;
 		"_r_bsp_NULL_end" = .;
 	} >RAM AT>RAM
-.r_bsp_istack ALIGN(0x4) (NOLOAD) :
+	.r_bsp_istack ALIGN(0x4) (NOLOAD) :
 	{
 		KEEP(*(.r_bsp_istack))
 	} >RAM AT>RAM
-.istack :
+	.istack :
 	{
 		"_istack" = .;
 	} >RAM
-.r_bsp_ustack ALIGN(0x4) (NOLOAD) :
+	.r_bsp_ustack ALIGN(0x4) (NOLOAD) :
 	{
 		KEEP(*(.r_bsp_ustack))
 	} >RAM AT>RAM
-.ustack :
+	.ustack :
 	{
 		"_ustack" = .;
 	} >RAM

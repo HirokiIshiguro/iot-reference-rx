@@ -18,7 +18,7 @@
 
 
 /* Function Name: r_tsip_key_write */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Writing TSIP key index information
  * @param[in] key KVS Key type
  * @param[in] wrKey Pointer to the key data to be copied into the cache.
@@ -45,7 +45,7 @@ BaseType_t r_tsip_key_write(KVStoreKey_t key, char * wrKey, uint32_t keySize)
 **********************************************************************************************************************/
 
 /* Function Name: r_tsip_key_read */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Reading TSIP key index information
  * @param[in] key KVS Key type
  * @param[in] rdKey Pointer to the key data to be copied into the cache.

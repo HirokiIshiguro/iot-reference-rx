@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -265,8 +267,9 @@ CK_RV PKCS11_PAL_GetObjectValue(CK_OBJECT_HANDLE xHandle,
         lfs_ret = lfs_file_size(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
 
         *ppucData = pvPortMalloc((size_t)lfs_ret);
+        configASSERT(ppucData);
 
-        if ((lfs_ret >= 0) && (NULL != *ppucData))
+        if ((lfs_ret >= 0) && (NULL != (*ppucData)))
         {
             lfs_ret = lfs_file_read(&RM_STDIO_LITTLEFS_CFG_LFS, &file, *ppucData, (lfs_size_t)lfs_ret);
 
@@ -311,6 +314,7 @@ void PKCS11_PAL_GetObjectValueCleanup(CK_BYTE_PTR pucData, CK_ULONG ulDataSize)
     (void)ulDataSize;
 
     vPortFree(pucData);
+    pucData = NULL;
 }
 /*****************************************************************************************
 End of function PKCS11_PAL_GetObjectValueCleanup

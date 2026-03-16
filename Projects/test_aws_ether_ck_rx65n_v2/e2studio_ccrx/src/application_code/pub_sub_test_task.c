@@ -2,6 +2,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -51,53 +53,45 @@
 /* MQTT agent task API. */
 #include "mqtt_agent_task.h"
 
-
-/**
- * @brief A test application which loops through subscribing to a topic and publishing message
- * to a topic. This test application can be used with AWS IoT device advisor test suite to
- * verify that an application implemented using MQTT agent follows best practices in connecting
- * to AWS IoT core.
- */
-#define configMS_TO_WAIT_FOR_NOTIFICATION            ( 10000 )
+#define configMS_TO_WAIT_FOR_NOTIFICATION (10000)
 
 /**
  * @brief Delay for the synchronous publisher task between publishes.
  */
-#define configDELAY_BETWEEN_PUBLISH_OPERATIONS_MS    ( 2000U )
+#define configDELAY_BETWEEN_PUBLISH_OPERATIONS_MS (2000U)
 
 /**
  * @brief The maximum amount of time in milliseconds to wait for the commands
  * to be posted to the MQTT agent should the MQTT agent's command queue be full.
  * Tasks wait in the Blocked state, so don't use any CPU time.
  */
-#define configMAX_COMMAND_SEND_BLOCK_TIME_MS         ( 500 )
+#define configMAX_COMMAND_SEND_BLOCK_TIME_MS (500)
 
 /**
  * @brief Size of statically allocated buffers for holding payloads.
  */
-#define confgPAYLOAD_BUFFER_LENGTH                   ( 100 )
+#define confgPAYLOAD_BUFFER_LENGTH (100)
 
 /**
  * @brief Format of topic used to publish outgoing messages.
  */
-#define configPUBLISH_TOPIC_FORMAT                   "mqtt_test/outgoing"
+#define configPUBLISH_TOPIC_FORMAT "mqtt_test/outgoing"
 
 /**
  * @brief Size of the static buffer to hold the topic name.
  */
-#define configPUBLISH_TOPIC_BUFFER_LENGTH            ( sizeof( configPUBLISH_TOPIC_FORMAT ) - 1 )
-
+#define configPUBLISH_TOPIC_BUFFER_LENGTH (sizeof(configPUBLISH_TOPIC_FORMAT) - 1)
 
 /**
  * @brief Format of topic used to subscribe to incoming messages.
  *
  */
-#define configSUBSCRIBE_TOPIC_FORMAT           "mqtt_test/incoming"
+#define configSUBSCRIBE_TOPIC_FORMAT "mqtt_test/incoming"
 
 /**
  * @brief Size of the static buffer to hold the topic name.
  */
-#define configSUBSCRIBE_TOPIC_BUFFER_LENGTH    ( sizeof( configSUBSCRIBE_TOPIC_FORMAT ) - 1 )
+#define configSUBSCRIBE_TOPIC_BUFFER_LENGTH (sizeof(configSUBSCRIBE_TOPIC_FORMAT) - 1)
 
 /*-----------------------------------------------------------*/
 
@@ -108,15 +102,15 @@
 struct MQTTAgentCommandContext
 {
     TaskHandle_t xTaskToNotify;
-    void        *pArgs;
+    void *pArgs;
 };
 
 /*-----------------------------------------------------------*/
 
- /**
-  * @brief The MQTT agent manages the MQTT contexts.  This set the handle to the
-  * context used by this demo.
-  */
+/**
+ * @brief The MQTT agent manages the MQTT contexts.  This set the handle to the
+ * context used by this demo.
+ */
 extern MQTTAgentContext_t xGlobalMqttAgentContext;
 
 /*-----------------------------------------------------------*/
@@ -135,8 +129,8 @@ extern MQTTAgentContext_t xGlobalMqttAgentContext;
  * @param[in] pxCommandContext Context of the initial command.
  * @param[in].xReturnStatus The result of the command.
  */
-static void prvSubscribeCommandCallback (MQTTAgentCommandContext_t * pxCommandContext,
-                                            MQTTAgentReturnInfo_t * pxReturnInfo);
+static void prvSubscribeCommandCallback (MQTTAgentCommandContext_t *pxCommandContext,
+                                         MQTTAgentReturnInfo_t *pxReturnInfo);
 
 /**
  * @brief Passed into MQTTAgent_Publish() as the callback to execute when the
@@ -152,8 +146,8 @@ static void prvSubscribeCommandCallback (MQTTAgentCommandContext_t * pxCommandCo
  * @param[in] pxCommandContext Context of the initial command.
  * @param[in].xReturnStatus The result of the command.
  */
-static void prvPublishCommandCallback (MQTTAgentCommandContext_t * pxCommandContext,
-                                        MQTTAgentReturnInfo_t * pxReturnInfo);
+static void prvPublishCommandCallback (MQTTAgentCommandContext_t *pxCommandContext,
+                                       MQTTAgentReturnInfo_t *pxReturnInfo);
 
 /**
  * @brief Passed into MQTTAgent_Subscribe() as the callback to execute when
@@ -166,8 +160,8 @@ static void prvPublishCommandCallback (MQTTAgentCommandContext_t * pxCommandCont
  * @param[in] pvIncomingPublishCallbackContext Context of the initial command.
  * @param[in] pxPublishInfo Deserialized publish.
  */
-static void prvIncomingPublishCallback (void * pvIncomingPublishCallbackContext,
-                                        MQTTPublishInfo_t * pxPublishInfo);
+static void prvIncomingPublishCallback (void *pvIncomingPublishCallbackContext,
+                                        MQTTPublishInfo_t *pxPublishInfo);
 
 /**
  * @brief Subscribe to the topic the demo task will also publish to - that
@@ -179,9 +173,7 @@ static void prvIncomingPublishCallback (void * pvIncomingPublishCallbackContext,
  * does not support QoS2.
  */
 static MQTTStatus_t prvSubscribeToTopic (MQTTQoS_t xQoS,
-                                            char * pcTopicFilter);
-
-
+                                         char *pcTopicFilter);
 
 /**
  * @brief Publishes the given payload using the given qos to the topic provided.
@@ -199,16 +191,16 @@ static MQTTStatus_t prvSubscribeToTopic (MQTTQoS_t xQoS,
  * @param[in] xPayloadLength Length of the payload blob to be published.
  */
 static MQTTStatus_t prvPublishToTopic (MQTTQoS_t xQoS,
-                                        char * pcTopic,
-                                        uint8_t * pucPayload,
-                                        size_t xPayloadLength);
+                                       char *pcTopic,
+                                       uint8_t *pucPayload,
+                                       size_t xPayloadLength);
 
 /**
  * @brief The function that implements the task demonstrated by this file.
  *
  * @param pvParameters The parameters to the task.
  */
-void vSubscribePublishTestTask (void * pvParameters);
+void vSubscribePublishTestTask (void *pvParameters);
 
 /*-----------------------------------------------------------*/
 
@@ -225,8 +217,8 @@ void vSubscribePublishTestTask (void * pvParameters);
  *              : pxReturnInfo        The result of the command.
  * Return Value : .
  *********************************************************************************************************************/
-static void prvPublishCommandCallback(MQTTAgentCommandContext_t * pxCommandContext,
-                                        MQTTAgentReturnInfo_t * pxReturnInfo)
+static void prvPublishCommandCallback(MQTTAgentCommandContext_t *pxCommandContext,
+                                      MQTTAgentReturnInfo_t *pxReturnInfo)
 {
     if (NULL != pxCommandContext->xTaskToNotify)
     {
@@ -254,11 +246,11 @@ End of function prvPublishCommandCallback
  *              : pxReturnInfo        The result of the command.
  * Return Value : .
  *********************************************************************************************************************/
-static void prvSubscribeCommandCallback(MQTTAgentCommandContext_t * pxCommandContext,
-                                        MQTTAgentReturnInfo_t * pxReturnInfo)
+static void prvSubscribeCommandCallback(MQTTAgentCommandContext_t *pxCommandContext,
+                                        MQTTAgentReturnInfo_t *pxReturnInfo)
 {
     BaseType_t xSubscriptionAdded;
-    MQTTAgentSubscribeArgs_t * pxSubscribeArgs = (MQTTAgentSubscribeArgs_t *) pxCommandContext->pArgs;
+    MQTTAgentSubscribeArgs_t *pxSubscribeArgs = (MQTTAgentSubscribeArgs_t *)pxCommandContext->pArgs;
 
     /* Check if the subscribe operation is a success. Only one topic is
      * subscribed by this demo. */
@@ -276,7 +268,7 @@ static void prvSubscribeCommandCallback(MQTTAgentCommandContext_t * pxCommandCon
     }
 
     xTaskNotify(pxCommandContext->xTaskToNotify,
-                (uint32_t) (pxReturnInfo->returnCode),
+                (uint32_t)(pxReturnInfo->returnCode),
                 eSetValueWithOverwrite);
 }
 /*****************************************************************************************
@@ -294,12 +286,12 @@ End of function prvSubscribeCommandCallback
  *                pxPublishInfo Deserialized publish.
  * Return Value : .
  *********************************************************************************************************************/
-static void prvIncomingPublishCallback(void * pvIncomingPublishCallbackContext,
-                                        MQTTPublishInfo_t * pxPublishInfo)
+static void prvIncomingPublishCallback(void *pvIncomingPublishCallbackContext,
+                                       MQTTPublishInfo_t *pxPublishInfo)
 {
     static char cTerminatedString[confgPAYLOAD_BUFFER_LENGTH];
 
-    (void) pvIncomingPublishCallbackContext;
+    (void)pvIncomingPublishCallbackContext;
 
     /* Create a message that contains the incoming MQTT payload to the logger,
      * terminating the string first. */
@@ -334,14 +326,14 @@ End of function prvIncomingPublishCallback
  * Return Value : .
  *********************************************************************************************************************/
 static MQTTStatus_t prvSubscribeToTopic(MQTTQoS_t xQoS,
-                                        char * pcTopicFilter)
+                                        char *pcTopicFilter)
 {
     MQTTStatus_t xMQTTStatus;
     BaseType_t xNotifyStatus = pdFALSE;
     MQTTAgentSubscribeArgs_t xSubscribeArgs;
     MQTTSubscribeInfo_t xSubscribeInfo;
-    MQTTAgentCommandContext_t xCommandContext = { 0UL };
-    MQTTAgentCommandInfo_t xCommandParams = { 0UL };
+    MQTTAgentCommandContext_t xCommandContext = {0UL};
+    MQTTAgentCommandInfo_t xCommandParams = {0UL};
     uint32_t ulNotifiedValue = 0UL;
 
     xTaskNotifyStateClear(NULL);
@@ -358,11 +350,11 @@ static MQTTStatus_t prvSubscribeToTopic(MQTTQoS_t xQoS,
      * This gets updated in the callback function so the variable must persist until
      * the callback executes. */
     xCommandContext.xTaskToNotify = xTaskGetCurrentTaskHandle();
-    xCommandContext.pArgs = (void *) &xSubscribeArgs;
+    xCommandContext.pArgs = (void *)&xSubscribeArgs;
 
     xCommandParams.blockTimeMs = configMAX_COMMAND_SEND_BLOCK_TIME_MS;
     xCommandParams.cmdCompleteCallback = prvSubscribeCommandCallback;
-    xCommandParams.pCmdCompleteCallbackContext = (void *) &xCommandContext;
+    xCommandParams.pCmdCompleteCallbackContext = (void *)&xCommandContext;
 
     /* Loop in case the queue used to communicate with the MQTT agent is full and
      * attempts to post to it time out.  The queue will not become full if the
@@ -371,8 +363,8 @@ static MQTTStatus_t prvSubscribeToTopic(MQTTQoS_t xQoS,
     do
     {
         xMQTTStatus = MQTTAgent_Subscribe(&xGlobalMqttAgentContext,
-                                            &xSubscribeArgs,
-                                            &xCommandParams);
+                                          &xSubscribeArgs,
+                                          &xCommandParams);
 
         if (MQTTSuccess == xMQTTStatus)
         {
@@ -383,7 +375,7 @@ static MQTTStatus_t prvSubscribeToTopic(MQTTQoS_t xQoS,
 
             if (pdTRUE == xNotifyStatus)
             {
-                xMQTTStatus = (MQTTStatus_t) (ulNotifiedValue);
+                xMQTTStatus = (MQTTStatus_t)(ulNotifiedValue);
             }
             else
             {
@@ -398,7 +390,6 @@ static MQTTStatus_t prvSubscribeToTopic(MQTTQoS_t xQoS,
 End of function prvSubscribeToTopic
 ****************************************************************************************/
 /*-----------------------------------------------------------*/
-
 
 /**********************************************************************************************************************
  * Function Name: prvPublishToTopic
@@ -416,15 +407,15 @@ End of function prvSubscribeToTopic
  * Return Value : .
  *********************************************************************************************************************/
 static MQTTStatus_t prvPublishToTopic(MQTTQoS_t xQoS,
-                                        char * pcTopic,
-                                        uint8_t * pucPayload,
-                                        size_t xPayloadLength)
+                                      char *pcTopic,
+                                      uint8_t *pucPayload,
+                                      size_t xPayloadLength)
 {
-    MQTTPublishInfo_t xPublishInfo = { 0UL };
-    MQTTAgentCommandContext_t xCommandContext = { 0 };
+    MQTTPublishInfo_t xPublishInfo = {0UL};
+    MQTTAgentCommandContext_t xCommandContext = {0};
     MQTTStatus_t xMQTTStatus;
     BaseType_t xNotifyStatus;
-    MQTTAgentCommandInfo_t xCommandParams = { 0UL };
+    MQTTAgentCommandInfo_t xCommandParams = {0UL};
     uint32_t ulNotifiedValue = 0U;
 
     /* Create a unique number of the subscribe that is about to be sent.  The number
@@ -466,7 +457,7 @@ static MQTTStatus_t prvPublishToTopic(MQTTQoS_t xQoS,
 
             if (pdTRUE == xNotifyStatus)
             {
-                xMQTTStatus = (MQTTStatus_t) (ulNotifiedValue);
+                xMQTTStatus = (MQTTStatus_t)(ulNotifiedValue);
             }
             else
             {
@@ -483,14 +474,13 @@ End of function prvPublishToTopic
 
 /*-----------------------------------------------------------*/
 
-
 /**********************************************************************************************************************
  * Function Name: vSubscribePublishTestTask
  * Description  : The function that implements the task demonstrated by this file.
  * Argument     : pvParameters    The parameters to the task.
  * Return Value : .
  *********************************************************************************************************************/
-void vSubscribePublishTestTask(void * pvParameters)
+void vSubscribePublishTestTask(void *pvParameters)
 {
     char cPayloadBuf[confgPAYLOAD_BUFFER_LENGTH];
     size_t xPayloadLength;
@@ -502,72 +492,74 @@ void vSubscribePublishTestTask(void * pvParameters)
     MQTTQoS_t xQoS;
     TickType_t xTicksToDelay;
 
-        configASSERT(xGetMQTTAgentState() != MQTT_AGENT_STATE_NONE);
+    configASSERT(xGetMQTTAgentState() != MQTT_AGENT_STATE_NONE);
 
-        if (xGetMQTTAgentState() != MQTT_AGENT_STATE_CONNECTED)
-        {
-            (void) (xWaitForMQTTAgentState(MQTT_AGENT_STATE_CONNECTED, portMAX_DELAY));
-        }
+    if (xGetMQTTAgentState() != MQTT_AGENT_STATE_CONNECTED)
+    {
+        (void)(xWaitForMQTTAgentState(MQTT_AGENT_STATE_CONNECTED, portMAX_DELAY));
+    }
 
-        LogInfo(("MQTT Agent is connected. Starting the publish subscribe task. "));
+    LogInfo(("MQTT Agent is connected. Starting the publish subscribe task. "));
 
-        xMQTTStatus = prvSubscribeToTopic(MQTTQoS1,
-                                            (char *) configSUBSCRIBE_TOPIC_FORMAT );
+    xMQTTStatus = prvSubscribeToTopic(MQTTQoS1,
+                                      /* Cast to type "char *" to be compatible with parameter type */
+                                      (char *)configSUBSCRIBE_TOPIC_FORMAT);
 
-        if (MQTTSuccess != xMQTTStatus)
-        {
-            LogError(("Failed to subscribe to topic: %s.", configSUBSCRIBE_TOPIC_FORMAT));
-            xStatus = pdFAIL;
+    if (MQTTSuccess != xMQTTStatus)
+    {
+        LogError(("Failed to subscribe to topic: %s.", configSUBSCRIBE_TOPIC_FORMAT));
+        xStatus = pdFAIL;
     }
 
     if (pdPASS == xStatus)
     {
         /* Loop through infinitely. */
-        for ( ; ; )
+        for (;;)
         {
             /* Have different tasks use different QoS.  0 and 1.  2 can also be used
              * if supported by the broker. */
-            xQoS = (MQTTQoS_t) ((ulPublishCount + 1) % 2UL);
-
+            xQoS = (MQTTQoS_t)((ulPublishCount + 1) % 2UL);
 
             /* Create a payload to send with the publish message.  This contains
              * the task name and an incrementing number. */
             xPayloadLength = snprintf(cPayloadBuf,
-                                        confgPAYLOAD_BUFFER_LENGTH,
-                                        "Test message %lu",
-                                        (ulPublishCount + 1));
+                                      confgPAYLOAD_BUFFER_LENGTH,
+                                      "Test message %lu",
+                                      (ulPublishCount + 1));
 
             /* Assert if the buffer length is large enough to hold the message. */
             configASSERT(xPayloadLength <= confgPAYLOAD_BUFFER_LENGTH);
 
             LogInfo(("Sending publish message to topic: %s with qos: %d, message : %*s",
-                        configPUBLISH_TOPIC_FORMAT,
-                        xQoS,
-                        xPayloadLength,
-                        (char *) cPayloadBuf));
+                     configPUBLISH_TOPIC_FORMAT,
+                     xQoS,
+                     xPayloadLength,
+                     (char *)cPayloadBuf));
 
             xMQTTStatus = prvPublishToTopic(xQoS,
-                                            (char *) configPUBLISH_TOPIC_FORMAT,
-                                            (uint8_t *) cPayloadBuf,
+                                            /* Cast to type "char *" to be compatible with parameter type */
+                                            (char *)configPUBLISH_TOPIC_FORMAT,
+                                            /* Cast to type "uint8_t*" to be compatible with parameter type */
+                                            (uint8_t *)cPayloadBuf,
                                             xPayloadLength);
 
             if (MQTTSuccess == xMQTTStatus)
             {
                 ulSuccessCount++;
                 LogInfo(("Successfully sent QoS %u publish to topic: %s (PassCount:%d, FailCount:%d).",
-                            xQoS,
-                            configPUBLISH_TOPIC_FORMAT,
-                            ulSuccessCount,
-                            ulFailCount));
+                         xQoS,
+                         configPUBLISH_TOPIC_FORMAT,
+                         ulSuccessCount,
+                         ulFailCount));
             }
             else
             {
                 ulFailCount++;
                 LogError(("Timed out while sending QoS %u publish to topic: %s (PassCount:%d, FailCount: %d)",
-                            xQoS,
-                            configPUBLISH_TOPIC_FORMAT,
-                            ulSuccessCount,
-                            ulFailCount));
+                          xQoS,
+                          configPUBLISH_TOPIC_FORMAT,
+                          ulSuccessCount,
+                          ulFailCount));
             }
 
             /* Add a little randomness into the delay so the tasks don't remain

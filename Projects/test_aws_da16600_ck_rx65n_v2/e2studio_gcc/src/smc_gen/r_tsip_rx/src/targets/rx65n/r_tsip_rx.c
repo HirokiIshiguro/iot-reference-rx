@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2017-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_rx.c
- * Version      : 1.21
+ * Version      : 1.22
  * Description  : Interface definition for the r_tsip_rx TSIP module.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
@@ -44,6 +31,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -161,16 +150,9 @@ extern uint32_t g_sha256hmacver_private_id;
 extern uint32_t g_ecdh256_private_id;
 #endif
 
-#if TSIP_FIRMWARE_UPDATE == 1
-TSIP_GEN_MAC_CB_FUNC_T TSIP_GEN_MAC_CB_FUNC;
-#endif
-
 /**********************************************************************************************************************
  Private (static) variables and functions
  *********************************************************************************************************************/
-TSIP_SEC_B_SECURE_BOOT
-static uint32_t *sp_user_program_mac;
-
 static e_tsip_err_t R_TSIP_SelfCheck1Private(void);
 static e_tsip_err_t R_TSIP_SelfCheck2Private(void);
 
@@ -399,49 +381,86 @@ static e_tsip_err_t R_TSIP_SelfCheck2Private(void)
  ***************************************/
 
 /***********************************************************************************************************************
-* Function Name: firm_mac_read
-*******************************************************************************************************************/ /**
-* @details       Read the firmware mac value.
-* @param[in]     InData_Program MAC value reading pointer
-* @note          None
-*/
-TSIP_SEC_P_SECURE_BOOT
-void firm_mac_read(uint32_t *InData_Program)
-{
-    memcpy(InData_Program, sp_user_program_mac, 16u);
-    return;
-}
-/****************************
- End of function firm_mac_read
- ****************************/
-
-/***********************************************************************************************************************
-* Function Name: R_TSIP_VerifyFirmwareMAC
+* Function Name: R_TSIP_VerifyFirmwareMACInit
 *******************************************************************************************************************/ /**
 * @details       Verify the MAC value using firmware.
-* @param[in]     InData_Program Firmware
-* @param[in]     MAX_CNT Word size of firmware.
-* @param[in]     InData_MAC MAC value to be compared (16byte)
 * @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
 * @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
-* @see           R_TSIP_VerifyFirmwareMacSub()
+* @see           R_TSIP_VerifyFirmwareMacInitSub()
 * @note          None
 */
 TSIP_SEC_P_SECURE_BOOT
-e_tsip_err_t R_TSIP_VerifyFirmwareMAC(uint32_t *InData_Program, uint32_t MAX_CNT, uint32_t *InData_MAC)
+e_tsip_err_t R_TSIP_VerifyFirmwareMACInit(void)
 {
-    if (0u == MAX_CNT)
+    return R_TSIP_VerifyFirmwareMacInitSub();
+}
+/***************************************
+ End of function R_TSIP_VerifyFirmwareMACInit
+ ***************************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_VerifyFirmwareMACUpdate
+*******************************************************************************************************************/ /**
+* @details       Verify the MAC value using firmware.
+* @param[in]     input Input firmware
+* @param[in]     input_length Size of input.
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal.
+* @see           R_TSIP_VerifyFirmwareMacUpdateSub()
+* @note          None
+*/
+TSIP_SEC_P_SECURE_BOOT
+e_tsip_err_t R_TSIP_VerifyFirmwareMACUpdate(uint8_t *input, uint32_t input_length)
+{
+    uint32_t max_cnt = 0;
+
+    if (0 != (input_length % 16))
     {
         return TSIP_ERR_PARAMETER;
     }
+    else
+    {
+        max_cnt = (input_length >> 2);
+    }
 
-    sp_user_program_mac = InData_MAC;
-    return R_TSIP_VerifyFirmwareMacSub(InData_Program, MAX_CNT);
+    /* Casting uint32_t pointer is used for address. */
+    return R_TSIP_VerifyFirmwareMacUpdateSub((uint32_t *)input, max_cnt);
 }
 /***************************************
- End of function R_TSIP_VerifyFirmwareMAC
+ End of function R_TSIP_VerifyFirmwareMACUpdate
+ ***************************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_VerifyFirmwareMACFinal
+*******************************************************************************************************************/ /**
+* @details       Verify the MAC value using firmware.
+* @param[in]     input Input firmware
+* @param[in]     mac_MAC of input firmware.
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_FAIL: Internal error occurred.
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal.
+* @see           R_TSIP_VerifyFirmwareMacFinalSub()
+* @note          None
+*/
+TSIP_SEC_P_SECURE_BOOT
+e_tsip_err_t R_TSIP_VerifyFirmwareMACFinal(uint8_t *input, uint8_t *mac, uint32_t input_length)
+{
+    uint32_t max_cnt = 0;
+
+    if (0 != (input_length % 16))
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+    else
+    {
+        max_cnt = (input_length >> 2);
+    }
+
+    /* Casting uint32_t pointer is used for address. */
+    return R_TSIP_VerifyFirmwareMacFinalSub((uint32_t *)input, (uint32_t *)mac, max_cnt);
+}
+/***************************************
+ End of function R_TSIP_VerifyFirmwareMACFinal
  ***************************************/
 
 #if TSIP_FIRMWARE_UPDATE == 1
@@ -464,52 +483,100 @@ e_tsip_err_t R_TSIP_StartUpdateFirmware(void)
  *****************************************/
 
 /***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateFirmwareMAC
+* Function Name: R_TSIP_GenerateFirmwareMACInit
 *******************************************************************************************************************/ /**
-* @details       Decrypt the firmware and generates new MAC for the encrypted firmware and the firmware checksum value.
-* @param[in]     InData_KeyIndex key Generation Information Area for generating MAC value and decrypting the encrypted
-* user program.
-* @param[in]     InData_SessionKey Session Key area for confirming checksum.
-* @param[in]     InData_UpProgram Temporaly Area for storing encrypted firmware data.
-* @param[in]     InData_IV  Initial vector area for decrypting the encrypted firmware.
-* @param[out]    OutData_Program Temporaly Area for storing decrypted firmware data.
-* @param[in]     MAX_CNT The word size for encrypted firmware.
-* @param[in]     p_callback It is called multiple times when user's action is required. The contents of teh action is
-* determined by teh enum TSIP_FW_CB_REQ_TYPE.
-* @param[in]     tsip_firmware_generate_mac_resume_handle The handle of work area for resume firmware update.
+* @details       Decrypt the firmware and generates new MAC for the encrypted firmware.
+* @param[in]     wrapped_key_encryption_key Wrapped key which is used to wrap image encryption key.
+* @param[in]     encrypted_image_encryption_key Image encryption key which is wapped by key encryption key.
+* @param[in]     initial_vector  Initial vector area for decrypting the encrypted firmware.
 * @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
 * @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
 * @retval        TSIP_ERR_KEY_SET: Input illegal user Key Generation Information
-* @retval        TSIP_ERR_CALLBACK_UNREGIST: Callback function is not registered
-* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
-* @retval        TSIP_RESUME_FIRMWARE_GENERATE_MAC: Continuation of R_TSIP_GenerateFirmwareMAC
-* @see           R_TSIP_GenerateFirmwareMacSub()
+* @see           R_TSIP_GenerateFirmwareMacInitSub()
 * @note          None
 */
 TSIP_SEC_P_SECURE_BOOT
-e_tsip_err_t R_TSIP_GenerateFirmwareMAC(uint32_t *InData_KeyIndex, uint32_t *InData_SessionKey,
-        uint32_t *InData_UpProgram, uint32_t *InData_IV, uint32_t *OutData_Program, uint32_t MAX_CNT,
-        TSIP_GEN_MAC_CB_FUNC_T p_callback,
-        tsip_firmware_generate_mac_resume_handle_t *tsip_firmware_generate_mac_resume_handle)
+e_tsip_err_t R_TSIP_GenerateFirmwareMACInit(uint32_t *wrapped_key_encryption_key,
+        uint8_t *encrypted_image_encryption_key, uint8_t *initial_vector)
 {
-    if (NULL == p_callback)
-    {
-        return TSIP_ERR_CALLBACK_UNREGIST;
-    }
+    /* Casting uint32_t pointer is used for address. */
+    return R_TSIP_GenerateFirmwareMacInitSub(wrapped_key_encryption_key, (uint32_t *)encrypted_image_encryption_key,
+            (uint32_t *)initial_vector);
+}
+/*****************************************
+ End of function R_TSIP_GenerateFirmwareMACInit
+ *****************************************/
 
-    if (0u == MAX_CNT)
+/***********************************************************************************************************************
+* Function Name: R_TSIP_GenerateFirmwareMACUpdate
+*******************************************************************************************************************/ /**
+* @details       Decrypt the firmware and generates new MAC for the encrypted firmware.
+* @param[in]     input Encrypted firmware.
+* @param[out]    output Decrypted firmware.
+* @param[in]     input_length Size of input.
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal.
+* @see           R_TSIP_GenerateFirmwareMacUpdateSub()
+* @note          None
+*/
+TSIP_SEC_P_SECURE_BOOT
+e_tsip_err_t R_TSIP_GenerateFirmwareMACUpdate(uint8_t *input, uint8_t *output, uint32_t input_length)
+{
+    uint32_t max_cnt = 0;
+
+    if (0 != (input_length % 16))
     {
         return TSIP_ERR_PARAMETER;
     }
+    else
+    {
+        max_cnt = (input_length >> 2);
+    }
 
-    TSIP_GEN_MAC_CB_FUNC = p_callback;
-    return R_TSIP_GenerateFirmwareMacSub(InData_KeyIndex, InData_SessionKey, InData_UpProgram, InData_IV,
-            OutData_Program, MAX_CNT, tsip_firmware_generate_mac_resume_handle);
+    /* Casting uint32_t pointer is used for address. */
+    return R_TSIP_GenerateFirmwareMacUpdateSub((uint32_t *)input, (uint32_t *)output, max_cnt);
+}
+/*****************************************
+ End of function R_TSIP_GenerateFirmwareMACUpdate
+ *****************************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_GenerateFirmwareMACFinal
+*******************************************************************************************************************/ /**
+* @details       Decrypt the firmware and generates new MAC for the encrypted firmware.
+* @param[in]     input Encrypted firmware.
+* @param[in]     input_mac MAC of input firmware.
+* @param[out]    output Decrypted firmware.
+* @param[out]    output_mac MAC of output firmware.
+* @param[in]     input_length Size of input.
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_FAIL: Internal error occurred.
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal.
+* @see           R_TSIP_GenerateFirmwareMacFinalSub()
+* @note          None
+*/
+TSIP_SEC_P_SECURE_BOOT
+e_tsip_err_t R_TSIP_GenerateFirmwareMACFinal(uint8_t *input, uint8_t *input_mac, uint8_t *output, uint8_t *output_mac,
+        uint32_t input_length)
+{
+    uint32_t max_cnt = 0;
+
+    if (0 != (input_length % 16))
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+    else
+    {
+        max_cnt = (input_length >> 2);
+    }
+
+    /* Casting uint32_t pointer is used for address. */
+    return R_TSIP_GenerateFirmwareMacFinalSub((uint32_t *)input, (uint32_t *)input_mac, (uint32_t *)output,
+            (uint32_t *)output_mac, max_cnt);
 }
 #endif /* TSIP_FIRMWARE_UPDATE == 1 */
 /*****************************************
- End of function R_TSIP_GenerateFirmwareMAC
+ End of function R_TSIP_GenerateFirmwareMACFinal
  *****************************************/
 TSIP_SEC_DEFAULT
 
@@ -529,43 +596,6 @@ e_tsip_err_t R_TSIP_GenerateRandomNumber(uint32_t *random)
 }
 /******************************************
  End of function R_TSIP_GenerateRandomNumber
- ******************************************/
-
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateUpdateKeyRingKeyIndex
-*******************************************************************************************************************/ /**
-* @details       The API for outputting the key generation information of the key update key ring.
-* @param[in]     encrypted_provisioning_key Input the provisioning key includes encrypted CBC/CBC-MAC key for user key
-* @param[in]     iv Input the IV for user key CBC encrypt
-* @param[in]     encrypted_key Input the key update key ring encrypted with AES128-ECB mode
-* @param[out]    key_index Output the key update key ring Generation Information (17 words)
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @see           R_TSIP_SelfCheck1Private()
-* @see           R_TSIP_SelfCheck2Private()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateUpdateKeyRingKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_update_key_ring_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-    error_code = R_TSIP_GenerateUpdateKeyRingKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_UPDATE_KEY_RING;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-    return error_code;
-}
-/******************************************
- End of function R_TSIP_GenerateUpdateKeyRingKeyIndex
  ******************************************/
 
 /***********************************************************************************************************************

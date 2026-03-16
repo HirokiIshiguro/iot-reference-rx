@@ -8,6 +8,7 @@ This document provides information about the demo with the following specificati
 * Demo Type: PubSub/MQTT
 
 > **Note:**  
+> For information about the "*PubSub/MQTT with Fleet Provisioning sample project*", see [**"da16600_fleet_information.md"**](da16600_fleet_information.md).  
 > For information about the "*PubSub/MQTT with Over-the-air(OTA) update sample project*", see [**"da16600_ota_information.md"**](da16600_ota_information.md).  
 > For more information about setting up and running the demo, see [**"Getting_Started_Guide.md"**](../../Getting_Started_Guide.md).
 
@@ -23,7 +24,7 @@ This demo performs the following tasks:
 |---------------------------|--------|----------------------|----------|
 | Logging task              | This task uses another task, such as UART, to actually perform the printing output.                              | 4608 | 2 |
 | UART command console task | This task provides a command console function to realize CLI using UART.                                         | 4608 | 1 |
-| main task task            | This task is the application entry point from power-on reset.                                                    | 512  | 1 |
+| main task                 | This task is the application entry point from power-on reset.                                                    | 512  | 1 |
 | MQTT-agent task           | This task uses the MQTT agent API to communicate with the MQTT broker over the same MQTT connection.             | 6144 | 2 |
 | PubSub task               | This task uses the MQTT Agent API to send a unique MQTT payload to a unique topic over the same MQTT connection. | 2048 | 1 |
 
@@ -31,15 +32,15 @@ This demo performs the following tasks:
 
 | Compiler | RAM size | ROM size |
 |----------|----------|----------|
-| CC-RX    | 359KB    | 323KB    |
-| GCC      | 364KB    | 318KB    |
+| CC-RX    | 359KB    | 333KB    |
+| GCC      | 363KB    | 322KB    |
 
 ### Confirmed Operation Environment
 
 | Compiler | Version  | Details |
 |----------|----------|---------|
 | CC-RX    | V3.07.00 | Optimization: Level 2 |
-| GCC      | GCC for Renesas RX v8.3.0.202411 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
+| GCC      | GCC for Renesas RX v14.2.0.202505 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
 
 ## Explanation specific to this demo
 

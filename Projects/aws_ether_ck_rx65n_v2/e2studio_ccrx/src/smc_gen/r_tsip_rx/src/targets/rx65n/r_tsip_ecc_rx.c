@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2019-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_ecc_rx.c
- * Version      : 1.20
+ * Version      : 1.22
  * Description  : Interface definition for the r_tsip_ecc_rx TSIP module.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
@@ -37,6 +24,8 @@
  *         : 24.05.2023 1.18     Added support for RX26T
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -180,344 +169,6 @@ static e_tsip_err_t set_ecdsa_hash_data(tsip_ecdsa_byte_data_t *p_message_hash, 
  End of function set_ecdsa_hash_data
  *******************************/
 #endif /* TSIP_PRV_USE_ECDSA */
-
-#if TSIP_ECDSA_P192
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP192PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-192 public user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-192 public key encrypted and MAC.
-* @param[out]    key_index ECC P-192 public key user key generation information (25 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccPublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP192PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_public_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(2); /* P-192 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateEccPublicKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P192_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP192PublicKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P192 */
-
-#if TSIP_ECDSA_P224
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP224PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-224 public user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-224 public key encrypted and MAC.
-* @param[out]    key_index ECC P-224 public key user key generation information (25 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccPublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP224PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_public_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(1); /* P-224 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateEccPublicKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P224_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP224PublicKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P224 */
-
-#if TSIP_ECDSA_P256 || TSIP_ECDH_P256
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP256PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-256 public user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-256 public key encrypted and MAC.
-* @param[out]    key_index ECC P-256 public key user key generation information (25 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccPublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP256PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_public_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(0); /* P-256 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateEccPublicKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P256_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP256PublicKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P256 || TSIP_ECDH_P256 */
-
-#if TSIP_ECDSA_P384
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP384PublicKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-384 public user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-384 public key encrypted and MAC.
-* @param[out]    key_index ECC P-384 public key user key generation information (33 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccP384PublicKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP384PublicKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_public_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    error_code = R_TSIP_GenerateEccP384PublicKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P384_PUBLIC;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP384PublicKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P384 */
-
-#if TSIP_ECDSA_P192
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP192PrivateKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-192 private user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-192 private key encrypted and MAC.
-* @param[out]    key_index ECC P-192 private key user key generation information (17 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccPrivateKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP192PrivateKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_private_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(2); /* P-192 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateEccPrivateKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P192_PRIVATE;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP192PrivateKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P192 */
-
-#if TSIP_ECDSA_P224
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP224PrivateKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-224 private user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-224 private key encrypted and MAC.
-* @param[out]    key_index ECC P-224 private key user key generation information (17 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccPrivateKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP224PrivateKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_private_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(1); /* P-224 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateEccPrivateKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P224_PRIVATE;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP224PrivateKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P224 */
-
-#if TSIP_ECDSA_P256 || TSIP_ECDH_P256 || TSIP_TLS
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP256PrivateKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-256 private user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-256 private key encrypted and MAC.
-* @param[out]    key_index ECC P-256 private key user key generation information (17 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccPrivateKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP256PrivateKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_private_key_index_t *key_index)
-{
-    uint32_t indata_cmd = 0;
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    indata_cmd = change_endian_long(0); /* P-256 */
-    /* Casting uint32_t pointer is used for address. */
-    error_code = R_TSIP_GenerateEccPrivateKeyIndexSub(&install_key_ring_index, (uint32_t*)encrypted_provisioning_key,
-        /* Casting uint32_t pointer is used for address. */
-        &indata_cmd, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P256_PRIVATE;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP256PrivateKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P256 || TSIP_ECDH_P256 || TSIP_TLS */
-
-#if TSIP_ECDSA_P384
-/***********************************************************************************************************************
-* Function Name: R_TSIP_GenerateEccP384PrivateKeyIndex
-*******************************************************************************************************************/ /**
-* @details       Generate ECC P-384 private user key index.
-* @param[in]     encrypted_provisioning_key Provisioning key wrapped in DLM.
-* @param[in]     iv The initial vector used when encrypted_key was generated.
-* @param[in]     encrypted_key ECC P-384 private key encrypted and MAC.
-* @param[out]    key_index ECC P-384 private key user key generation information (21 words).
-* @retval        TSIP_SUCCESS: Normal termination.
-* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
-* @retval        TSIP_ERR_FAIL: Internal error occurred.
-* @see           R_TSIP_GenerateEccP384PrivateKeyIndexSub()
-* @note          None
-*/
-e_tsip_err_t R_TSIP_GenerateEccP384PrivateKeyIndex(uint8_t *encrypted_provisioning_key, uint8_t *iv,
-        uint8_t *encrypted_key, tsip_ecc_private_key_index_t *key_index)
-{
-    e_tsip_err_t error_code = TSIP_SUCCESS;
-    uint32_t install_key_ring_index = TSIP_INSTALL_KEY_RING_INDEX;
-
-    error_code = R_TSIP_GenerateEccP384PrivateKeyIndexSub(&install_key_ring_index,
-        /* Casting uint32_t pointer is used for address. */
-        (uint32_t*)encrypted_provisioning_key, (uint32_t*)iv, (uint32_t*)encrypted_key, (uint32_t*)&key_index->value);
-    if (TSIP_SUCCESS == error_code)
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_ECC_P384_PRIVATE;
-    }
-    else
-    {
-        key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
-    }
-
-    return error_code;
-}
-/*******************************
- End of function R_TSIP_GenerateEccP384PrivateKeyIndex
- *******************************/
-#endif /* TSIP_ECDSA_P384 */
 
 #if TSIP_ECDSA_P192
 /***********************************************************************************************************************
@@ -853,7 +504,7 @@ e_tsip_err_t R_TSIP_GenerateEccP192RandomKeyIndex(tsip_ecc_key_pair_index_t *key
     e_tsip_err_t error_code = TSIP_SUCCESS;
 
     indata_cmd = change_endian_long(2); /* P-192 */
-    error_code =  R_TSIP_GenerateEccRandomKeyIndexSub(&indata_cmd,
+    error_code =  R_TSIP_GenerateEccRandomKeyIndexSub(&indata_cmd, DomainParam_NIST_P192,
         /* Casting uint32_t pointer is used for address. */
         (uint32_t*)&key_pair_index->public.value, (uint32_t*)&key_pair_index->private.value);
     if (TSIP_SUCCESS == error_code)
@@ -892,7 +543,7 @@ e_tsip_err_t R_TSIP_GenerateEccP224RandomKeyIndex(tsip_ecc_key_pair_index_t *key
     e_tsip_err_t error_code = TSIP_SUCCESS;
 
     indata_cmd = change_endian_long(1); /* P-224 */
-    error_code =  R_TSIP_GenerateEccRandomKeyIndexSub(&indata_cmd,
+    error_code =  R_TSIP_GenerateEccRandomKeyIndexSub(&indata_cmd, DomainParam_NIST_P224,
         /* Casting uint32_t pointer is used for address. */
         (uint32_t*)&key_pair_index->public.value, (uint32_t*)&key_pair_index->private.value);
     if (TSIP_SUCCESS == error_code)
@@ -931,7 +582,7 @@ e_tsip_err_t R_TSIP_GenerateEccP256RandomKeyIndex(tsip_ecc_key_pair_index_t *key
     e_tsip_err_t error_code = TSIP_SUCCESS;
 
     indata_cmd = change_endian_long(0); /* P-256 */
-    error_code =  R_TSIP_GenerateEccRandomKeyIndexSub(&indata_cmd,
+    error_code =  R_TSIP_GenerateEccRandomKeyIndexSub(&indata_cmd, DomainParam_NIST_P256,
         /* Casting uint32_t pointer is used for address. */
         (uint32_t*)&key_pair_index->public.value, (uint32_t*)&key_pair_index->private.value);
     if (TSIP_SUCCESS == error_code)
@@ -968,7 +619,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndex(tsip_ecc_key_pair_index_t *key
 {
     e_tsip_err_t error_code = TSIP_SUCCESS;
 
-    error_code =  R_TSIP_GenerateEccP384RandomKeyIndexSub(
+    error_code =  R_TSIP_GenerateEccP384RandomKeyIndexSub(DomainParam_NIST_P384,
         /* Casting uint32_t pointer is used for address. */
         (uint32_t*)&key_pair_index->public.value, (uint32_t*)&key_pair_index->private.value);
     if (TSIP_SUCCESS == error_code)
@@ -1023,9 +674,9 @@ e_tsip_err_t R_TSIP_EcdsaP192SignatureGenerate(tsip_ecdsa_byte_data_t *message_h
     }
 
     indata_cmd = change_endian_long(2); /* P-192 */
-    error_code = R_TSIP_EcdsaSigunatureGenerateSub(
+    error_code = R_TSIP_EcdsaSigunatureGenerateSub(&indata_cmd,
             /* Casting uint32_t pointer is used for address. */
-            &indata_cmd, (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, DomainParam_NIST_P192,(uint32_t*)signature->pdata);
     if (TSIP_SUCCESS == error_code)
     {
         signature->data_length = R_TSIP_ECDSA_DATA_BYTE_SIZE;
@@ -1073,9 +724,9 @@ e_tsip_err_t R_TSIP_EcdsaP224SignatureGenerate(tsip_ecdsa_byte_data_t *message_h
     }
 
     indata_cmd = change_endian_long(1); /* P-224 */
-    error_code = R_TSIP_EcdsaSigunatureGenerateSub(
+    error_code = R_TSIP_EcdsaSigunatureGenerateSub(&indata_cmd,
             /* Casting uint32_t pointer is used for address. */
-            &indata_cmd, (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, DomainParam_NIST_P224, (uint32_t*)signature->pdata);
     if (TSIP_SUCCESS == error_code)
     {
         signature->data_length = R_TSIP_ECDSA_DATA_BYTE_SIZE;
@@ -1123,9 +774,9 @@ e_tsip_err_t R_TSIP_EcdsaP256SignatureGenerate(tsip_ecdsa_byte_data_t *message_h
     }
 
     indata_cmd = change_endian_long(0); /* P-256 */
-    error_code = R_TSIP_EcdsaSigunatureGenerateSub(
+    error_code = R_TSIP_EcdsaSigunatureGenerateSub(&indata_cmd,
             /* Casting uint32_t pointer is used for address. */
-            &indata_cmd, (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, DomainParam_NIST_P256, (uint32_t*)signature->pdata);
     if (TSIP_SUCCESS == error_code)
     {
         signature->data_length = R_TSIP_ECDSA_DATA_BYTE_SIZE;
@@ -1173,7 +824,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SignatureGenerate(tsip_ecdsa_byte_data_t *message_h
 
     error_code = R_TSIP_EcdsaP384SigunatureGenerateSub(
             /* Casting uint32_t pointer is used for address. */
-            (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, DomainParam_NIST_P384, (uint32_t*)signature->pdata);
     if (TSIP_SUCCESS == error_code)
     {
         signature->data_length = R_TSIP_ECDSA_P384_DATA_BYTE_SIZE;
@@ -1221,9 +872,9 @@ e_tsip_err_t R_TSIP_EcdsaP192SignatureVerification(tsip_ecdsa_byte_data_t *signa
     }
 
     indata_cmd = change_endian_long(2); /* P-192 */
-    error_code = R_TSIP_EcdsaSigunatureVerificationSub(
+    error_code = R_TSIP_EcdsaSigunatureVerificationSub(&indata_cmd,
             /* Casting uint32_t pointer is used for address. */
-            &indata_cmd, (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata, DomainParam_NIST_P192);
 
     return error_code;
 }
@@ -1266,9 +917,9 @@ e_tsip_err_t R_TSIP_EcdsaP224SignatureVerification(tsip_ecdsa_byte_data_t *signa
     }
 
     indata_cmd = change_endian_long(1); /* P-224 */
-    error_code = R_TSIP_EcdsaSigunatureVerificationSub(
+    error_code = R_TSIP_EcdsaSigunatureVerificationSub(&indata_cmd,
             /* Casting uint32_t pointer is used for address. */
-            &indata_cmd, (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata, DomainParam_NIST_P224);
 
     return error_code;
 }
@@ -1311,9 +962,9 @@ e_tsip_err_t R_TSIP_EcdsaP256SignatureVerification(tsip_ecdsa_byte_data_t *signa
     }
 
     indata_cmd = change_endian_long(0); /* P-256 */
-    error_code = R_TSIP_EcdsaSigunatureVerificationSub(
+    error_code = R_TSIP_EcdsaSigunatureVerificationSub(&indata_cmd,
             /* Casting uint32_t pointer is used for address. */
-            &indata_cmd, (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata, DomainParam_NIST_P256);
 
     return error_code;
 }
@@ -1356,7 +1007,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SignatureVerification(tsip_ecdsa_byte_data_t *signa
 
     error_code = R_TSIP_EcdsaP384SigunatureVerificationSub(
             /* Casting uint32_t pointer is used for address. */
-            (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata);
+            (uint32_t*)&key_index->value, (uint32_t*)data_buff, (uint32_t*)signature->pdata, DomainParam_NIST_P384);
 
     return error_code;
 }
@@ -1714,6 +1365,95 @@ e_tsip_err_t R_TSIP_EcdhP256KeyDerivation(tsip_ecdh_handle_t *handle, tsip_ecdh_
 }
 /*******************************
  End of function R_TSIP_EcdhP256KeyDerivation
+ *******************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_EcdhP256SshKeyDerivation
+*******************************************************************************************************************/ /**
+* @details       Key is derived using the shared secret "Z" as the key material for SSH.
+* @param[in,out] handle Handler for ECDH(work area).
+* @param[in]     shared_secret_index key index of shared secret "Z"
+* @param[in]     key_type Derived key type(0:AES-128, 1:AES-256, 2:SHA256-HMAC)
+* @param[in]     other_info additional data used in key derivation
+* @param[in]     other_info_length additional data length(byte)
+* @param[out]    client_write_key_index Key index of client write key to encrypt traffic data
+* @param[out]    server_write_key_index Key index of server write key to encrypt traffic data
+* @param[out]    client_mac_key_index Key index of client mac key to generate MAC
+* @param[out]    server_mac_key_index Key index of server mac key to generate MAC
+* @param[out]    client_iv Initial vector of client to encrypt traffic data
+* @param[out]    server_iv Initial vector of server to encrypt traffic data
+* @retval        TSIP_SUCCESS: Normal termination.
+* @retval        TSIP_ERR_RESOURCE_CONFLICT: resource conflict
+* @retval        TSIP_ERR_KEY_SET: Input illegal user Key Generation Information
+* @retval        TSIP_ERR_FAIL: Internal error occurred.
+* @retval        TSIP_ERR_PARAMETER: Input parameter illegal
+* @retval        TSIP_ERR_PROHIBIT_FUNCTION: Illegal function called
+* @see           R_TSIP_EcdhP256SshKeyDerivationSub()
+* @note          None
+*/
+e_tsip_err_t R_TSIP_EcdhP256SshKeyDerivation(tsip_ecdh_handle_t *handle, tsip_ecdh_key_index_t *shared_secret_index,
+        uint32_t key_type, uint8_t *other_info, uint32_t other_info_length,
+        tsip_aes_key_index_t *client_write_key_index, tsip_aes_key_index_t *server_write_key_index,
+        tsip_aes_key_index_t *client_mac_key_index, tsip_aes_key_index_t *server_mac_key_index, uint8_t *client_iv,
+        uint8_t *server_iv)
+{
+    e_tsip_err_t error_code = TSIP_SUCCESS;
+    uint32_t indata_keyindextype = 0;
+    uint32_t indata_paddedmsglength = 0;
+
+    if (0 == handle->flag_call_shared_secret)
+    {
+        return TSIP_ERR_PROHIBIT_FUNCTION;
+    }
+    if (handle->id != g_ecdh256_private_id)
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+    if (2 < key_type)
+    {
+        return TSIP_ERR_PARAMETER;
+    }
+
+    indata_keyindextype    = change_endian_long(key_type);
+    indata_paddedmsglength = change_endian_long(other_info_length);
+
+    /* Casting uint32_t pointer is used for address. */
+    error_code = R_TSIP_EcdhP256SshKeyDerivationSub(
+    /* uint32_t *InData_KeyIndexType,       */&indata_keyindextype,
+    /* uint32_t *InData_KeyIndex,           */shared_secret_index->value,
+    /* uint32_t *InData_PaddedMsg,          */(uint32_t*)other_info,
+    /* uint32_t *InData_PaddedMsgLength,    */&indata_paddedmsglength,
+    /* uint32_t *OutData_KeyIndex1,         */client_write_key_index->value,
+    /* uint32_t *OutData_KeyIndex2,         */server_write_key_index->value,
+    /* uint32_t *OutData_KeyIndex3,         */client_mac_key_index->value,
+    /* uint32_t *OutData_KeyIndex4,         */server_mac_key_index->value,
+    /* uint32_t *OutData_IV1,               */(uint32_t*)client_iv,
+    /* uint32_t *OutData_IV2                */(uint32_t*)server_iv
+    );
+    if (TSIP_SUCCESS == error_code)
+    {
+        client_write_key_index->type = s_key_index_type[key_type];;
+        server_write_key_index->type = s_key_index_type[key_type];
+        client_mac_key_index->type   = s_key_index_type[key_type];
+        server_mac_key_index->type   = s_key_index_type[key_type];
+        if (2 == key_type)
+        {
+            client_write_key_index->type   = TSIP_KEY_INDEX_TYPE_INVALID;
+            server_write_key_index->type   = TSIP_KEY_INDEX_TYPE_INVALID;
+        }
+    }
+    else
+    {
+        client_write_key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
+        server_write_key_index->type = TSIP_KEY_INDEX_TYPE_INVALID;
+        client_mac_key_index->type   = TSIP_KEY_INDEX_TYPE_INVALID;
+        server_mac_key_index->type   = TSIP_KEY_INDEX_TYPE_INVALID;
+    }
+    memset(handle, 0, sizeof(tsip_ecdh_handle_t));
+    return error_code;
+}
+/*******************************
+ End of function R_TSIP_EcdhP256SshKeyDerivation
  *******************************/
 #endif  /* TSIP_ECDH_P256 */
 

@@ -1,21 +1,8 @@
 /* Generated configuration header file - do not edit */
 /***********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
-* other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
-* applicable laws, including copyright laws.
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
-* THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
-* EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
-* SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS
-* SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
-* this software. By using this software, you agree to the additional terms and conditions found by accessing the
-* following link:
-* http://www.renesas.com/disclaimer
+* Copyright (c) 2013 - 2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2013-2023 Renesas Electronics Corporation. All rights reserved.
+* SPDX-License-Identifier: BSD-3-Clause
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name    : r_irq_rx_config.h
@@ -32,6 +19,8 @@
 *         : 28.09.2018  2.30    Updated the coding rules of Renesas.
 *         : 15.08.2022  4.30    Fixed to comply with GSCE Coding Standards Rev.6.5.0.
 *         : 29.05.2023  4.40    Deleted the description of FIT configurator.
+*         : 31.12.2024  4.70    Added support Nested Interrupt.
+*         : 15.03.2025  4.71    Updated disclaimer.
 ***********************************************************************************************************************/
 #ifndef IRQ_CONFIG_H
 #define IRQ_CONFIG_H
@@ -136,6 +125,25 @@ Digital Filtering
 #define IRQ_CFG_FILT_PLCK_IRQ13   (IRQ_CFG_PCLK_DIV1)   /* Filter sample clock divisor for IRQ 13 = PCLK. */
 #define IRQ_CFG_FILT_PLCK_IRQ14   (IRQ_CFG_PCLK_DIV1)   /* Filter sample clock divisor for IRQ 14 = PCLK. */
 #define IRQ_CFG_FILT_PLCK_IRQ15   (IRQ_CFG_PCLK_DIV1)   /* Filter sample clock divisor for IRQ 15 = PCLK. */
+
+/* To enable nested interrupt with the selected IRQ.
+ * Set the value to 1 to enable the nested interrupt or 0 to disable it. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ0       (0)   /* Nested interrupt disabled on IRQ 0. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ1       (0)   /* Nested interrupt disabled on IRQ 1. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ2       (0)   /* Nested interrupt disabled on IRQ 2. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ3       (0)   /* Nested interrupt disabled on IRQ 3. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ4       (0)   /* Nested interrupt disabled on IRQ 4. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ5       (0)   /* Nested interrupt disabled on IRQ 5. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ6       (0)   /* Nested interrupt disabled on IRQ 6. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ7       (0)   /* Nested interrupt disabled on IRQ 7. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ8       (0)   /* Nested interrupt disabled on IRQ 8. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ9       (0)   /* Nested interrupt disabled on IRQ 9. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ10      (0)   /* Nested interrupt disabled on IRQ 10. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ11      (0)   /* Nested interrupt disabled on IRQ 11. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ12      (0)   /* Nested interrupt disabled on IRQ 12. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ13      (0)   /* Nested interrupt disabled on IRQ 13. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ14      (0)   /* Nested interrupt disabled on IRQ 14. */
+#define IRQ_CFG_NESTED_INT_EN_IRQ15      (0)   /* Nested interrupt disabled on IRQ 15. */
 
 /***********************************************************************************************************************
 Typedef definitions

@@ -2,6 +2,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -22,7 +24,6 @@
  * http://www.FreeRTOS.org
  * http://aws.amazon.com/freertos
  */
-
 
 /**
  * @brief A test application which loops through subscribing to a topic and publishing message
@@ -52,13 +53,6 @@
 /* MQTT agent task API. */
 #include "mqtt_agent_task.h"
 
-
-/**
- * @brief A test application which loops through subscribing to a topic and publishing message
- * to a topic. This test application can be used with AWS IoT device advisor test suite to
- * verify that an application implemented using MQTT agent follows best practices in connecting
- * to AWS IoT core.
- */
 #define configMS_TO_WAIT_FOR_NOTIFICATION            ( 10000 )
 
 /**
@@ -114,7 +108,7 @@ struct MQTTAgentCommandContext
 
 /*-----------------------------------------------------------*/
 
-/**
+ /**
   * @brief The MQTT agent manages the MQTT contexts.  This set the handle to the
   * context used by this demo.
   */
@@ -513,7 +507,7 @@ void vSubscribePublishTestTask(void * pvParameters)
         LogInfo(("MQTT Agent is connected. Starting the publish subscribe task. "));
 
         xMQTTStatus = prvSubscribeToTopic(MQTTQoS1,
-                                            (char*)configSUBSCRIBE_TOPIC_FORMAT );
+                                            (char *) configSUBSCRIBE_TOPIC_FORMAT );
 
         if (MQTTSuccess != xMQTTStatus)
         {
@@ -524,7 +518,7 @@ void vSubscribePublishTestTask(void * pvParameters)
     if (pdPASS == xStatus)
     {
         /* Loop through infinitely. */
-        for (;;)
+        for ( ; ; )
         {
             /* Have different tasks use different QoS.  0 and 1.  2 can also be used
              * if supported by the broker. */
@@ -548,7 +542,7 @@ void vSubscribePublishTestTask(void * pvParameters)
                         (char *) cPayloadBuf));
 
             xMQTTStatus = prvPublishToTopic(xQoS,
-                                            (char*)configPUBLISH_TOPIC_FORMAT,
+                                            (char *) configPUBLISH_TOPIC_FORMAT,
                                             (uint8_t *) cPayloadBuf,
                                             xPayloadLength);
 

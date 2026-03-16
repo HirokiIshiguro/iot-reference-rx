@@ -2,6 +2,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -51,13 +53,6 @@
 /* MQTT agent task API. */
 #include "mqtt_agent_task.h"
 
-
-/**
- * @brief A test application which loops through subscribing to a topic and publishing message
- * to a topic. This test application can be used with AWS IoT device advisor test suite to
- * verify that an application implemented using MQTT agent follows best practices in connecting
- * to AWS IoT core.
- */
 #define configMS_TO_WAIT_FOR_NOTIFICATION            ( 10000 )
 
 /**

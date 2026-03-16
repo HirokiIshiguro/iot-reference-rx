@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -48,27 +50,27 @@
 
 /* Cellular include. */
 #include "r_cellular_if.h"
-/**
- * @brief Sends data over TCP socket.
- *
- * @param[in] ctx The network context containing the socket handle.
- * @param[in] buf Buffer containing the bytes to send.
- * @param[in] len Number of bytes to send from the buffer.
- *
- * @return Number of bytes sent on success; else a negative value.
- */
+
+/**********************************************************************************************************************
+ * Function Name: xMbedTLSBioTCPSocketsWrapperSend
+ * Description  : Sends data over TCP socket.
+ * Arguments    : ctx - The network context containing the socket handle.
+ *              : buf - Buffer containing the bytes to send.
+ *              : len - Number of bytes to send from the buffer.
+ * Return Value : Number of bytes sent on success; else a negative value..
+ *********************************************************************************************************************/
 int xMbedTLSBioTCPSocketsWrapperSend( void * ctx,
-                                      const unsigned char * buf,
-                                      size_t len )
+                                    const unsigned char * buf,
+                                    size_t len )
 {
     int32_t xReturnStatus;
 
-    configASSERT( ctx != NULL );
-    configASSERT( buf != NULL );
+    configASSERT(NULL != ctx);
+    configASSERT(NULL != buf);
 
-    xReturnStatus = TCP_Sockets_Send( ( Socket_t ) ctx, buf, len );
+    xReturnStatus = TCP_Sockets_Send((Socket_t)ctx, buf, len);
 
-    switch( xReturnStatus )
+    switch (xReturnStatus)
     {
         case 0:
             xReturnStatus = MBEDTLS_ERR_SSL_WANT_WRITE;
@@ -77,32 +79,35 @@ int xMbedTLSBioTCPSocketsWrapperSend( void * ctx,
             break;
     }
 
-    return ( int ) xReturnStatus;
+    /* Cast to type "int" to be compatible with parameter type */
+    return (int) xReturnStatus;
 }
+/**********************************************************************************************************************
+ End of function xMbedTLSBioTCPSocketsWrapperSend
+ *********************************************************************************************************************/
 
-/**
- * @brief Receives data from TCP socket.
- *
- * @param[in] ctx The network context containing the socket handle.
- * @param[out] buf Buffer to receive bytes into.
- * @param[in] len Number of bytes to receive from the network.
- *
- * @return Number of bytes received if successful; Negative value on error.
- */
+/**********************************************************************************************************************
+ * Function Name: xMbedTLSBioTCPSocketsWrapperRecv
+ * Description  : Receives data from TCP socket..
+ * Arguments    : ctx - The network context containing the socket handle.
+ *              : buf - Buffer to receive bytes into.
+ *              : len - Number of bytes to receive from the network.
+ * Return Value : Number of bytes received if successful; Negative value on error..
+ *********************************************************************************************************************/
 int xMbedTLSBioTCPSocketsWrapperRecv( void * ctx,
-                                      unsigned char * buf,
-                                      size_t len )
+                                    unsigned char * buf,
+                                    size_t len )
 {
     int32_t xReturnStatus;
 
-    configASSERT( ctx != NULL );
-    configASSERT( buf != NULL );
+    configASSERT(NULL != ctx);
+    configASSERT(NULL != buf);
 
-    xReturnStatus = TCP_Sockets_Recv( ( Socket_t ) ctx, buf, len );
+    xReturnStatus = TCP_Sockets_Recv((Socket_t)ctx, buf, len);
 
 
 
-    switch( xReturnStatus )
+    switch (xReturnStatus)
     {
         /* A timeout occurred before any data could be received. */
         case 0:
@@ -113,5 +118,10 @@ int xMbedTLSBioTCPSocketsWrapperRecv( void * ctx,
             break;
     }
 
-    return ( int ) xReturnStatus;
+    /* Cast to type "int" to be compatible with parameter type */
+    return (int)xReturnStatus;
 }
+/**********************************************************************************************************************
+ End of function xMbedTLSBioTCPSocketsWrapperRecv
+ *********************************************************************************************************************/
+

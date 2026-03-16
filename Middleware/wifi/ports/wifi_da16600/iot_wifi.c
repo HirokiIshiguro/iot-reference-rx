@@ -333,7 +333,7 @@ End of function WIFI_NetworkDelete
 
 /*-----------------------------------------------------------*/
 
-WIFIReturnCode_t WIFI_Ping(uint8_t * pucIPAddr,
+WIFIReturnCode_t WIFI_Ping(uint32_t * pucIPAddr,
                             uint16_t usCount)
 {
     /* FIX ME. */
@@ -391,7 +391,7 @@ End of function WIFI_GetIPInfo
 
 /*-----------------------------------------------------------*/
 
-WIFIReturnCode_t WIFI_GetMAC(uint8_t * pucMac)
+WIFIReturnCode_t WIFI_GetMAC(uint32_t * pucMac)
 {
     /* FIX ME. */
 	if (R_WIFI_DA16XXX_GetMacAddress(pucMac) != WIFI_SUCCESS)
@@ -408,10 +408,10 @@ End of function WIFI_GetMAC
 /*-----------------------------------------------------------*/
 
 WIFIReturnCode_t WIFI_GetHostIP(char * pcHost,
-                                 uint8_t * pucIPAddr)
+                                 uint32_t * pucIPAddr)
 {
     /* FIX ME. */
-	uint8_t ipAddress[4] = { 0, 0, 0, 0 };
+	uint32_t ipAddress[4] = { 0, 0, 0, 0 };
 
 	if (R_WIFI_DA16XXX_DnsQuery((uint8_t*)pcHost, ipAddress) != WIFI_SUCCESS)
 	{

@@ -3,6 +3,8 @@
  * Copyright (C) 2017 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -26,7 +28,7 @@
  */
 
 
- /******************************************************************************
+/******************************************************************************
  *
  * https://www.FreeRTOS.org/cli
  *
@@ -57,30 +59,31 @@
 #endif
 extern volatile uint32_t pvwrite;
 #ifndef  configINCLUDE_TRACE_RELATED_CLI_COMMANDS
-	#define configINCLUDE_TRACE_RELATED_CLI_COMMANDS 0
+    #define configINCLUDE_TRACE_RELATED_CLI_COMMANDS (0)
 #endif
 
 #ifndef configINCLUDE_QUERY_HEAP_COMMAND
-	#define configINCLUDE_QUERY_HEAP_COMMAND 0
+    #define configINCLUDE_QUERY_HEAP_COMMAND (0)
 #endif
 
 
-static BaseType_t prvWaitMessage( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString );
+static BaseType_t prvWaitMessage ( char * pcWriteBuffer,
+                                   size_t xWriteBufferLen,
+                                   const char * pcCommandString );
 
-static BaseType_t prvFormat( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString );
+static BaseType_t prvFormat ( char * pcWriteBuffer,
+                              size_t xWriteBufferLen,
+                              const char * pcCommandString );
+
 /*
  * The function that registers the commands that are defined within this file.
  */
-void vRegisterSampleCLICommands( void );
+void vRegisterSampleCLICommands ( void );
 
 /*
  * Implements the task-stats command.
  */
-static BaseType_t prvTaskStatsCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
+static BaseType_t prvTaskStatsCommand ( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
 
 
 /*
@@ -90,31 +93,32 @@ static BaseType_t prvTaskStatsCommand( char *pcWriteBuffer, size_t xWriteBufferL
 static BaseType_t prvRunTimeStatsCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
 #endif
 
-static BaseType_t prvReset( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString );
+static BaseType_t prvReset ( char * pcWriteBuffer,
+                             size_t xWriteBufferLen,
+                             const char * pcCommandString );
+
 /*
  * Implements the "query heap" command.
  */
 #if( configINCLUDE_QUERY_HEAP_COMMAND == 1 )
-	static BaseType_t prvQueryHeapCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
+    static BaseType_t prvQueryHeapCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
 #endif
 
 /*
  * Implements the "trace start" and "trace stop" commands;
  */
 #if( configINCLUDE_TRACE_RELATED_CLI_COMMANDS == 1 )
-	static BaseType_t prvStartStopTraceCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
+    static BaseType_t prvStartStopTraceCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
 #endif
 
 /* Structure that defines the "task-stats" command line command.  This generates
 a table that gives information on each task in the system. */
 static const CLI_Command_Definition_t xTaskStats =
 {
-	"task-stats", /* The command string to type. */
-	"\r\ntask-stats:\r\n Displays a table showing the state of each FreeRTOS task\r\n",
-	prvTaskStatsCommand, /* The function to run. */
-	0 /* No parameters are expected. */
+    "task-stats", /* The command string to type. */
+    "\r\ntask-stats:\r\n Displays a table showing the state of each FreeRTOS task\r\n",
+    prvTaskStatsCommand, /* The function to run. */
+    0 /* No parameters are expected. */
 };
 
 #if (configGENERATE_RUN_TIME_STATS == 1)
@@ -129,44 +133,45 @@ static const CLI_Command_Definition_t xRunTimeStats =
 #endif
 
 #if( configINCLUDE_QUERY_HEAP_COMMAND == 1 )
-	/* Structure that defines the "query_heap" command line command. */
-	static const CLI_Command_Definition_t xQueryHeap =
-	{
-		"query-heap",
-		"\r\nquery-heap:\r\n Displays the free heap space, and minimum ever free heap space.\r\n",
-		prvQueryHeapCommand, /* The function to run. */
-		0 /* The user can enter any number of commands. */
-	};
+    /* Structure that defines the "query_heap" command line command. */
+    static const CLI_Command_Definition_t xQueryHeap =
+    {
+        "query-heap",
+        "\r\nquery-heap:\r\n Displays the free heap space, and minimum ever free heap space.\r\n",
+        prvQueryHeapCommand, /* The function to run. */
+        0 /* The user can enter any number of commands. */
+    };
 #endif /* configQUERY_HEAP_COMMAND */
 
-static BaseType_t prvParameterEchoCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
+static BaseType_t prvParameterEchoCommand ( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
+
 /* Structure that defines the "echo_parameters" command line command.  This
 takes a variable number of parameters that the command simply echos back one at
 a time. */
 static const CLI_Command_Definition_t xParameterEcho =
 {
-	"test",
-	"\r\necho-parameters <...>:\r\n Take variable number of parameters, echos each in turn\r\n",
-	prvParameterEchoCommand, /* The function to run. */
-	-1 /* The user can enter any number of commands. */
+    "test",
+    "\r\necho-parameters <...>:\r\n Take variable number of parameters, echos each in turn\r\n",
+    prvParameterEchoCommand, /* The function to run. */
+    -1 /* The user can enter any number of commands. */
 };
 
-static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString );
+static BaseType_t prvConfigCommandHandler ( char * pcWriteBuffer,
+                                           size_t xWriteBufferLen,
+                                           const char * pcCommandString );
 
 static CLI_Command_Definition_t xCommandConfig =
 {
-	.pcCommand                   = "conf",
-	.pcHelpString                = "\r\n"
-								   "conf:\r\n"
-								   "    Command to change or retrieve configuration for the device.\r\n"
-								   "    Usage: conf get {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert}\r\n"
-								   "    Usage: conf set {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert} VALUE\r\n"
-			                       "           get     : to retrieve configuration from Data Flash Memory\r\n"
-			                       "           set     : to change configuration for the device\r\n"
-			                       "           {cert}     : select client certificate as input target element\r\n"
-			                       "           {key}      : select client private key as input target element\r\n"
+    .pcCommand                   = "conf",
+    .pcHelpString                = "\r\n"
+                                   "conf:\r\n"
+                                   "    Command to change or retrieve configuration for the device.\r\n"
+                                   "    Usage: conf get {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert}\r\n"
+                                   "    Usage: conf set {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert} VALUE\r\n"
+                                   "           get     : to retrieve configuration from Data Flash Memory\r\n"
+                                   "           set     : to change configuration for the device\r\n"
+                                   "           {cert}     : select client certificate as input target element\r\n"
+                                   "           {key}      : select client private key as input target element\r\n"
                                    "           {thingname}: select AWS thing name as input target element\r\n"
                                    "           {endpoint} : select AWS MQTT endpoint as input target element\r\n"
                                    "           {claimcert}: select claim certificate as input target element\r\n"
@@ -175,110 +180,132 @@ static CLI_Command_Definition_t xCommandConfig =
                                    "           {rootca}   : select root CA certificate as input target element\r\n"
                                    "           {codesigncert} : select code signer certificate as input target element\r\n"
                                    "           VALUE : the value of input target element, this is only required for 'conf set' command\r\n"
-								   "    Usage: conf commit\r\n"
+                                   "    Usage: conf commit\r\n"
                                    "           commit   : to write the configured value to Internal Data Flash Memory\r\n",
-	.pxCommandInterpreter        = prvConfigCommandHandler,
-	.cExpectedNumberOfParameters = -1
+    .pxCommandInterpreter        = prvConfigCommandHandler,
+    .cExpectedNumberOfParameters = -1
 };
 static CLI_Command_Definition_t xReset =
 {
-		.pcCommand                   = "reset",
-		.pcHelpString                = "\r\n"
-									   "reset:\r\n"
-									   "    Command to reset the device.\r\n"
-									   "    Usage: reset\r\n",
-		.pxCommandInterpreter        = prvReset,
-		.cExpectedNumberOfParameters = -1
+        .pcCommand                   = "reset",
+        .pcHelpString                = "\r\n"
+                                       "reset:\r\n"
+                                       "    Command to reset the device.\r\n"
+                                       "    Usage: reset\r\n",
+        .pxCommandInterpreter        = prvReset,
+        .cExpectedNumberOfParameters = -1
 };
 
 static CLI_Command_Definition_t xFormat =
 {
-		.pcCommand                   = "format",
-		.pcHelpString                = "\r\n"
-									   "format:\r\n"
-									   "    Command to format the device.\r\n"
-									   "    Usage: format\r\n",
-		.pxCommandInterpreter        = prvFormat,
-		.cExpectedNumberOfParameters = -1
+        .pcCommand                   = "format",
+        .pcHelpString                = "\r\n"
+                                       "format:\r\n"
+                                       "    Command to format the device.\r\n"
+                                       "    Usage: format\r\n",
+        .pxCommandInterpreter        = prvFormat,
+        .cExpectedNumberOfParameters = -1
 };
 
 static CLI_Command_Definition_t xWait =
 {
-		.pcCommand                   = "CLI",
-		.pcHelpString                = "\r\n"
-									   "CLI:\r\n"
-									   "    Command to enter CLI mode and wait for user input.\r\n"
-									   "    Usage: wait for input\r\n",
-		.pxCommandInterpreter        = prvWaitMessage,
-		.cExpectedNumberOfParameters = -1
+        .pcCommand                   = "CLI",
+        .pcHelpString                = "\r\n"
+                                       "CLI:\r\n"
+                                       "    Command to enter CLI mode and wait for user input.\r\n"
+                                       "    Usage: wait for input\r\n",
+        .pxCommandInterpreter        = prvWaitMessage,
+        .cExpectedNumberOfParameters = -1
 };
+
 /*-----------------------------------------------------------*/
 
+/**********************************************************************************************************************
+ * Function Name: vRegisterSampleCLICommands
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
 void vRegisterSampleCLICommands( void )
 {
-	/* Register all the command line commands defined immediately above. */
-	FreeRTOS_CLIRegisterCommand( &xTaskStats );
-	FreeRTOS_CLIRegisterCommand( &xCommandConfig );
-	FreeRTOS_CLIRegisterCommand( &xParameterEcho );
-	FreeRTOS_CLIRegisterCommand( &xReset );
-	FreeRTOS_CLIRegisterCommand( &xFormat );
-	FreeRTOS_CLIRegisterCommand( &xWait );
+    /* Register all the command line commands defined immediately above. */
+    FreeRTOS_CLIRegisterCommand( &xTaskStats );
+    FreeRTOS_CLIRegisterCommand( &xCommandConfig );
+    FreeRTOS_CLIRegisterCommand( &xParameterEcho );
+    FreeRTOS_CLIRegisterCommand( &xReset );
+    FreeRTOS_CLIRegisterCommand( &xFormat );
+    FreeRTOS_CLIRegisterCommand( &xWait );
 
-	#if( configGENERATE_RUN_TIME_STATS == 1 )
-	{
-		FreeRTOS_CLIRegisterCommand( &xRunTimeStats );
-	}
-	#endif
-	
-	#if( configINCLUDE_QUERY_HEAP_COMMAND == 1 )
-	{
-		FreeRTOS_CLIRegisterCommand( &xQueryHeap );
-	}
-	#endif
+    #if( configGENERATE_RUN_TIME_STATS == 1 )
+    {
+        FreeRTOS_CLIRegisterCommand( &xRunTimeStats );
+    }
+    #endif
 
-	#if( configINCLUDE_TRACE_RELATED_CLI_COMMANDS == 1 )
-	{
-		FreeRTOS_CLIRegisterCommand( &xStartStopTrace );
-	}
-	#endif
+    #if( configINCLUDE_QUERY_HEAP_COMMAND == 1 )
+    {
+        FreeRTOS_CLIRegisterCommand( &xQueryHeap );
+    }
+    #endif
+
+    #if( configINCLUDE_TRACE_RELATED_CLI_COMMANDS == 1 )
+    {
+        FreeRTOS_CLIRegisterCommand( &xStartStopTrace );
+    }
+    #endif
 }
+/**********************************************************************************************************************
+ End of function vRegisterSampleCLICommands
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 
+/**********************************************************************************************************************
+ * Function Name: prvTaskStatsCommand
+ * Description  : .
+ * Arguments    : pcWriteBuffer
+ *              : xWriteBufferLen
+ *              : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
 static BaseType_t prvTaskStatsCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString )
 {
 const char *const pcHeader = "     State   Priority  Stack    #\r\n************************************************\r\n";
-BaseType_t xSpacePadding;
+BaseType_t        xSpacePadding;
 
-	/* Remove compile time warnings about unused parameters, and check the
-	write buffer is not NULL.  NOTE - for simplicity, this example assumes the
-	write buffer length is adequate, so does not check for buffer overflows. */
-	( void ) pcCommandString;
-	( void ) xWriteBufferLen;
-	configASSERT( pcWriteBuffer );
+    /* Remove compile time warnings about unused parameters, and check the
+    write buffer is not NULL.  NOTE - for simplicity, this example assumes the
+    write buffer length is adequate, so does not check for buffer overflows. */
+    (void) pcCommandString;
+    (void) xWriteBufferLen;
+    configASSERT( pcWriteBuffer );
 
-	/* Generate a table of task stats. */
-	strcpy( pcWriteBuffer, " Task" );
-	pcWriteBuffer += strlen( pcWriteBuffer );
+    /* Generate a table of task stats. */
+    strcpy( pcWriteBuffer, " Task" );
+    pcWriteBuffer += strlen( pcWriteBuffer );
 
-	/* Minus three for the null terminator and half the number of characters in
-	"Task" so the column lines up with the centre of the heading. */
-	configASSERT( configMAX_TASK_NAME_LEN > 3 );
-	for( xSpacePadding = strlen( "Task" ); xSpacePadding < ( configMAX_TASK_NAME_LEN - 3 ); xSpacePadding++ )
-	{
-		/* Add a space to align columns after the task's name. */
-		*pcWriteBuffer = ' ';
-		pcWriteBuffer++;
+    /* Minus three for the null terminator and half the number of characters in
+    "Task" so the column lines up with the centre of the heading. */
+    configASSERT( configMAX_TASK_NAME_LEN > 3 );
+    for ( xSpacePadding = strlen( "Task" ); xSpacePadding < ( configMAX_TASK_NAME_LEN - 3 ); xSpacePadding++ )
+    {
+        /* Add a space to align columns after the task's name. */
+        *pcWriteBuffer = ' ';
+        pcWriteBuffer++;
 
-		/* Ensure always terminated. */
-		*pcWriteBuffer = 0x00;
-	}
-	strcpy( pcWriteBuffer, pcHeader );
-	vTaskList( pcWriteBuffer + strlen( pcHeader ) );
+        /* Ensure always terminated. */
+        *pcWriteBuffer = 0x00;
+    }
+    strcpy( pcWriteBuffer, pcHeader );
+    vTaskList( pcWriteBuffer + strlen( pcHeader ) );
 
-	/* There is no more data to return after this single string, so return
-	pdFALSE. */
-	return pdFALSE;
+    /* There is no more data to return after this single string, so return
+    pdFALSE. */
+    return pdFALSE;
 }
+/**********************************************************************************************************************
+ End of function prvTaskStatsCommand
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 
 #if (configGENERATE_RUN_TIME_STATS == 1)
@@ -306,243 +333,318 @@ static BaseType_t prvRunTimeStatsCommand( char *pcWriteBuffer, size_t xWriteBuff
 
 #if( configINCLUDE_QUERY_HEAP_COMMAND == 1 )
 
-	static BaseType_t prvQueryHeapCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString )
-	{
-		/* Remove compile time warnings about unused parameters, and check the
-		write buffer is not NULL.  NOTE - for simplicity, this example assumes the
-		write buffer length is adequate, so does not check for buffer overflows. */
-		( void ) pcCommandString;
-		( void ) xWriteBufferLen;
-		configASSERT( pcWriteBuffer );
+    static BaseType_t prvQueryHeapCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString )
+    {
+        /* Remove compile time warnings about unused parameters, and check the
+        write buffer is not NULL.  NOTE - for simplicity, this example assumes the
+        write buffer length is adequate, so does not check for buffer overflows. */
+        ( void ) pcCommandString;
+        ( void ) xWriteBufferLen;
+        configASSERT( pcWriteBuffer );
 
-		sprintf( pcWriteBuffer, "Current free heap %d bytes, minimum ever free heap %d bytes\r\n", ( int ) xPortGetFreeHeapSize(), ( int ) xPortGetMinimumEverFreeHeapSize() );
+        sprintf( pcWriteBuffer, "Current free heap %d bytes, minimum ever free heap %d bytes\r\n", ( int ) xPortGetFreeHeapSize(), ( int ) xPortGetMinimumEverFreeHeapSize() );
 
-		/* There is no more data to return after this single string, so return
-		pdFALSE. */
-		return pdFALSE;
-	}
+        /* There is no more data to return after this single string, so return
+        pdFALSE. */
+        return pdFALSE;
+    }
 
 #endif /* configINCLUDE_QUERY_HEAP */
 /*-----------------------------------------------------------*/
 
+/**********************************************************************************************************************
+ * Function Name: prvWaitMessage
+ * Description  : .
+ * Arguments    : pcWriteBuffer
+ *              : xWriteBufferLen
+ *              : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
 static BaseType_t prvWaitMessage( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString )
+                                           size_t xWriteBufferLen,
+                                           const char * pcCommandString )
 {
-	( void ) pcCommandString;
-	( void ) xWriteBufferLen;
-	configASSERT( pcWriteBuffer );
-	extern signed char cRxedChar;
-	if (cRxedChar != 0)
-	{
-			sprintf( pcWriteBuffer, "Going to FreeRTOS-CLI !\r\n");
-	}
+    (void)pcCommandString;
+    (void)xWriteBufferLen;
+    configASSERT( pcWriteBuffer );
+    extern signed char cRxedChar;
+    if (0 != cRxedChar)
+    {
+            sprintf( pcWriteBuffer, "Going to FreeRTOS-CLI !\r\n");
+    }
 
-	return pdFALSE;
+    return pdFALSE;
 }
+/**********************************************************************************************************************
+ End of function prvWaitMessage
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ * Function Name: prvReset
+ * Description  : .
+ * Arguments    : pcWriteBuffer
+ *              : xWriteBufferLen
+ *              : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
 static BaseType_t prvReset( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString )
+                                           size_t xWriteBufferLen,
+                                           const char * pcCommandString )
 {
-	/* Remove compile time warnings about unused parameters, and check the
-	write buffer is not NULL.  NOTE - for simplicity, this example assumes the
-	write buffer length is adequate, so does not check for buffer overflows. */
-	( void ) pcCommandString;
-	( void ) xWriteBufferLen;
-	configASSERT( pcWriteBuffer );
-	sprintf( pcWriteBuffer, "Resetting !\r\n");
-	vTaskDelay(1000);
-	R_BSP_SET_PSW( 0 );
-	R_BSP_InterruptsDisable();
-	R_BSP_SoftwareReset();
+    /* Remove compile time warnings about unused parameters, and check the
+    write buffer is not NULL.  NOTE - for simplicity, this example assumes the
+    write buffer length is adequate, so does not check for buffer overflows. */
+    (void)pcCommandString;
+    (void)xWriteBufferLen;
+    configASSERT( pcWriteBuffer );
+    sprintf( pcWriteBuffer, "Resetting !\r\n");
+    vTaskDelay(1000);
+    R_BSP_SET_PSW( 0 );
+    R_BSP_InterruptsDisable();
+    R_BSP_SoftwareReset();
 
-	/* There is no more data to return after this single string, so return
-	pdFALSE. */
-	return pdFALSE;
+    /* There is no more data to return after this single string, so return
+    pdFALSE. */
+    return pdFALSE;
 }
+/**********************************************************************************************************************
+ End of function prvReset
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: prvFormat
+ * Description  : .
+ * Arguments    : pcWriteBuffer
+ *              : xWriteBufferLen
+ *              : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
 static BaseType_t prvFormat( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString )
+                                           size_t xWriteBufferLen,
+                                           const char * pcCommandString )
 {
-	/* Remove compile time warnings about unused parameters, and check the
-	write buffer is not NULL.  NOTE - for simplicity, this example assumes the
-	write buffer length is adequate, so does not check for buffer overflows. */
-	( void ) pcCommandString;
-	( void ) xWriteBufferLen;
-	int32_t err ;
+    /* Remove compile time warnings about unused parameters, and check the
+    write buffer is not NULL.  NOTE - for simplicity, this example assumes the
+    write buffer length is adequate, so does not check for buffer overflows. */
+    (void)pcCommandString;
+    (void)xWriteBufferLen;
+    int32_t err;
 
     /* File system is already mounted, unmount it to free up memory. */
     lfs_unmount(&g_rm_littlefs0_lfs);
-	RM_LITTLEFS_FLASH_Open(g_rm_littlefs0.p_ctrl, g_rm_littlefs0.p_cfg);
+    RM_LITTLEFS_FLASH_Open(g_rm_littlefs0.p_ctrl, g_rm_littlefs0.p_cfg);
 
-	err = lfs_format(&g_rm_littlefs0_lfs, &g_rm_littlefs0_lfs_cfg);
-	if (LFS_ERR_OK == err)
-	{
-		lfs_mount(&g_rm_littlefs0_lfs, &g_rm_littlefs0_lfs_cfg);
-		sprintf( pcWriteBuffer, "Format OK !\r\n");
+    err = lfs_format(&g_rm_littlefs0_lfs, &g_rm_littlefs0_lfs_cfg);
+    if (LFS_ERR_OK == err)
+    {
+        lfs_mount(&g_rm_littlefs0_lfs, &g_rm_littlefs0_lfs_cfg);
+        sprintf( pcWriteBuffer, "Format OK !\r\n");
 
-		/* Format the cache too */
-		vprvCacheFormat();
-	}
-	else
-	{
-		sprintf( pcWriteBuffer, "Format NG !\r\n");
-	}
+        /* Format the cache too */
+        vprvCacheFormat();
+    }
+    else
+    {
+        sprintf( pcWriteBuffer, "Format NG !\r\n");
+    }
 
-	/* There is no more data to return after this single string, so return
-	pdFALSE. */
-	return pdFALSE;
+    /* There is no more data to return after this single string, so return
+    pdFALSE. */
+    return pdFALSE;
 }
+/**********************************************************************************************************************
+ End of function prvFormat
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ * Function Name: prvConfigCommandHandler
+ * Description  : .
+ * Arguments    : pcWriteBuffer
+ *              : xWriteBufferLen
+ *              : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
 static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
-										   size_t xWriteBufferLen,
-										   const char * pcCommandString )
+                                           size_t xWriteBufferLen,
+                                           const char * pcCommandString )
 {
-	(void) xWriteBufferLen;
-    BaseType_t result = pdPASS;
-    const char * pRequest = NULL, * pKey = NULL, * pValue = NULL, * getValue = NULL;
-    BaseType_t requestLength = 0, keyLength = 0, valueLength = 0;
+    (void) xWriteBufferLen;
+    BaseType_t   result        = pdPASS;
+    const char * pRequest      = NULL;
+    const char * pKey          = NULL;
+    const char * pValue        = NULL;
+    const char * getValue      = NULL;
+    BaseType_t   requestLength = 0;
+    BaseType_t   keyLength     = 0;
+    BaseType_t   valueLength   = 0;
 
-    pRequest = FreeRTOS_CLIGetParameter( pcCommandString, 1U, &requestLength );
-    * pcWriteBuffer = '\0';
-	if( pRequest != NULL )
-	{
-		if( strncmp( pRequest, "get", requestLength ) == 0 )
-		{
-			pKey = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
-			/* Cast to type "const char *" to be compatible with parameter type */
-			getValue = (const char *) xprvGetCacheEntry((char *) pKey, keyLength);
-			if (getValue == NULL)
-			{
-				sprintf(pcWriteBuffer,"No %s in Data Flash!\r\n",pKey);
-			}
-			else
-			{
-				sprintf(pcWriteBuffer,"%s\r\n",getValue);
-				getValue = NULL;
-			}
+    pRequest        = FreeRTOS_CLIGetParameter( pcCommandString, 1U, &requestLength );
+    *pcWriteBuffer = '\0';
+    if ( NULL != pRequest)
+    {
+        if ( 0 == strncmp( pRequest, "get", requestLength ) )
+        {
+            pKey = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
 
-		}
-		else if( strncmp( pRequest, "set", requestLength ) == 0 )
-		{
-			pKey = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
-			pValue = FreeRTOS_CLIGetParameter( pcCommandString, 3U, &valueLength );
-			/* Cast to type "char *" to be compatible with parameter type */
-			if (xprvWriteCacheEntry(keyLength, (char *)pKey,valueLength, (char *)pValue) < 0)
-			{
-				result = pdFALSE;
-			}
-			else
-			{
-				KVStoreKey_t xKey;
-				/* Cast to type "char *" to be compatible with parameter type */
-				xKey = (KVStoreKey_t)Filename2Handle((char *)pKey, keyLength);
-				if ((KVS_TSIP_ROOTCA_PUBKEY_ID == xKey) ||
-				    (KVS_TSIP_CLIENT_PUBKEY_ID == xKey) ||
-				    (KVS_TSIP_CLIENT_PRIKEY_ID == xKey))
-				{
-					sprintf(pcWriteBuffer, "The TSIP key index cannot be write.\r\n");
-				}
-				else
-				{
-					sprintf(pcWriteBuffer, "OK.\r\n" );
-				}
-			}
-		}
-		else  if( strncmp( pRequest, "commit", requestLength ) == 0 )
-		{
-			BaseType_t xResult = KVStore_xCommitChanges();
-			if( xResult == pdTRUE )
-			{
-			    uint32_t totalSize = GetTotalLengthFromImpl();
-				sprintf(pcWriteBuffer, "Configuration save %d bytes to Data Flash. Total used size is %d bytes .\r\n",( int )pvwrite, ( int )totalSize );
-				pvwrite = 0;
-			}
-			else
-			{
-				sprintf(pcWriteBuffer, "Error: Could not save configuration to Data Flash or saved before.\r\n" );
-			}
+            /* Cast to type "const char *" to be compatible with parameter type */
+            getValue = (const char *)xprvGetCacheEntry((char *)pKey, keyLength);
+            if (NULL == getValue)
+            {
+                sprintf(pcWriteBuffer, "No %s in Data Flash!\r\n", pKey);
+            }
+            else
+            {
+                sprintf(pcWriteBuffer, "%s\r\n", getValue);
+                getValue = NULL;
+            }
 
-		}
+        }
+        else if ( 0 == strncmp( pRequest, "set", requestLength ) )
+        {
+            pKey   = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
+            pValue = FreeRTOS_CLIGetParameter( pcCommandString, 3U, &valueLength );
 
-		else
-		{
-			result = pdFALSE;
-		}
-	}
+            /* Cast to type "char *" to be compatible with parameter type */
+            if (xprvWriteCacheEntry(keyLength, (char *)pKey, valueLength, (char *)pValue) < 0)
+            {
+                result = pdFALSE;
+            }
+            else
+            {
+                KVStoreKey_t xKey;
 
-	if( result != pdPASS )
-	{
-		sprintf(pcWriteBuffer, "Error.\r\n\r\n" );
-	}
+                /* Cast to type "char *" to be compatible with parameter type */
+                xKey = (KVStoreKey_t)Filename2Handle((char *)pKey, keyLength);
+                if ((KVS_TSIP_ROOTCA_PUBKEY_ID == xKey) ||
+                    (KVS_TSIP_CLIENT_PUBKEY_ID == xKey) ||
+                    (KVS_TSIP_CLIENT_PRIKEY_ID == xKey))
+                {
+                    sprintf(pcWriteBuffer, "The TSIP key index cannot be write.\r\n");
+                }
+                else
+                {
+                    sprintf(pcWriteBuffer, "OK.\r\n" );
+                }
+            }
+        }
+        else  if ( 0 == strncmp( pRequest, "commit", requestLength ) )
+        {
+            BaseType_t xResult = KVStore_xCommitChanges();
+            if ( pdTRUE == xResult)
+            {
+                uint32_t totalSize = GetTotalLengthFromImpl();
 
-	return pdFALSE;
+                /* Cast to type "int" to be compatible with parameter type */
+                sprintf(pcWriteBuffer, "Configuration save %d bytes to Data Flash. Total used size is %d bytes .\r\n", (int)pvwrite, (int)totalSize );
+                pvwrite = 0;
+            }
+            else
+            {
+                sprintf(pcWriteBuffer, "Error: Could not save configuration to Data Flash or saved before.\r\n" );
+            }
+
+        }
+
+        else
+        {
+            result = pdFALSE;
+        }
+    }
+
+    if ( pdPASS != result)
+    {
+        sprintf(pcWriteBuffer, "Error.\r\n\r\n" );
+    }
+
+    return pdFALSE;
 }
+/**********************************************************************************************************************
+ End of function prvConfigCommandHandler
+ *********************************************************************************************************************/
 
+
+/**********************************************************************************************************************
+ * Function Name: prvParameterEchoCommand
+ * Description  : .
+ * Arguments    : pcWriteBuffer
+ *              : xWriteBufferLen
+ *              : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
 static BaseType_t prvParameterEchoCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString )
 {
-const char *pcParameter;
-BaseType_t xParameterStringLength, xReturn;
-static UBaseType_t uxParameterNumber = 0;
+const char        * pcParameter;
+BaseType_t          xParameterStringLength;
+BaseType_t          xReturn;
+static UBaseType_t  uxParameterNumber = 0;
 
-	/* Remove compile time warnings about unused parameters, and check the
-	write buffer is not NULL.  NOTE - for simplicity, this example assumes the
-	write buffer length is adequate, so does not check for buffer overflows. */
-	( void ) pcCommandString;
-	( void ) xWriteBufferLen;
-	configASSERT( pcWriteBuffer );
+    /* Remove compile time warnings about unused parameters, and check the
+    write buffer is not NULL.  NOTE - for simplicity, this example assumes the
+    write buffer length is adequate, so does not check for buffer overflows. */
+    (void) pcCommandString;
+    (void) xWriteBufferLen;
+    configASSERT( pcWriteBuffer );
 
-	if( uxParameterNumber == 0 )
-	{
-		/* The first time the function is called after the command has been
-		entered just a header string is returned. */
-		sprintf( pcWriteBuffer, "The parameters were:\r\n" );
+    if (0 == uxParameterNumber)
+    {
+        /* The first time the function is called after the command has been
+        entered just a header string is returned. */
+        sprintf( pcWriteBuffer, "The parameters were:\r\n" );
 
-		/* Next time the function is called the first parameter will be echoed
-		back. */
-		uxParameterNumber = 1U;
+        /* Next time the function is called the first parameter will be echoed
+        back. */
+        uxParameterNumber = 1U;
 
-		/* There is more data to be returned as no parameters have been echoed
-		back yet. */
-		xReturn = pdPASS;
-	}
-	else
-	{
-		/* Obtain the parameter string. */
-		pcParameter = FreeRTOS_CLIGetParameter
-						(
-							pcCommandString,		/* The command string itself. */
-							uxParameterNumber,		/* Return the next parameter. */
-							&xParameterStringLength	/* Store the parameter string length. */
-						);
+        /* There is more data to be returned as no parameters have been echoed
+        back yet. */
+        xReturn = pdPASS;
+    }
+    else
+    {
+        /* Obtain the parameter string. */
+        pcParameter = FreeRTOS_CLIGetParameter
+                        (
+                            pcCommandString,        /* The command string itself. */
+                            uxParameterNumber,      /* Return the next parameter. */
+                            &xParameterStringLength    /* Store the parameter string length. */
+                        );
 
-		if( pcParameter != NULL )
-		{
-			/* Return the parameter string. */
-			memset( pcWriteBuffer, 0x00, xWriteBufferLen );
-			sprintf( pcWriteBuffer, "%d: ", ( int ) uxParameterNumber );
-			strncat( pcWriteBuffer, ( char * ) pcParameter, ( size_t ) xParameterStringLength );
-			strncat( pcWriteBuffer, "\r\n", strlen( "\r\n" ) );
+        if( pcParameter != NULL )
+        {
+            /* Return the parameter string. */
+            memset(pcWriteBuffer, 0x00, xWriteBufferLen);
 
-			/* There might be more parameters to return after this one. */
-			xReturn = pdTRUE;
-			uxParameterNumber++;
-		}
-		else
-		{
-			/* No more parameters were found.  Make sure the write buffer does
-			not contain a valid string. */
-			pcWriteBuffer[ 0 ] = 0x00;
+            /* Cast to type "int" to be compatible with parameter type */
+            sprintf(pcWriteBuffer, "%d: ", (int)uxParameterNumber);
 
-			/* No more data to return. */
-			xReturn = pdFALSE;
+            /* Cast to type "char *" and "size_t" to be compatible with parameter type */
+            strncat(pcWriteBuffer, (char *)pcParameter, (size_t)xParameterStringLength);
+            strncat(pcWriteBuffer, "\r\n", strlen("\r\n")+1);
 
-			/* Start over the next time this command is executed. */
-			uxParameterNumber = 0;
-		}
-	}
+            /* There might be more parameters to return after this one. */
+            xReturn = pdTRUE;
+            uxParameterNumber++;
+        }
+        else
+        {
+            /* No more parameters were found.  Make sure the write buffer does
+            not contain a valid string. */
+            pcWriteBuffer[0] = 0x00;
 
-	return xReturn;
+            /* No more data to return. */
+            xReturn = pdFALSE;
+
+            /* Start over the next time this command is executed. */
+            uxParameterNumber = 0;
+        }
+    }
+
+    return xReturn;
 }
+/**********************************************************************************************************************
+ End of function prvParameterEchoCommand
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 

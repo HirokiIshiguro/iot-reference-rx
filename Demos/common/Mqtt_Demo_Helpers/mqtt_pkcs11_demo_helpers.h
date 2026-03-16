@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -50,13 +52,25 @@
  *
  * @return The status of the final connection attempt.
  */
-BaseType_t xEstablishMqttSession( MQTTContext_t * pxMqttContext,
-                                  NetworkContext_t * pxNetworkContext,
-                                  MQTTFixedBuffer_t * pxNetworkBuffer,
+/**********************************************************************************************************************
+ * Function Name: xEstablishMqttSession
+ * Description  : .
+ * Arguments    : pxMqttContext
+ *              : pxNetworkContext
+ *              : pxNetworkBuffer
+ *              : eventCallback
+ *              : pcClientCertLabel
+ *              : pcPrivateKeyLabel
+ *              : pcClient_identifier
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xEstablishMqttSession (MQTTContext_t *pxMqttContext,
+                                  NetworkContext_t *pxNetworkContext,
+                                  MQTTFixedBuffer_t *pxNetworkBuffer,
                                   MQTTEventCallback_t eventCallback,
-                                  char * pcClientCertLabel,
-                                  char * pcPrivateKeyLabel,
-                                  char * pcClient_identifier );
+                                  char *pcClientCertLabel,
+                                  char *pcPrivateKeyLabel,
+                                  char *pcClient_identifier);
 
 /**
  * @brief Handle the incoming packet if it's not related to the device shadow.
@@ -64,8 +78,15 @@ BaseType_t xEstablishMqttSession( MQTTContext_t * pxMqttContext,
  * @param[in] pxPacketInfo Packet Info pointer for the incoming packet.
  * @param[in] usPacketIdentifier Packet identifier of the incoming packet.
  */
-void vHandleOtherIncomingPacket( MQTTPacketInfo_t * pxPacketInfo,
-                                 uint16_t usPacketIdentifier );
+/**********************************************************************************************************************
+ * Function Name: vHandleOtherIncomingPacket
+ * Description  : .
+ * Arguments    : pxPacketInfo
+ *              : usPacketIdentifier
+ * Return Value : .
+ *********************************************************************************************************************/
+void vHandleOtherIncomingPacket (MQTTPacketInfo_t *pxPacketInfo,
+                                 uint16_t usPacketIdentifier);
 
 /**
  * @brief Close the MQTT connection.
@@ -77,8 +98,15 @@ void vHandleOtherIncomingPacket( MQTTPacketInfo_t * pxPacketInfo,
  * @return pdPASS if DISCONNECT was successfully sent;
  * pdFAIL otherwise.
  */
-BaseType_t xDisconnectMqttSession( MQTTContext_t * pxMqttContext,
-                                   NetworkContext_t * pxNetworkContext );
+/**********************************************************************************************************************
+ * Function Name: xDisconnectMqttSession
+ * Description  : .
+ * Arguments    : pxMqttContext
+ *              : pxNetworkContext
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xDisconnectMqttSession (MQTTContext_t *pxMqttContext,
+                                   NetworkContext_t *pxNetworkContext);
 
 /**
  * @brief Subscribe to a MQTT topic filter.
@@ -91,9 +119,17 @@ BaseType_t xDisconnectMqttSession( MQTTContext_t * pxMqttContext,
  * @return pdPASS if SUBSCRIBE was successfully sent;
  * pdFAIL otherwise.
  */
-BaseType_t xSubscribeToTopic( MQTTContext_t * pxMqttContext,
-                              const char * pcTopicFilter,
-                              uint16_t usTopicFilterLength );
+/**********************************************************************************************************************
+ * Function Name: xSubscribeToTopic
+ * Description  : .
+ * Arguments    : pxMqttContext
+ *              : pcTopicFilter
+ *              : usTopicFilterLength
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xSubscribeToTopic (MQTTContext_t *pxMqttContext,
+                              const char *pcTopicFilter,
+                              uint16_t usTopicFilterLength);
 
 /**
  * @brief Sends an MQTT UNSUBSCRIBE to unsubscribe from the shadow
@@ -106,9 +142,17 @@ BaseType_t xSubscribeToTopic( MQTTContext_t * pxMqttContext,
  * @return pdPASS if UNSUBSCRIBE was successfully sent;
  * pdFAIL otherwise.
  */
-BaseType_t xUnsubscribeFromTopic( MQTTContext_t * pxMqttContext,
-                                  const char * pcTopicFilter,
-                                  uint16_t usTopicFilterLength );
+/**********************************************************************************************************************
+ * Function Name: xUnsubscribeFromTopic
+ * Description  : .
+ * Arguments    : pxMqttContext
+ *              : pcTopicFilter
+ *              : usTopicFilterLength
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xUnsubscribeFromTopic (MQTTContext_t *pxMqttContext,
+                                  const char *pcTopicFilter,
+                                  uint16_t usTopicFilterLength);
 
 /**
  * @brief Publish a message to a MQTT topic.
@@ -122,11 +166,21 @@ BaseType_t xUnsubscribeFromTopic( MQTTContext_t * pxMqttContext,
  * @return pdPASS if PUBLISH was successfully sent;
  * pdFAIL otherwise.
  */
-BaseType_t xPublishToTopic( MQTTContext_t * pxMqttContext,
-                            const char * pcTopicFilter,
+/**********************************************************************************************************************
+ * Function Name: xPublishToTopic
+ * Description  : .
+ * Arguments    : pxMqttContext
+ *              : pcTopicFilter
+ *              : topicFilterLength
+ *              : pcPayload
+ *              : payloadLength
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xPublishToTopic (MQTTContext_t *pxMqttContext,
+                            const char *pcTopicFilter,
                             int32_t topicFilterLength,
-                            const char * pcPayload,
-                            size_t payloadLength );
+                            const char *pcPayload,
+                            size_t payloadLength);
 
 /**
  * @brief Invoke the core MQTT library's process loop function.
@@ -137,7 +191,14 @@ BaseType_t xPublishToTopic( MQTTContext_t * pxMqttContext,
  * @return pdPASS if process loop was successful;
  * pdFAIL otherwise.
  */
-BaseType_t xProcessLoop( MQTTContext_t * pxMqttContext,
-                         uint32_t ulTimeoutMs );
+/**********************************************************************************************************************
+ * Function Name: xProcessLoop
+ * Description  : .
+ * Arguments    : pxMqttContext
+ *              : ulTimeoutMs
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xProcessLoop (MQTTContext_t *pxMqttContext,
+                         uint32_t ulTimeoutMs);
 
 #endif /* ifndef MQTT_PKCS11_DEMO_HELPERS_H */

@@ -17,7 +17,7 @@
 
 #include "ota_fwup_wrap_verify.h"
 
-static uint8_t * get_cert( uint32_t * ulSignerCertSize );
+static uint8_t * get_cert ( uint32_t * ulSignerCertSize );
 void* s_ctx_iot = NULL;
 S_C_CH_FAR VERIFICATION_SCHEME_ECDSA[] = "sig-sha256-ecdsa";
 S_C_CH_FAR VERIFICATION_SCHEME_SHA[]  = "hash-sha256";
@@ -37,10 +37,10 @@ void * ota_get_crypt_context_function(void)
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
- * Function Name: ota_sha256_init_function_init
- * Description  : user-defined wrapper function to initialize SHA256.
- * Arguments    : vp_ctx : context
- * Return Value : library processing result
+ * Function Name: ota_sha256_init_function
+ * Description  : .
+ * Argument     : vp_ctx
+ * Return Value : .
  *********************************************************************************************************************/
 int32_t ota_sha256_init_function(void * vp_ctx)
 {
@@ -70,7 +70,7 @@ int32_t ota_sha256_update_function(void * vp_ctx, C_U8_FAR *p_data, uint32_t dat
 {
 
     (void) vp_ctx;
-    CRYPTO_SignatureVerificationUpdate(s_ctx_iot, ( const uint8_t * ) p_data, datalen);
+    CRYPTO_SignatureVerificationUpdate(s_ctx_iot, (const uint8_t *)p_data, datalen);
     return 0;
 }
 /**********************************************************************************************************************
@@ -129,19 +129,19 @@ int32_t ota_verify_ecdsa_function(uint8_t *p_hash, uint8_t *p_sig_type, uint8_t 
     LogInfo( ( "Started %s signature verification", VERIFICATION_SCHEME_ECDSA ) );
     pucSignerCert = get_cert( &ulSignerCertSize );
 
-    if( pucSignerCert == NULL )
+    if (NULL == pucSignerCert)
     {
         return -1;
     }
     else
     {
         if ( CRYPTO_SignatureVerificationFinal( s_ctx_iot, ( char * ) pucSignerCert, ulSignerCertSize,
-        		/* Cast to type "uint8_t *" to be compatible with parameter type */
+                /* Cast to type "uint8_t *" to be compatible with parameter type */
                 (uint8_t *)pOTAFileContext->signature, pOTAFileContext->signatureLen ) == pdFALSE )
         {
-             LogError( ( "Finished %s signature verification, but signature verification failed",
-                         VERIFICATION_SCHEME_ECDSA ) );
-             return -1;
+            LogError( ( "Finished %s signature verification, but signature verification failed",
+                        VERIFICATION_SCHEME_ECDSA ) );
+            return -1;
         }
         else
         {
@@ -171,7 +171,6 @@ static uint8_t * get_cert( uint32_t * ulSignerCertSize )
     uint8_t * pucCertData = NULL;
     uint32_t ulCertSize;
     uint8_t * pucSignerCert = NULL;
-	
     size_t valueLength = prvGetCacheEntryLength(KVS_CODE_SIGN_CERT_ID);
 
     if (valueLength > 0)
@@ -179,12 +178,13 @@ static uint8_t * get_cert( uint32_t * ulSignerCertSize )
         pucCertData = (uint8_t *)GetStringValue(KVS_CODE_SIGN_CERT_ID, valueLength);
     }
 
-    if (pucCertData != NULL)
+    if (NULL != pucCertData)
     {
         LogInfo( ( "Using certificate stored in DF...") );
         ulCertSize = valueLength;
     }
-    else {
+    else
+    {
         /* Allocate memory for the signer certificate plus a terminating zero so we can copy it and return to the caller. */
         LogError( ( "No certificate stored in DF! Please commit using CLI mode.") );
         return pucSignerCert;
@@ -192,11 +192,11 @@ static uint8_t * get_cert( uint32_t * ulSignerCertSize )
 
     pucSignerCert = pvPortMalloc( ulCertSize + 1 );
 
-    if ( pucSignerCert != NULL )
+    if (NULL != pucSignerCert)
     {
         memcpy( pucSignerCert, pucCertData, ulCertSize );
         /* The crypto code requires the terminating zero to be part of the length so add 1 to the size. */
-        pucSignerCert[ ulCertSize ] = 0U;
+        pucSignerCert[ulCertSize] = 0U;
         *ulSignerCertSize = ulCertSize + 1U;
     }
     else

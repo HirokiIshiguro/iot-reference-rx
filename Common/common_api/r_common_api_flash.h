@@ -40,7 +40,7 @@ typedef struct _update_data_flash_control_block
 extern xSemaphoreHandle xSemaphoreFlashAccess;
 
 /* Function Name: R_Demo_Common_API_Flash_Open */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief CommonAPI open function for Flash.
  * @param[in] void
  * @return e_commonapi_err_t
@@ -50,7 +50,7 @@ extern xSemaphoreHandle xSemaphoreFlashAccess;
 e_commonapi_err_t R_Demo_Common_API_Flash_Open (void);
 
 /* Function Name: R_Demo_Common_API_Flash_Close */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief CommonAPI close function for Flash.
  * @param[in] void
  * @return e_commonapi_err_t
@@ -60,7 +60,7 @@ e_commonapi_err_t R_Demo_Common_API_Flash_Open (void);
 e_commonapi_err_t R_Demo_Common_API_Flash_Close (void);
 
 /* Function Name: flashing_callback */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Callback function which is called from Renesas API's interrupt service routine.
  * @param[in] void *pvArgs
  * @return void

@@ -1,0 +1,1081 @@
+## Document Creation Information
+SPDXVersion: SPDX-2.2
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: sbom_iot-reference-rx-v202406.01-LTS-rx-1.2.0
+DocumentNamespace: https://www.renesas.com/spdx/iot-reference-rx-v202406.01-LTS-rx-1.2.0
+
+## Creation Information
+Creator: Organization:    Renesas Electronics Corporation
+Created: 2026-02-09T10:36:46Z
+DocumentComment: <text>
+This is a comment, to record external SBOMs
+ExternalDocumentRef: DocumentRef-AWS-IoT-Core-MQTT-File-Streams-Embedded-C https://github.com/aws/aws-iot-core-mqtt-file-streams-embedded-c/blob/v1.1.0/sbom.spdx SHA256: cbc2bcbef393608912b5e32520a81115fdcbb4e08a96572df071ce098c754f68
+ExternalDocumentRef: DocumentRef-backoffAlgorithm https://github.com/FreeRTOS/backoffAlgorithm/blob/v1.4.1/sbom.spdx SHA256: 8aae10d19ebadc69c64383b1aed448a863197e520242659bb1643d71cce0315b
+ExternalDocumentRef: DocumentRef-coreHTTP https://github.com/FreeRTOS/coreHTTP/blob/v3.1.1/sbom.spdx SHA256: 6049e593b57cc9b0955520e4855e85ebc06451c14f0b7c516ea173a0132565de
+ExternalDocumentRef: DocumentRef-coreJSON https://github.com/FreeRTOS/coreJSON/blob/v3.3.0/sbom.spdx SHA256: 9dc0130d6bc2c1cb53b4812d6a068a3b407c681bf375a1322850ee4f91f6595c
+ExternalDocumentRef: DocumentRef-coreMQTT-Agent https://github.com/FreeRTOS/coreMQTT-Agent/blob/refs/tags/v1.3.1/sbom.spdx SHA256: 8bc1594746f44b10bf95dc880f16390be04aa47a54768a30094fa69653f713ac
+ExternalDocumentRef: DocumentRef-coreMQTT https://github.com/FreeRTOS/coreMQTT/blob/v2.3.1/sbom.spdx SHA256: 4bf0d8de9fbed4b35c5f149f7009b06946834ea3d8384b1d39e1c392f8316563
+ExternalDocumentRef: DocumentRef-corePKCS11 https://github.com/FreeRTOS/corePKCS11/blob/v3.6.3/sbom.spdx SHA256: 22600504ae64dba0fa8897e1ee11408925a4d4c9f756f2db2514311507a4e853
+ExternalDocumentRef: DocumentRef-coreSNTP https://github.com/FreeRTOS/coreSNTP/blob/v1.3.1/sbom.spdx SHA256: c543afe701303213175d953e387482cb4a171d31037ea8928ba2130b2e0d5755
+ExternalDocumentRef: DocumentRef-Device-Defender-for-AWS-IoT-embedded-sdk https://github.com/aws/Device-Defender-for-AWS-IoT-embedded-sdk/blob/v1.4.0/sbom.spdx SHA256: 08a1f79b5087211c80698d14abccdb37e7663c7d664a4032482407cf46e33201
+ExternalDocumentRef: DocumentRef-Device-Shadow-for-AWS-IoT-embedded-sdk https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk/blob/v1.4.1/sbom.spdx SHA256: 0e38d6201f2a7e8948e78d2e9930f96c7849a9ccb9c439a73524ca4286f3f0d1
+ExternalDocumentRef: DocumentRef-Fleet-Provisioning-for-AWS-IoT-embedded-sdk https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/blob/v1.2.1/sbom.spdx SHA256: 1b65d2dc621836a3665017a76415ace30ebb0645a7e2513936759a10cf256f8a
+ExternalDocumentRef: DocumentRef-FreeRTOS-Cellular-Interface https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface/blob/v1.4.0/sbom.spdx SHA256: 881ccf8e2c5f5777f40249c775e2013f4c583b7d691a91e2113a7c3092fc33a1
+ExternalDocumentRef: DocumentRef-FreeRTOS-Plus-TCP https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/blob/V4.2.5/sbom.spdx SHA256: 6f080846fb262ace9cfc404f50fddf9419d3caa8b52c0efffb2d135aa0c35e1d
+ExternalDocumentRef: DocumentRef-Jobs-for-AWS-IoT-embedded-sdk https://github.com/aws/Jobs-for-AWS-IoT-embedded-sdk/blob/v1.5.1/sbom.spdx SHA256: 9d22d3c0d4c9835a8649fa6dc1b352e2d7f773288ac07aa3a766299b66f50202
+ExternalDocumentRef: DocumentRef-SigV4-for-AWS-IoT-embedded-sdk https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk/blob/v1.3.0/sbom.spdx SHA256: 42cadbd7b05029237525410546f0b97e5046df683c34adb96d18bf3cf400d5d6
+
+This is necessary to bypass conformance check failure.
+</text>
+
+## Relationships
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-iotrefrx
+
+FileName: ./MQTTFileDownloader_base64.c
+SPDXID: SPDXRef-MQTTFileDownloaderbase64
+FileComment: <text>NOASSERTION</text>
+FileChecksum: SHA1: b7a6e2f5c280439ce65b6cab6a09bf7b36c62be5
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./MQTTFileDownloader.c
+SPDXID: SPDXRef-MQTTFileDownloader
+FileChecksum: SHA1: 28aecd14cf507875fd09a72cb6e90955d0b01d78
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./MQTTFileDownloader_cbor.c
+SPDXID: SPDXRef-MQTTFileDownloadercbor
+FileChecksum: SHA1: 407aba114806acf8b0b5e7adf05df5a9a0188633
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./backoff_algorithm.c
+SPDXID: SPDXRef-backoffalgorithm
+FileChecksum: SHA1: 95dc857f8b8822f296027bfc98eb8fada16bdb43
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_http_client.c
+SPDXID: SPDXRef-corehttpclient
+FileChecksum: SHA1: 9f4ab38adb2cd96ec5e09bd9e40695d1f08a3532
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_json.c
+SPDXID: SPDXRef-corejsonc
+FileChecksum: SHA1: 4e469e1657621c2be7b69834c8d6bebcca59b2fc
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_mqtt_agent.c
+SPDXID: SPDXRef-coremqttagent
+FileChecksum: SHA1: be5a720e74e50451cd1e675ad73d2e7e5daffed0
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_mqtt_agent_command_functions.c
+SPDXID: SPDXRef-coremqttagentcommandfunctions
+FileChecksum: SHA1: 9c6f652d280eea97cfe2f14e5a65650ad60dd44d
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_mqtt.c
+SPDXID: SPDXRef-coremqtt
+FileChecksum: SHA1: 9a0721e577c840ae51c3878edb566bf09a7b3324
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_mqtt_serializer.c
+SPDXID: SPDXRef-coremqttserializer
+FileChecksum: SHA1: d2e3c46f2a7439ef0afebe175f6eee1e40f464dc
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_mqtt_state.c
+SPDXID: SPDXRef-coremqttstate
+FileChecksum: SHA1: 89110568f4e668dec30defb5d61ac2098c173a84
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_pki_utils.c
+SPDXID: SPDXRef-corepkiutils
+FileChecksum: SHA1: 7be8ebdfe6d0ee041b3cd943595f8fc5a1681db7
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_pkcs11.c
+SPDXID: SPDXRef-corepkcs11c
+FileChecksum: SHA1: 8c979b7459f41a3d3feea61bf72595654400c1b5
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/os/core_pkcs11_pal_utils.c
+SPDXID: SPDXRef-corepkcs11palutils
+FileChecksum: SHA1: 6cb70562b449c9e9bfdad4be00ddf155bc1476f7
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/os/posix/core_pkcs11_pal.c
+SPDXID: SPDXRef-corepkcs11pal
+FileChecksum: SHA1: c7535c3b77ec73219375416a8f1fcf01d50a9319
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/mbedtls/core_pkcs11_mbedtls.c
+SPDXID: SPDXRef-corepkcs11mbedtls
+FileChecksum: SHA1: 0787c547079a8a3debd6f5468df24a3af92591ca
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./dependency/3rdparty/mbedtls_utils/mbedtls_utils.c
+SPDXID: SPDXRef-mbedtlsutils
+FileChecksum: SHA1: b5cf007214be0cdaef3baccb4a74163c79618e49
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_sntp_client.c
+SPDXID: SPDXRef-coresntpclient
+FileChecksum: SHA1: a4d3c3c806c04f52f9e23d0fe08573e061842e51
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./core_sntp_serializer.c
+SPDXID: SPDXRef-coresntpserializer
+FileChecksum: SHA1: a3ee1e8e4807f44251e973f4b14e61978d1b8c72
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./defender.c
+SPDXID: SPDXRef-Device-Defender-for-AWS-IoT-embedded-sdk
+FileComment: <text>NOASSERTION</text>
+FileChecksum: SHA1: e1de139aa01ce02b095bf239763a093b69f01834
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./shadow.c
+SPDXID: SPDXRef-Device-Shadow-for-AWS-IoT-embedded-sdk
+FileComment: <text>NOASSERTION</text>
+FileChecksum: SHA1: 67caded0bb92d54b58c95373688bb1090c9e2eb2
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./fleet_provisioning.c
+SPDXID: SPDXRef-Fleet-Provisioning-for-AWS-IoT-embedded-sdk
+FileComment: <text>NOASSERTION</text>
+FileChecksum: SHA1: 46925ce87f9d5533afd81b1cee3327bb36cb7418
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./cellular_common.c
+SPDXID: SPDXRef-cellularcommon
+FileChecksum: SHA1: c4a4f55f7ed16cd664696a21bb48b25eb45ab503
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./cellular_common_api.c
+SPDXID: SPDXRef-cellularcommonapi
+FileChecksum: SHA1: 42044f7bb634ff2b789abb163d6cd052818541d0
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./cellular_3gpp_urc_handler.c
+SPDXID: SPDXRef-cellular3gppurchandler
+FileChecksum: SHA1: 7b0f0346070263982e7d9797682c6f249abc32bf
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./cellular_at_core.c
+SPDXID: SPDXRef-cellularatcore
+FileChecksum: SHA1: 2d664e328af110c38d7fc906f406fcc09518d67e
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./cellular_3gpp_api.c
+SPDXID: SPDXRef-cellular3gppapi
+FileChecksum: SHA1: 3f252974bd582c1a0871c5f0ed6a4563d84a9aaa
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./cellular_pkthandler.c
+SPDXID: SPDXRef-cellularpkthandler
+FileChecksum: SHA1: ee54808c53f20612aeb69ff11ad917a668ee861c
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./cellular_pktio.c
+SPDXID: SPDXRef-cellularpktio
+FileChecksum: SHA1: 37df5360c777ab55e06f062d8aebc78d5a1487da
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_WIN.c
+SPDXID: SPDXRef-FreeRTOSTCPWIN
+FileChecksum: SHA1: 8593b78059b9a7aedf556dd1f7fb76496205762b
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_DNS_Cache.c
+SPDXID: SPDXRef-FreeRTOSDNSCache
+FileChecksum: SHA1: d34785a52630a08eb2636360f3a850110f0a1f3c
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_DNS_Parser.c
+SPDXID: SPDXRef-FreeRTOSDNSParser
+FileChecksum: SHA1: 3f821f0d767509cb78c087e9d3a3c6abada03e5a
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_Transmission_IPv4.c
+SPDXID: SPDXRef-FreeRTOSTCPTransmissionIPv4
+FileChecksum: SHA1: f26ff3ee87f601afa014c819284cedc4e57cae9a
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_Stream_Buffer.c
+SPDXID: SPDXRef-FreeRTOSStreamBuffer
+FileChecksum: SHA1: 959ffb037fa0b7dc9f8744585290b32148d6f128
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_Utils.c
+SPDXID: SPDXRef-FreeRTOSTCPUtils
+FileChecksum: SHA1: 4980ab1536161f314fa8b4572b9191a1b87903f1
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_State_Handling_IPv4.c
+SPDXID: SPDXRef-FreeRTOSTCPStateHandlingIPv4
+FileChecksum: SHA1: 857361f96080b467c3323f70129a8e009ea2c82c
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_RA.c
+SPDXID: SPDXRef-FreeRTOSRA
+FileChecksum: SHA1: 40dcc0cb8b4f054697e7c94526039ec82619d079
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_Sockets.c
+SPDXID: SPDXRef-FreeRTOSSockets
+FileChecksum: SHA1: dac821aae824a36184b50022f1ffa18cd1a758a9
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_DNS_Networking.c
+SPDXID: SPDXRef-FreeRTOSDNSNetworking
+FileChecksum: SHA1: a518a83fb091cc0c6d48d81def5fd6e8dac5d20d
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_DNS_Callback.c
+SPDXID: SPDXRef-FreeRTOSDNSCallback
+FileChecksum: SHA1: 02f878ddbf2190bb993bbfc2589f033573b3121f
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IPv4.c
+SPDXID: SPDXRef-FreeRTOSIPv4
+FileChecksum: SHA1: 67dc511abd21ecdc6ebc078f10a6fee836a9d907
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_DNS.c
+SPDXID: SPDXRef-FreeRTOSDNS
+FileChecksum: SHA1: b7111e1e3cf5d0bc4dfc5f6ce76cb93b02460812
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IPv6.c
+SPDXID: SPDXRef-FreeRTOSIPv6
+FileChecksum: SHA1: 63bbce338e614258988d6ccadfba90e10e98bd1b
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IPv6_Sockets.c
+SPDXID: SPDXRef-FreeRTOSIPv6Sockets
+FileChecksum: SHA1: 1a3df8e7ed84d992ca97452488512cd4aa7fc98b
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_State_Handling.c
+SPDXID: SPDXRef-FreeRTOSTCPStateHandling
+FileChecksum: SHA1: bfc684da6f2d96116e350aec07bab476af217cfb
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_UDP_IP.c
+SPDXID: SPDXRef-FreeRTOSUDPIP
+FileChecksum: SHA1: 63803c0d44de74d08993e40f3bf064872168745a
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_DHCPv6.c
+SPDXID: SPDXRef-FreeRTOSDHCPv6
+FileChecksum: SHA1: 1fda1b1dc3aa0d445d2bdbc6d768b59d522ced3f
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IP_Timers.c
+SPDXID: SPDXRef-FreeRTOSIPTimers
+FileChecksum: SHA1: ab56cdafa6fd4c4bc9aba5da61a2171715ef64a1
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_IP_IPv6.c
+SPDXID: SPDXRef-FreeRTOSTCPIPIPv6
+FileChecksum: SHA1: d997f38e06a5fbbaba4119022b2d290c69ed93b2
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_UDP_IPv4.c
+SPDXID: SPDXRef-FreeRTOSUDPIPv4
+FileChecksum: SHA1: 0b1ace2e043599d566b1aeea319f77abfe64d2ba
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_IP_IPv4.c
+SPDXID: SPDXRef-FreeRTOSTCPIPIPv4
+FileChecksum: SHA1: 5fae0e2628d44e723413b2826365c1a3f26dad65
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_ARP.c
+SPDXID: SPDXRef-FreeRTOSARP
+FileChecksum: SHA1: c3af47174df3eb2cc4b93690411a900090e48859
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_Routing.c
+SPDXID: SPDXRef-FreeRTOSRouting
+FileChecksum: SHA1: 2d687225e53ae78703ef12a15ec2991b5646e5ae
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IPv6_Utils.c
+SPDXID: SPDXRef-FreeRTOSIPv6Utils
+FileChecksum: SHA1: 5a48bedd06d2b18f43b38dff324ff33cd6c2c2e4
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_Utils_IPv6.c
+SPDXID: SPDXRef-FreeRTOSTCPUtilsIPv6
+FileChecksum: SHA1: 0262e1249eb87e18e51381d21c7961b0af5ea5e9
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_Reception.c
+SPDXID: SPDXRef-FreeRTOSTCPReception
+FileChecksum: SHA1: c7b326289fe96b828499251c17ad2aa659d3e330
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_State_Handling_IPv6.c
+SPDXID: SPDXRef-FreeRTOSTCPStateHandlingIPv6
+FileChecksum: SHA1: 00dea0095157df61dd7e8e8386585f0d53703fd4
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_ND.c
+SPDXID: SPDXRef-FreeRTOSND
+FileChecksum: SHA1: a57677622232d0f66e0f5e99f55d62c098f88da0
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_BitConfig.c
+SPDXID: SPDXRef-FreeRTOSBitConfig
+FileChecksum: SHA1: 9c78c394b7c16dd08b6f0a0b6bd82c76ed9d7691
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_Transmission.c
+SPDXID: SPDXRef-FreeRTOSTCPTransmission
+FileChecksum: SHA1: 10735f957a3046e205eef04817d1339c3dd06d0b
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_ICMP.c
+SPDXID: SPDXRef-FreeRTOSICMP
+FileChecksum: SHA1: f0c33b2e438583d8669b361fc046976ce12d0aa2
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_UDP_IPv6.c
+SPDXID: SPDXRef-FreeRTOSUDPIPv6
+FileChecksum: SHA1: 556128a6a7975f0677133a2595ee6a611e633769
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_Transmission_IPv6.c
+SPDXID: SPDXRef-FreeRTOSTCPTransmissionIPv6
+FileChecksum: SHA1: d36a040da1233c99c67d97406eb69be587566099
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IPv4_Utils.c
+SPDXID: SPDXRef-FreeRTOSIPv4Utils
+FileChecksum: SHA1: 2565f11d79c3ad1d1045bb40f339a7613a4b39a2
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_Utils_IPv4.c
+SPDXID: SPDXRef-FreeRTOSTCPUtilsIPv4
+FileChecksum: SHA1: ca0298a09442c104c50296ff3759c9d0842a5fd2
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_Tiny_TCP.c
+SPDXID: SPDXRef-FreeRTOSTinyTCP
+FileChecksum: SHA1: 37ca9e7c135aa4dff63ab4511e7f2d2fe98acaca
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IP.c
+SPDXID: SPDXRef-FreeRTOSIP
+FileChecksum: SHA1: 2cc68f7a742007845c1d4083654a4804023edd26
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IPv4_Sockets.c
+SPDXID: SPDXRef-FreeRTOSIPv4Sockets
+FileChecksum: SHA1: 87f80a2f78c9820b726287493ddab74d7552df4e
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_TCP_IP.c
+SPDXID: SPDXRef-FreeRTOSTCPIP
+FileChecksum: SHA1: 4cb93826ff8a542d2d24b07517b9bfc61b34ef92
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_IP_Utils.c
+SPDXID: SPDXRef-FreeRTOSIPUtils
+FileChecksum: SHA1: a228a96844aecf8f34274c8e1ea8f5e2f8561af9
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./FreeRTOS_DHCP.c
+SPDXID: SPDXRef-FreeRTOSDHCP
+FileChecksum: SHA1: 3b9cb437de7a9c61aa889ce63ffe0b0c1151c04c
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/NetworkInterface/Common/phyHandling.c
+SPDXID: SPDXRef-phyHandling
+FileChecksum: SHA1: fc22798c581a3712ebb1cea1b2494b6a71d04b8d
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/NetworkInterface/SH2A/NetworkInterface.c
+SPDXID: SPDXRef-SH2A-NetworkInterface
+FileChecksum: SHA1: 5d1f48bc483a17ecb5d43fe28c034af33aa0c663
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/NetworkInterface/RX/NetworkInterface.c
+SPDXID: SPDXRef-NetworkInterface
+FileChecksum: SHA1: 3c238f9cb9dab89c5dbcd8a67da23d52078155f5
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/NetworkInterface/RX/ether_callback.c
+SPDXID: SPDXRef-ethercallback
+FileChecksum: SHA1: 0a2896913be2a566eb9d12dc06c6ce1857b894da
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/BufferManagement/BufferAllocation_2.c
+SPDXID: SPDXRef-BufferAllocation2
+FileChecksum: SHA1: 4588cbdb867453817a667b27d08793e7e00dfcb8
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./portable/BufferManagement/BufferAllocation_1.c
+SPDXID: SPDXRef-BufferAllocation1
+FileChecksum: SHA1: f54bf96b632276e2cb0aa2fb9408d9d90c647d3e
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileComment: NOASSERTION
+FileName: ./jobs.c
+SPDXID: SPDXRef-jobs
+FileChecksum: SHA1: c0eec9194525bb4bf9b6d23c930f885668e22833
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./otaJobParser/ota_job_handler.c
+SPDXID: SPDXRef-otaJobParser-otajobhandler.c
+FileComment: <text>NOASSERTION</text>
+FileChecksum: SHA1: 097a1e5596c7177bca6070261b0651c634849348
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./otaJobParser/job_parser.c
+SPDXID: SPDXRef-otaJobParser-jobparser
+FileChecksum: SHA1: 27fc99945cf64ac5e6fd33132a88915ca4a1fbe6
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./sigv4.c
+SPDXID: SPDXRef-sigv4c
+FileChecksum: SHA1: b1d286e59c81abc760466ed143e9412fc73acfe7
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+FileName: ./sigv4_quicksort.c
+SPDXID: SPDXRef-sigv4quicksort
+FileComment: <text>NOASSERTION</text>
+FileChecksum: SHA1: 334b8ce8c06ef6a3f94e4a70e1fd11db527ffeb4
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: NOASSERTION
+
+## Package Information
+PackageName: iot-reference-rx
+SPDXID: SPDXRef-iotrefrx
+PackageComment: <text>PURL is pkg:github/renesas/iot-reference-rx@v202406.01-LTS-rx-1.2.0</text>
+PackageVersion: v202406.01-LTS-rx-1.2.0
+PackageFileName: FreeRTOSv202406.04-LTS.zip
+PackageSupplier: Organization: Renesas Electronics Corporation
+PackageDownloadLocation: https://github.com/FreeRTOS/FreeRTOS-LTS/tree/202406.04-LTS
+PackageChecksum: SHA256: 6e29b315eddcd365e1ec536aced0bf150b2eadfb8c35cbafa1d0e5fa4e70c3e1
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/renesas/iot-reference-rx@v202406.01-LTS-rx-1.2.0
+FilesAnalyzed: false
+
+## Package Information
+PackageName: KVstore
+SPDXID: SPDXRef-kvstore
+PackageComment: <text>This package did not originate from an existing submodule.</text>
+PackageVersion: v1
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-kvstore
+
+## Package Information
+PackageName: AWS-IoT-Core-MQTT-Streams-Embedded-C
+SPDXID: SPDXRef-aws-stream
+PackageComment: <text>PURL is pkg:github/aws/aws-iot-core-mqtt-streams-embedded-c@v1.1.0</text>
+PackageVersion: v1.1.0
+PackageFileName: aws-iot-core-mqtt-streams-embedded-c-v1.1.0.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: https://github.com/aws/aws-iot-core-mqtt-streams-embedded-c/tree/v1.1.0
+PackageChecksum: SHA256: cbc2bcbef393608912b5e32520a81115fdcbb4e08a96572df071ce098c754f68
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/aws-iot-core-mqtt-streams-embedded-c@v1.1.0
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-aws-stream
+
+## Package Information
+PackageName: backoffAlgorithm
+SPDXID: SPDXRef-backoff-algo
+PackageComment: <text>PURL is pkg:github/FreeRTOS/backoffAlgorithm@v1.4.1</text>
+PackageVersion: v1.4.1
+PackageFileName: backoffAlgorithm-v1.4.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 8aae10d19ebadc69c64383b1aed448a863197e520242659bb1643d71cce0315b
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/backoffAlgorithm@v1.4.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-backoff-algo
+
+## Package Information
+PackageName: coreHTTP
+SPDXID: SPDXRef-corehttp
+PackageComment: <text>PURL is pkg:github/FreeRTOS/coreHTTP@v3.1.1</text>
+PackageVersion: v3.1.1
+PackageFileName: coreHTTP-v3.1.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 6049e593b57cc9b0955520e4855e85ebc06451c14f0b7c516ea173a0132565de
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreHTTP@v3.1.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-corehttp
+
+## Package Information
+PackageName: coreJSON
+SPDXID: SPDXRef-corejson
+PackageComment: <text>PURL is pkg:github/FreeRTOS/coreJSON@v3.3.0</text>
+PackageVersion: v3.3.0
+PackageFileName: coreJSON-v3.3.0.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 9dc0130d6bc2c1cb53b4812d6a068a3b407c681bf375a1322850ee4f91f6595c
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreJSON@v3.3.0
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-corejson
+
+## Package Information
+PackageName: coreMQTT-Agent
+SPDXID: SPDXRef-mqtt-agent
+PackageComment: <text>PURL is pkg:github/FreeRTOS/coreMQTT-Agent@v1.3.1</text>
+PackageVersion: v1.3.1
+PackageFileName: coreMQTT-Agent-v1.3.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 8bc1594746f44b10bf95dc880f16390be04aa47a54768a30094fa69653f713ac
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreMQTT-Agent@v1.3.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-mqtt-agent
+
+## Package Information
+PackageName: coreMQTT
+SPDXID: SPDXRef-mqtt
+PackageComment: <text>PURL is pkg:github/FreeRTOS/coreMQTT@v2.3.1</text>
+PackageVersion: v2.3.1
+PackageFileName: coreMQTT-v2.3.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 4bf0d8de9fbed4b35c5f149f7009b06946834ea3d8384b1d39e1c392f8316563
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreMQTT@v2.3.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-mqtt
+
+## Package Information
+PackageName: corePKCS11
+SPDXID: SPDXRef-corepkcs11
+PackageComment: <text>PURL is pkg:github/FreeRTOS/corePKCS11@v3.6.3</text>
+PackageVersion: v3.6.3
+PackageFileName: corePKCS11-v3.6.3.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 22600504ae64dba0fa8897e1ee11408925a4d4c9f756f2db2514311507a4e853
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/corePKCS11@v3.6.3
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-corepkcs11
+
+## Package Information
+PackageName: coreSNTP
+SPDXID: SPDXRef-sntp
+PackageComment: <text>PURL is pkg:github/FreeRTOS/coreSNTP@v1.3.1</text>
+PackageVersion: v1.3.1
+PackageFileName: coreSNTP-v1.3.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: c543afe701303213175d953e387482cb4a171d31037ea8928ba2130b2e0d5755
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreSNTP@v1.3.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-sntp
+
+## Package Information
+PackageName: Device-Defender-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-dev-defender
+PackageComment: <text>PURL is pkg:github/aws/Device-Defender-for-AWS-IoT-embedded-sdk@v1.4.0</text>
+PackageVersion: v1.4.0
+PackageFileName: Device-Defender-for-AWS-IoT-embedded-sdk-v1.4.0.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: https://github.com/aws/Device-Defender-for-AWS-IoT-embedded-sdk/tree/v1.4.0
+PackageChecksum: SHA256: 08a1f79b5087211c80698d14abccdb37e7663c7d664a4032482407cf46e33201
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Device-Defender-for-AWS-IoT-embedded-sdk@v1.4.0
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-dev-defender
+
+## Package Information
+PackageName: Device-Shadow-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-dev-shadow
+PackageComment: <text>PURL is pkg:github/aws/Device-Shadow-for-AWS-IoT-embedded-sdk@v1.4.1</text>
+PackageVersion: v1.4.1
+PackageFileName: Device-Shadow-for-AWS-IoT-embedded-sdk-v1.4.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk/tree/v1.4.1
+PackageChecksum: SHA256: 0e38d6201f2a7e8948e78d2e9930f96c7849a9ccb9c439a73524ca4286f3f0d1
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Device-Shadow-for-AWS-IoT-embedded-sdk@v1.4.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-dev-shadow
+
+## Package Information
+PackageName: Fleet-Provisioning-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-fleet-prov
+PackageComment: <text>PURL is pkg:github/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk@v1.2.1</text>
+PackageVersion: v1.2.1
+PackageFileName: Fleet-Provisioning-for-AWS-IoT-embedded-sdk-v1.2.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/tree/v1.2.1
+PackageChecksum: SHA256: 1b65d2dc621836a3665017a76415ace30ebb0645a7e2513936759a10cf256f8a
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk@v1.2.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-fleet-prov
+
+## Package Information
+PackageName: FreeRTOS Logging
+SPDXID: SPDXRef-logging
+PackageComment: <text>This package did not originate from an existing submodule.</text>
+PackageVersion: v1.1.3
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-logging
+
+## Package Information
+PackageName: FreeRTOS-Cellular-Interface
+SPDXID: SPDXRef-cellular
+PackageComment: <text>PURL is pkg:github/FreeRTOS/FreeRTOS-Cellular-Interface@v1.4.0</text>
+PackageVersion: v1.4.0
+PackageFileName: FreeRTOS-Cellular-Interface-v1.4.0.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 881ccf8e2c5f5777f40249c775e2013f4c583b7d691a91e2113a7c3092fc33a1
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/FreeRTOS-Cellular-Interface@v1.4.0
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-cellular
+
+## Package Information
+PackageName: FreeRTOS-Kernel
+SPDXID: SPDXRef-frtos-kernel
+PackageComment: <text>PURL is pkg:github/FreeRTOS/FreeRTOS-Kernel@v11.1.0</text>
+PackageVersion: v11.1.0
+PackageFileName: FreeRTOS-KernelV11.1.0.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: eebd58aa71a623c9381f25f77b708c0ed14ef995a8913e2460fe9f286bb271eb
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/FreeRTOS-Kernel@v11.1.0
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-frtos-kernel
+
+## Package Information
+PackageName: FreeRTOS-Plus-CLI
+SPDXID: SPDXRef-frtos-cli
+PackageComment: <text>This package did not originate from an existing submodule.</text>
+PackageVersion: v1.0.4
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-frtos-cli
+
+## Package Information
+PackageName: FreeRTOS-Plus-TCP
+SPDXID: SPDXRef-frtos-tcp
+PackageComment: <text>PURL is pkg:github/FreeRTOS/FreeRTOS-Plus-TCP@v4.2.5</text>
+PackageVersion: v4.2.5
+PackageFileName: FreeRTOS-Plus-TCP-V4.2.5.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageChecksum: SHA256: 6f080846fb262ace9cfc404f50fddf9419d3caa8b52c0efffb2d135aa0c35e1d
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/FreeRTOS-Plus-TCP@v4.2.5
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-frtos-tcp
+
+## Package Information
+PackageName: FreeRTOS crypto
+SPDXID: SPDXRef-freertos-crypto
+PackageComment: <text>This package did not originate from an existing submodule.</text>
+PackageVersion: v1.1.2
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-freertos-crypto
+
+## Package Information
+PackageName: Jobs-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-aws-jobs
+PackageComment: <text>PURL is pkg:github/aws/Jobs-for-AWS-IoT-embedded-sdk@v1.5.1</text>
+PackageVersion: v1.5.1
+PackageFileName: Jobs-for-AWS-IoT-embedded-sdk-v1.5.1.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: https://github.com/aws/Jobs-for-AWS-IoT-embedded-sdk/tree/v1.5.1
+PackageChecksum: SHA256: 9d22d3c0d4c9835a8649fa6dc1b352e2d7f773288ac07aa3a766299b66f50202
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Jobs-for-AWS-IoT-embedded-sdk@v1.5.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-aws-jobs
+
+## Package Information
+PackageName: littlefs
+SPDXID: SPDXRef-littlefs
+PackageComment: <text>PURL is pkg:github/littlefs-project/littlefs@v2.5.1</text>
+PackageVersion: v2.5.1
+PackageSupplier: Organization:   TrustedFirmware
+PackageDownloadLocation: https://github.com/littlefs-project/littlefs/tree/v2.5.1
+PackageLicenseConcluded: BSD-3-Clause
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: <text>Copyright (c) The littlefs authors, Copyright (c) Arm Limited. All rights reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/littlefs-project/littlefs@v2.5.1
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-littlefs
+
+## Package Information
+PackageName: mbedtls
+SPDXID: SPDXRef-mbedtls
+PackageComment: <text>PURL is pkg:github/Mbed-TLS/mbedtls@v3.6.4</text>
+PackageVersion: v3.6.4
+PackageSupplier: Organization:   TrustedFirmware
+PackageDownloadLocation: https://github.com/Mbed-TLS/mbedtls/tree/v3.6.4
+PackageLicenseConcluded: Apache-2.0 AND GPL-2.0-or-later
+PackageLicenseDeclared: Apache-2.0 AND GPL-2.0-or-later
+PackageLicenseComments: <text>Mbed TLS files are provided under a dual [Apache-2.0] OR [GPL-2.0-or-later] license.</text>
+PackageCopyrightText: <text>Copyright The Mbed TLS Contributors</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/Mbed-TLS/mbedtls@v3.6.4
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-mbedtls
+
+## Package Information
+PackageName: Network transport
+SPDXID: SPDXRef-net-transport
+PackageComment: <text>This package did not originate from an existing submodule.</text>
+PackageVersion: v1
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-net-transport
+
+## Package Information
+PackageName: rx-driver-package
+SPDXID: SPDXRef-rdp
+PackageComment: <text>PURL is pkg:github/renesas/rx-driver-package@v1.47</text>
+PackageVersion: v1.47
+PackageSupplier: Organization: Renesas Electronics Corporation
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: LicenseRef-Renesas
+PackageLicenseDeclared: LicenseRef-Renesas
+PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/renesas/rx-driver-package@v1.47
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-rdp
+
+## Package Information
+PackageName: r_bsp
+SPDXID: SPDXRef-r-bsp
+PackageComment: <text>This package is listed separately because it is not included in rx-driver-package v1.47</text>
+PackageVersion: v7.54
+PackageSupplier: Organization: Renesas Electronics Corporation
+PackageDownloadLocation: https://www.renesas.com/document/scd/rx-family-board-support-package-module-using-firmware-integration-technology
+PackageLicenseConcluded: LicenseRef-Renesas
+PackageLicenseDeclared: LicenseRef-Renesas
+PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-r-bsp
+
+## Package Information
+PackageName: r_wifi_da16xxx
+SPDXID: SPDXRef-r-wifi
+PackageComment: <text>This package is listed separately because it is not included in rx-driver-package v1.47</text>
+PackageVersion: v1.40
+PackageSupplier: Organization: Renesas Electronics Corporation
+PackageDownloadLocation: https://www.renesas.com/document/scd/rx-family-us159-da16xxxmevz-wi-fi-control-module-using-firmware-integration-technology
+PackageLicenseConcluded: LicenseRef-Renesas
+PackageLicenseDeclared: LicenseRef-Renesas
+PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-r-wifi
+
+## Package Information
+PackageName: SigV4-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-sigv4
+PackageComment: <text>PURL is pkg:github/aws/SigV4-for-AWS-IoT-embedded-sdk@v1.3.0</text>
+PackageVersion: v1.3.0
+PackageFileName: SigV4-for-AWS-IoT-embedded-sdk-v1.3.0.zip
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk/tree/v1.3.0
+PackageChecksum: SHA256: 42cadbd7b05029237525410546f0b97e5046df683c34adb96d18bf3cf400d5d6
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/SigV4-for-AWS-IoT-embedded-sdk@v1.3.0
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-sigv4
+
+## Package Information
+PackageName: tinycbor
+SPDXID: SPDXRef-tinycbor
+PackageComment: <text>PURL is pkg:github/intel/tinycbor@0.5.2</text>
+PackageVersion: v0.5.2
+PackageSupplier: Organization:   Intel Corporation
+PackageDownloadLocation: https://github.com/intel/tinycbor/tree/v0.5.2
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright (c) 2017 Intel Corporation</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:github/intel/tinycbor@0.5.2
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-tinycbor
+
+## Package Information
+PackageName: wifi
+SPDXID: SPDXRef-wifi
+PackageComment: <text>This package did not originate from an existing submodule.</text>
+PackageVersion: v1
+PackageSupplier: Organization:  Amazon Web Services
+PackageDownloadLocation: NOASSERTION
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
+FilesAnalyzed: false
+## Relationships
+Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-wifi
+
+## License Information
+LicenseID: LicenseRef-Renesas
+ExtractedText: <text>* DISCLAIMER
+* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products.
+* No other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
+* applicable laws, including copyright laws. 
+* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING THIS SOFTWARE, WHETHER EXPRESS, IMPLIED
+* OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NON-INFRINGEMENT.  ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED.TO THE MAXIMUM EXTENT PERMITTED NOT PROHIBITED BY
+* LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES SHALL BE LIABLE FOR ANY DIRECT,
+* INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS SOFTWARE, EVEN IF RENESAS OR
+* ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability 
+* of this software. By using this software, you agree to the additional terms and conditions found by accessing the 
+* following link:
+* http://www.renesas.com/disclaimer</text>
+LicenseName: Renesas Proprietary License

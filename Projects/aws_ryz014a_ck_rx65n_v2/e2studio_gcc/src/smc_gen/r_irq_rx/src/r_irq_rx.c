@@ -1,20 +1,7 @@
 /***********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
-* other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
-* applicable laws, including copyright laws.
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
-* THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
-* EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
-* SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS
-* SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
-* this software. By using this software, you agree to the additional terms and conditions found by accessing the
-* following link:
-* http://www.renesas.com/disclaimer
+* Copyright (c) 2013 - 2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2013-2024 Renesas Electronics Corporation. All rights reserved.
+* SPDX-License-Identifier: BSD-3-Clause
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name    : r_irq_rx.c
@@ -39,6 +26,8 @@
 *         : 15.08.2022  4.30    Fixed to comply with GSCE Coding Standards Rev.6.5.0.
 *         : 29.05.2023  4.40    Fixed to comply with GSCE Coding Standards Rev.6.5.0.
 *         : 28.06.2024  4.50    Fixed to comply with GSCE Coding Standards Rev.6.5.0.
+*         : 31.12.2024  4.70    Added support Nested Interrupt.
+*         : 15.03.2025  4.71    Updated disclaimer.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -979,6 +968,11 @@ R_BSP_PRAGMA_INTERRUPT (irq0_isr, VECT(ICU, IRQ0))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq0_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ0 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq0_handle.p_irq_callback))) && (NULL != (*(g_irq0_handle.p_irq_callback))))
     {
@@ -999,6 +993,11 @@ R_BSP_PRAGMA_INTERRUPT (irq1_isr, VECT(ICU, IRQ1))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq1_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ1 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq1_handle.p_irq_callback))) && (NULL != (*(g_irq1_handle.p_irq_callback))))
     {
@@ -1019,6 +1018,11 @@ R_BSP_PRAGMA_INTERRUPT (irq2_isr, VECT(ICU, IRQ2))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq2_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ2 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq2_handle.p_irq_callback))) && (NULL != (*(g_irq2_handle.p_irq_callback))))
     {
@@ -1039,6 +1043,11 @@ R_BSP_PRAGMA_INTERRUPT (irq3_isr, VECT(ICU, IRQ3))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq3_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ3 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq3_handle.p_irq_callback))) && (NULL != (*(g_irq3_handle.p_irq_callback))))
     {
@@ -1059,6 +1068,11 @@ R_BSP_PRAGMA_INTERRUPT (irq4_isr, VECT(ICU, IRQ4))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq4_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ4 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq4_handle.p_irq_callback))) && (NULL != (*(g_irq4_handle.p_irq_callback))))
     {
@@ -1079,6 +1093,11 @@ R_BSP_PRAGMA_INTERRUPT (irq5_isr, VECT(ICU, IRQ5))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq5_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ5 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq5_handle.p_irq_callback))) && (NULL != (*(g_irq5_handle.p_irq_callback))))
     {
@@ -1100,6 +1119,11 @@ R_BSP_PRAGMA_INTERRUPT (irq6_isr, VECT(ICU, IRQ6))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq6_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ6 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq6_handle.p_irq_callback))) && (NULL != (*(g_irq6_handle.p_irq_callback))))
     {
@@ -1120,6 +1144,11 @@ R_BSP_PRAGMA_INTERRUPT (irq7_isr, VECT(ICU, IRQ7))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq7_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ7 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if ((FIT_NO_FUNC != (*(g_irq7_handle.p_irq_callback))) && (NULL != (*(g_irq7_handle.p_irq_callback))))
     {
@@ -1141,6 +1170,11 @@ R_BSP_PRAGMA_INTERRUPT (irq8_isr,VECT(ICU, IRQ8))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq8_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ8 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq8_handle.p_irq_callback))) && (NULL != (*(g_irq8_handle.p_irq_callback))))
     {
@@ -1160,6 +1194,11 @@ R_BSP_PRAGMA_INTERRUPT (irq9_isr,VECT(ICU, IRQ9))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq9_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ9 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq9_handle.p_irq_callback))) && (NULL != (*(g_irq9_handle.p_irq_callback))))
     {
@@ -1179,6 +1218,11 @@ R_BSP_PRAGMA_INTERRUPT (irq10_isr,VECT(ICU, IRQ10))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq10_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ10 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq10_handle.p_irq_callback))) && (NULL != (*(g_irq10_handle.p_irq_callback))))
     {
@@ -1198,6 +1242,11 @@ R_BSP_PRAGMA_INTERRUPT (irq11_isr,VECT(ICU, IRQ11))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq11_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ11 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq11_handle.p_irq_callback))) && (NULL != (*(g_irq11_handle.p_irq_callback))))
     {
@@ -1217,6 +1266,11 @@ R_BSP_PRAGMA_INTERRUPT (irq12_isr, VECT(ICU, IRQ12))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq12_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ12 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq12_handle.p_irq_callback))) && (NULL != (*(g_irq12_handle.p_irq_callback))))
     {
@@ -1236,6 +1290,11 @@ R_BSP_PRAGMA_INTERRUPT (irq13_isr, VECT(ICU, IRQ13))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq13_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ13 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq13_handle.p_irq_callback))) && (NULL != (*(g_irq13_handle.p_irq_callback))))
     {
@@ -1255,6 +1314,11 @@ R_BSP_PRAGMA_INTERRUPT (irq14_isr, VECT(ICU, IRQ14))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq14_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ14 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq14_handle.p_irq_callback))) && (NULL != (*(g_irq14_handle.p_irq_callback))))
     {
@@ -1274,6 +1338,11 @@ R_BSP_PRAGMA_INTERRUPT (irq15_isr,VECT(ICU, IRQ15))
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void irq15_isr(void)
 {
+#if IRQ_CFG_NESTED_INT_EN_IRQ15 == 1
+    /* set bit PSW.I = 1 to allow nested interrupt */
+    R_BSP_SETPSW_I();
+#endif
+
     /* check callback address */
     if((FIT_NO_FUNC != (*(g_irq15_handle.p_irq_callback))) && (NULL != (*(g_irq15_handle.p_irq_callback))))
     {

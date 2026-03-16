@@ -139,7 +139,6 @@ SECTIONS
 	.bss :
 	{
 		_bss = .;
-		*MqttDemoExample.o(.bss.**)
 		*(COMMON)
 		*(B)
 		*(B_1)

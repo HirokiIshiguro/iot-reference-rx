@@ -17,11 +17,12 @@
 #include "MQTTFileDownloader_config.h"
 
 #define OTA_DATA_BLOCK_SIZE    mqttFileDownloader_CONFIG_BLOCK_SIZE
-#define JOB_DOC_SIZE           2048U
+#define JOB_DOC_SIZE           (2048U)
 
 typedef enum OtaEvent
 {
     OtaAgentEventStart = 0,           /*!< @brief Start the OTA state machine */
+    OtaAgentEventWaitForJob,          /*!< @brief Event to wait for Job notification */
     OtaAgentEventRequestJobDocument,  /*!< @brief Event for requesting job document. */
     OtaAgentEventReceivedJobDocument, /*!< @brief Event when job document is received. */
     OtaAgentEventCreateFile,          /*!< @brief Event to create a file. */
@@ -29,12 +30,13 @@ typedef enum OtaEvent
     OtaAgentEventReceivedFileBlock,   /*!< @brief Event to trigger when file block is received. */
     OtaAgentEventCloseFile,           /*!< @brief Event to trigger closing file. */
     OtaAgentEventActivateImage,       /*!< @brief Event to activate the new image. */
-    OtaAgentEventVersionCheck,	      /*!< @brief Event to verify the new image version. */
+    OtaAgentEventVersionCheck,        /*!< @brief Event to verify the new image version. */
     OtaAgentEventSuspend,             /*!< @brief Event to suspend ota task */
     OtaAgentEventResume,              /*!< @brief Event to resume suspended task */
     OtaAgentEventUserAbort,           /*!< @brief Event triggered by user to stop agent. */
     OtaAgentEventJobCanceled,         /*!< @brief Event triggered by AWS that cancels the OTA job. */
     OtaAgentEventShutdown,            /*!< @brief Event to trigger ota shutdown */
+    OtaAgentEventNotifyCanceled,      /*!< @brief Event to Unsubscribe from Job topic */
     OtaAgentEventMax                  /*!< @brief Last event specifier */
 } OtaEvent_t;
 
@@ -67,14 +69,14 @@ typedef enum OtaState
 
 typedef struct OtaDataEvent
 {
-    uint8_t data[ OTA_DATA_BLOCK_SIZE * 2 ]; /*!< Buffer for storing event information. */
+    uint8_t data[OTA_DATA_BLOCK_SIZE * 2]; /*!< Buffer for storing event information. */
     size_t dataLength;                       /*!< Total space required for the event. */
     bool bufferUsed;                         /*!< Flag set when buffer is used otherwise cleared. */
 } OtaDataEvent_t;
 
 typedef struct OtaJobEventData
 {
-    uint8_t jobData[ JOB_DOC_SIZE ];
+    uint8_t jobData[JOB_DOC_SIZE];
     size_t jobDataLength;
 } OtaJobEventData_t;
 
@@ -124,12 +126,49 @@ typedef struct OtaEventMsg
     OtaEvent_t eventId;           /*!< Identifier for the event. */
 } OtaEventMsg_t;
 
-void otaDemo_start( void );
 
-bool otaDemo_handleIncomingMQTTMessage( char * topic,
+/**********************************************************************************************************************
+ * Function Name: otaDemo_start
+ * Description  : Start the OTA demo agent. This function typically creates
+ *                OTA tasks and initializes OTA resources.
+ * Arguments    : None.
+ * Return Value : void
+ *********************************************************************************************************************/
+void otaDemo_start ( void );
+
+/**********************************************************************************************************************
+ End of function otaDemo_start
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ * Function Name: otaDemo_handleIncomingMQTTMessage
+ * Description  : Handler for incoming MQTT messages relevant to OTA. Called
+ *                by the MQTT receive path when a topic/message pair is
+ *                identified as intended for the OTA demo.
+ * Arguments    : char * topic - topic string (not necessarily null-terminated).
+ *                size_t topicLength - length of the topic string.
+ *                uint8_t * message - pointer to message payload.
+ *                size_t messageLength - length of message payload.
+ * Return Value : bool - true if message handled by OTA demo, false otherwise.
+ *********************************************************************************************************************/
+bool otaDemo_handleIncomingMQTTMessage ( char * topic,
                                         size_t topicLength,
                                         uint8_t * message,
                                         size_t messageLength );
 
-OtaState_t getOtaAgentState();
+/**********************************************************************************************************************
+ End of function otaDemo_handleIncomingMQTTMessage
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ * Function Name: getOtaAgentState
+ * Description  : Return the current OTA agent state.
+ * Arguments    : None.
+ * Return Value : OtaState_t - current OTA agent state.
+ *********************************************************************************************************************/
+OtaState_t getOtaAgentState ();
+
+/**********************************************************************************************************************
+ End of function getOtaAgentState
+ *********************************************************************************************************************/
 #endif /* ifndef OTA_DEMO_H */

@@ -50,7 +50,7 @@
     #define LIBRARY_LOG_NAME     "Sockets"
 #endif
 #ifndef LIBRARY_LOG_LEVEL
-    #define LIBRARY_LOG_LEVEL    LOG_INFO
+    #define LIBRARY_LOG_LEVEL    (LOG_INFO)
 #endif
 
 #include "logging_stack.h"
@@ -95,6 +95,16 @@ extern void vLoggingPrintf (const char * pcFormatString,
  *
  * @return Non-zero value on error, 0 on success.
  */
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Connect
+ * Description  : .
+ * Arguments    : pTcpSocket
+ *              : pHostName
+ *              : port
+ *              : receiveTimeoutMs
+ *              : sendTimeoutMs
+ * Return Value : .
+ *********************************************************************************************************************/
 BaseType_t TCP_Sockets_Connect (Socket_t * pTcpSocket,
                                 const char * pHostName,
                                 uint16_t port,
@@ -106,6 +116,12 @@ BaseType_t TCP_Sockets_Connect (Socket_t * pTcpSocket,
  *
  * @param[in] tcpSocket The socket descriptor.
  */
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Disconnect
+ * Description  : .
+ * Argument     : tcpSocket
+ * Return Value : .
+ *********************************************************************************************************************/
 void TCP_Sockets_Disconnect (Socket_t tcpSocket);
 
 /**
@@ -121,6 +137,14 @@ void TCP_Sockets_Disconnect (Socket_t tcpSocket);
  * * On success, the number of bytes actually sent is returned.
  * * If an error occurred, a negative value is returned. @ref SocketsErrors
  */
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Send
+ * Description  : .
+ * Arguments    : xSocket
+ *              : pvBuffer
+ *              : xDataLength
+ * Return Value : .
+ *********************************************************************************************************************/
 int32_t TCP_Sockets_Send (Socket_t xSocket,
                           const void * pvBuffer,
                           size_t xDataLength);
@@ -142,6 +166,14 @@ int32_t TCP_Sockets_Send (Socket_t xSocket,
  *   is set using @ref SOCKETS_SO_RCVTIMEO).
  * * If an error occurred, a negative value is returned. @ref SocketsErrors
  */
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Recv
+ * Description  : .
+ * Arguments    : xSocket
+ *              : pvBuffer
+ *              : xBufferLength
+ * Return Value : .
+ *********************************************************************************************************************/
 int32_t TCP_Sockets_Recv (Socket_t xSocket,
                           void * pvBuffer,
                           size_t xBufferLength);

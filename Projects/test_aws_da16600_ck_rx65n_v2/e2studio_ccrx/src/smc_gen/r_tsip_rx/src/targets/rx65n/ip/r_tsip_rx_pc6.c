@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -103,7 +92,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecretSub(uint32_t *InData_Sel_Ci
         #endif /* TSIP_MULTI_THREADING == 1 */
         return TSIP_ERR_RESOURCE_CONFLICT;
     }
-    TSIP.REG_84H.WORD = 0x0000fc01u;
+    TSIP.REG_84H.WORD = 0x0000c601u;
     TSIP.REG_108H.WORD = 0x00000000u;
     TSIP.REG_C4H.WORD = 0x200e1a0du;
     /* WAIT_LOOP */
@@ -132,12 +121,12 @@ e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecretSub(uint32_t *InData_Sel_Ci
     TSIP.REG_ECH.WORD = 0x00000008u;
     TSIP.REG_E0H.WORD = 0x00000080u;
     TSIP.REG_1CH.WORD = 0x00A60000u;
-    RX65NHU_func100(change_endian_long(0xf6f3c22cu), change_endian_long(0x10e14d0fu), change_endian_long(0xe4be340eu), change_endian_long(0x45584104u));
+    RX65NHU_func100(change_endian_long(0x80864a1eu), change_endian_long(0xb4f017f8u), change_endian_long(0xa8df8908u), change_endian_long(0x009f273au));
     TSIP.REG_1CH.WORD = 0x00400000u;
     TSIP.REG_1D0H.WORD = 0x00000000u;
     if (1u == (TSIP.REG_1CH.BIT.B22))
     {
-        RX65NHU_func102(change_endian_long(0x82892c76u), change_endian_long(0xc2939fe3u), change_endian_long(0x224268ccu), change_endian_long(0xc610e4deu));
+        RX65NHU_func102(change_endian_long(0xc2ef0487u), change_endian_long(0x08a0d59fu), change_endian_long(0x4c04ace0u), change_endian_long(0xd12a1acfu));
         TSIP.REG_1B8H.WORD = 0x00000040u;
         /* WAIT_LOOP */
         while (0u != TSIP.REG_18H.BIT.B12)
@@ -166,7 +155,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecretSub(uint32_t *InData_Sel_Ci
         TSIP.REG_ECH.WORD = 0x00000004u;
         TSIP.REG_E0H.WORD = 0x00000080u;
         TSIP.REG_1CH.WORD = 0x00260000u;
-        RX65NHU_func100(change_endian_long(0x55f882aeu), change_endian_long(0xa23de23fu), change_endian_long(0x93b433aeu), change_endian_long(0xab7b2f30u));
+        RX65NHU_func100(change_endian_long(0x9b039a84u), change_endian_long(0xb1a1fd3cu), change_endian_long(0xb8da13abu), change_endian_long(0xc5e079bfu));
         TSIP.REG_1CH.WORD = 0x00400000u;
         TSIP.REG_1D0H.WORD = 0x00000000u;
         if (1u == (TSIP.REG_1CH.BIT.B22))
@@ -229,7 +218,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecretSub(uint32_t *InData_Sel_Ci
             TSIP.REG_100H.WORD = InData_PreMasterSecret[17];
             TSIP.REG_100H.WORD = InData_PreMasterSecret[18];
             TSIP.REG_100H.WORD = InData_PreMasterSecret[19];
-            RX65NHU_func101(change_endian_long(0xdfe7b40fu), change_endian_long(0x6558581du), change_endian_long(0xa197386au), change_endian_long(0x7598255du));
+            RX65NHU_func101(change_endian_long(0xc9c40c44u), change_endian_long(0x35c79d8du), change_endian_long(0x25f7e12fu), change_endian_long(0x41d66f67u));
         }
         else
         {
@@ -289,7 +278,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecretSub(uint32_t *InData_Sel_Ci
             TSIP.REG_100H.WORD = InData_PreMasterSecret[13];
             TSIP.REG_100H.WORD = InData_PreMasterSecret[14];
             TSIP.REG_100H.WORD = InData_PreMasterSecret[15];
-            RX65NHU_func101(change_endian_long(0x12ff3c4au), change_endian_long(0x6633fb7du), change_endian_long(0xbb6ae245u), change_endian_long(0x0574ddddu));
+            RX65NHU_func101(change_endian_long(0x1f107e5au), change_endian_long(0xe1df0f54u), change_endian_long(0x0baf3e6eu), change_endian_long(0x60ced481u));
         }
         TSIP.REG_C4H.WORD = 0x00900c45u;
         TSIP.REG_00H.WORD = 0x00002213u;
@@ -591,5 +580,5 @@ e_tsip_err_t R_TSIP_TlsSVGenerateExtendedMasterSecretSub(uint32_t *InData_Sel_Ci
     }
 }
 /**********************************************************************************************************************
- End of function ./input_dir/RX65NHU/RX65NHU_pc6.prc
+ End of function ./input_dir/RX65NHU/RX65NHU_pc6_r1.prc
  *********************************************************************************************************************/

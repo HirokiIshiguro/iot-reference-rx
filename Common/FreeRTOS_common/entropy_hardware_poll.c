@@ -148,8 +148,10 @@ void get_random_number(uint8_t *data, uint32_t len)
     vTaskDelay(10);
 
     R_ADC_Control(1, ADC_CMD_SCAN_NOW, NULL);
-    while (R_ADC_Control(1, ADC_CMD_CHECK_SCAN_DONE, NULL) == ADC_ERR_SCAN_NOT_DONE);
-
+    while (R_ADC_Control(1, ADC_CMD_CHECK_SCAN_DONE, NULL) == ADC_ERR_SCAN_NOT_DONE)
+    {
+        /* Do nothing*/
+    };
     R_ADC_Read(1, ADC_REG_TEMP, &temperature_data);
 
     y += temperature_data;  /* randomness from internal temperature sensor */

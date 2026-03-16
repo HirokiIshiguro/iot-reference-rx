@@ -8,6 +8,7 @@ This document provides information about the demo with the following specificati
 * Demo Type: PubSub/MQTT
 
 > **Note:**  
+> For information about the "*PubSub/MQTT with Fleet Provisioning sample project*", see [**"ryz014a_fleet_information.md"**](ryz014a_fleet_information.md).  
 > For information about the "*PubSub/MQTT with Over-the-air(OTA) update sample project*", see [**"ryz014a_ota_information.md"**](ryz014a_ota_information.md).  
 > For more information about setting up and running the demo, see [**"Getting_Started_Guide.md"**](../../Getting_Started_Guide.md).
 
@@ -33,21 +34,21 @@ This demo performs the following tasks:
 
 | Compiler | RAM size | ROM size |
 |----------|----------|----------|
-| CC-RX    | 321KB    | 336KB    |
-| GCC      | 330KB    | 331KB    |
+| CC-RX    | 321KB    | 346KB    |
+| GCC      | 329KB    | 335KB    |
 
 ### Confirmed Operation Environment
 
 | Compiler | Version  | Details |
 |----------|----------|---------|
 | CC-RX    | V3.07.00 | Optimization: Level 2 |
-| GCC      | GCC for Renesas RX v8.3.0.202411 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
+| GCC      | GCC for Renesas RX v14.2.0.202505 | Optimization options:<br>&emsp;- Optimize for Debug<br>&emsp;- Function sections<br>&emsp;- Data sections<br>&emsp;- Enable garbage collection of unused input sections (-gc-sections) |
 
 ## Explanation specific to this demo
 
 ### Hardware setup
 
-For common hardware setup procedures, see [**Getting Started Guide: step 2**](../../Getting_Started_Guide.md#step-2-hardware-setup).
+For common hardware setup instructions, see [**Getting Started Guide: step 2**](../../Getting_Started_Guide.md#step-2-hardware-setup).
 
 #### Board setup
 
@@ -69,7 +70,7 @@ Connect a RYZ014A with LTE antenna and SIM card to device board.
 
 ### Software setup
 
-For common software setup procedures, see [**Getting Started Guide: step 4-1-1**](../../Getting_Started_Guide.md#step-4-1-1-software-setup-for-pubsub-demo).
+For common software setup instructions, see [**Getting Started Guide: step 4-1-1**](../../Getting_Started_Guide.md#step-4-1-1-software-setup-for-pubsub-demo).
 
 #### Settings of the hook function
 
@@ -99,7 +100,7 @@ The settings will vary depending on the SIM card that you are using, so please c
 * `"Access point password"` : Set SIM card password
 * `"SIM  card PIN code"` : Set SIM card PIN code
 
-If you are using the truephone SIM that comes with CK-RX65N v2, it will work if you only enter the Access point name.
+If you are using the truephone SIM that comes with CK-RX65N v1, it will work if you only enter the Access point name.
 
 ![4-1-1](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_1_Input_APN_l3_2.PNG?raw=true)
 

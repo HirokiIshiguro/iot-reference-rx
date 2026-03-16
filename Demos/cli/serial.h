@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -86,24 +88,90 @@ typedef enum
     ser115200
 } eBaud;
 
-xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud,
+/**********************************************************************************************************************
+ * Function Name: xSerialPortInitMinimal
+ * Description  : .
+ * Arguments    : ulWantedBaud
+ *              : uxQueueLength
+ * Return Value : .
+ *********************************************************************************************************************/
+xComPortHandle xSerialPortInitMinimal ( unsigned long ulWantedBaud,
                                        unsigned portBASE_TYPE uxQueueLength );
-xComPortHandle xSerialPortInit( eCOMPort ePort,
+
+/**********************************************************************************************************************
+ * Function Name: xSerialPortInit
+ * Description  : .
+ * Arguments    : ePort
+ *              : eWantedBaud
+ *              : eWantedParity
+ *              : eWantedDataBits
+ *              : eWantedStopBits
+ *              : uxBufferLength
+ * Return Value : .
+ *********************************************************************************************************************/
+xComPortHandle xSerialPortInit ( eCOMPort ePort,
                                 eBaud eWantedBaud,
                                 eParity eWantedParity,
                                 eDataBits eWantedDataBits,
                                 eStopBits eWantedStopBits,
                                 unsigned portBASE_TYPE uxBufferLength );
-void vSerialPutString( const signed char * pcString,
+
+/**********************************************************************************************************************
+ * Function Name: vSerialPutString
+ * Description  : .
+ * Arguments    : pcString
+ *              : usStringLength
+ * Return Value : .
+ *********************************************************************************************************************/
+void vSerialPutString ( const signed char * pcString,
                        unsigned short usStringLength );
-signed portBASE_TYPE xSerialGetChar( xComPortHandle pxPort,
+
+/**********************************************************************************************************************
+ * Function Name: xSerialGetChar
+ * Description  : .
+ * Arguments    : pxPort
+ *              : pcRxedChar
+ *              : xBlockTime
+ * Return Value : .
+ *********************************************************************************************************************/
+signed portBASE_TYPE xSerialGetChar ( xComPortHandle pxPort,
                                      signed char * pcRxedChar,
                                      TickType_t xBlockTime );
-signed portBASE_TYPE xSerialPutChar( xComPortHandle pxPort,
+
+/**********************************************************************************************************************
+ * Function Name: xSerialPutChar
+ * Description  : .
+ * Arguments    : pxPort
+ *              : cOutChar
+ *              : xBlockTime
+ * Return Value : .
+ *********************************************************************************************************************/
+signed portBASE_TYPE xSerialPutChar ( xComPortHandle pxPort,
                                      signed char cOutChar,
                                      TickType_t xBlockTime );
-portBASE_TYPE xSerialWaitForSemaphore( xComPortHandle xPort );
-void vSerialClose( xComPortHandle xPort );
-void vOutputString( const char * pcMessage );
+
+/**********************************************************************************************************************
+ * Function Name: xSerialWaitForSemaphore
+ * Description  : .
+ * Argument     : xPort
+ * Return Value : .
+ *********************************************************************************************************************/
+portBASE_TYPE xSerialWaitForSemaphore ( xComPortHandle xPort );
+
+/**********************************************************************************************************************
+ * Function Name: vSerialClose
+ * Description  : .
+ * Argument     : xPort
+ * Return Value : .
+ *********************************************************************************************************************/
+void vSerialClose ( xComPortHandle xPort );
+
+/**********************************************************************************************************************
+ * Function Name: vOutputString
+ * Description  : .
+ * Argument     : pcMessage
+ * Return Value : .
+ *********************************************************************************************************************/
+void vOutputString ( const char * pcMessage );
 
 #endif /* ifndef SERIAL_COMMS_H */

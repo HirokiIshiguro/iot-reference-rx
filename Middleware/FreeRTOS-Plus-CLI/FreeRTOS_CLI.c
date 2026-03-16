@@ -3,6 +3,8 @@
  * Copyright (C) 2017 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -38,47 +40,46 @@
 
 /* If the application writer needs to place the buffer used by the CLI at a
 fixed address then set configAPPLICATION_PROVIDES_cOutputBuffer to 1 in
-FreeRTOSConfig.h, then declare an array with the following name and size in 
+FreeRTOSConfig.h, then declare an array with the following name and size in
 one of the application files:
-	char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
+    char cOutputBuffer[configCOMMAND_INT_MAX_OUTPUT_SIZE];
 */
 #ifndef configAPPLICATION_PROVIDES_cOutputBuffer
-	#define configAPPLICATION_PROVIDES_cOutputBuffer 0
+#define configAPPLICATION_PROVIDES_cOutputBuffer (0)
 #endif
 
 typedef struct xCOMMAND_INPUT_LIST
 {
-	const CLI_Command_Definition_t *pxCommandLineDefinition;
-	struct xCOMMAND_INPUT_LIST *pxNext;
+    const CLI_Command_Definition_t *pxCommandLineDefinition;
+    struct xCOMMAND_INPUT_LIST *pxNext;
 } CLI_Definition_List_Item_t;
 
 /*
  * The callback function that is executed when "help" is entered.  This is the
  * only default command that is always present.
  */
-static BaseType_t prvHelpCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString );
+static BaseType_t prvHelpCommand(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
 /*
  * Return the number of parameters that follow the command name.
  */
-static int8_t prvGetNumberOfParameters( const char *pcCommandString );
+static int8_t prvGetNumberOfParameters(const char *pcCommandString);
 
 /* The definition of the "help" command.  This command is always at the front
 of the list of registered commands. */
 static const CLI_Command_Definition_t xHelpCommand =
-{
-	"help",
-	"\r\nhelp:\r\n Lists all the registered commands\r\n\r\n",
-	prvHelpCommand,
-	0
-};
+    {
+        "help",
+        "\r\nhelp:\r\n Lists all the registered commands\r\n\r\n",
+        prvHelpCommand,
+        0};
 
 /* The definition of the list of commands.  Commands that are registered are
 added to this list. */
 static CLI_Definition_List_Item_t xRegisteredCommands =
-{
-	&xHelpCommand,	/* The first command in the list is always the help command, defined in this file. */
-	NULL			/* The next pointer is initialised to NULL, as there are no other registered commands yet. */
+    {
+        &xHelpCommand, /* The first command in the list is always the help command, defined in this file. */
+        NULL           /* The next pointer is initialised to NULL, as there are no other registered commands yet. */
 };
 
 /* A buffer into which command outputs can be written is declared here, rather
@@ -93,274 +94,332 @@ attempted.
 configAPPLICATION_PROVIDES_cOutputBuffer is provided to allow the application
 writer to provide their own cOutputBuffer declaration in cases where the
 buffer needs to be placed at a fixed address (rather than by the linker). */
-#if( configAPPLICATION_PROVIDES_cOutputBuffer == 0 )
-	static char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
+#if (configAPPLICATION_PROVIDES_cOutputBuffer == 0)
+static char cOutputBuffer[configCOMMAND_INT_MAX_OUTPUT_SIZE];
 #else
-	extern char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
+extern char cOutputBuffer[configCOMMAND_INT_MAX_OUTPUT_SIZE];
 #endif
 
-
 /*-----------------------------------------------------------*/
 
-BaseType_t FreeRTOS_CLIRegisterCommand( const CLI_Command_Definition_t * const pxCommandToRegister )
+/**********************************************************************************************************************
+ * Function Name: FreeRTOS_CLIRegisterCommand
+ * Description  : .
+ * Argument     : pxCommandToRegister
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t FreeRTOS_CLIRegisterCommand(const CLI_Command_Definition_t *const pxCommandToRegister)
 {
-static CLI_Definition_List_Item_t *pxLastCommandInList = &xRegisteredCommands;
-CLI_Definition_List_Item_t *pxNewListItem;
-BaseType_t xReturn = pdFAIL;
+    static CLI_Definition_List_Item_t *pxLastCommandInList = &xRegisteredCommands;
+    CLI_Definition_List_Item_t *pxNewListItem;
+    BaseType_t xReturn = pdFAIL;
 
-	/* Check the parameter is not NULL. */
-	configASSERT( pxCommandToRegister );
+    /* Check the parameter is not NULL. */
+    configASSERT(pxCommandToRegister);
 
-	/* Create a new list item that will reference the command being registered. */
-	pxNewListItem = ( CLI_Definition_List_Item_t * ) pvPortMalloc( sizeof( CLI_Definition_List_Item_t ) );
-	configASSERT( pxNewListItem );
+    /* Create a new list item that will reference the command being registered. */
+    pxNewListItem = (CLI_Definition_List_Item_t *)pvPortMalloc(sizeof(CLI_Definition_List_Item_t));
+    configASSERT(pxNewListItem);
 
-	if( pxNewListItem != NULL )
-	{
-		taskENTER_CRITICAL();
-		{
-			/* Reference the command being registered from the newly created
-			list item. */
-			pxNewListItem->pxCommandLineDefinition = pxCommandToRegister;
+    if (NULL != pxNewListItem)
+    {
+        taskENTER_CRITICAL();
+        {
+            /* Reference the command being registered from the newly created
+            list item. */
+            pxNewListItem->pxCommandLineDefinition = pxCommandToRegister;
 
-			/* The new list item will get added to the end of the list, so
-			pxNext has nowhere to point. */
-			pxNewListItem->pxNext = NULL;
+            /* The new list item will get added to the end of the list, so
+            pxNext has nowhere to point. */
+            pxNewListItem->pxNext = NULL;
 
-			/* Add the newly created list item to the end of the already existing
-			list. */
-			pxLastCommandInList->pxNext = pxNewListItem;
+            /* Add the newly created list item to the end of the already existing
+            list. */
+            pxLastCommandInList->pxNext = pxNewListItem;
 
-			/* Set the end of list marker to the new list item. */
-			pxLastCommandInList = pxNewListItem;
-		}
-		taskEXIT_CRITICAL();
+            /* Set the end of list marker to the new list item. */
+            pxLastCommandInList = pxNewListItem;
+        }
+        taskEXIT_CRITICAL();
 
-		xReturn = pdPASS;
-	}
+        xReturn = pdPASS;
+    }
 
-	return xReturn;
+    return xReturn;
 }
+/**********************************************************************************************************************
+ End of function FreeRTOS_CLIRegisterCommand
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 
-BaseType_t FreeRTOS_CLIProcessCommand( const char * const pcCommandInput, char * pcWriteBuffer, size_t xWriteBufferLen  )
+/**********************************************************************************************************************
+ * Function Name: FreeRTOS_CLIProcessCommand
+ * Description  : .
+ * Arguments    : pcCommandInput
+ *              : pcWriteBuffer
+ *              : xWriteBufferLen
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t FreeRTOS_CLIProcessCommand(const char *const pcCommandInput, char *pcWriteBuffer, size_t xWriteBufferLen)
 {
-static const CLI_Definition_List_Item_t *pxCommand = NULL;
-BaseType_t xReturn = pdTRUE;
-const char *pcRegisteredCommandString;
-size_t xCommandStringLength;
+    static const CLI_Definition_List_Item_t *pxCommand = NULL;
+    BaseType_t xReturn = pdTRUE;
+    const char *pcRegisteredCommandString;
+    size_t xCommandStringLength;
 
-	/* Note:  This function is not re-entrant.  It must not be called from more
-	thank one task. */
+    /* Note:  This function is not re-entrant.  It must not be called from more
+    than one task. */
 
-	if( pxCommand == NULL )
-	{
-		/* Search for the command string in the list of registered commands. */
-		for( pxCommand = &xRegisteredCommands; pxCommand != NULL; pxCommand = pxCommand->pxNext )
-		{
-			pcRegisteredCommandString = pxCommand->pxCommandLineDefinition->pcCommand;
-			xCommandStringLength = strlen( pcRegisteredCommandString );
+    if (NULL == pxCommand)
+    {
+        /* Search for the command string in the list of registered commands. */
+        for (pxCommand = &xRegisteredCommands; NULL != pxCommand; pxCommand = pxCommand->pxNext)
+        {
+            pcRegisteredCommandString = pxCommand->pxCommandLineDefinition->pcCommand;
+            xCommandStringLength = strlen(pcRegisteredCommandString);
 
-			/* To ensure the string lengths match exactly, so as not to pick up
-			a sub-string of a longer command, check the byte after the expected
-			end of the string is either the end of the string or a space before
-			a parameter. */
-			if( strncmp( pcCommandInput, pcRegisteredCommandString, xCommandStringLength ) == 0 )
-			{
-				if( ( pcCommandInput[ xCommandStringLength ] == ' ' ) || ( pcCommandInput[ xCommandStringLength ] == 0x00 ) )
-				{
-					/* The command has been found.  Check it has the expected
-					number of parameters.  If cExpectedNumberOfParameters is -1,
-					then there could be a variable number of parameters and no
-					check is made. */
-					if( pxCommand->pxCommandLineDefinition->cExpectedNumberOfParameters >= 0 )
-					{
-						if( prvGetNumberOfParameters( pcCommandInput ) != pxCommand->pxCommandLineDefinition->cExpectedNumberOfParameters )
-						{
-							xReturn = pdFALSE;
-						}
-					}
-
-					break;
-				}
-			}
-		}
-	}
-
-	if( ( pxCommand != NULL ) && ( xReturn == pdFALSE ) )
-	{
-		/* The command was found, but the number of parameters with the command
-		was incorrect. */
-		strncpy( pcWriteBuffer, "Incorrect command parameter(s).  Enter \"help\" to view a list of available commands.\r\n\r\n", xWriteBufferLen );
-		pxCommand = NULL;
-	}
-	else if( pxCommand != NULL )
-	{
-		/* Call the callback function that is registered to this command. */
-		xReturn = pxCommand->pxCommandLineDefinition->pxCommandInterpreter( pcWriteBuffer, xWriteBufferLen, pcCommandInput );
-
-		/* If xReturn is pdFALSE, then no further strings will be returned
-		after this one, and	pxCommand can be reset to NULL ready to search
-		for the next entered command. */
-		if( xReturn == pdFALSE )
-		{
-			pxCommand = NULL;
-		}
-	}
-	else
-	{
-		/* pxCommand was NULL, the command was not found. */
-		strncpy( pcWriteBuffer, "Command not recognised.  Enter 'help' to view a list of available commands.\r\n\r\n", xWriteBufferLen );
-		xReturn = pdFALSE;
-	}
-
-	return xReturn;
-}
-/*-----------------------------------------------------------*/
-
-char *FreeRTOS_CLIGetOutputBuffer( void )
-{
-	return cOutputBuffer;
-}
-/*-----------------------------------------------------------*/
-
-const char *FreeRTOS_CLIGetParameter( const char *pcCommandString, UBaseType_t uxWantedParameter, BaseType_t *pxParameterStringLength )
-{
-UBaseType_t uxParametersFound = 0;
-const char *pcReturn = NULL;
-
-	*pxParameterStringLength = 0;
-
-	while( uxParametersFound < uxWantedParameter )
-	{
-		/* Index the character pointer past the current word.  If this is the start
-		of the command string then the first word is the command itself. */
-		while( ( ( *pcCommandString ) != 0x00 ) && ( ( *pcCommandString ) != ' ' ) )
-		{
-			pcCommandString++;
-		}
-
-		/* Find the start of the next string. */
-		while( ( ( *pcCommandString ) != 0x00 ) && ( ( *pcCommandString ) == ' ' ) )
-		{
-			pcCommandString++;
-		}
-
-		/* Was a string found? */
-		if( *pcCommandString != 0x00 )
-		{
-			/* Is this the start of the required parameter? */
-			uxParametersFound++;
-
-			if( uxParametersFound == uxWantedParameter )
-			{
-				/* How long is the parameter? */
-				pcReturn = pcCommandString;
-				if(uxWantedParameter == 3)
-				{
-                    while ((((*pcCommandString) != 0x00) && ((*pcCommandString) != ' '))
-                            || (strncmp(pcCommandString, " C", 2) == 0) || (strncmp(pcCommandString, " R", 2) == 0)
-                            || (strncmp(pcCommandString, " P", 2) == 0) || (strncmp(pcCommandString, " K", 2) == 0)
-                            || (strncmp(pcCommandString, " E", 2) == 0))
-                    {
-                        (*pxParameterStringLength)++;
-                        pcCommandString++;
-                    }
-                }
-				else
+            /* To ensure the string lengths match exactly, so as not to pick up
+            a sub-string of a longer command, check the byte after the expected
+            end of the string is either the end of the string or a space before
+            a parameter. */
+            if (strncmp(pcCommandInput, pcRegisteredCommandString, xCommandStringLength) == 0)
+            {
+                if ((' ' == pcCommandInput[xCommandStringLength]) || (0x00 == pcCommandInput[xCommandStringLength]))
                 {
-                    while (((*pcCommandString) != 0x00) && ((*pcCommandString) != ' '))
+                    /* The command has been found.  Check it has the expected
+                    number of parameters.  If cExpectedNumberOfParameters is -1,
+                    then there could be a variable number of parameters and no
+                    check is made. */
+                    if (pxCommand->pxCommandLineDefinition->cExpectedNumberOfParameters >= 0)
+                    {
+                        if (prvGetNumberOfParameters(pcCommandInput) != pxCommand->pxCommandLineDefinition->cExpectedNumberOfParameters)
+                        {
+                            xReturn = pdFALSE;
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    if ((NULL != pxCommand) && (pdFALSE == xReturn))
+    {
+        /* The command was found, but the number of parameters with the command
+        was incorrect. */
+        strncpy(pcWriteBuffer, "Incorrect command parameter(s).  Enter \"help\" to view a list of available commands.\r\n\r\n", xWriteBufferLen);
+        pxCommand = NULL;
+    }
+    else if (NULL != pxCommand)
+    {
+        /* Call the callback function that is registered to this command. */
+        xReturn = pxCommand->pxCommandLineDefinition->pxCommandInterpreter(pcWriteBuffer, xWriteBufferLen, pcCommandInput);
+
+        /* If xReturn is pdFALSE, then no further strings will be returned
+        after this one, and	pxCommand can be reset to NULL ready to search
+        for the next entered command. */
+        if (pdFALSE == xReturn)
+        {
+            pxCommand = NULL;
+        }
+    }
+    else
+    {
+        /* pxCommand was NULL, the command was not found. */
+        strncpy(pcWriteBuffer, "Command not recognised.  Enter 'help' to view a list of available commands.\r\n\r\n", xWriteBufferLen);
+        xReturn = pdFALSE;
+    }
+
+    return xReturn;
+}
+/**********************************************************************************************************************
+ End of function FreeRTOS_CLIProcessCommand
+ *********************************************************************************************************************/
+
+/*-----------------------------------------------------------*/
+
+/**********************************************************************************************************************
+ * Function Name: FreeRTOS_CLIGetOutputBuffer
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+char *FreeRTOS_CLIGetOutputBuffer(void)
+{
+    return cOutputBuffer;
+}
+/**********************************************************************************************************************
+ End of function FreeRTOS_CLIGetOutputBuffer
+ *********************************************************************************************************************/
+
+/*-----------------------------------------------------------*/
+
+/**********************************************************************************************************************
+ * Function Name: FreeRTOS_CLIGetParameter
+ * Description  : .
+ * Arguments    : pcCommandString
+ *              : uxWantedParameter
+ *              : pxParameterStringLength
+ * Return Value : .
+ *********************************************************************************************************************/
+const char *FreeRTOS_CLIGetParameter(const char *pcCommandString, UBaseType_t uxWantedParameter, BaseType_t *pxParameterStringLength)
+{
+    UBaseType_t uxParametersFound = 0;
+    const char *pcReturn = NULL;
+
+    *pxParameterStringLength = 0;
+
+    while (uxParametersFound < uxWantedParameter)
+    {
+        /* Index the character pointer past the current word.  If this is the start
+        of the command string then the first word is the command itself. */
+        while ((0x00 != (*pcCommandString)) && (' ' != (*pcCommandString)))
+        {
+            pcCommandString++;
+        }
+
+        /* Find the start of the next string. */
+        while ((0x00 != (*pcCommandString)) && (' ' == (*pcCommandString)))
+        {
+            pcCommandString++;
+        }
+
+        /* Was a string found? */
+        if (0x00 != (*pcCommandString))
+        {
+            /* Is this the start of the required parameter? */
+            uxParametersFound++;
+
+            if (uxParametersFound == uxWantedParameter)
+            {
+                /* How long is the parameter? */
+                pcReturn = pcCommandString;
+                if (3 == uxWantedParameter)
+                {
+                    while (((0x00 != (*pcCommandString)) && (' ' != (*pcCommandString))) || (strncmp(pcCommandString, " C", 2) == 0) || (strncmp(pcCommandString, " R", 2) == 0) || (strncmp(pcCommandString, " P", 2) == 0) || (strncmp(pcCommandString, " K", 2) == 0) || (strncmp(pcCommandString, " E", 2) == 0))
+                    {
+                        (*pxParameterStringLength)++;
+                        pcCommandString++;
+                    }
+                }
+                else
+                {
+                    while ((0x00 != (*pcCommandString)) && (' ' != (*pcCommandString)))
                     {
                         (*pxParameterStringLength)++;
                         pcCommandString++;
                     }
                 }
 
+                if (0 == (*pxParameterStringLength))
+                {
+                    pcReturn = NULL;
+                }
 
-				if( *pxParameterStringLength == 0 )
-				{
-					pcReturn = NULL;
-				}
+                break;
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
 
-				break;
-			}
-		}
-		else
-		{
-			break;
-		}
-	}
-
-	return pcReturn;
+    return pcReturn;
 }
+/**********************************************************************************************************************
+ End of function FreeRTOS_CLIGetParameter
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 
-static BaseType_t prvHelpCommand( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString )
+/**********************************************************************************************************************
+ * Function Name: prvHelpCommand
+ * Description  : .
+ * Arguments    : pcWriteBuffer
+ *              : xWriteBufferLen
+ *              : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
+static BaseType_t prvHelpCommand(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-static const CLI_Definition_List_Item_t * pxCommand = NULL;
-BaseType_t xReturn;
+    static const CLI_Definition_List_Item_t *pxCommand = NULL;
+    BaseType_t xReturn;
 
-	( void ) pcCommandString;
+    (void)pcCommandString;
 
-	if( pxCommand == NULL )
-	{
-		/* Reset the pxCommand pointer back to the start of the list. */
-		pxCommand = &xRegisteredCommands;
-	}
+    if (NULL == pxCommand)
+    {
+        /* Reset the pxCommand pointer back to the start of the list. */
+        pxCommand = &xRegisteredCommands;
+    }
 
-	/* Return the next command help string, before moving the pointer on to
-	the next command in the list. */
-	strncpy( pcWriteBuffer, pxCommand->pxCommandLineDefinition->pcHelpString, xWriteBufferLen );
-	pxCommand = pxCommand->pxNext;
+    /* Return the next command help string, before moving the pointer on to
+    the next command in the list. */
+    strncpy(pcWriteBuffer, pxCommand->pxCommandLineDefinition->pcHelpString, xWriteBufferLen);
+    pxCommand = pxCommand->pxNext;
 
-	if( pxCommand == NULL )
-	{
-		/* There are no more commands in the list, so there will be no more
-		strings to return after this one and pdFALSE should be returned. */
-		xReturn = pdFALSE;
-	}
-	else
-	{
-		xReturn = pdTRUE;
-	}
+    if (NULL == pxCommand)
+    {
+        /* There are no more commands in the list, so there will be no more
+        strings to return after this one and pdFALSE should be returned. */
+        xReturn = pdFALSE;
+    }
+    else
+    {
+        xReturn = pdTRUE;
+    }
 
-	return xReturn;
+    return xReturn;
 }
+/**********************************************************************************************************************
+ End of function prvHelpCommand
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 
-static int8_t prvGetNumberOfParameters( const char *pcCommandString )
+/**********************************************************************************************************************
+ * Function Name: prvGetNumberOfParameters
+ * Description  : .
+ * Argument     : pcCommandString
+ * Return Value : .
+ *********************************************************************************************************************/
+static int8_t prvGetNumberOfParameters(const char *pcCommandString)
 {
-int8_t cParameters = 0;
-BaseType_t xLastCharacterWasSpace = pdFALSE;
+    int8_t cParameters = 0;
+    BaseType_t xLastCharacterWasSpace = pdFALSE;
 
-	/* Count the number of space delimited words in pcCommandString. */
-	while( *pcCommandString != 0x00 )
-	{
-		if( ( *pcCommandString ) == ' ' )
-		{
-			if( xLastCharacterWasSpace != pdTRUE )
-			{
-				cParameters++;
-				xLastCharacterWasSpace = pdTRUE;
-			}
-		}
-		else
-		{
-			xLastCharacterWasSpace = pdFALSE;
-		}
+    /* Count the number of space delimited words in pcCommandString. */
+    while (0x00 != (*pcCommandString))
+    {
+        if (' ' == (*pcCommandString))
+        {
+            if (pdTRUE != xLastCharacterWasSpace)
+            {
+                cParameters++;
+                xLastCharacterWasSpace = pdTRUE;
+            }
+        }
+        else
+        {
+            xLastCharacterWasSpace = pdFALSE;
+        }
 
-		pcCommandString++;
-	}
+        pcCommandString++;
+    }
 
-	/* If the command string ended with spaces, then there will have been too
-	many parameters counted. */
-	if( xLastCharacterWasSpace == pdTRUE )
-	{
-		cParameters--;
-	}
+    /* If the command string ended with spaces, then there will have been too
+    many parameters counted. */
+    if (pdTRUE == xLastCharacterWasSpace)
+    {
+        cParameters--;
+    }
 
-	/* The value returned is one less than the number of space delimited words,
-	as the first word should be the command itself. */
-	return cParameters;
+    /* The value returned is one less than the number of space delimited words,
+    as the first word should be the command itself. */
+    return cParameters;
 }
-
+/**********************************************************************************************************************
+ End of function prvGetNumberOfParameters
+ *********************************************************************************************************************/
