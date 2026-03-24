@@ -500,6 +500,22 @@ Step 8 の完了判定:
   - UART ログ: `COM6`
   - ブートローダ初期ファームロード: `COM7`
 
+#### 2026-03-25: local #1 で build / boot_loader / RSU handoff を再確認
+
+- branch `codex/11-add-rx72n-envision-projects` / MR `!17` 上で、`tools/build_headless_rx72n.ps1` により `boot_loader_rx72n_envision_kit` と `aws_ether_rx72n_envision_kit` の headless build が成功した
+- local RX72N #1 では `rfp-cli -list-tools` から `e2l:OBE110008` が見え、boot_loader banner は `COM7` に出ることを確認した
+  - `COM6` は boot_loader 段階では無音で、少なくとも initial firmware load 用 UART ではない
+  - one-shot banner は flash 後にポートを開くと取り逃がしやすく、先に COM を開いたまま `rfp-cli -sig -run -noquery` を叩く観測が有効
+- RSU 生成では鍵 mismatch に注意
+  - `tools/test_keys/secp256r1.privatekey` で作った RSU は `verify install area buffer [sig-sha256-ecdsa]...NG`
+  - `sample_keys/secp256r1.privatekey` は RX72N boot_loader に埋め込まれた `src/key/code_signer_public_key.h` と対応しており、これで生成した RSU は `verify ... OK` と `activating image ... OK` まで進んだ
+- local bring-up helper として以下を追加した
+  - `tools/build_headless_rx72n.ps1`
+  - `tools/monitor_rx72n_boot.py`
+  - `tools/build_fwup_v2_rsu.py`
+  - `tools/test_uart_download_rx72n.py`
+  - `tools/run_rx72n_local_baseline.ps1`
+
 ## Git Rules / Git ルール
 
 - `main` ブランチは protected。直接 push 不可
