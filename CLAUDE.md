@@ -487,7 +487,7 @@ Step 8 の完了判定:
 | コードフラッシュ | 2MB (1MB x 2) | 4MB (2MB x 2) | リンカスクリプト変更 |
 | RAM | 640KB | 1MB | リンカスクリプト変更 |
 | Ethernet PHY | LAN8720 (RMII) | KSZ8041NL (MII) | r_ether_rx 設定・MPC 変更 |
-| デバッガ | E2 emulator Lite | J-Link OB | rfp-cli 設定変更 |
+| デバッガ | E2 emulator Lite | E2OB (FINE) | rfp-cli 設定変更 |
 | FreeRTOS ポート | RX600v2 | RX700v3_DPFPU | ポートレイヤー切替 |
 | r_fwup | RX65N_DualBank | RX72N_DualBank | ImageGenerator パラメータ変更 |
 
