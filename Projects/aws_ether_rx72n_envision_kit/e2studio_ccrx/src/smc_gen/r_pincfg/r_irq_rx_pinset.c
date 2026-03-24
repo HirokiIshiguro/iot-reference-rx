@@ -1,0 +1,41 @@
+/*
+* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+*
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+
+/***********************************************************************************************************************
+* File Name    : r_irq_rx_pinset.c
+* Version      : 1.0.2
+* Device(s)    : R5F565NEHxFB
+* Tool-Chain   : RXC toolchain
+* Description  : Setting of port and mpc registers
+***********************************************************************************************************************/
+
+/***********************************************************************************************************************
+Includes
+***********************************************************************************************************************/
+#include "r_irq_rx_pinset.h"
+#include "platform.h"
+
+/***********************************************************************************************************************
+Global variables and functions
+***********************************************************************************************************************/
+/***********************************************************************************************************************
+* Function Name: R_ICU_PinSet
+* Description  : This function initializes pins for r_irq_rx module
+* Arguments    : none
+* Return Value : none
+***********************************************************************************************************************/
+
+void R_ICU_PinSet( void )
+{
+    R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
+    /* Set IRQ2 pin */
+    PORTD.PMR.BYTE &= ~(1U<<2);
+    PORTD.PDR.BYTE &= ~(1U<<2);
+    MPC.PD2PFS.BYTE = 0x40U;
+
+    R_BSP_RegisterProtectEnable(BSP_REG_PROTECT_MPC);
+}
+
