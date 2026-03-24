@@ -16,6 +16,7 @@
  Includes   <System Includes> , "Project Includes"
  *********************************************************************************************************************/
 #include <stdio.h>
+#include "r_bsp/mcu/all/fsp_common_api.h"
 #include "lfs.h"
 #include "lfs_util.h"
 

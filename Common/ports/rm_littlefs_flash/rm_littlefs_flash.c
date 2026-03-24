@@ -17,6 +17,7 @@
 #include <string.h>
 #include "rm_littlefs_flash.h"
 #include "rm_littlefs_flash_config.h"
+#include "r_bsp/mcu/all/r_fsp_error.h"
 #include "r_common_api_flash.h"
 
 /**********************************************************************************************************************

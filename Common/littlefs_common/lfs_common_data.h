@@ -14,6 +14,7 @@
  Includes   <System Includes> , "Project Includes"
  *********************************************************************************************************************/
 #include <stdint.h>
+#include "r_bsp/mcu/all/fsp_common_api.h"
 
 #ifdef __TEST__
 #include "dev_mode_key_provisioning.h"
