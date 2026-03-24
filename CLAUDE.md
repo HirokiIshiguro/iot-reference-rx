@@ -491,6 +491,15 @@ Step 8 の完了判定:
 | FreeRTOS ポート | RX600v2 | RX700v3_DPFPU | ポートレイヤー切替 |
 | r_fwup | RX65N_DualBank | RX72N_DualBank | ImageGenerator パラメータ変更 |
 
+#### 2026-03-24: RX72N トラックを `iot-reference-rx` 側へ再集約
+
+- `rx72n-envision-kit` の MR `!52` は論点が build / flash / provision / MQTT / OTA まで広がりすぎたためクローズし、RX72N Envision Kit project 追加の正本トラックは Issue `#11` へ切り直した
+- 初手の完了条件は OTA まで広げず、`Projects/boot_loader_rx72n_envision_kit` と `Projects/aws_ether_rx72n_envision_kit` を追加したうえで `build -> flash -> provision -> MQTT` の baseline を通すことに絞る
+- 細かなデバッグを優先するため、RX72N Envision Kit #1 は Raspberry Pi からローカル PC へ付け替えた
+  - デバッガ: ローカル PC 直結
+  - UART ログ: `COM6`
+  - ブートローダ初期ファームロード: `COM7`
+
 ## Git Rules / Git ルール
 
 - `main` ブランチは protected。直接 push 不可
