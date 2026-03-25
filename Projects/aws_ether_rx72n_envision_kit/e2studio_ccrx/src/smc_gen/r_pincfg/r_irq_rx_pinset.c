@@ -7,7 +7,7 @@
 /***********************************************************************************************************************
 * File Name    : r_irq_rx_pinset.c
 * Version      : 1.0.2
-* Device(s)    : R5F565NEHxFB
+* Device(s)    : R5F572NNHxFB
 * Tool-Chain   : RXC toolchain
 * Description  : Setting of port and mpc registers
 ***********************************************************************************************************************/
@@ -28,7 +28,7 @@ Global variables and functions
 * Return Value : none
 ***********************************************************************************************************************/
 
-void R_ICU_PinSet( void )
+void R_ICU_PinSet()
 {
     R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
     /* Set IRQ2 pin */

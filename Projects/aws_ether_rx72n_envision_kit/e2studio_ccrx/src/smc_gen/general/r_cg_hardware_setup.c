@@ -6,8 +6,8 @@
 
 /***********************************************************************************************************************
 * File Name        : r_cg_hardware_setup.c
-* Version          : 1.2.200
-* Device(s)        : R5F565NEHxFB
+* Version          : 1.0.200
+* Device(s)        : R5F572NNHxFB
 * Description      : Initialization file for code generation configurations.
 ***********************************************************************************************************************/
 
@@ -68,8 +68,6 @@ void r_undefined_exception(void)
 
 void R_Systeminit(void)
 {
-    vStartupTracePutString("[phase8b] systeminit entered\r\n");
-
     /* Enable writing to registers related to operating modes, LPC, CGC and software reset */
     SYSTEM.PRCR.WORD = 0xA50BU;
 
@@ -101,9 +99,8 @@ void R_Systeminit(void)
 
     /* Enable protection */
     SYSTEM.PRCR.WORD = 0xA500U;
-
-    vStartupTracePutString("[phase8b] systeminit done\r\n");
 }
 
 /* Start user code for adding. Do not edit comment generated here */
 /* End user code. Do not edit comment generated here */
+

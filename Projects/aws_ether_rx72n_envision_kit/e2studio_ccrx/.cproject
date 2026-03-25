@@ -21,8 +21,8 @@
 				<deviceConfiguration core="" device="R5F572NN" family="rx" modes="bank.dual" package="HxFB"/>
 			</storageModule>
 			<storageModule moduleId="com.renesas.cdt.managedbuild.core.boardInfo">
-				<option id="board.id" value="GENERIC_RX72N"/>
-				<option id="board.name" value="GENERIC_RX72N"/>
+				<option id="board.id" value="EnvisionKitRX72N"/>
+				<option id="board.name" value="EnvisionKitRX72N"/>
 				<option id="board.device" value="R5F572NNHxFB"/>
 			</storageModule>
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
@@ -44,13 +44,13 @@
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.doublePrecisionFPU.1220970680" name="倍精度浮動小数点処理命令を使用する (-dpfpu/-nodpfpu)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.doublePrecisionFPU" value="true" valueType="boolean"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasFpu.515006211" name="Has FPU" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasFpu" value="TRUE" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceName.822497689" name="Device Name" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceName" value="R5F572NNHxFB_DUAL" valueType="string"/>
-								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceHistory.2143994247" name="Device history" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceHistory" value="non_init;R5F572NNHxFB_DUAL" valueType="string"/>
+								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceHistory.2143994247" name="Device history" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceHistory" value="R5F572NNHxFB;R5F572NNHxFB_DUAL" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isaHistory.1745065463" name="ISA history" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isaHistory" value="non_init;com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceCommand.1425356614" name="Device Command" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceCommand" value="R5F572NN_DUAL" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.checkRtos.910474609" name="Check RTOS" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.checkRtos" value="unusedRtos" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasDsp.1342681707" name="Has DSP" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasDsp" value="false" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceFamily.137653362" name="Device Family" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.deviceFamily" value="RX72N" valueType="string"/>
-								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasTFU.1748476173" name="Has TFU" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasTFU" value="false" valueType="string"/>
+								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasTFU.1748476173" name="Has TFU" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.hasTFU" value="true" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.1498717154" name="サブコマンド・ファイルの内容をコンソールに出力する" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console" value="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.OFF" valueType="enumerated"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.139356339" name="分岐幅 (-branch)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch" value="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.none" valueType="enumerated"/>
 							</tool>

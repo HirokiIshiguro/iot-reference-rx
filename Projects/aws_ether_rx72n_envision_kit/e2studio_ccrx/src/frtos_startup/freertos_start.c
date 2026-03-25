@@ -79,7 +79,7 @@ void Processing_Before_Start_Kernel(void);
 /* Main task. */
 extern void main_task(void *pvParameters);
 
-#if BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0
+#if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 )
 static StaticTask_t xMainTaskTcb;
 static StackType_t xMainTaskStack[mainAPP_MAIN_TASK_STACK_DEPTH];
 #endif
@@ -129,7 +129,7 @@ void vApplicationSetupTimerInterrupt(void)
     /* Set its priority to the application defined kernel priority. */
     IPR(CMT0, CMI0) = configKERNEL_INTERRUPT_PRIORITY;
 
-#if BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0
+#if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 )
     vStartupTracePutString("[phase8b] tick irq suppressed\r\n");
     IEN(CMT0, CMI0) = 0;
     CMT.CMSTR0.BIT.STR0 = 0;
@@ -363,7 +363,7 @@ void Processing_Before_Start_Kernel(void)
     /************** task creation ****************************/
     /* Main task. */
     vStartupTracePutString("[phase8b] kernel main task creating\r\n");
-    #if BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0
+    #if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 )
     if( NULL == xTaskCreateStatic( main_task,
                                    "MAIN_TASK",
                                    mainAPP_MAIN_TASK_STACK_DEPTH,

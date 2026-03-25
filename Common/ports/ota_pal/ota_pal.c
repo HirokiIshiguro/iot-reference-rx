@@ -42,7 +42,7 @@
 #include "platform.h"
 #include "r_fwup_if.h"
 #include "r_fwup_private.h"
-#include "./src/targets/rx65n/r_flash_rx65n.h"
+#include "./src/targets/rx72n/r_flash_rx72n.h"
 #include "mbedtls/ecdsa.h"
 #include "mbedtls/asn1.h"
 #include "mbedtls/error.h"
