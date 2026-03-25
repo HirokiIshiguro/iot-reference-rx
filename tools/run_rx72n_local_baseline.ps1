@@ -26,6 +26,7 @@ $buildScript = Join-Path $projectRoot "tools\build_headless_rx72n.ps1"
 $rsuBuilder = Join-Path $projectRoot "tools\build_fwup_v2_rsu.py"
 $bootMonitor = Join-Path $projectRoot "tools\monitor_rx72n_boot.py"
 $uartDownload = Join-Path $projectRoot "tools\test_uart_download_rx72n.py"
+$readyMessage = 'send "userprog.rsu" via UART.'
 
 function Invoke-Step {
     param(
@@ -86,7 +87,7 @@ if (-not $SkipFlashBootLoader) {
             --baud $Baud `
             --timeout 10 `
             --command $resetCmdPwsh `
-            --expect "send \"userprog.rsu\" via UART."
+            --expect $readyMessage
     }
 }
 
@@ -116,7 +117,7 @@ if (-not $SkipDownload) {
             --ack-each-chunk `
             --ack-timeout 20 `
             --reset-cmd $resetCmdCmd `
-            --ready-message "send \"userprog.rsu\" via UART." `
+            --ready-message $readyMessage `
             --success-message "jump to user program" `
             --success-timeout 30
     }
