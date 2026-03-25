@@ -1,22 +1,14 @@
 # boot_loader_rx72n_envision_kit
 
-RX72N boot loader seed project on top of the `iot-reference-rx` boot loader baseline.
+Legacy RX72N Envision Kit bootloader project imported from:
+- `rx72n-envision-kit/projects/renesas/rx72n_envision_kit/e2studio/boot_loader`
 
-Imported seed:
-- source project: `iot-reference-rx/Projects/boot_loader_ck_rx65n_v2/e2studio_ccrx/`
-- extra reference file: `bootloader_information.md`
+Current intent:
+- keep the folder name `boot_loader_rx72n_envision_kit` inside `iot-reference-rx`
+- use the legacy `rx72n_boot_loader` implementation for initial image download and reset handoff
+- keep the latest FreeRTOS app track in `Projects/aws_ether_rx72n_envision_kit`
 
-Current status:
-- directory name is already the RX72N target name
-- internal project metadata still contains RX65N-oriented names and settings
-- no RX72N build claim is made in this step
-
-Expected RX72N-specific adaptation areas:
-- dual-bank memory layout
-- boot area ROM budget
-- RX72N flash / SCI / pin configuration
-- `r_fwup` configuration for RX72N
-
-Important:
-- MCUboot migration is not part of this initial step
-- first goal is to recover a buildable `r_fwup`-based boot path
+Notes:
+- the e2studio metadata is aligned so the imported project builds as `boot_loader_rx72n_envision_kit`
+- RSU generation for local bring-up now uses the app-side PRM CSV because the legacy bootloader does not carry the `r_fwup` sample tool tree
+- MCUboot remains out of scope for this issue

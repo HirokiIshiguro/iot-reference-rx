@@ -1,14 +1,28 @@
-/*
-* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+/***********************************************************************************************************************
+* DISCLAIMER
+* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products.
+* No other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
+* applicable laws, including copyright laws. 
+* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING THIS SOFTWARE, WHETHER EXPRESS, IMPLIED
+* OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NON-INFRINGEMENT.  ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED.TO THE MAXIMUM EXTENT PERMITTED NOT PROHIBITED BY
+* LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES SHALL BE LIABLE FOR ANY DIRECT,
+* INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS SOFTWARE, EVEN IF RENESAS OR
+* ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability 
+* of this software. By using this software, you agree to the additional terms and conditions found by accessing the 
+* following link:
+* http://www.renesas.com/disclaimer
 *
-* SPDX-License-Identifier: BSD-3-Clause
-*/
+* Copyright (C) 2019 Renesas Electronics Corporation. All rights reserved.
+***********************************************************************************************************************/
 
 /***********************************************************************************************************************
-* File Name        : r_smc_interrupt.h
-* Version          : 1.2.51
-* Device(s)        : R5F565NEHxFB
-* Description      : This file implements interrupt setting.
+* File Name    : r_smc_interrupt.h
+* Version      : 1.1.0
+* Device(s)    : R5F572NNHxFB
+* Description  : This file implements interrupt setting.
+* Creation Date: 2020-04-23
 ***********************************************************************************************************************/
 
 #ifndef SMC_INTERRUPT_H
@@ -47,6 +61,7 @@ Macro definitions
  * Please do not modify this file manually
  */
 #define ICU_BSC_BUSERR_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_ICU_GROUPIE0_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_RAM_RAMERR_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_FCU_FIFERR_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_FCU_FRDYI_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
@@ -66,6 +81,9 @@ Macro definitions
 #define ICU_QSPI_SPTI_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_SDHI_SBFAI_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_MMCIF_MBFAI_PRIORITY                   (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_SSIE0_SSITXI0_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_SSIE0_SSIRXI0_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_SSIE1_SSIRTI1_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_RIIC1_RXI1_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_RIIC1_TXI1_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_RIIC0_RXI0_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
@@ -98,8 +116,8 @@ Macro definitions
 #define ICU_SCI3_TXI3_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_SCI4_RXI4_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_SCI4_TXI4_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
-#define ICU_SCI5_RXI5_PRIORITY                     (_03_ICU_PRIORITY_LEVEL3)
-#define ICU_SCI5_TXI5_PRIORITY                     (_03_ICU_PRIORITY_LEVEL3)
+#define ICU_SCI5_RXI5_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_SCI5_TXI5_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_SCI6_RXI6_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_SCI6_TXI6_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_LVD1_LVD1_PRIORITY                     (_0F_ICU_PRIORITY_LEVEL15)
@@ -122,7 +140,7 @@ Macro definitions
 #define ICU_ICU_GROUPBL2_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_RSPI2_SPRI2_PRIORITY                   (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_RSPI2_SPTI2_PRIORITY                   (_0F_ICU_PRIORITY_LEVEL15)
-#define ICU_ICU_GROUPBL0_PRIORITY                  (_03_ICU_PRIORITY_LEVEL3)
+#define ICU_ICU_GROUPBL0_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_ICU_GROUPBL1_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_ICU_GROUPAL0_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_ICU_GROUPAL1_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
@@ -202,7 +220,6 @@ Macro definitions
 #define ICU_S12AD1_S12ADI1_PRIORITY                (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_S12AD1_S12GBADI1_PRIORITY              (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_S12AD1_S12GCADI1_PRIORITY              (_0F_ICU_PRIORITY_LEVEL15)
-#define ICU_RNG_RNGEND_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_ELC_ELSR18I_PRIORITY                   (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_ELC_ELSR19I_PRIORITY                   (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_TSIP_PROC_BUSY_PRIORITY                (_0F_ICU_PRIORITY_LEVEL15)
@@ -216,6 +233,7 @@ Macro definitions
 #define ICU_TSIP_RDRDY1_PRIORITY                   (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_TSIP_INTEGRATE_WRRDY_PRIORITY          (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_TSIP_INTEGRATE_RDRDY_PRIORITY          (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_PERIB_INTB205_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_PERIB_INTB206_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_PERIB_INTB207_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_MTU1_TGIA1_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
@@ -261,9 +279,9 @@ Macro definitions
 #define ICU_MTU8_TGIC8_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_MTU8_TGID8_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_MTU8_TCIV8_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
-#define ICU_AES_AESRDY_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
-#define ICU_AES_AESEND_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
-#define ICU_PERIA_INTA253_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_EPTPC_IPLS_PRIORITY                    (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_PMGI0_PMGI0I_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
+#define ICU_PMGI1_PMGI1I_PRIORITY                  (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_PERIA_INTA254_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
 #define ICU_PERIA_INTA255_PRIORITY                 (_0F_ICU_PRIORITY_LEVEL15)
 
@@ -275,6 +293,4 @@ Typedef definitions
 Global functions
 ***********************************************************************************************************************/
 void R_Interrupt_Create(void);
-/* Start user code for function. Do not edit comment generated here */
-/* End user code. Do not edit comment generated here */
 #endif

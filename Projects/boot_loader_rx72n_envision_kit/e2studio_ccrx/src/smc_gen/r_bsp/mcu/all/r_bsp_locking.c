@@ -28,7 +28,6 @@
 *                               Fixed coding style.
 *         : 26.07.2019 2.01     Modified comment of API function to Doxygen style.
 *         : 10.12.2019 2.02     Modified comment.
-*         : 31.05.2024 2.03     Fixed coding style.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -71,7 +70,7 @@ Private global variables and functions
  * semaphore or mutex. If used improperly locks can lead to deadlock in the user's system.
  * Users can override the default locking mechanisms.
  */
-bool R_BSP_SoftwareLock(BSP_CFG_USER_LOCKING_TYPE * const plock)
+bool R_BSP_SoftwareLock (BSP_CFG_USER_LOCKING_TYPE * const plock)
 {
 #if BSP_CFG_USER_LOCKING_ENABLED == 0
     bool ret = false;
@@ -106,7 +105,7 @@ bool R_BSP_SoftwareLock(BSP_CFG_USER_LOCKING_TYPE * const plock)
 #else
     /* User is going to handle the locking themselves. */
     return BSP_CFG_USER_LOCKING_SW_LOCK_FUNCTION(plock);
-#endif /* BSP_CFG_USER_LOCKING_ENABLED == 0 */
+#endif
 } /* End of function R_BSP_SoftwareLock() */
 
 /**********************************************************************************************************************
@@ -118,7 +117,7 @@ bool R_BSP_SoftwareLock(BSP_CFG_USER_LOCKING_TYPE * const plock)
  * @retval false Failure, lock could not be released.
  * @details This function releases a lock that was previously acquired using the R_BSP_SoftwareLock() function.
  */
-bool R_BSP_SoftwareUnlock(BSP_CFG_USER_LOCKING_TYPE * const plock)
+bool R_BSP_SoftwareUnlock (BSP_CFG_USER_LOCKING_TYPE * const plock)
 {
 #if BSP_CFG_USER_LOCKING_ENABLED == 0
     /* Set lock back to unlocked. */
@@ -150,7 +149,7 @@ bool R_BSP_SoftwareUnlock(BSP_CFG_USER_LOCKING_TYPE * const plock)
  * using. For example, if the user is not using the CRC peripheral then they could delete the BSP_LOCK_CRC entry. The 
  * user will save 4-bytes per deleted entry.
  */
-bool R_BSP_HardwareLock(mcu_lock_t const hw_index)
+bool R_BSP_HardwareLock (mcu_lock_t const hw_index)
 {
 #if BSP_CFG_USER_LOCKING_ENABLED == 0
     /* Pass actual lock to software lock function. */
@@ -175,7 +174,7 @@ bool R_BSP_HardwareLock(mcu_lock_t const hw_index)
  * not using. For example, if the user is not using the CRC peripheral then they could delete the BSP_LOCK_CRC entry. 
  * The user will save 4-bytes per deleted entry.
  */
-bool R_BSP_HardwareUnlock(mcu_lock_t const hw_index)
+bool R_BSP_HardwareUnlock (mcu_lock_t const hw_index)
 {
 #if BSP_CFG_USER_LOCKING_ENABLED == 0
     /* Pass actual lock to software unlock function. */

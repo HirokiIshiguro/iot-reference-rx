@@ -14,6 +14,8 @@ flush a queue.
 
 The queue control blocks can be allocated at compile time or dynamically at run
 time. A configuration option for this exists in "r_config\r_byteq_config.h".
+An original copy of the configuration file is stored in "r_byteq\ref\
+r_byteq_config_reference.h".
 
 
 Features
@@ -29,10 +31,13 @@ r_byteq
 |
 +---doc
 |    +---en
-|    |      r01an1683ej{VERSION_NUMBER}-rx-apl.pdf
+|    |      r01an1683ej{VERSION_NUMBER}-rx.pdf
 |    |
 |    +---ja
-|           r01an1683jj{VERSION_NUMBER}-rx-apl.pdf
+|           r01an1683jj{VERSION_NUMBER}-rx.pdf
+|
++---ref
+|       r_byteq_config_reference.h
 |
 +---src
         r_byteq.c

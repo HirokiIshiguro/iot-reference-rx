@@ -14,7 +14,7 @@
 * following link:
 * http://www.renesas.com/disclaimer 
 *
-* Copyright (C) 2016-2024 Renesas Electronics Corporation. All rights reserved.
+* Copyright (C) 2016 Renesas Electronics Corporation. All rights reserved.
 **********************************************************************************************************************/
 /**********************************************************************************************************************
 * File Name    : r_flash_type1_if.h
@@ -28,84 +28,54 @@
 *                17.11.2016 2.10    Added flash_stop() declaration.
 *                                   Added FLASH_FREQ_xx and FLASH_FCU_INT_xxx #defines
 *                05.10.2016 3.00    Merged functions common to other flash types into r_flash_group.c.
-*                26.06.2020 4.60    Added FLASH_ACCESS_WINDOW_END_NEXT_REG_VALUE #define.
-*                23.04.2021 4.80    Added RX140.
-*                13.05.2022 4.90    Added support for Tool News R20TS0818.
-*                24.01.2023 5.00    Modified FLASH_FREQ_HI.
-*                30.07.2024 5.20    Added support for RX260 and RX261.
 **********************************************************************************************************************/
 
-#ifndef R_FLASH_TYPE1_IF_H
-#define R_FLASH_TYPE1_IF_H
+#ifndef R_FLASH_TYPE1_IF_HEADER_FILE
+#define R_FLASH_TYPE1_IF_HEADER_FILE
 
 #include "r_flash_rx_if.h"
-#if (FLASH_TYPE == FLASH_TYPE_1)
+#if (FLASH_TYPE == 1)
 
 /***********************************************************************************************************************
 Includes   <System Includes> , "Project Includes"
 ***********************************************************************************************************************/
 #include "r_flash_rx.h"
+#include "r_dataflash.h"
+#include "r_codeflash_extra.h"
 
-/******************************************************************************
+/***********************************************************************************************************************
 Macro definitions
-******************************************************************************/
-/*  operation definition (FEXCR Register setting)*/
-#define FEXCR_STARTUP       (0x81)
-#define FEXCR_AW            (0x82)
-#define FEXCR_CLEAR         (0x00)
-
-#define DEFAULT_AREA        (1)
-#define DEFAULT_AREA_VALUE  (0xFFFF)
-#define STARTUP_AREA_VALUE  (0xFEFF)
-
-#define SASMF_ALTERNATE     (0)
-#define SASMF_DEFAULT       (1)
-
+***********************************************************************************************************************/
 #define FLASH_FREQ_LO           (1000000)
-#if (FLASH_TYPE_VARIETY == FLASH_TYPE_VARIETY_A)
-#if defined(MCU_RX140)
-#define FLASH_FREQ_HI           (48000000)
-#elif defined(MCU_RX260) || defined(MCU_RX261)
-#define FLASH_FREQ_HI           (64000000)
-#endif
-#else
 #define FLASH_FREQ_HI           (32000000)
-#endif
 #define FLASH_FCU_INT_ENABLE    // no FCU
 #define FLASH_FCU_INT_DISABLE   // no FCU
 
-#if (FLASH_TYPE_VARIETY == FLASH_TYPE_VARIETY_A)
-#define FLASH_ACCESS_WINDOW_END_VALUE  (0x400)
-#elif defined(MCU_RX23_ALL) || defined(MCU_RX24_ALL)
-#define FLASH_ACCESS_WINDOW_END_VALUE (0x800)
-#else
-#define FLASH_ACCESS_WINDOW_END_VALUE (0x200)
-#endif
-
-/* Definition for function name compatibility */
-#define R_CF_GetCurrentSwapState   flash_get_current_swap_state
-#define R_CF_SetCurrentSwapState   flash_set_current_swap_state
-#define R_CF_GetCurrentStartupArea flash_get_current_startup_area
-#define R_CF_ToggleStartupArea     flash_toggle_startup_area
-#define R_CF_GetAccessWindow       flash_get_access_window
-#define R_CF_SetAccessWindow       flash_set_access_window
-
-/******************************************************************************
+/***********************************************************************************************************************
 Typedef definitions
-******************************************************************************/
+***********************************************************************************************************************/
 
-/******************************************************************************
+/***********************************************************************************************************************
+Exported global variables
+***********************************************************************************************************************/
+
+/***********************************************************************************************************************
 Exported global functions (to be accessed by other files)
-******************************************************************************/
-uint8_t flash_get_current_swap_state(void);
-void flash_set_current_swap_state(uint8_t value);
-uint8_t flash_get_current_startup_area(void);
-flash_err_t flash_toggle_startup_area(void);
-flash_err_t flash_get_access_window(flash_access_window_config_t *pAccessInfo);
-flash_err_t flash_set_access_window(flash_access_window_config_t *pAccessInfo);
-flash_err_t flash_wait_exrdy(void);
+***********************************************************************************************************************/
+/* from r_flash_type1.c */
+extern flash_err_t flash_get_status (void);
+extern void r_flash_delay_us (unsigned long us, unsigned long khz);
 
-#endif /* #if (FLASH_TYPE == FLASH_TYPE_1) */
-#endif /* R_FLASH_TYPE1_IF_H */
+/* from r_flash_utils.c */
+extern flash_err_t flash_pe_mode_enter(flash_type_t flash_type);
+extern flash_err_t flash_pe_mode_exit();
+extern void flash_stop(void);
+extern flash_err_t flash_reset();
+extern flash_err_t flash_erase(uint32_t block_address, uint32_t num_blocks);
+extern flash_err_t flash_blankcheck(uint32_t start_address, uint32_t num_bytes, flash_res_t *result);
+extern flash_err_t flash_write(uint32_t src_address, uint32_t dest_address, uint32_t num);
+
+#endif  // FLASH_TYPE == 1
+#endif  // R_FLASH_TYPE1_IF_HEADER_FILE
 
 /* end of file */

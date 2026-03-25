@@ -90,7 +90,7 @@
             <Setting id="BSP_CFG_ID_CODE_LONG_3" value="0xFFFFFFFF"/>
             <Setting id="BSP_CFG_USER_CHARPUT_FUNCTION" value="vOutputChar"/>
             <Setting id="BSP_CFG_TRUSTED_MODE_FUNCTION" value="0xFFFFFFFF"/>
-            <Setting id="BSP_CFG_SCI_UART_TERMINAL_BITRATE" value="115200"/>
+            <Setting id="BSP_CFG_SCI_UART_TERMINAL_BITRATE" value="921600"/>
             <Setting id="BSP_CFG_SWINT_TASK_BUFFER_NUMBER" value="8"/>
             <Setting id="BSP_CFG_USER_LOCKING_HW_UNLOCK_FUNCTION" value="my_hw_unlocking_function"/>
             <Setting id="BSP_CFG_ID_CODE_LONG_1" value="0xFFFFFFFF"/>
@@ -116,7 +116,7 @@
             <Setting id="BSP_CFG_USER_LOCKING_SW_LOCK_FUNCTION" value="my_sw_locking_function"/>
             <Setting id="BSP_CFG_ISTACK_BYTES" value="0x400"/>
             <Setting id="BSP_CFG_NONCACHEABLE_AREA1_DM_ENABLE" value="1"/>
-            <Setting id="BSP_CFG_SCI_UART_TERMINAL_CHANNEL" value="5"/>
+            <Setting id="BSP_CFG_SCI_UART_TERMINAL_CHANNEL" value="7"/>
             <Setting id="BSP_CFG_USER_LOCKING_ENABLED" value="0"/>
             <Setting id="BSP_CFG_USER_CHARGET_ENABLED" value="0"/>
             <Setting id="BSP_CFG_NONCACHEABLE_AREA0_IF_ENABLE" value="1"/>

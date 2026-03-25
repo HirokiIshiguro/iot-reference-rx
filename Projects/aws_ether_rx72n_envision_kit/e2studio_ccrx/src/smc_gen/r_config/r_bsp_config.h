@@ -851,11 +851,11 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 
 /* This macro is channel number for serial terminal.
 */
-#define BSP_CFG_SCI_UART_TERMINAL_CHANNEL        (5)
+#define BSP_CFG_SCI_UART_TERMINAL_CHANNEL        (7)
 
 /* This macro is bit-rate for serial terminal.
 */
-#define BSP_CFG_SCI_UART_TERMINAL_BITRATE        (115200)
+#define BSP_CFG_SCI_UART_TERMINAL_BITRATE        (921600)
 
 /* This macro is interrupt priority for serial terminal.
    0(low) - 15(high)

@@ -19,7 +19,7 @@ Set-StrictMode -Version Latest
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $bootMot = Join-Path $projectRoot "Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot"
 $appMot = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot"
-$prm = Join-Path $projectRoot "Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
+$prm = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
 $signingKey = Join-Path $projectRoot "sample_keys\secp256r1.privatekey"
 $rsu = Join-Path $projectRoot "rx72n_local_baseline.rsu"
 $buildScript = Join-Path $projectRoot "tools\build_headless_rx72n.ps1"
@@ -86,7 +86,7 @@ if (-not $SkipFlashBootLoader) {
             --baud $Baud `
             --timeout 10 `
             --command $resetCmdPwsh `
-            --expect "send image(*.rsu) via UART."
+            --expect "send \"userprog.rsu\" via UART."
     }
 }
 
@@ -116,7 +116,7 @@ if (-not $SkipDownload) {
             --ack-each-chunk `
             --ack-timeout 20 `
             --reset-cmd $resetCmdCmd `
-            --ready-message "send image(*.rsu) via UART." `
+            --ready-message "send \"userprog.rsu\" via UART." `
             --success-message "jump to user program" `
             --success-timeout 30
     }

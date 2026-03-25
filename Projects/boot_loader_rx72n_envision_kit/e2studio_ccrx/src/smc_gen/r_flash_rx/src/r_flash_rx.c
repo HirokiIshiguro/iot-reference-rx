@@ -14,7 +14,7 @@
 * following link:
 * http://www.renesas.com/disclaimer 
 *
-* Copyright (C) 2014-2024 Renesas Electronics Corporation. All rights reserved.
+* Copyright (C) 2014-2019 Renesas Electronics Corporation. All rights reserved.
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name    : r_flash_rx.c
@@ -34,14 +34,6 @@
 *                                   Removed support for flash type 2.
 *              : 09.09.2019 4.30    Added copy in the case of ICCRX big endian to the function R_FlashCodeCopy().
 *              : 18.11.2019 4.50    Modified comment of API function to Doxygen style.
-*              : 26.06.2020 4.60    Changed R_FlashCodeCopy() to static function.
-*                                   Modified to not use BSP API functions to enable/disable interrupt requests.
-*              : 24.01.2023 5.00    Modified the condition of PFRAM section definition.
-*              : 01.10.2023 5.11    Added support for Tool News R20TS0963.
-*              : 30.07.2024 5.20    Modified functions flash_InterruptRequestDisable(), flash_InterruptRequestEnable().
-*                                   (When using the GCC or IAR compiler in non-blocking mode,
-*                                    ROM access occurs during P/E mode.)
-*              : 15.11.2024 5.21    Added WAIT_LOOP comment.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -55,29 +47,6 @@ Includes   <System Includes> , "Project Includes"
 /***********************************************************************************************************************
 Macro definitions
 ***********************************************************************************************************************/
-/* ---------- Bit Manipulation ---------- */
-#if defined(__CCRX__)
-
-/* void __bclr(unsigned char *data, unsigned long bit) */
-#define R_FLASH_BIT_CLEAR(x, y)      __bclr((unsigned char *)(x), (unsigned long)(y))
-/* void __bset(unsigned char *data, unsigned long bit) */
-#define R_FLASH_BIT_SET(x, y)        __bset((unsigned char *)(x), (unsigned long)(y))
-
-#elif defined(__GNUC__)
-
-/* void R_FLASH_BitClear(uint8_t *data, uint32_t bit) (This macro uses API function of FLASH.) */
-#define R_FLASH_BIT_CLEAR(x, y)      R_FLASH_BitClear((uint8_t *)(x), (uint32_t)(y))
-/* void R_FLASH_BitSet(uint8_t *data, uint32_t bit) (This macro uses API function of FLASH.) */
-#define R_FLASH_BIT_SET(x, y)        R_FLASH_BitSet((uint8_t *)(x), (uint32_t)(y))
-
-#elif defined(__ICCRX__)
-
-/* void R_FLASH_BitClear(uint8_t *data, uint32_t bit) (This macro uses API function of FLASH.) */
-#define R_FLASH_BIT_CLEAR(x, y)      R_FLASH_BitClear((uint8_t *)(x), (uint32_t)(y))
-/* void R_FLASH_BitSet(uint8_t *data, uint32_t bit) (This macro uses API function of FLASH.) */
-#define R_FLASH_BIT_SET(x, y)        R_FLASH_BitSet((uint8_t *)(x), (uint32_t)(y))
-
-#endif
 
 /***********************************************************************************************************************
 Typedef definitions
@@ -90,18 +59,9 @@ External functions
 /***********************************************************************************************************************
 Private global variables and functions
 ***********************************************************************************************************************/
-int32_t g_flash_lock;                                        // for locking the driver
-volatile flash_states_t g_flash_state = FLASH_UNINITIALIZED; // for state in when driver locked
-FCU_BYTE_PTR g_pfcu_cmd_area = (uint8_t*) FCU_COMMAND_AREA;  // sequencer command pointer
-
-#if (FLASH_CFG_CODE_FLASH_ENABLE == 1)
-static void R_FlashCodeCopy(void);
-#endif
-
-#if defined(__GNUC__) || defined(__ICCRX__)
-R_BSP_ATTRIB_STATIC_INLINE_ASM void R_FLASH_BitSet(uint8_t *data, uint32_t bit);
-R_BSP_ATTRIB_STATIC_INLINE_ASM void R_FLASH_BitClear(uint8_t *data, uint32_t bit);
-#endif
+int32_t g_flash_lock;                                       // for locking the driver
+flash_states_t g_flash_state = FLASH_UNINITIALIZED;         // for state in when driver locked
+FCU_BYTE_PTR g_pfcu_cmd_area = (uint8_t*) FCU_COMMAND_AREA; // sequencer command pointer
 
 
 /***********************************************************************************************************************
@@ -126,9 +86,8 @@ flash_err_t R_FLASH_Open(void)
      * write to ROM simultaneously under certain circumstances (run from
      * one region and write to another).
      */
-#if (FLASH_CFG_CODE_FLASH_ENABLE == 1)
     R_FlashCodeCopy();
-#endif
+
 
     /* Perform flash and driver initialization */
     err = r_flash_open();
@@ -141,7 +100,6 @@ flash_err_t R_FLASH_Open(void)
 }
 
 
-#if (FLASH_CFG_CODE_FLASH_ENABLE == 1)
 /******************************************************************************
 * Function Name: R_FlashCodeCopy
 * Description  : Copies Flash driver code necessary for code flash program/erase
@@ -149,8 +107,10 @@ flash_err_t R_FLASH_Open(void)
 * Arguments    : none
 * Return Value : none
 ******************************************************************************/
-static void R_FlashCodeCopy(void)
+void R_FlashCodeCopy(void)
 {
+#if (FLASH_CFG_CODE_FLASH_ENABLE == 1)
+
 #if ((FLASH_CFG_CODE_FLASH_RUN_FROM_ROM == 0) || (FLASH_IN_DUAL_BANK_MODE == 1))
     uint8_t * p_rom_section;    // ROM source location
     uint8_t * p_ram_section;    // RAM copy destination
@@ -174,7 +134,6 @@ static void R_FlashCodeCopy(void)
     p_rom_section = (uint8_t *)R_BSP_SECTOP(PFRAM);
 
     /* Copy code from ROM to RAM. */
-    /* WAIT_LOOP */
     for (bytes_copied = 0; bytes_copied < R_BSP_SECSIZE(PFRAM); bytes_copied++)
     {
         p_ram_section[bytes_copied] = p_rom_section[bytes_copied];
@@ -187,7 +146,6 @@ static void R_FlashCodeCopy(void)
     p_rom_section = (uint8_t *)R_BSP_SECTOP(PFRAM2);
 
     /* Copy code from ROM to RAM. */
-    /* WAIT_LOOP */
     for (bytes_copied = 0; bytes_copied < R_BSP_SECSIZE(PFRAM2); bytes_copied++)
     {
         p_ram_section[bytes_copied] = p_rom_section[bytes_copied];
@@ -212,13 +170,11 @@ static void R_FlashCodeCopy(void)
 
     /* Copy code from ROM to RAM. */
 #if defined(__LIT)
-    /* WAIT_LOOP */
     for (bytes_copied = 0; bytes_copied < R_BSP_SECSIZE(PFRAM_init); bytes_copied++)
     {
         p_ram_section[bytes_copied] = p_rom_section[bytes_copied];
     }
 #elif defined(__BIG)
-    /* WAIT_LOOP */
     for (bytes_copied = 0; bytes_copied < R_BSP_SECSIZE(PFRAM_init); bytes_copied+=4)
     {
         /* Copy over data 4 byte at a time. */
@@ -237,13 +193,11 @@ static void R_FlashCodeCopy(void)
 
     /* Copy code from ROM to RAM. */
 #if defined(__LIT)
-    /* WAIT_LOOP */
     for (bytes_copied = 0; bytes_copied < R_BSP_SECSIZE(PFRAM2_init); bytes_copied++)
     {
         p_ram_section[bytes_copied] = p_rom_section[bytes_copied];
     }
 #elif defined(__BIG)
-    /* WAIT_LOOP */
     for (bytes_copied = 0; bytes_copied < R_BSP_SECSIZE(PFRAM2_init); bytes_copied+=4)
     {
         /* Copy over data 4 byte at a time. */
@@ -256,8 +210,9 @@ static void R_FlashCodeCopy(void)
 #endif /* FLASH_IN_DUAL_BANK_MODE */
 
 #endif /* defined(__CCRX__) || defined(__GNUC__) */
-}
+
 #endif /* (FLASH_CFG_CODE_FLASH_ENABLE == 1) */
+}
 
 
 /***********************************************************************************************************************
@@ -277,7 +232,7 @@ flash_err_t R_FLASH_Close(void)
 
 
 /* FUNCTIONS WHICH MUST BE RUN FROM RAM FOLLOW */
-#if (FLASH_CFG_CODE_FLASH_ENABLE == 1) && (FLASH_CFG_CODE_FLASH_RUN_FROM_ROM == 0)
+#if (FLASH_CFG_CODE_FLASH_ENABLE == 1)
 #define FLASH_PE_MODE_SECTION    R_BSP_ATTRIB_SECTION_CHANGE(P, FRAM)
 #define FLASH_SECTION_CHANGE_END R_BSP_ATTRIB_SECTION_CHANGE_END
 #else
@@ -561,116 +516,6 @@ bool flash_softwareUnlock(int32_t * const plock)
 
     return true;
 } /* End of function flash_softwareUnlock() */
-
-/***********************************************************************************************************************
-* Function Name: flash_InterruptRequestEnable
-* Description  : Enable the specified interrupt request.
-*                Calculate the corresponding IER [m].IEN [j] from the vector number of the argument,
-*                and set "1" to that bit. 
-*                The macro defined in iodefine.h can be used to the setting of the argument "vector". 
-*                NOTE: When setting an immediate value for an argument "vector", the argument must be 0 to 255.
-*                      Don't set the  vector number of the reserved interrupt source to the argument.
-*                      This function is diverted from R_BSP_InterruptRequestEnable().
-* Arguments    : vector -
-*                    Interrupt vector number.
-* Return Value : none
-***********************************************************************************************************************/
-FLASH_PE_MODE_SECTION
-void flash_InterruptRequestEnable (uint32_t vector)
-{
-    uint32_t ier_reg_num;
-    uint32_t ien_bit_num;
-    uint8_t  *p_ier_addr;
-
-    /* Calculate the register number. (IER[m].IENj)(m = vector_number / 8) */
-    ier_reg_num = vector >> 3;
-
-    /* Calculate the bit number. (IERm.IEN[j])(j = vector_number % 8) */
-    ien_bit_num = vector & 0x00000007;
-
-    /* Casting is valid because it matches the type to the right side or argument. */
-    p_ier_addr = (uint8_t *)&ICU.IER[ier_reg_num].BYTE;
-
-    /* Casting is valid because it matches the type to the right side or argument. */
-    R_FLASH_BIT_SET(p_ier_addr, ien_bit_num);
-} /* End of function flash_InterruptRequestEnable() */
-
-/***********************************************************************************************************************
-* Function Name: flash_InterruptRequestDisable
-* Description  : Disable the specified interrupt request.
-*                Calculate the corresponding IER [m].IEN [j] from the vector number of the argument,
-*                and clear "0" to that bit.
-*                The macro defined in iodefine.h can be used to the setting of the argument "vector".
-*                NOTE: When setting an immediate value for an argument "vector", the argument must be 0 to 255.
-*                      Don't set the vector number of the reserved interrupt source to the argument.
-*                      This function is diverted from R_BSP_InterruptRequestDisable().
-* Arguments    : vector -
-*                    Interrupt vector number.
-* Return Value : none
-***********************************************************************************************************************/
-FLASH_PE_MODE_SECTION
-void flash_InterruptRequestDisable (uint32_t vector)
-{
-    uint32_t ier_reg_num;
-    uint32_t ien_bit_num;
-    uint8_t  *p_ier_addr;
-
-    /* Calculate the register number. (IER[m].IENj)(m = vector_number / 8) */
-    ier_reg_num = vector >> 3;
-
-    /* Calculate the bit number. (IERm.IEN[j])(j = vector_number % 8) */
-    ien_bit_num = vector & 0x00000007;
-
-    /* Casting is valid because it matches the type to the right side or argument. */
-    p_ier_addr = (uint8_t *)&ICU.IER[ier_reg_num].BYTE;
-
-    /* Casting is valid because it matches the type to the right side or argument. */
-    R_FLASH_BIT_CLEAR(p_ier_addr, ien_bit_num);
-} /* End of function flash_InterruptRequestDisable() */
-
-#if defined(__GNUC__) || defined(__ICCRX__)
-/***********************************************************************************************************************
-* Function Name: R_FLASH_BitSet
-* Description  : Sets the specified one bit in the specified 1-byte area to 1.
-* Arguments    : data - Address of the target 1-byte area
-*                bit  - Position of the bit to be manipulated
-*                NOTE: This function is diverted from R_BSP_BitSet().
-* Return Value : none
-***********************************************************************************************************************/
-FLASH_PE_MODE_SECTION
-R_BSP_PRAGMA_STATIC_INLINE_ASM(R_FLASH_BitSet)
-void R_FLASH_BitSet(uint8_t *data, uint32_t bit)
-{
-    R_BSP_ASM_INTERNAL_USED(data)
-    R_BSP_ASM_INTERNAL_USED(bit)
-
-    R_BSP_ASM_BEGIN
-    R_BSP_ASM(    BSET    R2, [R1]    )
-    R_BSP_ASM_END
-} /* End of function R_FLASH_BitSet() */
-#endif /* defined(__GNUC__) || defined(__ICCRX__) */
-
-#if defined(__GNUC__) || defined(__ICCRX__)
-/***********************************************************************************************************************
-* Function Name: R_FLASH_BitClear
-* Description  : Sets the specified one bit in the specified 1-byte area to 0.
-* Arguments    : data - Address of the target 1-byte area
-*                bit  - Position of the bit to be manipulated
-*                NOTE: This function is diverted from R_BSP_BitClear().
-* Return Value : none
-***********************************************************************************************************************/
-FLASH_PE_MODE_SECTION
-R_BSP_PRAGMA_STATIC_INLINE_ASM(R_FLASH_BitClear)
-void R_FLASH_BitClear(uint8_t *data, uint32_t bit)
-{
-    R_BSP_ASM_INTERNAL_USED(data)
-    R_BSP_ASM_INTERNAL_USED(bit)
-
-    R_BSP_ASM_BEGIN
-    R_BSP_ASM(    BCLR    R2, [R1]    )
-    R_BSP_ASM_END
-} /* End of function R_FLASH_BitClear() */
-#endif /* defined(__GNUC__) || defined(__ICCRX__) */
 
 
 FLASH_SECTION_CHANGE_END /* end FLASH SECTION FRAM */
