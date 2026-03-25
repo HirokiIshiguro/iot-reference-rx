@@ -28,7 +28,7 @@ from device_config_loader import load_device_config, get_cert_env_var_name, get_
 
 
 # phase8b app の短時間 CLI は SCI7 / CN6 のログ UART と共用される。
-DEFAULT_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", "COM6"))
+DEFAULT_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", "COM7"))
 DEFAULT_BAUD = int(os.environ.get("UART_BAUD_RATE", "921600"))
 DEFAULT_CHAR_DELAY = 0.002
 DEFAULT_LINE_DELAY = 0.5

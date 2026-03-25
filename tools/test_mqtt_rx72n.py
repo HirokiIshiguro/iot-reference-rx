@@ -28,7 +28,7 @@ except ImportError:
 from device_config_loader import load_device_config
 
 
-DEFAULT_LOG_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", "COM6"))
+DEFAULT_LOG_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", "COM7"))
 DEFAULT_LOG_BAUD = int(os.environ.get("UART_BAUD_RATE", "921600"))
 DEFAULT_TIMEOUT = 150
 
