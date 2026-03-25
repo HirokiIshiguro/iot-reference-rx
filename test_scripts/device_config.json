@@ -6,7 +6,7 @@
       "thing_name": "rx72n-01",
       "command_port": "COM7",
       "command_baud": 115200,
-      "log_port": "COM6",
+      "log_port": "COM7",
       "log_baud": 921600,
       "e2lite_serial": "OBE110008",
       "codesigner_cert": "sample_keys/secp256r1.crt",

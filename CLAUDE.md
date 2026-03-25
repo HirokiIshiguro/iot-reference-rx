@@ -497,14 +497,13 @@ Step 8 の完了判定:
 - 初手の完了条件は OTA まで広げず、`Projects/boot_loader_rx72n_envision_kit` と `Projects/aws_ether_rx72n_envision_kit` を追加したうえで `build -> flash -> provision -> MQTT` の baseline を通すことに絞る
 - 細かなデバッグを優先するため、RX72N Envision Kit #1 は Raspberry Pi からローカル PC へ付け替えた
   - デバッガ: ローカル PC 直結
-  - UART ログ: `COM6`
-  - ブートローダ初期ファームロード: `COM7`
+  - `iot-reference-rx` 側では terminal/UART は `COM7` の 1 本前提で扱う
 
 #### 2026-03-25: local #1 で build / boot_loader / RSU handoff を再確認
 
 - branch `codex/11-add-rx72n-envision-projects` / MR `!17` 上で、`tools/build_headless_rx72n.ps1` により `boot_loader_rx72n_envision_kit` と `aws_ether_rx72n_envision_kit` の headless build が成功した
 - local RX72N #1 では `rfp-cli -list-tools` から `e2l:OBE110008` が見え、boot_loader banner は `COM7` に出ることを確認した
-  - `COM6` は boot_loader 段階では無音で、少なくとも initial firmware load 用 UART ではない
+  - `iot-reference-rx` の RX72N app 設定も `BSP_CFG_SCI_UART_TERMINAL_CHANNEL=7`, `BSP_CFG_SCI_UART_TERMINAL_BITRATE=921600` であり、現段階では `COM7` の single-UART 前提で追う
   - one-shot banner は flash 後にポートを開くと取り逃がしやすく、先に COM を開いたまま `rfp-cli -sig -run -noquery` を叩く観測が有効
 - RSU 生成では鍵 mismatch に注意
   - `tools/test_keys/secp256r1.privatekey` で作った RSU は `verify install area buffer [sig-sha256-ecdsa]...NG`

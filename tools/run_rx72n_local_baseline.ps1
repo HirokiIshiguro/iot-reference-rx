@@ -4,7 +4,7 @@ param(
     [string]$Workspace = "C:\iotref-rx72n-ws",
     [string]$RfpCli = "C:\Program Files (x86)\Renesas Electronics\Programming Tools\Renesas Flash Programmer V3.22\rfp-cli.exe",
     [string]$Tool = "e2l:OBE110008",
-    [string]$LogPort = "COM6",
+    [string]$LogPort = "COM7",
     [string]$DownloadPort = "COM7",
     [int]$Baud = 921600,
     [switch]$SkipBuild,
