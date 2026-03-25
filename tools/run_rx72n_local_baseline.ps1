@@ -110,15 +110,14 @@ if (-not $SkipDownload) {
             --port $DownloadPort `
             --baud $Baud `
             --timeout 300 `
+            --post-tx-wait 60 `
             --diag `
             --wait-for-ready `
             --ready-timeout 60 `
-            --send-chunk-size 128 `
-            --ack-each-chunk `
-            --ack-timeout 20 `
+            --send-chunk-size 4096 `
             --reset-cmd $resetCmdCmd `
             --ready-message $readyMessage `
             --success-message "jump to user program" `
-            --success-timeout 30
+            --success-timeout 60
     }
 }
