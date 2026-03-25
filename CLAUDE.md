@@ -512,6 +512,10 @@ Step 8 の完了判定:
 - direct-flash でも app handoff の鬼門は残っている
   - `aws_ether_rx72n_envision_kit.mot` を `rfp-cli -p ... -v -run -noquery` で直接書いたあとに COM を先開きで観測しても、復帰してくるのは `COM7` の boot_loader banner (`==== RX72N : BootLoader [dual bank] ==== / send image(*.rsu) via UART.`) だけだった
   - したがって現段階では「RSU verify / activate までは進むが app の UART 生存確認はまだ取れていない」「direct-flash でも app 側へ制御が渡り切っていないか、渡った直後に落ちている」可能性が高い
+- app linker vector の不整合も修正した
+  - `aws_ether_rx72n_envision_kit` の `EXCEPTVECT/RESETVECT` は当初 `0xFFFBFF80/0xFFFBFFFC` だったが、bootloader の `R_FWUP_ExecImage()` は `FWUP_CFG_MAIN_AREA_ADDR_L + FWUP_CFG_AREA_SIZE - 4` (= `0xFFFEFFFC`) を reset vector として参照する
+  - そのため app linker を `0xFFFEFF80/0xFFFEFFFC` へ修正し、build 後の map と RSU segment もこの新アドレスへ揃えた
+  - ただし vector 修正後も local 実機では `verify ... OK` / `activating image ... OK` の先が無音で、追加の source-level debug がまだ必要
 - local bring-up helper として以下を追加した
   - `tools/build_headless_rx72n.ps1`
   - `tools/monitor_rx72n_boot.py`
