@@ -46,3 +46,4 @@ Exported global functions (to be accessed by other files)
 void bsp_non_existent_port_init(void);      //r_bsp internal function. DO NOT CALL.
 
 #endif /* MCU_INIT_H */
+

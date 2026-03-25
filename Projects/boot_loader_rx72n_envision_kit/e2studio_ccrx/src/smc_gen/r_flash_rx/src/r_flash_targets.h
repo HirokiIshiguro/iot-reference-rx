@@ -14,7 +14,7 @@
 * following link:
 * http://www.renesas.com/disclaimer 
 *
-* Copyright (C) 2017-2024 Renesas Electronics Corporation. All rights reserved.
+* Copyright (C) 2017-2019 Renesas Electronics Corporation. All rights reserved.
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name    : r_flash_targets.h
@@ -32,12 +32,6 @@
 *           09.09.2019 4.30    Added RX13T
 *           27.09.2019 4.40    Added RX23E-A
 *           18.11.2019 4.50    Added RX66N, and RX72N.
-*           23.10.2020 4.70    Added RX671.
-*           23.04.2021 4.80    Added RX140.
-*           23.12.2021 4.90    Added RX660.
-*           24.01.2023 5.00    Added RX26T.
-*           28.02.2023 5.10    Added RX23E-B.
-*           30.07.2024 5.20    Added RX260, and RX261.
 ***********************************************************************************************************************/
 
 #ifndef FLASH_TARGETS_HEADER_FILE
@@ -72,9 +66,6 @@ Macro definitions
 #elif defined(BSP_MCU_RX13T)
     #define MCU_RX13T
     #define MCU_RX13_ALL
-#elif defined(BSP_MCU_RX140)
-    #define MCU_RX140
-    #define MCU_RX14_ALL
 #elif defined(BSP_MCU_RX231)
     #define MCU_RX231
     #define MCU_RX23_ALL
@@ -83,9 +74,6 @@ Macro definitions
     #define MCU_RX23_ALL
 #elif defined(BSP_MCU_RX23E_A)
     #define MCU_RX23E_A
-    #define MCU_RX23_ALL
-#elif defined(BSP_MCU_RX23E_B)
-    #define MCU_RX23E_B
     #define MCU_RX23_ALL
 #elif defined(BSP_MCU_RX23T)
     #define MCU_RX23T
@@ -99,12 +87,6 @@ Macro definitions
 #elif defined(BSP_MCU_RX24U)
     #define MCU_RX24U
     #define MCU_RX24_ALL
-#elif defined(BSP_MCU_RX260)
-    #define MCU_RX260
-#elif defined(BSP_MCU_RX261)
-    #define MCU_RX261
-#elif defined(BSP_MCU_RX26T)
-    #define MCU_RX26T
 #elif defined(BSP_MCU_RX64M)
     #define MCU_RX64M
     #define MCU_RX64_ALL
@@ -112,18 +94,12 @@ Macro definitions
     #define MCU_RX651
     #define MCU_RX65N
     #define MCU_RX65_ALL
-#elif defined(BSP_MCU_RX660)
-    #define MCU_RX660
-    #define MCU_RX66_ALL
 #elif defined(BSP_MCU_RX66T)
     #define MCU_RX66T
     #define MCU_RX66_ALL
 #elif defined(BSP_MCU_RX66N)
     #define MCU_RX66N
     #define MCU_RX66_ALL
-#elif defined(BSP_MCU_RX671)
-    #define MCU_RX671
-    #define MCU_RX67_ALL
 #elif defined(BSP_MCU_RX71M)
     #define MCU_RX71M
     #define MCU_RX71_ALL

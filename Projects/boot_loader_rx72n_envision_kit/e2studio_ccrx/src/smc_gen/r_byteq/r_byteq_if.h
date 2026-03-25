@@ -30,11 +30,6 @@
 *         : 01.06.2018 1.70    Updated version to 1.70
 *         : 03.12.2018 1.71    Updated version to 1.71 for update of xml file.
 *         : 07.02.2019 1.80    Updated version to 1.80.
-*         : 10.06.2020 1.81    Updated version to 1.81.
-*         : 30.11.2020 1.82    Updated version to 1.82 for e2studio 2020-10 support.
-*         : 31.03.2021 1.90    Updated for queue protection.
-*         : 29.10.2021 2.00    Updated for critical section protection in R_BYTEQ_Put, R_BYTEQ_Get functions.
-*         : 30.11.2022 2.10    Updated and added new demo project.
 ***********************************************************************************************************************/
 
 #ifndef BYTEQ_IF_H
@@ -44,19 +39,14 @@
 Includes   <System Includes> , "Project Includes"
 ***********************************************************************************************************************/
 #include "platform.h"
-#include "r_byteq_config.h"
+
 /***********************************************************************************************************************
 Macro definitions
 ***********************************************************************************************************************/
 /* Version Number of API. */
-#define BYTEQ_VERSION_MAJOR (2)
-#define BYTEQ_VERSION_MINOR (10)
+#define BYTEQ_VERSION_MAJOR (1)
+#define BYTEQ_VERSION_MINOR (80)
 
-#if ((BYTEQ_CFG_CRITICAL_SECTION == 1)||(BYTEQ_CFG_PROTECT_QUEUE == 1))
-#if (BSP_CFG_RUN_IN_USER_MODE == 1)
-    #error "Protect circular buffer must use in supervisor mode."
-#endif
-#endif
 
 /*****************************************************************************
 Typedef definitions

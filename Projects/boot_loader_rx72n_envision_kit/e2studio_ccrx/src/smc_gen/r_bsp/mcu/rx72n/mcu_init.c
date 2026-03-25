@@ -246,3 +246,4 @@ void bsp_non_existent_port_init (void)
     /* Set PORTQ.PDR */
     PORTQ.PDR.BYTE |= BSP_PRV_PORTQ_NE_PIN_MASK;
 } /* End of function bsp_non_existent_port_init() */
+

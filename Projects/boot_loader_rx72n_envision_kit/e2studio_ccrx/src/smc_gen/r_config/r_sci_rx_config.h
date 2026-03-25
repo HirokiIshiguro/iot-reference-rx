@@ -15,7 +15,7 @@
 * following link:
 * http://www.renesas.com/disclaimer 
 *
-* Copyright (C) 2013-2024 Renesas Electronics Corporation. All rights reserved.
+* Copyright (C) 2013-2019 Renesas Electronics Corporation. All rights reserved.
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name     : r_sci_rx_config.h
@@ -39,19 +39,6 @@
 *           25.11.2019 3.30    Added support RX13T.
 *                              Removed support for Generation 1 devices.
 *           30.12.2019 3.40    Added support RX66N, RX72N.
-*           31.03.2020 3.50    Added support RX23E-A.
-*           25.08.2020 3.60    Added feature using DTC/DMAC in SCI transfer.
-*                              Merged IrDA functionality to SCI FIT.
-*           31.03.2021 3.80    Added support for RX671.
-*                              Added support circular buffer in mode asynchronous.
-*           15.04.2021 3.90    Added support for RX140.
-*           31.03.2022 4.40    Added support for RX660.
-*           27.12.2022 4.60    Updated macro definition enable and disable nested interrupt for TXI, RXI, ERI, TEI.
-*           31.03.2023 4.80    Added support for RX26T.
-*                              Fixed to comply with GSCE Coding Standards Rev.6.5.0.
-*           29.05.2023 4.90    Added support for RX23E-B.
-*           31.01.2024 5.10    Modified comments in Data Match parameters.
-*           28.06.2024 5.30    Added support for RX260, RX261.
 ***********************************************************************************************************************/
 #ifndef SCI_CONFIG_H
 #define SCI_CONFIG_H
@@ -72,12 +59,6 @@ Configuration Options
 #define SCI_CFG_ASYNC_INCLUDED  (1)
 #define SCI_CFG_SYNC_INCLUDED   (0)
 #define SCI_CFG_SSPI_INCLUDED   (0)
-#define SCI_CFG_IRDA_INCLUDED   (0)
-
-/* Use circular buffer in mode asynchronous */
-/* 1=Use , 0=Unused */
-/* When SCI_CFG_USE_CIRCULAR is 1, please set BSP_CFG_RUN_IN_USER_MODE = 0  and BYTEQ_CFG_PROTECT_QUEUE = 1*/
-#define SCI_CFG_USE_CIRCULAR_BUFFER (0)
 
 /* SPECIFY BYTE VALUE TO TRANSMIT WHILE CLOCKING IN DATA IN SSPI MODES */
 #define SCI_CFG_DUMMY_TX_BYTE   (0xFF)
@@ -91,26 +72,25 @@ Configuration Options
  * a = this channel is used only for RX130-512KB
  * n = this channel is not available for RX65N-64pin.
  * s = this channel is not available in simple SPI mode.
- * i = this channel is available in IrDA interface.
  * RX MCU supported channels
  *
- * CH#  110 111 113 130 140 230  231  23T 24T 24U 64M 71M 65N 66T 72T 23W 72M 13T 72N 66N 23E-A 671 660 26T 23E-B 260 261
- * ---  --- --- --- --- --- --- ----- --- --- --- --- --- --- --- --- --- --- --- --- --- ----- --- --- --- ----- --- ---
- * CH0           X   Xa      X    X                X   X   Xn              X       X   X          X   X       X          
- * CH1   X   X*  X*  Xu   X  X    X    Xu  Xu  Xu  X   X   Xs  X   X   X   X   X   X   X    Xu    X   X  X    X    X   X 
- * CH2           X                                 X   X   Xu              X       X   X          X   X                  
- * CH3                                             X   X   Xs              X       X   X          X   X                  
- * CH4                                             X   X   Xn              X       X   X          X   X                  
- * CH5   X   X   Xi  X    X  Xi   Xu,i X   X   X   X   X   X   X   X   Xi  X   X   X   X    X     X   X  X    X    X   X 
- * CH6           X   X    X  X    X        X   X   X   X   Xn  X   X       Xu      X   X    X     X   X  X    X    X   X 
- * CH7                                             Xu  Xu  Xn              X       X   X          X   X                  
- * CH8           X   Xa   X  X    X            X           X   X   X   Xu  X       X   X          X   X       X          
- * CH9           X   Xa   X  X    X            X           Xs  X   X       X       X   X          X   X       X          
- * CH10                                                    X               X       X   X          X   X                  
- * CH11                                        X           Xs  X   X       X       X   X          X   X                  
- * CH12  X   X   X   X    X  X    X                X   X   Xs  X   X   X   X   X   X   X    X     X   X  X    X    X   X 
+ * CH#  110 111 113 130 230 231 23T 24T 24U 64M 71M 65N 66T 72T 23W 72M 13T 72N 66N
+ * ---  --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+ * CH0           X   Xa  X   X               X   X   Xn              X       X   X
+ * CH1   X   X*  X*  Xu  X   X   Xu  Xu  Xu  X   X   Xs  X   X   X   X   X   X   X
+ * CH2           X                           X   X   Xu              X       X   X
+ * CH3                                       X   X   Xs              X       X   X
+ * CH4                                       X   X   Xn              X       X   X
+ * CH5   X   X   X   X   X   Xu  X   X   X   X   X   X   X   X   X   X   X   X   X
+ * CH6           X   X   X   X       X   X   X   X   Xn  X   X       Xu      X   X
+ * CH7                                       Xu  Xu  Xn              X       X   X
+ * CH8           X   Xa  X   X           X           X   X   X   Xu  X       X   X
+ * CH9           X   Xa  X   X           X           Xs  X   X       X       X   X
+ * CH10                                              X               X       X   X
+ * CH11                                  X           Xs  X   X       X       X   X
+ * CH12  X   X   X   X   X   X               X   X   Xs  X   X   X   X   X   X   X
 */
-
+                                   
 #define SCI_CFG_CH0_INCLUDED    (0)
 #define SCI_CFG_CH1_INCLUDED    (0)
 #define SCI_CFG_CH2_INCLUDED    (1)
@@ -124,70 +104,6 @@ Configuration Options
 #define SCI_CFG_CH10_INCLUDED   (0)
 #define SCI_CFG_CH11_INCLUDED   (0)
 #define SCI_CFG_CH12_INCLUDED   (0)
-
-/* SPECIFY WHETHER TO INCLUDE CODE FOR NESTED INTERRUPT TXI */
-/* 1=included, 0=not */
-#define SCI_CFG_CH0_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH1_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH2_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH3_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH4_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH5_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH6_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH7_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH8_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH9_EN_TXI_NESTED_INT    (0)
-#define SCI_CFG_CH10_EN_TXI_NESTED_INT   (0)
-#define SCI_CFG_CH11_EN_TXI_NESTED_INT   (0)
-#define SCI_CFG_CH12_EN_TXI_NESTED_INT   (0)
-
-/* SPECIFY WHETHER TO INCLUDE CODE FOR NESTED INTERRUPT RXI */
-/* 1=included, 0=not */
-#define SCI_CFG_CH0_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH1_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH2_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH3_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH4_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH5_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH6_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH7_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH8_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH9_EN_RXI_NESTED_INT    (0)
-#define SCI_CFG_CH10_EN_RXI_NESTED_INT   (0)
-#define SCI_CFG_CH11_EN_RXI_NESTED_INT   (0)
-#define SCI_CFG_CH12_EN_RXI_NESTED_INT   (0)
-
-/* SPECIFY WHETHER TO INCLUDE CODE FOR NESTED INTERRUPT TEI */
-/* 1=included, 0=not */
-#define SCI_CFG_CH0_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH1_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH2_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH3_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH4_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH5_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH6_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH7_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH8_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH9_EN_TEI_NESTED_INT    (0)
-#define SCI_CFG_CH10_EN_TEI_NESTED_INT   (0)
-#define SCI_CFG_CH11_EN_TEI_NESTED_INT   (0)
-#define SCI_CFG_CH12_EN_TEI_NESTED_INT   (0)
-
-/* SPECIFY WHETHER TO INCLUDE CODE FOR NESTED INTERRUPT ERI */
-/* 1=included, 0=not */
-#define SCI_CFG_CH0_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH1_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH2_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH3_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH4_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH5_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH6_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH7_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH8_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH9_EN_ERI_NESTED_INT    (0)
-#define SCI_CFG_CH10_EN_ERI_NESTED_INT   (0)
-#define SCI_CFG_CH11_EN_ERI_NESTED_INT   (0)
-#define SCI_CFG_CH12_EN_ERI_NESTED_INT   (0)
 
 /* SPECIFY ASYNC MODE TX QUEUE BUFFER SIZES (will not allocate if chan not enabled */
 #define SCI_CFG_CH0_TX_BUFSIZ   (80)
@@ -234,14 +150,13 @@ Configuration Options
 #define SCI_CFG_TEI_INCLUDED    (0)      /* 1=included, 0=not */
 
 /* 
-* SET GROUPBL0 (ERI, TEI) INTERRUPT PRIORITY; RX64M/RX71M/RX65N/RX72M/RX72N/RX66N/RX671/RX660/RX26T ONLY
+* SET GROUPBL0 (ERI, TEI) INTERRUPT PRIORITY; RX64M/RX71M/RX65N/RX72M/RX72N/RX66N ONLY
 * SET GROUPBL1; RX65N ONLY
 * SET GROUPAL0 (ERI,TEI) INTERRUPT PRIORITY; RX65N, RX72M, RX72N, RX66N ONLY
 * This sets the priority level for receiver overrun, framing, and parity errors
 * as well as TEI interrupts for all SCI channels.
 */
-/* (RX64M/RX71M/RX65N/RX72M/RX72N/RX66N/RX671/RX660/RX26T ONLY) 1 lowest, 15 highest */
-#define SCI_CFG_ERI_TEI_PRIORITY (3)
+#define SCI_CFG_ERI_TEI_PRIORITY (3)     /* (RX64M/RX71M/RX65N/RX72M/RX72N/RX66N ONLY) 1 lowest, 15 highest */
 
 /* ENABLE TX/RX FIFO; (SCIi supported MCU ONLY) 1=included, 0=not */
 #define SCI_CFG_CH7_FIFO_INCLUDED   (0)
@@ -253,23 +168,20 @@ Configuration Options
 /* SET TX FIFO THRESHOLD; (SCIi supported MCU ONLY) 0 lowest, 15 highest */
 /* TX FIFO THRESHOLD is invalid in Clock Synchronous Mode and Simple SPI Mode. */
 /* Set the same value for TX FIFO THRESHOLD and RX FIFO THRESHOLD in Clock Synchronous Mode and Simple SPI Mode. */
-#define SCI_CFG_CH7_TX_FIFO_THRESH  (8)
-#define SCI_CFG_CH8_TX_FIFO_THRESH  (8)
-#define SCI_CFG_CH9_TX_FIFO_THRESH  (8)
+#define SCI_CFG_CH7_TX_FIFO_THRESH (8)
+#define SCI_CFG_CH8_TX_FIFO_THRESH (8)
+#define SCI_CFG_CH9_TX_FIFO_THRESH (8)
 #define SCI_CFG_CH10_TX_FIFO_THRESH (8)
 #define SCI_CFG_CH11_TX_FIFO_THRESH (8)
 
 /* SET RX FIFO THRESHOLD; (SCIi supported MCU ONLY) 1 lowest, 15 highest */
-#define SCI_CFG_CH7_RX_FIFO_THRESH  (8)
-#define SCI_CFG_CH8_RX_FIFO_THRESH  (8)
-#define SCI_CFG_CH9_RX_FIFO_THRESH  (8)
+#define SCI_CFG_CH7_RX_FIFO_THRESH (8)
+#define SCI_CFG_CH8_RX_FIFO_THRESH (8)
+#define SCI_CFG_CH9_RX_FIFO_THRESH (8)
 #define SCI_CFG_CH10_RX_FIFO_THRESH (8)
 #define SCI_CFG_CH11_RX_FIFO_THRESH (8)
 
-/* ENABLE Received Data match function (SCIj supported MCU RX66T/RX72T/RX72M/RX72N/RX66N ONLY) 1=included, 0=not */
-/*(SCIi supported MCU RX65N/RX66T/RX72T/RX72M/RX72N/RX66N ONLY) 1=included, 0=not */
-/*(SCIk supported MCU RX671/RX660/RX140/RX26T/RX260/RX261 ONLY) 1=included, 0=not */
-/*(SCIm supported MCU RX671/RX660 ONLY) 1=included, 0=not */
+/* ENABLE Received Data match function (SCIj and SCIi supported MCU RX65N/RX66T/RX72T/RX72M/RX72N/RX66N ONLY) 1=included, 0=not */
 #define SCI_CFG_CH0_DATA_MATCH_INCLUDED  (0)
 #define SCI_CFG_CH1_DATA_MATCH_INCLUDED  (0)
 #define SCI_CFG_CH2_DATA_MATCH_INCLUDED  (0)
@@ -282,102 +194,5 @@ Configuration Options
 #define SCI_CFG_CH9_DATA_MATCH_INCLUDED  (0)
 #define SCI_CFG_CH10_DATA_MATCH_INCLUDED (0)
 #define SCI_CFG_CH11_DATA_MATCH_INCLUDED (0)
-
-/* 0=Disable, 1=DTC, 2=DMAC */
-#define SCI_CFG_CH0_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH1_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH2_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH3_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH4_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH5_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH6_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH7_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH8_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH9_TX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH10_TX_DTC_DMACA_ENABLE (0)
-#define SCI_CFG_CH11_TX_DTC_DMACA_ENABLE (0)
-#define SCI_CFG_CH12_TX_DTC_DMACA_ENABLE (0)
-
-#define SCI_CFG_CH0_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH1_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH2_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH3_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH4_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH5_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH6_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH7_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH8_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH9_RX_DTC_DMACA_ENABLE  (0)
-#define SCI_CFG_CH10_RX_DTC_DMACA_ENABLE (0)
-#define SCI_CFG_CH11_RX_DTC_DMACA_ENABLE (0)
-#define SCI_CFG_CH12_RX_DTC_DMACA_ENABLE (0)
-
-/* 0~7 8 channels dmac, but maximum of SCI channel is 13 channel => cost 13*2 = 26 dmac channels in case all of sci channels run simultaneously */
-#define SCI_CFG_CH0_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH1_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH2_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH3_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH4_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH5_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH6_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH7_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH8_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH9_TX_DMACA_CH_NUM      (0)
-#define SCI_CFG_CH10_TX_DMACA_CH_NUM     (0)
-#define SCI_CFG_CH11_TX_DMACA_CH_NUM     (0)
-#define SCI_CFG_CH12_TX_DMACA_CH_NUM     (0)
-
-#define SCI_CFG_CH0_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH1_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH2_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH3_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH4_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH5_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH6_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH7_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH8_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH9_RX_DMACA_CH_NUM      (1)
-#define SCI_CFG_CH10_RX_DMACA_CH_NUM     (1)
-#define SCI_CFG_CH11_RX_DMACA_CH_NUM     (1)
-#define SCI_CFG_CH12_RX_DMACA_CH_NUM     (1)
-
-/* Set enable/ disable transmit signal transition timing adjust feature for each channel*/
-#define SCI_CFG_CH0_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH1_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH2_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH3_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH4_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH5_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH6_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH7_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH8_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH9_TX_SIGNAL_TRANSITION_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH10_TX_SIGNAL_TRANSITION_TIMING_INCLUDED   (0)
-#define SCI_CFG_CH11_TX_SIGNAL_TRANSITION_TIMING_INCLUDED   (0)
-
-/* Set enable/ disable receive data sampling timing adjust feature for each channel*/
-#define SCI_CFG_CH0_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH1_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH2_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH3_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH4_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH5_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH6_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH7_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH8_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH9_RX_DATA_SAMPLING_TIMING_INCLUDED    (0)
-#define SCI_CFG_CH10_RX_DATA_SAMPLING_TIMING_INCLUDED   (0)
-#define SCI_CFG_CH11_RX_DATA_SAMPLING_TIMING_INCLUDED   (0)
-
-/* SPECIFY IRDA CHANNELS TO INCLUDE SOFTWARE (SUPPORTED MCU RX113/RX23W/RX231/RX230 ONLY) 1=included, 0=not */
-#define SCI_CFG_CH5_IRDA_INCLUDED    (0)
-
-/* Set the non-active level of the TXD pin */
-/* 1=High , 0=Low */
-#define SCI_CFG_CH5_IRDA_IRTXD_INACTIVE_LEVEL (1)
-
-/* Set the non-active level of the RXD pin */
-/* 1=High , 0=Low */
-#define SCI_CFG_CH5_IRDA_IRRXD_INACTIVE_LEVEL (1)
 
 #endif /* SCI_CONFIG_H */

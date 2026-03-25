@@ -1,5 +1,11 @@
 # Bootloader (Using in the "PubSub/MQTT with Over-the-air(OTA) update sample project")
 
+> Note:
+> This document is preserved as imported reference material.
+> The active RX72N Envision Kit track in this repository now uses the legacy
+> `rx72n_boot_loader` project imported from `rx72n-envision-kit`, not the
+> `r_fwup` sample bootloader that Issue #11 started from.
+
 ## Overview
 
 This document provides information about the bootloader used for "*PubSub/MQTT with Over-the-air(OTA) update sample project*".

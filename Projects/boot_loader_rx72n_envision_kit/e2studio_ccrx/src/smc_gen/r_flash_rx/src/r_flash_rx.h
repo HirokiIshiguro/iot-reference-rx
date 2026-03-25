@@ -14,7 +14,7 @@
 * following link:
 * http://www.renesas.com/disclaimer 
 *
-* Copyright (C) 2014-2024 Renesas Electronics Corporation. All rights reserved.
+* Copyright (C) 2014-2019 Renesas Electronics Corporation. All rights reserved.
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name    : r_flash_rx.h
@@ -45,14 +45,6 @@
 *           27.09.2019 4.40    Added RX23E-A.
 *                              Added include path for rx230.
 *           18.11.2019 4.50    Added RX66N, and RX72N.
-*           26.06.2020 4.60    Added prototypes for flash_InterruptRequestEnable() and flash_InterruptRequestDisable().
-*           23.10.2020 4.70    Added RX671.
-*           23.04.2021 4.80    Added RX140.
-*           23.12.2021 4.90    Added RX660.
-*           24.01.2023 5.00    Added RX26T.
-*           28.02.2023 5.10    Added RX23E-B.
-*           01.10.2023 5.11    Added support for Tool News R20TS0963.
-*           30.07.2024 5.20    Added RX260, and RX261.
 ***********************************************************************************************************************/
 
 #ifndef FLASH_RX_HEADER_FILE
@@ -72,16 +64,12 @@
     #include "./src/targets/rx130/r_flash_rx130.h"
 #elif defined(MCU_RX13T)
     #include "./src/targets/rx13t/r_flash_rx13t.h"
-#elif defined(MCU_RX140)
-    #include "./src/targets/rx140/r_flash_rx140.h"
 #elif defined(MCU_RX230)
     #include "./src/targets/rx230/r_flash_rx230.h"
 #elif defined(MCU_RX231)
     #include "./src/targets/rx231/r_flash_rx231.h"
 #elif defined(MCU_RX23E_A)
     #include "./src/targets/rx23e-a/r_flash_rx23e-a.h"
-#elif defined(MCU_RX23E_B)
-    #include "./src/targets/rx23e-b/r_flash_rx23e-b.h"
 #elif defined(MCU_RX23T)
     #include "./src/targets/rx23t/r_flash_rx23t.h"
 #elif defined(MCU_RX23W)
@@ -90,24 +78,14 @@
     #include "./src/targets/rx24t/r_flash_rx24t.h"
 #elif defined(MCU_RX24U)
     #include "./src/targets/rx24u/r_flash_rx24u.h"
-#elif defined(MCU_RX260)
-    #include "./src/targets/rx260/r_flash_rx260.h"
-#elif defined(MCU_RX261)
-    #include "./src/targets/rx261/r_flash_rx261.h"
-#elif defined(MCU_RX26T)
-    #include "./src/targets/rx26t/r_flash_rx26t.h"
 #elif defined(MCU_RX64M)
-    #include "./src/targets/rx64m/r_flash_rx64m.h"
+    #include <targets/rx64m/r_flash_rx64m.h>
 #elif defined(MCU_RX651) || defined(MCU_RX65N)
     #include "./src/targets/rx65n/r_flash_rx65n.h"
-#elif defined(MCU_RX660)
-    #include "./src/targets/rx660/r_flash_rx660.h"
 #elif defined(MCU_RX66T)
     #include "./src/targets/rx66t/r_flash_rx66t.h"
 #elif defined(MCU_RX66N)
     #include "./src/targets/rx66n/r_flash_rx66n.h"
-#elif defined(MCU_RX671)
-    #include "./src/targets/rx671/r_flash_rx671.h"
 #elif defined(MCU_RX71M)
     #include "./src/targets/rx71m/r_flash_rx71m.h"
 #elif defined(MCU_RX72T)
@@ -203,7 +181,7 @@ typedef enum
 Exported global variables
 ***********************************************************************************************************************/
 extern int32_t g_flash_lock;
-extern volatile flash_states_t g_flash_state;
+extern flash_states_t g_flash_state;
 extern FCU_BYTE_PTR g_pfcu_cmd_area;
 
 
@@ -214,8 +192,6 @@ extern flash_err_t flash_lock_state(flash_states_t new_state);
 extern void flash_release_state(void);
 extern bool flash_softwareLock (int32_t * const plock);
 extern bool flash_softwareUnlock (int32_t * const plock);
-extern void flash_InterruptRequestEnable (uint32_t vector);
-extern void flash_InterruptRequestDisable (uint32_t vector);
 
 
 #endif /* FLASH_RX_HEADER_FILE */
