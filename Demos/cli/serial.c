@@ -36,63 +36,52 @@
 
 /* Renesas includes. */
 #include "platform.h"
+#include "Pin.h"
 #include "r_sci_rx_if.h"
 #include "r_byteq_if.h"
-#include "r_sci_rx_pinset.h"
+
+#define U_SCI_UART_CLI_PINSET()  R_Pins_Create()
 
 /* FreeRTOS CLI Command Console */
 #if !defined(BSP_CFG_SCI_UART_TERMINAL_ENABLE)
 #error "Error! Need to define MY_BSP_CFG_SERIAL_TERM_SCI in r_bsp_config.h"
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (0)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI0()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH0
 #define U_SCI_UART_CLI_REG             SCI0
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (1)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI1()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH1
 #define U_SCI_UART_CLI_REG             SCI1
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (2)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI2()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH2
 #define U_SCI_UART_CLI_REG             SCI2
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (3)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI3()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH3
 #define U_SCI_UART_CLI_REG             SCI3
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (4)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI4()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH4
 #define U_SCI_UART_CLI_REG             SCI4
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (5)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI5()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH5
 #define U_SCI_UART_CLI_REG             SCI5
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (6)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI6()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH6
 #define U_SCI_UART_CLI_REG             SCI6
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (7)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI7()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH7
 #define U_SCI_UART_CLI_REG             SCI7
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (8)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI8()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH8
 #define U_SCI_UART_CLI_REG             SCI8
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (9)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI9()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH9
 #define U_SCI_UART_CLI_REG             SCI9
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (10)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI10()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH10
 #define U_SCI_UART_CLI_REG             SCI10
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (11)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI11()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH11
 #define U_SCI_UART_CLI_REG             SCI11
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (12)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI12()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH12
 #define U_SCI_UART_CLI_REG             SCI12
 #else
@@ -152,7 +141,7 @@ static sci_err_t prvEnsureSerialPortOpen( void )
                               vSerialSciCallback,
                               &xSerialSciHandle );
 
-#if ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
+#if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
     if( SCI_SUCCESS == xOpenResult )
     {
         IEN( SCI7, RXI7 ) = 0;

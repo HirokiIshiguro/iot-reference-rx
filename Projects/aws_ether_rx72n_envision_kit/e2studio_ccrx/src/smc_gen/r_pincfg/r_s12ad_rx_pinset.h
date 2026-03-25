@@ -7,7 +7,7 @@
 /***********************************************************************************************************************
 * File Name    : r_s12ad_rx_pinset.h
 * Version      : 1.0.2
-* Device(s)    : R5F565NEHxFB
+* Device(s)    : R5F572NNHxFB
 * Tool-Chain   : RXC toolchain
 * Description  : Setting of port and mpc registers
 ***********************************************************************************************************************/
@@ -23,6 +23,6 @@ Includes
 Global variables and functions
 ***********************************************************************************************************************/
 
-void R_ADC_PinSet_S12AD1( void );
+void R_ADC_PinSet_S12AD1();
 
 #endif

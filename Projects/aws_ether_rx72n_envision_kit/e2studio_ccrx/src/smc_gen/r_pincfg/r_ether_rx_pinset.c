@@ -7,7 +7,7 @@
 /***********************************************************************************************************************
 * File Name    : r_ether_rx_pinset.c
 * Version      : 1.0.2
-* Device(s)    : R5F565NEHxFB
+* Device(s)    : R5F572NNHxFB
 * Tool-Chain   : RXC toolchain
 * Description  : Setting of port and mpc registers
 ***********************************************************************************************************************/
@@ -28,7 +28,7 @@ Global variables and functions
 * Arguments    : none
 * Return Value : none
 ***********************************************************************************************************************/
-void R_ETHER_PinSet_ETHERC0_RMII( void )
+void R_ETHER_PinSet_ETHERC0_RMII()
 {
     R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
 

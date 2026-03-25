@@ -15,54 +15,25 @@
 * following link:
 * http://www.renesas.com/disclaimer
 *
-* Copyright (C) 2017 Renesas Electronics Corporation. All rights reserved.
+* Copyright (C) 2019 Renesas Electronics Corporation. All rights reserved.
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name    : r_bsp_config_reference.h
-* Device(s)    : RX65N
+* Device(s)    : RX72N
 * Description  : The file r_bsp_config.h is used to configure your BSP. r_bsp_config.h should be included
 *                somewhere in your package so that the r_bsp code has access to it. This file (r_bsp_config_reference.h)
 *                is just a reference file that the user can use to make their own r_bsp_config.h file.
 ************************************************************************************************************************
-* History : DD.MM.YYYY Version   Description
-*         : 15.05.2017 1.00      First Release
-*         : 01.12.2017 1.01      Added the following macro definition.
-*                                - BSP_CFG_EBMAPCR_1ST_PRIORITY
-*                                - BSP_CFG_EBMAPCR_2ND_PRIORITY
-*                                - BSP_CFG_EBMAPCR_3RD_PRIORITY
-*                                - BSP_CFG_EBMAPCR_4TH_PRIORITY
-*                                - BSP_CFG_EBMAPCR_5TH_PRIORITY
-*         : 01.07.2018 1.02      Added the following macro definition.
-*                                - BSP_CFG_CONFIGURATOR_SELECT
-*                                Add RTOS support. FreeRTOS. Define a timer for RTOS.
-*         : 27.07.2018 1.03      Modified the comment of PLL clock source.
-*                                Added the following macro definition for ID code protection.
-*                                 - BSP_CFG_ID_CODE_LONG_1
-*                                 - BSP_CFG_ID_CODE_LONG_2
-*                                 - BSP_CFG_ID_CODE_LONG_3
-*                                 - BSP_CFG_ID_CODE_LONG_4
-*                                Added the following macro definition.
-*                                 - BSP_CFG_FIT_IPL_MAX
-*         : 31.10.2018 1.04      Added support for RX651 with 64 pin package.
-*         : 28.02.2019 2.00      Added support for GNUC and ICCRX.
-*                                Fixed coding style.
-*         : 26.07.2019 2.01      Modified comment.
-*         : 08.10.2019 2.02      Added the following macro definition.
-*                                - BSP_CFG_SWINT_UNIT1_ENABLE
-*                                - BSP_CFG_SWINT_UNIT2_ENABLE
-*                                - BSP_CFG_SWINT_TASK_BUFFER_NUMBER
-*                                - BSP_CFG_SWINT_IPR_INITIAL_VALUE
-*                                Modified comment for added support of Renesas RTOS (RI600V4 or RI600PX).
-*                                Added the following macro definition.
-*                                - BSP_CFG_RENESAS_RTOS_USED
-*         : 31.07.2020 2.03      Modified comment.
-*         : 29.01.2021 2.04      Added the following macro definition.
+* History : DD.MM.YYYY Version  Description
+*         : 08.10.2019 1.00     First Release.
+*         : 31.07.2020 1.01     Modified comment.
+*         : 29.01.2021 1.02     Added the following macro definition.
 *                                - BSP_CFG_SCI_UART_TERMINAL_ENABLE
 *                                - BSP_CFG_SCI_UART_TERMINAL_CHANNEL
 *                                - BSP_CFG_SCI_UART_TERMINAL_BITRATE
 *                                - BSP_CFG_SCI_UART_TERMINAL_INTERRUPT_PRIORITY
-*         : 26.02.2021 2.05      Added a comment for Azure RTOS to BSP_CFG_RTOS_USED.
-*         : 30.11.2021 3.00      Added the following macro definitions.
+*         : 26.02.2021 1.03     Added a comment for Azure RTOS to BSP_CFG_RTOS_USED.
+*         : 30.11.2021 2.00     Added the following macro definitions.
 *                                - BSP_CFG_MAIN_CLOCK_OSCILLATE_ENABLE
 *                                - BSP_CFG_SUB_CLOCK_OSCILLATE_ENABLE
 *                                - BSP_CFG_HOCO_OSCILLATE_ENABLE
@@ -71,17 +42,17 @@
 *                                - BSP_CFG_CONFIGURATOR_VERSION
 *                                - BSP_CFG_CPLUSPLUS
 *                                - BSP_CFG_SERIAL_PROGRAMMER_CONECT_ENABLE
-*                                Changed initial value of the following macro definitions.
+*                               Changed initial value of the following macro definitions.
 *                                - BSP_CFG_MCU_PART_GROUP
 *                                - BSP_CFG_MCU_PART_SERIES
-*         : 11.02.2022 3.01      Changed initial value of the following macro definitions.
+*         : 11.02.2022 2.01     Changed initial value of the following macro definitions.
 *                                - BSP_CFG_SWINT_UNIT1_ENABLE
 *                                - BSP_CFG_SWINT_UNIT2_ENABLE
-*         : 25.11.2022 3.02      Modified comment.
-*                                Added the following macro definition.
+*         : 25.11.2022 2.02     Modified comment.
+*                               Added the following macro definition.
 *                                - BSP_CFG_EXPANSION_RAM_ENABLE
-*         : 28.02.2023 3.03      Modified comment.
-*         : 21.11.2023 3.04      Added the following macro definitions.
+*         : 28.02.2023 2.03     Modified comment.
+*         : 21.11.2023 2.04     Added the following macro definitions.
 *                                - BSP_CFG_BUS_PRIORITY_INITIALIZE_ENABLE
 *                                - BSP_CFG_MEMORY_BUS1_3_PRIORITY
 *                                - BSP_CFG_MEMORY_BUS2_PRIORITY
@@ -91,7 +62,7 @@
 *                                - BSP_CFG_INTERNAL_PERIPHERAL_BUS6_PRIORITY
 *                                - BSP_CFG_EXTERNAL_BUS_PRIORITY
 *                                - BSP_CFG_BOOTLOADER_PROJECT
-*         : 27.11.2024 3.05      Changed comment of BSP_CFG_RTC_ENABLE.
+*         : 27.11.2024 2.05     Changed comment of BSP_CFG_RTC_ENABLE.
 ***********************************************************************************************************************/
 #ifndef R_BSP_CONFIG_REF_HEADER_FILE
 #define R_BSP_CONFIG_REF_HEADER_FILE
@@ -101,11 +72,11 @@ Configuration Options
 ***********************************************************************************************************************/
 
 /* NOTE:
-   The default settings are the same as when using RSKRX65N-2MB.
+   The default settings are the same as when using RSKRX72N.
    Change to the settings for the user board.
- */
+*/
 
-/* ③'b diagnostic switch. Normal builds must keep this at 0. */
+/* phase8b diagnostic switch. Normal builds must keep this at 0. */
 #define BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP   (0)
 
 /* Start up select
@@ -117,11 +88,11 @@ Configuration Options
 /* Enter the product part number for your MCU. This information will be used to obtain information about your MCU such 
    as package and memory size.
    To help parse this information, the part number will be defined using multiple macros.
-   R 5 F 56 5N E D D FP
+   R 5 F 57 2N N D D BD
    | | | |  |  | | | |  Macro Name                             Description
    | | | |  |  | | | |__BSP_CFG_MCU_PART_PACKAGE             = Package type, number of pins, and pin pitch
    | | | |  |  | | |____not used                             = Products with wide temperature range
-   | | | |  |  | |______BSP_CFG_MCU_PART_ENCRYPTION_INCLUDED = Encryption module included/not included
+   | | | |  |  | |______BSP_CFG_MCU_PART_FUNCTION            = Encryption module included/not included
    | | | |  |  |________BSP_CFG_MCU_PART_MEMORY_SIZE         = ROM, RAM, and Data Flash Capacity
    | | | |  |___________BSP_CFG_MCU_PART_GROUP               = Group name
    | | | |______________BSP_CFG_MCU_PART_SERIES              = Series name
@@ -134,50 +105,39 @@ Configuration Options
    Character(s) = Value for macro = Package Type/Number of Pins/Pin Pitch
    FC           = 0x0             = LFQFP/176/0.50
    BG           = 0x1             = LFBGA/176/0.80
-   LC           = 0x2             = TFLGA/177/0.50
+   BD           = 0x2             = LFBGA/224/0.80
    FB           = 0x3             = LFQFP/144/0.50
    LK           = 0x4             = TFLGA/145/0.50
    FP           = 0x5             = LFQFP/100/0.50
-   FM           = 0x8             = LFQFP/64/0.50
-   LJ           = 0xA             = TFLGA/100/0.65
-   BP           = 0xC             = TFBGA/64/0.50
 */
-#define BSP_CFG_MCU_PART_PACKAGE        (0x2) /* RX72N Envision Kit: LFBGA224 */
+#define BSP_CFG_MCU_PART_PACKAGE        (0x3) /* Generated value. Do not edit this manually */
 
-/* Whether Encryption and SDHI/SDSI are included or not.
+/* Whether Encryption is included or not.
    Character(s) = Value for macro = Description
-   A            = false           = Encryption module not included, SDHI/SDSI module not included
-   B            = false           = Encryption module not included, SDHI/SDSI module included
-   D            = false           = Encryption module not included, SDHI/SDSI module included, dual-bank structure
-   E            = true            = Encryption module included, SDHI/SDSI module not included
-   F            = true            = Encryption module included, SDHI/SDSI module included
-   H            = true            = Encryption module included, SDHI/SDSI module included, dual-bank structure
+   D            = 0xD             = Encryption module not included
+   H            = 0x11            = Encryption module included
 */
-#define BSP_CFG_MCU_PART_FUNCTION       (0x11) /* RX72N Envision Kit: encryption + dual-bank */
-#define BSP_CFG_MCU_PART_ENCRYPTION_INCLUDED   (true) /* Generated value. Do not edit this manually */
+#define BSP_CFG_MCU_PART_FUNCTION       (0x11) /* Generated value. Do not edit this manually */
 
 /* ROM, RAM, and Data Flash Capacity.
    Character(s) = Value for macro = ROM Size/Ram Size/Data Flash Size
-   4            = 0x4             = 512KB/256KB/Not equipped
-   7            = 0x7             = 768KB/256KB/Not equipped
-   9            = 0x9             = 1MB/256KB/Not equipped
-   C            = 0xC             = 1.5MB/640KB/32KB
-   E            = 0xE             = 2MB/640KB/32KB
-   NOTE: When the RAM capacity is 640KB, the RAM areas are not contiguous.
+   D            = 0xD             = 2MB/1MB/32KB
+   N            = 0x17            = 4MB/1MB/32KB
+NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 */
-#define BSP_CFG_MCU_PART_MEMORY_SIZE    (0x17) /* RX72N Envision Kit: 4MB ROM / 1MB RAM / 32KB data flash */
+#define BSP_CFG_MCU_PART_MEMORY_SIZE    (0x17) /* Generated value. Do not edit this manually */
 
 /* Group name.
    Character(s) = Description
-   5N/51        = RX65N Group/RX651 Group
+   2N           = RX72N Group
 */
-#define BSP_CFG_MCU_PART_GROUP          (0x0) /* RX72N group */
+#define BSP_CFG_MCU_PART_GROUP          (0x0) /* Generated value. Do not edit this manually */
 
 /* Series name.
    Character(s) = Description
-   56           = RX600 Series
+   57           = RX700 Series
 */
-#define BSP_CFG_MCU_PART_SERIES         (0x0) /* RX700 series */
+#define BSP_CFG_MCU_PART_SERIES         (0x0) /* Generated value. Do not edit this manually */
 
 /* Memory type.
    Character(s) = Value for macro = Description
@@ -210,8 +170,8 @@ Configuration Options
 #endif
 
 /* Interrupt Stack size in bytes.
-   NOTE: This setting is available only when using CCRX and GNUC. */
-#define BSP_CFG_ISTACK_BYTES            (0x600)
+ * NOTE: This setting is available only when using CCRX and GNUC. */
+#define BSP_CFG_ISTACK_BYTES            (0x400)
 
 /* Heap size in bytes.
    To disable the heap you must follow these steps:
@@ -301,12 +261,12 @@ Configuration Options
    1 = High Speed On-Chip Oscillator (HOCO)
    2 = Main Clock Oscillator
    3 = Sub-Clock Oscillator
-   4 = PLL Circuit
+   4 = PLL Circuit (default)
 */
 #define BSP_CFG_CLOCK_SOURCE            (4) /* Generated value. Do not edit this manually */
 
 /* Main clock Oscillator Switching (MOSEL).
-   0 = Resonator
+   0 = Resonator (default)
    1 = External clock input
 */
 #define BSP_CFG_MAIN_CLOCK_SOURCE       (0) /* Generated value. Do not edit this manually */
@@ -316,27 +276,27 @@ Configuration Options
    1 = USB PLL Circuit (This is not available.)
    2 = PLL Circuit (UDIVCLK) (default)
    3 = PPLL Circuit (PPLLDIVCLK)
- */
-#define BSP_CFG_USB_CLOCK_SOURCE        (2) /* RX72N Envision Kit legacy setting */
+*/
+#define BSP_CFG_USB_CLOCK_SOURCE        (2) /* Generated value. Do not edit this manually */
 
 /* Ethernet-PHY clock source (OUTCKSEL). Choose which clock source to input to the Ethernet PHY LSI.
    Available clock sources:
    0 = PLL circuit
    1 = PPLL circuit (default)
    2 = Ethernet-PHY not use
- */
-#define BSP_CFG_PHY_CLOCK_SOURCE        (1) /* RX72N Envision Kit legacy setting */
+*/
+#define BSP_CFG_PHY_CLOCK_SOURCE        (1) /* Generated value. Do not edit this manually */
 
 /* Configure clock source of clock output(CLKOUT) pin (CKOSEL).
    Available clock sources:
    0 = LOCO
    1 = HOCO
-   2 = Main clock oscillator
+   2 = Main clock oscillator (default)
    3 = Sub-clock oscillator
    4 = PLL circuit
    6 = PPLL circuit
  */
-#define BSP_CFG_CLKOUT_SOURCE           (2) /* RX72N Envision Kit: disable output but keep valid source */
+#define BSP_CFG_CLKOUT_SOURCE           (2) /* Generated value. Do not edit this manually */
 
 /* Defines whether to use the RTC or not.
    This setting will initialize the RTC related registers.
@@ -355,28 +315,31 @@ Configuration Options
 /* Clock configuration options.
    The input clock frequency is specified and then the system clocks are set by specifying the multipliers used. The
    multiplier settings are used to set the clock registers in resetprg.c. If a 24MHz clock is used and the
-   ICLK is 120MHz, PCLKA is 120MHz, PCLKB is 60MHz, PCLKC is 60MHz, PCLKD is 60MHz, FCLK is 60MHz, USB Clock is 48MHz,
-   and BCLK is 120MHz then the settings would be:
+   ICLK is 120MHz, PCLKA is 120MHz, PCLKB is 60MHz, PCLKC is 60MHz, PCLKD is 60MHz, FCLK is 60MHz, BCLK is 80MHz, 
+   USB Clock is 48MHz, ESC Clock is 100MHz, Ether-Phy Clock is 25MHz then the settings would be:
 
-   BSP_CFG_XTAL_HZ  = 24000000
-   BSP_CFG_PLL_DIV  = 1        (no division)
-   BSP_CFG_PLL_MUL  = 10.0     (24MHz x 10.0 = 240MHz)
-   BSP_CFG_ICK_DIV  = 2      : System Clock (ICLK)        = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_ICK_DIV)  = 120MHz
-   BSP_CFG_PCKA_DIV = 2      : Peripheral Clock A (PCLKA) = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKA_DIV) = 120MHz
-   BSP_CFG_PCKB_DIV = 4      : Peripheral Clock B (PCLKB) = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKB_DIV) = 60MHz
-   BSP_CFG_PCKC_DIV = 4      : Peripheral Clock C (PCLKC) = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKC_DIV) = 60MHz
-   BSP_CFG_PCKD_DIV = 4      : Peripheral Clock D (PCLKD) = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKD_DIV) = 60MHz
-   BSP_CFG_FCK_DIV  = 4      : Flash IF Clock (FCLK)      = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_FCK_DIV)  = 60MHz
-   BSP_CFG_BCK_DIV  = 2      : External Bus Clock (BCK)   = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_BCK_DIV)  = 120MHz
-   BSP_CFG_UCK_DIV  = 5      : USB Clock (UCLK)           = 
-                               (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_UCK_DIV)  = 48MHz
+   BSP_CFG_XTAL_HZ   = 24000000
+   BSP_CFG_PLL_DIV   = 1       (no division)
+   BSP_CFG_PLL_MUL   = 10.0    (24MHz x 10.0 = 240MHz)
+   BSP_CFG_PPLL_DIV  = 3       (divide by 3)
+   BSP_CFG_PPLL_MUL  = 25.0    (8MHz x 25.0 = 200MHz)
+   BSP_CFG_PPLCK_DIV = 2       (divide by 2)
+   BSP_CFG_ICK_DIV   = 1     : System Clock (ICLK)        = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_ICK_DIV)  = 240MHz
+   BSP_CFG_PCKA_DIV  = 2     : Peripheral Clock A (PCLKA) = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKA_DIV) = 120MHz
+   BSP_CFG_PCKB_DIV  = 4     : Peripheral Clock B (PCLKB) = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKB_DIV) = 60MHz
+   BSP_CFG_PCKC_DIV  = 4     : Peripheral Clock C (PCLKC) = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKC_DIV) = 60MHz
+   BSP_CFG_PCKD_DIV  = 4     : Peripheral Clock D (PCLKD) = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_PCKD_DIV) = 60MHz
+   BSP_CFG_FCK_DIV   = 4     : Flash IF Clock (FCLK)      = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_FCK_DIV)  = 60MHz
+   BSP_CFG_BCK_DIV   = 3     : External Bus Clock (BCK)   = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_BCK_DIV)  = 80MHz
+   BSP_CFG_UCK_DIV   = 5     : USB Clock (UCLK)           = 
+                              (((BSP_CFG_XTAL_HZ/BSP_CFG_PLL_DIV) * BSP_CFG_PLL_MUL) / BSP_CFG_UCK_DIV)  = 48MHz
 */
 
 /* Input clock frequency in Hz (XTAL or EXTAL). */
@@ -433,7 +396,7 @@ Configuration Options
 #define BSP_CFG_PCKD_DIV                (4) /* Generated value. Do not edit this manually */
 
 /* External Bus Clock Divider (BCLK).
-   Available divisors = /1 (no division), /2, /4, /8, /16, /32, /64
+   Available divisors = /1 (no division), /2, /3, /4, /8, /16, /32, /64
 */
 #define BSP_CFG_BCK_DIV                 (2) /* Generated value. Do not edit this manually */
 
@@ -450,23 +413,17 @@ Configuration Options
 /* PPLL Input Frequency Division Ratio Select (PPLIDIV).
    Available divisors = /1 (no division), /2, /3
 */
-#define BSP_CFG_PPLL_DIV                (3) /* RX72N Envision Kit: 24MHz / 3 = 8MHz */
+#define BSP_CFG_PPLL_DIV                (3) /* Generated value. Do not edit this manually */
 
-/* PPLL Frequency Multiplication Factor Select (PPLSTC).
-   Available multipliers = x10.0 to x30.0 in 0.5 increments.
+/* PPLL Frequency Multiplication Factor Select (PPLSTC). 
+   Available multipliers = x10.0 to x30.0 in 0.5 increments (e.g. 10.0, 10.5, 11.0, 11.5, ..., 29.0, 29.5, 30.0)
 */
-#define BSP_CFG_PPLL_MUL                (25.0) /* RX72N Envision Kit: 8MHz x 25 = 200MHz */
+#define BSP_CFG_PPLL_MUL                (25.0) /* Generated value. Do not edit this manually */
 
-/* PPLL Clock Divider Select.
+/* PPLL Clock Divider Select. 
    Available divisors = /2, /3, /4, /5
 */
-#define BSP_CFG_PPLCK_DIV               (2) /* RX72N Envision Kit legacy setting */
-
-/* Configure CLKOUT output pin.
-   0 = CLKOUT pin output disabled.
-   1 = CLKOUT pin output enabled.
-*/
-#define BSP_CFG_CLKOUT_OUTPUT           (0) /* RX72N Envision Kit: unused */
+#define BSP_CFG_PPLCK_DIV               (2) /* Generated value. Do not edit this manually */
 
 /* Configure BCLK output pin (only effective when external bus enabled)
    Values 0=no output, 1 = BCK frequency, 2= BCK/2 frequency
@@ -477,6 +434,23 @@ Configuration Options
    Values 0=no output, 1 = BCK frequency
 */
 #define BSP_CFG_SDCLK_OUTPUT            (0) /* Generated value. Do not edit this manually */
+
+/* CLKOUT Output Frequency Division Ratio Select. (CKODIV)
+   Values
+   0 = x1/1 (default)
+   1 = x1/2
+   2 = x1/4
+   3 = x1/8
+   4 = x1/16
+ */
+#define BSP_CFG_CLKOUT_DIV              (0) /* Generated value. Do not edit this manually */
+
+/* Configure clock output(CLKOUT) pin (CKOSTP).
+   Values
+   0 = CLKOUT pin output stopped. (Fixed to the low level) (default)
+   1 = CLKOUT pin output enabled.
+ */
+#define BSP_CFG_CLKOUT_OUTPUT           (0) /* Generated value. Do not edit this manually */
 
 /* Main Clock Oscillator Wait Time (MOSCWTCR).
    The value of MOSCWTCR register required for correspondence with the waiting time required to secure stable 
@@ -508,8 +482,98 @@ Configuration Options
 /* ROM Cache Enable Register (ROMCE).
    0 = ROM cache operation disabled.
    1 = ROM cache operation enabled.
-*/
+*/ 
 #define BSP_CFG_ROM_CACHE_ENABLE        (0)
+
+/* Configure non-cacheable area 0 of the ROM cache function.
+   0 = Non-cacheable area 0 settings disabled.
+   1 = Non-cacheable area 0 settings enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA0_ENABLE    (0)
+
+/* Specifies the start address of non-cacheable area 0.
+   Selects the start address of non-cacheable area 0.
+   The upper 10 bits are fixed at 1. The lower 4 bits are fixed at 0.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA0_ADDR      (0xFFE00000)
+
+/* Configures the size of non-cacheable area 0.
+   Selects the size of non-cacheable area 0 in byte units from among the following:
+   0x0 =  16 bytes, 0xA =  16K bytes,
+   0x1 =  32 bytes, 0xB =  32K bytes,
+   0x2 =  64 bytes, 0xC =  64K bytes,
+   0x3 = 128 bytes, 0xD = 128K bytes,
+   0x4 = 256 bytes, 0xE = 256K bytes,
+   0x5 = 512 bytes, 0xF = 512K bytes,
+   0x6 =  1K bytes, 0x10=   1M bytes,
+   0x7 =  2K bytes, 0x11=   2M bytes,
+   0x8 =  4K bytes,
+   0x9 =  8K bytes
+*/
+#define BSP_CFG_NONCACHEABLE_AREA0_SIZE      (0x0)
+
+/* Specifies the IF non-cacheable area enable bit setting of non-cacheable area 0.
+   0 = Non-cacheable area 0 setting of IF cache disabled.
+   1 = Non-cacheable area 0 setting of IF cache enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA0_IF_ENABLE (1)
+
+/* Specifies the OA non-cacheable area enable bit setting of non-cacheable area 0.
+   0 = Non-cacheable area 0 setting of OA cache disabled.
+   1 = Non-cacheable area 0 setting of OA cache enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA0_OA_ENABLE (1)
+
+/* Specifies the DM non-cacheable area enable bit setting of non-cacheable area 0.
+   0 = Non-cacheable area 0 setting of DM cache disabled.
+   1 = Non-cacheable area 0 setting of DM cache enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA0_DM_ENABLE (1)
+
+/* Configure non-cacheable area 1 of the ROM cache function.
+   0 = Non-cacheable area 1 settings disabled.
+   1 = Non-cacheable area 1 settings enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA1_ENABLE    (0)
+
+/* Specifies the start address of non-cacheable area 1.
+   Selects the start address of non-cacheable area 1.
+   The upper 10 bits are fixed at 1. The lower 4 bits are fixed at 0.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA1_ADDR      (0xFFE00000)
+
+/* Configures the size of non-cacheable area 1.
+   Selects the size of non-cacheable area 0 in byte units from among the following:
+   0x0 =  16 bytes, 0xA =  16K bytes,
+   0x1 =  32 bytes, 0xB =  32K bytes,
+   0x2 =  64 bytes, 0xC =  64K bytes,
+   0x3 = 128 bytes, 0xD = 128K bytes,
+   0x4 = 256 bytes, 0xE = 256K bytes,
+   0x5 = 512 bytes, 0xF = 512K bytes,
+   0x6 =  1K bytes, 0x10=   1M bytes,
+   0x7 =  2K bytes, 0x11=   2M bytes,
+   0x8 =  4K bytes,
+   0x9 =  8K bytes
+*/
+#define BSP_CFG_NONCACHEABLE_AREA1_SIZE      (0x0)
+
+/* Specifies the IF non-cacheable area enable bit setting of non-cacheable area 1.
+   0 = Non-cacheable area 1 setting of IF cache disabled.
+   1 = Non-cacheable area 1 setting of IF cache enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA1_IF_ENABLE (1)
+
+/* Specifies the OA non-cacheable area enable bit setting of non-cacheable area 1.
+   0 = Non-cacheable area 1 setting of OA cache disabled.
+   1 = Non-cacheable area 1 setting of OA cache enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA1_OA_ENABLE (1)
+
+/* Specifies the DM non-cacheable area enable bit setting of non-cacheable area 1.
+   0 = Non-cacheable area 1 setting of DM cache disabled.
+   1 = Non-cacheable area 1 setting of DM cache enabled.
+*/
+#define BSP_CFG_NONCACHEABLE_AREA1_DM_ENABLE (1)
 
 /* Configure WDT and IWDT settings.
    OFS0 - Option Function Select Register 0
@@ -548,20 +612,18 @@ Configuration Options
 */
 #define BSP_CFG_OFS1_REG_VALUE  (0xFFFFFFFF) /* Generated value. Do not edit this manually */
 
-/* Trusted memory is facility to prevent the reading of blocks 8 and 9 and blocks 46 and 47 (in dual mode) in 
+/* Trusted memory is facility to prevent the reading of blocks 8 and 9 and blocks 78 and 79 (in dual mode) in 
    the code flash memory by third party software. This feature is disabled by default.
    TMEF - TM Enable Flag Register
        b31     Reserved (set to 1)
-       b30:b28 TMEFDB - Dual-Bank TM Enable - 000: The TM function in the address range from FFEE 0000h to 
-                                                   FFEE FFFFh is enabled in dual mode.
-                                            - 111: The TM function in the address range from FFEE 0000h to 
-                                                   FFEE FFFFh is disabled in dual mode.
+       b30:b28 TMEFDB - Dual-Bank TM Enable - 000: The TM function in the address range from FFDE 0000h to 
+                                                   FFDE FFFFh is enabled in dual mode.
+                                            - 111: The TM function in the address range from FFDE 0000h to 
+                                                   FFDE FFFFh is disabled in dual mode.
        b27     Reserved (set to 1)
        b26:b24 TMEF   - TM Enable - 000: TM function is enabled.
                                   - 111: TM function is disabled.
        b23:b0  Reserved (set to 1)
-       NOTE: If the dual bank function has not been incorporated in a device,
-             TMEFDB bits [b30:b28] are reserved area.
    Default value is 0xFFFFFFFF.
 */
 #define BSP_CFG_TRUSTED_MODE_FUNCTION  (0xFFFFFFFF)
@@ -606,8 +668,8 @@ Configuration Options
 #define BSP_CFG_CODE_FLASH_BANK_MODE    (0)
 
 /* Select the startup bank of the program when dual bank function is in dual mode.
-   0 = The address range of bank 1 from FFE00000h to FFEFFFFFh and bank 0 from FFF00000h to FFFFFFFFh. (default)
-   1 = The address range of bank 1 from FFF00000h to FFFFFFFFh and bank 0 from FFE00000h to FFEFFFFFh.
+   0 = The address range of bank 1 from FFC00000h to FFDFFFFFh and bank 0 from FFE00000h to FFFFFFFFh. (default)
+   1 = The address range of bank 1 from FFE00000h to FFFFFFFFh and bank 0 from FFC00000h to FFDFFFFFh.
    NOTE: If the dual bank function has been incorporated in a device, select the start bank in this macro.
          Default setting of the start bank is bank0.
          If the dual bank function has not been incorporated in a device, this macro should be 0.
@@ -692,7 +754,7 @@ Configuration Options
 #define BSP_CFG_USER_WARM_START_CALLBACK_PRE_INITC_ENABLED    (0)
 #define BSP_CFG_USER_WARM_START_PRE_C_FUNCTION     my_sw_warmstart_prec_function
 
-#define BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED    (1)
+#define BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED    (0)
 #define BSP_CFG_USER_WARM_START_POST_C_FUNCTION    my_sw_warmstart_postc_function
 
 /* By default FIT modules will check input parameters to be valid. This is helpful during development but some users
@@ -721,8 +783,7 @@ Configuration Options
    3 = GLCDC graphics 2 data read
    4 = EDMAC
 
-   Note : This macro is only available for products with at least 1.5 Mbytes of code flash memory.
-          Settings other than above are prohibited.
+   Note : Settings other than above are prohibited.
           Duplicate priority settings can not be made.
 */
 #define BSP_CFG_EBMAPCR_1ST_PRIORITY                (0) /* Extended Bus Master 1st Priority Selection */
@@ -790,11 +851,11 @@ Configuration Options
 
 /* This macro is channel number for serial terminal.
 */
-#define BSP_CFG_SCI_UART_TERMINAL_CHANNEL        (7)
+#define BSP_CFG_SCI_UART_TERMINAL_CHANNEL        (5)
 
 /* This macro is bit-rate for serial terminal.
 */
-#define BSP_CFG_SCI_UART_TERMINAL_BITRATE        (921600)
+#define BSP_CFG_SCI_UART_TERMINAL_BITRATE        (115200)
 
 /* This macro is interrupt priority for serial terminal.
    0(low) - 15(high)
@@ -819,7 +880,7 @@ Configuration Options
 */
 #define BSP_CFG_BUS_PRIORITY_INITIALIZE_ENABLE      (0)
 
-/* Select the priority order for memory bus 1 (RAM) and memory bus 3 (expansion RAM).
+/* Select the priority order for memory bus 1 (RAM) and memory bus 3 (expansion RAM/ECCRAM).
    0 = The order of priority is fixed.
    1 = The order of priority is toggled.
 */
@@ -869,3 +930,4 @@ Configuration Options
 #define BSP_CFG_BOOTLOADER_PROJECT    (0)
 
 #endif /* R_BSP_CONFIG_REF_HEADER_FILE */
+
