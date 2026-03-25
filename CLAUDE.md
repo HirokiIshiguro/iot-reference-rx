@@ -509,6 +509,9 @@ Step 8 の完了判定:
 - RSU 生成では鍵 mismatch に注意
   - `tools/test_keys/secp256r1.privatekey` で作った RSU は `verify install area buffer [sig-sha256-ecdsa]...NG`
   - `sample_keys/secp256r1.privatekey` は RX72N boot_loader に埋め込まれた `src/key/code_signer_public_key.h` と対応しており、これで生成した RSU は `verify ... OK` と `activating image ... OK` まで進んだ
+- direct-flash でも app handoff の鬼門は残っている
+  - `aws_ether_rx72n_envision_kit.mot` を `rfp-cli -p ... -v -run -noquery` で直接書いたあとに COM を先開きで観測しても、復帰してくるのは `COM7` の boot_loader banner (`==== RX72N : BootLoader [dual bank] ==== / send image(*.rsu) via UART.`) だけだった
+  - したがって現段階では「RSU verify / activate までは進むが app の UART 生存確認はまだ取れていない」「direct-flash でも app 側へ制御が渡り切っていないか、渡った直後に落ちている」可能性が高い
 - local bring-up helper として以下を追加した
   - `tools/build_headless_rx72n.ps1`
   - `tools/monitor_rx72n_boot.py`
