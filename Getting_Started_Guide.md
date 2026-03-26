@@ -425,7 +425,7 @@ If successful, it will be displayed on AWS console as shown below.![4-1-9](https
 * In this chapter, the "PubSub/MQTT with Fleet Provisioning sample project" will be referred to as the "PubSub demo with Fleet Provisioning".
 * Details for *PubSub demo with Fleet Provisioning* are provided in the special application note (document number: **R01AN8016**).  
   Please check the following webpage:
-  * <https://www.renesas.com/document/apn/25611441>  
+  * <https://www.renesas.com/document/apn/rx-family-how-implement-aws-iot-fleet-provisioning-202406-lts-version?r=1471546>  
   Though this application note is for Ethernet projects, Cellular and Wi-Fi project will also work as described in application note.
 * When running this demo, please check your RX Smart Configurator settings.  
   If a gray icon appears in the component tree in the Smart Configurator, the corresponding component is not present in your environment.  
@@ -455,7 +455,7 @@ Demos\common\Mqtt_Demo_Helpers\mqtt_pkcs11_demo_helper.c
 
 * Details for *PubSub/MQTT with Over-the-air(OTA) update sample project* are provided in the special application note (document number: **R01AN7662**).  
   Please check the following webpage:
-  * <https://www.renesas.com/document/apn/25574449>  
+  * <https://www.renesas.com/document/apn/rx-family-how-implement-freertos-ota-using-amazon-web-services-202406-lts-version-rev110?r=1471546>  
 * About how to run this demo, see the chapter "*2. Prerequisites*" and beyond in preceding application note.
 * Although this application note focuses on an Ethernet project, the Cellular and Wi-Fi projects also work as described in the application note.
 * When running this demo, please check your RX Smart Configurator settings.  
