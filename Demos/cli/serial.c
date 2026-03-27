@@ -42,6 +42,10 @@
 
 #define U_SCI_UART_CLI_PINSET()  R_Pins_Create()
 
+#ifndef PHASE8B_DEBUG_POLLING_UART
+    #define PHASE8B_DEBUG_POLLING_UART    ( 1 )
+#endif
+
 /* FreeRTOS CLI Command Console */
 #if !defined(BSP_CFG_SCI_UART_TERMINAL_ENABLE)
 #error "Error! Need to define MY_BSP_CFG_SERIAL_TERM_SCI in r_bsp_config.h"
@@ -141,7 +145,7 @@ static sci_err_t prvEnsureSerialPortOpen( void )
                               vSerialSciCallback,
                               &xSerialSciHandle );
 
-#if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
+#if ( PHASE8B_DEBUG_POLLING_UART == 1 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
     if( SCI_SUCCESS == xOpenResult )
     {
         IEN( SCI7, RXI7 ) = 0;
@@ -286,6 +290,52 @@ void vSerialPutString(const signed char * pcString, unsigned short usStringLengt
 const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
 
     /* Only one port is supported. */
+
+#if ( PHASE8B_DEBUG_POLLING_UART == 1 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
+    {
+        const uint8_t * pucMessage = ( const uint8_t * ) pcString;
+        uint32_t ulRemaining = ( uint32_t ) usStringLength;
+        uint32_t ulRetry;
+
+        ( void ) xMaxBlockTime;
+
+        if( ( NULL == pcString ) || ( 0U == usStringLength ) )
+        {
+            return;
+        }
+
+        if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
+        {
+            return;
+        }
+
+        while( ulRemaining > 0U )
+        {
+            ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
+
+            while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0U ) )
+            {
+                R_BSP_NOP();
+            }
+
+            if( 0U == ulRetry )
+            {
+                return;
+            }
+
+            U_SCI_UART_CLI_REG.TDR = *pucMessage++;
+            ulRemaining--;
+        }
+
+        ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
+        while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TEND ) && ( ulRetry-- > 0U ) )
+        {
+            R_BSP_NOP();
+        }
+
+        return;
+    }
+#endif
 
 
     /* Don't send the string unless the previous string has been sent. */

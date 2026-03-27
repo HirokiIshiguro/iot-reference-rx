@@ -19,6 +19,8 @@
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_Sockets.h"
 
+extern void vStartupTracePutString(const char * pcMessage);
+
 /******************************************************************************
 * Function Name: vApplicationIPNetworkEventHook
 * Description  : This function will be called on each network up/down event.
@@ -37,6 +39,8 @@ void vApplicationIPNetworkEventHook(eIPCallbackEvent_t eNetworkEvent)
     /* If the network has just come up...*/
     if (eNetworkUp == eNetworkEvent)
     {
+        vStartupTracePutString("[phase8b] IP hook: network up\r\n");
+
         /* Print out the network configuration, which may have come from a DHCP
          * server. */
         FreeRTOS_GetAddressConfiguration(
@@ -56,6 +60,10 @@ void vApplicationIPNetworkEventHook(eIPCallbackEvent_t eNetworkEvent)
 
         FreeRTOS_inet_ntoa(ulDNSServerAddress, cBuffer);
         FreeRTOS_printf(("DNS Server Address: %s\n", cBuffer));
+    }
+    else
+    {
+        vStartupTracePutString("[phase8b] IP hook: network down\r\n");
     }
 }
 /*****************************************************************************************
