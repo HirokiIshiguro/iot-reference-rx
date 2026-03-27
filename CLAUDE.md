@@ -1,5 +1,9 @@
 # CLAUDE.md — iot-reference-rx
 
+> Current scope note:
+> This fork now retains only the RX72N Envision Kit projects under `Projects/`.
+> Historical CK-RX65N / DA16600 / RYZ014A notes below are preserved as reference and may not match the current repository layout.
+
 ## Background / 背景
 
 [iot-reference-rx](https://github.com/renesas/iot-reference-rx) は Renesas が提供する
