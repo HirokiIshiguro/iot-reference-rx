@@ -72,6 +72,7 @@ Private global variables and functions
 /* This array holds callback functions. */
 static void (* g_bsp_vectors[BSP_INT_SRC_TOTAL_ITEMS])(void * pdata);
 static volatile uint32_t g_phase8b_undefined_interrupt_trace_count = 0U;
+static volatile uint32_t g_phase8b_undefined_inst_trace_count = 0U;
 
 static bsp_int_err_t bsp_fit_interrupts_control (bool enable, bsp_int_ctrl_t * pdata);
 
@@ -773,6 +774,49 @@ R_BSP_ATTRIB_INTERRUPT void excep_access_isr(void)
 R_BSP_ATTRIB_INTERRUPT void excep_undefined_inst_isr(void)
 {
     vStartupTracePutString( "[phase8b] exception: undefined instruction\r\n" );
+
+    if( g_phase8b_undefined_inst_trace_count < 4U )
+    {
+        uint32_t bpc_val;
+        uint32_t bpsw_val;
+
+        bpc_val = ( uint32_t ) R_BSP_GET_BPC();
+        bpsw_val = ( uint32_t ) R_BSP_GET_BPSW();
+
+        vStartupTracePutString( "[phase8b] undef-inst BPC=0x" );
+        prvPhase8bTraceUndefRegister( "", bpc_val );
+        vStartupTracePutString( " BPSW=0x" );
+        prvPhase8bTraceUndefRegister( "", bpsw_val );
+        vStartupTracePutString( " INTB=0x" );
+        prvPhase8bTraceUndefRegister( "", ( uint32_t ) R_BSP_GET_INTB() );
+        vStartupTracePutString( "\r\n" );
+
+        if( ( bpc_val >= 0x00100000U ) ||
+            ( ( bpc_val >= 0xFF800000U ) && ( bpc_val <= 0xFFFFFFFFU ) ) )
+        {
+            volatile uint16_t * p16 = ( volatile uint16_t * ) ( bpc_val & ~1UL );
+
+            vStartupTracePutString( "[phase8b] undef-inst op[-2..+2]=" );
+            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 0 ] );
+            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 1 ] );
+            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 2 ] );
+            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 3 ] );
+            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 4 ] );
+            vStartupTracePutString( "\r\n" );
+        }
+    }
+
+    g_phase8b_undefined_inst_trace_count++;
+
+    if( g_phase8b_undefined_inst_trace_count >= 1U )
+    {
+        R_BSP_CLRPSW_I();
+        while( 1 )
+        {
+            R_BSP_NOP();
+        }
+    }
+
     /* If user has registered a callback for this exception then call it. */
     R_BSP_InterruptControl(BSP_INT_SRC_EXC_UNDEFINED_INSTR, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
 } /* End of function excep_undefined_inst_isr() */
