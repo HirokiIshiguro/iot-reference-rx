@@ -27,6 +27,7 @@ $rsuBuilder = Join-Path $projectRoot "tools\build_fwup_v2_rsu.py"
 $bootMonitor = Join-Path $projectRoot "tools\monitor_rx72n_boot.py"
 $uartDownload = Join-Path $projectRoot "tools\test_uart_download_rx72n.py"
 $readyMessage = 'send "userprog.rsu" via UART.'
+$observePorts = @($LogPort, $DownloadPort) | Where-Object { $_ } | Select-Object -Unique
 
 function Invoke-Step {
     param(
@@ -83,7 +84,7 @@ if (-not $SkipFlashBootLoader) {
 
     Invoke-Step "Observe boot_loader UART" {
         python $bootMonitor `
-            --ports $LogPort $DownloadPort `
+            --ports $observePorts `
             --baud $Baud `
             --timeout 10 `
             --command $resetCmdPwsh `

@@ -101,26 +101,22 @@ git submodule update --init --recursive
 
 | Project | Directory | Output | Description |
 |---------|-----------|--------|-------------|
-| aws_ether_ck_rx65n_v2 | `Projects/aws_ether_ck_rx65n_v2/e2studio_ccrx/` | `.mot` (1.0MB) | Ethernet + AWS IoT デモ（PubSub, OTA） |
-| boot_loader_ck_rx65n_v2 | `Projects/boot_loader_ck_rx65n_v2/e2studio_ccrx/` | `.mot` (92KB) | OTA 用デュアルバンクブートローダ |
+| aws_ether_rx72n_envision_kit | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `.mot`, `.abs`, `.x` | RX72N Ethernet + AWS IoT デモ（local bring-up / MQTT / OTA task startup） |
+| boot_loader_rx72n_envision_kit | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | `.mot` | RX72N OTA 用デュアルバンクブートローダ |
 
 ### Headless Build（CLI）
 
 ```bash
 # 前提: サブモジュール初期化済み
-e2studio-cli.exe -nosplash \
-  -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
-  -data <workspace> \
-  -import <app_project_dir> \
-  -import <bl_project_dir> \
-  -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug" \
-  -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug" \
-  -no-indexer
+pwsh -File tools/build_headless_rx72n.ps1 \
+  -ProjectRoot <repo_root> \
+  -E2Studio <e2studio_exe> \
+  -Workspace <workspace>
 ```
 
-- ビルドスクリプト: `tools/build_headless.bat`
-- ワークスペースは一時ディレクトリ（`%TEMP%\e2ws_iot_ref`）を使用
-- リンクリソース (`AWS_IOT_MCU_ROOT = ${PARENT-3-PROJECT_LOC}`) はサブモジュール初期化後に正常解決
+- 現行ビルドスクリプト: `tools/build_headless_rx72n.ps1`
+- 互換 wrapper: `tools/build_headless.bat`
+- `tools/build_headless_rx72n.ps1` は `boot_loader_rx72n_envision_kit` と `aws_ether_rx72n_envision_kit` を import/build し、`.mot` / `.abs` / `.x` を確認する
 
 ### Demo Configuration
 
@@ -395,6 +391,10 @@ happy path 判定メモ:
 - `allow_failure: true` を外しても branch pipeline の信頼性を下げない
 
 ### Step 8: CI/CD pipeline integration
+
+> Historical note:
+> The detailed Step 8 notes below describe the earlier CK-RX65N pipeline track.
+> In the current RX72N-only branch, `.gitlab-ci.yml` is intentionally simplified to the `build_rx72n` job.
 
 2026-03-08 時点の実装状態:
 

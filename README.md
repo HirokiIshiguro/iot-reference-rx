@@ -28,6 +28,7 @@ The current maintained projects in `Projects/` are:
 * `aws_ether_rx72n_envision_kit`
 
 Historical documentation for CK-RX65N v2 and its variants may remain in this repository, but those projects are no longer shipped in `Projects/`.
+The release matrix and legacy configuration notes below are retained as upstream reference only and do not describe the current maintained workflow of this fork.
 
 | Tags | Connectivity | Compiler  | Import project | Project generation (PG) | PubSub | OTA update | Fleet Provisioning | TLS with TSIP |TCP minimal |
 |------|--------------|-----------|----------------|-------------------------|--------|-----|-------------------|-------------|-------------|
@@ -182,7 +183,7 @@ These changes will be saved in the `\Common\patches` folder and will be incorpor
 * If changed, the program may not work properly.
 
 <details>
-<summary>CK-RX65N v2 Ethernet Projects</summary>
+<summary>Legacy CK-RX65N v2 Ethernet Projects (historical reference)</summary>
 
   | FIT module | Config name | Default Value | Project value | Reason for change |
   |------------|-------------|---------------|---------------|-------------------|
