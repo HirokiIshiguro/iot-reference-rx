@@ -65,17 +65,17 @@ def main():
     parser.add_argument(
         "--signing-key",
         default=None,
-        help="Private key for image-gen.py; defaults to tools/test_keys/secp256r1.privatekey",
+        help="Private key for image-gen.py; defaults to sample_keys/secp256r1.privatekey",
     )
     parser.add_argument(
         "--e2studio-cli",
         default=None,
-        help="Optional path passed to build_headless.bat",
+        help="Optional path passed to build_headless_rx72n.ps1",
     )
     parser.add_argument(
         "--workspace",
         default=None,
-        help="Optional workspace path passed to build_headless.bat",
+        help="Optional workspace path passed to build_headless_rx72n.ps1",
     )
     parser.add_argument(
         "--code-sign-cert-out",
@@ -93,7 +93,7 @@ def main():
     app_mot = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "HardwareDebug" / "aws_ether_rx72n_envision_kit.mot"
     prm_csv = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "src" / "smc_gen" / "r_fwup" / "tool" / "RX72N_DualBank_ImageGenerator_PRM.csv"
 
-    signing_key = Path(args.signing_key).resolve() if args.signing_key else tools_dir / "test_keys" / "secp256r1.privatekey"
+    signing_key = Path(args.signing_key).resolve() if args.signing_key else repo_root / "sample_keys" / "secp256r1.privatekey"
     code_sign_cert_out = Path(args.code_sign_cert_out).resolve() if args.code_sign_cert_out else Path(f"{args.output_prefix}_codesign_cert.pem")
     output_prefix = Path(args.output_prefix).resolve()
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
