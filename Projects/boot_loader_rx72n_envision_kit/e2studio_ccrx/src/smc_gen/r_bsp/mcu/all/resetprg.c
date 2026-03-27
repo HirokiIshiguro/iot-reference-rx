@@ -35,16 +35,6 @@
 *                                - BSP_PRV_DPSW_INIT
 *         : 26.07.2019 3.01      Added vbatt_voltage_stability_wait function.
 *         : 08.10.2019 3.10      Changed for added support of Renesas RTOS (RI600V4 or RI600PX).
-*         : 20.11.2020 3.11      Changed vbatt_voltage_stability_wait function.
-*         : 26.02.2021 3.12      Changed BSP_CFG_RTOS_USED for Azure RTOS.
-*         : 18.05.2021 3.13      Changed vbatt_voltage_stability_wait function.
-*         : 30.11.2021 3.14      Changed the compile switch of _CALL_INIT.
-*         : 28.04,2022 3.15      Added the section of ResetPRG only for CCRX.
-*         : 28.02.2023 3.16      Added the compile switch of R_BSP_INIT_TFU.
-*                                Added the bsp_tfu_init function.
-*         : 21.11.2023 3.17      Deleted the process to set bus error.
-*                                Added bsp_bus_priority_initialize function.
-*                                Added compile switch of BSP_CFG_BOOTLOADER_PROJECT.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -86,7 +76,7 @@ R_BSP_PRAGMA_STACKSIZE_SI(BSP_CFG_ISTACK_BYTES)
 Macro definitions
 ***********************************************************************************************************************/
 #if BSP_CFG_RTOS_USED == 4 /* Renesas RI600V4 & RI600PX */
-    #define BSP_PRV_PSW_INIT  (0x00000000)    /* Supervisor mode & Disable Interrupt */
+    #define BSP_PRV_PSW_INIT  (0x00000000)	/* Supervisor mode & Disable Interrupt */
 #else /* BSP_CFG_RTOS_USED!=4 */
 /* If the user chooses only 1 stack then the 'U' bit will not be set and the CPU will always use the interrupt stack. */
 #if BSP_CFG_USER_STACK_ENABLE == 1
@@ -125,15 +115,6 @@ Pre-processor Directives
 ***********************************************************************************************************************/
 /* Set this as the entry point from a power-on reset */
 #if defined(__CCRX__)
-#if BSP_CFG_CONFIGURATOR_VERSION < 2140
-    /* The PResetPRG section of compiler setting are not added by Smart configurator if you are using Smart Configurator
-       for RX V2.13.0 (equivalent to e2 studio 2022-04) or earlier version.
-       Please update Smart configurator to Smart Configurator for RX V2.14.0 (equivalent to e2 studio 2022-07) or 
-       later version.
-     */
-    #error "To use this version of BSP, you need to upgrade Smart configurator. Please upgrade Smart configurator. If you don't use Smart Configurator, please change value of BSP_CFG_CONFIGURATOR_VERSION in r_bsp_config.h."
-#endif
-#pragma section ResetPRG /* Put PResetPRG section at the start address of the code flash. */
 #pragma entry PowerON_Reset_PC
 #endif /* defined(__CCRX__) */
 
@@ -143,7 +124,7 @@ External function Prototypes
 /* Initialize C runtime environment */
 extern void _INITSCT(void);
 
-#if BSP_CFG_CPLUSPLUS == 1
+#if defined(CPPAPP)
 /* Initialize C++ global class object */
 extern void _CALL_INIT(void);
 #endif
@@ -173,7 +154,7 @@ Private global variables and functions
 R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION);
 
 /* Main program function declaration */
-#if (BSP_CFG_RTOS_USED == 0) || (BSP_CFG_RTOS_USED == 5)    /* Non-OS or Azure RTOS */
+#if BSP_CFG_RTOS_USED == 0    /* Non-OS */
 extern void R_BSP_MAIN_FUNCTION(void);
 #endif
 
@@ -244,26 +225,17 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
 #endif
 #endif
 
-#if BSP_CFG_BOOTLOADER_PROJECT == 0
-/* Disable the following functions in the bootloader project. */
     /* Initializes the trigonometric function unit. */
 #ifdef BSP_MCU_TRIGONOMETRIC
 #ifdef __TFU
-#if BSP_MCU_TFU_VERSION == 1
     R_BSP_INIT_TFU();
-#elif BSP_MCU_TFU_VERSION == 2
-#if BSP_CFG_TFU_INITIALIZE_ENABLE == 1
-    bsp_tfu_init();
-#endif /* BSP_CFG_TFU_INITIALIZE_ENABLE == 1 */
-#endif /* BSP_MCU_TFU_VERSION */
-#endif /* __TFU */
-#endif /* BSP_MCU_TRIGONOMETRIC */
-#endif /* BSP_CFG_BOOTLOADER_PROJECT == 0 */
+#endif
+#endif
 
 #endif /* defined(__CCRX__), defined(__GNUC__) */
 
     /* Wait for power voltage stabilization of VBATT function. */
-#ifdef BSP_MCU_VBATT_INITIALIZE
+#if (defined(BSP_CFG_VBATT_ENABLE) && (BSP_CFG_VBATT_ENABLE == 0))
     vbatt_voltage_stability_wait();
 #endif
 
@@ -278,7 +250,7 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
     /* Initialize C runtime environment */
     _INITSCT();
 
-#if BSP_CFG_CPLUSPLUS == 1
+#if defined(CPPAPP)
     /* Initialize C++ global class object */
     _CALL_INIT();
 #endif
@@ -304,14 +276,6 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
     /* Initialize register protection functionality. */
     bsp_register_protect_open();
 
-#if BSP_CFG_BOOTLOADER_PROJECT == 0
-/* Disable the following functions in the bootloader project. */
-#if BSP_CFG_BUS_PRIORITY_INITIALIZE_ENABLE == 1
-    /* Initialize bus priority. */
-    bsp_bus_priority_initialize();
-#endif /* BSP_CFG_BUS_PRIORITY_INITIALIZE_ENABLE == 1 */
-#endif /* BSP_CFG_BOOTLOADER_PROJECT == 0 */
-
     /* Configure the MCU and board hardware */
     hardware_setup();
 
@@ -331,7 +295,10 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
 #endif /* BSP_CFG_RUN_IN_USER_MODE */
 #endif /* BSP_CFG_RTOS_USED */
 
-#if (BSP_CFG_RTOS_USED == 0) || (BSP_CFG_RTOS_USED == 5)    /* Non-OS or Azure RTOS */
+    /* Enable the bus error interrupt to catch accesses to illegal/reserved areas of memory */
+    R_BSP_InterruptControl(BSP_INT_SRC_BUS_ERROR, BSP_INT_CMD_INTERRUPT_ENABLE, FIT_NO_PTR);
+
+#if BSP_CFG_RTOS_USED == 0    /* Non-OS */
     /* Call the main program function (should not return) */
     R_BSP_MAIN_FUNCTION();
 #elif BSP_CFG_RTOS_USED == 1    /* FreeRTOS */

@@ -522,6 +522,24 @@ Step 8 の完了判定:
   - `tools/test_uart_download_rx72n.py`
   - `tools/run_rx72n_local_baseline.ps1`
 
+#### 2026-03-25: Issue #12 で legacy bootloader トラックへ切り替え
+
+- `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx` は `r_fwup` sample 系 bootloader ではなく、
+  `rx72n-envision-kit/projects/renesas/rx72n_envision_kit/e2studio/boot_loader`
+  由来の legacy `rx72n_boot_loader` ベースへ差し替える方針に切り替えた
+- 置換後も `iot-reference-rx` 側では folder 名を `boot_loader_rx72n_envision_kit` に維持し、
+  build 出力名も `boot_loader_rx72n_envision_kit.*` に揃える
+- app 側 handoff は legacy bootloader 前提へ戻す
+  - `EXCEPTVECT/RESETVECT`: `0xFFFBFF80 / 0xFFFBFFFC`
+  - terminal UART: `SCI7 / 921600`
+- local baseline helper は legacy bootloader banner
+  `send "userprog.rsu" via UART.` を待ち受ける
+- RSU 生成時の PRM CSV は bootloader project ではなく
+  `Projects/aws_ether_rx72n_envision_kit/.../RX72N_DualBank_ImageGenerator_PRM.csv`
+  を使う
+- ここでの切り替えは「source / metadata / local helper の整合」までであり、
+  local 実機での initial image download -> reset -> app 起動の再確認は引き続き Issue #12 の検証項目
+
 ## Git Rules / Git ルール
 
 - `main` ブランチは protected。直接 push 不可

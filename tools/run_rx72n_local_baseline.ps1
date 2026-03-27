@@ -19,13 +19,14 @@ Set-StrictMode -Version Latest
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $bootMot = Join-Path $projectRoot "Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot"
 $appMot = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot"
-$prm = Join-Path $projectRoot "Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
+$prm = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
 $signingKey = Join-Path $projectRoot "sample_keys\secp256r1.privatekey"
 $rsu = Join-Path $projectRoot "rx72n_local_baseline.rsu"
 $buildScript = Join-Path $projectRoot "tools\build_headless_rx72n.ps1"
 $rsuBuilder = Join-Path $projectRoot "tools\build_fwup_v2_rsu.py"
 $bootMonitor = Join-Path $projectRoot "tools\monitor_rx72n_boot.py"
 $uartDownload = Join-Path $projectRoot "tools\test_uart_download_rx72n.py"
+$readyMessage = 'send "userprog.rsu" via UART.'
 
 function Invoke-Step {
     param(
@@ -86,7 +87,7 @@ if (-not $SkipFlashBootLoader) {
             --baud $Baud `
             --timeout 10 `
             --command $resetCmdPwsh `
-            --expect "send image(*.rsu) via UART."
+            --expect $readyMessage
     }
 }
 
@@ -109,15 +110,14 @@ if (-not $SkipDownload) {
             --port $DownloadPort `
             --baud $Baud `
             --timeout 300 `
+            --post-tx-wait 60 `
             --diag `
             --wait-for-ready `
             --ready-timeout 60 `
-            --send-chunk-size 128 `
-            --ack-each-chunk `
-            --ack-timeout 20 `
+            --send-chunk-size 4096 `
             --reset-cmd $resetCmdCmd `
-            --ready-message "send image(*.rsu) via UART." `
+            --ready-message $readyMessage `
             --success-message "jump to user program" `
-            --success-timeout 30
+            --success-timeout 60
     }
 }

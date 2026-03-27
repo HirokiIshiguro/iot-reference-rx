@@ -39,9 +39,15 @@ foreach ($projectName in $projectNames) {
         Write-Host "Cleared: $hardwareDebug"
     }
 
-    $rcpcPath = Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx\$projectName.rcpc"
-    if (Test-Path $rcpcPath) {
-        $rcpcSnapshots[$rcpcPath] = Get-Content $rcpcPath -Raw
+    $projectDir = Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx"
+    $preferredRcpc = Join-Path $projectDir "$projectName.rcpc"
+    if (Test-Path $preferredRcpc) {
+        $rcpcPath = Get-Item $preferredRcpc
+    } else {
+        $rcpcPath = Get-ChildItem -Path $projectDir -Filter '*.rcpc' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+    }
+    if ($rcpcPath) {
+        $rcpcSnapshots[$rcpcPath.FullName] = Get-Content $rcpcPath.FullName -Raw
     }
 }
 
@@ -64,7 +70,7 @@ $e2base = @(
     "-data", $workspace
 )
 
-Write-Host "=== RX72N import + cleanBuild all ==="
+Write-Host "=== RX72N import + build all ==="
 Write-Host "Workspace: $workspace"
 Write-Host "Log file:  $logFile"
 foreach ($projectName in $projectNames) {
@@ -88,7 +94,7 @@ function Find-Artifacts {
 }
 
 try {
-    & $E2Studio @e2base @imports -cleanBuild all 2>&1 | Tee-Object -FilePath $logFile | Out-Null
+    & $E2Studio @e2base @imports -build all 2>&1 | Tee-Object -FilePath $logFile | Out-Null
     $e2exit = $LASTEXITCODE
 
     Write-Host "e2studio exit code: $e2exit"

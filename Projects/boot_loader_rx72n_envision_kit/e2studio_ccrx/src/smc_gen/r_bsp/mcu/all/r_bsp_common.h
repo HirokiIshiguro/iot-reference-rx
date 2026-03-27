@@ -58,39 +58,14 @@
 *         : 08.10.2019 1.35     Changed Minor version to 5.50.
 *         : 10.12.2019 1.36     Changed Minor version to 5.51.
 *         : 14.02.2020 1.37     Changed Minor version to 5.52.
-*         : 31.07.2020 1.38     Changed Minor version to 5.60.
-*         : 04.08.2020 1.39     Changed Minor version to 5.61.
-*         : 20.11.2020 1.40     Changed Minor version to 5.62.
-*         : 29.01.2021 1.41     Changed Minor version to 5.63.
-*         : 26.02.2021 1.42     Changed Minor version to 5.64.
-*         : 23.04.2021 1.43     Changed Minor version to 5.65.
-*         : 14.05.2021 1.44     Changed Minor version to 5.66.
-*         : 18.05.2021 1.45     Changed Major/Minor version to 6.11.
-*         : 30.06.2021 1.45     Changed Minor version to 6.20.
-*         : 20.08.2021 1.46     Changed Minor version to 6.21.
-*         : 30.11.2021 1.47     Changed Major/Minor version to 7.00.
-*                               Modified the compile switch.
-*         : 11.02.2022 1.48     Changed Minor version to 7.10.
-*         : 22.04.2022 1.49     Changed Minor version to 7.20.
-*         : 25.11.2022 1.50     Changed Minor version to 7.21.
-*         : 28.02.2023 1.51     Changed Minor version to 7.30.
-*         : 10.03.2023 1.52     Changed Minor version to 7.40.
-*         : 26.04.2023 1.53     Changed Minor version to 7.41.
-*         : 21.11.2023 1.54     Changed Minor version to 7.42.
-*                               Added definition of R_BSP_ClockReset_Bootloader function.
-*         : 31.05.2024 1.55     Changed Minor version to 7.50.
-*         : 05.07.2024 1.56     Changed Minor version to 7.51.
-*         : 27.11.2024 1.57     Changed Minor version to 7.52.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
 Includes   <System Includes> , "Project Includes"
 ***********************************************************************************************************************/
-#include    "r_bsp_config.h"
-
 /* C99 (or later) is necessary because r_rx_compiler.h uses Pragma operator and variadic macros.
  * This means that r_typedefs.h is not used in any case. */
-#if (BSP_CFG_CPLUSPLUS == 0) && !defined(CPPAPP)
+#if !defined(__cplusplus) && !defined(CPPAPP)
 /* All implementation is C99 (or later) */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 #include    <stdint.h>
@@ -100,13 +75,13 @@ Includes   <System Includes> , "Project Includes"
 #else
 #error "This version of FIT needs C99 (or later)."
 #endif
-#else /* (BSP_CFG_CPLUSPLUS == 1) || defined(CPPAPP) */
+#else /* defined(__cplusplus) || defined(CPPAPP) */
 /* Interface might be referred from C++ */
 #include    <stdint.h>
 #include    <stdbool.h>
 #include    <stdio.h>
 #include    <stddef.h>
-#endif /* (BSP_CFG_CPLUSPLUS == 0) && !defined(CPPAPP) */
+#endif /* !defined(__cplusplus) && !defined(CPPAPP) */
 
 #if defined(__CCRX__) || defined(__ICCRX__)
 /* Intrinsic functions provided by compiler. */
@@ -125,7 +100,7 @@ Macro definitions
 #define R_BSP_COMMON_H
 
 /* Version Number of r_bsp. */
-#define R_BSP_VERSION_MAJOR           (7)
+#define R_BSP_VERSION_MAJOR           (5)
 #define R_BSP_VERSION_MINOR           (52)
 
 /* This macro is used to suppress compiler messages about not only a parameter but also a auto variable not being used
@@ -163,13 +138,6 @@ Exported global functions (to be accessed by other files)
 uint32_t R_BSP_GetVersion(void);
 bool R_BSP_SoftwareDelay(uint32_t delay, bsp_delay_units_t units);
 uint32_t R_BSP_GetIClkFreqHz(void);
-
-#if defined(BSP_CFG_BOOTLOADER_PROJECT)
-  #if BSP_CFG_BOOTLOADER_PROJECT == 1
-/* Enable the following functions in the bootloader project. */
-void R_BSP_ClockReset_Bootloader(void);
-  #endif /* BSP_CFG_BOOTLOADER_PROJECT == 1 */
-#endif /* defined(BSP_CFG_BOOTLOADER_PROJECT) */
 
 /* End of multiple inclusion prevention macro */
 #endif  /* R_BSP_COMMON_H */

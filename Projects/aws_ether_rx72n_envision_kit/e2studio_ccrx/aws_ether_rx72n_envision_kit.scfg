@@ -17,7 +17,7 @@
     </general>
     <tool id="Clock">
         <option enabled="true" id="vccinput" selection="textinputitem">
-            <item enabled="true" id="textinputitem" input="3.3" value="3.3"/>
+            <item enabled="true" id="textinputitem" input="3.3" value="3.300"/>
         </option>
         <option enabled="true" id="mainclockenable" selection="check">
             <item enabled="true" id="check"/>
@@ -28,10 +28,10 @@
             <item enabled="true" id="srcEOI"/>
         </option>
         <option enabled="true" id="mainfrequency" selection="textinputitem">
-            <item enabled="true" id="textinputitem" input="16" value="16"/>
+            <item enabled="true" id="textinputitem" input="16" value="16.000000"/>
         </option>
         <option enabled="true" id="mainwaittime" selection="textinputitem">
-            <item enabled="true" id="textinputitem" input="9980" value="9980"/>
+            <item enabled="true" id="textinputitem" input="9980" value="9980.000000"/>
         </option>
         <option enabled="true" id="subclockenable" selection="uncheck">
             <item enabled="true" id="check"/>
@@ -45,7 +45,7 @@
             <item enabled="true" id="standardCL"/>
         </option>
         <option enabled="false" id="subwaittime" selection="textinputitem">
-            <item enabled="true" id="textinputitem" input="2000" value="2000"/>
+            <item enabled="true" id="textinputitem" input="2000" value="2000.000000"/>
         </option>
         <option enabled="true" id="hococlockenable" selection="uncheck">
             <item enabled="true" id="check"/>
@@ -75,7 +75,7 @@
             <item enabled="true" id="textinputitem" input="" value="120"/>
         </option>
         <option enabled="true" id="pllswitcher" selection="pllmain">
-            <item enabled="true" id="pllmain" input="" value="16"/>
+            <item enabled="true" id="pllmain" input="" value="16.0"/>
             <item enabled="false" id="pllhoco" input="" value="16"/>
         </option>
         <option enabled="true" id="plldivider" selection="div1-2">
@@ -176,7 +176,7 @@
         </option>
         <option enabled="true" id="sckswitcher" selection="pll">
             <item enabled="true" id="pll" input="" value="240.0"/>
-            <item enabled="true" id="main" input="" value="16"/>
+            <item enabled="true" id="main" input="" value="16.0"/>
             <item enabled="false" id="sub" input="" value="0.032768"/>
             <item enabled="false" id="hoco" input="" value="16"/>
             <item enabled="false" id="loco" input="" value="0.24"/>
@@ -184,7 +184,7 @@
         <option enabled="true" id="ckoswitcher" selection="ckomain">
             <item enabled="true" id="ckoppll" input="" value="200.0"/>
             <item enabled="true" id="ckopll" input="" value="240.0"/>
-            <item enabled="true" id="ckomain" input="" value="16"/>
+            <item enabled="true" id="ckomain" input="" value="16.0"/>
             <item enabled="false" id="ckosub" input="" value="0.032768"/>
             <item enabled="false" id="ckohoco" input="" value="16"/>
             <item enabled="false" id="ckoloco" input="" value="0.24"/>
@@ -337,7 +337,7 @@
             <item enabled="true" id="uncheck"/>
         </option>
         <option enabled="false" id="clkout" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="16"/>
+            <item enabled="true" id="textoutputitem" input="" value="16.0"/>
         </option>
         <option enabled="false" id="cacilclk" selection="textoutputitem">
             <item enabled="true" id="textoutputitem" input="" value="120"/>
@@ -359,7 +359,7 @@
             <item enabled="true" id="textoutputitem" input="" value="32.768"/>
         </option>
         <option enabled="true" id="cacmclk" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="16"/>
+            <item enabled="true" id="textoutputitem" input="" value="16.0"/>
         </option>
     </tool>
     <tool id="Interrupt">
@@ -397,8 +397,8 @@
         <Item currentVect="59" id="SCI0_TXI0" priority="15" usedState="未使用"/>
         <Item currentVect="60" id="SCI1_RXI1" priority="15" usedState="未使用"/>
         <Item currentVect="61" id="SCI1_TXI1" priority="15" usedState="未使用"/>
-        <Item currentVect="62" id="SCI2_RXI2" priority="3" usedState="未使用"/>
-        <Item currentVect="63" id="SCI2_TXI2" priority="3" usedState="未使用"/>
+        <Item currentVect="62" id="SCI2_RXI2" priority="15" usedState="使用中"/>
+        <Item currentVect="63" id="SCI2_TXI2" priority="15" usedState="使用中"/>
         <Item currentVect="64" id="ICU_IRQ0" priority="15" usedState="未使用"/>
         <Item currentVect="65" id="ICU_IRQ1" priority="15" usedState="未使用"/>
         <Item currentVect="66" id="ICU_IRQ2" priority="15" usedState="未使用"/>
@@ -419,8 +419,8 @@
         <Item currentVect="81" id="SCI3_TXI3" priority="15" usedState="未使用"/>
         <Item currentVect="82" id="SCI4_RXI4" priority="15" usedState="未使用"/>
         <Item currentVect="83" id="SCI4_TXI4" priority="15" usedState="未使用"/>
-        <Item currentVect="84" id="SCI5_RXI5" priority="3" usedState="使用中"/>
-        <Item currentVect="85" id="SCI5_TXI5" priority="3" usedState="使用中"/>
+        <Item currentVect="84" id="SCI5_RXI5" priority="3" usedState="未使用"/>
+        <Item currentVect="85" id="SCI5_TXI5" priority="3" usedState="未使用"/>
         <Item currentVect="86" id="SCI6_RXI6" priority="15" usedState="未使用"/>
         <Item currentVect="87" id="SCI6_TXI6" priority="15" usedState="未使用"/>
         <Item currentVect="88" id="LVD1_LVD1" priority="15" usedState="未使用"/>
@@ -431,8 +431,8 @@
         <Item currentVect="95" id="IWDT_IWUNI" priority="15" usedState="未使用"/>
         <Item currentVect="96" id="WDT_WUNI" priority="15" usedState="未使用"/>
         <Item currentVect="97" id="PDC_PCDFI" priority="15" usedState="未使用"/>
-        <Item currentVect="98" id="SCI7_RXI7" priority="3" usedState="未使用"/>
-        <Item currentVect="99" id="SCI7_TXI7" priority="3" usedState="未使用"/>
+        <Item currentVect="98" id="SCI7_RXI7" priority="15" usedState="使用中"/>
+        <Item currentVect="99" id="SCI7_TXI7" priority="15" usedState="使用中"/>
         <Item currentVect="100" id="SCI8_RXI8" priority="15" usedState="未使用"/>
         <Item currentVect="101" id="SCI8_TXI8" priority="15" usedState="未使用"/>
         <Item currentVect="102" id="SCI9_RXI9" priority="15" usedState="未使用"/>
@@ -443,10 +443,10 @@
         <Item currentVect="107" groupchild="&lt;br&gt;7-POEGGAI&lt;br&gt;8-POEGGBI&lt;br&gt;9-POEGGCI&lt;br&gt;10-POEGGDI" id="BL2" priority="15" usedState="未使用"/>
         <Item currentVect="108" id="RSPI2_SPRI2" priority="15" usedState="未使用"/>
         <Item currentVect="109" id="RSPI2_SPTI2" priority="15" usedState="未使用"/>
-        <Item currentVect="110" groupchild="&lt;br&gt;0-TEI0&lt;br&gt;1-ERI0&lt;br&gt;2-TEI1&lt;br&gt;3-ERI1&lt;br&gt;4-TEI2&lt;br&gt;5-ERI2&lt;br&gt;6-TEI3&lt;br&gt;7-ERI3&lt;br&gt;8-TEI4&lt;br&gt;9-ERI4&lt;br&gt;10-TEI5&lt;br&gt;11-ERI5&lt;br&gt;12-TEI6&lt;br&gt;13-ERI6&lt;br&gt;16-TEI12&lt;br&gt;17-ERI12&lt;br&gt;18-SCIX0&lt;br&gt;19-SCIX1&lt;br&gt;20-SCIX2&lt;br&gt;21-SCIX3&lt;br&gt;24-QSPSSLI&lt;br&gt;26-FERRI&lt;br&gt;27-MENDI&lt;br&gt;28-OVFI&lt;br&gt;29-DOPCI&lt;br&gt;30-PCFEI&lt;br&gt;31-PCERI" id="BL0" priority="3" usedState="使用中"/>
+        <Item currentVect="110" groupchild="&lt;br&gt;0-TEI0&lt;br&gt;1-ERI0&lt;br&gt;2-TEI1&lt;br&gt;3-ERI1&lt;br&gt;4-TEI2&lt;br&gt;5-ERI2&lt;br&gt;6-TEI3&lt;br&gt;7-ERI3&lt;br&gt;8-TEI4&lt;br&gt;9-ERI4&lt;br&gt;10-TEI5&lt;br&gt;11-ERI5&lt;br&gt;12-TEI6&lt;br&gt;13-ERI6&lt;br&gt;16-TEI12&lt;br&gt;17-ERI12&lt;br&gt;18-SCIX0&lt;br&gt;19-SCIX1&lt;br&gt;20-SCIX2&lt;br&gt;21-SCIX3&lt;br&gt;24-QSPSSLI&lt;br&gt;26-FERRI&lt;br&gt;27-MENDI&lt;br&gt;28-OVFI&lt;br&gt;29-DOPCI&lt;br&gt;30-PCFEI&lt;br&gt;31-PCERI" id="BL0" priority="15" usedState="使用中"/>
         <Item currentVect="111" groupchild="&lt;br&gt;3-CDETI&lt;br&gt;4-CACI&lt;br&gt;5-SDACI&lt;br&gt;6-CDETIO&lt;br&gt;7-ERRIO&lt;br&gt;8-ACCIO&lt;br&gt;9-OEI1&lt;br&gt;10-OEI2&lt;br&gt;11-OEI3&lt;br&gt;12-OEI4&lt;br&gt;13-TEI0&lt;br&gt;14-EEI0&lt;br&gt;15-TEI2&lt;br&gt;16-EEI2&lt;br&gt;17-SSIF0&lt;br&gt;18-SSIF1&lt;br&gt;20-S12CMPAI&lt;br&gt;21-S12CMPBI&lt;br&gt;22-S12CMPAI1&lt;br&gt;23-S12CMPBI1&lt;br&gt;28-TEI1&lt;br&gt;29-EEI1" id="BL1" priority="15" usedState="未使用"/>
-        <Item currentVect="112" groupchild="&lt;br&gt;0-TEI8&lt;br&gt;1-ERI8&lt;br&gt;4-TEI9&lt;br&gt;5-ERI9&lt;br&gt;8-TEI10&lt;br&gt;9-ERI10&lt;br&gt;12-TEI11&lt;br&gt;13-ERI11&lt;br&gt;16-SPII0&lt;br&gt;17-SPEI0&lt;br&gt;18-SPII1&lt;br&gt;19-SPEI1&lt;br&gt;20-SPII2&lt;br&gt;21-SPEI2&lt;br&gt;22-TEI7&lt;br&gt;23-ERI7" id="AL0" priority="15" usedState="未使用"/>
-        <Item currentVect="113" groupchild="&lt;br&gt;0-MINT&lt;br&gt;1-PINT&lt;br&gt;4-EINT0&lt;br&gt;5-EINT1&lt;br&gt;8-VPOS&lt;br&gt;9-GR1UF&lt;br&gt;10-GR2UF&lt;br&gt;11-DRW_IRQ" id="AL1" priority="2" usedState="使用中"/>
+        <Item currentVect="112" groupchild="&lt;br&gt;0-TEI8&lt;br&gt;1-ERI8&lt;br&gt;4-TEI9&lt;br&gt;5-ERI9&lt;br&gt;8-TEI10&lt;br&gt;9-ERI10&lt;br&gt;12-TEI11&lt;br&gt;13-ERI11&lt;br&gt;16-SPII0&lt;br&gt;17-SPEI0&lt;br&gt;18-SPII1&lt;br&gt;19-SPEI1&lt;br&gt;20-SPII2&lt;br&gt;21-SPEI2&lt;br&gt;22-TEI7&lt;br&gt;23-ERI7" id="AL0" priority="15" usedState="使用中"/>
+        <Item currentVect="113" groupchild="&lt;br&gt;0-MINT&lt;br&gt;1-PINT&lt;br&gt;4-EINT0&lt;br&gt;5-EINT1&lt;br&gt;8-VPOS&lt;br&gt;9-GR1UF&lt;br&gt;10-GR2UF&lt;br&gt;11-DRW_IRQ" id="AL1" priority="14" usedState="使用中"/>
         <Item currentVect="114" id="SCI11_RXI11" priority="15" usedState="未使用"/>
         <Item currentVect="115" id="SCI11_TXI11" priority="15" usedState="未使用"/>
         <Item currentVect="116" id="SCI12_RXI12" priority="15" usedState="未使用"/>
@@ -591,22 +591,34 @@
     <tool id="Pins" version="1.0.1.0">
         <pinItem allocation="10" comments="" direction="None" id="EMLE" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="20" comments="" direction="None" id="XTAL" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="71" comments="" direction="None" id="RMII0_RXD0" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
-        <pinItem allocation="72" comments="" direction="None" id="RMII0_RXD1" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
-        <pinItem allocation="63" comments="" direction="None" id="RMII0_TXD1" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
-        <pinItem allocation="64" comments="" direction="None" id="RMII0_TXD0" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
+        <pinItem allocation="50" comments="" direction="None" id="CLKOUT25M" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="124" comments="" direction="None" id="IRQ2" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
-        <pinItem allocation="69" comments="" direction="None" id="REF50CK0" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
+        <pinItem allocation="45" comments="" direction="None" id="RXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="128" comments="" direction="None" id="RXD7" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="129" comments="" direction="None" id="AN115" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="127" comments="" direction="None" id="AN117" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="65" comments="" direction="None" id="ET0_TX_EN" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="67" comments="" direction="None" id="ET0_TX_ER" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="85" comments="" direction="None" id="ET0_MDC" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="60" comments="" direction="None" id="ET0_COL" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="131" comments="" direction="None" id="TXD7" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="58" comments="" direction="None" id="ET0_CRS" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="44" comments="" direction="None" id="TXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="22" comments="" direction="None" id="EXTAL" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="16" comments="" direction="None" id="FINED" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="52" comments="" direction="None" id="ET0_LINKSTA" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="68" comments="" direction="None" id="RMII0_RX_ER" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
-        <pinItem allocation="81" comments="" direction="None" id="RMII0_TXD_EN" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
+        <pinItem allocation="70" comments="" direction="None" id="ET0_RX_DV" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="68" comments="" direction="None" id="ET0_RX_ER" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="61" comments="" direction="None" id="ET0_ETXD3" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="62" comments="" direction="None" id="ET0_ETXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="63" comments="" direction="None" id="ET0_ETXD1" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="64" comments="" direction="None" id="ET0_ETXD0" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="69" comments="" direction="None" id="ET0_RX_CLK" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="75" comments="" direction="None" id="ET0_ERXD3" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="73" comments="" direction="None" id="ET0_ERXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="72" comments="" direction="None" id="ET0_ERXD1" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="71" comments="" direction="None" id="ET0_ERXD0" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="66" comments="" direction="None" id="ET0_TX_CLK" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="86" comments="" direction="None" id="ET0_MDIO" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="58" comments="" direction="None" id="RMII0_CRS_DV" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
         <pinnumItem comment="LCD-B4" id="88" symbolicname=""/>
         <pinnumItem comment="LCD-B5" id="89" symbolicname=""/>
         <pinnumItem comment="LCD-R7" id="110" symbolicname=""/>
@@ -873,8 +885,8 @@
                 <gridItem id="BSP_CFG_SWINT_TASK_BUFFER_NUMBER" selectedIndex="8"/>
                 <gridItem id="BSP_CFG_SWINT_IPR_INITIAL_VALUE" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_SCI_UART_TERMINAL_ENABLE" selectedIndex="1"/>
-                <gridItem id="BSP_CFG_SCI_UART_TERMINAL_CHANNEL" selectedIndex="5"/>
-                <gridItem id="BSP_CFG_SCI_UART_TERMINAL_BITRATE" selectedIndex="115200"/>
+                <gridItem id="BSP_CFG_SCI_UART_TERMINAL_CHANNEL" selectedIndex="7"/>
+                <gridItem id="BSP_CFG_SCI_UART_TERMINAL_BITRATE" selectedIndex="921600"/>
                 <gridItem id="BSP_CFG_SCI_UART_TERMINAL_INTERRUPT_PRIORITY" selectedIndex="15"/>
                 <gridItem id="BSP_CFG_BUS_PRIORITY_INITIALIZE_ENABLE" selectedIndex="0"/>
                 <gridItem id="BSP_CFG_MEMORY_BUS1_3_PRIORITY" selectedIndex="0"/>
@@ -913,8 +925,8 @@
                 <gridItem id="CTS1#/RTS1#/SS1#" selectedIndex="0"/>
                 <gridItem id="SCI1" selectedIndex="0"/>
                 <gridItem id="SCK2" selectedIndex="0"/>
-                <gridItem id="RXD2/SMISO2/SSCL2" selectedIndex="0"/>
-                <gridItem id="TXD2/SMOSI2/SSDA2" selectedIndex="0"/>
+                <gridItem id="RXD2/SMISO2/SSCL2" selectedIndex="1"/>
+                <gridItem id="TXD2/SMOSI2/SSDA2" selectedIndex="1"/>
                 <gridItem id="CTS2#/RTS2#/SS2#" selectedIndex="0"/>
                 <gridItem id="SCI2" selectedIndex="1"/>
                 <gridItem id="SCK3" selectedIndex="0"/>
@@ -928,8 +940,8 @@
                 <gridItem id="CTS4#/RTS4#/SS4#" selectedIndex="0"/>
                 <gridItem id="SCI4" selectedIndex="0"/>
                 <gridItem id="SCK5" selectedIndex="0"/>
-                <gridItem id="RXD5/SMISO5/SSCL5" selectedIndex="1"/>
-                <gridItem id="TXD5/SMOSI5/SSDA5" selectedIndex="1"/>
+                <gridItem id="RXD5/SMISO5/SSCL5" selectedIndex="0"/>
+                <gridItem id="TXD5/SMOSI5/SSDA5" selectedIndex="0"/>
                 <gridItem id="CTS5#/RTS5#/SS5#" selectedIndex="0"/>
                 <gridItem id="SCI5" selectedIndex="0"/>
                 <gridItem id="SCK6" selectedIndex="0"/>
@@ -938,8 +950,8 @@
                 <gridItem id="CTS6#/RTS6#/SS6#" selectedIndex="0"/>
                 <gridItem id="SCI6" selectedIndex="0"/>
                 <gridItem id="SCK7" selectedIndex="0"/>
-                <gridItem id="RXD7/SMISO7/SSCL7" selectedIndex="0"/>
-                <gridItem id="TXD7/SMOSI7/SSDA7" selectedIndex="0"/>
+                <gridItem id="RXD7/SMISO7/SSCL7" selectedIndex="1"/>
+                <gridItem id="TXD7/SMOSI7/SSDA7" selectedIndex="1"/>
                 <gridItem id="CTS7#/RTS7#/SS7#" selectedIndex="0"/>
                 <gridItem id="SCI7" selectedIndex="1"/>
                 <gridItem id="SCK8" selectedIndex="0"/>
@@ -980,12 +992,12 @@
                 <gridItem id="SCI_CFG_DUMMY_TX_BYTE" selectedIndex="0xFF"/>
                 <gridItem id="SCI_CFG_CH0_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH1_INCLUDED" selectedIndex="0"/>
-                <gridItem id="SCI_CFG_CH2_INCLUDED" selectedIndex="0"/>
+                <gridItem id="SCI_CFG_CH2_INCLUDED" selectedIndex="1"/>
                 <gridItem id="SCI_CFG_CH3_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH4_INCLUDED" selectedIndex="0"/>
-                <gridItem id="SCI_CFG_CH5_INCLUDED" selectedIndex="1"/>
+                <gridItem id="SCI_CFG_CH5_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH6_INCLUDED" selectedIndex="0"/>
-                <gridItem id="SCI_CFG_CH7_INCLUDED" selectedIndex="0"/>
+                <gridItem id="SCI_CFG_CH7_INCLUDED" selectedIndex="1"/>
                 <gridItem id="SCI_CFG_CH8_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH9_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH10_INCLUDED" selectedIndex="0"/>
@@ -1070,7 +1082,7 @@
                 <gridItem id="SCI_CFG_CH11_RX_BUFSIZ" selectedIndex="80"/>
                 <gridItem id="SCI_CFG_CH12_RX_BUFSIZ" selectedIndex="80"/>
                 <gridItem id="SCI_CFG_TEI_INCLUDED" selectedIndex="1"/>
-                <gridItem id="SCI_CFG_ERI_TEI_PRIORITY" selectedIndex="3"/>
+                <gridItem id="SCI_CFG_ERI_TEI_PRIORITY" selectedIndex="15"/>
                 <gridItem id="SCI_CFG_CH7_FIFO_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH8_FIFO_INCLUDED" selectedIndex="0"/>
                 <gridItem id="SCI_CFG_CH9_FIFO_INCLUDED" selectedIndex="0"/>
@@ -1232,117 +1244,6 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration inuse="true" name="r_ether_rx">
-            <component description="依存モジュール: r_bsp バージョン 5.52&#10;The Ethernet fit module provides a method to send and receive Ethernet / IEEE802.3 frame using Ethernet controller (ETHERC), Ethernet DMA controller (EDMAC)." detailDescription="Ethernet Driver." display="r_ether_rx" id="r_ether_rx1.23" version="1.23">
-                <gridItem id="CLKOUT25M" selectedIndex="0"/>
-                <gridItem id="ET0_TX_CLK" selectedIndex="0"/>
-                <gridItem id="ET0_RX_CLK" selectedIndex="0"/>
-                <gridItem id="ET0_TX_EN" selectedIndex="0"/>
-                <gridItem id="ET0_ETXD3" selectedIndex="0"/>
-                <gridItem id="ET0_ETXD2" selectedIndex="0"/>
-                <gridItem id="ET0_ETXD1" selectedIndex="0"/>
-                <gridItem id="ET0_ETXD0" selectedIndex="0"/>
-                <gridItem id="ET0_TX_ER" selectedIndex="0"/>
-                <gridItem id="ET0_RX_DV" selectedIndex="0"/>
-                <gridItem id="ET0_ERXD3" selectedIndex="0"/>
-                <gridItem id="ET0_ERXD2" selectedIndex="0"/>
-                <gridItem id="ET0_ERXD1" selectedIndex="0"/>
-                <gridItem id="ET0_ERXD0" selectedIndex="0"/>
-                <gridItem id="ET0_RX_ER" selectedIndex="0"/>
-                <gridItem id="ET0_CRS" selectedIndex="0"/>
-                <gridItem id="ET0_COL" selectedIndex="0"/>
-                <gridItem id="ET0_MDC" selectedIndex="1"/>
-                <gridItem id="ET0_MDIO" selectedIndex="1"/>
-                <gridItem id="PMGI0_MDC" selectedIndex="0"/>
-                <gridItem id="PMGI0_MDIO" selectedIndex="0"/>
-                <gridItem id="ET0_LINKSTA" selectedIndex="1"/>
-                <gridItem id="ET0_EXOUT" selectedIndex="0"/>
-                <gridItem id="ET0_WOL" selectedIndex="0"/>
-                <gridItem id="ETHERC0_MII" selectedIndex="1"/>
-                <gridItem id="CLKOUT25M" selectedIndex="0"/>
-                <gridItem id="REF50CK0" selectedIndex="1"/>
-                <gridItem id="RMII0_TXD_EN" selectedIndex="1"/>
-                <gridItem id="RMII0_TXD1" selectedIndex="1"/>
-                <gridItem id="RMII0_TXD0" selectedIndex="1"/>
-                <gridItem id="RMII0_RXD1" selectedIndex="1"/>
-                <gridItem id="RMII0_RXD0" selectedIndex="1"/>
-                <gridItem id="RMII0_RX_ER" selectedIndex="1"/>
-                <gridItem id="RMII0_CRS_DV" selectedIndex="1"/>
-                <gridItem id="ET0_MDC" selectedIndex="1"/>
-                <gridItem id="ET0_MDIO" selectedIndex="1"/>
-                <gridItem id="PMGI0_MDC" selectedIndex="0"/>
-                <gridItem id="PMGI0_MDIO" selectedIndex="0"/>
-                <gridItem id="ET0_LINKSTA" selectedIndex="1"/>
-                <gridItem id="ET0_EXOUT" selectedIndex="0"/>
-                <gridItem id="ET0_WOL" selectedIndex="0"/>
-                <gridItem id="ETHERC0_RMII" selectedIndex="1"/>
-                <gridItem id="CLKOUT25M" selectedIndex="0"/>
-                <gridItem id="ET1_TX_CLK" selectedIndex="0"/>
-                <gridItem id="ET1_RX_CLK" selectedIndex="0"/>
-                <gridItem id="ET1_TX_EN" selectedIndex="0"/>
-                <gridItem id="ET1_ETXD3" selectedIndex="0"/>
-                <gridItem id="ET1_ETXD2" selectedIndex="0"/>
-                <gridItem id="ET1_ETXD1" selectedIndex="0"/>
-                <gridItem id="ET1_ETXD0" selectedIndex="0"/>
-                <gridItem id="ET1_TX_ER" selectedIndex="0"/>
-                <gridItem id="ET1_RX_DV" selectedIndex="0"/>
-                <gridItem id="ET1_ERXD3" selectedIndex="0"/>
-                <gridItem id="ET1_ERXD2" selectedIndex="0"/>
-                <gridItem id="ET1_ERXD1" selectedIndex="0"/>
-                <gridItem id="ET1_ERXD0" selectedIndex="0"/>
-                <gridItem id="ET1_RX_ER" selectedIndex="0"/>
-                <gridItem id="ET1_CRS" selectedIndex="0"/>
-                <gridItem id="ET1_COL" selectedIndex="0"/>
-                <gridItem id="ET1_MDC" selectedIndex="0"/>
-                <gridItem id="ET1_MDIO" selectedIndex="0"/>
-                <gridItem id="PMGI1_MDC" selectedIndex="0"/>
-                <gridItem id="PMGI1_MDIO" selectedIndex="0"/>
-                <gridItem id="ET1_LINKSTA" selectedIndex="0"/>
-                <gridItem id="ET1_EXOUT" selectedIndex="0"/>
-                <gridItem id="ET1_WOL" selectedIndex="0"/>
-                <gridItem id="ETHERC1_MII" selectedIndex="0"/>
-                <gridItem id="CLKOUT25M" selectedIndex="0"/>
-                <gridItem id="REF50CK1" selectedIndex="0"/>
-                <gridItem id="RMII1_TXD_EN" selectedIndex="0"/>
-                <gridItem id="RMII1_TXD1" selectedIndex="0"/>
-                <gridItem id="RMII1_TXD0" selectedIndex="0"/>
-                <gridItem id="RMII1_RXD1" selectedIndex="0"/>
-                <gridItem id="RMII1_RXD0" selectedIndex="0"/>
-                <gridItem id="RMII1_RX_ER" selectedIndex="0"/>
-                <gridItem id="RMII1_CRS_DV" selectedIndex="0"/>
-                <gridItem id="ET1_MDC" selectedIndex="0"/>
-                <gridItem id="ET1_MDIO" selectedIndex="0"/>
-                <gridItem id="PMGI1_MDC" selectedIndex="0"/>
-                <gridItem id="PMGI1_MDIO" selectedIndex="0"/>
-                <gridItem id="ET1_LINKSTA" selectedIndex="0"/>
-                <gridItem id="ET1_EXOUT" selectedIndex="0"/>
-                <gridItem id="ET1_WOL" selectedIndex="0"/>
-                <gridItem id="ETHERC1_RMII" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_MODE_SEL" selectedIndex="1"/>
-                <gridItem id="ETHER_CFG_CH0_PHY_ADDRESS" selectedIndex="5"/>
-                <gridItem id="ETHER_CFG_CH1_PHY_ADDRESS" selectedIndex="1"/>
-                <gridItem id="ETHER_CFG_EMAC_RX_DESCRIPTORS" selectedIndex="8"/>
-                <gridItem id="ETHER_CFG_EMAC_TX_DESCRIPTORS" selectedIndex="16"/>
-                <gridItem id="ETHER_CFG_BUFSIZE" selectedIndex="1536"/>
-                <gridItem id="ETHER_CFG_AL1_INT_PRIORTY" selectedIndex="1"/>
-                <gridItem id="ETHER_CFG_CH0_PHY_ACCESS" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_CH1_PHY_ACCESS" selectedIndex="1"/>
-                <gridItem id="ETHER_CFG_PHY_MII_WAIT" selectedIndex="8"/>
-                <gridItem id="ETHER_CFG_PHY_DELAY_RESET" selectedIndex="0x00020000L"/>
-                <gridItem id="ETHER_CFG_LINK_PRESENT" selectedIndex="1"/>
-                <gridItem id="ETHER_CFG_USE_LINKSTA" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_USE_PHY_KSZ8041NL" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_USE_PHY_ICS1894_32" selectedIndex="1"/>
-                <gridItem id="ETHER_CFG_NON_BLOCKING" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_PMGI_CLOCK" selectedIndex="2500000"/>
-                <gridItem id="ETHER_CFG_PMGI_ENABLE_PREAMBLE" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_PMGI_HOLD_TIME" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_PMGI_CAPTURE_TIME" selectedIndex="0"/>
-                <gridItem id="ETHER_CFG_PMGI_INT_PRIORTY" selectedIndex="1"/>
-            </component>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-        </configuration>
         <configuration inuse="true" name="r_irq_rx">
             <component description="依存モジュール: r_bsp バージョン 7.60&#10;This software provides a unified, abstracted interface for low-level handling of interrupt events from external pin interrupts. These events are mapped to the IRQ vectors." detailDescription="IRQ Driver" display="r_irq_rx" id="r_irq_rx4.80" version="4.80">
                 <gridItem id="IRQ0" selectedIndex="0"/>
@@ -1415,7 +1316,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="3097a1e6-6a3f-4a10-b45d-b90d470a8ab6" inuse="true" name="FreeRTOS_IP">
+        <configuration enable="true" exclude="false" id="c121d714-ef1d-472f-816a-32f621b8d713" inuse="true" name="FreeRTOS_IP">
             <component description="依存モジュール: r_ether_rx&#10;FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." detailDescription="FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." display="FreeRTOS-Plus-TCP" id="FreeRTOS_IP202406.01-LTS-rx-1.1.1" version="4.2.2">
                 <gridItem id="ipconfigBYTE_ORDER" selectedIndex="0"/>
                 <gridItem id="ipconfigHAS_DEBUG_PRINTF" selectedIndex="0"/>
@@ -1440,7 +1341,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="5d1f05c1-6774-4f1e-ab07-1178c0113799" inuse="true" name="FreeRTOS Object">
+        <configuration enable="true" exclude="false" id="139d21d9-9fce-48bc-8ad3-f2dac391fdae" inuse="true" name="FreeRTOS Object">
             <allocatable id="OBJECT" name="OBJECT" type="">
                 <allocatable id="TASK" name="TASK" type="">
                     <allocatable id="TASKOBJECTLINK1" name="TASK" readonly="true" type="">
@@ -1476,7 +1377,7 @@
             <component description="This component is a part of RTOS Configurator feature that allow user to use the GUI to create and configure new object of FreeRTOS." detailDescription="" display="FreeRTOS_Object" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.object" version="202406.01-LTS-rx-1.1.1"/>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="ce37b32b-14e3-4c21-af55-56727306a92e" inuse="true" name="LittleFS">
+        <configuration enable="true" exclude="false" id="4cb4782f-7f59-425f-9b58-bf1b157eca9f" inuse="true" name="LittleFS">
             <component description="依存モジュール: なし&#10;LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." detailDescription="LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." display="LittleFS" id="LittleFS202406.01-LTS-rx-1.1.1" version="2.5.1">
                 <gridItem id="LFS_FLASH_READ_SIZE" selectedIndex="1"/>
                 <gridItem id="LFS_FLASH_PROGRAM_SIZE" selectedIndex="4"/>
@@ -1486,7 +1387,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="662932fe-cffd-4b3e-907b-7d31c67c3c68" inuse="true" name="FreeRTOS_Kernel">
+        <configuration enable="true" exclude="false" id="8b67923f-bf0d-4b05-8665-6e2f3f6429a2" inuse="true" name="FreeRTOS_Kernel">
             <component description="依存モジュール: なし&#10;FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." detailDescription="FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." display="FreeRTOS Kernel" id="FreeRTOS_Kernel202406.01-LTS-rx-1.1.1" version="11.1.0">
                 <gridItem id="configENABLE_BACKWARD_COMPATIBILITY" selectedIndex="1"/>
                 <gridItem id="configUSE_PREEMPTION" selectedIndex="1"/>
@@ -1590,6 +1491,117 @@
                 <gridItem id="configUSE_TIME_SLICING" selectedIndex="1"/>
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_ether_rx">
+            <component description="依存モジュール: r_bsp バージョン 5.52&#10;The Ethernet fit module provides a method to send and receive Ethernet / IEEE802.3 frame using Ethernet controller (ETHERC), Ethernet DMA controller (EDMAC)." detailDescription="Ethernet Driver." display="r_ether_rx" id="r_ether_rx1.23" version="1.23">
+                <gridItem id="CLKOUT25M" selectedIndex="1"/>
+                <gridItem id="ET0_TX_CLK" selectedIndex="1"/>
+                <gridItem id="ET0_RX_CLK" selectedIndex="1"/>
+                <gridItem id="ET0_TX_EN" selectedIndex="1"/>
+                <gridItem id="ET0_ETXD3" selectedIndex="1"/>
+                <gridItem id="ET0_ETXD2" selectedIndex="1"/>
+                <gridItem id="ET0_ETXD1" selectedIndex="1"/>
+                <gridItem id="ET0_ETXD0" selectedIndex="1"/>
+                <gridItem id="ET0_TX_ER" selectedIndex="1"/>
+                <gridItem id="ET0_RX_DV" selectedIndex="1"/>
+                <gridItem id="ET0_ERXD3" selectedIndex="1"/>
+                <gridItem id="ET0_ERXD2" selectedIndex="1"/>
+                <gridItem id="ET0_ERXD1" selectedIndex="1"/>
+                <gridItem id="ET0_ERXD0" selectedIndex="1"/>
+                <gridItem id="ET0_RX_ER" selectedIndex="1"/>
+                <gridItem id="ET0_CRS" selectedIndex="1"/>
+                <gridItem id="ET0_COL" selectedIndex="1"/>
+                <gridItem id="ET0_MDC" selectedIndex="1"/>
+                <gridItem id="ET0_MDIO" selectedIndex="1"/>
+                <gridItem id="PMGI0_MDC" selectedIndex="0"/>
+                <gridItem id="PMGI0_MDIO" selectedIndex="0"/>
+                <gridItem id="ET0_LINKSTA" selectedIndex="0"/>
+                <gridItem id="ET0_EXOUT" selectedIndex="0"/>
+                <gridItem id="ET0_WOL" selectedIndex="0"/>
+                <gridItem id="ETHERC0_MII" selectedIndex="1"/>
+                <gridItem id="CLKOUT25M" selectedIndex="1"/>
+                <gridItem id="REF50CK0" selectedIndex="0"/>
+                <gridItem id="RMII0_TXD_EN" selectedIndex="0"/>
+                <gridItem id="RMII0_TXD1" selectedIndex="0"/>
+                <gridItem id="RMII0_TXD0" selectedIndex="0"/>
+                <gridItem id="RMII0_RXD1" selectedIndex="0"/>
+                <gridItem id="RMII0_RXD0" selectedIndex="0"/>
+                <gridItem id="RMII0_RX_ER" selectedIndex="0"/>
+                <gridItem id="RMII0_CRS_DV" selectedIndex="0"/>
+                <gridItem id="ET0_MDC" selectedIndex="1"/>
+                <gridItem id="ET0_MDIO" selectedIndex="1"/>
+                <gridItem id="PMGI0_MDC" selectedIndex="0"/>
+                <gridItem id="PMGI0_MDIO" selectedIndex="0"/>
+                <gridItem id="ET0_LINKSTA" selectedIndex="0"/>
+                <gridItem id="ET0_EXOUT" selectedIndex="0"/>
+                <gridItem id="ET0_WOL" selectedIndex="0"/>
+                <gridItem id="ETHERC0_RMII" selectedIndex="1"/>
+                <gridItem id="CLKOUT25M" selectedIndex="1"/>
+                <gridItem id="ET1_TX_CLK" selectedIndex="0"/>
+                <gridItem id="ET1_RX_CLK" selectedIndex="0"/>
+                <gridItem id="ET1_TX_EN" selectedIndex="0"/>
+                <gridItem id="ET1_ETXD3" selectedIndex="0"/>
+                <gridItem id="ET1_ETXD2" selectedIndex="0"/>
+                <gridItem id="ET1_ETXD1" selectedIndex="0"/>
+                <gridItem id="ET1_ETXD0" selectedIndex="0"/>
+                <gridItem id="ET1_TX_ER" selectedIndex="0"/>
+                <gridItem id="ET1_RX_DV" selectedIndex="0"/>
+                <gridItem id="ET1_ERXD3" selectedIndex="0"/>
+                <gridItem id="ET1_ERXD2" selectedIndex="0"/>
+                <gridItem id="ET1_ERXD1" selectedIndex="0"/>
+                <gridItem id="ET1_ERXD0" selectedIndex="0"/>
+                <gridItem id="ET1_RX_ER" selectedIndex="0"/>
+                <gridItem id="ET1_CRS" selectedIndex="0"/>
+                <gridItem id="ET1_COL" selectedIndex="0"/>
+                <gridItem id="ET1_MDC" selectedIndex="0"/>
+                <gridItem id="ET1_MDIO" selectedIndex="0"/>
+                <gridItem id="PMGI1_MDC" selectedIndex="0"/>
+                <gridItem id="PMGI1_MDIO" selectedIndex="0"/>
+                <gridItem id="ET1_LINKSTA" selectedIndex="0"/>
+                <gridItem id="ET1_EXOUT" selectedIndex="0"/>
+                <gridItem id="ET1_WOL" selectedIndex="0"/>
+                <gridItem id="ETHERC1_MII" selectedIndex="1"/>
+                <gridItem id="CLKOUT25M" selectedIndex="1"/>
+                <gridItem id="REF50CK1" selectedIndex="0"/>
+                <gridItem id="RMII1_TXD_EN" selectedIndex="0"/>
+                <gridItem id="RMII1_TXD1" selectedIndex="0"/>
+                <gridItem id="RMII1_TXD0" selectedIndex="0"/>
+                <gridItem id="RMII1_RXD1" selectedIndex="0"/>
+                <gridItem id="RMII1_RXD0" selectedIndex="0"/>
+                <gridItem id="RMII1_RX_ER" selectedIndex="0"/>
+                <gridItem id="RMII1_CRS_DV" selectedIndex="0"/>
+                <gridItem id="ET1_MDC" selectedIndex="0"/>
+                <gridItem id="ET1_MDIO" selectedIndex="0"/>
+                <gridItem id="PMGI1_MDC" selectedIndex="0"/>
+                <gridItem id="PMGI1_MDIO" selectedIndex="0"/>
+                <gridItem id="ET1_LINKSTA" selectedIndex="0"/>
+                <gridItem id="ET1_EXOUT" selectedIndex="0"/>
+                <gridItem id="ET1_WOL" selectedIndex="0"/>
+                <gridItem id="ETHERC1_RMII" selectedIndex="1"/>
+                <gridItem id="ETHER_CFG_MODE_SEL" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_CH0_PHY_ADDRESS" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_CH1_PHY_ADDRESS" selectedIndex="1"/>
+                <gridItem id="ETHER_CFG_EMAC_RX_DESCRIPTORS" selectedIndex="1"/>
+                <gridItem id="ETHER_CFG_EMAC_TX_DESCRIPTORS" selectedIndex="1"/>
+                <gridItem id="ETHER_CFG_BUFSIZE" selectedIndex="1536"/>
+                <gridItem id="ETHER_CFG_AL1_INT_PRIORTY" selectedIndex="13"/>
+                <gridItem id="ETHER_CFG_CH0_PHY_ACCESS" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_CH1_PHY_ACCESS" selectedIndex="1"/>
+                <gridItem id="ETHER_CFG_PHY_MII_WAIT" selectedIndex="8"/>
+                <gridItem id="ETHER_CFG_PHY_DELAY_RESET" selectedIndex="0x00020000L"/>
+                <gridItem id="ETHER_CFG_LINK_PRESENT" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_USE_LINKSTA" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_USE_PHY_KSZ8041NL" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_USE_PHY_ICS1894_32" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_NON_BLOCKING" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_PMGI_CLOCK" selectedIndex="2500000"/>
+                <gridItem id="ETHER_CFG_PMGI_ENABLE_PREAMBLE" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_PMGI_HOLD_TIME" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_PMGI_CAPTURE_TIME" selectedIndex="0"/>
+                <gridItem id="ETHER_CFG_PMGI_INT_PRIORTY" selectedIndex="1"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
     </tool>
     <tool id="System">

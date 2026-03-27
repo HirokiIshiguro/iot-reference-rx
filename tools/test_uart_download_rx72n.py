@@ -46,6 +46,11 @@ import threading
 import time
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="backslashreplace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(errors="backslashreplace")
+
 try:
     import serial
 except ImportError:
@@ -92,7 +97,8 @@ class UartDownloader:
                  success_timeout=30, reset_cmd=None, reset_settle=0.2,
                  send_chunk_size=SEND_CHUNK_SIZE, inter_chunk_delay=DEFAULT_INTER_CHUNK_DELAY,
                  rtscts=False, ack_each_chunk=False,
-                 ack_prefix=DEFAULT_WRITE_ACK_PREFIX, ack_timeout=10.0):
+                 ack_prefix=DEFAULT_WRITE_ACK_PREFIX, ack_timeout=10.0,
+                 observe_after_success=0.0, expect_after_success=None):
         self.port_name = port
         self.baud = baud
         self.timeout = timeout
@@ -111,6 +117,8 @@ class UartDownloader:
         self.ack_each_chunk = ack_each_chunk
         self.ack_prefix = ack_prefix
         self.ack_timeout = ack_timeout
+        self.observe_after_success = observe_after_success
+        self.expect_after_success = expect_after_success or []
         self.ser = None
         self.rx_buffer = ""
         self.messages = []
@@ -344,6 +352,8 @@ class UartDownloader:
         last_ack_report = 0
         post_reset_timeout = self.success_timeout
         post_reset_start = None
+        success_observe_start = None
+        success_observed_markers = set()
 
         while True:
             elapsed = time.time() - self.start_time
@@ -452,6 +462,18 @@ class UartDownloader:
             # Success condition: firmware installed + verified + data flash + reset
             if sw_reset:
                 if success_message_seen:
+                    if self.observe_after_success > 0:
+                        if success_observe_start is None:
+                            success_observe_start = time.time()
+                            print(f"  [{elapsed:6.1f}s] Observing post-success UART for {self.observe_after_success}s...")
+                        for line in lines:
+                            for marker in self.expect_after_success:
+                                if marker in line:
+                                    success_observed_markers.add(marker)
+                        if time.time() - success_observe_start < self.observe_after_success:
+                            time.sleep(0.05)
+                            continue
+
                     # Full success — aws_demos is booting
                     elapsed = time.time() - self.start_time
                     print(f"\n=== Download Complete ===")
@@ -460,6 +482,12 @@ class UartDownloader:
                     print(f"  Const data:        {'YES' if const_completed else 'NO'}")
                     print(f"  Software reset:    YES")
                     print(f"  Success marker:    YES ({self.success_message})")
+                    if self.observe_after_success > 0:
+                        print(f"  Post-success observe: {self.observe_after_success}s")
+                        if self.expect_after_success:
+                            for marker in self.expect_after_success:
+                                status = "YES" if marker in success_observed_markers else "NO"
+                                print(f"  Post marker:       {status} ({marker})")
                     print(f"  Total time:        {elapsed:.1f}s ({elapsed/60:.1f} min)")
                     self.close_port()
                     return 0
@@ -530,6 +558,10 @@ def main():
                         help=f"UART line prefix that acknowledges one write chunk (default: {DEFAULT_WRITE_ACK_PREFIX})")
     parser.add_argument("--ack-timeout", type=float, default=10.0,
                         help="Seconds to wait for the next write acknowledgement in --ack-each-chunk mode (default: 10.0)")
+    parser.add_argument("--observe-after-success", type=float, default=0.0,
+                        help="Seconds to keep reading UART after the success marker is observed (default: 0)")
+    parser.add_argument("--expect-after-success", action="append", default=[],
+                        help="Additional UART substring expected during --observe-after-success; may be specified multiple times")
 
     args = parser.parse_args()
 
@@ -556,6 +588,8 @@ def main():
         ack_each_chunk=args.ack_each_chunk,
         ack_prefix=args.ack_prefix,
         ack_timeout=args.ack_timeout,
+        observe_after_success=args.observe_after_success,
+        expect_after_success=args.expect_after_success,
     )
 
     try:

@@ -13,7 +13,8 @@ function for taking actions such as issuing a break signal or enabling noise
 cancellation. The driver supports all channels available on the mcu. The driver 
 can be reduced in size by removing code used for parameter checking, unused 
 channels, or unused modes. These configuration options can be found in 
-"r_config\r_sci_rx_config.h".
+"r_config\r_sci_rx_config.h". An original copy of the configuration file 
+is stored in "r_sci_rx\ref\r_sci_rx_config_reference.h".
 
 
 Features
@@ -25,20 +26,13 @@ Features
 * (RX64M, RX71M) Simultaneous operation of up to 9 channels.
 * (RX130) Simultaneous operation of up to 4 channels.
 * (RX13T) Simultaneous operation of up to 3 channels.
-* (RX140) Simultaneous operation of up to 6 channels.
 * (RX24T) Simultaneous operation of up to 3 channels.
 * (RX24U) Simultaneous operation of up to 6 channels.
-* (RX260/261) Simultaneous operation of up to 4 channels.
-* (RX26T) Simultaneous operation of up to 4 channels.
 * (RX66T) Simultaneous operation of up to 7 channels
 * (RX72T) Simultaneous operation of up to 7 channels
 * (RX72M) Simultaneous operation of up to 13 channels
 * (RX72N) Simultaneous operation of up to 13 channels
 * (RX66N) Simultaneous operation of up to 13 channels
-* (RX23E-A) Simultaneous operation of up to 4 channels
-* (RX23E-B) Simultaneous operation of up to 7 channels
-* (RX671) Simultaneous operation of up to 13 channels
-* (RX660) Simultaneous operation of up to 13 channels
 * Simultaneous operation of Async, Sync, or SSPI modes on different channels.
 * Queueing of incoming and outgoing data for Asynchronous channels.
 * Interrupt driven.
@@ -55,6 +49,9 @@ r_sci_rx
 |   |    r01an1815jj{VERSION_NUMBER}-rx-serial.pdf
 |   +---en
 |        r01an1815ej{VERSION_NUMBER}-rx-serial.pdf
+|
++---ref
+|       r_sci_rx_config_reference.h
 |
 +---src
     |   r_sci_rx.c

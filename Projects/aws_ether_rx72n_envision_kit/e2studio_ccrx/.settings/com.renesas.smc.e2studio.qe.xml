@@ -5,46 +5,57 @@
     </Segment>
     <Segment id="Pin">
         <Setting id="EMLE" value="EMLE"/>
-        <Setting id="PC3" value="TXD5"/>
-        <Setting id="PB4" value="RMII0_TXD_EN"/>
-        <Setting id="P81" value="RMII0_TXD0"/>
+        <Setting id="P81" value="ET0_ETXD0"/>
+        <Setting id="P80" value="ET0_TX_EN"/>
+        <Setting id="P83" value="ET0_CRS"/>
+        <Setting id="P82" value="ET0_ETXD1"/>
+        <Setting id="MD" value="FINED"/>
+        <Setting id="PC0" value="ET0_ERXD3"/>
+        <Setting id="PC2" value="ET0_RX_DV"/>
+        <Setting id="PC1" value="ET0_ERXD2"/>
+        <Setting id="PC4" value="ET0_TX_CLK"/>
+        <Setting id="PC3" value="ET0_TX_ER"/>
+        <Setting id="PC6" value="ET0_ETXD3"/>
+        <Setting id="PC5" value="ET0_ETXD2"/>
+        <Setting id="PC7" value="ET0_COL"/>
+        <Setting id="P90" value="TXD7"/>
+        <Setting id="P92" value="RXD7"/>
         <Setting id="P91" value="AN115"/>
         <Setting id="P72" value="ET0_MDC"/>
-        <Setting id="P83" value="RMII0_CRS_DV"/>
         <Setting id="P93" value="AN117"/>
         <Setting id="P71" value="ET0_MDIO"/>
-        <Setting id="P82" value="RMII0_TXD1"/>
-        <Setting id="P74" value="RMII0_RXD1"/>
-        <Setting id="P54" value="ET0_LINKSTA"/>
-        <Setting id="P76" value="REF50CK0"/>
-        <Setting id="P75" value="RMII0_RXD0"/>
-        <Setting id="P77" value="RMII0_RX_ER"/>
+        <Setting id="P74" value="ET0_ERXD1"/>
+        <Setting id="P76" value="ET0_RX_CLK"/>
+        <Setting id="P75" value="ET0_ERXD0"/>
+        <Setting id="P56" value="CLKOUT25M"/>
+        <Setting id="P12" value="RXD2"/>
+        <Setting id="P77" value="ET0_RX_ER"/>
         <Setting id="P36" value="EXTAL"/>
+        <Setting id="P13" value="TXD2"/>
         <Setting id="P37" value="XTAL"/>
-        <Setting id="MD" value="FINED"/>
-        <Setting id="PC2" value="RXD5"/>
         <Setting id="PD2" value="IRQ2"/>
     </Segment>
     <Segment id="Device">
         <Setting id="Series" value="RX700"/>
         <Setting id="Group" value="RX72N"/>
-        <Setting id="Board" value="CK-RX65N"/>
+        <Setting id="Board" value="EnvisionKitRX72N"/>
         <Setting id="PartNo" value="R5F572NNHxFB"/>
         <Setting id="PinCount" value="144"/>
     </Segment>
     <Segment id="Clock">
-        <Setting id="PCLKD" value="60000.0"/>
-        <Setting id="CacMCLK" value="24000.0"/>
+        <Setting id="CacMCLK" value="16000.0"/>
         <Setting id="PLLCLK" value="240000.0"/>
+        <Setting id="BusCLK" value="80000.0"/>
+        <Setting id="PCLKA" value="120000.0"/>
+        <Setting id="ExtCLK" value="16000.0"/>
+        <Setting id="UsbCLK" value="48000.0"/>
+        <Setting id="PCLKD" value="60000.0"/>
         <Setting id="PCLKB" value="60000.0"/>
         <Setting id="VCC" value="3.3"/>
         <Setting id="PCLKC" value="60000.0"/>
-        <Setting id="BusCLK" value="120000.0"/>
-        <Setting id="PCLKA" value="120000.0"/>
-        <Setting id="ICLK" value="120000.0"/>
+        <Setting id="ICLK" value="240000.0"/>
         <Setting id="FCLK" value="60000.0"/>
         <Setting id="SysCLKSrc" value="4.0"/>
-        <Setting id="ExtCLK" value="24000.0"/>
     </Segment>
     <Segment id="Component">
         <Setting id="r_bsp" value="FIT"/>
@@ -90,7 +101,7 @@
             <Setting id="BSP_CFG_ID_CODE_LONG_3" value="0xFFFFFFFF"/>
             <Setting id="BSP_CFG_USER_CHARPUT_FUNCTION" value="vOutputChar"/>
             <Setting id="BSP_CFG_TRUSTED_MODE_FUNCTION" value="0xFFFFFFFF"/>
-            <Setting id="BSP_CFG_SCI_UART_TERMINAL_BITRATE" value="115200"/>
+            <Setting id="BSP_CFG_SCI_UART_TERMINAL_BITRATE" value="921600"/>
             <Setting id="BSP_CFG_SWINT_TASK_BUFFER_NUMBER" value="8"/>
             <Setting id="BSP_CFG_USER_LOCKING_HW_UNLOCK_FUNCTION" value="my_hw_unlocking_function"/>
             <Setting id="BSP_CFG_ID_CODE_LONG_1" value="0xFFFFFFFF"/>
@@ -116,7 +127,7 @@
             <Setting id="BSP_CFG_USER_LOCKING_SW_LOCK_FUNCTION" value="my_sw_locking_function"/>
             <Setting id="BSP_CFG_ISTACK_BYTES" value="0x400"/>
             <Setting id="BSP_CFG_NONCACHEABLE_AREA1_DM_ENABLE" value="1"/>
-            <Setting id="BSP_CFG_SCI_UART_TERMINAL_CHANNEL" value="5"/>
+            <Setting id="BSP_CFG_SCI_UART_TERMINAL_CHANNEL" value="7"/>
             <Setting id="BSP_CFG_USER_LOCKING_ENABLED" value="0"/>
             <Setting id="BSP_CFG_USER_CHARGET_ENABLED" value="0"/>
             <Setting id="BSP_CFG_NONCACHEABLE_AREA0_IF_ENABLE" value="1"/>
@@ -227,7 +238,7 @@
             <Setting id="SCI_CFG_CH8_FIFO_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH7_DATA_MATCH_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH3_TX_BUFSIZ" value="80"/>
-            <Setting id="SCI_CFG_CH2_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH2_INCLUDED" value="1"/>
             <Setting id="SCI_CFG_CH3_EN_RXI_NESTED_INT" value="0"/>
             <Setting id="SCI_CFG_CH8_TX_FIFO_THRESH" value="8"/>
             <Setting id="SCI_CFG_CH3_EN_TXI_NESTED_INT" value="0"/>
@@ -239,7 +250,7 @@
             <Setting id="SCI_CFG_CH8_TX_DTC_DMACA_ENABLE" value="0"/>
             <Setting id="SCI_CFG_CH5_EN_ERI_NESTED_INT" value="0"/>
             <Setting id="SCI_CFG_CH12_TX_DTC_DMACA_ENABLE" value="0"/>
-            <Setting id="SCI_CFG_CH7_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH7_INCLUDED" value="1"/>
             <Setting id="SCI_CFG_CH9_TX_DMACA_CH_NUM" value="0"/>
             <Setting id="SCI_CFG_CH0_DATA_MATCH_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH12_TX_DMACA_CH_NUM" value="0"/>
@@ -301,7 +312,7 @@
             <Setting id="SCI_CFG_CH8_TX_BUFSIZ" value="80"/>
             <Setting id="SCI_CFG_CH4_DATA_MATCH_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH5_TX_DTC_DMACA_ENABLE" value="0"/>
-            <Setting id="SCI_CFG_CH5_INCLUDED" value="1"/>
+            <Setting id="SCI_CFG_CH5_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH1_EN_ERI_NESTED_INT" value="0"/>
             <Setting id="SCI_CFG_CH12_RX_DMACA_CH_NUM" value="1"/>
             <Setting id="SCI_CFG_CH2_RX_DMACA_CH_NUM" value="1"/>
@@ -378,7 +389,7 @@
             <Setting id="SCI_CFG_CH11_DATA_MATCH_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH11_RX_DTC_DMACA_ENABLE" value="0"/>
             <Setting id="SCI_CFG_CH9_EN_RXI_NESTED_INT" value="0"/>
-            <Setting id="SCI_CFG_ERI_TEI_PRIORITY" value="3"/>
+            <Setting id="SCI_CFG_ERI_TEI_PRIORITY" value="15"/>
             <Setting id="SCI_CFG_CH11_RX_BUFSIZ" value="80"/>
             <Setting id="SCI_CFG_CH2_TX_DTC_DMACA_ENABLE" value="0"/>
             <Setting id="SCI_CFG_CH3_TX_SIGNAL_TRANSITION_TIMING_INCLUDED" value="0"/>
@@ -390,12 +401,12 @@
         </Segment>
         <Segment component="r_ether_rx1.23" id="r_ether_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="ETHER_CFG_PHY_MII_WAIT" value="8"/>
-            <Setting id="ETHER_CFG_USE_PHY_ICS1894_32" value="1"/>
-            <Setting id="ETHER_CFG_MODE_SEL" value="1"/>
-            <Setting id="ETHER_CFG_LINK_PRESENT" value="1"/>
-            <Setting id="ETHER_CFG_EMAC_RX_DESCRIPTORS" value="8"/>
+            <Setting id="ETHER_CFG_USE_PHY_ICS1894_32" value="0"/>
+            <Setting id="ETHER_CFG_MODE_SEL" value="0"/>
+            <Setting id="ETHER_CFG_LINK_PRESENT" value="0"/>
+            <Setting id="ETHER_CFG_EMAC_RX_DESCRIPTORS" value="1"/>
             <Setting id="ETHER_CFG_BUFSIZE" value="1536"/>
-            <Setting id="ETHER_CFG_EMAC_TX_DESCRIPTORS" value="16"/>
+            <Setting id="ETHER_CFG_EMAC_TX_DESCRIPTORS" value="1"/>
             <Setting id="ETHER_CFG_PHY_DELAY_RESET" value="0x00020000L"/>
             <Setting id="ETHER_CFG_CH1_PHY_ACCESS" value="1"/>
             <Setting id="ETHER_CFG_USE_PHY_KSZ8041NL" value="0"/>
@@ -403,11 +414,11 @@
             <Setting id="ETHER_CFG_PMGI_HOLD_TIME" value="0"/>
             <Setting id="ETHER_CFG_PMGI_CAPTURE_TIME" value="0"/>
             <Setting id="ETHER_CFG_USE_LINKSTA" value="0"/>
-            <Setting id="ETHER_CFG_AL1_INT_PRIORTY" value="2"/>
+            <Setting id="ETHER_CFG_AL1_INT_PRIORTY" value="14"/>
             <Setting id="ETHER_CFG_PMGI_ENABLE_PREAMBLE" value="0"/>
             <Setting id="ETHER_CFG_CH1_PHY_ADDRESS" value="1"/>
             <Setting id="ETHER_CFG_PMGI_INT_PRIORTY" value="2"/>
-            <Setting id="ETHER_CFG_CH0_PHY_ADDRESS" value="5"/>
+            <Setting id="ETHER_CFG_CH0_PHY_ADDRESS" value="0"/>
             <Setting id="ETHER_CFG_NON_BLOCKING" value="0"/>
             <Setting id="ETHER_CFG_CH0_PHY_ACCESS" value="0"/>
         </Segment>

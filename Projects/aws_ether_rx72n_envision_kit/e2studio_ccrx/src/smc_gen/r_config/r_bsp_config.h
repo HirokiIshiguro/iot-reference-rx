@@ -118,6 +118,7 @@ Configuration Options
    H            = 0x11            = Encryption module included
 */
 #define BSP_CFG_MCU_PART_FUNCTION       (0x11) /* Generated value. Do not edit this manually */
+#define BSP_CFG_MCU_PART_ENCRYPTION_INCLUDED   (true)
 
 /* ROM, RAM, and Data Flash Capacity.
    Character(s) = Value for macro = ROM Size/Ram Size/Data Flash Size
@@ -131,13 +132,13 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
    Character(s) = Description
    2N           = RX72N Group
 */
-#define BSP_CFG_MCU_PART_GROUP          (0x0) /* Generated value. Do not edit this manually */
+#define BSP_CFG_MCU_PART_GROUP          ("RX72N") /* Generated value. Do not edit this manually */
 
 /* Series name.
    Character(s) = Description
    57           = RX700 Series
 */
-#define BSP_CFG_MCU_PART_SERIES         (0x0) /* Generated value. Do not edit this manually */
+#define BSP_CFG_MCU_PART_SERIES         ("RX700") /* Generated value. Do not edit this manually */
 
 /* Memory type.
    Character(s) = Value for macro = Description
@@ -343,7 +344,7 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 */
 
 /* Input clock frequency in Hz (XTAL or EXTAL). */
-#define BSP_CFG_XTAL_HZ                 (24000000) /* Generated value. Do not edit this manually */
+#define BSP_CFG_XTAL_HZ                 (16000000) /* Generated value. Do not edit this manually */
 
 /* The HOCO can operate at several different frequencies. Choose which one using the macro below.
    Available frequency settings:
@@ -363,17 +364,17 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 /* PLL Input Frequency Division Ratio Select (PLIDIV).
    Available divisors = /1 (no division), /2, /3
 */
-#define BSP_CFG_PLL_DIV                 (1) /* Generated value. Do not edit this manually */
+#define BSP_CFG_PLL_DIV                 (2) /* Generated value. Do not edit this manually */
 
 /* PLL Frequency Multiplication Factor Select (STC).
    Available multipliers = x10.0 to x30.0 in 0.5 increments (e.g. 10.0, 10.5, 11.0, 11.5, ..., 29.0, 29.5, 30.0)
 */
-#define BSP_CFG_PLL_MUL                 (10.0) /* Generated value. Do not edit this manually */
+#define BSP_CFG_PLL_MUL                 (30.0) /* Generated value. Do not edit this manually */
 
 /* System Clock Divider (ICK).
    Available divisors = /1 (no division), /2, /4, /8, /16, /32, /64
 */
-#define BSP_CFG_ICK_DIV                 (2) /* Generated value. Do not edit this manually */
+#define BSP_CFG_ICK_DIV                 (1) /* Generated value. Do not edit this manually */
 
 /* Peripheral Module Clock A Divider (PCKA).
    Available divisors = /1 (no division), /2, /4, /8, /16, /32, /64
@@ -398,7 +399,7 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 /* External Bus Clock Divider (BCLK).
    Available divisors = /1 (no division), /2, /3, /4, /8, /16, /32, /64
 */
-#define BSP_CFG_BCK_DIV                 (2) /* Generated value. Do not edit this manually */
+#define BSP_CFG_BCK_DIV                 (3) /* Generated value. Do not edit this manually */
 
 /* Flash IF Clock Divider (FCK).
    Available divisors = /1 (no division), /2, /4, /8, /16, /32, /64
@@ -408,22 +409,22 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 /* USB Clock Divider Select.
    Available divisors = /2, /3, /4, /5
 */
-#define BSP_CFG_UCK_DIV                 (5) /* RX72N Envision Kit: 240MHz / 5 = 48MHz */
+#define BSP_CFG_UCK_DIV                 (5) /* Generated value. Do not edit this manually */
 
 /* PPLL Input Frequency Division Ratio Select (PPLIDIV).
    Available divisors = /1 (no division), /2, /3
 */
-#define BSP_CFG_PPLL_DIV                (3) /* Generated value. Do not edit this manually */
+#define BSP_CFG_PPLL_DIV                (1) /* Generated value. Do not edit this manually */
 
 /* PPLL Frequency Multiplication Factor Select (PPLSTC). 
    Available multipliers = x10.0 to x30.0 in 0.5 increments (e.g. 10.0, 10.5, 11.0, 11.5, ..., 29.0, 29.5, 30.0)
 */
-#define BSP_CFG_PPLL_MUL                (25.0) /* Generated value. Do not edit this manually */
+#define BSP_CFG_PPLL_MUL                (12.5) /* Generated value. Do not edit this manually */
 
 /* PPLL Clock Divider Select. 
    Available divisors = /2, /3, /4, /5
 */
-#define BSP_CFG_PPLCK_DIV               (2) /* Generated value. Do not edit this manually */
+#define BSP_CFG_PPLCK_DIV               (4) /* Generated value. Do not edit this manually */
 
 /* Configure BCLK output pin (only effective when external bus enabled)
    Values 0=no output, 1 = BCK frequency, 2= BCK/2 frequency
@@ -851,11 +852,11 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 
 /* This macro is channel number for serial terminal.
 */
-#define BSP_CFG_SCI_UART_TERMINAL_CHANNEL        (5)
+#define BSP_CFG_SCI_UART_TERMINAL_CHANNEL        (7)
 
 /* This macro is bit-rate for serial terminal.
 */
-#define BSP_CFG_SCI_UART_TERMINAL_BITRATE        (115200)
+#define BSP_CFG_SCI_UART_TERMINAL_BITRATE        (921600)
 
 /* This macro is interrupt priority for serial terminal.
    0(low) - 15(high)

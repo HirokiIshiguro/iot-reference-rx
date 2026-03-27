@@ -23,46 +23,82 @@ Global variables and functions
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
-* Function Name: R_ETHER_PinSet_ETHERC0_RMII
+* Function Name: R_ETHER_PinSet_ETHERC0_MII
 * Description  : This function initializes pins for r_ether_rx module
 * Arguments    : none
 * Return Value : none
 ***********************************************************************************************************************/
-void R_ETHER_PinSet_ETHERC0_RMII()
+void R_ETHER_PinSet_ETHERC0_MII()
 {
     R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
 
-    /* Set REF50CK0 pin */
-    MPC.P76PFS.BYTE = 0x12U;
+    /* Set CLKOUT25M pin */
+    MPC.P56PFS.BYTE = 0x2AU;
+    PORT5.PMR.BIT.B6 = 1U;
+
+    /* Set ET0_TX_CLK pin */
+    MPC.PC4PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B4 = 1U;
+
+    /* Set ET0_RX_CLK pin */
+    MPC.P76PFS.BYTE = 0x11U;
     PORT7.PMR.BIT.B6 = 1U;
 
-    /* Set RMII0_TXD_EN pin */
-    MPC.PB4PFS.BYTE = 0x12U;
-    PORTB.PMR.BIT.B4 = 1U;
+    /* Set ET0_TX_EN pin */
+    MPC.P80PFS.BYTE = 0x11U;
+    PORT8.PMR.BIT.B0 = 1U;
 
-    /* Set RMII0_TXD1 pin */
-    MPC.P82PFS.BYTE = 0x12U;
+    /* Set ET0_ETXD3 pin */
+    MPC.PC6PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B6 = 1U;
+
+    /* Set ET0_ETXD2 pin */
+    MPC.PC5PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B5 = 1U;
+
+    /* Set ET0_ETXD1 pin */
+    MPC.P82PFS.BYTE = 0x11U;
     PORT8.PMR.BIT.B2 = 1U;
 
-    /* Set RMII0_TXD0 pin */
-    MPC.P81PFS.BYTE = 0x12U;
+    /* Set ET0_ETXD0 pin */
+    MPC.P81PFS.BYTE = 0x11U;
     PORT8.PMR.BIT.B1 = 1U;
 
-    /* Set RMII0_RXD1 pin */
-    MPC.P74PFS.BYTE = 0x12U;
+    /* Set ET0_TX_ER pin */
+    MPC.PC3PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B3 = 1U;
+
+    /* Set ET0_RX_DV pin */
+    MPC.PC2PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B2 = 1U;
+
+    /* Set ET0_ERXD3 pin */
+    MPC.PC0PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B0 = 1U;
+
+    /* Set ET0_ERXD2 pin */
+    MPC.PC1PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B1 = 1U;
+
+    /* Set ET0_ERXD1 pin */
+    MPC.P74PFS.BYTE = 0x11U;
     PORT7.PMR.BIT.B4 = 1U;
 
-    /* Set RMII0_RXD0 pin */
-    MPC.P75PFS.BYTE = 0x12U;
+    /* Set ET0_ERXD0 pin */
+    MPC.P75PFS.BYTE = 0x11U;
     PORT7.PMR.BIT.B5 = 1U;
 
-    /* Set RMII0_RX_ER pin */
-    MPC.P77PFS.BYTE = 0x12U;
+    /* Set ET0_RX_ER pin */
+    MPC.P77PFS.BYTE = 0x11U;
     PORT7.PMR.BIT.B7 = 1U;
 
-    /* Set RMII0_CRS_DV pin */
-    MPC.P83PFS.BYTE = 0x12U;
+    /* Set ET0_CRS pin */
+    MPC.P83PFS.BYTE = 0x11U;
     PORT8.PMR.BIT.B3 = 1U;
+
+    /* Set ET0_COL pin */
+    MPC.PC7PFS.BYTE = 0x11U;
+    PORTC.PMR.BIT.B7 = 1U;
 
     /* Set ET0_MDC pin */
     MPC.P72PFS.BYTE = 0x11U;
@@ -72,9 +108,22 @@ void R_ETHER_PinSet_ETHERC0_RMII()
     MPC.P71PFS.BYTE = 0x11U;
     PORT7.PMR.BIT.B1 = 1U;
 
-    /* Set ET0_LINKSTA pin */
-    MPC.P54PFS.BYTE = 0x11U;
-    PORT5.PMR.BIT.B4 = 1U;
+    R_BSP_RegisterProtectEnable(BSP_REG_PROTECT_MPC);
+}
+
+/***********************************************************************************************************************
+* Function Name: R_ETHER_PinSet_ETHERC1_MII
+* Description  : This function initializes pins for r_ether_rx module
+* Arguments    : none
+* Return Value : none
+***********************************************************************************************************************/
+void R_ETHER_PinSet_ETHERC1_MII()
+{
+    R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
+
+    /* Set CLKOUT25M pin */
+    MPC.P56PFS.BYTE = 0x2AU;
+    PORT5.PMR.BIT.B6 = 1U;
 
     R_BSP_RegisterProtectEnable(BSP_REG_PROTECT_MPC);
 }

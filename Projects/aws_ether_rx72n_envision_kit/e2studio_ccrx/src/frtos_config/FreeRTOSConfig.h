@@ -193,22 +193,52 @@ extern void vOutputString( const char * pcMessage );
 #define configPRINT_STRING( x )    vOutputString(x)
 
 #define traceENTER_xTaskCreate( pxTaskCode, pcName, uxStackDepth, pvParameters, uxPriority, pxCreatedTask ) \
-    vStartupTracePutString( "[phase8b] trace enter xTaskCreate\r\n" )
+    do { \
+        vStartupTracePutString( "[phase8b] trace enter xTaskCreate code=0x" ); \
+        vStartupTracePutHex32( ( uint32_t ) ( pxTaskCode ) ); \
+        vStartupTracePutString( "\r\n" ); \
+    } while( 0 )
 
 #define traceRETURN_xTaskCreate( xReturn ) \
     vStartupTracePutString( "[phase8b] trace return xTaskCreate\r\n" )
 
 #define traceENTER_xTaskCreateStatic( pxTaskCode, pcName, uxStackDepth, pvParameters, uxPriority, puxStackBuffer, pxTaskBuffer ) \
-    vStartupTracePutString( "[phase8b] trace enter xTaskCreateStatic\r\n" )
+    do { \
+        vStartupTracePutString( "[phase8b] trace enter xTaskCreateStatic code=0x" ); \
+        vStartupTracePutHex32( ( uint32_t ) ( pxTaskCode ) ); \
+        vStartupTracePutString( "\r\n" ); \
+    } while( 0 )
 
 #define traceRETURN_xTaskCreateStatic( xReturn ) \
     vStartupTracePutString( "[phase8b] trace return xTaskCreateStatic\r\n" )
 
+#ifndef PHASE8B_DEBUG_TRACE_CRITICAL
+    #define PHASE8B_DEBUG_TRACE_CRITICAL    ( 0 )
+#endif
+
+#if ( PHASE8B_DEBUG_TRACE_CRITICAL == 1 )
 #define traceENTER_vTaskEnterCritical() \
     vStartupTracePutString( "[phase8b] trace enter vTaskEnterCritical\r\n" )
 
 #define traceRETURN_vTaskEnterCritical() \
     vStartupTracePutString( "[phase8b] trace return vTaskEnterCritical\r\n" )
+#else
+#define traceENTER_vTaskEnterCritical()
+
+#define traceRETURN_vTaskEnterCritical()
+#endif
+
+#define traceENTER_xTimerCreateTimerTask() \
+    vStartupTracePutString( "[phase8b] trace enter xTimerCreateTimerTask\r\n" )
+
+#define traceRETURN_xTimerCreateTimerTask( xReturn ) \
+    vStartupTracePutString( "[phase8b] trace return xTimerCreateTimerTask\r\n" )
+
+#define traceENTER_vTaskStartScheduler() \
+    vStartupTracePutString( "[phase8b] trace enter vTaskStartScheduler\r\n" )
+
+#define traceRETURN_vTaskStartScheduler() \
+    vStartupTracePutString( "[phase8b] trace return vTaskStartScheduler\r\n" )
 
 #define traceMALLOC( pvAddress, uiSize ) \
     vStartupTracePutString( "[phase8b] trace malloc\r\n" )

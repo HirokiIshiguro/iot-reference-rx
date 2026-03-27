@@ -43,7 +43,7 @@
  * Setting to BSP_CFG_PARAM_CHECKING_ENABLE utilizes the system default setting
  * Setting to 1 includes parameter checking; 0 compiles out parameter checking
  */
-#define FLASH_CFG_PARAM_CHECKING_ENABLE     (0)
+#define FLASH_CFG_PARAM_CHECKING_ENABLE     (1)
 
 
 /******************************************************************************
@@ -67,7 +67,7 @@
  * started. Notification of the operation completion is done via the callback 
  * function. 
  */
-#define FLASH_CFG_DATA_FLASH_BGO   (0)
+#define FLASH_CFG_DATA_FLASH_BGO   (1)
 
 
 /******************************************************************************
@@ -81,7 +81,7 @@
  * INTERRUPT ROUTINES MUST BE IN RAM.  
  * See sections 2.17 Usage Notes in the App Note.
  */
-#define FLASH_CFG_CODE_FLASH_BGO   (0)
+#define FLASH_CFG_CODE_FLASH_BGO   (1)
 
 
 /******************************************************************************

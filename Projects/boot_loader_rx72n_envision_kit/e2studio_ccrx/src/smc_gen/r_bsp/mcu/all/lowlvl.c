@@ -24,8 +24,6 @@
 * History : DD.MM.YYYY Version  Description
 *         : 28.02.2019 3.00     Merged processing of all devices.
 *                               Fixed coding style.
-*         : 25.11.2022 3.01     Modiffied comment.
-*         : 31.05.2024 3.02     Fixed coding style.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -40,7 +38,7 @@ Includes   <System Includes> , "Project Includes"
 Macro definitions
 ***********************************************************************************************************************/
 #define BSP_PRV_E1_DBG_PORT (*(volatile st_dbg_t     R_BSP_EVENACCESS_SFR *)0x84080)
-#define BSP_PRV_TXFL0EN     (0x00000100)          /* debug TX flow control bit */
+#define BSP_PRV_TXFL0EN     (0x00000100)          /* debug tx flow control bit */
 #define BSP_PRV_RXFL0EN     (0x00001000)          /* debug RX flow control bit */
 
 /***********************************************************************************************************************
@@ -78,7 +76,7 @@ Private global variables and functions
 * Arguments    : character to output
 * Return Value : none
 ***********************************************************************************************************************/
-void charput(char output_char)
+void charput (char output_char)
 {
     /* If user has provided their own charput() function, then call it. */
 #if BSP_CFG_USER_CHARPUT_ENABLED == 1
@@ -104,13 +102,13 @@ void charput(char output_char)
 * Arguments    : none
 * Return Value : received character
 ***********************************************************************************************************************/
-char charget(void)
+char charget (void)
 {
     /* If user has provided their own charget() function, then call it. */
 #if BSP_CFG_USER_CHARGET_ENABLED == 1
     return BSP_CFG_USER_CHARGET_FUNCTION();
 #else
-    /* Wait for recieve buffer to be ready */
+    /* Wait for rx buffer buffer to be ready */
     /* WAIT_LOOP */
     while(0 == (BSP_PRV_E1_DBG_PORT.dbgstat & BSP_PRV_RXFL0EN))
     {

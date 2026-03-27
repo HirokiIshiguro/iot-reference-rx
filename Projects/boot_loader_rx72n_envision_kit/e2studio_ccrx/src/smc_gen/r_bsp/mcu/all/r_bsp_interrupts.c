@@ -36,12 +36,6 @@
 *                               Fixed coding style.
 *         : 08.10.2019 1.11     Added process for software interrupt.
 *         : 10.12.2019 1.12     Modified comment.
-*         : 18.05.2021 1.13     Added function for Address exceptions.
-*         : 21.11.2023 1.14     Added error handling when BSP_INT_SRC_BUS_ERROR_ILLEGAL_ACCESS and 
-*                               BSP_INT_SRC_BUS_ERROR_TIMEOUT are specified as vector in the R_BSP_InterruptWrite 
-*                               function.
-*                               Modified comment.
-*         : 31.05.2024 1.15     Fixed coding style.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -88,7 +82,7 @@ static bsp_int_err_t bsp_gr_int_enable_disable (bsp_int_src_t vector, bool enabl
  * @note When setting an immediate value for an argument "vector", the argument must be 0 to 255. Don't set the 
  * vector number of the reserved interrupt source to the argument.
  */
-void R_BSP_InterruptRequestEnable(uint32_t vector)
+void R_BSP_InterruptRequestEnable (uint32_t vector)
 {
     uint32_t ier_reg_num;
     uint32_t ien_bit_num;
@@ -118,7 +112,7 @@ void R_BSP_InterruptRequestEnable(uint32_t vector)
  * @note When setting an immediate value for an argument "vector", the argument must be 0 to 255. Don't set the 
  * vector number of the reserved interrupt source to the argument.
  */
-void R_BSP_InterruptRequestDisable(uint32_t vector)
+void R_BSP_InterruptRequestDisable (uint32_t vector)
 {
     uint32_t ier_reg_num;
     uint32_t ien_bit_num;
@@ -143,7 +137,7 @@ void R_BSP_InterruptRequestDisable(uint32_t vector)
 * Arguments    : None
 * Return Value : None
 ***********************************************************************************************************************/
-void bsp_interrupt_open(void)
+void bsp_interrupt_open (void)
 {
     uint32_t i;
 
@@ -174,7 +168,7 @@ void bsp_interrupt_open(void)
  * @param[in] vector Which interrupt to register a callback for.
  * @param[in] callback Pointer to function to call when interrupt occurs.
  * @retval BSP_INT_SUCCESS Successful, callback has been registered.
- * @retval BSP_INT_ERR_INVALID_ARG An invalid interrupt source was specified for vector.
+ * @retval BSP_INT_ERR_INVALID_ARG Invalid function address input, any previous function has been unregistered.
  * @details This function registers a callback function for an interrupt. If FIT_NO_FUNC, NULL, or any other invalid 
  * function address is passed for the callback argument then any previously registered callbacks are unregistered.
  * If one of the interrupts that is handled by this code is triggered then the interrupt handler will query this code 
@@ -185,7 +179,7 @@ void bsp_interrupt_open(void)
  * @note Use of FIT_NO_FUNC is preferred over NULL since access to the address defined by FIT_NO_FUNC will cause a 
  * bus error which is easy for the user to catch. NULL typically resolves to 0 which is a valid address on RX MCUs.
  */
-bsp_int_err_t R_BSP_InterruptWrite(bsp_int_src_t vector,  bsp_int_cb_t callback)
+bsp_int_err_t R_BSP_InterruptWrite (bsp_int_src_t vector,  bsp_int_cb_t callback)
 {
     bsp_int_err_t err;
 
@@ -199,18 +193,7 @@ bsp_int_err_t R_BSP_InterruptWrite(bsp_int_src_t vector,  bsp_int_cb_t callback)
     }
     else
     {
-        #if defined(BSP_INT_SRC_BUS_ERROR_ILLEGAL_ACCESS) && defined(BSP_INT_SRC_BUS_ERROR_TIMEOUT)
-        if ((BSP_INT_SRC_BUS_ERROR_ILLEGAL_ACCESS == vector) || (BSP_INT_SRC_BUS_ERROR_TIMEOUT == vector) ||
-            (BSP_INT_SRC_EMPTY <= vector))
-        {
-            /* When registering a bus error callback function, specify BSP_INT_SRC_BUS_ERROR in the vector. */
-            err = BSP_INT_ERR_INVALID_ARG;
-        }
-        else
-        #endif
-        {
-            g_bsp_vectors[vector] = callback;
-        }
+        g_bsp_vectors[vector] = callback;
     }
 
     return err;
@@ -227,7 +210,7 @@ bsp_int_err_t R_BSP_InterruptWrite(bsp_int_src_t vector,  bsp_int_cb_t callback)
  * @details This function returns the callback function address for an interrupt if one has been registered. If a 
  * callback function has not been registered then an error is returned and nothing is stored to the callback address.
  */
-bsp_int_err_t R_BSP_InterruptRead(bsp_int_src_t vector, bsp_int_cb_t * callback)
+bsp_int_err_t R_BSP_InterruptRead (bsp_int_src_t vector, bsp_int_cb_t * callback)
 {
     bsp_int_err_t err;
 
@@ -288,7 +271,7 @@ bsp_int_err_t R_BSP_InterruptRead(bsp_int_src_t vector, bsp_int_cb_t * callback)
  * executed in user mode, atomicity is not to secure.\n
  * See Section 5.15 in the application note for more information.
  */
-bsp_int_err_t R_BSP_InterruptControl(bsp_int_src_t vector, bsp_int_cmd_t cmd, void * pdata)
+bsp_int_err_t R_BSP_InterruptControl (bsp_int_src_t vector, bsp_int_cmd_t cmd, void * pdata)
 {
     bsp_int_err_t       err;
     bsp_int_cb_args_t   cb_args;
@@ -339,7 +322,7 @@ bsp_int_err_t R_BSP_InterruptControl(bsp_int_src_t vector, bsp_int_cmd_t cmd, vo
             }
             else
             {
-                err = BSP_INT_ERR_INVALID_ARG;
+                 err = BSP_INT_ERR_INVALID_ARG;
             }
             break;
 
@@ -384,7 +367,7 @@ bsp_int_err_t R_BSP_InterruptControl(bsp_int_src_t vector, bsp_int_cmd_t cmd, vo
 *                BSP_INT_ERR_UNSUPPORTED -
 *                    This processing is not supported. (Executed in user mode.)
 ***********************************************************************************************************************/
-static bsp_int_err_t bsp_fit_interrupts_control(bool enable, bsp_int_ctrl_t * pdata)
+static bsp_int_err_t bsp_fit_interrupts_control (bool enable, bsp_int_ctrl_t * pdata)
 {
     bsp_int_err_t       err;
     uint32_t            pmode;
@@ -392,7 +375,7 @@ static bsp_int_err_t bsp_fit_interrupts_control(bool enable, bsp_int_ctrl_t * pd
     uint32_t            ipl_value;
 
     /* Casting is valid because it matches the type to the right side or argument. */
-    if (((uint32_t)NULL != (uint32_t)pdata) && ((uint32_t)FIT_NO_FUNC != (uint32_t)pdata))
+    if(((uint32_t)NULL != (uint32_t)pdata) && ((uint32_t)FIT_NO_FUNC != (uint32_t)pdata))
     {
         /* Read current processor mode. */
         pmode = (R_BSP_GET_PSW() & 0x00100000);
@@ -408,7 +391,7 @@ static bsp_int_err_t bsp_fit_interrupts_control(bool enable, bsp_int_ctrl_t * pd
             }
             else
             {
-                /* Get the current Processor Interrupt Priority Level (IPL) and save IPL value. */
+                 /* Get the current Processor Interrupt Priority Level (IPL) and save IPL value. */
                 pdata->ipl = R_BSP_CpuInterruptLevelRead();
 
                 /* Set IPL to the maximum value to disable all interrupts,
@@ -462,7 +445,7 @@ static bsp_int_err_t bsp_fit_interrupts_control(bool enable, bsp_int_ctrl_t * pd
 *                BSP_INT_ERR_GROUP_STILL_ENABLED -
 *                    Not all group interrupts were disabled so group interrupt was not disabled.
 ***********************************************************************************************************************/
-static bsp_int_err_t bsp_gr_int_enable_disable(bsp_int_src_t vector, bool enable, uint32_t ipl)
+static bsp_int_err_t bsp_gr_int_enable_disable (bsp_int_src_t vector, bool enable, uint32_t ipl)
 {
     bsp_int_err_t err = BSP_INT_SUCCESS;
 
@@ -794,21 +777,6 @@ R_BSP_ATTRIB_INTERRUPT void excep_floating_point_isr(void)
 } /* End of function excep_floating_point_isr() */
 #endif
 
-#ifdef BSP_MCU_EXCEP_ADDRESS_ISR
-/***********************************************************************************************************************
-* Function name: excep_address_isr
-* Description  : Address exception ISR
-* Arguments    : none
-* Return Value : none
-* Note         : This function is supported by only CCRX and GCC.
-***********************************************************************************************************************/
-R_BSP_ATTRIB_INTERRUPT void excep_address_isr(void)
-{
-    /* If user has registered a callback for this exception then call it. */
-    R_BSP_InterruptControl(BSP_INT_SRC_EXC_ADDRESS, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
-} /* End of function excep_address_isr() */
-#endif
-
 #ifdef BSP_MCU_NON_MASKABLE_ISR
 /***********************************************************************************************************************
 * Function name: non_maskable_isr
@@ -942,7 +910,7 @@ R_BSP_ATTRIB_INTERRUPT void non_maskable_isr(void)
     if ((1 == ICU.NMISR.BIT.RAMST) && (1 == ICU.NMIER.BIT.RAMEN))
     {
         /* Casting is valid because it matches the type to the right side or argument. */
-        if (1 == RAM.RAMSTS.BIT.RAMERR)
+        if(1 == RAM.RAMSTS.BIT.RAMERR)
         {
             /* RAM Error interrupt is requested. */
             R_BSP_InterruptControl(BSP_INT_SRC_RAM, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
@@ -1061,13 +1029,13 @@ R_BSP_ATTRIB_INTERRUPT void non_maskable_isr(void)
 #endif /* BSP_MCU_NMI_EXNMI */
 
     /* WAIT_LOOP */
-    while (1)
+    while(1)
     {
         /* Infinite loop. Return from Non-maskable interrupt handlling routine is prohibited.
            Never use the non-maskable interrupt with an attempt to return to the program that was being executed at 
            the time of interrupt generation after the exception handling routine is ended.
          */
-        R_BSP_NOP();
+         R_BSP_NOP();
     }
 } /* End of function non_maskable_isr() */
 #endif /* BSP_MCU_NON_MASKABLE_ISR */
@@ -1090,7 +1058,7 @@ R_BSP_ATTRIB_INTERRUPT void undefined_interrupt_source_isr(void)
 #ifdef BSP_MCU_BUS_ERROR_ISR
 /***********************************************************************************************************************
 * Function name: bus_error_isr
-* Description  : This interrupt will fire if the user tries 
+* Description  : By default, this demo code enables the Bus Error Interrupt. This interrupt will fire if the user tries 
 *                to access code or data from one of the reserved areas in the memory map, including the areas covered 
 *                by disabled chip selects. A nop() statement is included here as a convenient place to set a breakpoint 
 *                during debugging and development, and further handling should be added by the user for their 
@@ -1098,7 +1066,7 @@ R_BSP_ATTRIB_INTERRUPT void undefined_interrupt_source_isr(void)
 * Arguments    : none
 * Return value : none
 ***********************************************************************************************************************/
-R_BSP_ATTRIB_INTERRUPT void bus_error_isr(void)
+R_BSP_ATTRIB_INTERRUPT void bus_error_isr (void)
 {
     /* Clear the bus error */
     BSC.BERCLR.BIT.STSCLR = 1;
