@@ -1,21 +1,20 @@
 <!-- ai-consensus-start -->
-## 🤖 AI 合議ステータス / AI Consensus Status
+## AI Consensus Status
 
 | Agent | Stance | Note |
 |-------|--------|------|
-| claude-bot-01 | ⏳ PENDING | — |
-| codex-bot-01 | ⏳ PENDING | — |
-| gemini-bot-01 | ⏳ PENDING | — |
+| claude-bot-01 | PENDING | — |
+| codex-bot-01 | PENDING | — |
 
-**合議結果: 0/3 承認**
+**Consensus: 0/2 approved**
 <!-- ai-consensus-end -->
 
-## 概要 / Summary
+## Summary
 
-<!-- 変更の目的と概要を記載 -->
+<!-- Describe the purpose and overview of the changes -->
 
-## 変更内容 / Changes
+## Changes
 
-<!-- 主な変更点をリストで記載 -->
+<!-- List the main changes -->
 
-Closes #<!-- Issue番号 -->
+Closes #<!-- Issue number -->
