@@ -405,4 +405,10 @@
  */
 #define ENABLE_CREDENTIAL_BY_CLI    (1)
 
+/**
+ * @brief Event bit that the OTA demo sets when image self-test passes,
+ * allowing other demos to proceed.
+ */
+#define SELF_TEST_PASSED             ((EventBits_t)(1U))
+
 #endif /* DEMO_CONFIG_H */

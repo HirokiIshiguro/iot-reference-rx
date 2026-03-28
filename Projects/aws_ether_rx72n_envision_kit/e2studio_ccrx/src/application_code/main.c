@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "task.h"
+#include "event_groups.h"
 
 /* Logging includes. */
 #include "iot_logging_task.h"
@@ -42,6 +43,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
+
+EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 bool ApplicationCounter (uint32_t xWaitTime);
 signed char vISR_Routine (void);
@@ -376,6 +379,9 @@ void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
+
+    /* Create the event group to sync among demos */
+    xStartDemoEventGroup = xEventGroupCreate();
 
 #if ( PHASE8B_DEBUG_SKIP_LOGGING_TASK == 1 )
     vStartupTracePutString("[phase8b] logging task skipped\r\n");
