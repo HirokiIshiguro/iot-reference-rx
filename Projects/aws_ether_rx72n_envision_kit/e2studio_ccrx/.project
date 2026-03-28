@@ -272,7 +272,7 @@
 		<filter>
 			<id>1756976941107</id>
 			<name>Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c/source</name>
-			<type>5</type>
+			<type>6</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
 				<arguments>1.0-name-matches-false-false-MQTTFileDownloader_cbor.c</arguments>
