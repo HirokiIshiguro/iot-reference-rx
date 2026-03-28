@@ -30,6 +30,25 @@ The current maintained projects in `Projects/` are:
 Historical documentation for CK-RX65N v2 and its variants may remain in this repository, but those projects are no longer shipped in `Projects/`.
 The release matrix and legacy configuration notes below are retained as upstream reference only and do not describe the current maintained workflow of this fork.
 
+### CI Automation
+
+The GitLab pipeline provides two RX72N-specific tracks:
+
+* `build_rx72n`
+  Builds the baseline RX72N boot loader and application without injecting AWS device credentials.
+* `build_rx72n_mqtt_candidate` -> `package_rx72n_mqtt_candidate_rsu`
+  Renders `Demos/include/aws_clientcredential*.h` from CI variables, builds the RX72N application, and packages a signed `.rsu` image.
+
+The MQTT candidate jobs require these CI/CD variables:
+
+* `AWS_IOT_ENDPOINT`
+* `AWS_IOT_THING_NAME`
+* `AWS_IOT_CERT`
+* `AWS_IOT_PRIVKEY`
+
+`AWS_IOT_CERT` and `AWS_IOT_PRIVKEY` are expected as GitLab File variables, but the helper also accepts plain PEM text values.
+The generated credential headers are restored after the build job finishes so the checked-out workspace is not left with rendered secrets.
+
 | Tags | Connectivity | Compiler  | Import project | Project generation (PG) | PubSub | OTA update | Fleet Provisioning | TLS with TSIP |TCP minimal |
 |------|--------------|-----------|----------------|-------------------------|--------|-----|-------------------|-------------|-------------|
 | [v202406.01-LTS-rx-1.1.1](https://github.com/renesas/iot-reference-rx/tree/v202406.01-LTS-rx-1.1.1)<br>* This Version | Ethernet, Cellular, Wi-Fi | CC-RX, GCC | Yes | Yes  | Yes  | Yes<BR>(Not supported for Wi-Fi)  | No  | No  | Yes |
