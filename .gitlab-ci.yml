@@ -58,6 +58,7 @@ build_rx72n:
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem")) { Write-Error "rx72n_codesign_cert.pem missing"; exit 1 }
     - Write-Host "BUILD SUCCESS"
   artifacts:
+    when: always
     paths:
       - rx72n_e2studio_build.log
       - rx72n_app.rsu
@@ -223,6 +224,7 @@ build_rx72n_mqtt_candidate:
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "app .x missing"; exit 1 }
     - Write-Host "BUILD MQTT CANDIDATE SUCCESS"
   artifacts:
+    when: always
     paths:
       - rx72n_e2studio_build_mqtt_candidate.log
       - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
