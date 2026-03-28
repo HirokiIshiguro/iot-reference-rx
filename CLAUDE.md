@@ -1,5 +1,9 @@
 # CLAUDE.md — iot-reference-rx
 
+> Current scope note:
+> This fork now retains only the RX72N Envision Kit projects under `Projects/`.
+> Historical CK-RX65N / DA16600 / RYZ014A notes below are preserved as reference and may not match the current repository layout.
+
 ## Background / 背景
 
 [iot-reference-rx](https://github.com/renesas/iot-reference-rx) は Renesas が提供する
@@ -97,26 +101,22 @@ git submodule update --init --recursive
 
 | Project | Directory | Output | Description |
 |---------|-----------|--------|-------------|
-| aws_ether_ck_rx65n_v2 | `Projects/aws_ether_ck_rx65n_v2/e2studio_ccrx/` | `.mot` (1.0MB) | Ethernet + AWS IoT デモ（PubSub, OTA） |
-| boot_loader_ck_rx65n_v2 | `Projects/boot_loader_ck_rx65n_v2/e2studio_ccrx/` | `.mot` (92KB) | OTA 用デュアルバンクブートローダ |
+| aws_ether_rx72n_envision_kit | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `.mot`, `.abs`, `.x` | RX72N Ethernet + AWS IoT デモ（local bring-up / MQTT / OTA task startup） |
+| boot_loader_rx72n_envision_kit | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | `.mot` | RX72N OTA 用デュアルバンクブートローダ |
 
 ### Headless Build（CLI）
 
 ```bash
 # 前提: サブモジュール初期化済み
-e2studio-cli.exe -nosplash \
-  -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
-  -data <workspace> \
-  -import <app_project_dir> \
-  -import <bl_project_dir> \
-  -cleanBuild "boot_loader_ck_rx65n_v2/HardwareDebug" \
-  -cleanBuild "aws_ether_ck_rx65n_v2/HardwareDebug" \
-  -no-indexer
+pwsh -File tools/build_headless_rx72n.ps1 \
+  -ProjectRoot <repo_root> \
+  -E2Studio <e2studio_exe> \
+  -Workspace <workspace>
 ```
 
-- ビルドスクリプト: `tools/build_headless.bat`
-- ワークスペースは一時ディレクトリ（`%TEMP%\e2ws_iot_ref`）を使用
-- リンクリソース (`AWS_IOT_MCU_ROOT = ${PARENT-3-PROJECT_LOC}`) はサブモジュール初期化後に正常解決
+- 現行ビルドスクリプト: `tools/build_headless_rx72n.ps1`
+- 互換 wrapper: `tools/build_headless.bat`
+- `tools/build_headless_rx72n.ps1` は `boot_loader_rx72n_envision_kit` と `aws_ether_rx72n_envision_kit` を import/build し、`.mot` / `.abs` / `.x` を確認する
 
 ### Demo Configuration
 
@@ -392,6 +392,10 @@ happy path 判定メモ:
 
 ### Step 8: CI/CD pipeline integration
 
+> Historical note:
+> The detailed Step 8 notes below describe the earlier CK-RX65N pipeline track.
+> In the current RX72N-only branch, `.gitlab-ci.yml` is intentionally simplified to the `build_rx72n` job.
+
 2026-03-08 時点の実装状態:
 
 - `.gitlab-ci.yml` は `build -> flash -> provision -> test_mqtt -> test_ota` を 1 本に統合済み
@@ -487,9 +491,58 @@ Step 8 の完了判定:
 | コードフラッシュ | 2MB (1MB x 2) | 4MB (2MB x 2) | リンカスクリプト変更 |
 | RAM | 640KB | 1MB | リンカスクリプト変更 |
 | Ethernet PHY | LAN8720 (RMII) | KSZ8041NL (MII) | r_ether_rx 設定・MPC 変更 |
-| デバッガ | E2 emulator Lite | J-Link OB | rfp-cli 設定変更 |
+| デバッガ | E2 emulator Lite | E2OB (FINE) | rfp-cli 設定変更 |
 | FreeRTOS ポート | RX600v2 | RX700v3_DPFPU | ポートレイヤー切替 |
 | r_fwup | RX65N_DualBank | RX72N_DualBank | ImageGenerator パラメータ変更 |
+
+#### 2026-03-24: RX72N トラックを `iot-reference-rx` 側へ再集約
+
+- `rx72n-envision-kit` の MR `!52` は論点が build / flash / provision / MQTT / OTA まで広がりすぎたためクローズし、RX72N Envision Kit project 追加の正本トラックは Issue `#11` へ切り直した
+- 初手の完了条件は OTA まで広げず、`Projects/boot_loader_rx72n_envision_kit` と `Projects/aws_ether_rx72n_envision_kit` を追加したうえで `build -> flash -> provision -> MQTT` の baseline を通すことに絞る
+- 細かなデバッグを優先するため、RX72N Envision Kit #1 は Raspberry Pi からローカル PC へ付け替えた
+  - デバッガ: ローカル PC 直結
+  - `iot-reference-rx` 側では terminal/UART は `COM7` の 1 本前提で扱う
+
+#### 2026-03-25: local #1 で build / boot_loader / RSU handoff を再確認
+
+- branch `codex/11-add-rx72n-envision-projects` / MR `!17` 上で、`tools/build_headless_rx72n.ps1` により `boot_loader_rx72n_envision_kit` と `aws_ether_rx72n_envision_kit` の headless build が成功した
+- local RX72N #1 では `rfp-cli -list-tools` から `e2l:OBE110008` が見え、boot_loader banner は `COM7` に出ることを確認した
+  - `iot-reference-rx` の RX72N app 設定も `BSP_CFG_SCI_UART_TERMINAL_CHANNEL=7`, `BSP_CFG_SCI_UART_TERMINAL_BITRATE=921600` であり、現段階では `COM7` の single-UART 前提で追う
+  - one-shot banner は flash 後にポートを開くと取り逃がしやすく、先に COM を開いたまま `rfp-cli -sig -run -noquery` を叩く観測が有効
+- RSU 生成では鍵 mismatch に注意
+  - `tools/test_keys/secp256r1.privatekey` で作った RSU は `verify install area buffer [sig-sha256-ecdsa]...NG`
+  - `sample_keys/secp256r1.privatekey` は RX72N boot_loader に埋め込まれた `src/key/code_signer_public_key.h` と対応しており、これで生成した RSU は `verify ... OK` と `activating image ... OK` まで進んだ
+- direct-flash でも app handoff の鬼門は残っている
+  - `aws_ether_rx72n_envision_kit.mot` を `rfp-cli -p ... -v -run -noquery` で直接書いたあとに COM を先開きで観測しても、復帰してくるのは `COM7` の boot_loader banner (`==== RX72N : BootLoader [dual bank] ==== / send image(*.rsu) via UART.`) だけだった
+  - したがって現段階では「RSU verify / activate までは進むが app の UART 生存確認はまだ取れていない」「direct-flash でも app 側へ制御が渡り切っていないか、渡った直後に落ちている」可能性が高い
+- app linker vector の不整合も修正した
+  - `aws_ether_rx72n_envision_kit` の `EXCEPTVECT/RESETVECT` は当初 `0xFFFBFF80/0xFFFBFFFC` だったが、bootloader の `R_FWUP_ExecImage()` は `FWUP_CFG_MAIN_AREA_ADDR_L + FWUP_CFG_AREA_SIZE - 4` (= `0xFFFEFFFC`) を reset vector として参照する
+  - そのため app linker を `0xFFFEFF80/0xFFFEFFFC` へ修正し、build 後の map と RSU segment もこの新アドレスへ揃えた
+  - ただし vector 修正後も local 実機では `verify ... OK` / `activating image ... OK` の先が無音で、追加の source-level debug がまだ必要
+- local bring-up helper として以下を追加した
+  - `tools/build_headless_rx72n.ps1`
+  - `tools/monitor_rx72n_boot.py`
+  - `tools/build_fwup_v2_rsu.py`
+  - `tools/test_uart_download_rx72n.py`
+  - `tools/run_rx72n_local_baseline.ps1`
+
+#### 2026-03-25: Issue #12 で legacy bootloader トラックへ切り替え
+
+- `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx` は `r_fwup` sample 系 bootloader ではなく、
+  `rx72n-envision-kit/projects/renesas/rx72n_envision_kit/e2studio/boot_loader`
+  由来の legacy `rx72n_boot_loader` ベースへ差し替える方針に切り替えた
+- 置換後も `iot-reference-rx` 側では folder 名を `boot_loader_rx72n_envision_kit` に維持し、
+  build 出力名も `boot_loader_rx72n_envision_kit.*` に揃える
+- app 側 handoff は legacy bootloader 前提へ戻す
+  - `EXCEPTVECT/RESETVECT`: `0xFFFBFF80 / 0xFFFBFFFC`
+  - terminal UART: `SCI7 / 921600`
+- local baseline helper は legacy bootloader banner
+  `send "userprog.rsu" via UART.` を待ち受ける
+- RSU 生成時の PRM CSV は bootloader project ではなく
+  `Projects/aws_ether_rx72n_envision_kit/.../RX72N_DualBank_ImageGenerator_PRM.csv`
+  を使う
+- ここでの切り替えは「source / metadata / local helper の整合」までであり、
+  local 実機での initial image download -> reset -> app 起動の再確認は引き続き Issue #12 の検証項目
 
 ## Git Rules / Git ルール
 

@@ -21,7 +21,7 @@
 	url = https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface.git
 [submodule "Middleware/FreeRTOS/FreeRTOS-Kernel"]
 	path = Middleware/FreeRTOS/FreeRTOS-Kernel
-	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+	url = https://gitlab.saffti.jp/oss/import/github/freertos/FreeRTOS-Kernel.git
 [submodule "Middleware/FreeRTOS/FreeRTOS-Plus-TCP"]
 	path = Middleware/FreeRTOS/FreeRTOS-Plus-TCP
 	url = https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git

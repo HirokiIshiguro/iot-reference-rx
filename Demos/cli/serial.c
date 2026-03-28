@@ -29,58 +29,65 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
+#include <string.h>
 
 /* Demo program includes. */
 #include "serial.h"
 
 /* Renesas includes. */
 #include "platform.h"
+#include "Pin.h"
 #include "r_sci_rx_if.h"
 #include "r_byteq_if.h"
-#include "r_sci_rx_pinset.h"
+
+#define U_SCI_UART_CLI_PINSET()  R_Pins_Create()
+
+#ifndef PHASE8B_DEBUG_POLLING_UART
+    #define PHASE8B_DEBUG_POLLING_UART    ( 1 )
+#endif
 
 /* FreeRTOS CLI Command Console */
 #if !defined(BSP_CFG_SCI_UART_TERMINAL_ENABLE)
 #error "Error! Need to define MY_BSP_CFG_SERIAL_TERM_SCI in r_bsp_config.h"
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (0)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI0()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH0
+#define U_SCI_UART_CLI_REG             SCI0
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (1)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI1()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH1
+#define U_SCI_UART_CLI_REG             SCI1
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (2)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI2()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH2
+#define U_SCI_UART_CLI_REG             SCI2
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (3)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI3()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH3
+#define U_SCI_UART_CLI_REG             SCI3
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (4)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI4()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH4
+#define U_SCI_UART_CLI_REG             SCI4
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (5)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI5()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH5
+#define U_SCI_UART_CLI_REG             SCI5
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (6)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI6()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH6
+#define U_SCI_UART_CLI_REG             SCI6
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (7)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI7()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH7
+#define U_SCI_UART_CLI_REG             SCI7
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (8)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI8()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH8
+#define U_SCI_UART_CLI_REG             SCI8
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (9)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI9()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH9
+#define U_SCI_UART_CLI_REG             SCI9
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (10)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI10()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH10
+#define U_SCI_UART_CLI_REG             SCI10
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (11)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI11()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH11
+#define U_SCI_UART_CLI_REG             SCI11
 #elif BSP_CFG_SCI_UART_TERMINAL_CHANNEL == (12)
-#define U_SCI_UART_CLI_PINSET()  R_SCI_PinSet_SCI12()
 #define U_SCI_UART_CLI_SCI_CH          SCI_CH12
+#define U_SCI_UART_CLI_REG             SCI12
 #else
 #error "Error! Invalid setting for MY_BSP_CFG_SERIAL_TERM_SCI in r_bsp_config.h"
 #endif
@@ -104,25 +111,67 @@ void CLI_Support_Settings(void);
 void vSerialSciCallback( void *pvArgs );
 void CLI_Close(void);
 
-void CLI_Support_Settings(void)
-{
+#define serialSTARTUP_TRACE_RETRY_LIMIT    ( 200000UL )
 
-    /* FreeRTOS CLI Command Console */
-    U_SCI_UART_CLI_PINSET();
+static char prvNibbleToHex( uint8_t ucNibble )
+{
+    ucNibble &= 0x0FU;
+    return ( char ) ( ( ucNibble < 10U ) ? ( '0' + ucNibble ) : ( 'A' + ( ucNibble - 10U ) ) );
+}
+
+static sci_err_t prvEnsureSerialPortOpen( void )
+{
     sci_cfg_t xSerialSciConfig;
+    sci_err_t xOpenResult;
+
+    if( 0 != xSerialSciHandle )
+    {
+        return SCI_SUCCESS;
+    }
+
+    U_SCI_UART_CLI_PINSET();
+    memset( &xSerialSciConfig, 0, sizeof( xSerialSciConfig ) );
     xSerialSciConfig.async.baud_rate    = BSP_CFG_SCI_UART_TERMINAL_BITRATE;
     xSerialSciConfig.async.clk_src      = SCI_CLK_INT;
     xSerialSciConfig.async.data_size    = SCI_DATA_8BIT;
     xSerialSciConfig.async.parity_en    = SCI_PARITY_OFF;
     xSerialSciConfig.async.parity_type  = SCI_EVEN_PARITY;
     xSerialSciConfig.async.stop_bits    = SCI_STOPBITS_1;
-    xSerialSciConfig.async.int_priority = 1; /* lowest at first. */
-    R_SCI_Open(U_SCI_UART_CLI_SCI_CH, SCI_MODE_ASYNC, &xSerialSciConfig, vSerialSciCallback, &xSerialSciHandle);
+    xSerialSciConfig.async.int_priority = 1;
+
+    xOpenResult = R_SCI_Open( U_SCI_UART_CLI_SCI_CH,
+                              SCI_MODE_ASYNC,
+                              &xSerialSciConfig,
+                              vSerialSciCallback,
+                              &xSerialSciHandle );
+
+#if ( PHASE8B_DEBUG_POLLING_UART == 1 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
+    if( SCI_SUCCESS == xOpenResult )
+    {
+        IEN( SCI7, RXI7 ) = 0;
+        IEN( SCI7, TXI7 ) = 0;
+        IR( SCI7, RXI7 ) = 0;
+        IR( SCI7, TXI7 ) = 0;
+        ICU.GENAL0.LONG &= ~( ( 1UL << 22 ) | ( 1UL << 23 ) );
+        U_SCI_UART_CLI_REG.SCR.BYTE &= ( uint8_t ) ~( 0xC4U );
+    }
+#endif
+
+    return xOpenResult;
+}
+
+void CLI_Support_Settings(void)
+{
+    ( void ) prvEnsureSerialPortOpen();
 }
 
 void CLI_Close(void)
 {
-	R_SCI_Close(xSerialSciHandle);
+    if( 0 != xSerialSciHandle )
+    {
+        R_SCI_Close( xSerialSciHandle );
+        xSerialSciHandle = 0;
+    }
 }
 
 /* Callback function which is called from Renesas API's interrupt service routine. */
@@ -137,7 +186,10 @@ sci_cb_args_t *pxArgs = (sci_cb_args_t *)pvArgs;
     {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-        configASSERT( xRxQueue );
+        if( NULL == xRxQueue )
+        {
+            return;
+        }
 
         /* Characters received from the UART are stored in this queue, ready to be
         received by the application.  ***NOTE*** Using a queue in this way is very
@@ -178,6 +230,59 @@ xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud, unsigned port
     return 0;
 }
 
+void vStartupTracePutString( const char * pcMessage )
+{
+    const uint8_t * pucMessage = ( const uint8_t * ) pcMessage;
+    uint32_t ulRetry;
+
+    if( ( NULL == pcMessage ) || ( '\0' == pcMessage[ 0 ] ) )
+    {
+        return;
+    }
+
+    if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
+    {
+        return;
+    }
+
+    while( '\0' != *pucMessage )
+    {
+        ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
+
+        while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0 ) )
+        {
+            R_BSP_NOP();
+        }
+
+        if( 0 == ulRetry )
+        {
+            return;
+        }
+
+        U_SCI_UART_CLI_REG.TDR = *pucMessage++;
+    }
+
+    ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
+    while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TEND ) && ( ulRetry-- > 0 ) )
+    {
+        R_BSP_NOP();
+    }
+}
+
+void vStartupTracePutHex32( uint32_t ulValue )
+{
+    char cHex[ 9 ];
+    int32_t lIndex;
+
+    for( lIndex = 0; lIndex < 8; lIndex++ )
+    {
+        cHex[ lIndex ] = prvNibbleToHex( ( uint8_t ) ( ulValue >> ( 28 - ( lIndex * 4 ) ) ) );
+    }
+    cHex[ 8 ] = '\0';
+
+    vStartupTracePutString( cHex );
+}
+
 /* Function required in order to link UARTCommandConsole.c - which is used by
 multiple different demo application. */
 void vSerialPutString(const signed char * pcString, unsigned short usStringLength )
@@ -185,6 +290,52 @@ void vSerialPutString(const signed char * pcString, unsigned short usStringLengt
 const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
 
     /* Only one port is supported. */
+
+#if ( PHASE8B_DEBUG_POLLING_UART == 1 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
+    {
+        const uint8_t * pucMessage = ( const uint8_t * ) pcString;
+        uint32_t ulRemaining = ( uint32_t ) usStringLength;
+        uint32_t ulRetry;
+
+        ( void ) xMaxBlockTime;
+
+        if( ( NULL == pcString ) || ( 0U == usStringLength ) )
+        {
+            return;
+        }
+
+        if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
+        {
+            return;
+        }
+
+        while( ulRemaining > 0U )
+        {
+            ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
+
+            while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0U ) )
+            {
+                R_BSP_NOP();
+            }
+
+            if( 0U == ulRetry )
+            {
+                return;
+            }
+
+            U_SCI_UART_CLI_REG.TDR = *pucMessage++;
+            ulRemaining--;
+        }
+
+        ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
+        while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TEND ) && ( ulRetry-- > 0U ) )
+        {
+            R_BSP_NOP();
+        }
+
+        return;
+    }
+#endif
 
 
     /* Don't send the string unless the previous string has been sent. */

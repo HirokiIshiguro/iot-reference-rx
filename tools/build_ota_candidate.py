@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Build an OTA candidate image with a temporary app version override.
+Build an RX72N OTA candidate image with a temporary app version override.
 
 This helper updates APP_VERSION_{MAJOR,MINOR,BUILD} in demo_config.h,
-builds the CK-RX65N app/boot_loader, generates a signed .rsu image, then
+builds the RX72N app/boot_loader, generates a signed .rsu image, then
 restores the original source file so the workspace stays on the baseline
 version after the command finishes.
 """
@@ -45,7 +45,7 @@ def parse_version(version):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build CK-RX65N OTA candidate with temporary version override")
+    parser = argparse.ArgumentParser(description="Build RX72N OTA candidate with temporary version override")
     parser.add_argument(
         "--repo-root",
         default=str((Path(__file__).resolve().parent / "..").resolve()),
@@ -65,17 +65,17 @@ def main():
     parser.add_argument(
         "--signing-key",
         default=None,
-        help="Private key for image-gen.py; defaults to tools/test_keys/secp256r1.privatekey",
+        help="Private key for image-gen.py; defaults to sample_keys/secp256r1.privatekey",
     )
     parser.add_argument(
         "--e2studio-cli",
         default=None,
-        help="Optional path passed to build_headless.bat",
+        help="Optional path passed to build_headless_rx72n.ps1",
     )
     parser.add_argument(
         "--workspace",
         default=None,
-        help="Optional workspace path passed to build_headless.bat",
+        help="Optional workspace path passed to build_headless_rx72n.ps1",
     )
     parser.add_argument(
         "--code-sign-cert-out",
@@ -86,14 +86,14 @@ def main():
 
     repo_root = Path(args.repo_root).resolve()
     tools_dir = repo_root / "tools"
-    demo_config = repo_root / "Projects" / "aws_ether_ck_rx65n_v2" / "e2studio_ccrx" / "src" / "frtos_config" / "demo_config.h"
-    build_script = tools_dir / "build_headless.bat"
+    demo_config = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "src" / "frtos_config" / "demo_config.h"
+    build_script = tools_dir / "build_headless_rx72n.ps1"
     generate_cert = tools_dir / "generate_signer_cert.py"
-    image_gen = repo_root / "Projects" / "boot_loader_ck_rx65n_v2" / "e2studio_ccrx" / "src" / "smc_gen" / "r_fwup" / "tool" / "image-gen.py"
-    app_mot = repo_root / "Projects" / "aws_ether_ck_rx65n_v2" / "e2studio_ccrx" / "HardwareDebug" / "aws_ether_ck_rx65n_v2.mot"
-    prm_csv = repo_root / "Projects" / "boot_loader_ck_rx65n_v2" / "e2studio_ccrx" / "src" / "smc_gen" / "r_fwup" / "tool" / "RX65N_DualBank_ImageGenerator_PRM.csv"
+    rsu_builder = tools_dir / "build_fwup_v2_rsu.py"
+    app_mot = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "HardwareDebug" / "aws_ether_rx72n_envision_kit.mot"
+    prm_csv = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "src" / "smc_gen" / "r_fwup" / "tool" / "RX72N_DualBank_ImageGenerator_PRM.csv"
 
-    signing_key = Path(args.signing_key).resolve() if args.signing_key else tools_dir / "test_keys" / "secp256r1.privatekey"
+    signing_key = Path(args.signing_key).resolve() if args.signing_key else repo_root / "sample_keys" / "secp256r1.privatekey"
     code_sign_cert_out = Path(args.code_sign_cert_out).resolve() if args.code_sign_cert_out else Path(f"{args.output_prefix}_codesign_cert.pem")
     output_prefix = Path(args.output_prefix).resolve()
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
@@ -107,13 +107,18 @@ def main():
         with open(demo_config, "w", encoding="utf-8", newline="") as handle:
             handle.write(updated_text)
 
-        build_cmd = [str(build_script), str(repo_root)]
+        build_cmd = [
+            "powershell",
+            "-NoProfile",
+            "-File",
+            str(build_script),
+            "-ProjectRoot",
+            str(repo_root),
+        ]
         if args.e2studio_cli:
-            build_cmd.append(args.e2studio_cli)
+            build_cmd.extend(["-E2Studio", args.e2studio_cli])
         if args.workspace:
-            if not args.e2studio_cli:
-                build_cmd.append("")
-            build_cmd.append(args.workspace)
+            build_cmd.extend(["-Workspace", args.workspace])
         run(build_cmd, repo_root)
 
         run(
@@ -131,19 +136,15 @@ def main():
         run(
             [
                 sys.executable,
-                str(image_gen),
-                "-iup",
+                str(rsu_builder),
+                "--mot",
                 str(app_mot),
-                "-ip",
+                "--prm",
                 str(prm_csv),
-                "-o",
-                str(output_prefix),
-                "-key",
+                "--key",
                 str(signing_key),
-                "-vt",
-                "ecdsa",
-                "-ff",
-                "RTOS",
+                "--output",
+                str(output_prefix.with_suffix(".rsu")),
             ],
             repo_root,
         )
@@ -157,7 +158,7 @@ def main():
 
     version_str = ".".join(str(part) for part in args.version)
     print("")
-    print("OTA candidate build complete")
+    print("RX72N OTA candidate build complete")
     print(f"  version:         {version_str}")
     print(f"  candidate .rsu:  {rsu_path}")
     print(f"  code-sign cert:  {code_sign_cert_out}")

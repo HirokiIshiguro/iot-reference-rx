@@ -1,10 +1,11 @@
-# FreeRTOS LTS IoT Reference for RX Family
+# FreeRTOS LTS IoT Reference for RX72N Envision Kit
 
 ## Introduction
 
-This product provides the reference of IoT solution with using [RX family](https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus), [AWS](https://aws.amazon.com), and [FreeRTOS](https://www.freertos.org/RTOS.html). The RX family is a kind of MCUs provided by the [Renesas](https://www.renesas.com).
-You can easily try to run AWS IoT demos using RX family while working with our various other products.  
-Refer to the [Getting Started Guide](Getting_Started_Guide.md) for step by step instructions on setting up your development environment and running demos.
+This repository is currently maintained as an RX72N Envision Kit focused FreeRTOS/AWS IoT reference.  
+The original upstream covered multiple RX boards, but this fork now keeps only the RX72N projects because the boot loader mechanism differs from the other targets.
+
+The RX family is a kind of MCUs provided by [Renesas](https://www.renesas.com), and this repository uses [AWS](https://aws.amazon.com) and [FreeRTOS](https://www.freertos.org/RTOS.html) as the software stack.
 
 ## Product Specifications
 
@@ -17,17 +18,17 @@ Summary of specifications explains in the following chapters.
 
 ### Supported Board
 
-* [CK-RX65N v2](https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus/ck-rx65n-cloud-kit-based-rx65n-mcu-group) with:
-  * Ethernet
-  * Cellular(LTE Cat-M1)
-    * [RYZ014A](https://www.renesas.com/br/en/products/wireless-connectivity/cellular-iot-modules/ryz014a-lte-cat-m1-cellular-iot-module) [(Obsolete)](https://www.renesas.com/document/eln/plc-240004-end-life-eol-process-select-part-numbers?r=1503996)  
-      * This product is no longer in production and technical support may be limited.  
-  * Wi-Fi
-    * [DA16600](https://www.renesas.com/us/en/products/wireless-connectivity/wi-fi/low-power-wi-fi/da16600mod-ultra-low-power-wi-fi-bluetooth-low-energy-combo-modules-battery-powered-iot-devices)
+* RX72N Envision Kit
 
-### List of demos supported by each release tag
+### Current Scope
 
-The following table shows the demos and features available on CK-RX65N v2.<br>
+The current maintained projects in `Projects/` are:
+
+* `boot_loader_rx72n_envision_kit`
+* `aws_ether_rx72n_envision_kit`
+
+Historical documentation for CK-RX65N v2 and its variants may remain in this repository, but those projects are no longer shipped in `Projects/`.
+The release matrix and legacy configuration notes below are retained as upstream reference only and do not describe the current maintained workflow of this fork.
 
 | Tags | Connectivity | Compiler  | Import project | Project generation (PG) | PubSub | OTA update | Fleet Provisioning | TLS with TSIP |TCP minimal |
 |------|--------------|-----------|----------------|-------------------------|--------|-----|-------------------|-------------|-------------|
@@ -182,7 +183,7 @@ These changes will be saved in the `\Common\patches` folder and will be incorpor
 * If changed, the program may not work properly.
 
 <details>
-<summary>CK-RX65N v2 Ethernet Projects</summary>
+<summary>Legacy CK-RX65N v2 Ethernet Projects (historical reference)</summary>
 
   | FIT module | Config name | Default Value | Project value | Reason for change |
   |------------|-------------|---------------|---------------|-------------------|

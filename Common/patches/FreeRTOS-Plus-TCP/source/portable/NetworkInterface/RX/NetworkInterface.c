@@ -35,6 +35,9 @@
 #include "r_ether_rx_if.h"
 #include "r_pinset.h"
 
+extern void vStartupTracePutString( const char * pcMessage );
+extern void vStartupTracePutHex32( uint32_t ulValue );
+
 /***********************************************************************************************************************
  * Macro definitions
  **********************************************************************************************************************/
@@ -466,19 +469,30 @@ static int InitializeNetwork( void )
     configASSERT( pxMyInterface );
     const uint8_t * myethaddr = &pxMyInterface->pxEndPoint->xMACAddress.ucBytes[ 0 ];
 
+    vStartupTracePutString( "[phase8b] netif: pin setup\r\n" );
     R_ETHER_PinSet_CHANNEL_0();
+    vStartupTracePutString( "[phase8b] netif: R_ETHER_Initial\r\n" );
     R_ETHER_Initial();
+    vStartupTracePutString( "[phase8b] netif: callback_ether_regist\r\n" );
     callback_ether_regist();
 
     param.channel = ETHER_CHANNEL_0;
+    vStartupTracePutString( "[phase8b] netif: CONTROL_POWER_ON\r\n" );
     eth_ret = R_ETHER_Control( CONTROL_POWER_ON, param ); /* PHY mode settings, module stop cancellation */
+    vStartupTracePutString( "[phase8b] netif: CONTROL_POWER_ON ret=0x" );
+    vStartupTracePutHex32( ( uint32_t ) eth_ret );
+    vStartupTracePutString( "\r\n" );
 
     if( ETHER_SUCCESS != eth_ret )
     {
         return pdFALSE;
     }
 
+    vStartupTracePutString( "[phase8b] netif: R_ETHER_Open_ZC2\r\n" );
     eth_ret = R_ETHER_Open_ZC2( ETHER_CHANNEL_0, myethaddr, ETHER_FLAG_OFF );
+    vStartupTracePutString( "[phase8b] netif: R_ETHER_Open_ZC2 ret=0x" );
+    vStartupTracePutHex32( ( uint32_t ) eth_ret );
+    vStartupTracePutString( "\r\n" );
 
     if( ETHER_SUCCESS != eth_ret )
     {
@@ -487,12 +501,16 @@ static int InitializeNetwork( void )
 
     if( ether_receive_check_task_handle == NULL )
     {
+        vStartupTracePutString( "[phase8b] netif: create deferred handler\r\n" );
         return_code = xTaskCreate( prvEMACDeferredInterruptHandlerTask,
                                    "ETHER_RECEIVE_CHECK_TASK",
                                    512u,
                                    0,
                                    configMAX_PRIORITIES - 1,
                                    &ether_receive_check_task_handle );
+        vStartupTracePutString( "[phase8b] netif: deferred handler ret=0x" );
+        vStartupTracePutHex32( ( uint32_t ) return_code );
+        vStartupTracePutString( "\r\n" );
     }
     else
     {
