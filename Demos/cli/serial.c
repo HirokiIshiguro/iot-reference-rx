@@ -105,6 +105,8 @@ wait for the transmission to end.  The task handle is then used from the UART
 transmit end interrupt to remove the task from the Blocked state. */
 static TaskHandle_t xSendingTask = NULL;
 
+/* vOutputChar is the BSP charput function (BSP_CFG_USER_CHARPUT_FUNCTION). */
+
 /* Board Support Data Structures. */
 sci_hdl_t xSerialSciHandle = 0;
 void CLI_Support_Settings(void);
@@ -229,6 +231,27 @@ xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud, unsigned port
     here. */
     return 0;
 }
+
+void vOutputChar(char cOutChar)
+{
+    uint32_t ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
+
+    if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
+    {
+        return;
+    }
+
+    while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0 ) )
+    {
+        R_BSP_NOP();
+    }
+
+    if( ulRetry > 0 )
+    {
+        U_SCI_UART_CLI_REG.TDR = ( uint8_t ) cOutChar;
+    }
+}
+
 
 void vStartupTracePutString( const char * pcMessage )
 {
