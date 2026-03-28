@@ -99,13 +99,16 @@ flash_rx72n:
         --port $env:UART_PORT `
         --baud $env:UART_BAUD_RATE `
         --timeout 420 `
-        --post-tx-wait 90 `
+        --post-tx-wait 120 `
         --diag `
         --wait-for-ready `
         --ready-timeout 90 `
         --reset-cmd $resetCmd `
-        --success-timeout 90 `
-        --observe-after-success 10 `
+        --ack-each-chunk `
+        --ack-timeout 30 `
+        --success-message "[phase8b] main_task entered" `
+        --success-timeout 120 `
+        --strict-success `
         2>&1 | Tee-Object -FilePath "$artifactDir\flash_rx72n.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
