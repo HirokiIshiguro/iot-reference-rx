@@ -490,6 +490,7 @@ static inline void * pvGetDataWritePtr( KVStoreKey_t key )
 int32_t vprvCacheInit( void )
 {
 	int32_t xNvLength = -1;
+	int32_t xStatus = LFS_ERR_OK;
 	CK_RV xResult = CKR_OK;
 	CK_BBOOL xIsPrivate = ( CK_BBOOL ) CK_TRUE;
 
@@ -523,7 +524,8 @@ int32_t vprvCacheInit( void )
     	}
 
     }
-	return xNvLength;
+	(void) xNvLength;
+	return xStatus;
 
 }
 
