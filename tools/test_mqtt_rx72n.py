@@ -44,8 +44,8 @@ MARKERS = [
         "required": True,
     },
     {
-        "name": "MQTT Connect",
-        "pattern": "Successfully connected to MQTT broker",
+        "name": "MQTT Receive",
+        "pattern": "Incoming PUBLISH received on topic $aws/things/",
         "required": True,
     },
     {
