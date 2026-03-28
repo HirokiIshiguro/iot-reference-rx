@@ -100,22 +100,6 @@ extern BaseType_t KVStore_xCommitChanges(void);
 #define mainTEST_RUNNER_TASK_STACK_SIZE           ( configMINIMAL_STACK_SIZE * 8 )
 #define UNSIGNED_SHORT_RANDOM_NUMBER_MASK         (0xFFFFUL)
 
-#ifndef PHASE8B_DEBUG_SKIP_LOGGING_TASK
-    #define PHASE8B_DEBUG_SKIP_LOGGING_TASK       ( 0 )
-#endif
-
-#ifndef PHASE8B_DEBUG_SKIP_CLI_TASK
-    #define PHASE8B_DEBUG_SKIP_CLI_TASK           ( 0 )
-#endif
-
-#ifndef PHASE8B_DEBUG_SKIP_CACHE_INIT
-    #define PHASE8B_DEBUG_SKIP_CACHE_INIT         ( 0 )
-#endif
-
-#ifndef PHASE8B_DEBUG_SKIP_APPLICATION_COUNTER
-    #define PHASE8B_DEBUG_SKIP_APPLICATION_COUNTER ( 0 )
-#endif
-
 #define mainUART_COMMAND_CONSOLE_STACK_SIZE ( configMINIMAL_STACK_SIZE * 6UL )
 /* The priority used by the UART command console task. */
 #define mainUART_COMMAND_CONSOLE_TASK_PRIORITY  ( 1 )
@@ -169,7 +153,6 @@ static const uint8_t ucDNSServerAddress[4] =
 
 extern int32_t littlFs_init (void);
 extern void vSerialPutString(const signed char * pcString, unsigned short usStringLength);
-extern void vStartupTracePutString(const char * pcMessage);
 
 /**
  * @brief Application task startup hook.
@@ -201,57 +184,28 @@ void main_task(void *pvParameters)
     int32_t xCacheInitResult = LFS_ERR_OK;
     int32_t Time2Wait = 10000;
     BaseType_t xProceedToDemo = pdTRUE;
-    uint32_t ulNetworkWaitTrace = 0U;
     extern void vRegisterSampleCLICommands (void);
     extern void vUARTCommandConsoleStart (uint16_t usStackSize, UBaseType_t uxPriority);
     extern TaskHandle_t xCLIHandle;
 
     (void) pvParameters;
 
-    vStartupTracePutString("[phase8b] main_task pre-init\r\n");
     prvMiscInitialization();
-    vStartupTracePutString("[phase8b] misc init done\r\n");
-    vStartupTracePutString("[phase8b] about to print main_task entered\r\n");
-    vSerialPutString((const signed char *)"[phase8b] main_task entered\r\n",
-                     (unsigned short)strlen("[phase8b] main_task entered\r\n"));
-    vStartupTracePutString("[phase8b] before UserInitialization\r\n");
     UserInitialization();
-    vStartupTracePutString("[phase8b] after UserInitialization\r\n");
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 1)
     /* Register the standard CLI commands. */
-#if ( PHASE8B_DEBUG_SKIP_CLI_TASK == 1 )
-    vStartupTracePutString("[phase8b] CLI task skipped\r\n");
-#else
-    vStartupTracePutString("[phase8b] before vRegisterSampleCLICommands\r\n");
     vRegisterSampleCLICommands();
-    vStartupTracePutString("[phase8b] before vUARTCommandConsoleStart\r\n");
     vUARTCommandConsoleStart(mainUART_COMMAND_CONSOLE_STACK_SIZE, mainUART_COMMAND_CONSOLE_TASK_PRIORITY);
-    vSerialPutString((const signed char *)"[phase8b] cli task started\r\n",
-                     (unsigned short)strlen("[phase8b] cli task started\r\n"));
-#endif
 #endif
 
-    vStartupTracePutString("[phase8b] before littlFs_init\r\n");
     xResults = littlFs_init();
-    vStartupTracePutString("[phase8b] after littlFs_init\r\n");
 
-    vStartupTracePutString("[phase8b] before xMQTTAgentInit\r\n");
     xMQTTAgentInit();
-    vStartupTracePutString("[phase8b] after xMQTTAgentInit\r\n");
 
     if (LFS_ERR_OK == xResults)
     {
-#if ( PHASE8B_DEBUG_SKIP_CACHE_INIT == 1 )
-        vStartupTracePutString("[phase8b] cache init skipped\r\n");
-#else
-        vStartupTracePutString("[phase8b] before vprvCacheInit\r\n");
         xCacheInitResult = vprvCacheInit();
-        vStartupTracePutString("[phase8b] after vprvCacheInit\r\n");
-        vStartupTracePutString("[phase8b] cache init result=0x");
-        vStartupTracePutHex32( ( uint32_t ) xCacheInitResult );
-        vStartupTracePutString("\r\n");
-#endif
     }
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 1)
@@ -259,36 +213,14 @@ void main_task(void *pvParameters)
         ( LFS_ERR_OK == xCacheInitResult ) &&
         ( pdTRUE == prvShouldAutoProvisionFromClientCredentials() ) )
     {
-        BaseType_t xProvisionResult;
-
-        vStartupTracePutString("[phase8b] auto provisioning from clientcredential headers\r\n");
-        xProvisionResult = vAssignCredentials();
-        vStartupTracePutString("[phase8b] auto provisioning result=0x");
-        vStartupTracePutHex32( ( uint32_t ) xProvisionResult );
-        vStartupTracePutString("\r\n");
-        vStartupTracePutString("[phase8b] cache thingname len=0x");
-        vStartupTracePutHex32( ( uint32_t ) prvGetCacheEntryLength( KVS_CORE_THING_NAME ) );
-        vStartupTracePutString(" endpoint len=0x");
-        vStartupTracePutHex32( ( uint32_t ) prvGetCacheEntryLength( KVS_CORE_MQTT_ENDPOINT ) );
-        vStartupTracePutString("\r\n");
+        vAssignCredentials();
     }
 #endif
-
-    vStartupTracePutString("[phase8b] before ApplicationCounter\r\n");
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 0)
     vAssignCredentials();
 #else
-#if ( PHASE8B_DEBUG_SKIP_APPLICATION_COUNTER == 1 )
-    vStartupTracePutString("[phase8b] ApplicationCounter skipped\r\n");
-    xProceedToDemo = pdTRUE;
-#else
     xProceedToDemo = ApplicationCounter(Time2Wait);
-    if (pdTRUE == xProceedToDemo)
-    {
-        vStartupTracePutString("[phase8b] after ApplicationCounter true\r\n");
-    }
-#endif
 #endif
 
     if (pdTRUE == xProceedToDemo)
@@ -299,12 +231,7 @@ void main_task(void *pvParameters)
         /* For this reason, the CLI task must be deleted before executing the Demo. */
         if( xCLIHandle != NULL )
         {
-            vStartupTracePutString("[phase8b] deleting CLI task\r\n");
             vTaskDelete(xCLIHandle);
-        }
-        else
-        {
-            vStartupTracePutString("[phase8b] CLI handle null, skip delete\r\n");
         }
     #endif
 
@@ -312,51 +239,34 @@ void main_task(void *pvParameters)
             are created in the vApplicationIPNetworkEventHook() hook function
             below.  The hook function is called when the network connects. */
 
-        vStartupTracePutString("[phase8b] before FreeRTOS_IPInit\r\n");
         FreeRTOS_IPInit(ucIPAddress,
                         ucNetMask,
                         ucGatewayAddress,
                         ucDNSServerAddress,
                         ucMACAddress );
-        vStartupTracePutString("[phase8b] after FreeRTOS_IPInit\r\n");
 
         /* We should wait for the network to be up before we run any demos. */
         while (FreeRTOS_IsNetworkUp() == pdFALSE)
         {
-            if( ulNetworkWaitTrace < 8U )
-            {
-                vStartupTracePutString("[phase8b] waiting for network up\r\n");
-                ulNetworkWaitTrace++;
-            }
             vTaskDelay(300);
         }
-
-        vStartupTracePutString("[phase8b] network is up\r\n");
 
         FreeRTOS_printf(("Initialise the RTOS's TCP/IP stack\n"));
 
         FreeRTOS_printf(("---------STARTING DEMO---------\r\n"));
 
             #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
-                vStartupTracePutString("[phase8b] before vStartFleetProvisioningDemo\r\n");
                 vStartFleetProvisioningDemo();
             #else
-                vStartupTracePutString("[phase8b] setting MQTT agent initialized\r\n");
                 xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
             #endif
 
-            vStartupTracePutString("[phase8b] before vStartMQTTAgent\r\n");
             vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
-            vStartupTracePutString("[phase8b] after vStartMQTTAgent\r\n");
 
-            vStartupTracePutString("[phase8b] before vStartSimplePubSubDemo\r\n");
             vStartSimplePubSubDemo ();
-            vStartupTracePutString("[phase8b] after vStartSimplePubSubDemo\r\n");
 
             #if (ENABLE_OTA_UPDATE_DEMO == 1)
-                        vStartupTracePutString("[phase8b] before vStartOtaDemo\r\n");
                         vStartOtaDemo();
-                        vStartupTracePutString("[phase8b] after vStartOtaDemo\r\n");
             #endif
     }
 
@@ -380,17 +290,12 @@ void prvMiscInitialization(void)
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
 
-    /* Create the event group to sync among demos */
     xStartDemoEventGroup = xEventGroupCreate();
 
-#if ( PHASE8B_DEBUG_SKIP_LOGGING_TASK == 1 )
-    vStartupTracePutString("[phase8b] logging task skipped\r\n");
-#else
     /* Start logging task. */
     xLoggingTaskInitialize(mainLOGGING_TASK_STACK_SIZE,
                             tskIDLE_PRIORITY + 2,
                             mainLOGGING_MESSAGE_QUEUE_LENGTH);
-#endif
 
 }
 /*****************************************************************************************
@@ -405,7 +310,6 @@ End of function prvMiscInitialization
  *********************************************************************************************************************/
 void vApplicationDaemonTaskStartupHook(void)
 {
-    vStartupTracePutString("[phase8b] daemon hook entered\r\n");
 }
 /*****************************************************************************************
 End of function vApplicationDaemonTaskStartupHook
@@ -505,7 +409,6 @@ End of function vApplicationGetTimerTaskMemory
  *********************************************************************************************************************/
 void vApplicationMallocFailedHook( void )
     {
-        vStartupTracePutString("[phase8b] malloc failed\r\n");
         configPRINT_STRING(("ERROR: Malloc failed to allocate memory\r\n"));
         taskDISABLE_INTERRUPTS();
 
@@ -536,7 +439,6 @@ End of function vApplicationMallocFailedHook
 void vApplicationStackOverflowHook(TaskHandle_t xTask,
                                         char * pcTaskName)
     {
-        vStartupTracePutString("[phase8b] stack overflow\r\n");
         configPRINT_STRING(("ERROR: stack overflow\r\n"));
         portDISABLE_INTERRUPTS();
 
@@ -637,24 +539,14 @@ bool ApplicationCounter(uint32_t xWaitTime)
     TickType_t xCurrent;
     bool DEMO_TEST = pdTRUE;
     const TickType_t xPrintFrequency = pdMS_TO_TICKS(xWaitTime);
-    static uint32_t ulPhase8bCounterTrace = 0U;
     xCurrent = xTaskGetTickCount();
     signed char cRxChar;
     while (xCurrent < xPrintFrequency)
     {
-        if( ulPhase8bCounterTrace < 4U )
-        {
-            vStartupTracePutString("[phase8b] ApplicationCounter loop\r\n");
-        }
         vTaskDelay(1);
-        if( ulPhase8bCounterTrace < 4U )
-        {
-            vStartupTracePutString("[phase8b] ApplicationCounter after delay\r\n");
-        }
         xCurrent = xTaskGetTickCount();
 
         cRxChar = vISR_Routine();
-        ulPhase8bCounterTrace++;
         if ((0 != cRxChar))
         {
 

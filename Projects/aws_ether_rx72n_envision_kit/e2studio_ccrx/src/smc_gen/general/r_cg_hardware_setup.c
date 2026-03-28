@@ -39,7 +39,6 @@ void my_sw_warmstart_prec_function(void)
 
 void my_sw_warmstart_postc_function(void)
 {
-    vStartupTracePutString("[phase8b] warm start postc\r\n");
 }
 /* End user code. Do not edit comment generated here */
 

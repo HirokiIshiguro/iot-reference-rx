@@ -280,12 +280,7 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
     vbatt_voltage_stability_wait();
 #endif
 
-    /* Switch to high-speed operation unless the 3b diagnostic path intentionally
-     * preserves the bootloader clock state to validate direct-jump hypotheses.
-     */
-#if BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP == 0
     mcu_clock_setup();
-#endif
 
     /* If the warm start Pre C runtime callback is enabled, then call it. */
 #if BSP_CFG_USER_WARM_START_CALLBACK_PRE_INITC_ENABLED == 1
@@ -331,11 +326,9 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
 
     /* Configure the MCU and board hardware */
     hardware_setup();
-    vStartupTracePutString("[phase8b] startup hardware ready\r\n");
 
     /* Enable interrupt and select the I stack or the U stack */
     R_BSP_SET_PSW(BSP_PRV_PSW_INIT);
-    vStartupTracePutString("[phase8b] startup psw enabled\r\n");
 
 #if BSP_CFG_RTOS_USED == 4  /* Renesas RI600V4 & RI600PX */
     /* Does not change the MCU's user mode to user in Renesas RTOS. */

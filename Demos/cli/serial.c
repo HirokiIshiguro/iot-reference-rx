@@ -42,9 +42,6 @@
 
 #define U_SCI_UART_CLI_PINSET()  R_Pins_Create()
 
-#ifndef PHASE8B_DEBUG_POLLING_UART
-    #define PHASE8B_DEBUG_POLLING_UART    ( 1 )
-#endif
 
 /* FreeRTOS CLI Command Console */
 #if !defined(BSP_CFG_SCI_UART_TERMINAL_ENABLE)
@@ -105,21 +102,12 @@ wait for the transmission to end.  The task handle is then used from the UART
 transmit end interrupt to remove the task from the Blocked state. */
 static TaskHandle_t xSendingTask = NULL;
 
-/* vOutputChar is the BSP charput function (BSP_CFG_USER_CHARPUT_FUNCTION). */
-
 /* Board Support Data Structures. */
 sci_hdl_t xSerialSciHandle = 0;
 void CLI_Support_Settings(void);
 void vSerialSciCallback( void *pvArgs );
 void CLI_Close(void);
 
-#define serialSTARTUP_TRACE_RETRY_LIMIT    ( 200000UL )
-
-static char prvNibbleToHex( uint8_t ucNibble )
-{
-    ucNibble &= 0x0FU;
-    return ( char ) ( ( ucNibble < 10U ) ? ( '0' + ucNibble ) : ( 'A' + ( ucNibble - 10U ) ) );
-}
 
 static sci_err_t prvEnsureSerialPortOpen( void )
 {
@@ -147,17 +135,6 @@ static sci_err_t prvEnsureSerialPortOpen( void )
                               vSerialSciCallback,
                               &xSerialSciHandle );
 
-#if ( PHASE8B_DEBUG_POLLING_UART == 1 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
-    if( SCI_SUCCESS == xOpenResult )
-    {
-        IEN( SCI7, TXI7 ) = 0;
-        IR( SCI7, TXI7 ) = 0;
-        /* Keep RXI/RIE enabled so the CLI can still receive commands on SCI7,
-         * but force TX onto the polling path to avoid early boot TXI noise. */
-        ICU.GENAL0.LONG &= ~( 1UL << 23 );
-        U_SCI_UART_CLI_REG.SCR.BYTE &= ( uint8_t ) ~( 0x84U );
-    }
-#endif
 
     return xOpenResult;
 }
@@ -206,6 +183,34 @@ sci_cb_args_t *pxArgs = (sci_cb_args_t *)pvArgs;
     }
 }
 
+
+/******************************************************************************
+ * Function Name: vOutputChar
+ * Description  : BSP charput function (BSP_CFG_USER_CHARPUT_FUNCTION).
+ *                Simple polling output for a single character.
+ * Argument     : cOutChar - character to output
+ * Return Value : None
+ *****************************************************************************/
+void vOutputChar(char cOutChar)
+{
+    uint32_t ulRetry = 200000UL;
+
+    if( 0 == xSerialSciHandle )
+    {
+        return;
+    }
+
+    while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0 ) )
+    {
+        R_BSP_NOP();
+    }
+
+    if( ulRetry > 0 )
+    {
+        U_SCI_UART_CLI_REG.TDR = ( uint8_t ) cOutChar;
+    }
+}
+
 /* Function required in order to link UARTCommandConsole.c - which is used by
 multiple different demo application. */
 xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud, unsigned portBASE_TYPE uxQueueLength )
@@ -232,79 +237,6 @@ xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud, unsigned port
     return 0;
 }
 
-void vOutputChar(char cOutChar)
-{
-    uint32_t ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
-
-    if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
-    {
-        return;
-    }
-
-    while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0 ) )
-    {
-        R_BSP_NOP();
-    }
-
-    if( ulRetry > 0 )
-    {
-        U_SCI_UART_CLI_REG.TDR = ( uint8_t ) cOutChar;
-    }
-}
-
-
-void vStartupTracePutString( const char * pcMessage )
-{
-    const uint8_t * pucMessage = ( const uint8_t * ) pcMessage;
-    uint32_t ulRetry;
-
-    if( ( NULL == pcMessage ) || ( '\0' == pcMessage[ 0 ] ) )
-    {
-        return;
-    }
-
-    if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
-    {
-        return;
-    }
-
-    while( '\0' != *pucMessage )
-    {
-        ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
-
-        while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0 ) )
-        {
-            R_BSP_NOP();
-        }
-
-        if( 0 == ulRetry )
-        {
-            return;
-        }
-
-        U_SCI_UART_CLI_REG.TDR = *pucMessage++;
-    }
-
-    ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
-    while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TEND ) && ( ulRetry-- > 0 ) )
-    {
-        R_BSP_NOP();
-    }
-}
-
-void vStartupTracePutHex32( uint32_t ulValue )
-{
-    char cHex[ 9 ];
-    int32_t lIndex;
-
-    for( lIndex = 0; lIndex < 8; lIndex++ )
-    {
-        cHex[ lIndex ] = prvNibbleToHex( ( uint8_t ) ( ulValue >> ( 28 - ( lIndex * 4 ) ) ) );
-    }
-    cHex[ 8 ] = '\0';
-
-    vStartupTracePutString( cHex );
-}
 
 /* Function required in order to link UARTCommandConsole.c - which is used by
 multiple different demo application. */
@@ -314,51 +246,6 @@ const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
 
     /* Only one port is supported. */
 
-#if ( PHASE8B_DEBUG_POLLING_UART == 1 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
-    {
-        const uint8_t * pucMessage = ( const uint8_t * ) pcString;
-        uint32_t ulRemaining = ( uint32_t ) usStringLength;
-        uint32_t ulRetry;
-
-        ( void ) xMaxBlockTime;
-
-        if( ( NULL == pcString ) || ( 0U == usStringLength ) )
-        {
-            return;
-        }
-
-        if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
-        {
-            return;
-        }
-
-        while( ulRemaining > 0U )
-        {
-            ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
-
-            while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0U ) )
-            {
-                R_BSP_NOP();
-            }
-
-            if( 0U == ulRetry )
-            {
-                return;
-            }
-
-            U_SCI_UART_CLI_REG.TDR = *pucMessage++;
-            ulRemaining--;
-        }
-
-        ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
-        while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TEND ) && ( ulRetry-- > 0U ) )
-        {
-            R_BSP_NOP();
-        }
-
-        return;
-    }
-#endif
 
 
     /* Don't send the string unless the previous string has been sent. */

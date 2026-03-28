@@ -1,5 +1,5 @@
-#ifndef PHASE8B_REGEN_SAFE_R_BSP_CONFIG_H
-#define PHASE8B_REGEN_SAFE_R_BSP_CONFIG_H
+#ifndef REGEN_SAFE_R_BSP_CONFIG_H
+#define REGEN_SAFE_R_BSP_CONFIG_H
 
 /*
  * Smart Configurator regeneration may rewrite the RX72N MCU identity macros in
@@ -30,4 +30,4 @@
 #undef BSP_CFG_MCU_PART_MEMORY_TYPE
 #define BSP_CFG_MCU_PART_MEMORY_TYPE    (0x0)
 
-#endif /* PHASE8B_REGEN_SAFE_R_BSP_CONFIG_H */
+#endif /* REGEN_SAFE_R_BSP_CONFIG_H */

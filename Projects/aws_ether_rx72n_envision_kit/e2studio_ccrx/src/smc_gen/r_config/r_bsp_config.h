@@ -76,8 +76,6 @@ Configuration Options
    Change to the settings for the user board.
 */
 
-/* phase8b diagnostic switch. Normal builds must keep this at 0. */
-#define BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP   (0)
 
 /* Start up select
    0 = Enable BSP startup program.

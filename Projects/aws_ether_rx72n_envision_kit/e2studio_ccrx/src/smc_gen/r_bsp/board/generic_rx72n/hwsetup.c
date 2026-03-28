@@ -103,8 +103,6 @@ static void bsp_bsc_initial_configure(void);
 ***********************************************************************************************************************/
 void hardware_setup(void)
 {
-    vStartupTracePutString("[phase8b] hardware_setup entered\r\n");
-
 /* When using the user startup program, disable the following code. */
 #if BSP_CFG_STARTUP_DISABLE == 0
 #if BSP_CFG_ROM_CACHE_ENABLE == 1
@@ -119,7 +117,6 @@ void hardware_setup(void)
     bsp_non_existent_port_init();
     bsp_adc_initial_configure();
     bsp_bsc_initial_configure();
-    vStartupTracePutString("[phase8b] hardware_setup done\r\n");
 } /* End of function hardware_setup() */
 
 /* When using the user startup program, disable the following code. */

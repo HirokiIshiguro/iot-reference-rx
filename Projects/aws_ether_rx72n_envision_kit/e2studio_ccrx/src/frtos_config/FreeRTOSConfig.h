@@ -38,8 +38,6 @@
 #include <stdio.h>
 #include "r_bsp_config.h"
 
-extern void vStartupTracePutString( const char * pcMessage );
-
 /*-----------------------------------------------------------
 * Application specific definitions.
 *
@@ -95,11 +93,7 @@ extern void vStartupTracePutString( const char * pcMessage );
 #define configUSE_TIMERS                           1
 #define configTIMER_TASK_PRIORITY                  (6)
 #define configTIMER_QUEUE_LENGTH                   5
-#if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 )
-    #define configTIMER_TASK_STACK_DEPTH           (configMINIMAL_STACK_SIZE * 2UL)
-#else
-    #define configTIMER_TASK_STACK_DEPTH           (configMINIMAL_STACK_SIZE)
-#endif
+#define configTIMER_TASK_STACK_DEPTH           (configMINIMAL_STACK_SIZE)
 
 /* The interrupt priority used by the kernel itself for the tick interrupt and
 the pended interrupt.  This would normally be the lowest priority. */
@@ -191,57 +185,6 @@ extern void vLoggingPrint( const char * pcMessage );
 extern void vOutputString( const char * pcMessage );
 /* Map the logging task's printf to the board specific output function. */
 #define configPRINT_STRING( x )    vOutputString(x)
-
-#define traceENTER_xTaskCreate( pxTaskCode, pcName, uxStackDepth, pvParameters, uxPriority, pxCreatedTask ) \
-    do { \
-        vStartupTracePutString( "[phase8b] trace enter xTaskCreate code=0x" ); \
-        vStartupTracePutHex32( ( uint32_t ) ( pxTaskCode ) ); \
-        vStartupTracePutString( "\r\n" ); \
-    } while( 0 )
-
-#define traceRETURN_xTaskCreate( xReturn ) \
-    vStartupTracePutString( "[phase8b] trace return xTaskCreate\r\n" )
-
-#define traceENTER_xTaskCreateStatic( pxTaskCode, pcName, uxStackDepth, pvParameters, uxPriority, puxStackBuffer, pxTaskBuffer ) \
-    do { \
-        vStartupTracePutString( "[phase8b] trace enter xTaskCreateStatic code=0x" ); \
-        vStartupTracePutHex32( ( uint32_t ) ( pxTaskCode ) ); \
-        vStartupTracePutString( "\r\n" ); \
-    } while( 0 )
-
-#define traceRETURN_xTaskCreateStatic( xReturn ) \
-    vStartupTracePutString( "[phase8b] trace return xTaskCreateStatic\r\n" )
-
-#ifndef PHASE8B_DEBUG_TRACE_CRITICAL
-    #define PHASE8B_DEBUG_TRACE_CRITICAL    ( 0 )
-#endif
-
-#if ( PHASE8B_DEBUG_TRACE_CRITICAL == 1 )
-#define traceENTER_vTaskEnterCritical() \
-    vStartupTracePutString( "[phase8b] trace enter vTaskEnterCritical\r\n" )
-
-#define traceRETURN_vTaskEnterCritical() \
-    vStartupTracePutString( "[phase8b] trace return vTaskEnterCritical\r\n" )
-#else
-#define traceENTER_vTaskEnterCritical()
-
-#define traceRETURN_vTaskEnterCritical()
-#endif
-
-#define traceENTER_xTimerCreateTimerTask() \
-    vStartupTracePutString( "[phase8b] trace enter xTimerCreateTimerTask\r\n" )
-
-#define traceRETURN_xTimerCreateTimerTask( xReturn ) \
-    vStartupTracePutString( "[phase8b] trace return xTimerCreateTimerTask\r\n" )
-
-#define traceENTER_vTaskStartScheduler() \
-    vStartupTracePutString( "[phase8b] trace enter vTaskStartScheduler\r\n" )
-
-#define traceRETURN_vTaskStartScheduler() \
-    vStartupTracePutString( "[phase8b] trace return vTaskStartScheduler\r\n" )
-
-#define traceMALLOC( pvAddress, uiSize ) \
-    vStartupTracePutString( "[phase8b] trace malloc\r\n" )
 
 /* Sets the length of the buffers into which logging messages are written - so
  * also defines the maximum length of each log message. */
