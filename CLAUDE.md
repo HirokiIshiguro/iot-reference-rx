@@ -47,7 +47,7 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 | GitHub (upstream) | https://github.com/renesas/iot-reference-rx |
 
 - GitLab プロジェクト ID: **38**
-- ベースバージョン: **v202406.01-LTS-rx-1.1.1**（FreeRTOS 202406.01 LTS）
+- ベースバージョン: **v202406.04-LTS-rx-1.2.0**（FreeRTOS 202406.04 LTS）
 - デフォルトブランチ: `main`（protected）
 
 ## Version Information / バージョン情報
@@ -67,8 +67,8 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 | littlefs | 2.5.1 | -- |
 | r_fwup | 2.04 | -- |
 
-**注意:** v202406.01-LTS-rx-1.1.1 では Fleet Provisioning デモは未サポート。
-ただし SDK (1.2.1) は含まれており、将来のリリースまたは独自実装で対応可能。
+**注意:** v202406.04-LTS-rx-1.2.0 より Fleet Provisioning デモが正式サポート（`Demos/Fleet_Provisioning_With_CSR_Demo/`）。
+SBOM (`sbom.spdx`) および Wi-Fi OTA (DA16600) 対応も追加（DA16600 は本 fork 非対象）。
 
 ## Build Environment / ビルド環境
 
