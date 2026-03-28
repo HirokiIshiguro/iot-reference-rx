@@ -94,7 +94,7 @@ def send_pem_command(ser, key_name, pem_path, char_delay, line_delay):
     return False
 
 
-def wait_for_boot(ser, timeout, shadow_ser=None, shadow_name="shadow"):
+def wait_for_boot(ser, timeout, shadow_ser=None, shadow_name="shadow", stop_tokens=None):
     print(f"Waiting for device boot ({timeout}s timeout)...")
     start = time.time()
     collected = ""
@@ -105,6 +105,8 @@ def wait_for_boot(ser, timeout, shadow_ser=None, shadow_name="shadow"):
             collected += data
             sys.stdout.write(mask_sensitive_output(data))
             sys.stdout.flush()
+            if stop_tokens and any(token in collected for token in stop_tokens):
+                break
         shadow_collected = read_shadow_data(shadow_ser, shadow_name, shadow_collected)
         time.sleep(0.1)
     return collected, shadow_collected
@@ -130,14 +132,21 @@ def run_reset_command(reset_cmd, description):
     return True
 
 
-def enter_cli_mode(ser, char_delay, line_delay, timeout, retry_interval, shadow_ser=None, shadow_name="shadow"):
+def enter_cli_mode(ser, char_delay, line_delay, timeout, retry_interval, shadow_ser=None, shadow_name="shadow", initial_output=""):
     print("Entering CLI mode...")
-    ser.reset_input_buffer()
     shadow_collected = ""
     shadow_bootloader_reported = False
 
     start = time.monotonic()
-    collected = ""
+    collected = initial_output or ""
+
+    if any(marker in collected for marker in CLI_READY_MARKERS):
+        print("CLI prompt already detected")
+        return True
+    if any(marker in collected for marker in BOOTLOADER_MARKERS):
+        print("ERROR: boot_loader responded on the log UART; phase8b app CLI is not active")
+        return False
+
     next_retry = start
     attempt = 0
     while time.monotonic() - start < timeout:
@@ -288,8 +297,15 @@ def provision(args):
             if not run_reset_command(args.reset_cmd, "Running external reset command after opening serial..."):
                 return 1
 
+        boot_output = ""
         if not args.skip_boot_wait:
-            wait_for_boot(ser, args.boot_wait, shadow_ser=shadow_ser, shadow_name=args.shadow_name)
+            boot_output, _ = wait_for_boot(
+                ser,
+                args.boot_wait,
+                shadow_ser=shadow_ser,
+                shadow_name=args.shadow_name,
+                stop_tokens=CLI_READY_MARKERS,
+            )
 
         if not enter_cli_mode(
             ser,
@@ -299,6 +315,7 @@ def provision(args):
             args.cli_retry_interval,
             shadow_ser=shadow_ser,
             shadow_name=args.shadow_name,
+            initial_output=boot_output,
         ):
             print("ERROR: Failed to enter CLI mode")
             return 1

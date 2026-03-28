@@ -48,14 +48,12 @@ signed char vISR_Routine (void);
 extern void vStartSimplePubSubDemo (void);
 BaseType_t OtaSelfTest(void);
 
-#if (ENABLE_CREDENTIAL_BY_CLI == 0)
 void vAssignCredentials(void);
 extern int32_t xprvWriteCacheEntry(size_t KeyLength,
         char * Key,
         size_t ValueLength,
         char * pvNewValue );
 extern BaseType_t KVStore_xCommitChanges(void);
-#endif
 
 #if (ENABLE_OTA_UPDATE_DEMO == 1)
     extern void vStartOtaDemo(void);
@@ -104,11 +102,11 @@ extern BaseType_t KVStore_xCommitChanges(void);
 #endif
 
 #ifndef PHASE8B_DEBUG_SKIP_CLI_TASK
-    #define PHASE8B_DEBUG_SKIP_CLI_TASK           ( 1 )
+    #define PHASE8B_DEBUG_SKIP_CLI_TASK           ( 0 )
 #endif
 
 #ifndef PHASE8B_DEBUG_SKIP_CACHE_INIT
-    #define PHASE8B_DEBUG_SKIP_CACHE_INIT         ( 1 )
+    #define PHASE8B_DEBUG_SKIP_CACHE_INIT         ( 0 )
 #endif
 
 #ifndef PHASE8B_DEBUG_SKIP_APPLICATION_COUNTER
@@ -179,6 +177,7 @@ void vApplicationDaemonTaskStartupHook (void);
  * @brief Initializes the board.
  */
 void prvMiscInitialization (void);
+static BaseType_t prvShouldAutoProvisionFromClientCredentials( void );
 
 extern void UserInitialization (void);
 extern void CLI_Support_Settings (void);
@@ -247,6 +246,15 @@ void main_task(void *pvParameters)
         vStartupTracePutString("[phase8b] after vprvCacheInit\r\n");
 #endif
     }
+
+#if (ENABLE_CREDENTIAL_BY_CLI == 1)
+    if ((LFS_ERR_OK == xResults) && (pdTRUE == prvShouldAutoProvisionFromClientCredentials()))
+    {
+        vStartupTracePutString("[phase8b] auto provisioning from clientcredential headers\r\n");
+        vAssignCredentials();
+        vStartupTracePutString("[phase8b] auto provisioning complete\r\n");
+    }
+#endif
 
     vStartupTracePutString("[phase8b] before ApplicationCounter\r\n");
 
@@ -654,7 +662,31 @@ signed char vISR_Routine(void)
  End of function vISR_Routine
  ****************************************************************************************/
 
-#if (ENABLE_CREDENTIAL_BY_CLI == 0)
+static BaseType_t prvShouldAutoProvisionFromClientCredentials( void )
+{
+    if( clientcredentialMQTT_BROKER_ENDPOINT[ 0 ] == '\0' )
+    {
+        return pdFALSE;
+    }
+
+    if( strcmp( clientcredentialIOT_THING_NAME, "dummy" ) == 0 )
+    {
+        return pdFALSE;
+    }
+
+    if( ( keyCLIENT_CERTIFICATE_PEM == NULL ) || ( keyCLIENT_PRIVATE_KEY_PEM == NULL ) )
+    {
+        return pdFALSE;
+    }
+
+    if( ( prvGetCacheEntryLength( KVS_CORE_THING_NAME ) > 0U ) &&
+        ( prvGetCacheEntryLength( KVS_CORE_MQTT_ENDPOINT ) > 0U ) )
+    {
+        return pdFALSE;
+    }
+
+    return pdTRUE;
+}
 /**********************************************************************************************************************
  * Function Name: vAssignCredentials
  * Description  : Handle pre-provisioning.
@@ -693,8 +725,6 @@ void vAssignCredentials(void)
 /**********************************************************************************************************************
  End of function vAssignCredentials
  *********************************************************************************************************************/
-#endif
-
 /**********************************************************************************************************************
  * Function Name: OtaSelfTest
  * Description  : The test function executed during the self-check process during an OTA update
