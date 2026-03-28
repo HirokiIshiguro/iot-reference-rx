@@ -394,7 +394,8 @@ happy path 判定メモ:
 
 > Historical note:
 > The detailed Step 8 notes below describe the earlier CK-RX65N pipeline track.
-> In the current RX72N-only branch, `.gitlab-ci.yml` is intentionally simplified to the `build_rx72n` job.
+> In the current RX72N-only branch, `.gitlab-ci.yml` now covers the RX72N baseline path
+> `build_rx72n -> flash_rx72n -> provision_rx72n -> test_mqtt_rx72n`.
 
 2026-03-08 時点の実装状態:
 

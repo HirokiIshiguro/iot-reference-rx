@@ -104,11 +104,11 @@ extern BaseType_t KVStore_xCommitChanges(void);
 #endif
 
 #ifndef PHASE8B_DEBUG_SKIP_CLI_TASK
-    #define PHASE8B_DEBUG_SKIP_CLI_TASK           ( 1 )
+    #define PHASE8B_DEBUG_SKIP_CLI_TASK           ( 0 )
 #endif
 
 #ifndef PHASE8B_DEBUG_SKIP_CACHE_INIT
-    #define PHASE8B_DEBUG_SKIP_CACHE_INIT         ( 1 )
+    #define PHASE8B_DEBUG_SKIP_CACHE_INIT         ( 0 )
 #endif
 
 #ifndef PHASE8B_DEBUG_SKIP_APPLICATION_COUNTER
