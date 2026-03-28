@@ -1,5 +1,6 @@
 stages:
   - build
+  - package
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -37,3 +38,63 @@ build_rx72n:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
+
+build_rx72n_mqtt_candidate:
+  stage: build
+  tags:
+    - run_ishiguro_machine
+  rules:
+    - if: '$AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Build RX72N MQTT candidate ==="
+    - |
+      & "$env:CI_PROJECT_DIR\tools\build_headless_rx72n_with_client_credentials.ps1" `
+        -ProjectRoot "$env:CI_PROJECT_DIR" `
+        -ThingName "$env:AWS_IOT_THING_NAME" `
+        -Endpoint "$env:AWS_IOT_ENDPOINT" `
+        -CertInput "$env:AWS_IOT_CERT" `
+        -KeyInput "$env:AWS_IOT_PRIVKEY" `
+        -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_mqtt_candidate.log"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "app .abs missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "app .x missing"; exit 1 }
+    - Write-Host "BUILD MQTT CANDIDATE SUCCESS"
+  artifacts:
+    paths:
+      - rx72n_e2studio_build_mqtt_candidate.log
+      - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 1 day
+
+package_rx72n_mqtt_candidate_rsu:
+  stage: package
+  tags:
+    - run_ishiguro_machine
+  needs:
+    - job: build_rx72n_mqtt_candidate
+      artifacts: true
+  rules:
+    - if: '$AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Package RX72N MQTT candidate RSU ==="
+    - |
+      & "$env:CI_PROJECT_DIR\tools\generate_rx72n_rsu.ps1" `
+        -ProjectRoot "$env:CI_PROJECT_DIR" `
+        -Output "$env:CI_PROJECT_DIR\artifacts\rx72n_mqtt_candidate.rsu"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\artifacts\rx72n_mqtt_candidate.rsu")) { Write-Error "RSU missing"; exit 1 }
+    - Write-Host "PACKAGE MQTT CANDIDATE SUCCESS"
+  artifacts:
+    paths:
+      - artifacts/rx72n_mqtt_candidate.rsu
+      - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 1 day
