@@ -331,11 +331,9 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
 
     /* Configure the MCU and board hardware */
     hardware_setup();
-    vStartupTracePutString("[phase8b] startup hardware ready\r\n");
 
     /* Enable interrupt and select the I stack or the U stack */
     R_BSP_SET_PSW(BSP_PRV_PSW_INIT);
-    vStartupTracePutString("[phase8b] startup psw enabled\r\n");
 
 #if BSP_CFG_RTOS_USED == 4  /* Renesas RI600V4 & RI600PX */
     /* Does not change the MCU's user mode to user in Renesas RTOS. */

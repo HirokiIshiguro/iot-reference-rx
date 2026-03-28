@@ -71,16 +71,8 @@ Private global variables and functions
 ***********************************************************************************************************************/
 /* This array holds callback functions. */
 static void (* g_bsp_vectors[BSP_INT_SRC_TOTAL_ITEMS])(void * pdata);
-static volatile uint32_t g_phase8b_undefined_interrupt_trace_count = 0U;
-static volatile uint32_t g_phase8b_undefined_inst_trace_count = 0U;
 
 static bsp_int_err_t bsp_fit_interrupts_control (bool enable, bsp_int_ctrl_t * pdata);
-
-static void prvPhase8bTraceUndefRegister( const char * pcLabel, uint32_t ulValue )
-{
-    vStartupTracePutString( pcLabel );
-    vStartupTracePutHex32( ulValue );
-}
 
 #ifdef BSP_MCU_GROUP_INTERRUPT
 static bsp_int_err_t bsp_gr_int_enable_disable (bsp_int_src_t vector, bool enable, uint32_t ipl);
@@ -743,7 +735,6 @@ static bsp_int_err_t bsp_gr_int_enable_disable(bsp_int_src_t vector, bool enable
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void excep_supervisor_inst_isr(void)
 {
-    vStartupTracePutString( "[phase8b] exception: supervisor instruction\r\n" );
     /* If user has registered a callback for this exception then call it. */
     R_BSP_InterruptControl(BSP_INT_SRC_EXC_SUPERVISOR_INSTR, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
 } /* End of function excep_supervisor_inst_isr() */
@@ -758,7 +749,6 @@ R_BSP_ATTRIB_INTERRUPT void excep_supervisor_inst_isr(void)
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void excep_access_isr(void)
 {
-    vStartupTracePutString( "[phase8b] exception: access\r\n" );
     /* If user has registered a callback for this exception then call it. */
     R_BSP_InterruptControl(BSP_INT_SRC_EXC_ACCESS, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
 } /* End of function excep_access_isr() */
@@ -773,50 +763,6 @@ R_BSP_ATTRIB_INTERRUPT void excep_access_isr(void)
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void excep_undefined_inst_isr(void)
 {
-    vStartupTracePutString( "[phase8b] exception: undefined instruction\r\n" );
-
-    if( g_phase8b_undefined_inst_trace_count < 4U )
-    {
-        uint32_t bpc_val;
-        uint32_t bpsw_val;
-
-        bpc_val = ( uint32_t ) R_BSP_GET_BPC();
-        bpsw_val = ( uint32_t ) R_BSP_GET_BPSW();
-
-        vStartupTracePutString( "[phase8b] undef-inst BPC=0x" );
-        prvPhase8bTraceUndefRegister( "", bpc_val );
-        vStartupTracePutString( " BPSW=0x" );
-        prvPhase8bTraceUndefRegister( "", bpsw_val );
-        vStartupTracePutString( " INTB=0x" );
-        prvPhase8bTraceUndefRegister( "", ( uint32_t ) R_BSP_GET_INTB() );
-        vStartupTracePutString( "\r\n" );
-
-        if( ( bpc_val >= 0x00100000U ) ||
-            ( ( bpc_val >= 0xFF800000U ) && ( bpc_val <= 0xFFFFFFFFU ) ) )
-        {
-            volatile uint16_t * p16 = ( volatile uint16_t * ) ( bpc_val & ~1UL );
-
-            vStartupTracePutString( "[phase8b] undef-inst op[-2..+2]=" );
-            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 0 ] );
-            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 1 ] );
-            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 2 ] );
-            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 3 ] );
-            prvPhase8bTraceUndefRegister( " ", ( uint32_t ) p16[ 4 ] );
-            vStartupTracePutString( "\r\n" );
-        }
-    }
-
-    g_phase8b_undefined_inst_trace_count++;
-
-    if( g_phase8b_undefined_inst_trace_count >= 1U )
-    {
-        R_BSP_CLRPSW_I();
-        while( 1 )
-        {
-            R_BSP_NOP();
-        }
-    }
-
     /* If user has registered a callback for this exception then call it. */
     R_BSP_InterruptControl(BSP_INT_SRC_EXC_UNDEFINED_INSTR, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
 } /* End of function excep_undefined_inst_isr() */
@@ -835,8 +781,6 @@ R_BSP_ATTRIB_INTERRUPT void excep_floating_point_isr(void)
     /* Used for reading FPSW register. */
     uint32_t tmp_fpsw;
 #endif
-
-    vStartupTracePutString( "[phase8b] exception: floating point\r\n" );
 
     /* If user has registered a callback for this exception then call it. */
     R_BSP_InterruptControl(BSP_INT_SRC_EXC_FPU, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
@@ -861,7 +805,6 @@ R_BSP_ATTRIB_INTERRUPT void excep_floating_point_isr(void)
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void excep_address_isr(void)
 {
-    vStartupTracePutString( "[phase8b] exception: address\r\n" );
     /* If user has registered a callback for this exception then call it. */
     R_BSP_InterruptControl(BSP_INT_SRC_EXC_ADDRESS, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
 } /* End of function excep_address_isr() */
@@ -1140,76 +1083,6 @@ R_BSP_ATTRIB_INTERRUPT void non_maskable_isr(void)
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void undefined_interrupt_source_isr(void)
 {
-    vStartupTracePutString( "[phase8b] exception: undefined interrupt source\r\n" );
-
-    if( g_phase8b_undefined_interrupt_trace_count < 4U )
-    {
-        /* Dump BPC/BPSW — if this ISR was reached via an exception (not an
-         * interrupt), BPC holds the faulting PC and BPSW holds the faulting
-         * PSW.  For normal interrupts these are stale / zero. */
-        {
-            uint32_t bpc_val, bpsw_val;
-            bpc_val  = ( uint32_t ) R_BSP_GET_BPC();
-            bpsw_val = ( uint32_t ) R_BSP_GET_BPSW();
-            vStartupTracePutString( "[phase8b] undef BPC=0x" );
-            prvPhase8bTraceUndefRegister( "", bpc_val );
-            vStartupTracePutString( " BPSW=0x" );
-            prvPhase8bTraceUndefRegister( "", bpsw_val );
-            vStartupTracePutString( "\r\n" );
-        }
-
-        /* Dump INTB to verify vector table base is correct. */
-        vStartupTracePutString( "[phase8b] undef intb=0x" );
-        prvPhase8bTraceUndefRegister( "", ( uint32_t ) R_BSP_GET_INTB() );
-        vStartupTracePutString( "\r\n" );
-
-        vStartupTracePutString( "[phase8b] undef irq ir swint=0x" );
-        prvPhase8bTraceUndefRegister( "", IR( ICU, SWINT ) );
-        vStartupTracePutString( " cmt0=0x" );
-        prvPhase8bTraceUndefRegister( "", IR( CMT0, CMI0 ) );
-        vStartupTracePutString( " grpAL0=0x" );
-        prvPhase8bTraceUndefRegister( "", IR( ICU, GROUPAL0 ) );
-        vStartupTracePutString( " grpAL1=0x" );
-        prvPhase8bTraceUndefRegister( "", IR( ICU, GROUPAL1 ) );
-        vStartupTracePutString( " grpBE0=0x" );
-        prvPhase8bTraceUndefRegister( "", IR( ICU, GROUPBE0 ) );
-        vStartupTracePutString( "\r\n" );
-
-        vStartupTracePutString( "[phase8b] undef irq sci7 rxi=0x" );
-        prvPhase8bTraceUndefRegister( "", IR( SCI7, RXI7 ) );
-        vStartupTracePutString( " txi=0x" );
-        prvPhase8bTraceUndefRegister( "", IR( SCI7, TXI7 ) );
-        vStartupTracePutString( " scr=0x" );
-        prvPhase8bTraceUndefRegister( "", SCI7.SCR.BYTE );
-        vStartupTracePutString( " ssr=0x" );
-        prvPhase8bTraceUndefRegister( "", SCI7.SSR.BYTE );
-        vStartupTracePutString( "\r\n" );
-
-        vStartupTracePutString( "[phase8b] undef irq grp al0=0x" );
-        prvPhase8bTraceUndefRegister( "", ICU.GRPAL0.LONG );
-        vStartupTracePutString( " al1=0x" );
-        prvPhase8bTraceUndefRegister( "", ICU.GRPAL1.LONG );
-        vStartupTracePutString( " be0=0x" );
-        prvPhase8bTraceUndefRegister( "", ICU.GRPBE0.LONG );
-        vStartupTracePutString( "\r\n" );
-
-        /* Dump all 32 IEN registers to identify which interrupt sources are
-         * still enabled.  This is the key diagnostic: if any IEN bit is set
-         * for a vector that the app has not registered, a stale bootloader
-         * IEN bit is the root cause. */
-        {
-            uint32_t ien_idx;
-            vStartupTracePutString( "[phase8b] undef IER[0..31]=" );
-            for( ien_idx = 0; ien_idx < 32U; ien_idx++ )
-            {
-                prvPhase8bTraceUndefRegister( " ", ICU.IER[ ien_idx ].BYTE );
-            }
-            vStartupTracePutString( "\r\n" );
-        }
-    }
-
-    g_phase8b_undefined_interrupt_trace_count++;
-
     /* If user has registered a callback for this exception then call it. */
     R_BSP_InterruptControl(BSP_INT_SRC_UNDEFINED_INTERRUPT, BSP_INT_CMD_CALL_CALLBACK, FIT_NO_PTR);
 } /* End of function undefined_interrupt_source_isr() */
@@ -1228,7 +1101,6 @@ R_BSP_ATTRIB_INTERRUPT void undefined_interrupt_source_isr(void)
 ***********************************************************************************************************************/
 R_BSP_ATTRIB_INTERRUPT void bus_error_isr(void)
 {
-    vStartupTracePutString( "[phase8b] exception: bus error\r\n" );
     /* Clear the bus error */
     BSC.BERCLR.BIT.STSCLR = 1;
 

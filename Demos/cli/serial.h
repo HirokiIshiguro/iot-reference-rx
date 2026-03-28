@@ -109,7 +109,5 @@ signed portBASE_TYPE xSerialPutChar( xComPortHandle pxPort,
 portBASE_TYPE xSerialWaitForSemaphore( xComPortHandle xPort );
 void vSerialClose( xComPortHandle xPort );
 void vOutputString( const char * pcMessage );
-void vStartupTracePutString( const char * pcMessage );
-void vStartupTracePutHex32( uint32_t ulValue );
 
 #endif /* ifndef SERIAL_COMMS_H */

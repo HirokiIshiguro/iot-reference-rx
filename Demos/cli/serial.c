@@ -113,12 +113,6 @@ void CLI_Close(void);
 
 #define serialSTARTUP_TRACE_RETRY_LIMIT    ( 200000UL )
 
-static char prvNibbleToHex( uint8_t ucNibble )
-{
-    ucNibble &= 0x0FU;
-    return ( char ) ( ( ucNibble < 10U ) ? ( '0' + ucNibble ) : ( 'A' + ( ucNibble - 10U ) ) );
-}
-
 static sci_err_t prvEnsureSerialPortOpen( void )
 {
     sci_cfg_t xSerialSciConfig;
@@ -230,58 +224,6 @@ xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud, unsigned port
     return 0;
 }
 
-void vStartupTracePutString( const char * pcMessage )
-{
-    const uint8_t * pucMessage = ( const uint8_t * ) pcMessage;
-    uint32_t ulRetry;
-
-    if( ( NULL == pcMessage ) || ( '\0' == pcMessage[ 0 ] ) )
-    {
-        return;
-    }
-
-    if( SCI_SUCCESS != prvEnsureSerialPortOpen() )
-    {
-        return;
-    }
-
-    while( '\0' != *pucMessage )
-    {
-        ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
-
-        while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0 ) )
-        {
-            R_BSP_NOP();
-        }
-
-        if( 0 == ulRetry )
-        {
-            return;
-        }
-
-        U_SCI_UART_CLI_REG.TDR = *pucMessage++;
-    }
-
-    ulRetry = serialSTARTUP_TRACE_RETRY_LIMIT;
-    while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TEND ) && ( ulRetry-- > 0 ) )
-    {
-        R_BSP_NOP();
-    }
-}
-
-void vStartupTracePutHex32( uint32_t ulValue )
-{
-    char cHex[ 9 ];
-    int32_t lIndex;
-
-    for( lIndex = 0; lIndex < 8; lIndex++ )
-    {
-        cHex[ lIndex ] = prvNibbleToHex( ( uint8_t ) ( ulValue >> ( 28 - ( lIndex * 4 ) ) ) );
-    }
-    cHex[ 8 ] = '\0';
-
-    vStartupTracePutString( cHex );
-}
 
 /* Function required in order to link UARTCommandConsole.c - which is used by
 multiple different demo application. */
