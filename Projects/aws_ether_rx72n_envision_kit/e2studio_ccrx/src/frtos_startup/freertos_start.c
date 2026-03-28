@@ -97,8 +97,6 @@ Private global variables and functions
 ******************************************************************************/
 void vApplicationSetupTimerInterrupt(void)
 {
-    vStartupTracePutString("[phase8b] tick setup entered\r\n");
-
     /* CMT channel 0 is configured as RTOS's system timer. */
 #if (BSP_CFG_RTOS_SYSTEM_TIMER == 0)
     /* Protect off. */
@@ -130,7 +128,6 @@ void vApplicationSetupTimerInterrupt(void)
     IPR(CMT0, CMI0) = configKERNEL_INTERRUPT_PRIORITY;
 
 #if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 )
-    vStartupTracePutString("[phase8b] tick irq suppressed\r\n");
     IEN(CMT0, CMI0) = 0;
     CMT.CMSTR0.BIT.STR0 = 0;
 #else
@@ -253,7 +250,6 @@ void vApplicationSetupTimerInterrupt(void)
     CMT.CMSTR1.BIT.STR3 = 1;
 #endif /* (BSP_CFG_RTOS_SYSTEM_TIMER == 3) */
 
-    vStartupTracePutString("[phase8b] tick setup done\r\n");
 } /* End of function vApplicationSetupTimerInterrupt() */
 
 /******************************************************************************
@@ -270,7 +266,6 @@ void vAssertCalled(void)
     /* if not using a emulator, you can use LED on/off or serial terminal */
     volatile unsigned long ul = 0;
 
-    vStartupTracePutString("[phase8b] assert: vAssertCalled\r\n");
     taskENTER_CRITICAL();
     {
         /* Program may stop here when you stop it by debugger. In the case,
@@ -356,13 +351,10 @@ void Processing_Before_Start_Kernel(void)
 	}
 #endif
 
-    vStartupTracePutString("[phase8b] kernel prep entered\r\n");
     Kernel_Object_init();
-    vStartupTracePutString("[phase8b] kernel objects ready\r\n");
 
     /************** task creation ****************************/
     /* Main task. */
-    vStartupTracePutString("[phase8b] kernel main task creating\r\n");
     #if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 )
     if( NULL == xTaskCreateStatic( main_task,
                                    "MAIN_TASK",
@@ -383,14 +375,11 @@ void Processing_Before_Start_Kernel(void)
     #endif
     if (pdPASS != ret)
     {
-        vStartupTracePutString("[phase8b] kernel main task create failed\r\n");
         while(1)
         {
             /* Failed! Task can not be created. */
         }
     }
-
-    vStartupTracePutString("[phase8b] kernel main task created\r\n");
 
 } /* End of function Processing_Before_Start_Kernel() */
 
