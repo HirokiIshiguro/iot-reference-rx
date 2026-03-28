@@ -98,7 +98,8 @@ class UartDownloader:
                  send_chunk_size=SEND_CHUNK_SIZE, inter_chunk_delay=DEFAULT_INTER_CHUNK_DELAY,
                  rtscts=False, ack_each_chunk=False,
                  ack_prefix=DEFAULT_WRITE_ACK_PREFIX, ack_timeout=10.0,
-                 observe_after_success=0.0, expect_after_success=None):
+                 observe_after_success=0.0, expect_after_success=None,
+                 strict_success=False):
         self.port_name = port
         self.baud = baud
         self.timeout = timeout
@@ -119,6 +120,7 @@ class UartDownloader:
         self.ack_timeout = ack_timeout
         self.observe_after_success = observe_after_success
         self.expect_after_success = expect_after_success or []
+        self.strict_success = strict_success
         self.ser = None
         self.rx_buffer = ""
         self.messages = []
@@ -457,6 +459,8 @@ class UartDownloader:
                 print(f"\nWARNING: No response from boot_loader after TX completion.")
                 print(f"  TX succeeded. Verify on LCD or fix COM port MCU→PC direction.")
                 self.close_port()
+                if self.strict_success:
+                    return 1
                 return 0
 
             # Success condition: firmware installed + verified + data flash + reset
@@ -507,6 +511,8 @@ class UartDownloader:
                     print(f"  This may be normal if the user program does not output to UART,")
                     print(f"  or if boot_loader does bank swap before printing this message.")
                     self.close_port()
+                    if self.strict_success:
+                        return 1
                     # Still return 0 — download+verify succeeded, user program behavior is separate
                     return 0
 
@@ -562,6 +568,8 @@ def main():
                         help="Seconds to keep reading UART after the success marker is observed (default: 0)")
     parser.add_argument("--expect-after-success", action="append", default=[],
                         help="Additional UART substring expected during --observe-after-success; may be specified multiple times")
+    parser.add_argument("--strict-success", action="store_true",
+                        help="Return non-zero unless a post-reset success marker is observed")
 
     args = parser.parse_args()
 
@@ -590,6 +598,7 @@ def main():
         ack_timeout=args.ack_timeout,
         observe_after_success=args.observe_after_success,
         expect_after_success=args.expect_after_success,
+        strict_success=args.strict_success,
     )
 
     try:

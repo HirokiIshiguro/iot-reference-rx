@@ -35,10 +35,16 @@ DEFAULT_LINE_DELAY = 0.5
 DEFAULT_BOOT_WAIT = 3.0
 DEFAULT_CLI_TIMEOUT = 15.0
 DEFAULT_CLI_RETRY_INTERVAL = 1.0
+DEFAULT_COMMIT_TIMEOUT = 15.0
 DEFAULT_SHADOW_BAUD = int(os.environ.get("COMMAND_BAUD_RATE", "115200"))
-CLI_READY_MARKERS = ("Going to FreeRTOS-CLI", ">")
+CLI_READY_MARKERS = ("Going to FreeRTOS-CLI",)
+CLI_INVITE_MARKERS = (
+    "Press CLI and enter to switch to CLI mode",
+    "FreeRTOS command server.",
+)
 BOOTLOADER_MARKERS = (
     "send image(*.rsu) via UART.",
+    "send \"userprog.rsu\" via UART.",
     "error occurred. please reset your board.",
 )
 
@@ -92,6 +98,28 @@ def send_pem_command(ser, key_name, pem_path, char_delay, line_delay):
 
     print(f"  ERROR: unexpected response: {mask_sensitive_output(response.strip()) or 'No response'}")
     return False
+
+
+def wait_for_response_tokens(ser, timeout, success_tokens, error_tokens=("Error",)):
+    start = time.time()
+    collected = ""
+
+    while time.time() - start < timeout:
+        if ser.in_waiting:
+            data = ser.read(ser.in_waiting).decode("ascii", errors="replace")
+            collected += data
+            sys.stdout.write(mask_sensitive_output(data))
+            sys.stdout.flush()
+
+            if any(token in collected for token in error_tokens):
+                return None
+
+            if any(token in collected for token in success_tokens):
+                return collected
+
+        time.sleep(0.1)
+
+    return None
 
 
 def wait_for_boot(ser, timeout, shadow_ser=None, shadow_name="shadow", stop_tokens=None):
@@ -304,7 +332,7 @@ def provision(args):
                 args.boot_wait,
                 shadow_ser=shadow_ser,
                 shadow_name=args.shadow_name,
-                stop_tokens=CLI_READY_MARKERS,
+                stop_tokens=CLI_INVITE_MARKERS + CLI_READY_MARKERS,
             )
 
         if not enter_cli_mode(
@@ -355,8 +383,15 @@ def provision(args):
             print("\nWARNING: No code signing certificate provided; OTA signature verification will fail")
 
         print("\n--- Commit to data flash ---")
-        resp = send_command(ser, "conf commit", args.char_delay, args.line_delay * 3,
-                            required_tokens=("OK",))
+        ser.reset_input_buffer()
+        send_chars(ser, "conf commit", args.char_delay)
+        ser.write(b"\r\n")
+        time.sleep(args.line_delay)
+        resp = wait_for_response_tokens(
+            ser,
+            args.commit_timeout,
+            success_tokens=("Configuration save", "\r\n>", "\n>"),
+        )
         if resp is None:
             return 1
         print(f"  {mask_sensitive_output(resp.strip()) if resp else 'No response'}")
@@ -403,6 +438,8 @@ def main():
                         help=f"Seconds to wait for CLI prompt (default: {DEFAULT_CLI_TIMEOUT})")
     parser.add_argument("--cli-retry-interval", type=float, default=DEFAULT_CLI_RETRY_INTERVAL,
                         help=f"Seconds between repeated CLI wake-up sends (default: {DEFAULT_CLI_RETRY_INTERVAL})")
+    parser.add_argument("--commit-timeout", type=float, default=DEFAULT_COMMIT_TIMEOUT,
+                        help=f"Seconds to wait for conf commit completion (default: {DEFAULT_COMMIT_TIMEOUT})")
     parser.add_argument("--reset-cmd", help="External reset/run command executed before or after opening UART")
     parser.add_argument("--reset-after-open", action="store_true",
                         help="Open UART first, then execute --reset-cmd to capture the short CLI window")

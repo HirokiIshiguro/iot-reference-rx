@@ -36,6 +36,8 @@ The GitLab pipeline provides two RX72N-specific tracks:
 
 * `build_rx72n`
   Builds the baseline RX72N boot loader and application without injecting AWS device credentials.
+* `flash_rx72n` -> `provision_rx72n` -> `test_mqtt_rx72n`
+  Uses the baseline image, writes it to the board, provisions credentials over the short-lived CLI, and verifies the MQTT baseline on the hardware-connected runner.
 * `build_rx72n_mqtt_candidate` -> `package_rx72n_mqtt_candidate_rsu`
   Renders `Demos/include/aws_clientcredential*.h` from CI variables, builds the RX72N application, and packages a signed `.rsu` image.
 
@@ -140,11 +142,11 @@ RX family of MCU has internal Data Flash Memory, and this references are using t
 
 | Area | Description | Contents |Start address<br>[Size] | Section name |
 |------|-------------|----------|--------------|--------------|
-|LittleFS management area|It's consist of the filesystem LittleFS,<br>default size is 8960 bytes.<br>You can change size by `LFS_FLASH_BLOCK_COUNT`.|IoT const data<br><ul><li>thingname</li><li>endpoint</li><li>claim credentials</li><li>device credentials</li><li>provisioning template</li><li>codesigncert</li><li>root ca</li>|0x00100000<br><br>[8960 bytes<br>(*Default*)]|C_LITTLEFS_MANAGEMENT_AREA|
-|Free area|It's not used by the demo.<br>Therefore, it's free area for user application.|User application data|0x00102300<br>(*Default*)<br><br>[23808 bytes<br>(*Default*)]|C_USER_APPLICATION_AREA|
+|LittleFS management area|It's consist of the filesystem LittleFS,<br>default size is 8960 bytes.<br>You can change size by `LFS_FLASH_BLOCK_COUNT`.|IoT const data<br><ul><li>thingname</li><li>endpoint</li><li>claim credentials</li><li>device credentials</li><li>provisioning template</li><li>codesigncert</li><li>root ca</li>|0x00100800<br><br>[8960 bytes<br>(*Default*)]|C_LITTLEFS_MANAGEMENT_AREA|
+|Free area|It's not used by the demo.<br>Therefore, it's free area for user application.|User application data|0x00102B00<br>(*Default*)<br><br>[21760 bytes<br>(*Default*)]|C_USER_APPLICATION_AREA|
 
 * LittleFS management area
-  * The demo project uses a maximum of 8960 bytes of Data Flash from address 0x00100000 to 0x001022FF using LittleFS.
+* The demo project uses a maximum of 8960 bytes of Data Flash from address 0x00100800 to 0x00102AFF using LittleFS.
     * If this area is less than 8960 bytes, the demo will not work properly.
   * You must **NOT** overwrite other data against IoT const data in this area.
   * If you intend to read/write user application data in this area, incrsease the value of `LFS_FLASH_BLOCK_COUNT` in the "Projects\\...\\frtos_config\\rm_littlefs_flash_config.h".
@@ -154,7 +156,7 @@ RX family of MCU has internal Data Flash Memory, and this references are using t
     **Open the project by e2 studio of IDE** --> **Right-click on the project at the project explore** --> **properties** --> **C/C++ Build** --> **Settings** --> **Section**
     * If you do not set up a section, the demo may not work properly.
 * Free area
-  * The remaining area on Data Flash, 23808 bytes of Data Flash area at address 0x00102300 or above, can be used as user application area.
+* The remaining area on Data Flash, 21760 bytes of Data Flash area at address 0x00102B00 or above, can be used as user application area.
     * You must use FLASH FIT module's API to write this area.
 
 #### Data Flash Memory Map
@@ -163,9 +165,9 @@ The following figure indicates how memory in Data Flash in CK-RX65N v2 is used f
 
 ```text
 In case of `LFS_FLASH_BLOCK_COUNT` == 70 (8960 bytes)
- +----------------------------+-------------------------+ <- 0x00100000
+ +----------------------------+-------------------------+ <- 0x00100800
  |  LittleFS management area  |  IoT const data         |    <8960 bytes>
- +----------------------------+-------------------------+ <- 0x00102300
+ +----------------------------+-------------------------+ <- 0x00102B00
  |  Free area                 |  User application data  |    <23808 bytes>
  |                            |                         |
  +----------------------------+-------------------------+ <- 0x00107FFF
@@ -433,7 +435,8 @@ The hook function *1 is called by occurring an error of a TCP_Sockets API *2 (di
   *1 The hook function defined in USER_TCP_HOOK_FUNCTION macro in src/frtos_config/user_tcp_hook_config.h  
   *2 TCP_Sockets API is a function defined in TCP_Sockets_xxxx
 * Notes on redundant linker section after generating code with Smart Configurator.  
-  After generating code with Smart Configurator, sections `C_FIRMWARE_UPDATE_CONTROL_BLOCK` and `C_FIRMWARE_UPDATE_CONTROL_BLOCK_MIRROR` will be created at address 0x00100000.  
+After generating code with Smart Configurator, sections `C_FIRMWARE_UPDATE_CONTROL_BLOCK` and `C_FIRMWARE_UPDATE_CONTROL_BLOCK_MIRROR` will be created at address 0x00100000.
+For RX72N Envision Kit, LittleFS is shifted to `0x00100800` so it does not overlap the legacy boot_loader signer-key storage in the first 0x800 bytes of Data Flash.
   These sections are redundant, it does not impact memory usage of the project.  
   This behavior is according to the specification of r_tsip_rx FIT module (from version 1.17.l).  
 * Notes on bootloader to application transition.  

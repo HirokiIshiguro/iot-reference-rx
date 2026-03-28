@@ -148,12 +148,12 @@ static sci_err_t prvEnsureSerialPortOpen( void )
 #if ( PHASE8B_DEBUG_POLLING_UART == 1 ) && ( BSP_CFG_SCI_UART_TERMINAL_CHANNEL == ( 7 ) )
     if( SCI_SUCCESS == xOpenResult )
     {
-        IEN( SCI7, RXI7 ) = 0;
         IEN( SCI7, TXI7 ) = 0;
-        IR( SCI7, RXI7 ) = 0;
         IR( SCI7, TXI7 ) = 0;
-        ICU.GENAL0.LONG &= ~( ( 1UL << 22 ) | ( 1UL << 23 ) );
-        U_SCI_UART_CLI_REG.SCR.BYTE &= ( uint8_t ) ~( 0xC4U );
+        /* Keep RXI/RIE enabled so the CLI can still receive commands on SCI7,
+         * but force TX onto the polling path to avoid early boot TXI noise. */
+        ICU.GENAL0.LONG &= ~( 1UL << 23 );
+        U_SCI_UART_CLI_REG.SCR.BYTE &= ( uint8_t ) ~( 0x84U );
     }
 #endif
 
