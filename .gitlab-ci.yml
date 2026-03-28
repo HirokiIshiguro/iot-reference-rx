@@ -1,5 +1,8 @@
 stages:
   - build
+  - flash
+  - provision
+  - test
   - package
 
 variables:
@@ -7,6 +10,15 @@ variables:
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: "core.longpaths"
   GIT_CONFIG_VALUE_0: "true"
+  E2STUDIO_CLI: "C:/Renesas/e2_studio_2025_12/eclipse/e2studioc.exe"
+  E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref_rx72n"
+  RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
+  RFP_SPEED: "1500K"
+  RFP_AUTH: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+  E2L_SERIAL: "OBE110008"
+  UART_PORT: "COM7"
+  UART_BAUD_RATE: "921600"
+  RX72N_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
 
 workflow:
   rules:
@@ -21,22 +33,170 @@ build_rx72n:
     - run_ishiguro_machine
   script:
     - Write-Host "=== Build RX72N projects ==="
+    - pip install cryptography --quiet
     - |
       & "$env:CI_PROJECT_DIR\tools\build_headless_rx72n.ps1" `
         -ProjectRoot "$env:CI_PROJECT_DIR" `
+        -E2Studio "$env:E2STUDIO_CLI" `
+        -Workspace "$env:E2STUDIO_WORKSPACE" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build.log"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "app .abs missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "app .x missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
+        --mot "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot" `
+        --prm "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
+        --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\generate_signer_cert.py" `
+        --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
+        --out "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem")) { Write-Error "rx72n_codesign_cert.pem missing"; exit 1 }
     - Write-Host "BUILD SUCCESS"
   artifacts:
     paths:
       - rx72n_e2studio_build.log
+      - rx72n_app.rsu
+      - rx72n_codesign_cert.pem
       - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 7 days
+
+flash_rx72n:
+  stage: flash
+  tags:
+    - run_ishiguro_machine
+  resource_group: rx72n-envision-kit-local
+  needs:
+    - build_rx72n
+  rules:
+    - if: '$AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Flash RX72N boot_loader and download app RSU ==="
+    - pip install pyserial --quiet
+    - if (-not $env:E2L_SERIAL) { Write-Error "E2L_SERIAL not set"; exit 1 }
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\flash_rx72n"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $resetCmd = '"{0}" -device RX72x -tool "e2l:{1}" -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
+        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH
+
+      & "$env:RFP_CLI" -device RX72x -tool "e2l:$env:E2L_SERIAL" -if fine -speed $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH -erase-chip -noquery
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      & "$env:RFP_CLI" -device RX72x -tool "e2l:$env:E2L_SERIAL" -if fine -speed $env:RFP_SPEED `
+        -auth id $env:RFP_AUTH `
+        -p "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot" `
+        -v -run -noquery
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      python tools/test_uart_download_rx72n.py `
+        --rsu "$env:CI_PROJECT_DIR\rx72n_app.rsu" `
+        --port $env:UART_PORT `
+        --baud $env:UART_BAUD_RATE `
+        --timeout 420 `
+        --post-tx-wait 120 `
+        --diag `
+        --wait-for-ready `
+        --ready-timeout 90 `
+        --reset-cmd $resetCmd `
+        2>&1 | Tee-Object -FilePath "$artifactDir\flash_rx72n.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/flash_rx72n/
+    expire_in: 7 days
+
+provision_rx72n:
+  stage: provision
+  tags:
+    - run_ishiguro_machine
+  resource_group: rx72n-envision-kit-local
+  needs:
+    - build_rx72n
+    - flash_rx72n
+  rules:
+    - if: '$AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Provision RX72N AWS IoT credentials ==="
+    - pip install pyserial --quiet
+    - if (-not $env:AWS_IOT_THING_NAME) { Write-Error "AWS_IOT_THING_NAME not set"; exit 1 }
+    - if (-not $env:AWS_IOT_ENDPOINT) { Write-Error "AWS_IOT_ENDPOINT not set"; exit 1 }
+    - if (-not $env:AWS_IOT_CERT) { Write-Error "AWS_IOT_CERT not set"; exit 1 }
+    - if (-not $env:AWS_IOT_PRIVKEY) { Write-Error "AWS_IOT_PRIVKEY not set"; exit 1 }
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\provision_rx72n"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $resetCmd = '"{0}" -device RX72x -tool "e2l:{1}" -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
+        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH
+
+      python tools/provision_rx72n.py `
+        --port $env:UART_PORT `
+        --baud $env:UART_BAUD_RATE `
+        --thing-name $env:AWS_IOT_THING_NAME `
+        --endpoint $env:AWS_IOT_ENDPOINT `
+        --cert $env:AWS_IOT_CERT `
+        --key $env:AWS_IOT_PRIVKEY `
+        --codesigner-cert "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem" `
+        --format `
+        --reset-cmd $resetCmd `
+        --reset-after-open `
+        --boot-wait 12 `
+        --cli-timeout 25 `
+        2>&1 | Tee-Object -FilePath "$artifactDir\provision_rx72n.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/provision_rx72n/
+    expire_in: 7 days
+
+test_mqtt_rx72n:
+  stage: test
+  tags:
+    - run_ishiguro_machine
+  resource_group: rx72n-envision-kit-local
+  needs:
+    - build_rx72n
+    - flash_rx72n
+    - provision_rx72n
+  rules:
+    - if: '$AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Verify RX72N MQTT baseline ==="
+    - pip install pyserial --quiet
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\test_mqtt_rx72n"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      python -m serial.tools.list_ports -v 2>&1 | Tee-Object -FilePath "$artifactDir\serial_ports.txt"
+      $resetCmd = '"{0}" -device RX72x -tool "e2l:{1}" -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
+        $env:RFP_CLI, $env:E2L_SERIAL, $env:RFP_SPEED, $env:RFP_AUTH
+
+      python tools/test_mqtt_rx72n.py `
+        --log-port $env:UART_PORT `
+        --log-baud $env:UART_BAUD_RATE `
+        --timeout 180 `
+        --reset-cmd $resetCmd `
+        2>&1 | Tee-Object -FilePath "$artifactDir\test_mqtt_rx72n.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_mqtt_rx72n/
     expire_in: 7 days
 
 build_rx72n_mqtt_candidate:
@@ -84,6 +244,7 @@ package_rx72n_mqtt_candidate_rsu:
     - when: never
   script:
     - Write-Host "=== Package RX72N MQTT candidate RSU ==="
+    - pip install cryptography --quiet
     - |
       & "$env:CI_PROJECT_DIR\tools\generate_rx72n_rsu.ps1" `
         -ProjectRoot "$env:CI_PROJECT_DIR" `
