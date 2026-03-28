@@ -48,7 +48,7 @@ signed char vISR_Routine (void);
 extern void vStartSimplePubSubDemo (void);
 BaseType_t OtaSelfTest(void);
 
-void vAssignCredentials(void);
+BaseType_t vAssignCredentials(void);
 extern int32_t xprvWriteCacheEntry(size_t KeyLength,
         char * Key,
         size_t ValueLength,
@@ -195,6 +195,7 @@ extern void vRegisterSampleCLICommands (void);
 void main_task(void *pvParameters)
 {
     int32_t xResults;
+    int32_t xCacheInitResult = LFS_ERR_OK;
     int32_t Time2Wait = 10000;
     BaseType_t xProceedToDemo = pdTRUE;
     uint32_t ulNetworkWaitTrace = 0U;
@@ -242,17 +243,31 @@ void main_task(void *pvParameters)
         vStartupTracePutString("[phase8b] cache init skipped\r\n");
 #else
         vStartupTracePutString("[phase8b] before vprvCacheInit\r\n");
-        xResults = vprvCacheInit();
+        xCacheInitResult = vprvCacheInit();
         vStartupTracePutString("[phase8b] after vprvCacheInit\r\n");
+        vStartupTracePutString("[phase8b] cache init result=0x");
+        vStartupTracePutHex32( ( uint32_t ) xCacheInitResult );
+        vStartupTracePutString("\r\n");
 #endif
     }
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 1)
-    if ((LFS_ERR_OK == xResults) && (pdTRUE == prvShouldAutoProvisionFromClientCredentials()))
+    if( ( LFS_ERR_OK == xResults ) &&
+        ( LFS_ERR_OK == xCacheInitResult ) &&
+        ( pdTRUE == prvShouldAutoProvisionFromClientCredentials() ) )
     {
+        BaseType_t xProvisionResult;
+
         vStartupTracePutString("[phase8b] auto provisioning from clientcredential headers\r\n");
-        vAssignCredentials();
-        vStartupTracePutString("[phase8b] auto provisioning complete\r\n");
+        xProvisionResult = vAssignCredentials();
+        vStartupTracePutString("[phase8b] auto provisioning result=0x");
+        vStartupTracePutHex32( ( uint32_t ) xProvisionResult );
+        vStartupTracePutString("\r\n");
+        vStartupTracePutString("[phase8b] cache thingname len=0x");
+        vStartupTracePutHex32( ( uint32_t ) prvGetCacheEntryLength( KVS_CORE_THING_NAME ) );
+        vStartupTracePutString(" endpoint len=0x");
+        vStartupTracePutHex32( ( uint32_t ) prvGetCacheEntryLength( KVS_CORE_MQTT_ENDPOINT ) );
+        vStartupTracePutString("\r\n");
     }
 #endif
 
@@ -692,35 +707,63 @@ static BaseType_t prvShouldAutoProvisionFromClientCredentials( void )
  * Description  : Handle pre-provisioning.
  * Return Value : .
  *********************************************************************************************************************/
-void vAssignCredentials(void)
+BaseType_t vAssignCredentials(void)
 {
+    BaseType_t xCommitResult;
+    int32_t xStoreResult;
 
     /* Write thing name */
     char *pValue = democonfigCLIENT_IDENTIFIER;
-    xprvWriteCacheEntry(strlen("thingname"), "thingname", strlen(pValue), pValue);
+    xStoreResult = xprvWriteCacheEntry(strlen("thingname"), "thingname", strlen(pValue), pValue);
+    if( xStoreResult < 0 )
+    {
+        return pdFALSE;
+    }
 
     /* Write endpoint */
     pValue = democonfigMQTT_BROKER_ENDPOINT;
-    xprvWriteCacheEntry(strlen("endpoint"), "endpoint", strlen(pValue), pValue);
+    xStoreResult = xprvWriteCacheEntry(strlen("endpoint"), "endpoint", strlen(pValue), pValue);
+    if( xStoreResult < 0 )
+    {
+        return pdFALSE;
+    }
 
     /* Write certificate */
     pValue = keyCLIENT_CERTIFICATE_PEM;
-    xprvWriteCacheEntry(strlen("cert"), "cert", strlen(pValue), pValue);
+    xStoreResult = xprvWriteCacheEntry(strlen("cert"), "cert", strlen(pValue), pValue);
+    if( xStoreResult < 0 )
+    {
+        return pdFALSE;
+    }
 
     /* Write private key */
     pValue = keyCLIENT_PRIVATE_KEY_PEM;
-    xprvWriteCacheEntry(strlen("key"), "key", strlen(pValue), pValue);
+    xStoreResult = xprvWriteCacheEntry(strlen("key"), "key", strlen(pValue), pValue);
+    if( xStoreResult < 0 )
+    {
+        return pdFALSE;
+    }
 
     /* Write code signing certificate */
     pValue = otapalconfigCODE_SIGNING_CERTIFICATE;
-    xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pValue), pValue);
+    xStoreResult = xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pValue), pValue);
+    if( xStoreResult < 0 )
+    {
+        return pdFALSE;
+    }
 
     /* Write root CA */
     pValue = democonfigROOT_CA_PEM;
-    xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pValue), pValue);
+    xStoreResult = xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pValue), pValue);
+    if( xStoreResult < 0 )
+    {
+        return pdFALSE;
+    }
 
     /* Write cache to DF */
-    KVStore_xCommitChanges();
+    xCommitResult = KVStore_xCommitChanges();
+
+    return xCommitResult;
 }
 /**********************************************************************************************************************
  End of function vAssignCredentials
