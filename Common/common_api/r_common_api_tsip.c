@@ -15,10 +15,10 @@
  Includes   <System Includes> , "Project Includes"
  *********************************************************************************************************************/
 #include <stdio.h>
+#include <stddef.h>
 
 #include "FreeRTOS.h"
 #include "queue.h"
-#include "stddef.h"
 #include "serial.h"
 #include "semphr.h"
 #include "r_common_api_tsip.h"
@@ -38,7 +38,7 @@ xSemaphoreHandle xSemaphoreTSIPAccess;
 static volatile CommonAPI_Status_t s_TSIP_COM_Status = COMAPI_STATE_CLOSE;/* Variables that manage commonAPI status */
 
 /* Function Name: TSIP_COM_Resource_Create */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Functions for creating OS resources.
  * @param[in] void
  * @return e_commonapi_err_t
@@ -65,7 +65,7 @@ static e_commonapi_err_t TSIP_COM_Resource_Create(void)
  *********************************************************************************************************************/
 
 /* Function Name: TSIP_COM_Resource_Release */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief Function to release OS resources.
  * @param[in] void
  * @return e_commonapi_err_t
@@ -87,7 +87,7 @@ static e_commonapi_err_t TSIP_COM_Resource_Release(void)
  *********************************************************************************************************************/
 
 /* Function Name: R_Demo_Common_API_TSIP_Open */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief CommonAPI open function for TSIP.
  * @param[in] void
  * @return e_commonapi_err_t
@@ -170,7 +170,7 @@ e_commonapi_err_t R_Demo_Common_API_TSIP_Open(tsip_tls_ca_certification_public_k
  *********************************************************************************************************************/
 
 /* Function Name: R_Demo_Common_API_TSIP_Close */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief CommonAPI close function for TSIP.
  * @param[in] void
  * @return e_commonapi_err_t

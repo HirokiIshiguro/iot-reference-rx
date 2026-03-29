@@ -98,6 +98,16 @@ try {
     $e2exit = $LASTEXITCODE
 
     Write-Host "e2studio exit code: $e2exit"
+    $logLines = Get-Content $logFile -ErrorAction SilentlyContinue
+    $logLineCount = if ($logLines) { $logLines.Count } else { 0 }
+    Write-Host "Build log: $logLineCount lines"
+
+    if ($e2exit -ne 0) {
+        Write-Host "--- Build log (first 100 lines) ---"
+        $logLines | Select-Object -First 100 | ForEach-Object { Write-Host "  $_" }
+        Write-Host "--- Build log (error lines) ---"
+        $logLines | Where-Object { $_ -match '(?i)(error|fatal|cannot|failed|undefined)' } | Select-Object -First 50 | ForEach-Object { Write-Host "  $_" }
+    }
     Write-Host "--- Build log tail ---"
     Get-Content $logFile -Tail 30 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
 

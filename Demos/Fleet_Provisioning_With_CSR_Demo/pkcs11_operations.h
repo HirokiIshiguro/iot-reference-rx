@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -44,9 +46,17 @@
  *
  * @return CKR_OK if certificate and private key import succeeded. Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xGetCertificateAndKeyState( CK_SESSION_HANDLE xP11Session,
+/**********************************************************************************************************************
+ * Function Name: xGetCertificateAndKeyState
+ * Description  : .
+ * Arguments    : xP11Session
+ *              : pxClientCertificate
+ *              : pxPrivateKey
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xGetCertificateAndKeyState (CK_SESSION_HANDLE xP11Session,
                                   CK_OBJECT_HANDLE_PTR pxClientCertificate,
-                                  CK_OBJECT_HANDLE_PTR pxPrivateKey );
+                                  CK_OBJECT_HANDLE_PTR pxPrivateKey);
 
 /**
  * @brief Destroy the required client crypto object.
@@ -55,7 +65,13 @@ CK_RV xGetCertificateAndKeyState( CK_SESSION_HANDLE xP11Session,
  *
  * @return CKR_OK if certificate and private key destroy succeeded. Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xDestroyCertificateAndKey( CK_SESSION_HANDLE xP11Session );
+/**********************************************************************************************************************
+ * Function Name: xDestroyCertificateAndKey
+ * Description  : .
+ * Argument     : xP11Session
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xDestroyCertificateAndKey (CK_SESSION_HANDLE xP11Session);
 
 /**
  * @brief Loads the claim credentials into the PKCS #11 module. Claim
@@ -76,11 +92,21 @@ CK_RV xDestroyCertificateAndKey( CK_SESSION_HANDLE xP11Session );
  *
  * @return True on success.
  */
-bool xLoadClaimCredentials( CK_SESSION_HANDLE xP11Session,
-                           const char * pClaimCert,
-                           size_t       ClaimCertLength,
-                           const char * pClaimPrivKey,
-                           size_t       ClaimPrivKeyLength );
+/**********************************************************************************************************************
+ * Function Name: xLoadClaimCredentials
+ * Description  : .
+ * Arguments    : xP11Session
+ *              : pClaimCert
+ *              : ClaimCertLength
+ *              : pClaimPrivKey
+ *              : ClaimPrivKeyLength
+ * Return Value : .
+ *********************************************************************************************************************/
+bool xLoadClaimCredentials (CK_SESSION_HANDLE xP11Session,
+                            const char *pClaimCert,
+                            size_t ClaimCertLength,
+                            const char *pClaimPrivKey,
+                            size_t ClaimPrivKeyLength);
 
 /**
  * @brief Generate a new public-private key pair in the PKCS #11 module, and
@@ -99,13 +125,25 @@ bool xLoadClaimCredentials( CK_SESSION_HANDLE xP11Session,
  *
  * @return True on success.
  */
-bool xGenerateKeyAndCsr( CK_SESSION_HANDLE xP11Session,
-                         const char * pcPrivKeyLabel,
-                         const char * pcPubKeyLabel,
-                         char * pcCsrBuffer,
+/**********************************************************************************************************************
+ * Function Name: xGenerateKeyAndCsr
+ * Description  : .
+ * Arguments    : xP11Session
+ *              : pcPrivKeyLabel
+ *              : pcPubKeyLabel
+ *              : pcCsrBuffer
+ *              : xCsrBufferLength
+ *              : pcOutCsrLength
+ *              : pcCsrsubjectname
+ * Return Value : .
+ *********************************************************************************************************************/
+bool xGenerateKeyAndCsr (CK_SESSION_HANDLE xP11Session,
+                         const char *pcPrivKeyLabel,
+                         const char *pcPubKeyLabel,
+                         char *pcCsrBuffer,
                          size_t xCsrBufferLength,
-                         size_t * pcOutCsrLength,
-                         const char * pcCsrsubjectname );
+                         size_t *pcOutCsrLength,
+                         const char *pcCsrsubjectname);
 
 /**
  * @brief Save the device client certificate into the PKCS #11 module.
@@ -117,11 +155,19 @@ bool xGenerateKeyAndCsr( CK_SESSION_HANDLE xP11Session,
  *
  * @return True on success.
  */
-bool xLoadCertificate( CK_SESSION_HANDLE xP11Session,
-                       const char * pcCertificate,
-                       const char * pcLabel,
-                       size_t xCertificateLength );
-
+/**********************************************************************************************************************
+ * Function Name: xLoadCertificate
+ * Description  : .
+ * Arguments    : xP11Session
+ *              : pcCertificate
+ *              : pcLabel
+ *              : xCertificateLength
+ * Return Value : .
+ *********************************************************************************************************************/
+bool xLoadCertificate (CK_SESSION_HANDLE xP11Session,
+                       const char *pcCertificate,
+                       const char *pcLabel,
+                       size_t xCertificateLength);
 
 /**
  * @brief Import the specified private key into storage.
@@ -131,10 +177,19 @@ bool xLoadCertificate( CK_SESSION_HANDLE xP11Session,
  * @param[in] privateKeyLength The length of the key, including null terminator.
  * @param[in] label The label to store the key.
  */
-CK_RV provisionPrivateKey( CK_SESSION_HANDLE session,
-                                  const char * privateKey,
-                                  size_t privateKeyLength,
-                                  const char * label );
+/**********************************************************************************************************************
+ * Function Name: provisionPrivateKey
+ * Description  : .
+ * Arguments    : session
+ *              : privateKey
+ *              : privateKeyLength
+ *              : label
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV provisionPrivateKey (CK_SESSION_HANDLE session,
+                           const char *privateKey,
+                           size_t privateKeyLength,
+                           const char *label);
 
 /**
  * @brief Import the specified X.509 client certificate into storage.
@@ -144,10 +199,19 @@ CK_RV provisionPrivateKey( CK_SESSION_HANDLE session,
  * @param[in] certificateLength The length of the certificate, including the null terminator.
  * @param[in] label The label to store the certificate.
  */
-CK_RV provisionCertificate( CK_SESSION_HANDLE session,
-                                   const char * certificate,
-                                   size_t certificateLength,
-                                   const char * label );
+/**********************************************************************************************************************
+ * Function Name: provisionCertificate
+ * Description  : .
+ * Arguments    : session
+ *              : certificate
+ *              : certificateLength
+ *              : label
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV provisionCertificate (CK_SESSION_HANDLE session,
+                            const char *certificate,
+                            size_t certificateLength,
+                            const char *label);
 
 /**
  * @brief Close the PKCS #11 session.
@@ -156,6 +220,12 @@ CK_RV provisionCertificate( CK_SESSION_HANDLE session,
  *
  * @return True on success.
  */
-bool xPkcs11CloseSession( CK_SESSION_HANDLE xP11Session );
+/**********************************************************************************************************************
+ * Function Name: xPkcs11CloseSession
+ * Description  : .
+ * Argument     : xP11Session
+ * Return Value : .
+ *********************************************************************************************************************/
+bool xPkcs11CloseSession (CK_SESSION_HANDLE xP11Session);
 
 #endif /* ifndef PKCS11_OPERATIONS_H_ */

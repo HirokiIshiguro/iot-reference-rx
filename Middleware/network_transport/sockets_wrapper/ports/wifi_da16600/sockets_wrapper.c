@@ -131,18 +131,18 @@ static wifi_err_t SocketErrorHook(wifi_err_t error, bool force_reset)
     }
     else
     {
-    	if (WIFI_ERR_MODULE_COM == error)
-    	{
+        if (WIFI_ERR_MODULE_COM == error)
+        {
             count_module_comm++;
             LogInfo(("Wi-Fi has error = %d in %d times \r\n", error, count_module_comm));
             if (USER_COMM_ERROR_TRIES > count_module_comm)
             {
                 return WIFI_SUCCESS;
             }
-    	}
+        }
 
-    	if ((USER_COMM_ERROR_TRIES <= count_module_comm) || (WIFI_ERR_MODULE_COM != error))
-    	{
+        if ((USER_COMM_ERROR_TRIES <= count_module_comm) || (WIFI_ERR_MODULE_COM != error))
+        {
             if (USER_COMM_ERROR_TRIES <= count_module_comm)
             {
                 LogInfo(("Start no force reset Wi-Fi Hardware due to the continuation of %d error \r\n", error));
@@ -167,7 +167,7 @@ static wifi_err_t SocketErrorHook(wifi_err_t error, bool force_reset)
             {
                 LogError(("Failed after tried to connect %d times", reconnect_tries));
             }
-    	}
+        }
 
         return error;
     }
@@ -285,7 +285,20 @@ BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
 
     if(WIFI_SUCCESS != socketStatus)
     {
-        SocketErrorHook(socketStatus, FORCE_RESET);
+        /* Clean up resources on failure */
+        if (NULL != pxContext)
+        {
+            /* Close the underlying socket created at the start */
+            CloseSocket(pxContext->socket_no);
+
+            /* Free the memory */
+            vPortFree(pxContext);
+            pxContext = NULL;
+
+            s_sockets_num_allocated--;
+        }
+
+        SocketErrorHook((wifi_err_t)socketStatus, FORCE_RESET);
         LogError(("Failed to create new socket."));
     }
     else
@@ -328,7 +341,7 @@ int32_t TCP_Sockets_Recv(Socket_t xSocket,
         }
         else
         {
-            receive_byte = SocketErrorHook(receive_byte, NO_FORCE_RESET);
+            receive_byte = SocketErrorHook((wifi_err_t)receive_byte, NO_FORCE_RESET);
         }
     }
     else
@@ -368,7 +381,7 @@ int32_t TCP_Sockets_Send(Socket_t xSocket,
         }
         else
         {
-            send_byte = SocketErrorHook(send_byte, NO_FORCE_RESET);
+            send_byte = SocketErrorHook((wifi_err_t)send_byte, NO_FORCE_RESET);
         }
     }
     else

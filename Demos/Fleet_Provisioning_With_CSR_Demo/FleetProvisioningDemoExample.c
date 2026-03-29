@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -104,26 +106,26 @@
 /**
  * @brief The length of #democonfigPROVISIONING_TEMPLATE_NAME.
  */
-#define fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH    ( ( uint16_t ) ( sizeof( democonfigPROVISIONING_TEMPLATE_NAME ) - 1 ) )
+#define fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH ((uint16_t)(sizeof(democonfigPROVISIONING_TEMPLATE_NAME) - 1))
 
 /**
  * @brief The length of #democonfigFP_DEMO_ID.
  */
-#define fpdemoFP_DEMO_ID_LENGTH                    ( ( uint16_t ) ( sizeof( democonfigFP_DEMO_ID ) - 1 ) )
+#define fpdemoFP_DEMO_ID_LENGTH ((uint16_t)(sizeof(democonfigFP_DEMO_ID) - 1))
 
 /**
  * @brief Size of AWS IoT Thing name buffer.
  *
  * See https://docs.aws.amazon.com/iot/latest/apireference/API_CreateThing.html#iot-CreateThing-request-thingName
  */
-#define fpdemoMAX_THING_NAME_LENGTH                128
+#define fpdemoMAX_THING_NAME_LENGTH (128)
 
 /**
  * @brief Size of CSR subject name buffer.
  *
  * See https://docs.aws.amazon.com/iot/latest/apireference/API_CreateThing.html#iot-CreateThing-request-thingName
  */
-#define fpdemoMAX_CSR_SUBJECT_NAME_LENGTH          128
+#define fpdemoMAX_CSR_SUBJECT_NAME_LENGTH (128)
 
 /**
  * @brief The maximum number of times to run the loop in this demo.
@@ -132,46 +134,46 @@
  * Once the demo loop succeeds in an iteration, the demo exits successfully.
  */
 #ifndef fpdemoMAX_DEMO_LOOP_COUNT
-    #define fpdemoMAX_DEMO_LOOP_COUNT    ( 3 )
+    #define fpdemoMAX_DEMO_LOOP_COUNT (3)
 #endif
 
 /**
  * @brief Time in seconds to wait between retries of the demo loop if
  * demo loop fails.
  */
-#define fpdemoDELAY_BETWEEN_DEMO_RETRY_ITERATIONS_SECONDS    ( 5 )
+#define fpdemoDELAY_BETWEEN_DEMO_RETRY_ITERATIONS_SECONDS (5)
 
 /**
  * @brief Size of buffer in which to hold the certificate signing request (CSR).
  */
-#define fpdemoCSR_BUFFER_LENGTH                              2048
+#define fpdemoCSR_BUFFER_LENGTH (2048)
 
 /**
  * @brief Size of buffer in which to hold the certificate.
  */
-#define fpdemoCERT_BUFFER_LENGTH                             2048
+#define fpdemoCERT_BUFFER_LENGTH (2048)
 
 /**
  * @brief Size of buffer in which to hold the certificate id.
  *
  * See https://docs.aws.amazon.com/iot/latest/apireference/API_Certificate.html#iot-Type-Certificate-certificateId
  */
-#define fpdemoCERT_ID_BUFFER_LENGTH                          64
+#define fpdemoCERT_ID_BUFFER_LENGTH (64)
 
 /**
  * @brief Size of buffer in which to hold the certificate ownership token.
  */
-#define fpdemoOWNERSHIP_TOKEN_BUFFER_LENGTH                  512
+#define fpdemoOWNERSHIP_TOKEN_BUFFER_LENGTH (512)
 
 /**
  * @brief Milliseconds per second.
  */
-#define fpdemoMILLISECONDS_PER_SECOND                        ( 1000U )
+#define fpdemoMILLISECONDS_PER_SECOND (1000U)
 
 /**
  * @brief Milliseconds per FreeRTOS tick.
  */
-#define fpdemoMILLISECONDS_PER_TICK                          ( fpdemoMILLISECONDS_PER_SECOND / configTICK_RATE_HZ )
+#define fpdemoMILLISECONDS_PER_TICK (fpdemoMILLISECONDS_PER_SECOND / configTICK_RATE_HZ)
 
 /**
  * @brief Status values of the Fleet Provisioning response.
@@ -183,7 +185,6 @@ typedef enum
     ResponseRejected
 } ResponseStatus_t;
 
-
 /**
  * @brief Each compilation unit that consumes the NetworkContext must define it.
  * It should contain a single pointer to the type of your desired transport.
@@ -193,7 +194,7 @@ typedef enum
  */
 struct NetworkContext
 {
-    TlsTransportParams_t * pxParams;
+    TlsTransportParams_t *pxParams;
 };
 
 /*-----------------------------------------------------------*/
@@ -201,17 +202,17 @@ struct NetworkContext
 /**
  * @brief Buffer to hold the fleet provisioning demo ID.
  */
-static char pcDemoID[ fpdemoMAX_THING_NAME_LENGTH ] = { 0 };
+static char pcDemoID[fpdemoMAX_THING_NAME_LENGTH] = {0};
 
 /**
  * @brief Buffer to hold the provisioned AWS IoT Thing name.
  */
-static char pcThingName[ fpdemoMAX_THING_NAME_LENGTH ] = { 0 };
+static char pcThingName[fpdemoMAX_THING_NAME_LENGTH] = {0};
 
 /**
  * @brief Buffer to hold the CSR subject name.
  */
-static char pcCSRSubjectName[ fpdemoMAX_CSR_SUBJECT_NAME_LENGTH ] = { 0 };
+static char pcCSRSubjectName[fpdemoMAX_CSR_SUBJECT_NAME_LENGTH] = {0};
 
 /*-----------------------------------------------------------*/
 
@@ -226,17 +227,24 @@ static ResponseStatus_t xResponseStatus;
 static size_t xThingNameLength;
 
 /**
+ * @brief Buffer to hold request sent from the AWS IoT Fleet Provisioning API
+ */
+static uint8_t pucPayloadBuffer[democonfigNETWORK_BUFFER_SIZE];
+
+/**
  * @brief Buffer to hold responses received from the AWS IoT Fleet Provisioning
  * APIs. When the MQTT publish callback receives an expected Fleet Provisioning
  * accepted payload, it copies it into this buffer.
  */
-static uint8_t pucPayloadBuffer[ democonfigNETWORK_BUFFER_SIZE ];
+static uint8_t pucResponseBuffer[democonfigNETWORK_BUFFER_SIZE];
 
 /**
- * @brief Length of the payload stored in #pucPayloadBuffer. This is set by the
- * MQTT publish callback when it copies a received payload into #pucPayloadBuffer.
+ * @brief Length of the payload stored in #pucResponseBuffer. This is set by the
+ * MQTT publish callback when it copies a received payload into #pucResponseBuffer.
  */
 static size_t xPayloadLength;
+
+static size_t xResponseLength;
 
 /**
  * @brief The MQTT context used for MQTT operation.
@@ -256,7 +264,7 @@ static TlsTransportParams_t xTlsTransportParams;
 /**
  * @brief Static buffer used to hold MQTT messages being sent and received.
  */
-static uint8_t ucSharedBuffer[ democonfigNETWORK_BUFFER_SIZE ];
+static uint8_t ucSharedBuffer[democonfigNETWORK_BUFFER_SIZE];
 
 /**
  * @brief Static buffer used to hold MQTT messages being sent and received.
@@ -270,14 +278,15 @@ static MQTTFixedBuffer_t xBuffer =
 /**
  * @brief Accept topic/reject topic/publish topic
  */
-static char * pcPublishTopic = NULL;
+static char *pcPublishTopic = NULL;
 static uint16_t xPublishTopicLength;
 
-static char * pcAcceptTopic = NULL;
+static char *pcAcceptTopic = NULL;
 static uint16_t xAcceptTopicLength;
 
-static char * pcRejectTopic = NULL;
+static char *pcRejectTopic = NULL;
 static uint16_t xRejectTopicLength;
+
 /*-----------------------------------------------------------*/
 
 /**
@@ -289,29 +298,29 @@ static uint16_t xRejectTopicLength;
  * @param[in] pPublishInfo Pointer to publish info of the incoming publish.
  * @param[in] usPacketIdentifier Packet identifier of the incoming publish.
  */
-static void prvProvisioningPublishCallback( MQTTContext_t * pxMqttContext,
-                                            MQTTPacketInfo_t * pxPacketInfo,
-                                            MQTTDeserializedInfo_t * pxDeserializedInfo );
+static void prvProvisioningPublishCallback (MQTTContext_t *pxMqttContext,
+                                           MQTTPacketInfo_t *pxPacketInfo,
+                                           MQTTDeserializedInfo_t *pxDeserializedInfo);
 
 /**
  * @brief Subscribe to the CreateCertificateFromCsr accepted and rejected topics.
  */
-static bool prvSubscribeToCsrResponseTopics( void );
+static bool prvSubscribeToCsrResponseTopics (void);
 
 /**
  * @brief Unsubscribe from the CreateCertificateFromCsr accepted and rejected topics.
  */
-static bool prvUnsubscribeFromCsrResponseTopics( void );
+static bool prvUnsubscribeFromCsrResponseTopics (void);
 
 /**
  * @brief Subscribe to the RegisterThing accepted and rejected topics.
  */
-static bool prvSubscribeToRegisterThingResponseTopics( void );
+static bool prvSubscribeToRegisterThingResponseTopics (void);
 
 /**
  * @brief Unsubscribe from the RegisterThing accepted and rejected topics.
  */
-static bool prvUnsubscribeFromRegisterThingResponseTopics( void );
+static bool prvUnsubscribeFromRegisterThingResponseTopics (void);
 
 /**
  * @brief The task used to demonstrate the FP API.
@@ -325,275 +334,359 @@ static bool prvUnsubscribeFromRegisterThingResponseTopics( void );
  * @param[in] pvParameters Parameters as passed at the time of task creation.
  * Not used in this example.
  */
-static int prvFleetProvisioningTask( void * pvParameters );
+static void prvFleetProvisioningTask (void *pvParam);
 
-void vStartFleetProvisioningDemo(void);
+int prvFpDemo_start (void *pvParameters);
+
+void vStartFleetProvisioningDemo (void);
 
 /*-----------------------------------------------------------*/
 
-static void prvProvisioningPublishCallback( MQTTContext_t * pxMqttContext,
-                                            MQTTPacketInfo_t * pxPacketInfo,
-                                            MQTTDeserializedInfo_t * pxDeserializedInfo )
+/**********************************************************************************************************************
+ * Function Name: prvProvisioningPublishCallback
+ * Description  : .
+ * Arguments    : pxMqttContext
+ *              : pxPacketInfo
+ *              : pxDeserializedInfo
+ * Return Value : .
+ *********************************************************************************************************************/
+static void prvProvisioningPublishCallback(MQTTContext_t *pxMqttContext,
+                                           MQTTPacketInfo_t *pxPacketInfo,
+                                           MQTTDeserializedInfo_t *pxDeserializedInfo)
 {
     FleetProvisioningStatus_t xStatus;
     FleetProvisioningTopic_t xApi;
-    MQTTPublishInfo_t * pxPublishInfo;
+    MQTTPublishInfo_t *pxPublishInfo = NULL;
 
-    configASSERT( pxMqttContext != NULL );
-    configASSERT( pxPacketInfo != NULL );
-    configASSERT( pxDeserializedInfo != NULL );
+    configASSERT(NULL != pxMqttContext);
+    configASSERT(NULL != pxPacketInfo);
+    configASSERT(NULL != pxDeserializedInfo);
 
     /* Suppress the unused parameter warning when asserts are disabled in
      * build. */
-    ( void ) pxMqttContext;
+    (void)pxMqttContext;
 
     /* Handle an incoming publish. The lower 4 bits of the publish packet
      * type is used for the dup, QoS, and retain flags. Hence masking
      * out the lower bits to check if the packet is publish. */
-    if( ( pxPacketInfo->type & 0xF0U ) == MQTT_PACKET_TYPE_PUBLISH )
+    if (MQTT_PACKET_TYPE_PUBLISH == (pxPacketInfo->type & 0xF0U))
     {
-        configASSERT( pxDeserializedInfo->pPublishInfo != NULL );
+        configASSERT(NULL != pxDeserializedInfo->pPublishInfo);
         pxPublishInfo = pxDeserializedInfo->pPublishInfo;
 
         xStatus = FleetProvisioning_MatchTopic(pxPublishInfo->pTopicName,
                                                pxPublishInfo->topicNameLength,
                                                &xApi);
 
-        if (xStatus != FleetProvisioningSuccess)
+        if (FleetProvisioningSuccess != xStatus)
         {
-            LogWarn( ( "Unexpected publish message received. Topic: %.*s.",
-                       ( int ) pxPublishInfo->topicNameLength,
-                       ( const char * ) pxPublishInfo->pTopicName ) );
+            LogWarn(("Unexpected publish message received. Topic: %.*s.",
+                     (int)pxPublishInfo->topicNameLength,
+                     (const char *)pxPublishInfo->pTopicName));
         }
         else
         {
-            if (xApi == FleetProvCborCreateCertFromCsrAccepted)
+            if (FleetProvCborCreateCertFromCsrAccepted == xApi)
             {
-                LogInfo( ( "Received accepted response from Fleet Provisioning CreateCertificateFromCsr API." ) );
+                LogInfo(("Received accepted response from Fleet Provisioning CreateCertificateFromCsr API."));
 
                 xResponseStatus = ResponseAccepted;
 
-                /* Copy the payload from the MQTT library's buffer to #pucPayloadBuffer. */
-                ( void ) memcpy( ( void * ) pucPayloadBuffer,
-                                 ( const void * ) pxPublishInfo->pPayload,
-                                 ( size_t ) pxPublishInfo->payloadLength );
+                /* Copy the payload from the MQTT library's buffer to #pucResponseBuffer. */
+                ( void ) memcpy( ( void * ) pucResponseBuffer,
+                             (const void *)pxPublishInfo->pPayload,
+                             (size_t)pxPublishInfo->payloadLength);
 
-                xPayloadLength = pxPublishInfo->payloadLength;
+                xResponseLength = pxPublishInfo->payloadLength;
             }
-            else if (xApi == FleetProvCborCreateCertFromCsrRejected)
+            else if (FleetProvCborCreateCertFromCsrRejected == xApi)
             {
-                LogError( ( "Received rejected response from Fleet Provisioning CreateCertificateFromCsr API." ) );
+                LogError(("Received rejected response from Fleet Provisioning CreateCertificateFromCsr API."));
 
                 xResponseStatus = ResponseRejected;
             }
-            else if (xApi == FleetProvCborRegisterThingAccepted)
+            else if (FleetProvCborRegisterThingAccepted == xApi)
             {
-                LogInfo( ( "Received accepted response from Fleet Provisioning RegisterThing API." ) );
+                LogInfo(("Received accepted response from Fleet Provisioning RegisterThing API."));
 
                 xResponseStatus = ResponseAccepted;
 
-                /* Copy the payload from the MQTT library's buffer to #pucPayloadBuffer. */
-                ( void ) memcpy( ( void * ) pucPayloadBuffer,
-                                 ( const void * ) pxPublishInfo->pPayload,
-                                 ( size_t ) pxPublishInfo->payloadLength );
+                /* Copy the payload from the MQTT library's buffer to #pucResponseBuffer. */
+                ( void ) memcpy( ( void * ) pucResponseBuffer,
+                             (const void *)pxPublishInfo->pPayload,
+                             (size_t)pxPublishInfo->payloadLength);
 
-                xPayloadLength = pxPublishInfo->payloadLength;
+                xResponseLength = pxPublishInfo->payloadLength;
             }
-            else if (xApi == FleetProvCborRegisterThingRejected)
+            else if (FleetProvCborRegisterThingRejected == xApi)
             {
-                LogError( ( "Received rejected response from Fleet Provisioning RegisterThing API." ) );
+                LogError(("Received rejected response from Fleet Provisioning RegisterThing API."));
 
                 xResponseStatus = ResponseRejected;
             }
             else
             {
-                LogError( ( "Received message on unexpected Fleet Provisioning topic. Topic: %.*s.",
-                            ( int ) pxPublishInfo->topicNameLength,
-                            ( const char * ) pxPublishInfo->pTopicName ) );
+                LogError(("Received message on unexpected Fleet Provisioning topic. Topic: %.*s.",
+                          (int)pxPublishInfo->topicNameLength,
+                          (const char *)pxPublishInfo->pTopicName));
             }
         }
     }
     else
     {
-        vHandleOtherIncomingPacket( pxPacketInfo, pxDeserializedInfo->packetIdentifier );
+        vHandleOtherIncomingPacket(pxPacketInfo, pxDeserializedInfo->packetIdentifier);
         xResponseStatus = ResponseAccepted;
     }
 }
-/*-----------------------------------------------------------*/
+/**********************************************************************************************************************
+ End of function prvProvisioningPublishCallback
+ *********************************************************************************************************************/
 
-static bool prvSubscribeToCsrResponseTopics( void )
+/**********************************************************************************************************************
+ * Function Name: prvSubscribeToCsrResponseTopics
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+static bool prvSubscribeToCsrResponseTopics(void)
 {
     bool xStatus;
 
-    xStatus = xSubscribeToTopic( &xMqttContext,
-                                 FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC,
-                                 FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH );
+    xStatus = xSubscribeToTopic(&xMqttContext,
+                                FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC,
+                                FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH);
 
-    if( xStatus == false )
+    if (false == xStatus)
     {
-        LogError( ( "Failed to subscribe to fleet provisioning topic: %.*s.",
-                    FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH,
-                    FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC ) );
+        LogError(("Failed to subscribe to fleet provisioning topic: %.*s.",
+                  FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH,
+                  FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC));
     }
 
-    if( xStatus == true )
+    if (true == xStatus)
     {
-        xStatus = xSubscribeToTopic( &xMqttContext,
-                                     FP_CBOR_CREATE_CERT_REJECTED_TOPIC,
-                                     FP_CBOR_CREATE_CERT_REJECTED_LENGTH );
+        xStatus = xSubscribeToTopic(&xMqttContext,
+                                    FP_CBOR_CREATE_CERT_REJECTED_TOPIC,
+                                    FP_CBOR_CREATE_CERT_REJECTED_LENGTH);
 
-        if( xStatus == false )
+        if (false == xStatus)
         {
-            LogError( ( "Failed to subscribe to fleet provisioning topic: %.*s.",
-                        FP_CBOR_CREATE_CERT_REJECTED_LENGTH,
-                        FP_CBOR_CREATE_CERT_REJECTED_TOPIC ) );
+            LogError(("Failed to subscribe to fleet provisioning topic: %.*s.",
+                      FP_CBOR_CREATE_CERT_REJECTED_LENGTH,
+                      FP_CBOR_CREATE_CERT_REJECTED_TOPIC));
         }
     }
 
     return xStatus;
 }
-/*-----------------------------------------------------------*/
+/**********************************************************************************************************************
+ End of function prvSubscribeToCsrResponseTopics
+ *********************************************************************************************************************/
 
-static bool prvUnsubscribeFromCsrResponseTopics( void )
+/**********************************************************************************************************************
+ * Function Name: prvUnsubscribeFromCsrResponseTopics
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+static bool prvUnsubscribeFromCsrResponseTopics(void)
 {
     bool xStatus;
 
-    xStatus = xUnsubscribeFromTopic( &xMqttContext,
-                                     FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC,
-                                     FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH );
+    xStatus = xUnsubscribeFromTopic(&xMqttContext,
+                                    FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC,
+                                    FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH);
 
-    if( xStatus == false )
+    if (false == xStatus)
     {
-        LogError( ( "Failed to unsubscribe from fleet provisioning topic: %.*s.",
-                    FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH,
-                    FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC ) );
+        LogError(("Failed to unsubscribe from fleet provisioning topic: %.*s.",
+                  FP_CBOR_CREATE_CERT_ACCEPTED_LENGTH,
+                  FP_CBOR_CREATE_CERT_ACCEPTED_TOPIC));
     }
 
-    if( xStatus == true )
+    if (true == xStatus)
     {
-        xStatus = xUnsubscribeFromTopic( &xMqttContext,
-                                         FP_CBOR_CREATE_CERT_REJECTED_TOPIC,
-                                         FP_CBOR_CREATE_CERT_REJECTED_LENGTH );
+        xStatus = xUnsubscribeFromTopic(&xMqttContext,
+                                        FP_CBOR_CREATE_CERT_REJECTED_TOPIC,
+                                        FP_CBOR_CREATE_CERT_REJECTED_LENGTH);
 
-        if( xStatus == false )
+        if (false == xStatus)
         {
-            LogError( ( "Failed to unsubscribe from fleet provisioning topic: %.*s.",
-                        FP_CBOR_CREATE_CERT_REJECTED_LENGTH,
-                        FP_CBOR_CREATE_CERT_REJECTED_TOPIC ) );
+            LogError(("Failed to unsubscribe from fleet provisioning topic: %.*s.",
+                      FP_CBOR_CREATE_CERT_REJECTED_LENGTH,
+                      FP_CBOR_CREATE_CERT_REJECTED_TOPIC));
         }
     }
 
     return xStatus;
 }
-/*-----------------------------------------------------------*/
+/**********************************************************************************************************************
+ End of function prvUnsubscribeFromCsrResponseTopics
+ *********************************************************************************************************************/
 
-static bool prvSubscribeToRegisterThingResponseTopics( void )
+/**********************************************************************************************************************
+ * Function Name: prvSubscribeToRegisterThingResponseTopics
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+static bool prvSubscribeToRegisterThingResponseTopics(void)
 {
     bool xStatus;
 
-    xStatus = xSubscribeToTopic( &xMqttContext,
-                                 pcAcceptTopic,
-                                 xAcceptTopicLength );
+    xStatus = xSubscribeToTopic(&xMqttContext,
+                                pcAcceptTopic,
+                                xAcceptTopicLength);
 
-    if( xStatus == false )
+    if (false == xStatus)
     {
-        LogError( ( "Failed to subscribe to fleet provisioning topic: %.*s.",
-                    xAcceptTopicLength,
-                    pcAcceptTopic ) );
+        LogError(("Failed to subscribe to fleet provisioning topic: %.*s.",
+                  xAcceptTopicLength,
+                  pcAcceptTopic));
     }
 
-    if( xStatus == true )
+    if (true == xStatus)
     {
-        xStatus = xSubscribeToTopic( &xMqttContext,
-                                     pcRejectTopic,
-                                     xRejectTopicLength );
+        xStatus = xSubscribeToTopic(&xMqttContext,
+                                    pcRejectTopic,
+                                    xRejectTopicLength);
 
-        if( xStatus == false )
+        if (false == xStatus)
         {
-            LogError( ( "Failed to subscribe to fleet provisioning topic: %.*s.",
-                        xRejectTopicLength,
-                        pcRejectTopic ) );
+            LogError(("Failed to subscribe to fleet provisioning topic: %.*s.",
+                      xRejectTopicLength,
+                      pcRejectTopic));
         }
     }
 
     return xStatus;
 }
-/*-----------------------------------------------------------*/
+/**********************************************************************************************************************
+ End of function prvSubscribeToRegisterThingResponseTopics
+ *********************************************************************************************************************/
 
-static bool prvUnsubscribeFromRegisterThingResponseTopics( void )
+/**********************************************************************************************************************
+ * Function Name: prvUnsubscribeFromRegisterThingResponseTopics
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+static bool prvUnsubscribeFromRegisterThingResponseTopics(void)
 {
     bool xStatus;
 
-    xStatus = xUnsubscribeFromTopic( &xMqttContext,
-                                     pcAcceptTopic,
-                                     xAcceptTopicLength );
+    xStatus = xUnsubscribeFromTopic(&xMqttContext,
+                                    pcAcceptTopic,
+                                    xAcceptTopicLength);
 
-    if( xStatus == false )
+    if (false == xStatus)
     {
-        LogError( ( "Failed to unsubscribe from fleet provisioning topic: %.*s.",
-                    xAcceptTopicLength,
-                    pcAcceptTopic ) );
+        LogError(("Failed to unsubscribe from fleet provisioning topic: %.*s.",
+                  xAcceptTopicLength,
+                  pcAcceptTopic));
     }
 
-    if( xStatus == true )
+    if (true == xStatus)
     {
-        xStatus = xUnsubscribeFromTopic( &xMqttContext,
-                                         pcRejectTopic,
-                                         xRejectTopicLength );
+        xStatus = xUnsubscribeFromTopic(&xMqttContext,
+                                        pcRejectTopic,
+                                        xRejectTopicLength);
 
-        if( xStatus == false )
+        if (false == xStatus)
         {
-            LogError( ( "Failed to unsubscribe from fleet provisioning topic: %.*s.",
-                        xRejectTopicLength,
-                        pcRejectTopic ) );
+            LogError(("Failed to unsubscribe from fleet provisioning topic: %.*s.",
+                      xRejectTopicLength,
+                      pcRejectTopic));
         }
     }
 
     return xStatus;
 }
-/*-----------------------------------------------------------*/
+/**********************************************************************************************************************
+ End of function prvUnsubscribeFromRegisterThingResponseTopics
+ *********************************************************************************************************************/
 
 /**
  * @brief Create the task that demonstrates the Fleet Provisioning library API
  */
+/**********************************************************************************************************************
+ * Function Name: vStartFleetProvisioningDemo
+ * Description  : .
+ * Argument     :
+ * Return Value : .
+ *********************************************************************************************************************/
 void vStartFleetProvisioningDemo()
 {
     /* This example uses a single application task, which shows that how to use
      * Fleet Provisioning library to generate and sign certificates with AWS IoT
      * and create new IoT Things using the AWS IoT Fleet Provisioning API */
-    xTaskCreate( prvFleetProvisioningTask, /* Function that implements the task. */
-                 "DemoTask",               /* Text name for the task - only used for debugging. */
-                 democonfigDEMO_STACKSIZE, /* Size of stack (in words, not bytes) to allocate for the task. */
-                 NULL,                     /* Task parameter - not used in this case. */
-                 tskIDLE_PRIORITY,         /* Task priority, must be between 0 and configMAX_PRIORITIES - 1. */
-                 NULL );                   /* Used to pass out a handle to the created task - not used in this case. */
+    xTaskCreate(prvFleetProvisioningTask, /* Function that implements the task. */
+                "DemoTask",               /* Text name for the task - only used for debugging. */
+                democonfigDEMO_STACKSIZE, /* Size of stack (in words, not bytes) to allocate for the task. */
+                NULL,                     /* Task parameter - not used in this case. */
+                tskIDLE_PRIORITY + 3,     /* Task priority, must be between 0 and configMAX_PRIORITIES - 1. */
+                NULL);                    /* Used to pass out a handle to the created task - not used in this case. */
 }
+/**********************************************************************************************************************
+ End of function vStartFleetProvisioningDemo
+ *********************************************************************************************************************/
+
+/* Add this intermediate task runner to solve the mismatch pointer type error. */
+/**********************************************************************************************************************
+ * Function Name: prvFleetProvisioningTask
+ * Description  : .
+ * Argument     : pvParam
+ * Return Value : .
+ *********************************************************************************************************************/
+static void prvFleetProvisioningTask(void *pvParam)
+{
+    BaseType_t xResult;
+
+    (void)pvParam;
+
+    LogInfo(("Running Fleet Provisioning demo task."));
+
+    xResult = prvFpDemo_start(pvParam);
+
+    /* Delete this task. */
+    LogInfo(("Deleting Fleet Provisioning Demo task."));
+    vTaskDelete(NULL);
+}
+/**********************************************************************************************************************
+ End of function prvFleetProvisioningTask
+ *********************************************************************************************************************/
 
 /* This example uses a single application task, which shows that how to use
  * the Fleet Provisioning library to generate and validate AWS IoT Fleet
  * Provisioning MQTT topics, and use the coreMQTT library to communicate with
  * the AWS IoT Fleet Provisioning APIs. */
-int prvFleetProvisioningTask( void * pvParameters )
+/**********************************************************************************************************************
+ * Function Name: prvFpDemo_start
+ * Description  : .
+ * Argument     : pvParameters
+ * Return Value : .
+ *********************************************************************************************************************/
+int prvFpDemo_start(void *pvParameters)
 {
     bool xStatus = false;
+
     /* Buffer for holding the CSR. */
-    char pcCsr[ fpdemoCSR_BUFFER_LENGTH ] = { 0 };
+    char pcCsr[fpdemoCSR_BUFFER_LENGTH] = {0};
     size_t xCsrLength = 0;
+
     /* Buffer for holding received certificate until it is saved. */
-    char pcCertificate[ fpdemoCERT_BUFFER_LENGTH ];
+    char pcCertificate[fpdemoCERT_BUFFER_LENGTH];
     size_t xCertificateLength;
+
     /* Buffer for holding the certificate ID. */
-    char pcCertificateId[ fpdemoCERT_ID_BUFFER_LENGTH ];
+    char pcCertificateId[fpdemoCERT_ID_BUFFER_LENGTH];
     size_t xCertificateIdLength;
+
     /* Buffer for holding the certificate ownership token. */
-    char pcOwnershipToken[ fpdemoOWNERSHIP_TOKEN_BUFFER_LENGTH ];
+    char pcOwnershipToken[fpdemoOWNERSHIP_TOKEN_BUFFER_LENGTH];
     size_t xOwnershipTokenLength;
     bool xConnectionEstablished = false;
     CK_SESSION_HANDLE xP11Session;
     uint32_t ulDemoRunCount = 0U;
     CK_RV xPkcs11Ret = CKR_OK;
-    CK_OBJECT_HANDLE xClientCertificate;
-    CK_OBJECT_HANDLE xPrivateKey;
+    CK_OBJECT_HANDLE xClientCertificate = CK_INVALID_HANDLE;
+    CK_OBJECT_HANDLE xPrivateKey = CK_INVALID_HANDLE;
     uuid_param_t uuid;
     size_t templateLength;
     size_t thingnameLength;
@@ -602,50 +695,52 @@ int prvFleetProvisioningTask( void * pvParameters )
     char *template_buff = NULL;
     char *thingname_buff = NULL;
 
-
-    LogInfo( ( "---------Start Fleet Provisioning Task---------\r\n" ) );
+    LogInfo(("---------Start Fleet Provisioning Task---------\r\n"));
 
     templateLength = prvGetCacheEntryLength(KVS_TEMPLATE_NAME);
 
 #if defined(__TEST__)
-    pcPublishTopic = FP_CBOR_REGISTER_PUBLISH_TOPIC( democonfigPROVISIONING_TEMPLATE_NAME );
-    xPublishTopicLength = FP_CBOR_REGISTER_PUBLISH_LENGTH( fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH );
-    pcAcceptTopic = FP_CBOR_REGISTER_ACCEPTED_TOPIC( democonfigPROVISIONING_TEMPLATE_NAME );
-    xAcceptTopicLength = FP_CBOR_REGISTER_ACCEPTED_LENGTH( fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH );
-    pcRejectTopic = FP_CBOR_REGISTER_REJECTED_TOPIC( democonfigPROVISIONING_TEMPLATE_NAME );
-    xRejectTopicLength = FP_CBOR_REGISTER_REJECTED_LENGTH( fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH ) ;
+    pcPublishTopic = FP_CBOR_REGISTER_PUBLISH_TOPIC(democonfigPROVISIONING_TEMPLATE_NAME);
+    xPublishTopicLength = FP_CBOR_REGISTER_PUBLISH_LENGTH(fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH);
+    pcAcceptTopic = FP_CBOR_REGISTER_ACCEPTED_TOPIC(democonfigPROVISIONING_TEMPLATE_NAME);
+    xAcceptTopicLength = FP_CBOR_REGISTER_ACCEPTED_LENGTH(fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH);
+    pcRejectTopic = FP_CBOR_REGISTER_REJECTED_TOPIC(democonfigPROVISIONING_TEMPLATE_NAME);
+    xRejectTopicLength = FP_CBOR_REGISTER_REJECTED_LENGTH(fpdemoPROVISIONING_TEMPLATE_NAME_LENGTH);
 #else
     if (templateLength > 0)
     {
 
-    	template_buff = pvPortMalloc(templateLength + 1);
-    	xReadEntry(KVS_TEMPLATE_NAME, template_buff, templateLength );
-    	template_buff[templateLength] = '\0';
-    	templateData = template_buff;
+        template_buff = pvPortMalloc(templateLength + 1);
+        configASSERT(template_buff);
+        xReadEntry(KVS_TEMPLATE_NAME, template_buff, templateLength);
+        template_buff[templateLength] = '\0';
+        templateData = template_buff;
 
-    	xPublishTopicLength = FP_CBOR_REGISTER_PUBLISH_LENGTH(templateLength);
-    	pcPublishTopic = pvPortMalloc(xPublishTopicLength + 1);
-		snprintf( pcPublishTopic, xPublishTopicLength + 1, "%s%s%s%s", FP_REGISTER_API_PREFIX, templateData, FP_REGISTER_API_BRIDGE, FP_API_CBOR_FORMAT);
+        xPublishTopicLength = FP_CBOR_REGISTER_PUBLISH_LENGTH(templateLength);
+        pcPublishTopic = pvPortMalloc(xPublishTopicLength + 1);
+        configASSERT(pcPublishTopic);
+        snprintf(pcPublishTopic, xPublishTopicLength + 1, "%s%s%s%s", FP_REGISTER_API_PREFIX, templateData, FP_REGISTER_API_BRIDGE, FP_API_CBOR_FORMAT);
 
         xAcceptTopicLength = FP_CBOR_REGISTER_ACCEPTED_LENGTH(templateLength);
         pcAcceptTopic = pvPortMalloc(xAcceptTopicLength + 1);
-        snprintf( pcAcceptTopic, xAcceptTopicLength + 1, "%s%s%s%s%s", FP_REGISTER_API_PREFIX, templateData, FP_REGISTER_API_BRIDGE, FP_API_CBOR_FORMAT,FP_API_ACCEPTED_SUFFIX);
+        configASSERT(pcAcceptTopic);
+        snprintf(pcAcceptTopic, xAcceptTopicLength + 1, "%s%s%s%s%s", FP_REGISTER_API_PREFIX, templateData, FP_REGISTER_API_BRIDGE, FP_API_CBOR_FORMAT, FP_API_ACCEPTED_SUFFIX);
 
         xRejectTopicLength = FP_CBOR_REGISTER_REJECTED_LENGTH(templateLength);
         pcRejectTopic = pvPortMalloc(xRejectTopicLength + 1);
-        snprintf( pcRejectTopic, xRejectTopicLength + 1, "%s%s%s%s%s", FP_REGISTER_API_PREFIX, templateData, FP_REGISTER_API_BRIDGE, FP_API_CBOR_FORMAT,FP_API_REJECTED_SUFFIX);
+        configASSERT(pcRejectTopic);
+        snprintf(pcRejectTopic, xRejectTopicLength + 1, "%s%s%s%s%s", FP_REGISTER_API_PREFIX, templateData, FP_REGISTER_API_BRIDGE, FP_API_CBOR_FORMAT, FP_API_REJECTED_SUFFIX);
     }
 
 #endif
 
-
     /* Silence compiler warnings about unused variables. */
-    ( void ) pvParameters;
+    (void)pvParameters;
 
     /* Generate unique fleet provisioning demo ID. */
     get_unique_id(&uuid);
-    snprintf( pcDemoID, fpdemoMAX_THING_NAME_LENGTH, "%s_%08X_%08X_%08X_%08X", democonfigFP_DEMO_ID, uuid.uuid0, uuid.uuid1, uuid.uuid2, uuid.uuid3);
-    snprintf( pcCSRSubjectName, fpdemoMAX_CSR_SUBJECT_NAME_LENGTH, "CN=%s", pcDemoID);
+    snprintf(pcDemoID, fpdemoMAX_THING_NAME_LENGTH, "%s_%08X_%08X_%08X_%08X", democonfigFP_DEMO_ID, uuid.uuid0, uuid.uuid1, uuid.uuid2, uuid.uuid3);
+    snprintf(pcCSRSubjectName, fpdemoMAX_CSR_SUBJECT_NAME_LENGTH, "CN=%s", pcDemoID);
 
     /* Set the pParams member of the network context with desired transport. */
     xNetworkContext.pxParams = &xTlsTransportParams;
@@ -658,69 +753,70 @@ int prvFleetProvisioningTask( void * pvParameters )
         xOwnershipTokenLength = fpdemoOWNERSHIP_TOKEN_BUFFER_LENGTH;
 
         /* Initialize the PKCS #11 module */
-        xPkcs11Ret = xInitializePkcs11Session( &xP11Session );
+        xPkcs11Ret = xInitializePkcs11Session(&xP11Session);
 
-        if( xPkcs11Ret != CKR_OK )
+        if (CKR_OK != xPkcs11Ret)
         {
-            LogError( ( "Failed to initialize PKCS #11." ) );
+            LogError(("Failed to initialize PKCS #11."));
             xStatus = false;
         }
         else
         {
-            xPkcs11Ret = xGetCertificateAndKeyState( xP11Session,
-                                                     &xClientCertificate,
-                                                     &xPrivateKey );
-            if( xPkcs11Ret != CKR_OK )
+            xPkcs11Ret = xGetCertificateAndKeyState(xP11Session,
+                                                    &xClientCertificate,
+                                                    &xPrivateKey);
+            if (CKR_OK != xPkcs11Ret)
             {
-                LogError( ( "Failed to get state of device certificate and private key." ) );
+                LogError(("Failed to get state of device certificate and private key."));
                 xStatus = false;
             }
         }
 
         thingnameLength = prvGetCacheEntryLength(KVS_CORE_THING_NAME);
 
-        if ( (xPkcs11Ret == CKR_OK) && ((xClientCertificate == CK_INVALID_HANDLE) || (xPrivateKey == CK_INVALID_HANDLE) || thingnameLength == 0) )
+        if ((CKR_OK == xPkcs11Ret) && ((CK_INVALID_HANDLE == xClientCertificate) || (CK_INVALID_HANDLE == xPrivateKey) || (0 == thingnameLength)))
         {
-            xPkcs11Ret = xDestroyCertificateAndKey ( xP11Session );
-            if( xPkcs11Ret != CKR_OK )
+            xPkcs11Ret = xDestroyCertificateAndKey(xP11Session);
+            if (CKR_OK != xPkcs11Ret)
             {
-                LogError( ( "Failed to Destroy of device certificate and private key." ) );
+                LogError(("Failed to Destroy of device certificate and private key."));
                 xStatus = false;
             }
             else
             {
-                xStatus = xGenerateKeyAndCsr( xP11Session,
-                                              pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
-                                              pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS,
-                                              pcCsr,
-                                              fpdemoCSR_BUFFER_LENGTH,
-                                              &xCsrLength,
-                                              pcCSRSubjectName );
+                xStatus = xGenerateKeyAndCsr(xP11Session,
+                                             pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
+                                             pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS,
+                                             pcCsr,
+                                             fpdemoCSR_BUFFER_LENGTH,
+                                             &xCsrLength,
+                                             pcCSRSubjectName);
 
-                if( xStatus == false )
+                if (false == xStatus)
                 {
-                    LogError( ( "Failed to generate Key and Certificate Signing Request." ) );
+                    LogError(("Failed to generate Key and Certificate Signing Request."));
                 }
             }
         }
 
-        else if ( (xPkcs11Ret == CKR_OK) && (xClientCertificate != CK_INVALID_HANDLE) && (xPrivateKey != CK_INVALID_HANDLE) && (thingnameLength > 0) )
+        else if ((CKR_OK == xPkcs11Ret) && (CK_INVALID_HANDLE != xClientCertificate) && (CK_INVALID_HANDLE != xPrivateKey) && (thingnameLength > 0))
         {
-            LogInfo( ( "It uses the device certificate, private key, thing name already stored." ) );
+            LogInfo(("It uses the device certificate, private key, thing name already stored."));
             thingname_buff = pvPortMalloc(thingnameLength + 1);
-            xReadEntry(KVS_CORE_THING_NAME, thingname_buff, thingnameLength );
+            configASSERT(thingname_buff);
+            xReadEntry(KVS_CORE_THING_NAME, thingname_buff, thingnameLength);
             thingname_buff[thingnameLength] = '\0';
-            snprintf( pcThingName, fpdemoMAX_THING_NAME_LENGTH, "%s", thingname_buff);
+            snprintf(pcThingName, fpdemoMAX_THING_NAME_LENGTH, "%s", thingname_buff);
             xStatus = true;
         }
         else
         {
-            LogError( ( "Failed to initialize PKCS #11 or get state." ) );
+            LogError(("Failed to initialize PKCS #11 or get state."));
             xStatus = false;
         }
 
         /* Skip fleet provisioning if you already have a device certificate, private key and thingname. */
-        if ( (xClientCertificate == CK_INVALID_HANDLE) || (xPrivateKey == CK_INVALID_HANDLE) || thingnameLength == 0 )
+        if ((CK_INVALID_HANDLE == xClientCertificate) || (CK_INVALID_HANDLE == xPrivateKey) || (0 == thingnameLength))
         {
             /**** Connect to AWS IoT Core with provisioning claim credentials *****/
 
@@ -728,37 +824,41 @@ int prvFleetProvisioningTask( void * pvParameters )
              * credentials should allow use of the RegisterThing API and one of the
              * CreateCertificatefromCsr or CreateKeysAndCertificate.
              * In this demo we use CreateCertificatefromCsr. */
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Attempts to connect to the AWS IoT MQTT broker. If the
                  * connection fails, retries after a timeout. Timeout value will
                  * exponentially increase until maximum attempts are reached. */
-                LogInfo( ( "Establishing MQTT session with claim certificate..." ) );
-                xStatus = xEstablishMqttSession( &xMqttContext,
-                                                 &xNetworkContext,
-                                                 &xBuffer,
-                                                 prvProvisioningPublishCallback,
-                                                 pkcs11configLABEL_CLAIM_CERTIFICATE,
-                                                 pkcs11configLABEL_CLAIM_PRIVATE_KEY,
-                                                 pcDemoID);
+                LogInfo(("Establishing MQTT session with claim certificate..."));
+                xStatus = xEstablishMqttSession(&xMqttContext,
+                                                &xNetworkContext,
+                                                &xBuffer,
+                                                prvProvisioningPublishCallback,
+                                                pkcs11configLABEL_CLAIM_CERTIFICATE,
+                                                pkcs11configLABEL_CLAIM_PRIVATE_KEY,
+                                                pcDemoID);
 
-                if( xStatus == false )
+                if (false == xStatus)
                 {
-                    LogError( ( "Failed to establish MQTT session." ) );
+                    LogError(("Failed to establish MQTT session."));
                 }
                 else
                 {
-                    LogInfo( ( "Established connection with claim credentials." ) );
+                    LogInfo(("Established connection with claim credentials."));
                     xConnectionEstablished = true;
                 }
             }
 
             /**** Call the CreateCertificateFromCsr API ***************************/
 
+            LogInfo(("Format pucResponseBuffer."));
+            memset(pucResponseBuffer, 0x00, democonfigNETWORK_BUFFER_SIZE);
+            xResponseLength = 0;
+
             /* We use the CreateCertificatefromCsr API to obtain a client certificate
              * for a key on the device by means of sending a certificate signing
              * request (CSR). */
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Subscribe to the CreateCertificateFromCsr accepted and rejected
                  * topics. In this demo we use CBOR encoding for the payloads,
@@ -766,63 +866,67 @@ int prvFleetProvisioningTask( void * pvParameters )
                 xStatus = prvSubscribeToCsrResponseTopics();
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Create the request payload containing the CSR to publish to the
                  * CreateCertificateFromCsr APIs. */
-                xStatus = xGenerateCsrRequest( pucPayloadBuffer,
-                                               democonfigNETWORK_BUFFER_SIZE,
-                                               pcCsr,
-                                               xCsrLength,
-                                               &xPayloadLength );
+                xStatus = xGenerateCsrRequest(pucPayloadBuffer,
+                                              democonfigNETWORK_BUFFER_SIZE,
+                                              pcCsr,
+                                              xCsrLength,
+                                              &xPayloadLength);
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Publish the CSR to the CreateCertificatefromCsr API. */
-                xStatus = xPublishToTopic( &xMqttContext,
-                                           FP_CBOR_CREATE_CERT_PUBLISH_TOPIC,
-                                           FP_CBOR_CREATE_CERT_PUBLISH_LENGTH,
-                                           ( char * ) pucPayloadBuffer,
-                                           xPayloadLength );
+                xStatus = xPublishToTopic(&xMqttContext,
+                                          FP_CBOR_CREATE_CERT_PUBLISH_TOPIC,
+                                          FP_CBOR_CREATE_CERT_PUBLISH_LENGTH,
+                                          (char *)pucPayloadBuffer,
+                                          xPayloadLength);
 
-                if( xStatus == false )
+                if (false == xStatus)
                 {
-                    LogError( ( "Failed to publish to fleet provisioning topic: %.*s.",
-                                FP_CBOR_CREATE_CERT_PUBLISH_LENGTH,
-                                FP_CBOR_CREATE_CERT_PUBLISH_TOPIC ) );
+                    LogError(("Failed to publish to fleet provisioning topic: %.*s.",
+                              FP_CBOR_CREATE_CERT_PUBLISH_LENGTH,
+                              FP_CBOR_CREATE_CERT_PUBLISH_TOPIC));
                 }
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* From the response, extract the certificate, certificate ID, and
                  * certificate ownership token. */
-                xStatus = xParseCsrResponse( pucPayloadBuffer,
-                                             xPayloadLength,
-                                             pcCertificate,
-                                             &xCertificateLength,
-                                             pcCertificateId,
-                                             &xCertificateIdLength,
-                                             pcOwnershipToken,
-                                             &xOwnershipTokenLength );
+                xStatus = xParseCsrResponse(pucResponseBuffer,
+                                            xResponseLength,
+                                            pcCertificate,
+                                            &xCertificateLength,
+                                            pcCertificateId,
+                                            &xCertificateIdLength,
+                                            pcOwnershipToken,
+                                            &xOwnershipTokenLength);
 
-                if( xStatus == true )
+                if (true == xStatus)
                 {
-                    LogInfo( ( "Received certificate with Id: %.*s", ( int ) xCertificateIdLength, pcCertificateId ) );
+                    LogInfo(("Received certificate with Id: %.*s", (int)xCertificateIdLength, pcCertificateId));
+                }
+                else
+                {
+                	LogError( ( "Failed to parse the CreateCertificatefromCsr API response." ) );
                 }
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Save the certificate into PKCS #11. */
-                xStatus = xLoadCertificate( xP11Session,
-                                            pcCertificate,
-                                            pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
-                                            xCertificateLength );
+                xStatus = xLoadCertificate(xP11Session,
+                                           pcCertificate,
+                                           pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
+                                           xCertificateLength);
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Unsubscribe from the CreateCertificateFromCsr topics. */
                 xStatus = prvUnsubscribeFromCsrResponseTopics();
@@ -830,66 +934,74 @@ int prvFleetProvisioningTask( void * pvParameters )
 
             /**** Call the RegisterThing API **************************************/
 
+            LogInfo(("Format pucResponseBuffer."));
+            memset(pucResponseBuffer, 0x00, democonfigNETWORK_BUFFER_SIZE);
+            xResponseLength = 0;
+
             /* We then use the RegisterThing API to activate the received certificate,
              * provision AWS IoT resources according to the provisioning template, and
              * receive device configuration. */
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Create the request payload to publish to the RegisterThing API. */
-                xStatus = xGenerateRegisterThingRequest( pucPayloadBuffer,
-                                                         democonfigNETWORK_BUFFER_SIZE,
-                                                         pcOwnershipToken,
-                                                         xOwnershipTokenLength,
-                                                         pcDemoID,
-                                                         strlen ( pcDemoID ),
-                                                         &xPayloadLength );
+                xStatus = xGenerateRegisterThingRequest(pucPayloadBuffer,
+                                                        democonfigNETWORK_BUFFER_SIZE,
+                                                        pcOwnershipToken,
+                                                        xOwnershipTokenLength,
+                                                        pcDemoID,
+                                                        strlen(pcDemoID),
+                                                        &xPayloadLength);
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Subscribe to the RegisterThing response topics. */
                 xStatus = prvSubscribeToRegisterThingResponseTopics();
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Publish the RegisterThing request. */
-                xStatus = xPublishToTopic( &xMqttContext,
-                                           pcPublishTopic,
-                                           xPublishTopicLength,
-                                           ( char * ) pucPayloadBuffer,
-                                           xPayloadLength );
+                xStatus = xPublishToTopic(&xMqttContext,
+                                          pcPublishTopic,
+                                          xPublishTopicLength,
+                                          (char *)pucPayloadBuffer,
+                                          xPayloadLength);
 
-                if( xStatus == false )
+                if (false == xStatus)
                 {
-                    LogError( ( "Failed to publish to fleet provisioning topic: %.*s.",
-                    			xPublishTopicLength,
-								pcPublishTopic ) );
+                    LogError(("Failed to publish to fleet provisioning topic: %.*s.",
+                              xPublishTopicLength,
+                              pcPublishTopic));
                 }
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Extract the Thing name from the response. */
                 xThingNameLength = fpdemoMAX_THING_NAME_LENGTH;
-                xStatus = xParseRegisterThingResponse( pucPayloadBuffer,
-                                                       xPayloadLength,
-                                                       pcThingName,
-                                                       &xThingNameLength );
+                xStatus = xParseRegisterThingResponse(pucResponseBuffer,
+                                                      xResponseLength,
+                                                      pcThingName,
+                                                      &xThingNameLength);
 
-                if( xStatus == true )
+                if (true == xStatus)
                 {
-                    LogInfo( ( "Received AWS IoT Thing name: %.*s", ( int ) xThingNameLength, pcThingName ) );
-                    xprvWriteCacheEntry (strlen("thingname"), "thingname", xThingNameLength, pcThingName);
-                    BaseType_t xSuccess = xprvWriteValueToImpl (KVS_CORE_THING_NAME, pcThingName, xThingNameLength);
-                    if (xSuccess == pdTRUE)
+                    LogInfo(("Received AWS IoT Thing name: %.*s", (int)xThingNameLength, pcThingName));
+                    xprvWriteCacheEntry(strlen("thingname"), "thingname", xThingNameLength, pcThingName);
+                    BaseType_t xSuccess = xprvWriteValueToImpl(KVS_CORE_THING_NAME, pcThingName, xThingNameLength);
+                    if (pdTRUE == xSuccess)
                     {
-                        LogInfo( ( "AWS IoT Thing name is saved to Data Flash") );
+                        LogInfo(("AWS IoT Thing name is saved to Data Flash"));
                     }
+                }
+                else
+                {
+                	LogError( ( "Failed to parse the RegisterThing API response." ) );
                 }
             }
 
-            if( xStatus == true )
+            if (true == xStatus)
             {
                 /* Unsubscribe from the RegisterThing topics. */
                 prvUnsubscribeFromRegisterThingResponseTopics();
@@ -901,115 +1013,118 @@ int prvFleetProvisioningTask( void * pvParameters )
              * the connection using the provisioning claim credentials. We will
              * establish a new MQTT connection with the newly provisioned
              * credentials. */
-            if( xConnectionEstablished == true )
+            if (true == xConnectionEstablished)
             {
-                xDisconnectMqttSession( &xMqttContext, &xNetworkContext );
+                xDisconnectMqttSession(&xMqttContext, &xNetworkContext);
                 xConnectionEstablished = false;
             }
         }
 
         /**** Connect to AWS IoT Core with provisioned certificate ************/
 
-        if( xStatus == true )
+        if (true == xStatus)
         {
-            LogInfo( ( "Establishing MQTT session with provisioned certificate..." ) );
-            xStatus = xEstablishMqttSession( &xMqttContext,
-                                             &xNetworkContext,
-                                             &xBuffer,
-                                             prvProvisioningPublishCallback,
-                                             pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
-                                             pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
-                                             pcThingName );
+            LogInfo(("Establishing MQTT session with provisioned certificate..."));
+            xStatus = xEstablishMqttSession(&xMqttContext,
+                                            &xNetworkContext,
+                                            &xBuffer,
+                                            prvProvisioningPublishCallback,
+                                            pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
+                                            pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
+                                            pcThingName);
 
-            if( xStatus != true )
+            if (true != xStatus)
             {
-                LogError( ( "Failed to establish MQTT session with provisioned "
-                            "credentials. Verify on your AWS account that the "
-                            "new certificate is active and has an attached IoT "
-                            "Policy that allows the \"iot:Connect\" action." ) );
+                LogError(("Failed to establish MQTT session with provisioned "
+                          "credentials. Verify on your AWS account that the "
+                          "new certificate is active and has an attached IoT "
+                          "Policy that allows the \"iot:Connect\" action."));
+
+                /* Force re-provisioning on next iteration */
+                xDestroyCertificateAndKey(xP11Session);
             }
             else
             {
-                LogInfo( ( "Sucessfully established connection with provisioned credentials." ) );
+                LogInfo(("Sucessfully established connection with provisioned credentials."));
                 xConnectionEstablished = true;
             }
         }
 
         /**** Finish **********************************************************/
 
-        if( xConnectionEstablished == true )
+        if (true == xConnectionEstablished)
         {
             /* Close the connection. */
-            xDisconnectMqttSession( &xMqttContext, &xNetworkContext );
+            xDisconnectMqttSession(&xMqttContext, &xNetworkContext);
             xConnectionEstablished = false;
         }
 
         /**** Retry in case of failure ****************************************/
 
-        xPkcs11CloseSession( xP11Session );
+        xPkcs11CloseSession(xP11Session);
 
         /* Increment the demo run count. */
         ulDemoRunCount++;
 
-        if( xStatus == true )
+        if (true == xStatus)
         {
-            LogInfo( ( "Demo iteration %d is successful.", ulDemoRunCount ) );
+            LogInfo(("Demo iteration %d is successful.", ulDemoRunCount));
         }
         /* Attempt to retry a failed iteration of demo for up to #fpdemoMAX_DEMO_LOOP_COUNT times. */
-        else if( ulDemoRunCount < fpdemoMAX_DEMO_LOOP_COUNT )
+        else if (ulDemoRunCount < fpdemoMAX_DEMO_LOOP_COUNT)
         {
-            LogWarn( ( "Demo iteration %d failed. Retrying...", ulDemoRunCount ) );
-            vTaskDelay( fpdemoDELAY_BETWEEN_DEMO_RETRY_ITERATIONS_SECONDS );
+            LogWarn(("Demo iteration %d failed. Retrying...", ulDemoRunCount));
+            vTaskDelay(fpdemoDELAY_BETWEEN_DEMO_RETRY_ITERATIONS_SECONDS);
         }
         /* Failed all #fpdemoMAX_DEMO_LOOP_COUNT demo iterations. */
         else
         {
-            LogError( ( "All %d demo iterations failed.", fpdemoMAX_DEMO_LOOP_COUNT ) );
+            LogError(("All %d demo iterations failed.", fpdemoMAX_DEMO_LOOP_COUNT));
             break;
         }
-    } while( xStatus != true );
+    } while (true != xStatus);
 
     /* Log demo success. */
-    if( xStatus == true )
+    if (true == xStatus)
     {
 #if !defined(__TEST__)
-        if (pcPublishTopic != NULL)
+        if (NULL != pcPublishTopic)
         {
-            vPortFree (pcPublishTopic);
+            vPortFree(pcPublishTopic);
             pcPublishTopic = NULL;
         }
 
-        if (pcAcceptTopic != NULL)
+        if (NULL != pcAcceptTopic)
         {
-            vPortFree (pcAcceptTopic);
+            vPortFree(pcAcceptTopic);
             pcAcceptTopic = NULL;
         }
-        if (pcRejectTopic != NULL)
+        if (NULL != pcRejectTopic)
         {
-            vPortFree (pcRejectTopic);
+            vPortFree(pcRejectTopic);
             pcRejectTopic = NULL;
         }
 #endif
         if (templateLength > 0)
         {
             vPortFree(template_buff);
+            template_buff = NULL;
         }
 
         if (thingnameLength > 0)
         {
             vPortFree(thingname_buff);
+            thingname_buff = NULL;
         }
 
-        LogInfo( ( "Demo completed successfully." ) );
-        LogInfo( ( "-------Fleet Provisioning Task Finished-------\r\n" ) );
+        LogInfo(("Demo completed successfully."));
+        LogInfo(("-------Fleet Provisioning Task Finished-------\r\n"));
     }
 
-    xSetMQTTAgentState( MQTT_AGENT_STATE_INITIALIZED );
+    xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
 
-    /* Delete this task. */
-    LogInfo( ( "Deleting Fleet Provisioning Demo task." ) );
-    vTaskDelete( NULL );
-
-    return ( xStatus == true ) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return (true == xStatus) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-/*-----------------------------------------------------------*/
+/**********************************************************************************************************************
+ End of function prvFpDemo_start
+ *********************************************************************************************************************/

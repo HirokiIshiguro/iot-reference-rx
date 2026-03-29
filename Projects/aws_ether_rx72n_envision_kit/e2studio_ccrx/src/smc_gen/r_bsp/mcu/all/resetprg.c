@@ -280,12 +280,8 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
     vbatt_voltage_stability_wait();
 #endif
 
-    /* Switch to high-speed operation unless the 3b diagnostic path intentionally
-     * preserves the bootloader clock state to validate direct-jump hypotheses.
-     */
-#if BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP == 0
+    /* Initialize MCU clocks. */
     mcu_clock_setup();
-#endif
 
     /* If the warm start Pre C runtime callback is enabled, then call it. */
 #if BSP_CFG_USER_WARM_START_CALLBACK_PRE_INITC_ENABLED == 1

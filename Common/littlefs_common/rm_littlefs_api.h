@@ -20,7 +20,7 @@ Includes   <System Includes> , "Project Includes"
 #ifndef RM_LITTLEFS_API_H
 #define RM_LITTLEFS_API_H
 
-/*******************************************************************************************************************//**
+/***********************************************************************************************************************
  * @defgroup RM_LITTLEFS_API LittleFS Interface
  * @ingroup RENESAS_INTERFACES
  * @brief Interface for LittleFS access
@@ -91,7 +91,7 @@ typedef struct st_rm_littlefs_instance
 /* Common macro for SSP header files. There is also a corresponding SSP_HEADER macro at the top of this file. */
 FSP_FOOTER
 
-/*******************************************************************************************************************//**
+/***********************************************************************************************************************
  * @} (end defgroup RM_LITTLEFS_API)
  **********************************************************************************************************************/
 

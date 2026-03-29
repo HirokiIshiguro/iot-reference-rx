@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -41,20 +43,21 @@
 
 /* Sanity check all the definitions required by this file are set. */
 #ifndef configPRINT_STRING
-    #error configPRINT_STRING( x ) must be defined in FreeRTOSConfig.h to use this logging file.  Set configPRINT_STRING( x ) to a function that outputs a string, where X is the string.  For example, #define configPRINT_STRING( x ) MyUARTWriteString( X )
+#error configPRINT_STRING( x ) must be defined in FreeRTOSConfig.h to use this logging file.  Set configPRINT_STRING( x ) to a function that outputs a string, where X is the string.  For example, #define configPRINT_STRING( x ) MyUARTWriteString( X )
 #endif
 
 #ifndef configLOGGING_MAX_MESSAGE_LENGTH
-    #error configLOGGING_MAX_MESSAGE_LENGTH must be defined in FreeRTOSConfig.h to use this logging file.  configLOGGING_MAX_MESSAGE_LENGTH sets the size of the buffer into which formatted text is written, so also sets the maximum log message length.
+#error configLOGGING_MAX_MESSAGE_LENGTH must be defined in FreeRTOSConfig.h to use this logging file.  configLOGGING_MAX_MESSAGE_LENGTH sets the size of the buffer into which formatted text is written, so also sets the maximum log message length.
 #endif
 
 #ifndef configLOGGING_INCLUDE_TIME_AND_TASK_NAME
-    #error configLOGGING_INCLUDE_TIME_AND_TASK_NAME must be defined in FreeRTOSConfig.h to use this logging file.  Set configLOGGING_INCLUDE_TIME_AND_TASK_NAME to 1 to prepend a time stamp, message number and the name of the calling task to each logged message.  Otherwise set to 0.
+#error configLOGGING_INCLUDE_TIME_AND_TASK_NAME must be defined in FreeRTOSConfig.h to use this logging file.  Set configLOGGING_INCLUDE_TIME_AND_TASK_NAME to 1 to prepend a time stamp, message number and the name of the calling task to each logged message.  Otherwise set to 0.
 #endif
 
 /* A block time of 0 just means don't block. */
-#define loggingDONT_BLOCK    0
-extern void vOutputString( const char * pcString);
+#define loggingDONT_BLOCK 0
+extern void vOutputString(const char *pcString);
+
 /*
  * Wrapper functions for vsnprintf and snprintf to return the actual number of
  * characters written.
@@ -81,14 +84,14 @@ extern void vOutputString( const char * pcString);
  *    that nothing was written as opposed to negative value from
  *    vsnprintf/snprintf.
  */
-static int vsnprintf_safe( char * s,
-                           size_t n,
-                           const char * format,
-                           va_list arg );
-static int snprintf_safe( char * s,
+static int vsnprintf_safe(char *s,
                           size_t n,
-                          const char * format,
-                          ... );
+                          const char *format,
+                          va_list arg);
+static int snprintf_safe(char *s,
+                         size_t n,
+                         const char *format,
+                         ...);
 
 /*-----------------------------------------------------------*/
 
@@ -104,7 +107,7 @@ static int snprintf_safe( char * s,
  * this file.  This version uses dynamic memory, so the buffer that contained
  * the log message is freed after it has been output.
  */
-static void prvLoggingTask( void * pvParameters );
+static void prvLoggingTask(void *pvParameters);
 
 /*-----------------------------------------------------------*/
 
@@ -116,24 +119,34 @@ static QueueHandle_t xQueue = NULL;
 
 /*-----------------------------------------------------------*/
 
-static int vsnprintf_safe( char * s,
-                           size_t n,
-                           const char * format,
-                           va_list arg )
+/**********************************************************************************************************************
+* Function Name: vsnprintf_safe
+* Description  : Wrapper function for vsnprintf that returns the actual number of characters written
+*               instead of the number that would have been written if the buffer was large enough.
+* Arguments    : s - Pointer to the buffer where the resulting string is stored
+*                n - Maximum number of bytes to be written
+*                format - String that contains the text to be written
+*                arg - Variable argument list
+* Return Value : The number of characters actually written, 0 on encoding error
+*********************************************************************************************************************/
+static int vsnprintf_safe(char *s,
+                          size_t n,
+                          const char *format,
+                          va_list arg)
 {
     int ret;
 
-    ret = vsnprintf( s, n, format, arg );
+    ret = vsnprintf(s, n, format, arg);
 
     /* Check if the string was truncated and if so, update the return value
      * to reflect the number of characters actually written. */
-    if( ret >= n )
+    if (ret >= n)
     {
         /* Do not include the terminating NULL character to keep the behaviour
          * same as the standard. */
         ret = n - 1;
     }
-    else if( ret < 0 )
+    else if (ret < 0)
     {
         /* Encoding error - Return 0 to indicate that nothing was written to the
          * buffer. */
@@ -149,170 +162,212 @@ static int vsnprintf_safe( char * s,
 
 /*-----------------------------------------------------------*/
 
-static int snprintf_safe( char * s,
-                          size_t n,
-                          const char * format,
-                          ... )
+/**********************************************************************************************************************
+* Function Name: snprintf_safe
+* Description  : Wrapper function for snprintf that returns the actual number of characters written
+*               instead of the number that would have been written if the buffer was large enough.
+* Arguments    : s - Pointer to the buffer where the resulting string is stored
+*                n - Maximum number of bytes to be written
+*                format - String that contains the text to be written
+*                ... - Variable arguments
+* Return Value : The number of characters actually written, 0 on encoding error
+*********************************************************************************************************************/
+static int snprintf_safe(char *s,
+                         size_t n,
+                         const char *format,
+                         ...)
 {
     int ret;
     va_list args;
 
-    va_start( args, format );
-    ret = vsnprintf_safe( s, n, format, args );
-    va_end( args );
+    va_start(args, format);
+    ret = vsnprintf_safe(s, n, format, args);
+    va_end(args);
 
     return ret;
 }
 
 /*-----------------------------------------------------------*/
 
-BaseType_t xLoggingTaskInitialize( uint16_t usStackSize,
-                                   UBaseType_t uxPriority,
-                                   UBaseType_t uxQueueLength )
+/**********************************************************************************************************************
+* Function Name: xLoggingTaskInitialize
+* Description  : Initializes the logging task and creates the queue used to pass log messages.
+* Arguments    : usStackSize - The size of the stack allocated to the logging task
+*                uxPriority - The priority of the logging task
+*                uxQueueLength - The length of the queue used to pass messages to the logging task
+* Return Value : pdPASS if initialization was successful, pdFAIL otherwise
+*********************************************************************************************************************/
+BaseType_t xLoggingTaskInitialize(uint16_t usStackSize,
+                                  UBaseType_t uxPriority,
+                                  UBaseType_t uxQueueLength)
 {
     BaseType_t xReturn = pdFAIL;
 
     /* Ensure the logging task has not been created already. */
-    if( xQueue == NULL )
+    if (NULL == xQueue)
     {
         /* Create the queue used to pass pointers to strings to the logging task. */
-        xQueue = xQueueCreate( uxQueueLength, sizeof( char ** ) );
+        xQueue = xQueueCreate(uxQueueLength, sizeof(char **));
 
-        if( xQueue != NULL )
+        if (NULL != xQueue)
         {
-            if( xTaskCreate( prvLoggingTask, "Logging", usStackSize, NULL, uxPriority, NULL ) == pdPASS )
+            if (xTaskCreate(prvLoggingTask, "Logging", usStackSize, NULL, uxPriority, NULL) == pdPASS)
             {
                 xReturn = pdPASS;
             }
             else
             {
                 /* Could not create the task, so delete the queue again. */
-                vQueueDelete( xQueue );
+                vQueueDelete(xQueue);
             }
         }
     }
 
     return xReturn;
 }
+/**********************************************************************************************************************
+ End of function xLoggingTaskInitialize
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 
-static void prvLoggingTask( void * pvParameters )
+/**********************************************************************************************************************
+* Function Name: prvLoggingTask
+* Description  : Task that performs the actual print output by receiving strings from the queue
+*                and sending them to the output port.
+* Arguments    : pvParameters - Task parameters (not used)
+* Return Value : None
+*********************************************************************************************************************/
+static void prvLoggingTask(void *pvParameters)
 {
     /* Disable unused parameter warning. */
-    ( void ) pvParameters;
-    typedef void * xComPortHandle;
+    (void)pvParameters;
+    typedef void *xComPortHandle;
 
-    char * pcReceivedString = NULL;
+    char *pcReceivedString = NULL;
     xComPortHandle xPort;
-    for( ; ; )
+    for (;;)
     {
         /* Block to wait for the next string to print. */
-        if( xQueueReceive( xQueue, &pcReceivedString, portMAX_DELAY ) == pdPASS )
+        if (xQueueReceive(xQueue, &pcReceivedString, portMAX_DELAY) == pdPASS)
         {
-            configPRINT_STRING( pcReceivedString );
+            configPRINT_STRING(pcReceivedString);
 
-            vPortFree( ( void * ) pcReceivedString );
+            vPortFree((void *)pcReceivedString);
         }
     }
 }
+/**********************************************************************************************************************
+ End of function prvLoggingTask
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-static void prvLoggingPrintfCommon( uint8_t usLoggingLevel,
-                                    const char * pcFile,
-                                    size_t fileLineNo,
-                                    const char * pcFormat,
-                                    va_list args )
+/**********************************************************************************************************************
+* Function Name: prvLoggingPrintfCommon
+* Description  : Common function used by all logging functions to format and output messages.
+* Arguments    : usLoggingLevel - The logging level of the message
+*                pcFile - Source file name (can be NULL)
+*                fileLineNo - Line number in source file
+*                pcFormat - Format string for the log message
+*                args - Variable argument list containing values to be formatted
+* Return Value : None
+*********************************************************************************************************************/
+static void prvLoggingPrintfCommon(uint8_t usLoggingLevel,
+                                   const char *pcFile,
+                                   size_t fileLineNo,
+                                   const char *pcFormat,
+                                   va_list args)
 {
     size_t xLength = 0;
-    char * pcPrintString = NULL;
+    char *pcPrintString = NULL;
 
-    configASSERT( usLoggingLevel <= LOG_DEBUG );
-    configASSERT( pcFormat != NULL );
-    configASSERT( configLOGGING_MAX_MESSAGE_LENGTH > 0 );
+    configASSERT(usLoggingLevel <= LOG_DEBUG);
+    configASSERT(NULL != pcFormat);
+    configASSERT(configLOGGING_MAX_MESSAGE_LENGTH > 0);
 
     /* The queue is created by xLoggingTaskInitialize().  Check
      * xLoggingTaskInitialize() has been called. */
-    configASSERT( xQueue );
+    configASSERT(xQueue);
 
     /* Allocate a buffer to hold the log message. */
-    pcPrintString = pvPortMalloc( configLOGGING_MAX_MESSAGE_LENGTH );
+    pcPrintString = pvPortMalloc(configLOGGING_MAX_MESSAGE_LENGTH);
 
-    if( pcPrintString != NULL )
+    if (NULL != pcPrintString)
     {
-        const char * pcLevelString = NULL;
+        const char *pcLevelString = NULL;
         size_t ulFormatLen = 0UL;
 
         /* Add metadata of task name and tick time for a new log message. */
-        if( strcmp( pcFormat, "\n" ) != 0 )
+        if (strcmp(pcFormat, "\n") != 0)
         {
-            /* Add metadata of task name and tick count if config is enabled. */
-            #if ( configLOGGING_INCLUDE_TIME_AND_TASK_NAME == 1 )
+/* Add metadata of task name and tick count if config is enabled. */
+#if (configLOGGING_INCLUDE_TIME_AND_TASK_NAME == 1)
+            {
+                const char *pcTaskName;
+                const char *pcNoTask = "None";
+                static BaseType_t xMessageNumber = 0;
+
+                /* Add a time stamp and the name of the calling task to the
+                 * start of the log. */
+                if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
                 {
-                    const char * pcTaskName;
-                    const char * pcNoTask = "None";
-                    static BaseType_t xMessageNumber = 0;
-
-                    /* Add a time stamp and the name of the calling task to the
-                     * start of the log. */
-                    if( xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED )
-                    {
-                        pcTaskName = pcTaskGetName( NULL );
-                    }
-                    else
-                    {
-                        pcTaskName = pcNoTask;
-                    }
-
-                    xLength += snprintf_safe( pcPrintString, configLOGGING_MAX_MESSAGE_LENGTH, "%lu %lu [%s] ",
-                                              ( unsigned long ) xMessageNumber++,
-                                              ( unsigned long ) xTaskGetTickCount(),
-                                              pcTaskName );
+                    pcTaskName = pcTaskGetName(NULL);
                 }
-            #endif /* if ( configLOGGING_INCLUDE_TIME_AND_TASK_NAME == 1 ) */
+                else
+                {
+                    pcTaskName = pcNoTask;
+                }
+
+                xLength += snprintf_safe(pcPrintString, configLOGGING_MAX_MESSAGE_LENGTH, "%lu %lu [%s] ",
+                                         (unsigned long)xMessageNumber++,
+                                         (unsigned long)xTaskGetTickCount(),
+                                         pcTaskName);
+            }
+#endif /* if ( configLOGGING_INCLUDE_TIME_AND_TASK_NAME == 1 ) */
         }
 
         /* Choose the string for the log level metadata for the log message. */
-        switch( usLoggingLevel )
+        switch (usLoggingLevel)
         {
-            case LOG_ERROR:
-                pcLevelString = "ERROR";
-                break;
+        case LOG_ERROR:
+            pcLevelString = "ERROR";
+            break;
 
-            case LOG_WARN:
-                pcLevelString = "WARN";
-                break;
+        case LOG_WARN:
+            pcLevelString = "WARN";
+            break;
 
-            case LOG_INFO:
-                pcLevelString = "INFO";
-                break;
+        case LOG_INFO:
+            pcLevelString = "INFO";
+            break;
 
-            case LOG_DEBUG:
-                pcLevelString = "DEBUG";
+        case LOG_DEBUG:
+            pcLevelString = "DEBUG";
         }
 
         /* Add the chosen log level information as prefix for the message. */
-        if( ( pcLevelString != NULL ) && ( xLength < configLOGGING_MAX_MESSAGE_LENGTH ) )
+        if ((NULL != pcLevelString) && (xLength < configLOGGING_MAX_MESSAGE_LENGTH))
         {
-            xLength += snprintf_safe( pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, "[%s] ", pcLevelString );
+            xLength += snprintf_safe(pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, "[%s] ", pcLevelString);
         }
 
         /* If provided, add the source file and line number metadata in the message. */
-        if( ( pcFile != NULL ) && ( xLength < configLOGGING_MAX_MESSAGE_LENGTH ) )
+        if ((NULL != pcFile) && (xLength < configLOGGING_MAX_MESSAGE_LENGTH))
         {
             /* If a file path is provided, extract only the file name from the string
              * by looking for '/' or '\' directory seperator. */
-            const char * pcFileName = NULL;
+            const char *pcFileName = NULL;
 
             /* Check if file path contains "\" as the directory separator. */
-            if( strrchr( pcFile, '\\' ) != NULL )
+            if (strrchr(pcFile, '\\') != NULL)
             {
-                pcFileName = strrchr( pcFile, '\\' ) + 1;
+                pcFileName = strrchr(pcFile, '\\') + 1;
             }
             /* Check if file path contains "/" as the directory separator. */
-            else if( strrchr( pcFile, '/' ) != NULL )
+            else if (strrchr(pcFile, '/') != NULL)
             {
-                pcFileName = strrchr( pcFile, '/' ) + 1;
+                pcFileName = strrchr(pcFile, '/') + 1;
             }
             else
             {
@@ -320,168 +375,234 @@ static void prvLoggingPrintfCommon( uint8_t usLoggingLevel,
                 pcFileName = pcFile;
             }
 
-            xLength += snprintf_safe( pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, "[%s:%d] ", pcFileName, fileLineNo );
-            configASSERT( xLength > 0 );
+            xLength += snprintf_safe(pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, "[%s:%d] ", pcFileName, fileLineNo);
+            configASSERT(xLength > 0);
         }
 
-        if( xLength < configLOGGING_MAX_MESSAGE_LENGTH )
+        if (xLength < configLOGGING_MAX_MESSAGE_LENGTH)
         {
-            xLength += vsnprintf_safe( pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, pcFormat, args );
+            xLength += vsnprintf_safe(pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, pcFormat, args);
         }
 
         /* Add newline characters if the message does not end with them.*/
-        ulFormatLen = strlen( pcFormat );
+        ulFormatLen = strlen(pcFormat);
 
-        if( ( ulFormatLen >= 2 ) &&
-            ( strncmp( pcFormat + ulFormatLen, "\r\n", 2 ) != 0 ) &&
-            ( xLength < configLOGGING_MAX_MESSAGE_LENGTH ) )
+        if ((ulFormatLen >= 2) &&
+            (strncmp(pcFormat + ulFormatLen, "\r\n", 2) != 0) &&
+            (xLength < configLOGGING_MAX_MESSAGE_LENGTH))
         {
-            xLength += snprintf_safe( pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, "%s", "\r\n" );
+            xLength += snprintf_safe(pcPrintString + xLength, configLOGGING_MAX_MESSAGE_LENGTH - xLength, "%s", "\r\n");
         }
 
         /* The standard says that snprintf writes the terminating NULL
          * character. Just re-write it in case some buggy implementation does
          * not. */
-        configASSERT( xLength < configLOGGING_MAX_MESSAGE_LENGTH );
-        pcPrintString[ xLength ] = '\0';
+        configASSERT(xLength < configLOGGING_MAX_MESSAGE_LENGTH);
+        pcPrintString[xLength] = '\0';
 
         /* Only send the buffer to the logging task if it is
          * not empty. */
-        if( xLength > 0 )
+        if (xLength > 0)
         {
             /* Send the string to the logging task for IO. */
-            if( xQueueSend( xQueue, &pcPrintString, loggingDONT_BLOCK ) != pdPASS )
-//        	configPRINT_STRING(pcPrintString);
+            if (xQueueSend(xQueue, &pcPrintString, loggingDONT_BLOCK) != pdPASS)
             {
                 /* The buffer was not sent so must be freed again. */
-                vPortFree( ( void * ) pcPrintString );
+                vPortFree((void *)pcPrintString);
             }
         }
         else
         {
             /* The buffer was not sent, so it must be
              * freed. */
-            vPortFree( ( void * ) pcPrintString );
+            vPortFree((void *)pcPrintString);
         }
     }
 }
+/**********************************************************************************************************************
+ End of function prvLoggingPrintfCommon
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-void vLoggingPrintfError( const char * pcFormat,
-                          ... )
+/**********************************************************************************************************************
+* Function Name: vLoggingPrintfError
+* Description  : Outputs a log message with ERROR level.
+* Arguments    : pcFormat - Format string for the log message
+*                ... - Variable arguments to be formatted
+* Return Value : None
+*********************************************************************************************************************/
+void vLoggingPrintfError(const char *pcFormat,
+                         ...)
 {
     va_list args;
 
-    va_start( args, pcFormat );
-    prvLoggingPrintfCommon( LOG_ERROR, NULL, 0, pcFormat, args );
+    va_start(args, pcFormat);
+    prvLoggingPrintfCommon(LOG_ERROR, NULL, 0, pcFormat, args);
 
-    va_end( args );
+    va_end(args);
 }
+/**********************************************************************************************************************
+ End of function vLoggingPrintfError
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-void vLoggingPrintfWarn( const char * pcFormat,
-                         ... )
+/**********************************************************************************************************************
+* Function Name: vLoggingPrintfWarn
+* Description : Outputs a log message with WARN level.
+* Arguments : pcFormat - Format string for the log message
+*             ... - Variable arguments to be formatted
+* Return Value : None
+*********************************************************************************************************************/
+void vLoggingPrintfWarn(const char *pcFormat,
+                        ...)
 {
     va_list args;
 
-    va_start( args, pcFormat );
-    prvLoggingPrintfCommon( LOG_WARN, NULL, 0, pcFormat, args );
+    va_start(args, pcFormat);
+    prvLoggingPrintfCommon(LOG_WARN, NULL, 0, pcFormat, args);
 
-    va_end( args );
+    va_end(args);
 }
+/**********************************************************************************************************************
+ End of function vLoggingPrintfWarn
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-void vLoggingPrintfInfo( const char * pcFormat,
-                         ... )
+/**********************************************************************************************************************
+* Function Name: vLoggingPrintfInfo
+* Description  : Outputs a log message with INFO level.
+* Arguments    : pcFormat - Format string for the log message
+*                ... - Variable arguments to be formatted
+* Return Value : None
+*********************************************************************************************************************/
+void vLoggingPrintfInfo(const char *pcFormat,
+                        ...)
 {
     va_list args;
 
-    va_start( args, pcFormat );
-    prvLoggingPrintfCommon( LOG_INFO, NULL, 0, pcFormat, args );
+    va_start(args, pcFormat);
+    prvLoggingPrintfCommon(LOG_INFO, NULL, 0, pcFormat, args);
 
-    va_end( args );
+    va_end(args);
 }
+/**********************************************************************************************************************
+ End of function vLoggingPrintfInfo
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-void vLoggingPrintfDebug( const char * pcFormat,
-                          ... )
+/**********************************************************************************************************************
+* Function Name: vLoggingPrintfDebug
+* Description  : Outputs a log message with DEBUG level.
+* Arguments    : pcFormat - Format string for the log message
+*                ... - Variable arguments to be formatted
+* Return Value : None
+*********************************************************************************************************************/
+void vLoggingPrintfDebug(const char *pcFormat,
+                         ...)
 {
     va_list args;
 
-    va_start( args, pcFormat );
-    prvLoggingPrintfCommon( LOG_DEBUG, NULL, 0, pcFormat, args );
+    va_start(args, pcFormat);
+    prvLoggingPrintfCommon(LOG_DEBUG, NULL, 0, pcFormat, args);
 
-    va_end( args );
+    va_end(args);
 }
+/**********************************************************************************************************************
+ End of function vLoggingPrintfDebug
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-void vLoggingPrintfWithFileAndLine( const char * pcFile,
-                                    size_t fileLineNo,
-                                    const char * pcFormat,
-                                    ... )
+/**********************************************************************************************************************
+* Function Name: vLoggingPrintfWithFileAndLine
+* Description  : Outputs a log message with source file name and line number information.
+* Arguments    : pcFile - Source file name
+*                fileLineNo - Line number in source file
+*                pcFormat - Format string for the log message
+*                ... - Variable arguments to be formatted
+* Return Value : None
+*********************************************************************************************************************/
+void vLoggingPrintfWithFileAndLine(const char *pcFile,
+                                   size_t fileLineNo,
+                                   const char *pcFormat,
+                                   ...)
 {
-    configASSERT( pcFile != NULL );
+    configASSERT(NULL != pcFile);
 
     va_list args;
 
-    va_start( args, pcFormat );
-    prvLoggingPrintfCommon( LOG_NONE, pcFile, fileLineNo, pcFormat, args );
+    va_start(args, pcFormat);
+    prvLoggingPrintfCommon(LOG_NONE, pcFile, fileLineNo, pcFormat, args);
 
-    va_end( args );
+    va_end(args);
 }
+/**********************************************************************************************************************
+ End of function vLoggingPrintfWithFileAndLine
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-/*!
- * \brief Formats a string to be printed and sends it
- * to the print queue.
- *
- * Appends the message number, time (in ticks), and task
- * that called vLoggingPrintf to the beginning of each
- * print statement.
- *
- */
-void vLoggingPrintf( const char * pcFormat,
-                     ... )
+/**********************************************************************************************************************
+* Function Name: vLoggingPrintf
+* Description  : Formats a string to be printed and sends it to the print queue.
+*                Appends the message number, time (in ticks), and task that called vLoggingPrintf
+*                to the beginning of each print statement if configured.
+* Arguments    : pcFormat - Format string for the log message
+*                ... - Variable arguments to be formatted
+* Return Value : None
+*********************************************************************************************************************/
+void vLoggingPrintf(const char *pcFormat,
+                    ...)
 {
     va_list args;
 
-    va_start( args, pcFormat );
-    prvLoggingPrintfCommon( LOG_NONE, NULL, 0, pcFormat, args );
+    va_start(args, pcFormat);
+    prvLoggingPrintfCommon(LOG_NONE, NULL, 0, pcFormat, args);
 
-    va_end( args );
+    va_end(args);
 }
+/**********************************************************************************************************************
+ End of function vLoggingPrintf
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
 
-void vLoggingPrint( const char * pcMessage )
+/**********************************************************************************************************************
+* Function Name: vLoggingPrint
+* Description  : Sends a pre-formatted string to the logging task for output.
+* Arguments    : pcMessage - The string to be printed
+* Return Value : None
+*********************************************************************************************************************/
+void vLoggingPrint(const char *pcMessage)
 {
-    char * pcPrintString = NULL;
+    char *pcPrintString = NULL;
     size_t xLength = 0;
 
     /* The queue is created by xLoggingTaskInitialize().  Check
      * xLoggingTaskInitialize() has been called. */
-    configASSERT( xQueue );
+    configASSERT(xQueue);
 
-    xLength = strlen( pcMessage ) + 1;
-    pcPrintString = pvPortMalloc( xLength );
+    xLength = strlen(pcMessage) + 1;
+    pcPrintString = pvPortMalloc(xLength);
 
-    if( pcPrintString != NULL )
+    if (NULL != pcPrintString)
     {
-        strncpy( pcPrintString, pcMessage, xLength );
+        strncpy(pcPrintString, pcMessage, xLength);
 
         /* Send the string to the logging task for IO. */
-        if( xQueueSend( xQueue, &pcPrintString, loggingDONT_BLOCK ) != pdPASS )
+        if (xQueueSend(xQueue, &pcPrintString, loggingDONT_BLOCK) != pdPASS)
         {
             /* The buffer was not sent so must be freed again. */
-            vPortFree( ( void * ) pcPrintString );
+            vPortFree((void *)pcPrintString);
         }
     }
 }
+/**********************************************************************************************************************
+ End of function vLoggingPrint
+ *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/

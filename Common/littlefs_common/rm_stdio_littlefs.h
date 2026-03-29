@@ -75,19 +75,24 @@ End of function rm_littlefs_fopen
 /* Use the above inline function to replace fopen. */
 #define fopen    (rm_littlefs_fopen)
 
+/* fwrite macro defenition */
 #define fwrite(data, n, len, stream)    (lfs_file_write(MBEDTLS_CONFIG_LFS, (lfs_file_t *) stream, data, n * len))
 
+/* fread macro defenition */
 #define fread(data, n, len, stream)     (lfs_file_read(MBEDTLS_CONFIG_LFS, (lfs_file_t *) stream, data, n * len))
 
+/* fseek macro defenition */
 #define fseek(stream, offset,                                                                              \
                 seek)                     ((lfs_file_seek(MBEDTLS_CONFIG_LFS, (lfs_file_t *) stream, offset, \
                                                         seek) >= 0) ? 0 : -1)
 
+/* remove macro defenition */
 #define remove(file)                    (lfs_remove(MBEDTLS_CONFIG_LFS, file))
 
 /* Free the memory associated with this file after it is closed. */
 #define fclose(stream)                  (lfs_file_close(MBEDTLS_CONFIG_LFS, (lfs_file_t *) stream); free(stream))
 
+/* rename macro defenition */
 #define rename(oldpath, newpath)        (lfs_rename(MBEDTLS_CONFIG_LFS, oldpath, newpath))
 
 extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;

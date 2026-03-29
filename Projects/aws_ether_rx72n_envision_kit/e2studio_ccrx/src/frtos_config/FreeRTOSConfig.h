@@ -93,11 +93,7 @@
 #define configUSE_TIMERS                           1
 #define configTIMER_TASK_PRIORITY                  (6)
 #define configTIMER_QUEUE_LENGTH                   5
-#if defined( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP ) && ( BSP_CFG_PHASE8B_3B_SKIP_MCU_CLOCK_SETUP != 0 )
-    #define configTIMER_TASK_STACK_DEPTH           (configMINIMAL_STACK_SIZE * 2UL)
-#else
-    #define configTIMER_TASK_STACK_DEPTH           (configMINIMAL_STACK_SIZE)
-#endif
+#define configTIMER_TASK_STACK_DEPTH           (configMINIMAL_STACK_SIZE)
 
 /* The interrupt priority used by the kernel itself for the tick interrupt and
 the pended interrupt.  This would normally be the lowest priority. */

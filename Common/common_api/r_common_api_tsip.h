@@ -27,7 +27,7 @@
 extern xSemaphoreHandle xSemaphoreTSIPAccess;
 
 /* Function Name: R_Demo_Common_API_TSIP_Open */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief CommonAPI open function for TSIP.
  * @param[in] void
  * @return e_commonapi_err_t
@@ -37,7 +37,7 @@ extern xSemaphoreHandle xSemaphoreTSIPAccess;
 e_commonapi_err_t R_Demo_Common_API_TSIP_Open (tsip_tls_ca_certification_public_key_index_t *ki1, tsip_update_key_ring_t *ki2);
 
 /* Function Name: R_Demo_Common_API_TSIP_Close */
-/******************************************************************************************************************//**
+/**********************************************************************************************************************
  * @brief CommonAPI close function for TSIP.
  * @param[in] void
  * @return e_commonapi_err_t

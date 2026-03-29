@@ -1,7 +1,7 @@
 # Getting Started Guide
 
 * This document explains demo and how to run them.  
-* This demo supports the FreeRTOS 202406.01 LTS libraries.  
+* This demo supports the FreeRTOS 202406.04 LTS libraries.  
 * This demo only works with CK-RX65N v2.
 
 ## Summary of demos
@@ -13,6 +13,7 @@ The following table describes the different combinations of demos.
 |Demo Name|Based AWS IoT contents|Description|Each information|
 | ---- | ---- | ---- | ---- |
 |PubSub/MQTT|[coreMQTT demos](https://docs.aws.amazon.com/freertos/latest/userguide/mqtt-demo.html)|It demonstrates simple MQTT communication between device and AWS server.|- [Ethernet project](/Projects/aws_ether_ck_rx65n_v2/ether_pubsub_information.md)<BR>- [Cellular project](/Projects/aws_ryz014a_ck_rx65n_v2/ryz014a_pubsub_information.md)<BR>- [Wi-Fi project](/Projects/aws_da16600_ck_rx65n_v2/da16600_pubsub_information.md)|
+|PubSub/MQTT with Fleet Provisioning|[Provisioning devices without device certificates using fleet provisioning](https://docs.aws.amazon.com/iot/latest/developerguide/provision-wo-cert.html)|This demonstration illustrates Fleet Provisioning functionality, followed by PubSub using AWS services.|- [Ethernet project](/Projects/aws_ether_ck_rx65n_v2/ether_fleet_information.md)<BR>- [Cellular project](/Projects/aws_ryz014a_ck_rx65n_v2/ryz014a_fleet_information.md)<BR>- [Wi-Fi project](/Projects/aws_da16600_ck_rx65n_v2/da16600_fleet_information.md)|
 |PubSub/MQTT with Over-the-air(OTA)| [OTA tutorial](https://docs.aws.amazon.com/freertos/latest/userguide/dev-guide-ota-workflow.html) | It provides the steps to update the firmware on your device.|- [Ethernet project](/Projects/aws_ether_ck_rx65n_v2/ether_ota_information.md)<BR>- [Cellular project](/Projects/aws_ryz014a_ck_rx65n_v2/ryz014a_ota_information.md)<BR>- [Wi-Fi project](/Projects/aws_da16600_ck_rx65n_v2/da16600_ota_information.md)<BR>- [Boot loader project](/Projects/boot_loader_ck_rx65n_v2/bootloader_information.md)|
 
 Each demo is independent as a FreeRTOS's task. It means multiple demos can be run at the same time.
@@ -22,7 +23,6 @@ These tasks establish a server and client-authenticated TLS connection, and demo
 
 > **Note** :
 >
-> * Fleet Provisioning demo is not supported in this version.  
 > * TCP minimal will only be created when you create as a new project (PG) and usage is described in [minimal_tcp/README.md](https://github.com/renesas/iot-reference-rx/blob/accf243603b068bf6e8d88be76c433f8b9125da5/Configuration/samples/minimal_tcp/README.md).
 
 <details>
@@ -44,14 +44,14 @@ When you create as a new project (PG) according to the FAQ below, you can skip s
 
 #### Software requirements
 
-* IDE: [e2 studio](https://www.renesas.com/software-tool/e-studio#download) 2025-04
+* IDE: [e2 studio](https://www.renesas.com/software-tool/e-studio#download) 2025-12
 * Compiler:
   * [CC-RX](https://www.renesas.com/software-tool/cc-compiler-package-rx-family) V3.07.00
-  * [GCC](https://llvm-gcc-renesas.com/rx-download-toolchains/) for Renesas RX v8.3.0.202411  
+  * [GCC](https://llvm-gcc-renesas.com/rx-download-toolchains/) for Renesas RX v14.2.0.202505  
 * Code generator: [RX Smart Configurator](https://www.renesas.com/software-tool/rx-smart-configurator)
   * It is installed with e2 studio.
 * Serial terminal application: such as Tera Term
-  * Recommend using [Tera Term v4.108](https://github.com/TeraTermProject/teraterm/releases/tag/v4.108)
+  * Recommend using [Tera Term v5.5.0](https://github.com/TeraTermProject/teraterm/releases/tag/v5.5.0)
 
 #### Choosing the sample project
 
@@ -61,16 +61,15 @@ Each connectivity has a corresponding sample project as described in the followi
 |:-----------------|:-------------|:-------------|:------------|:---------|:-------|
 | CK-RX65N v2 | Ethernet | aws_ether_ck_rx65n_v2 | boot_loader_ck_rx65n_v2 | CC-RX/GCC |
 | CK-RX65N v2 | Cellular (Cat-M1)(Obsolete) | aws_ryz014a_ck_rx65n_v2 | boot_loader_ck_rx65n_v2 |CC-RX/GCC|   |
-| CK-RX65N v2 | Wi-Fi (DA16600) | aws_da16600_ck_rx65n_v2 | -- | CC-RX/GCC | See Note |
-
-> **Note**: The Wi-Fi (DA16600) project only supports PubSub/MQTT sample project.  
+| CK-RX65N v2 | Wi-Fi (DA16600) | aws_da16600_ck_rx65n_v2 | boot_loader_ck_rx65n_v2 | CC-RX/GCC |  |
 
 The following are combinations of demos that can be tried for each procedure.
 
 |Operating Procedure|Macro Settings|PubSub|Fleet Provisioning|OTA|
 |---|---|---|---|---|
 |[Step 4-1:<BR>Run PubSub/MQTT sample project](#step-4-1-run-pubsubmqtt-sample-project)|`ENABLE_FLEET_PROVISIONING_DEMO (0)`<BR>`ENABLE_OTA_UPDATE_DEMO (0)`|✓|-|-|
-|[Step 4-2:<BR>Run PubSub/MQTT with Over-the-air(OTA) update sample project](#step-4-2-run-pubsubmqtt-with-over-the-airota-update-sample-project)|`ENABLE_FLEET_PROVISIONING_DEMO (0)`<BR>`ENABLE_OTA_UPDATE_DEMO (1)`|✓|-|✓|
+|[Step 4-2:<BR>Run PubSub/MQTT with Fleet Provisioning sample project](#step-4-2-run-pubsubmqtt-with-fleet-provisioning-sample-project)|`ENABLE_FLEET_PROVISIONING_DEMO (1)`<BR>`ENABLE_OTA_UPDATE_DEMO (0)`|✓|✓|-|
+|[Step 4-3:<BR>Run PubSub/MQTT with Over-the-air(OTA) update sample project](#step-4-3-run-pubsubmqtt-with-over-the-airota-update-sample-project)|`ENABLE_FLEET_PROVISIONING_DEMO (0)`<BR>`ENABLE_OTA_UPDATE_DEMO (1)`|✓|-|✓|
 
 * The macro configuration is done in the file \src\frtos_config\demo_config.h.  
 * Be sure to complete Step 1 to 3 before performing Step 4 in the table above.
@@ -79,8 +78,9 @@ The following are combinations of demos that can be tried for each procedure.
 
 ### Step 1: Downloading this product
 
-At first step, prepare this product on your local environment.
-Clone this repository by the following commands.
+[Step 3](#step-3-import-project-into-e2-studio) shows the procedure for downloading and importing a project from GitHub using e2 studio.  
+You can also get the project directly from GitHub.  
+To do this, clone this repository with the following command:  
 
 * For long path name:  
 
@@ -92,14 +92,18 @@ Clone this repository by the following commands.
   * To clone using HTTPS:  
 
     ```text
-    git clone https://github.com/renesas/iot-reference-rx.git -b v202406.01-LTS-rx-1.1.0 --recurse-submodules
+    git clone https://github.com/renesas/iot-reference-rx.git -b v202406.04-LTS-rx-1.2.0 --recurse-submodules
     ```  
 
   * To clone using  SSH:
 
     ```text
-    git clone git@github.com:renesas/iot-reference-rx -b v202406.01-LTS-rx-1.1.0 --recurse-submodules
+    git clone git@github.com:renesas/iot-reference-rx -b v202406.04-LTS-rx-1.2.0 --recurse-submodules
     ```  
+
+> **Note:**:
+>
+> When you clone the project directly from GitHub, import the project in e2 studio by selecting **Import** -> **Existing Projects into Workspace**.
 
 ### Step 2: Hardware setup
 
@@ -138,18 +142,35 @@ Import demo project into IDE; e2 studio.
 
 1. Open e2 studio.
 1. Choose workspace and click **Launch**.
-1. **File** -> **Import...** -> **Existing Project into WorkSpace**.
-1. Click **Browse...** and choose **aws_ether_ck_rx65n_v2** (for Ethernet) demo.  
-  In the project folder, there is a folder corresponding to your compiler. Select the **e2studio_ccrx** folder.  
-   * The **e2studio_gcc** folder contains the GCC compiler project.  
-   * The **flash_project** folder contains a project for writing firmware to the RX65N flash memory using the [**Renesas Flash Programmer**](https://www.renesas.com/software-tool/renesas-flash-programmer-programming-gui?srsltid=AfmBOooUVDTEBakGjnRCPWrDtsjxbOEhQTCX3KR6HLw2oXfya7HAwy2_) during OTA execution.
-  
-    ![3-4](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step3_4_project_import_l3_2.png?raw=true)
+1. **File** -> **Import...** -> **Renesas GitHub FreeRTOS (with IoT libraries) Project**.
+1. Specify the folder to import the project into.  
+   Next, select `v202406.04-LTS-rx-1.2.0` from **RTOS version setting** and click the **Next** button.  
+   ![step3-1](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step3_1_project_import1_l3_s3.png?raw=true)
+1. If the specified version cannot be found, click **Manage RTOS** and download the required FreeRTOS Module.
+   * In the **Download Configuration** screen, select `FreeRTOS (with IoT libraries) for RX` and click **OK** button.
+   * Check the required version of **FreeRTOS (with IoT libraries)**.  
+     At this time, set a short path of 10 characters or less for Module Folder Path.  
+     Click the **Download** button.  
+     ![step3-2](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step3_2_project_import2_l3_s3.png?raw=true)  
+1. The project will be downloaded from GitHub to the specified folder.
+1. From the Import Projects screen, check `aws_ether_ck_rx65n_v2` and click the **Finish** button to import the project.  
+ ![step3-3](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step3_3_project_import3_l3_s3.png?raw=true)  
+   Here, you can select the following projects.  
+   Check them as needed and import them.
+
+   | Project name                         | compiler | Connectivity |
+   |--------------------------------------|----------|--------------|
+   |aws_ether_ck_rx65n_v2\e2studio_ccrx   | CC-RX    | Ethernet     |
+   |aws_ether_ck_rx65n_v2\e2studio_gcc    | GCC      | Ethernet     |
+   |aws_ryz014a _ck_rx65n_v2\e2studio_ccrx| CC-RX    | Cellular     |
+   |aws_ryz014a _ck_rx65n_v2\e2studio_gcc | GCC      | Cellular     |
+   |aws_da16600_ck_rx65n_v2\e2studio_ccrx | CC-RX    | Wi-Fi        |
+   |aws_da16600_ck_rx65n_v2\e2studio_gcc  | GCC      | Wi-Fi        |
+   |boot_loader_ck_rx65n_v2\e2studio_ccrx | CC-RX    | -            |
+   |boot_loader_ck_rx65n_v2\e2studio_gcc  | GCC      | -            |
 
     > **Note:**  
-    > Ensure that **"copy project into workspace"** is **not selected**.  
-    > ![3-4](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step3_4_project_import2_l3_1.png?raw=true)  
-1. Click **Finish** to import the project.
+    > Projects with the same connectivity for `CC-RX` and `GCC` cannot be imported at the same time.
 
 ### Step 4: Run demos
 
@@ -167,7 +188,7 @@ In "*Projects\\<project_name>\\e2studio_ccrx\\src\\frtos_config\\demo_config.h*"
 > **Note:**  
 >
 > * In the above, *<project_name>* refers to the specific project name described in `'Choosing the sample project'`.
-> * The default demo application is "PubSub Demo", disable the OTA and Fleet Provisiong demos to run PubSub only demo.
+> * The default demo application is "PubSub Demo", disable the OTA and Fleet Provisioning demos to run PubSub only demo.
 
 * `ENABLE_FLEET_PROVISIONING_DEMO`: (0)
 * `ENABLE_OTA_UPDATE_DEMO`: (0)  
@@ -224,7 +245,7 @@ Configure Tera Term settings as following if you use it:
   * Receive : AUTO
   * Transmit: CR+LF  
 
-  ![4-1-4](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_5teraterm_setting1.PNG?raw=true)
+  ![4-1-4](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_4_teraterm_setting1_l3_s3.png?raw=true)
 * Serial port settings: Setup->Serial port
   * Port : Your COM
 * Speed : 115200
@@ -232,20 +253,22 @@ Configure Tera Term settings as following if you use it:
 * Parity : none
 * Stop bits: 1 bit
 * Flow control : none  
-  ![4-1-4](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_5teraterm_setting2.PNG?raw=true)
+  ![4-1-4](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_4_teraterm_setting2_l3_s3.png?raw=true)
 
 ##### Step 4-1-5: AWS MQTT test client settings  
 
 You can run the PubSub Demo to see the communication messages in AWS.  
 To do this, you must first set up the **MQTT test client**.
 
-* Open the **MQTT test client** website.  
+* Open the IoT Core **MQTT Test Client** website in the AWS Management Console.  
   <https://us-east-2.console.aws.amazon.com/iot/home?region=us-east-2#/test>
 
 > **Note:** The above URL is an example, change it to the AWS site that matches your region.
 
-* Click **Subscribe to a topic**, enter `#` in the **Topic filter**, and click the `Subscribe` button.  
-  ![4-1-7](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_7_2.PNG?raw=true)
+* Click **Subscribe to a topic** and enter `#` in the **Topic filter**.
+* Click **Additional configuration** and select **Display payloads as strings (more accurate)** from **MQTT payload display**.
+* Click the **Subscribe** button.  
+  ![4-1-5](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_5_l3_s3.png?raw=true)
 * You can check the communication messages by running the demo.  
   For instructions on how to check the messages, see [Step 4-1-9](#step-4-1-9-check-messages-with-the-aws-mqtt-test-client).
 
@@ -334,8 +357,12 @@ Drag and drop "xxxx-certificate.pem.crt" generated in [Step 4-1-3: Create RSA ke
 
  ![4-1-6](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_6_5cert_l3_2.PNG?raw=true)  
 
-> **Note:** About \<device certificate\>, if you use Tera Term, drag and drop the certificate file onto the Terminal screen after entered `conf set cert` , then select `Send File (Paste content of file)` on the screen that appears, and press `OK`.  
-> The contents of the certificate file will be entered.
+> **Note1:**  
+>
+> * About \<device certificate\>, if you use Tera Term, drag and drop the certificate file onto the Terminal screen after entered `conf set cert` , then select `Send File (Paste content of file)` on the screen that appears, and press `OK`.  
+>   The contents of the certificate file will be entered.
+> * After dropping the file, on the **File Drag and Drop** screen that appears, select the `Binary` checkbox.  
+  ![4-1-6](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_6_9_binary_l3_s3.png?raw=true)
 
 Next, set the device private key:  
 Drag and drop "xxxx-private.pem.key" generated in [Step 4-1-3: Create RSA key pair and device certificate for PubSub Demo](#step-4-1-3-create-rsa-key-pair-and-device-certificate-for-pubsub-demo) to Tera Term.
@@ -346,8 +373,12 @@ Drag and drop "xxxx-private.pem.key" generated in [Step 4-1-3: Create RSA key pa
 
  ![4-1-6](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_6_6key_l3_2.PNG?raw=true)
 
-> **Note:** About \<private key\>, if you use Tera Term, drag and drop the certificate file onto the Terminal screen after entered `conf set key` , then select `Send File (Paste content of file)` on the screen that appears, and press `OK`.  
+> **Note:**
+>
+> * About \<private key\>, if you use Tera Term, drag and drop the certificate file onto the Terminal screen after entered `conf set key` , then select `Send File (Paste content of file)` on the screen that appears, and press `OK`.  
 > The contents of the certificate file will be entered.
+> * After dropping the file, on the **File Drag and Drop** screen that appears, select the `Binary` checkbox.  
+  ![4-1-6](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_6_9_binary_l3_s3.png?raw=true)
 
 ###### Commit configuration changes
 
@@ -385,15 +416,46 @@ Once you configure the MQTT test client in [Step 4-1-5](#step-4-1-5-aws-mqtt-tes
 
 * Display the MQTT test client website you set in [Step 4-1-5](#step-4-1-5-aws-mqtt-test-client-settings).
 * You can get message "*Task x publishing message x*" published to **MQTT test client** console.  
-If successful, it will be displayed on AWS console as shown below.![4-1-7](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_7_3.PNG?raw=true)  
+If successful, it will be displayed on AWS console as shown below.![4-1-9](https://github.com/renesas/iot-reference-rx/wiki/getting_started_guide_image/step4_1_9_l3_s3.png?raw=true)  
 
 ---
 
-#### Step 4-2: Run PubSub/MQTT with Over-the-air(OTA) update sample project
+#### Step 4-2: Run PubSub/MQTT with Fleet Provisioning sample project
 
-* Details for *PubSub/MQTT with Over-the-air(OTA) update sample project* are provided in the special application note (document number: R01AN7662).  
+* In this chapter, the "PubSub/MQTT with Fleet Provisioning sample project" will be referred to as the "PubSub demo with Fleet Provisioning".
+* Details for *PubSub demo with Fleet Provisioning* are provided in the special application note (document number: **R01AN8016**).  
   Please check the following webpage:
-  * <https://www.renesas.com/document/apn/rx-family-how-implement-freertos-ota-using-amazon-web-services-202406-lts-version-rev100>  
+  * <https://www.renesas.com/document/apn/rx-family-how-implement-aws-iot-fleet-provisioning-202406-lts-version?r=1471546>  
+  Though this application note is for Ethernet projects, Cellular and Wi-Fi project will also work as described in application note.
+* When running this demo, please check your RX Smart Configurator settings.  
+  If a gray icon appears in the component tree in the Smart Configurator, the corresponding component is not present in your environment.  
+  To download the required modules, see the "[**Download the FIT module**](#download-the-fit-module)" section.
+
+##### Precaution for PubSub demo with Fleet Provisioning
+
+* Make sure to follow the steps described in the preceding application note.
+* If you deviate from the *normal flow*, the Data Flash usage is not guaranteed.
+* The following is an example of Fleet Provisioning with *abnormal flow*:
+  1. When the demo program enters CLI mode for the first time, after formatting the Data Flash, set and commit the endpoint, template, claim certificate, and claim private key as usual.
+  1. After Fleet Provisioning and PubSub demo completes, reset the device.
+  1. When demo program enters CLI mode again after reset,
+      set and commit a new set of device credentials.
+* With the *normal flow*, Data Flash usage is ~7808 bytes after Fleet Provisioning.
+* With the *abnormal flow*, new device credentials will overwrite existing credentials provisioned by Fleet Provisioning.
+  * In this case, an additional 1408 bytes will be used.
+* Currently the maximum response latency between AWS and the device is set at 5000 ms.  
+The latency is set to be long enough to allow for a margin of error.  
+If you want to shorten the latency, please adjust it according to your environment.  
+Demos\common\Mqtt_Demo_Helpers\mqtt_pkcs11_demo_helper.c  
+`mqttexamplePROCESS_LOOP_TIMEOUT_MS　(5000U)`
+
+---
+
+#### Step 4-3: Run PubSub/MQTT with Over-the-air(OTA) update sample project
+
+* Details for *PubSub/MQTT with Over-the-air(OTA) update sample project* are provided in the special application note (document number: **R01AN7662**).  
+  Please check the following webpage:
+  * <https://www.renesas.com/document/apn/rx-family-how-implement-freertos-ota-using-amazon-web-services-202406-lts-version-rev110?r=1471546>  
 * About how to run this demo, see the chapter "*2. Prerequisites*" and beyond in preceding application note.
 * Although this application note focuses on an Ethernet project, the Cellular and Wi-Fi projects also work as described in the application note.
 * When running this demo, please check your RX Smart Configurator settings.  

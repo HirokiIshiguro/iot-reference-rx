@@ -754,7 +754,7 @@ WIFIReturnCode_t WIFI_NetworkDelete (uint16_t usIndex);
  * @return @ref eWiFiSuccess if ping was successful, other failure code otherwise.
  */
 /* @[declare_wifi_wifi_ping] */
-WIFIReturnCode_t WIFI_Ping (uint8_t * pucIPAddr,
+WIFIReturnCode_t WIFI_Ping (uint32_t * pucIPAddr,
                             uint16_t usCount);
 
 /* @[declare_wifi_wifi_ping] */
@@ -774,7 +774,7 @@ WIFIReturnCode_t WIFI_Ping (uint8_t * pucIPAddr,
  * otherwise. The returned MAC address must be 6 consecutive bytes with no delimitters.
  */
 /* @[declare_wifi_wifi_getmac] */
-WIFIReturnCode_t WIFI_GetMAC (uint8_t * pucMac);
+WIFIReturnCode_t WIFI_GetMAC (uint32_t * pucMac);
 
 /* @[declare_wifi_wifi_getmac] */
 
@@ -795,7 +795,7 @@ WIFIReturnCode_t WIFI_GetMAC (uint8_t * pucMac);
  */
 /* @[declare_wifi_wifi_gethostip] */
 WIFIReturnCode_t WIFI_GetHostIP (char * pcHost,
-                                 uint8_t * pucIPAddr);
+                                 uint32_t * pucIPAddr);
 
 /* @[declare_wifi_wifi_gethostip] */
 

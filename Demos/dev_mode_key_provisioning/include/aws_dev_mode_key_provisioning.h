@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -23,8 +25,6 @@
  * http://aws.amazon.com/freertos
  * http://www.FreeRTOS.org
  */
-
-
 
 /**
  * @file  aws_dev_mode_key_provsioning.h
@@ -47,15 +47,15 @@
 
 typedef struct ProvisioningParams_t
 {
-    uint8_t * pucClientPrivateKey;      /**< Pointer to the device private key in PEM format.
+    uint8_t *pucClientPrivateKey;       /**< Pointer to the device private key in PEM format.
                                          *   See tools/certificate_configuration/PEMfileToCString.html
                                          *   for help with formatting.*/
     uint32_t ulClientPrivateKeyLength;  /**< Length of the private key data, in bytes. */
-    uint8_t * pucClientCertificate;     /**< Pointer to the device certificate in PEM format.
+    uint8_t *pucClientCertificate;      /**< Pointer to the device certificate in PEM format.
                                          *   See tools/certificate_configuration/PEMfileToCString.html
                                          *   for help with formatting.*/
     uint32_t ulClientCertificateLength; /**< Length of the device certificate in bytes. */
-    uint8_t * pucJITPCertificate;       /**< Pointer to the Just-In-Time Provisioning (JITP) certificate in
+    uint8_t *pucJITPCertificate;        /**< Pointer to the Just-In-Time Provisioning (JITP) certificate in
                                          *   PEM format.
                                          *   - This is REQUIRED if JITP is being used.
                                          *   - If you are not using JITP, this certificate
@@ -68,7 +68,6 @@ typedef struct ProvisioningParams_t
                                          *   If JITP is not being used, this value should be set to 0. */
 } ProvisioningParams_t;
 
-
 /** \brief Provisions device with default credentials.
  *
  * Imports the certificate and private key located in
@@ -77,7 +76,12 @@ typedef struct ProvisioningParams_t
  * \return CKR_OK upon successful credential setup.
  * Otherwise, a positive PKCS #11 error code.
  */
-CK_RV vDevModeKeyProvisioning( void);
+/**********************************************************************************************************************
+ * Function Name: vDevModeKeyProvisioning
+ * Description  : .
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV vDevModeKeyProvisioning (void);
 
 /** \brief Provisiong a device given a valid PKCS #11 session.
  *
@@ -88,8 +92,15 @@ CK_RV vDevModeKeyProvisioning( void);
  * \return CKR_OK upon successful credential setup.
  * Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xProvisionDevice( CK_SESSION_HANDLE xSession,
-                        ProvisioningParams_t * pxParams );
+/**********************************************************************************************************************
+ * Function Name: xProvisionDevice
+ * Description  : .
+ * Arguments    : xSession
+ *              : pxParams
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xProvisionDevice (CK_SESSION_HANDLE xSession,
+                       ProvisioningParams_t *pxParams);
 
 /** \brief Provisions device with provided credentials.
  *
@@ -99,7 +110,13 @@ CK_RV xProvisionDevice( CK_SESSION_HANDLE xSession,
  * \return CKR_OK upon successful credential setup.
  * Otherwise, a positive PKCS #11 error code.
  */
-BaseType_t vAlternateKeyProvisioning( ProvisioningParams_t * xParams );
+/**********************************************************************************************************************
+ * Function Name: vAlternateKeyProvisioning
+ * Description  : .
+ * Argument     : xParams
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t vAlternateKeyProvisioning (ProvisioningParams_t *xParams);
 
 /** \brief Provisions a private key using PKCS #11 library.
  *
@@ -115,11 +132,21 @@ BaseType_t vAlternateKeyProvisioning( ProvisioningParams_t * xParams );
  * \return CKR_OK upon successful key creation.
  * Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xProvisionPrivateKey( CK_SESSION_HANDLE xSession,
-                            uint8_t * pucPrivateKey,
-                            size_t xPrivateKeyLength,
-                            uint8_t * pucLabel,
-                            CK_OBJECT_HANDLE_PTR pxObjectHandle );
+/**********************************************************************************************************************
+ * Function Name: xProvisionPrivateKey
+ * Description  : .
+ * Arguments    : xSession
+ *              : pucPrivateKey
+ *              : xPrivateKeyLength
+ *              : pucLabel
+ *              : pxObjectHandle
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xProvisionPrivateKey (CK_SESSION_HANDLE xSession,
+                           uint8_t *pucPrivateKey,
+                           size_t xPrivateKeyLength,
+                           uint8_t *pucLabel,
+                           CK_OBJECT_HANDLE_PTR pxObjectHandle);
 
 /** \brief Imports a public key into the PKCS #11 module.
  *
@@ -136,13 +163,23 @@ CK_RV xProvisionPrivateKey( CK_SESSION_HANDLE xSession,
  * \return CKR_OK upon successful key creation.
  * Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xProvisionPublicKey( CK_SESSION_HANDLE xSession,
-                           uint8_t * pucKey,
-                           size_t xKeyLength,
-                           CK_KEY_TYPE xPublicKeyType,
-                           uint8_t * pucPublicKeyLabel,
-                           CK_OBJECT_HANDLE_PTR pxPublicKeyHandle );
-
+/**********************************************************************************************************************
+ * Function Name: xProvisionPublicKey
+ * Description  : .
+ * Arguments    : xSession
+ *              : pucKey
+ *              : xKeyLength
+ *              : xPublicKeyType
+ *              : pucPublicKeyLabel
+ *              : pxPublicKeyHandle
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xProvisionPublicKey (CK_SESSION_HANDLE xSession,
+                          uint8_t *pucKey,
+                          size_t xKeyLength,
+                          CK_KEY_TYPE xPublicKeyType,
+                          uint8_t *pucPublicKeyLabel,
+                          CK_OBJECT_HANDLE_PTR pxPublicKeyHandle);
 
 /** \brief Imports a certificate into the PKCS #11 module.
  *
@@ -160,32 +197,42 @@ CK_RV xProvisionPublicKey( CK_SESSION_HANDLE xSession,
  * \return CKR_OK if certificate import succeeded.
  * Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xProvisionCertificate( CK_SESSION_HANDLE xSession,
-                             uint8_t * pucCertificate,
-                             size_t xCertificateLength,
-                             uint8_t * pucLabel,
-                             CK_OBJECT_HANDLE_PTR pxObjectHandle );
+/**********************************************************************************************************************
+ * Function Name: xProvisionCertificate
+ * Description  : .
+ * Arguments    : xSession
+ *              : pucCertificate
+ *              : xCertificateLength
+ *              : pucLabel
+ *              : pxObjectHandle
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xProvisionCertificate (CK_SESSION_HANDLE xSession,
+                            uint8_t *pucCertificate,
+                            size_t xCertificateLength,
+                            uint8_t *pucLabel,
+                            CK_OBJECT_HANDLE_PTR pxObjectHandle);
 
-/** \brief Generates an RSA key pair.
- *
- * \param[in] xSession              A valid PKCS #11 session handle.
- * \param[in] pucPrivateKeyLabel    PKCS #11 label attribute value for private key to be created.
- *                                  This should be a string value. See core_pkcs11_config.h.
- * \param[in] pucPublicKeyLabel     PKCS #11 label attribute value for public key to be created.
- *                                  This should be a string value. See core_pkcs11_config.h.
- * \param[out] pxPrivateKeyHandle   Points to the location that receives the PKCS #11 private
- *                                  key handle created.
- * \param[out] pxPublicKeyHandle    Points to the location that receives the PKCS #11 public
- *                                  key handle created.
- *
- * \return CKR_OK if RSA key pair generation succeeded.
- * Otherwise, a positive PKCS #11 error code.
- */
-CK_RV xProvisionGenerateKeyPairRSA( CK_SESSION_HANDLE xSession,
-                                    uint8_t * pucPrivateKeyLabel,
-                                    uint8_t * pucPublicKeyLabel,
-                                    CK_OBJECT_HANDLE_PTR pxPrivateKeyHandle,
-                                    CK_OBJECT_HANDLE_PTR pxPublicKeyHandle );
+/**********************************************************************************************************************
+ * Function Name: xProvisionGenerateKeyPairRSA
+ * Description  : Generates an RSA key pair.
+ * Arguments    : xSession              A valid PKCS #11 session handle.
+ *                pucPrivateKeyLabel    PKCS #11 label attribute value for private key to be created.
+ *                                      This should be a string value. See core_pkcs11_config.h.
+ *                pucPublicKeyLabel     PKCS #11 label attribute value for public key to be created.
+ *                                      This should be a string value. See core_pkcs11_config.h.
+ *                pxPrivateKeyHandle   Points to the location that receives the PKCS #11 private
+ *                                      key handle created.
+ *                pxPublicKeyHandle    Points to the location that receives the PKCS #11 public
+ *                                      key handle created.
+ * Return Value : CKR_OK if RSA key pair generation succeeded.
+ *                       Otherwise, a positive PKCS #11 error code.
+ *********************************************************************************************************************/
+CK_RV xProvisionGenerateKeyPairRSA (CK_SESSION_HANDLE xSession,
+                                   uint8_t *pucPrivateKeyLabel,
+                                   uint8_t *pucPublicKeyLabel,
+                                   CK_OBJECT_HANDLE_PTR pxPrivateKeyHandle,
+                                   CK_OBJECT_HANDLE_PTR pxPublicKeyHandle);
 
 /** \brief Generates an elliptic curve key pair.
  *
@@ -202,11 +249,21 @@ CK_RV xProvisionGenerateKeyPairRSA( CK_SESSION_HANDLE xSession,
  * \return CKR_OK if EC key pair generation succeeded.
  * Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xProvisionGenerateKeyPairEC( CK_SESSION_HANDLE xSession,
-                                   uint8_t * pucPrivateKeyLabel,
-                                   uint8_t * pucPublicKeyLabel,
-                                   CK_OBJECT_HANDLE_PTR pxPrivateKeyHandle,
-                                   CK_OBJECT_HANDLE_PTR pxPublicKeyHandle );
+/**********************************************************************************************************************
+ * Function Name: xProvisionGenerateKeyPairEC
+ * Description  : .
+ * Arguments    : xSession
+ *              : pucPrivateKeyLabel
+ *              : pucPublicKeyLabel
+ *              : pxPrivateKeyHandle
+ *              : pxPublicKeyHandle
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xProvisionGenerateKeyPairEC (CK_SESSION_HANDLE xSession,
+                                  uint8_t *pucPrivateKeyLabel,
+                                  uint8_t *pucPublicKeyLabel,
+                                  CK_OBJECT_HANDLE_PTR pxPrivateKeyHandle,
+                                  CK_OBJECT_HANDLE_PTR pxPublicKeyHandle);
 
 /**
  *\brief Destroys FreeRTOS credentials stored in device PKCS #11 module.
@@ -226,7 +283,13 @@ CK_RV xProvisionGenerateKeyPairEC( CK_SESSION_HANDLE xSession,
  *   \return CKR_OK if all credentials were destroyed.
  *   Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xDestroyDefaultCryptoObjects( CK_SESSION_HANDLE xSession );
+/**********************************************************************************************************************
+ * Function Name: xDestroyDefaultCryptoObjects
+ * Description  : .
+ * Argument     : xSession
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xDestroyDefaultCryptoObjects (CK_SESSION_HANDLE xSession);
 
 /**
  * \brief Destroys specified credentials in PKCS #11 module.
@@ -254,9 +317,18 @@ CK_RV xDestroyDefaultCryptoObjects( CK_SESSION_HANDLE xSession );
  *   \return CKR_OK if all credentials were destroyed.
  *   Otherwise, a positive PKCS #11 error code.
  */
-CK_RV xDestroyProvidedObjects( CK_SESSION_HANDLE xSession,
-                               CK_BYTE_PTR * ppxPkcsLabels,
-                               CK_OBJECT_CLASS * pxClass,
-                               CK_ULONG ulCount );
+/**********************************************************************************************************************
+ * Function Name: xDestroyProvidedObjects
+ * Description  : .
+ * Arguments    : xSession
+ *              : ppxPkcsLabels
+ *              : pxClass
+ *              : ulCount
+ * Return Value : .
+ *********************************************************************************************************************/
+CK_RV xDestroyProvidedObjects (CK_SESSION_HANDLE xSession,
+                              CK_BYTE_PTR *ppxPkcsLabels,
+                              CK_OBJECT_CLASS *pxClass,
+                              CK_ULONG ulCount);
 
 #endif /* _AWS_DEV_MODE_KEY_PROVISIONING_H_ */

@@ -3,6 +3,8 @@
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
@@ -35,14 +37,14 @@
 
 /* Logging configuration for the Sockets. */
 #ifndef LIBRARY_LOG_NAME
-    #define LIBRARY_LOG_NAME     "SocketsWrapper"
+#define LIBRARY_LOG_NAME "SocketsWrapper"
 #endif
 #ifndef LIBRARY_LOG_LEVEL
-    #define LIBRARY_LOG_LEVEL    LOG_INFO
+#define LIBRARY_LOG_LEVEL (LOG_INFO)
 #endif
 
-extern void vLoggingPrintf( const char * pcFormatString,
-                            ... );
+extern void vLoggingPrintf (const char *pcFormatString,
+                           ...);
 
 #include "logging_stack.h"
 
@@ -70,13 +72,13 @@ extern void vLoggingPrintf( const char * pcFormatString,
  * @brief Maximum number of times to call FreeRTOS_recv when initiating a graceful shutdown.
  */
 #ifndef FREERTOS_SOCKETS_WRAPPER_SHUTDOWN_LOOPS
-    #define FREERTOS_SOCKETS_WRAPPER_SHUTDOWN_LOOPS    ( 3 )
+#define FREERTOS_SOCKETS_WRAPPER_SHUTDOWN_LOOPS (3)
 #endif
 
 /**
  * @brief negative error code indicating a network failure.
  */
-#define FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR    ( -1 )
+#define FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR (-1)
 
 /**
  * @brief Establish a connection to server.
@@ -91,99 +93,111 @@ extern void vLoggingPrintf( const char * pcFormatString,
  *
  * @return Non-zero value on error, 0 on success.
  */
-BaseType_t TCP_Sockets_Connect( Socket_t * pTcpSocket,
-                                const char * pHostName,
-                                uint16_t port,
-                                uint32_t receiveTimeoutMs,
-                                uint32_t sendTimeoutMs )
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Connect
+ * Description  : .
+ * Arguments    : pTcpSocket
+ *              : pHostName
+ *              : port
+ *              : receiveTimeoutMs
+ *              : sendTimeoutMs
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
+                               const char *pHostName,
+                               uint16_t port,
+                               uint32_t receiveTimeoutMs,
+                               uint32_t sendTimeoutMs)
 {
     Socket_t tcpSocket = FREERTOS_INVALID_SOCKET;
     BaseType_t socketStatus = 0;
-    struct freertos_sockaddr serverAddress = { 0 };
+    struct freertos_sockaddr serverAddress = {0};
     TickType_t transportTimeout = 0;
 
-    configASSERT( pTcpSocket != NULL );
-    configASSERT( pHostName != NULL );
+    configASSERT(NULL != pTcpSocket);
+    configASSERT(NULL != pHostName);
 
     /* Create a new TCP socket. */
-    tcpSocket = FreeRTOS_socket( FREERTOS_AF_INET, FREERTOS_SOCK_STREAM, FREERTOS_IPPROTO_TCP );
+    tcpSocket = FreeRTOS_socket(FREERTOS_AF_INET, FREERTOS_SOCK_STREAM, FREERTOS_IPPROTO_TCP);
 
-    if( tcpSocket == FREERTOS_INVALID_SOCKET )
+    if (FREERTOS_INVALID_SOCKET == tcpSocket)
     {
-        LogError( ( "Failed to create new socket." ) );
+        LogError(("Failed to create new socket."));
         socketStatus = FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR;
     }
     else
     {
-        LogDebug( ( "Created new TCP socket." ) );
+        LogDebug(("Created new TCP socket."));
 
         /* Connection parameters. */
         serverAddress.sin_family = FREERTOS_AF_INET;
-        serverAddress.sin_port = FreeRTOS_htons( port );
-        serverAddress.sin_len = ( uint8_t ) sizeof( serverAddress );
+        serverAddress.sin_port = FreeRTOS_htons(port);
+        serverAddress.sin_len = (uint8_t)sizeof(serverAddress);
 
-        #if defined( ipconfigIPv4_BACKWARD_COMPATIBLE ) && ( ipconfigIPv4_BACKWARD_COMPATIBLE == 0 )
-            serverAddress.sin_address.ulIP_IPv4 = ( uint32_t ) FreeRTOS_gethostbyname( pHostName );
-
-            /* Check for errors from DNS lookup. */
-            if( serverAddress.sin_address.ulIP_IPv4 == 0U )
-        #else
-        serverAddress.sin_addr = ( uint32_t ) FreeRTOS_gethostbyname( pHostName );
+#if defined(ipconfigIPv4_BACKWARD_COMPATIBLE) && (ipconfigIPv4_BACKWARD_COMPATIBLE == 0)
+        serverAddress.sin_address.ulIP_IPv4 = (uint32_t)FreeRTOS_gethostbyname(pHostName);
 
         /* Check for errors from DNS lookup. */
-        if( serverAddress.sin_addr == 0U )
-        #endif /* defined( ipconfigIPv4_BACKWARD_COMPATIBLE ) && ( ipconfigIPv4_BACKWARD_COMPATIBLE == 0 ) */
+        if (serverAddress.sin_address.ulIP_IPv4 == 0U)
+#else
+        serverAddress.sin_addr = (uint32_t)FreeRTOS_gethostbyname(pHostName);
+
+        /* Check for errors from DNS lookup. */
+        if (0U == serverAddress.sin_addr)
+#endif /* defined( ipconfigIPv4_BACKWARD_COMPATIBLE ) && ( ipconfigIPv4_BACKWARD_COMPATIBLE == 0 ) */
 
         {
-            LogError( ( "Failed to connect to server: DNS resolution failed: Hostname=%s.",
-                        pHostName ) );
+            LogError(("Failed to connect to server: DNS resolution failed: Hostname=%s.",
+                      pHostName));
             socketStatus = FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR;
         }
     }
 
-    if( socketStatus == 0 )
+    if (0 == socketStatus)
     {
         /* Establish connection. */
-        LogDebug( ( "Creating TCP Connection to %s.", pHostName ) );
-        socketStatus = FreeRTOS_connect( tcpSocket, &serverAddress, sizeof( serverAddress ) );
+        LogDebug(("Creating TCP Connection to %s.", pHostName));
+        socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
 
-        if( socketStatus != 0 )
+        if (0 != socketStatus)
         {
-            LogError( ( "Failed to connect to server: FreeRTOS_Connect failed: ReturnCode=%d,"
-                        " Hostname=%s, Port=%u.",
-                        socketStatus,
-                        pHostName,
-                        port ) );
+            LogError(("Failed to connect to server: FreeRTOS_Connect failed: ReturnCode=%d,"
+                      " Hostname=%s, Port=%u.",
+                      socketStatus,
+                      pHostName,
+                      port));
         }
     }
 
-    if( socketStatus == 0 )
+    if (0 == socketStatus)
     {
         /* Set socket receive timeout. */
-        transportTimeout = pdMS_TO_TICKS( receiveTimeoutMs );
+        transportTimeout = pdMS_TO_TICKS(receiveTimeoutMs);
+
         /* Setting the receive block time cannot fail. */
-        ( void ) FreeRTOS_setsockopt( tcpSocket,
-                                      0,
-                                      FREERTOS_SO_RCVTIMEO,
-                                      &transportTimeout,
-                                      sizeof( TickType_t ) );
+        (void)FreeRTOS_setsockopt(tcpSocket,
+                                  0,
+                                  FREERTOS_SO_RCVTIMEO,
+                                  &transportTimeout,
+                                  sizeof(TickType_t));
 
         /* Set socket send timeout. */
-        transportTimeout = pdMS_TO_TICKS( sendTimeoutMs );
+        transportTimeout = pdMS_TO_TICKS(sendTimeoutMs);
+
         /* Setting the send block time cannot fail. */
-        ( void ) FreeRTOS_setsockopt( tcpSocket,
-                                      0,
-                                      FREERTOS_SO_SNDTIMEO,
-                                      &transportTimeout,
-                                      sizeof( TickType_t ) );
+        (void)FreeRTOS_setsockopt(tcpSocket,
+                                  0,
+                                  FREERTOS_SO_SNDTIMEO,
+                                  &transportTimeout,
+                                  sizeof(TickType_t));
     }
 
     /* Clean up on failure. */
-    if( socketStatus != 0 )
+    if (0 != socketStatus)
     {
-        if( tcpSocket != FREERTOS_INVALID_SOCKET )
+        if (FREERTOS_INVALID_SOCKET != tcpSocket)
         {
-            ( void ) FreeRTOS_closesocket( tcpSocket );
+            (void)FreeRTOS_closesocket(tcpSocket);
             tcpSocket = FREERTOS_INVALID_SOCKET;
         }
     }
@@ -191,42 +205,54 @@ BaseType_t TCP_Sockets_Connect( Socket_t * pTcpSocket,
     {
         /* Set the socket. */
         *pTcpSocket = tcpSocket;
-        LogInfo( ( "Established TCP connection with %s.", pHostName ) );
+        LogInfo(("Established TCP connection with %s.", pHostName));
     }
 
     return socketStatus;
 }
+/**********************************************************************************************************************
+ End of function TCP_Sockets_Connect
+ *********************************************************************************************************************/
 
 /**
  * @brief End connection to server.
  *
  * @param[in] tcpSocket The socket descriptor.
  */
-void TCP_Sockets_Disconnect( Socket_t tcpSocket )
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Disconnect
+ * Description  : .
+ * Argument     : tcpSocket
+ * Return Value : .
+ *********************************************************************************************************************/
+void TCP_Sockets_Disconnect(Socket_t tcpSocket)
 {
     BaseType_t waitForShutdownLoopCount = 0;
-    uint8_t pDummyBuffer[ 2 ];
+    uint8_t pDummyBuffer[2];
 
-    if( ( tcpSocket != NULL ) && ( tcpSocket != FREERTOS_INVALID_SOCKET ) )
+    if ((NULL != tcpSocket) && (FREERTOS_INVALID_SOCKET != tcpSocket))
     {
         /* Initiate graceful shutdown. */
-        ( void ) FreeRTOS_shutdown( tcpSocket, FREERTOS_SHUT_RDWR );
+        (void)FreeRTOS_shutdown(tcpSocket, FREERTOS_SHUT_RDWR);
 
         /* Wait for the socket to disconnect gracefully (indicated by FreeRTOS_recv()
          * returning a FREERTOS_EINVAL error) before closing the socket. */
-        while( FreeRTOS_recv( tcpSocket, pDummyBuffer, sizeof( pDummyBuffer ), 0 ) >= 0 )
+        while (FreeRTOS_recv(tcpSocket, pDummyBuffer, sizeof(pDummyBuffer), 0) >= 0)
         {
             /* We don't need to delay since FreeRTOS_recv should already have a timeout. */
 
-            if( ++waitForShutdownLoopCount >= FREERTOS_SOCKETS_WRAPPER_SHUTDOWN_LOOPS )
+            if ((++waitForShutdownLoopCount) >= FREERTOS_SOCKETS_WRAPPER_SHUTDOWN_LOOPS)
             {
                 break;
             }
         }
 
-        ( void ) FreeRTOS_closesocket( tcpSocket );
+        (void)FreeRTOS_closesocket(tcpSocket);
     }
 }
+/**********************************************************************************************************************
+ End of function TCP_Sockets_Disconnect
+ *********************************************************************************************************************/
 
 /**
  * @brief Transmit data to the remote socket.
@@ -241,52 +267,63 @@ void TCP_Sockets_Disconnect( Socket_t tcpSocket )
  * * On success, the number of bytes actually sent is returned.
  * * If an error occurred, a negative value is returned. @ref SocketsErrors
  */
-int32_t TCP_Sockets_Send( Socket_t xSocket,
-                          const void * pvBuffer,
-                          size_t xBufferLength )
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Send
+ * Description  : .
+ * Arguments    : xSocket
+ *              : pvBuffer
+ *              : xBufferLength
+ * Return Value : .
+ *********************************************************************************************************************/
+int32_t TCP_Sockets_Send(Socket_t xSocket,
+                         const void *pvBuffer,
+                         size_t xBufferLength)
 {
     BaseType_t xSendStatus;
     int xReturnStatus = TCP_SOCKETS_ERRNO_ERROR;
 
-    configASSERT( xSocket != NULL );
-    configASSERT( pvBuffer != NULL );
+    configASSERT(NULL != xSocket);
+    configASSERT(NULL != pvBuffer);
 
-    xSendStatus = FreeRTOS_send( xSocket, pvBuffer, xBufferLength, 0 );
+    xSendStatus = FreeRTOS_send(xSocket, pvBuffer, xBufferLength, 0);
 
-    switch( xSendStatus )
+    switch (xSendStatus)
     {
-        /* Socket was closed or just got closed. */
-        case -pdFREERTOS_ERRNO_ENOTCONN:
-            xReturnStatus = TCP_SOCKETS_ERRNO_ENOTCONN;
-            break;
+    /* Socket was closed or just got closed. */
+    case -pdFREERTOS_ERRNO_ENOTCONN:
+        xReturnStatus = TCP_SOCKETS_ERRNO_ENOTCONN;
+        break;
 
-        /* Not enough memory for the socket to create either an Rx or Tx stream. */
-        case -pdFREERTOS_ERRNO_ENOMEM:
-            xReturnStatus = TCP_SOCKETS_ERRNO_ENOMEM;
-            break;
+    /* Not enough memory for the socket to create either an Rx or Tx stream. */
+    case -pdFREERTOS_ERRNO_ENOMEM:
+        xReturnStatus = TCP_SOCKETS_ERRNO_ENOMEM;
+        break;
 
-        /* Socket is not valid, is not a TCP socket, or is not bound. */
-        case -pdFREERTOS_ERRNO_EINVAL:
-            xReturnStatus = TCP_SOCKETS_ERRNO_EINVAL;
-            break;
+    /* Socket is not valid, is not a TCP socket, or is not bound. */
+    case -pdFREERTOS_ERRNO_EINVAL:
+        xReturnStatus = TCP_SOCKETS_ERRNO_EINVAL;
+        break;
 
-        /* Socket received a signal, causing the read operation to be aborted. */
-        case -pdFREERTOS_ERRNO_EINTR:
-            xReturnStatus = TCP_SOCKETS_ERRNO_EINTR;
-            break;
+    /* Socket received a signal, causing the read operation to be aborted. */
+    case -pdFREERTOS_ERRNO_EINTR:
+        xReturnStatus = TCP_SOCKETS_ERRNO_EINTR;
+        break;
 
-        /* A timeout occurred before any data could be sent as the TCP buffer was full. */
-        case -pdFREERTOS_ERRNO_ENOSPC:
-            xReturnStatus = TCP_SOCKETS_ERRNO_ENOSPC;
-            break;
+    /* A timeout occurred before any data could be sent as the TCP buffer was full. */
+    case -pdFREERTOS_ERRNO_ENOSPC:
+        xReturnStatus = TCP_SOCKETS_ERRNO_ENOSPC;
+        break;
 
-        default:
-            xReturnStatus = ( int ) xSendStatus;
-            break;
+    default:
+        xReturnStatus = (int)xSendStatus;
+        break;
     }
 
     return xReturnStatus;
 }
+/**********************************************************************************************************************
+ End of function TCP_Sockets_Send
+ *********************************************************************************************************************/
 
 /**
  * @brief Receive data from a TCP socket.
@@ -305,51 +342,70 @@ int32_t TCP_Sockets_Send( Socket_t xSocket,
  *   is set using @ref SOCKETS_SO_RCVTIMEO).
  * * If an error occurred, a negative value is returned. @ref SocketsErrors
  */
-int32_t TCP_Sockets_Recv( Socket_t xSocket,
-                          void * pvBuffer,
-                          size_t xBufferLength )
+/**********************************************************************************************************************
+ * Function Name: TCP_Sockets_Recv
+ * Description  : .
+ * Arguments    : xSocket
+ *              : pvBuffer
+ *              : xBufferLength
+ * Return Value : .
+ *********************************************************************************************************************/
+int32_t TCP_Sockets_Recv(Socket_t xSocket,
+                         void *pvBuffer,
+                         size_t xBufferLength)
 {
     BaseType_t xRecvStatus;
     int xReturnStatus = TCP_SOCKETS_ERRNO_ERROR;
 
-    configASSERT( xSocket != NULL );
-    configASSERT( pvBuffer != NULL );
+    configASSERT(NULL != xSocket);
+    configASSERT(NULL != pvBuffer);
 
-    xRecvStatus = FreeRTOS_recv( xSocket, pvBuffer, xBufferLength, 0 );
+    xRecvStatus = FreeRTOS_recv(xSocket, pvBuffer, xBufferLength, 0);
 
-    switch( xRecvStatus )
+    switch (xRecvStatus)
     {
-        /* Socket was closed or just got closed. */
-        case -pdFREERTOS_ERRNO_ENOTCONN:
-            xReturnStatus = TCP_SOCKETS_ERRNO_ENOTCONN;
-            break;
+    /* Socket was closed or just got closed. */
+    case -pdFREERTOS_ERRNO_ENOTCONN:
+        xReturnStatus = TCP_SOCKETS_ERRNO_ENOTCONN;
+        break;
 
-        /* Not enough memory for the socket to create either an Rx or Tx stream. */
-        case -pdFREERTOS_ERRNO_ENOMEM:
-            xReturnStatus = TCP_SOCKETS_ERRNO_ENOMEM;
-            break;
+    /* Not enough memory for the socket to create either an Rx or Tx stream. */
+    case -pdFREERTOS_ERRNO_ENOMEM:
+        xReturnStatus = TCP_SOCKETS_ERRNO_ENOMEM;
+        break;
 
-        /* Socket is not valid, is not a TCP socket, or is not bound. */
-        case -pdFREERTOS_ERRNO_EINVAL:
-            xReturnStatus = TCP_SOCKETS_ERRNO_EINVAL;
-            break;
+    /* Socket is not valid, is not a TCP socket, or is not bound. */
+    case -pdFREERTOS_ERRNO_EINVAL:
+        xReturnStatus = TCP_SOCKETS_ERRNO_EINVAL;
+        break;
 
-        /* Socket received a signal, causing the read operation to be aborted. */
-        case -pdFREERTOS_ERRNO_EINTR:
-            xReturnStatus = TCP_SOCKETS_ERRNO_EINTR;
-            break;
+    /* Socket received a signal, causing the read operation to be aborted. */
+    case -pdFREERTOS_ERRNO_EINTR:
+        xReturnStatus = TCP_SOCKETS_ERRNO_EINTR;
+        break;
 
-        default:
-            xReturnStatus = ( int ) xRecvStatus;
-            break;
+    default:
+        xReturnStatus = (int)xRecvStatus;
+        break;
     }
 
     return xReturnStatus;
 }
+/**********************************************************************************************************************
+ End of function TCP_Sockets_Recv
+ *********************************************************************************************************************/
 
-static CK_RV prvSocketsGetCryptoSession( SemaphoreHandle_t * pxSessionLock,
-                                         CK_SESSION_HANDLE * pxSession,
-                                         CK_FUNCTION_LIST_PTR_PTR ppxFunctionList )
+/**********************************************************************************************************************
+ * Function Name: prvSocketsGetCryptoSession
+ * Description  : .
+ * Arguments    : pxSessionLock
+ *              : pxSession
+ *              : ppxFunctionList
+ * Return Value : .
+ *********************************************************************************************************************/
+static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
+                                        CK_SESSION_HANDLE *pxSession,
+                                        CK_FUNCTION_LIST_PTR_PTR ppxFunctionList)
 {
     CK_RV xResult = CKR_OK;
     CK_C_GetFunctionList pxCkGetFunctionList = NULL;
@@ -358,23 +414,23 @@ static CK_RV prvSocketsGetCryptoSession( SemaphoreHandle_t * pxSessionLock,
     static StaticSemaphore_t xStaticSemaphore;
     static SemaphoreHandle_t xSessionLock = NULL;
     CK_ULONG ulCount = 0;
-    CK_SLOT_ID * pxSlotIds = NULL;
+    CK_SLOT_ID *pxSlotIds = NULL;
 
     /* Check if one-time initialization of the lock is needed.*/
     portENTER_CRITICAL();
 
-    if( NULL == xSessionLock )
+    if (NULL == xSessionLock)
     {
-        xSessionLock = xSemaphoreCreateMutexStatic( &xStaticSemaphore );
+        xSessionLock = xSemaphoreCreateMutexStatic(&xStaticSemaphore);
     }
 
     *pxSessionLock = xSessionLock;
     portEXIT_CRITICAL();
 
     /* Check if one-time initialization of the crypto handle is needed.*/
-    xSemaphoreTake( xSessionLock, portMAX_DELAY );
+    xSemaphoreTake(xSessionLock, portMAX_DELAY);
 
-    if( 0 == xPkcs11Session )
+    if (0 == xPkcs11Session)
     {
         /* One-time initialization. */
 
@@ -383,63 +439,73 @@ static CK_RV prvSocketsGetCryptoSession( SemaphoreHandle_t * pxSessionLock,
          * requirements for accessing a crypto module. */
 
         pxCkGetFunctionList = C_GetFunctionList;
-        xResult = pxCkGetFunctionList( &pxPkcs11FunctionList );
+        xResult = pxCkGetFunctionList(&pxPkcs11FunctionList);
 
-        if( CKR_OK == xResult )
+        if (CKR_OK == xResult)
         {
             xResult = xInitializePkcs11Token();
         }
 
         /* Get the crypto token slot count. */
-        if( CKR_OK == xResult )
+        if (CKR_OK == xResult)
         {
-            xResult = pxPkcs11FunctionList->C_GetSlotList( CK_TRUE,
-                                                           NULL,
-                                                           &ulCount );
+            xResult = pxPkcs11FunctionList->C_GetSlotList(CK_TRUE,
+                                                          NULL,
+                                                          &ulCount);
         }
 
         /* Allocate memory to store the token slots. */
-        if( CKR_OK == xResult )
+        if (CKR_OK == xResult)
         {
-            pxSlotIds = ( CK_SLOT_ID * ) pvPortMalloc( sizeof( CK_SLOT_ID ) * ulCount );
+            pxSlotIds = (CK_SLOT_ID *)pvPortMalloc(sizeof(CK_SLOT_ID) * ulCount);
 
-            if( NULL == pxSlotIds )
+            if (NULL == pxSlotIds)
             {
                 xResult = CKR_HOST_MEMORY;
             }
         }
 
         /* Get all of the available private key slot identities. */
-        if( CKR_OK == xResult )
+        if (CKR_OK == xResult)
         {
-            xResult = pxPkcs11FunctionList->C_GetSlotList( CK_TRUE,
-                                                           pxSlotIds,
-                                                           &ulCount );
+            xResult = pxPkcs11FunctionList->C_GetSlotList(CK_TRUE,
+                                                          pxSlotIds,
+                                                          &ulCount);
         }
 
         /* Start a session with the PKCS#11 module. */
-        if( CKR_OK == xResult )
+        if (CKR_OK == xResult)
         {
-            xResult = pxPkcs11FunctionList->C_OpenSession( pxSlotIds[ 0 ],
-                                                           CKF_SERIAL_SESSION,
-                                                           NULL,
-                                                           NULL,
-                                                           &xPkcs11Session );
+            xResult = pxPkcs11FunctionList->C_OpenSession(pxSlotIds[0],
+                                                          CKF_SERIAL_SESSION,
+                                                          NULL,
+                                                          NULL,
+                                                          &xPkcs11Session);
         }
     }
 
     *pxSession = xPkcs11Session;
     *ppxFunctionList = pxPkcs11FunctionList;
-    xSemaphoreGive( xSessionLock );
+    xSemaphoreGive(xSessionLock);
 
-    if( NULL != pxSlotIds )
+    if (NULL != pxSlotIds)
     {
-        vPortFree( pxSlotIds );
+        vPortFree(pxSlotIds);
     }
 
     return xResult;
 }
-BaseType_t xApplicationGetRandomNumber( uint32_t * pulNumber )
+/**********************************************************************************************************************
+ End of function prvSocketsGetCryptoSession
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ * Function Name: xApplicationGetRandomNumber
+ * Description  : .
+ * Argument     : pulNumber
+ * Return Value : .
+ *********************************************************************************************************************/
+BaseType_t xApplicationGetRandomNumber(uint32_t *pulNumber)
 {
     CK_RV xResult = 0;
     SemaphoreHandle_t xSessionLock = NULL;
@@ -448,154 +514,171 @@ BaseType_t xApplicationGetRandomNumber( uint32_t * pulNumber )
     uint32_t ulRandomValue = 0;
     BaseType_t xReturn; /* Return pdTRUE if successful */
 
-    xResult = prvSocketsGetCryptoSession( &xSessionLock,
-                                          &xPkcs11Session,
-                                          &pxPkcs11FunctionList );
+    xResult = prvSocketsGetCryptoSession(&xSessionLock,
+                                         &xPkcs11Session,
+                                         &pxPkcs11FunctionList);
 
-    if( 0 == xResult )
+    if (0 == xResult)
     {
         /* Request a sequence of cryptographically random byte values using
          * PKCS#11. */
-        xResult = pxPkcs11FunctionList->C_GenerateRandom( xPkcs11Session,
-                                                          ( CK_BYTE_PTR ) &ulRandomValue,
-                                                          sizeof( ulRandomValue ) );
+        xResult = pxPkcs11FunctionList->C_GenerateRandom(xPkcs11Session,
+                                                         (CK_BYTE_PTR)&ulRandomValue,
+                                                         sizeof(ulRandomValue));
     }
 
     /* Check if any of the API calls failed. */
-    if( 0 == xResult )
+    if (0 == xResult)
     {
         xReturn = pdTRUE;
-        *( pulNumber ) = ulRandomValue;
+        *(pulNumber) = ulRandomValue;
     }
     else
     {
         xReturn = pdFALSE;
-        *( pulNumber ) = 0uL;
+        *(pulNumber) = 0uL;
     }
 
     return xReturn;
 }
+/**********************************************************************************************************************
+ End of function xApplicationGetRandomNumber
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
 
 /**
  * @brief Generate a TCP Initial Sequence Number that is reasonably difficult
  * to predict, per https://tools.ietf.org/html/rfc6528.
  */
-uint32_t ulApplicationGetNextSequenceNumber( uint32_t ulSourceAddress,
-                                             uint16_t usSourcePort,
-                                             uint32_t ulDestinationAddress,
-                                             uint16_t usDestinationPort )
+/**********************************************************************************************************************
+ * Function Name: ulApplicationGetNextSequenceNumber
+ * Description  : .
+ * Arguments    : ulSourceAddress
+ *              : usSourcePort
+ *              : ulDestinationAddress
+ *              : usDestinationPort
+ * Return Value : .
+ *********************************************************************************************************************/
+uint32_t ulApplicationGetNextSequenceNumber(uint32_t ulSourceAddress,
+                                            uint16_t usSourcePort,
+                                            uint32_t ulDestinationAddress,
+                                            uint16_t usDestinationPort)
 {
     CK_RV xResult = CKR_OK;
     SemaphoreHandle_t xSessionLock = NULL;
     CK_SESSION_HANDLE xPkcs11Session = 0;
     CK_FUNCTION_LIST_PTR pxPkcs11FunctionList = NULL;
-    CK_MECHANISM xMechSha256 = { 0 };
-    uint8_t ucSha256Result[ cryptoSHA256_DIGEST_BYTES ];
-    CK_ULONG ulLength = sizeof( ucSha256Result );
+    CK_MECHANISM xMechSha256 = {0};
+    uint8_t ucSha256Result[cryptoSHA256_DIGEST_BYTES];
+    CK_ULONG ulLength = sizeof(ucSha256Result);
     uint32_t ulNextSequenceNumber = 0;
     static uint64_t ullKey;
     static CK_BBOOL xKeyIsInitialized = CK_FALSE;
 
     /* Acquire a crypto session handle. */
-    xResult = prvSocketsGetCryptoSession( &xSessionLock,
-                                          &xPkcs11Session,
-                                          &pxPkcs11FunctionList );
+    xResult = prvSocketsGetCryptoSession(&xSessionLock,
+                                         &xPkcs11Session,
+                                         &pxPkcs11FunctionList);
 
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        xSemaphoreTake( xSessionLock, portMAX_DELAY );
+        xSemaphoreTake(xSessionLock, portMAX_DELAY);
 
-        if( CK_FALSE == xKeyIsInitialized )
+        if (CK_FALSE == xKeyIsInitialized)
         {
             /* One-time initialization, per boot, of the random seed. */
-            xResult = pxPkcs11FunctionList->C_GenerateRandom( xPkcs11Session,
-                                                              ( CK_BYTE_PTR ) &ullKey,
-                                                              sizeof( ullKey ) );
+            xResult = pxPkcs11FunctionList->C_GenerateRandom(xPkcs11Session,
+                                                             (CK_BYTE_PTR)&ullKey,
+                                                             sizeof(ullKey));
 
-            if( xResult == CKR_OK )
+            if (CKR_OK == xResult)
             {
                 xKeyIsInitialized = CK_TRUE;
             }
         }
 
-        xSemaphoreGive( xSessionLock );
+        xSemaphoreGive(xSessionLock);
     }
 
     /* Lock the shared crypto session. */
-    xSemaphoreTake( xSessionLock, portMAX_DELAY );
+    xSemaphoreTake(xSessionLock, portMAX_DELAY);
 
     /* Start a hash. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
         xMechSha256.mechanism = CKM_SHA256;
-        xResult = pxPkcs11FunctionList->C_DigestInit( xPkcs11Session, &xMechSha256 );
+        xResult = pxPkcs11FunctionList->C_DigestInit(xPkcs11Session, &xMechSha256);
     }
 
     /* Hash the seed. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        xResult = pxPkcs11FunctionList->C_DigestUpdate( xPkcs11Session,
-                                                        ( CK_BYTE_PTR ) &ullKey,
-                                                        sizeof( ullKey ) );
+        xResult = pxPkcs11FunctionList->C_DigestUpdate(xPkcs11Session,
+                                                       (CK_BYTE_PTR)&ullKey,
+                                                       sizeof(ullKey));
     }
 
     /* Hash the source address. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        xResult = pxPkcs11FunctionList->C_DigestUpdate( xPkcs11Session,
-                                                        ( CK_BYTE_PTR ) &ulSourceAddress,
-                                                        sizeof( ulSourceAddress ) );
+        xResult = pxPkcs11FunctionList->C_DigestUpdate(xPkcs11Session,
+                                                       (CK_BYTE_PTR)&ulSourceAddress,
+                                                       sizeof(ulSourceAddress));
     }
 
     /* Hash the source port. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        xResult = pxPkcs11FunctionList->C_DigestUpdate( xPkcs11Session,
-                                                        ( CK_BYTE_PTR ) &usSourcePort,
-                                                        sizeof( usSourcePort ) );
+        xResult = pxPkcs11FunctionList->C_DigestUpdate(xPkcs11Session,
+                                                       (CK_BYTE_PTR)&usSourcePort,
+                                                       sizeof(usSourcePort));
     }
 
     /* Hash the destination address. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        xResult = pxPkcs11FunctionList->C_DigestUpdate( xPkcs11Session,
-                                                        ( CK_BYTE_PTR ) &ulDestinationAddress,
-                                                        sizeof( ulDestinationAddress ) );
+        xResult = pxPkcs11FunctionList->C_DigestUpdate(xPkcs11Session,
+                                                       (CK_BYTE_PTR)&ulDestinationAddress,
+                                                       sizeof(ulDestinationAddress));
     }
 
     /* Hash the destination port. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        xResult = pxPkcs11FunctionList->C_DigestUpdate( xPkcs11Session,
-                                                        ( CK_BYTE_PTR ) &usDestinationPort,
-                                                        sizeof( usDestinationPort ) );
+        xResult = pxPkcs11FunctionList->C_DigestUpdate(xPkcs11Session,
+                                                       (CK_BYTE_PTR)&usDestinationPort,
+                                                       sizeof(usDestinationPort));
     }
 
     /* Get the hash. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        xResult = pxPkcs11FunctionList->C_DigestFinal( xPkcs11Session,
-                                                       ucSha256Result,
-                                                       &ulLength );
+        xResult = pxPkcs11FunctionList->C_DigestFinal(xPkcs11Session,
+                                                      ucSha256Result,
+                                                      &ulLength);
     }
 
-    xSemaphoreGive( xSessionLock );
+    xSemaphoreGive(xSessionLock);
 
     /* Use the first four bytes of the hash result as the starting point for
      * all initial sequence numbers for connections based on the input 4-tuple. */
-    if( CKR_OK == xResult )
+    if (CKR_OK == xResult)
     {
-        memcpy( &ulNextSequenceNumber,
-                ucSha256Result,
-                sizeof( ulNextSequenceNumber ) );
+        memcpy(&ulNextSequenceNumber,
+               ucSha256Result,
+               sizeof(ulNextSequenceNumber));
 
         /* Add the tick count of four-tick intervals. In theory, per the RFC
          * (see above), this approach still allows server equipment to optimize
          * handling of connections from the same device that haven't fully timed out. */
-        ulNextSequenceNumber += xTaskGetTickCount() / 4;
+        ulNextSequenceNumber += (xTaskGetTickCount() / 4);
     }
 
     return ulNextSequenceNumber;
 }
+/**********************************************************************************************************************
+ End of function ulApplicationGetNextSequenceNumber
+ *********************************************************************************************************************/
+
 /*-----------------------------------------------------------*/
