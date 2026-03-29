@@ -280,6 +280,7 @@ R_BSP_POR_FUNCTION(R_BSP_STARTUP_FUNCTION)
     vbatt_voltage_stability_wait();
 #endif
 
+    /* Initialize MCU clocks. */
     mcu_clock_setup();
 
     /* If the warm start Pre C runtime callback is enabled, then call it. */
