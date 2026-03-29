@@ -104,6 +104,18 @@ static TaskHandle_t xSendingTask = NULL;
 
 /* Board Support Data Structures. */
 sci_hdl_t xSerialSciHandle = 0;
+
+extern char* txBuffer;
+
+const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
+
+static size_t txIndex = 0;
+
+/* Used to guard access to the UART in case messages are sent to the UART from
+more than one task. */
+static SemaphoreHandle_t xTransmitMutex = NULL;
+static SemaphoreHandle_t xOutCharMutex = NULL;
+
 void CLI_Support_Settings(void);
 void vSerialSciCallback( void *pvArgs );
 void CLI_Close(void);
@@ -142,6 +154,14 @@ static sci_err_t prvEnsureSerialPortOpen( void )
 void CLI_Support_Settings(void)
 {
     ( void ) prvEnsureSerialPortOpen();
+
+    /* Create the semaphore used to access the UART Tx. */
+    xTransmitMutex = xSemaphoreCreateMutex();
+    configASSERT( xTransmitMutex );
+
+    /* Create the semaphore used to protect the transmit buffer */
+    xOutCharMutex = xSemaphoreCreateMutex();
+    configASSERT( xOutCharMutex );
 }
 
 void CLI_Close(void)
@@ -187,27 +207,33 @@ sci_cb_args_t *pxArgs = (sci_cb_args_t *)pvArgs;
 /******************************************************************************
  * Function Name: vOutputChar
  * Description  : BSP charput function (BSP_CFG_USER_CHARPUT_FUNCTION).
- *                Simple polling output for a single character.
+ *                Buffers characters and flushes on newline via interrupt-driven
+ *                vSerialPutString.
  * Argument     : cOutChar - character to output
  * Return Value : None
  *****************************************************************************/
 void vOutputChar(char cOutChar)
 {
-    uint32_t ulRetry = 200000UL;
-
-    if( 0 == xSerialSciHandle )
+    if (xSemaphoreTake(xOutCharMutex, portMAX_DELAY) == pdPASS)
     {
-        return;
-    }
+        /* OVERFLOW GUARD: Check if the buffer is full (or near-full) */
+        if (txIndex >= (SCI_CFG_CH5_TX_BUFSIZ * 5))
+        {
+            /* Force a flush now to free up the buffer space */
+            vSerialPutString((signed char *)txBuffer, (unsigned short)txIndex);
+            txIndex = 0;
+        }
 
-    while( ( 0 == U_SCI_UART_CLI_REG.SSR.BIT.TDRE ) && ( ulRetry-- > 0 ) )
-    {
-        R_BSP_NOP();
-    }
+        /* Write the character (safe now that space is guaranteed) */
+        txBuffer[txIndex++] = (char)cOutChar;
 
-    if( ulRetry > 0 )
-    {
-        U_SCI_UART_CLI_REG.TDR = ( uint8_t ) cOutChar;
+        if ((0x0D == txBuffer[txIndex - 1]) || (0x0A == txBuffer[txIndex - 1]))
+        {
+            vSerialPutString((signed char *)txBuffer, (unsigned short)txIndex);
+            txIndex = 0;
+        }
+
+        xSemaphoreGive(xOutCharMutex);
     }
 }
 
@@ -242,48 +268,44 @@ xComPortHandle xSerialPortInitMinimal( unsigned long ulWantedBaud, unsigned port
 multiple different demo application. */
 void vSerialPutString(const signed char * pcString, unsigned short usStringLength )
 {
-const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
-
     /* Only one port is supported. */
 
-
-
-    /* Don't send the string unless the previous string has been sent. */
     {
         /* Ensure the calling task's notification state is not already
         pending. */
         xTaskNotifyStateClear( NULL );
 
-        /* Store the handle of the transmitting task.  This is used to unblock
-        the task when the transmission has completed. */
-        xSendingTask = xTaskGetCurrentTaskHandle();
         uint32_t str_length = usStringLength;
         uint32_t transmit_length = 0;
         sci_err_t sci_err = SCI_SUCCESS;
         uint32_t retry = 0xFFFF;
 
-        while ((retry > 0) && (str_length > 0))
+        if ( xSemaphoreTake( xTransmitMutex, xMaxBlockTime ) == pdPASS )
         {
-
-            R_SCI_Control(xSerialSciHandle, SCI_CMD_TX_Q_BYTES_FREE, &transmit_length);
-
-            if(transmit_length > str_length)
+            while ((retry > 0) && (str_length > 0))
             {
-                transmit_length = str_length;
+                R_SCI_Control(xSerialSciHandle, SCI_CMD_TX_Q_BYTES_FREE, &transmit_length);
+
+                if (transmit_length > str_length)
+                {
+                    transmit_length = str_length;
+                }
+
+                sci_err = R_SCI_Send(xSerialSciHandle, (uint8_t *) pcString,
+                                     transmit_length);
+
+                if ((SCI_ERR_XCVR_BUSY == sci_err) || (SCI_ERR_INSUFFICIENT_SPACE == sci_err))
+                {
+                    retry--; // retry if previous transmission still in progress or tx buffer is insufficient.
+                    continue;
+                }
+
+                str_length -= transmit_length;
+                pcString += transmit_length;
             }
 
-            sci_err = R_SCI_Send(xSerialSciHandle, (uint8_t *) pcString,
-                                 transmit_length);
-
-            if ((sci_err == SCI_ERR_XCVR_BUSY) || (sci_err == SCI_ERR_INSUFFICIENT_SPACE))
-            {
-                retry--; // retry if previous transmission still in progress or tx buffer is insufficient.
-                continue;
-            }
-
-            str_length -= transmit_length;
-            pcString += transmit_length;
-
+            /* Must ensure to give the mutex back. */
+            xSemaphoreGive( xTransmitMutex );
         }
 
         if (SCI_SUCCESS != sci_err)
