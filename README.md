@@ -179,6 +179,15 @@ The GitLab CI pipeline provides:
 
 </details>
 
+## FreeRTOS-Kernel Patch / FreeRTOS カーネルパッチ
+
+This fork uses a patched FreeRTOS-Kernel as a git submodule. The RX72N port layer in the upstream FreeRTOS-Kernel has an issue that has been fixed in our fork and mirrored to GitHub.
+
+本フォークでは FreeRTOS カーネルの RX72N 移植部に不具合的なものがあり、パッチを当てたものを自前 GitLab にアップし、GitHub にミラーしています。それを git submodule で参照しています。
+
+- Issue: https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/13
+- Patch: https://gitlab.saffti.jp/oss/import/github/freertos/FreeRTOS-Kernel/-/merge_requests/1
+
 ## License
 
 - Source code in `Projects/`, `Common/`, `Middleware/AWS/`, and `Middleware/FreeRTOS/` is available under the MIT License. See [LICENSE](LICENSE).
