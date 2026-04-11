@@ -19,6 +19,7 @@ doxygen_warnings.txt
 *.elf
 *.hex
 *.bin
+*.rsu
 
 # Ignore Python-related files
 *.pyc
