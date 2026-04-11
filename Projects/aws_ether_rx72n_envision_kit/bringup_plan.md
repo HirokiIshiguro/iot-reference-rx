@@ -80,5 +80,25 @@ Port these as separate MRs after the runtime gate is stable:
 - audio task
 - OTA UI integration on the existing custom boot path
 
+## Current Validation Notes
+
+As of the initial bring-up MR:
+
+- Headless CCRX build passes for `boot_loader_rx72n_envision_kit` and
+  `aws_ether_rx72n_envision_kit`.
+- RSU packaging passes for the RX72N app image.
+- Manual hardware validation on RX72N Envision Kit set #2 through Raspberry Pi
+  #2 passed for:
+  - custom boot loader flash
+  - UART RSU download over CN6 / SCI7
+  - boot into the iot-reference-rx RX72N application
+  - Ethernet DHCP address acquisition
+  - MQTT TLS connect
+  - MQTT receive, subscribe, and publish runtime markers
+- GitLab CI Linux hardware jobs are present behind `RUN_RX72N_HW_TESTS=true`
+  and `RX72N_HW_RUNNER_PLATFORM=linux`, but the `iot-reference-rx` project must
+  have access to the RX72N set #2 runner tags before those jobs can run
+  automatically.
+
 [iot-reference-rx]: https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx
 [rx72n-envision-kit]: https://gitlab.saffti.jp/oss/import/github/renesas/rx72n-envision-kit
