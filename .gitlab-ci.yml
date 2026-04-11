@@ -19,6 +19,7 @@ variables:
   UART_PORT: "COM7"
   UART_BAUD_RATE: "921600"
   RX72N_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
+  RX72N_DEVICE_ID: "rx72n-02"
   RUN_RX72N_HW_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
@@ -97,7 +98,7 @@ flash_rx72n_linux:
   needs:
     - build_rx72n
   rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -139,7 +140,7 @@ provision_rx72n_linux:
     - build_rx72n
     - flash_rx72n_linux
   rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -157,10 +158,10 @@ provision_rx72n_linux:
       python tools/provision_rx72n.py \
         --port "$RX72N_LINUX_UART_PORT" \
         --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --thing-name "$AWS_IOT_THING_NAME" \
+        --thing-name "$RX72N_DEVICE_ID" \
         --endpoint "$AWS_IOT_ENDPOINT" \
-        --cert "$AWS_IOT_CERT" \
-        --key "$AWS_IOT_PRIVKEY" \
+        --cert "$AWS_CLIENT_CERT_RX72N_02" \
+        --key "$AWS_PRIVATE_KEY_RX72N_02" \
         --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem" \
         --format \
         --reset-cmd "$reset_cmd" \
@@ -183,7 +184,7 @@ test_mqtt_rx72n_linux:
     - flash_rx72n_linux
     - provision_rx72n_linux
   rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -214,7 +215,7 @@ flash_rx72n:
   needs:
     - build_rx72n
   rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -264,16 +265,16 @@ provision_rx72n:
     - build_rx72n
     - flash_rx72n
   rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
     - Write-Host "=== Provision RX72N AWS IoT credentials ==="
     - pip install pyserial --quiet
-    - if (-not $env:AWS_IOT_THING_NAME) { Write-Error "AWS_IOT_THING_NAME not set"; exit 1 }
+    - if (-not $env:RX72N_DEVICE_ID) { Write-Error "RX72N_DEVICE_ID not set"; exit 1 }
     - if (-not $env:AWS_IOT_ENDPOINT) { Write-Error "AWS_IOT_ENDPOINT not set"; exit 1 }
-    - if (-not $env:AWS_IOT_CERT) { Write-Error "AWS_IOT_CERT not set"; exit 1 }
-    - if (-not $env:AWS_IOT_PRIVKEY) { Write-Error "AWS_IOT_PRIVKEY not set"; exit 1 }
+    - if (-not $env:AWS_CLIENT_CERT_RX72N_02) { Write-Error "AWS_CLIENT_CERT_RX72N_02 not set"; exit 1 }
+    - if (-not $env:AWS_PRIVATE_KEY_RX72N_02) { Write-Error "AWS_PRIVATE_KEY_RX72N_02 not set"; exit 1 }
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\provision_rx72n"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -283,10 +284,10 @@ provision_rx72n:
       python tools/provision_rx72n.py `
         --port $env:UART_PORT `
         --baud $env:UART_BAUD_RATE `
-        --thing-name $env:AWS_IOT_THING_NAME `
+        --thing-name $env:RX72N_DEVICE_ID `
         --endpoint $env:AWS_IOT_ENDPOINT `
-        --cert $env:AWS_IOT_CERT `
-        --key $env:AWS_IOT_PRIVKEY `
+        --cert $env:AWS_CLIENT_CERT_RX72N_02 `
+        --key $env:AWS_PRIVATE_KEY_RX72N_02 `
         --codesigner-cert "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem" `
         --format `
         --reset-cmd $resetCmd `
@@ -311,7 +312,7 @@ test_mqtt_rx72n:
     - flash_rx72n
     - provision_rx72n
   rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -342,7 +343,7 @@ build_rx72n_mqtt_candidate:
   tags:
     - run_ishiguro_machine
   rules:
-    - if: '$AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -350,10 +351,10 @@ build_rx72n_mqtt_candidate:
     - |
       & "$env:CI_PROJECT_DIR\tools\build_headless_rx72n_with_client_credentials.ps1" `
         -ProjectRoot "$env:CI_PROJECT_DIR" `
-        -ThingName "$env:AWS_IOT_THING_NAME" `
+        -ThingName "$env:RX72N_DEVICE_ID" `
         -Endpoint "$env:AWS_IOT_ENDPOINT" `
-        -CertInput "$env:AWS_IOT_CERT" `
-        -KeyInput "$env:AWS_IOT_PRIVKEY" `
+        -CertInput "$env:AWS_CLIENT_CERT_RX72N_02" `
+        -KeyInput "$env:AWS_PRIVATE_KEY_RX72N_02" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_mqtt_candidate.log"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
@@ -378,7 +379,7 @@ package_rx72n_mqtt_candidate_rsu:
     - job: build_rx72n_mqtt_candidate
       artifacts: true
   rules:
-    - if: '$AWS_IOT_ENDPOINT && $AWS_IOT_THING_NAME && $AWS_IOT_CERT && $AWS_IOT_PRIVKEY'
+    - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
