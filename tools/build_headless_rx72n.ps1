@@ -17,7 +17,6 @@ $projectRoot = (Resolve-Path $ProjectRoot).Path
 $workspace = $Workspace
 $projectsPath = $ProjectsPath -replace "/", "\"
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
-$shortRoot = "C:\iotref-rx72n-src"
 $projectNames = @(
     "boot_loader_rx72n_envision_kit",
     "aws_ether_rx72n_envision_kit"
@@ -26,6 +25,10 @@ $rcpcSnapshots = @{}
 
 if (-not (Test-Path (Join-Path $projectRoot "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h"))) {
     throw "Git submodules not initialized."
+}
+
+if (-not (Test-Path (Join-Path $projectRoot "Middleware\FreeRTOS\corePKCS11\source\dependency\3rdparty\pkcs11\published\2-40-errata-1\pkcs11.h"))) {
+    throw "Git submodules not initialized recursively. Missing corePKCS11 pkcs11.h."
 }
 
 if (Test-Path $workspace) {
@@ -51,16 +54,9 @@ foreach ($projectName in $projectNames) {
     }
 }
 
-if (Test-Path $shortRoot) {
-    cmd /c "rmdir `"$shortRoot`"" 2>$null
-}
-
-New-Item -ItemType Junction -Path $shortRoot -Target $projectRoot | Out-Null
-Write-Host "Junction: $shortRoot -> $projectRoot"
-
 $imports = @()
 foreach ($projectName in $projectNames) {
-    $imports += @("-import", (Join-Path $shortRoot "$projectsPath\$projectName\e2studio_ccrx"))
+    $imports += @("-import", (Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx"))
 }
 
 $e2base = @(
@@ -74,7 +70,7 @@ Write-Host "=== RX72N import + build all ==="
 Write-Host "Workspace: $workspace"
 Write-Host "Log file:  $logFile"
 foreach ($projectName in $projectNames) {
-    Write-Host "Import:    $(Join-Path $shortRoot "$projectsPath\$projectName\e2studio_ccrx")"
+    Write-Host "Import:    $(Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx")"
 }
 
 function Find-Artifacts {
@@ -83,14 +79,10 @@ function Find-Artifacts {
     )
 
     $primary = Join-Path $projectRoot $RelativePattern
-    $short = Join-Path $shortRoot $RelativePattern
-
     $items = Get-ChildItem $primary -ErrorAction SilentlyContinue
     if ($items) {
         return $items
     }
-
-    return Get-ChildItem $short -ErrorAction SilentlyContinue
 }
 
 try {
@@ -143,9 +135,5 @@ try {
 finally {
     foreach ($rcpcPath in $rcpcSnapshots.Keys) {
         [System.IO.File]::WriteAllText($rcpcPath, $rcpcSnapshots[$rcpcPath], [System.Text.UTF8Encoding]::new($false))
-    }
-
-    if (Test-Path $shortRoot) {
-        cmd /c "rmdir `"$shortRoot`"" 2>$null
     }
 }
