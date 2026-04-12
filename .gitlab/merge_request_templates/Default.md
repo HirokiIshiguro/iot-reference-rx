@@ -1,20 +1,33 @@
 <!-- ai-consensus-start -->
-## AI Consensus Status
+## 🤖 AI 合議ステータス / AI Consensus Status
 
 | Agent | Stance | Note |
 |-------|--------|------|
-| claude-bot-01 | PENDING | — |
-| codex-bot-01 | PENDING | — |
+| claude-bot-01 | ⏳ PENDING | — |
+| codex-bot-01 | ⏳ PENDING | — |
 
-**Consensus: 0/2 approved**
+**合議結果: 0/2 承認**
+
+Owner / Maintainer が合議不要または即時判断が必要と判断した場合は、AI 合議の完了を待たずにマージする場合があります。
 <!-- ai-consensus-end -->
 
-## Summary
+## 概要 / Summary
 
-<!-- Describe the purpose and overview of the changes -->
+<!-- 変更の目的と概要を記載 -->
 
-## Changes
+## 変更内容 / Changes
 
-<!-- List the main changes -->
+<!-- 主な変更点をリストで記載 -->
 
-Closes #<!-- Issue number -->
+## 判断メモ / Decision Notes
+
+<!-- 自明でない設計判断や置き場所の理由を記載 -->
+
+## テスト / Test Plan
+
+- [ ] <!-- 実施した確認、または未実施ならその理由を記載 -->
+
+## 関連 / Related
+
+- Closes #<!-- Issue番号 -->
+- Related: <!-- 任意 -->
