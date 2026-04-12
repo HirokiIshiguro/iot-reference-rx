@@ -172,6 +172,7 @@ provision_rx72n_linux:
         --reset-after-open \
         --boot-wait 12 \
         --cli-timeout 25 \
+        --attempts 3 \
         "${shadow_args[@]}" \
         2>&1 | tee "$artifact_dir/provision_rx72n.log"
   artifacts:

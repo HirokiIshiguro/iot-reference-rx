@@ -37,6 +37,7 @@ DEFAULT_CLI_TIMEOUT = 15.0
 DEFAULT_CLI_RETRY_INTERVAL = 1.0
 DEFAULT_COMMIT_TIMEOUT = 15.0
 DEFAULT_SHADOW_BAUD = int(os.environ.get("COMMAND_BAUD_RATE", "115200"))
+DEFAULT_ATTEMPTS = 1
 CLI_READY_MARKERS = ("Going to FreeRTOS-CLI",)
 CLI_INVITE_MARKERS = (
     "Press CLI and enter to switch to CLI mode",
@@ -440,6 +441,8 @@ def main():
                         help=f"Seconds between repeated CLI wake-up sends (default: {DEFAULT_CLI_RETRY_INTERVAL})")
     parser.add_argument("--commit-timeout", type=float, default=DEFAULT_COMMIT_TIMEOUT,
                         help=f"Seconds to wait for conf commit completion (default: {DEFAULT_COMMIT_TIMEOUT})")
+    parser.add_argument("--attempts", type=int, default=DEFAULT_ATTEMPTS,
+                        help=f"Provisioning attempts before failing (default: {DEFAULT_ATTEMPTS})")
     parser.add_argument("--reset-cmd", help="External reset/run command executed before or after opening UART")
     parser.add_argument("--reset-after-open", action="store_true",
                         help="Open UART first, then execute --reset-cmd to capture the short CLI window")
@@ -455,8 +458,20 @@ def main():
     parser.add_argument("--quiet", action="store_true", help="Suppress boot output after reset")
     args = parser.parse_args()
 
+    if args.attempts < 1:
+        parser.error("--attempts must be at least 1")
+
     resolve_device_args(args, parser)
-    return provision(args)
+    for attempt in range(1, args.attempts + 1):
+        if args.attempts > 1:
+            print(f"\n=== Provisioning attempt {attempt}/{args.attempts} ===")
+        result = provision(args)
+        if result == 0:
+            return 0
+        if attempt < args.attempts:
+            print(f"Provisioning attempt {attempt} failed; retrying after reset window settle...")
+            time.sleep(2.0)
+    return result
 
 
 if __name__ == "__main__":
