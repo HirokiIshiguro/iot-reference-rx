@@ -98,6 +98,8 @@ flash_rx72n_linux:
   needs:
     - build_rx72n
   rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
@@ -140,6 +142,8 @@ provision_rx72n_linux:
     - build_rx72n
     - flash_rx72n_linux
   rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
@@ -184,6 +188,8 @@ test_mqtt_rx72n_linux:
     - flash_rx72n_linux
     - provision_rx72n_linux
   rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
