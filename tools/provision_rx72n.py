@@ -458,6 +458,9 @@ def main():
     parser.add_argument("--quiet", action="store_true", help="Suppress boot output after reset")
     args = parser.parse_args()
 
+    if args.attempts < 1:
+        parser.error("--attempts must be at least 1")
+
     resolve_device_args(args, parser)
     for attempt in range(1, args.attempts + 1):
         if args.attempts > 1:
