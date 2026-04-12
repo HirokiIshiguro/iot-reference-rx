@@ -61,3 +61,6 @@
 [submodule "tools/provisioning"]
 	path = tools/provisioning
 	url = https://shelty2.servegame.com/oss/experiment/generic/scripts/python/provisioning.git
+[submodule "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/rx_bootloader"]
+	path = Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/rx_bootloader
+	url = ../../../../experiment/embedded/mcu/renesas/rx/bootloader/submodule.git
