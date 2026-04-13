@@ -10,6 +10,7 @@ version after the command finishes.
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -107,8 +108,9 @@ def main():
         with open(demo_config, "w", encoding="utf-8", newline="") as handle:
             handle.write(updated_text)
 
+        powershell = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
         build_cmd = [
-            "powershell",
+            powershell,
             "-NoProfile",
             "-File",
             str(build_script),
