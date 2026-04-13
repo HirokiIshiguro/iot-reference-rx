@@ -559,6 +559,8 @@ test_ota_rx72n_linux:
         --timeout "$RX72N_OTA_OBSERVE_TIMEOUT" \
         --expected-version "$RX72N_OTA_CANDIDATE_VERSION" \
         --reset-cmd "$reset_cmd" \
+        --reset-after-open \
+        --no-reset \
         --raw-log "$artifact_dir/ota_uart_raw.log" \
         --summary-json "$artifact_dir/ota_summary.json" \
         2>&1 | tee "$artifact_dir/test_ota_console.log"

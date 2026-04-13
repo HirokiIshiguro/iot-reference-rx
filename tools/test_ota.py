@@ -522,12 +522,13 @@ def analyze_log_file(path, expected_version=None):
     return analyzer, summary
 
 
-def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None, skip_reset=False, raw_log_path=None):
+def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
+                 skip_reset=False, reset_after_open=False, raw_log_path=None):
     analyzer = OtaLogAnalyzer(expected_version=expected_version)
     total_bytes = 0
     raw_log_file = ensure_parent(raw_log_path)
 
-    if reset_cmd:
+    if reset_cmd and not reset_after_open:
         if not reset_device_via_command(reset_cmd):
             print("WARNING: Reset command failed, continuing to monitor anyway...")
         print("Waiting 5s for USB-Serial bridge recovery...")
@@ -538,6 +539,13 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None, ski
         summary = analyzer.build_summary(total_bytes=0, elapsed=0.0, success=False)
         summary["classification"] = "cannot_open_uart"
         return summary
+
+    if reset_cmd and reset_after_open:
+        print("Issuing external reset while keeping UART open...")
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
+        if not reset_device_via_command(reset_cmd):
+            print("WARNING: Reset command failed, continuing to monitor anyway...")
 
     if skip_reset:
         print("Skipping device reset")
@@ -679,6 +687,8 @@ def main():
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate for live UART mode")
     parser.add_argument("--timeout", type=int, default=420, help="Total live monitoring timeout in seconds")
     parser.add_argument("--reset-cmd", default=None, help="External command to run before opening UART")
+    parser.add_argument("--reset-after-open", action="store_true",
+                        help="Open UART first, then execute --reset-cmd before monitoring")
     parser.add_argument("--no-reset", action="store_true", help="Skip UART reset in live mode")
     parser.add_argument(
         "--expected-version",
@@ -700,7 +710,13 @@ def main():
         print(f"Port:        {args.port}")
         print(f"Baud:        {args.baud}")
         print(f"Timeout:     {args.timeout}s")
-        if args.reset_cmd:
+        if args.reset_cmd and args.reset_after_open and args.no_reset:
+            print("Reset:       external command after UART open; UART 'reset' skipped")
+        elif args.reset_cmd and args.no_reset:
+            print("Reset:       external command only (UART 'reset' skipped)")
+        elif args.reset_cmd and args.reset_after_open:
+            print("Reset:       external command after UART open + UART 'reset'")
+        elif args.reset_cmd:
             print("Reset:       external command + UART 'reset'")
         elif args.no_reset:
             print("Reset:       disabled (--no-reset)")
@@ -736,6 +752,7 @@ def main():
             expected_version=args.expected_version,
             reset_cmd=args.reset_cmd,
             skip_reset=args.no_reset,
+            reset_after_open=args.reset_after_open,
             raw_log_path=args.raw_log,
         )
 
