@@ -55,7 +55,7 @@ Configuration Options
 /* Area configuration */
 #define FWUP_CFG_MAIN_AREA_ADDR_L                   (0xFFE00000U)      /* Main area start address     */
 #define FWUP_CFG_BUF_AREA_ADDR_L                    (0xFFC00000U)      /* Buffer area start address   */
-#define FWUP_CFG_AREA_SIZE                          (0x1F0000U)        /* Install area size           */
+#define FWUP_CFG_AREA_SIZE                          (0x1C0000U)        /* Install area size           */
 
 /* Internal flash */
 #define FWUP_CFG_CF_BLK_SIZE                        (0x8000U)          /* Code flash block size       */

@@ -1199,7 +1199,7 @@
                 <gridItem id="FWUP_CFG_FUNCTION_MODE" selectedIndex="1"/>
                 <gridItem id="FWUP_CFG_MAIN_AREA_ADDR_L" selectedIndex="0xFFE00000U"/>
                 <gridItem id="FWUP_CFG_BUF_AREA_ADDR_L" selectedIndex="0xFFC00000U"/>
-                <gridItem id="FWUP_CFG_AREA_SIZE" selectedIndex="0x1F0000U"/>
+                <gridItem id="FWUP_CFG_AREA_SIZE" selectedIndex="0x1C0000U"/>
                 <gridItem id="FWUP_CFG_CF_BLK_SIZE" selectedIndex="0x8000U"/>
                 <gridItem id="FWUP_CFG_CF_W_UNIT_SIZE" selectedIndex="128U"/>
                 <gridItem id="FWUP_CFG_EXT_BUF_AREA_ADDR_L" selectedIndex="0x00000U"/>
