@@ -520,6 +520,7 @@ create_rx72n_ota_update:
         --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
         --bucket "$env:AWS_OTA_S3_BUCKET_RX72N_02" `
         --signing-profile "$env:AWS_OTA_SIGNING_PROFILE_RX72N_02" `
+        --certificate-path-on-device "codesigncert" `
         --role-arn "$otaRoleArn" `
         --region "$env:AWS_DEFAULT_REGION" `
         --ota-id-prefix "${env:RX72N_DEVICE_ID}-ota" `

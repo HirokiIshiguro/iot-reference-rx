@@ -83,6 +83,11 @@ def main():
     parser.add_argument("--file-version", required=True, help="Target OTA file version (e.g. 0.9.3)")
     parser.add_argument("--bucket", required=True, help="S3 bucket for OTA source image")
     parser.add_argument("--signing-profile", required=True, help="AWS Signer profile name")
+    parser.add_argument(
+        "--certificate-path-on-device",
+        default=None,
+        help="Certificate label/path used in the OTA job document. If set, certificate ARN and platform are read from the signer profile.",
+    )
     parser.add_argument("--role-arn", required=True, help="AWS IoT OTA service role ARN")
     parser.add_argument("--region", required=True, help="AWS region")
     parser.add_argument("--ota-id-prefix", default="ck-rx65n-ota", help="Prefix for generated OTA update IDs")
@@ -133,6 +138,14 @@ def main():
     put_payload = load_json(put_result)
     write_json(artifact_dir / "ota_s3_put_output.json", put_payload)
 
+    signing_profile_payload = None
+    signing_profile_result = run_aws(
+        ["signer", "get-signing-profile", "--profile-name", args.signing_profile],
+        region=args.region,
+    )
+    signing_profile_payload = load_json(signing_profile_result)
+    write_json(artifact_dir / "signing_profile.json", signing_profile_payload)
+
     ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
     file_location = {
         "s3Location": {
@@ -143,6 +156,35 @@ def main():
     if "VersionId" in put_payload:
         file_location["s3Location"]["version"] = put_payload["VersionId"]
 
+    if args.certificate_path_on_device:
+        code_signing = {
+            "startSigningJobParameter": {
+                "signingProfileParameter": {
+                    "certificateArn": signing_profile_payload["signingMaterial"]["certificateArn"],
+                    "platform": signing_profile_payload["platformId"],
+                    "certificatePathOnDevice": args.certificate_path_on_device,
+                },
+                "destination": {
+                    "s3Destination": {
+                        "bucket": args.bucket,
+                        "prefix": signed_prefix,
+                    }
+                },
+            }
+        }
+    else:
+        code_signing = {
+            "startSigningJobParameter": {
+                "signingProfileName": args.signing_profile,
+                "destination": {
+                    "s3Destination": {
+                        "bucket": args.bucket,
+                        "prefix": signed_prefix,
+                    }
+                },
+            }
+        }
+
     create_input = {
         "otaUpdateId": ota_update_id,
         "targets": [thing_arn],
@@ -150,17 +192,7 @@ def main():
         "targetSelection": "SNAPSHOT",
         "files": [
             {
-                "codeSigning": {
-                    "startSigningJobParameter": {
-                        "signingProfileName": args.signing_profile,
-                        "destination": {
-                            "s3Destination": {
-                                "bucket": args.bucket,
-                                "prefix": signed_prefix,
-                            }
-                        },
-                    }
-                },
+                "codeSigning": code_signing,
                 "fileVersion": args.file_version,
                 "fileName": s3_key,
                 "fileLocation": file_location,
@@ -216,6 +248,7 @@ def main():
         "s3_key": s3_key,
         "s3_version": file_location["s3Location"].get("version"),
         "signing_profile": args.signing_profile,
+        "certificate_path_on_device": args.certificate_path_on_device,
         "signing_job_id": signer_job_id,
         "file_version": args.file_version,
         "input_rsu": str(input_rsu),
