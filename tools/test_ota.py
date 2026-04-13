@@ -700,7 +700,9 @@ def main():
         print(f"Port:        {args.port}")
         print(f"Baud:        {args.baud}")
         print(f"Timeout:     {args.timeout}s")
-        if args.reset_cmd:
+        if args.reset_cmd and args.no_reset:
+            print("Reset:       external command only (UART 'reset' skipped)")
+        elif args.reset_cmd:
             print("Reset:       external command + UART 'reset'")
         elif args.no_reset:
             print("Reset:       disabled (--no-reset)")
