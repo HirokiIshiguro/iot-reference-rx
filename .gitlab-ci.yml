@@ -49,7 +49,7 @@ workflow:
 build_rx72n:
   stage: build
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   script:
     - Write-Host "=== Build RX72N projects ==="
     - pip install cryptography --quiet
@@ -93,7 +93,7 @@ build_rx72n:
     - exec-shell
     - os-linux
     - hw-raspi
-    - dev-rx72n-02
+    - dev-ek-rx72n
   resource_group: $RX72N_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail
@@ -232,7 +232,7 @@ test_mqtt_rx72n_linux:
 flash_rx72n:
   stage: flash
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n
@@ -281,7 +281,7 @@ flash_rx72n:
 provision_rx72n:
   stage: provision
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n
@@ -327,7 +327,7 @@ provision_rx72n:
 test_mqtt_rx72n:
   stage: test
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n
@@ -363,7 +363,7 @@ test_mqtt_rx72n:
 build_rx72n_mqtt_candidate:
   stage: build
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   rules:
     - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -396,7 +396,7 @@ build_rx72n_mqtt_candidate:
 package_rx72n_mqtt_candidate_rsu:
   stage: package
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   needs:
     - job: build_rx72n_mqtt_candidate
       artifacts: true
@@ -426,7 +426,7 @@ build_rx72n_ota_candidate:
   stage: ota_build
   allow_failure: true
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   needs:
     - test_mqtt_rx72n_linux
   rules:
@@ -537,7 +537,7 @@ create_rx72n_ota_update:
   stage: ota_create
   allow_failure: true
   tags:
-    - run_ishiguro_machine
+    - exec-run_ishiguro_machine
   needs:
     - job: build_rx72n_ota_candidate
       artifacts: true
