@@ -686,7 +686,11 @@ def main():
 
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate for live UART mode")
     parser.add_argument("--timeout", type=int, default=420, help="Total live monitoring timeout in seconds")
-    parser.add_argument("--reset-cmd", default=None, help="External command to run before opening UART")
+    parser.add_argument(
+        "--reset-cmd",
+        default=None,
+        help="External reset/recovery command; runs before opening UART unless --reset-after-open is set",
+    )
     parser.add_argument("--reset-after-open", action="store_true",
                         help="Open UART first, then execute --reset-cmd before monitoring")
     parser.add_argument("--no-reset", action="store_true", help="Skip UART reset in live mode")
