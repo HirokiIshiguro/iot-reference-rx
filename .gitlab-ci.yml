@@ -4,6 +4,9 @@ stages:
   - provision
   - test
   - package
+  - ota_build
+  - ota_create
+  - ota_test
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -21,6 +24,7 @@ variables:
   RX72N_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
   RX72N_DEVICE_ID: "rx72n-02"
   RUN_RX72N_HW_TESTS: "false"
+  RUN_RX72N_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
   RX72N_LINUX_RFP_CLI: "rfp-cli"
@@ -29,6 +33,10 @@ variables:
   RX72N_LINUX_COMMAND_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN8_RPI2}"
   RX72N_LINUX_UART_BAUD_RATE: "921600"
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
+  RX72N_OTA_CANDIDATE_VERSION: "0.9.3"
+  RX72N_OTA_OBSERVE_TIMEOUT: "420"
+  AWS_DEFAULT_REGION: "ap-northeast-1"
+  E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
 
 workflow:
   rules:
@@ -100,6 +108,8 @@ flash_rx72n_linux:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
@@ -143,6 +153,8 @@ provision_rx72n_linux:
     - flash_rx72n_linux
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -190,6 +202,8 @@ test_mqtt_rx72n_linux:
     - provision_rx72n_linux
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -406,3 +420,148 @@ package_rx72n_mqtt_candidate_rsu:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
+
+build_rx72n_ota_candidate:
+  stage: ota_build
+  tags:
+    - run_ishiguro_machine
+  needs:
+    - test_mqtt_rx72n_linux
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Build RX72N OTA candidate ==="
+    - pip install cryptography --quiet
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota_candidate"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      if (-not $env:RX72N_OTA_CANDIDATE_VERSION) { Write-Error "RX72N_OTA_CANDIDATE_VERSION not set"; exit 1 }
+      $signingKey = $env:RX72N_OTA_SIGNING_KEY
+      if (-not $signingKey) {
+        $signingKey = "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY"
+        Write-Host "RX72N_OTA_SIGNING_KEY not set; using RX72N_SIGNING_KEY path: $signingKey"
+      }
+      if (-not (Test-Path $signingKey)) { Write-Error "OTA signing key not found: $signingKey"; exit 1 }
+
+      $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
+      $candidatePrefix = "$artifactDir\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore
+      $candidateCodeSignCert = "$artifactDir\$env:RX72N_DEVICE_ID" + "_codesign_cert.pem"
+
+      python tools/build_ota_candidate.py `
+        --repo-root "$env:CI_PROJECT_DIR" `
+        --version "$env:RX72N_OTA_CANDIDATE_VERSION" `
+        --output-prefix "$candidatePrefix" `
+        --signing-key "$signingKey" `
+        --e2studio-cli "$env:E2STUDIO_CLI" `
+        --workspace "$env:E2STUDIO_WORKSPACE_OTA" `
+        --code-sign-cert-out "$candidateCodeSignCert" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\build_ota_candidate.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      $candidateRsu = "$candidatePrefix.rsu"
+      if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
+      if (-not (Test-Path $candidateCodeSignCert)) { Write-Error "OTA code-sign cert missing: $candidateCodeSignCert"; exit 1 }
+      Write-Host "OTA candidate: $candidateRsu"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/rx72n_ota_candidate/
+      - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 1 day
+
+create_rx72n_ota_update:
+  stage: ota_create
+  tags:
+    - run_ishiguro_machine
+  needs:
+    - job: build_rx72n_ota_candidate
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Create RX72N AWS IoT OTA update ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      foreach ($name in @("RX72N_DEVICE_ID", "RX72N_OTA_CANDIDATE_VERSION", "RX72N_OTA_S3_BUCKET", "RX72N_OTA_SIGNING_PROFILE", "RX72N_OTA_SERVICE_ROLE_ARN", "AWS_DEFAULT_REGION")) {
+        if (-not [Environment]::GetEnvironmentVariable($name)) {
+          Write-Error "$name not set"
+          exit 1
+        }
+      }
+
+      $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
+      $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota_candidate\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
+      if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
+
+      python tools/create_ota_update.py `
+        --artifact-dir "$artifactDir" `
+        --thing-name "$env:RX72N_DEVICE_ID" `
+        --input-rsu "$candidateRsu" `
+        --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
+        --bucket "$env:RX72N_OTA_S3_BUCKET" `
+        --signing-profile "$env:RX72N_OTA_SIGNING_PROFILE" `
+        --role-arn "$env:RX72N_OTA_SERVICE_ROLE_ARN" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --ota-id-prefix "${env:RX72N_DEVICE_ID}-ota" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/rx72n_ota/
+    expire_in: 7 days
+
+test_ota_rx72n_linux:
+  stage: ota_test
+  extends: .rx72n_linux_hw_job
+  needs:
+    - job: create_rx72n_ota_update
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Verify RX72N OTA over MQTT on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_ota_rx72n_linux"
+      mkdir -p "$artifact_dir"
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      python tools/test_ota.py \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout "$RX72N_OTA_OBSERVE_TIMEOUT" \
+        --expected-version "$RX72N_OTA_CANDIDATE_VERSION" \
+        --reset-cmd "$reset_cmd" \
+        --raw-log "$artifact_dir/ota_uart_raw.log" \
+        --summary-json "$artifact_dir/ota_summary.json" \
+        2>&1 | tee "$artifact_dir/test_ota_console.log"
+
+      if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+        exit "${PIPESTATUS[0]}"
+      fi
+
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_ota_rx72n_linux/
+    expire_in: 7 days
