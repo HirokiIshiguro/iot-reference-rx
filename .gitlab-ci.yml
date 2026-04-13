@@ -108,7 +108,7 @@ flash_rx72n_linux:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
-    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -154,7 +154,7 @@ provision_rx72n_linux:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
-    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -203,7 +203,7 @@ test_mqtt_rx72n_linux:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
-    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -429,9 +429,9 @@ build_rx72n_ota_candidate:
   needs:
     - test_mqtt_rx72n_linux
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
-    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -487,9 +487,9 @@ create_rx72n_ota_update:
     - job: build_rx72n_ota_candidate
       artifacts: true
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
-    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -498,11 +498,15 @@ create_rx72n_ota_update:
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
-      foreach ($name in @("RX72N_DEVICE_ID", "RX72N_OTA_CANDIDATE_VERSION", "RX72N_OTA_S3_BUCKET", "RX72N_OTA_SIGNING_PROFILE", "RX72N_OTA_SERVICE_ROLE_ARN", "AWS_DEFAULT_REGION")) {
+      foreach ($name in @("RX72N_DEVICE_ID", "RX72N_OTA_CANDIDATE_VERSION", "AWS_OTA_S3_BUCKET_RX72N_02", "AWS_OTA_SIGNING_PROFILE_RX72N_02", "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02", "AWS_DEFAULT_REGION")) {
         if (-not [Environment]::GetEnvironmentVariable($name)) {
           Write-Error "$name not set"
           exit 1
         }
+      }
+      $otaRoleArn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
+      if ($otaRoleArn -and -not $otaRoleArn.StartsWith("arn:")) {
+        $otaRoleArn = "arn:aws:iam::$otaRoleArn"
       }
 
       $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
@@ -514,9 +518,9 @@ create_rx72n_ota_update:
         --thing-name "$env:RX72N_DEVICE_ID" `
         --input-rsu "$candidateRsu" `
         --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
-        --bucket "$env:RX72N_OTA_S3_BUCKET" `
-        --signing-profile "$env:RX72N_OTA_SIGNING_PROFILE" `
-        --role-arn "$env:RX72N_OTA_SERVICE_ROLE_ARN" `
+        --bucket "$env:AWS_OTA_S3_BUCKET_RX72N_02" `
+        --signing-profile "$env:AWS_OTA_SIGNING_PROFILE_RX72N_02" `
+        --role-arn "$otaRoleArn" `
         --region "$env:AWS_DEFAULT_REGION" `
         --ota-id-prefix "${env:RX72N_DEVICE_ID}-ota" `
         2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
@@ -535,9 +539,9 @@ test_ota_rx72n_linux:
     - job: create_rx72n_ota_update
       artifacts: true
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
-    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $RX72N_OTA_S3_BUCKET && $RX72N_OTA_SIGNING_PROFILE && $RX72N_OTA_SERVICE_ROLE_ARN'
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - when: never
   script:
