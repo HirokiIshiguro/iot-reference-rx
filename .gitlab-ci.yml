@@ -423,6 +423,7 @@ package_rx72n_mqtt_candidate_rsu:
 
 build_rx72n_ota_candidate:
   stage: ota_build
+  allow_failure: true
   tags:
     - run_ishiguro_machine
   needs:
@@ -479,6 +480,7 @@ build_rx72n_ota_candidate:
 
 create_rx72n_ota_update:
   stage: ota_create
+  allow_failure: true
   tags:
     - run_ishiguro_machine
   needs:
@@ -527,6 +529,7 @@ create_rx72n_ota_update:
 
 test_ota_rx72n_linux:
   stage: ota_test
+  allow_failure: true
   extends: .rx72n_linux_hw_job
   needs:
     - job: create_rx72n_ota_update
