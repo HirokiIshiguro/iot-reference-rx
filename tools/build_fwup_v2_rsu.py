@@ -44,6 +44,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--key", required=True, type=Path, help="ECDSA private key in PEM format")
     parser.add_argument("--output", required=True, type=Path, help="Output .rsu file")
     parser.add_argument("--seq-no", type=int, default=1, help="Sequence number (default: 1)")
+    parser.add_argument(
+        "--format",
+        choices=("legacy-full-rsu", "rtos-ota-payload"),
+        default="legacy-full-rsu",
+        help=(
+            "Output format. legacy-full-rsu is for the UART bootloader. "
+            "rtos-ota-payload starts at the FWUP descriptor for AWS OTA PAL."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -165,6 +174,27 @@ def build_rsu(code_flash: bytearray, data_flash: bytearray, key_path: Path, seq_
     return bytes(rsu)
 
 
+def build_rtos_ota_payload(code_flash: bytearray, data_flash: bytearray, data_bytes_written: int) -> bytes:
+    user_prog_size = USER_PROGRAM_BOTTOM - USER_PROGRAM_TOP + 1
+
+    entries = [(USER_PROGRAM_TOP, user_prog_size)]
+    if data_bytes_written > 0:
+        entries.append((USER_CONST_DATA_TOP, USER_CONST_DATA_BOTTOM - USER_CONST_DATA_TOP + 1))
+
+    descriptor = bytearray(b"\xFF" * RSU_DESCRIPTOR_SIZE)
+    struct.pack_into("<I", descriptor, 0, len(entries))
+    for index, (address, size) in enumerate(entries):
+        struct.pack_into("<I", descriptor, 4 + (index * 8), address)
+        struct.pack_into("<I", descriptor, 8 + (index * 8), size)
+
+    payload = bytearray()
+    payload += descriptor
+    payload += code_flash[:user_prog_size]
+    if data_bytes_written > 0:
+        payload += data_flash[:USER_CONST_DATA_BOTTOM - USER_CONST_DATA_TOP + 1]
+    return bytes(payload)
+
+
 def main() -> int:
     args = parse_args()
 
@@ -199,14 +229,18 @@ def main() -> int:
         f"data={const_data_size:,} bytes ({const_data_size/1024:.0f} KB)"
     )
 
-    rsu = build_rsu(code_flash, data_flash, args.key, args.seq_no)
+    if args.format == "legacy-full-rsu":
+        output_data = build_rsu(code_flash, data_flash, args.key, args.seq_no)
+    else:
+        output_data = build_rtos_ota_payload(code_flash, data_flash, data_written)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_bytes(rsu)
+    args.output.write_bytes(output_data)
 
     print()
     print(f"Output: {args.output}")
-    print(f"  Size: {len(rsu):,} bytes ({len(rsu)/1024:.1f} KB)")
+    print(f"  Format: {args.format}")
+    print(f"  Size: {len(output_data):,} bytes ({len(output_data)/1024:.1f} KB)")
     print("Done.")
     return 0
 

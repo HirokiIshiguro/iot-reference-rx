@@ -147,6 +147,8 @@ def main():
                 str(signing_key),
                 "--output",
                 str(output_prefix.with_suffix(".rsu")),
+                "--format",
+                "rtos-ota-payload",
             ],
             repo_root,
         )
