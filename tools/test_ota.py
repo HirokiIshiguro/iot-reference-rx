@@ -3,7 +3,7 @@
 OTA observability and log classification helper for iot-reference-rx.
 
 This script has two modes:
-1. Live UART monitor mode for RX hardware.
+1. Live UART monitor mode for CK-RX65N hardware.
 2. Offline log analysis mode for previously captured UART logs.
 
 It records progress markers, classifies likely failure points, and can emit:
@@ -523,24 +523,10 @@ def analyze_log_file(path, expected_version=None):
 
 
 def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
-                 skip_reset=False, reset_after_open=False, raw_log_path=None,
-                 trigger_command=None, trigger_marker=None, trigger_log_path=None,
-                 trigger_timeout=180):
+                 skip_reset=False, reset_after_open=False, raw_log_path=None):
     analyzer = OtaLogAnalyzer(expected_version=expected_version)
     total_bytes = 0
     raw_log_file = ensure_parent(raw_log_path)
-    trigger_proc = None
-    trigger_log_handle = None
-    trigger_started_at = None
-    trigger_state = {
-        "command": trigger_command,
-        "marker": trigger_marker,
-        "started": False,
-        "completed": False,
-        "returncode": None,
-        "timed_out": False,
-        "log_path": str(trigger_log_path) if trigger_log_path else None,
-    }
 
     if reset_cmd and not reset_after_open:
         if not reset_device_via_command(reset_cmd):
@@ -584,63 +570,7 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
     start = time.time()
     last_progress_print = start
     failure_detected_at = None
-    trigger_failed_at = None
     partial_line = ""
-
-    def close_trigger_log():
-        nonlocal trigger_log_handle
-        if trigger_log_handle:
-            trigger_log_handle.close()
-            trigger_log_handle = None
-
-    def start_trigger():
-        nonlocal trigger_proc, trigger_log_handle, trigger_started_at
-        if not trigger_command or trigger_proc is not None:
-            return
-
-        print("")
-        print(f">>> Starting trigger command after marker '{trigger_marker}' <<<")
-        if trigger_log_path:
-            trigger_log_file = ensure_parent(trigger_log_path)
-            trigger_log_handle = trigger_log_file.open("w", encoding="utf-8", errors="replace")
-            print(f"Trigger log: {trigger_log_file}")
-
-        trigger_proc = subprocess.Popen(
-            trigger_command,
-            shell=True,
-            stdout=trigger_log_handle or subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
-        )
-        trigger_started_at = time.time()
-        trigger_state["started"] = True
-
-    def poll_trigger():
-        nonlocal trigger_failed_at
-        if trigger_proc is None:
-            return
-
-        returncode = trigger_proc.poll()
-        if returncode is None:
-            if trigger_started_at and (time.time() - trigger_started_at) > trigger_timeout:
-                print("")
-                print(f">>> Trigger command timed out after {trigger_timeout}s <<<")
-                trigger_proc.kill()
-                trigger_proc.wait()
-                close_trigger_log()
-                trigger_state["completed"] = True
-                trigger_state["returncode"] = trigger_proc.returncode
-                trigger_state["timed_out"] = True
-                trigger_failed_at = time.time()
-            return
-
-        close_trigger_log()
-        if not trigger_state["completed"]:
-            print("")
-            print(f">>> Trigger command completed with exit code {returncode} <<<")
-            trigger_state["completed"] = True
-            trigger_state["returncode"] = returncode
-            if returncode != 0:
-                trigger_failed_at = time.time()
 
     try:
         while time.time() - start < timeout:
@@ -664,8 +594,6 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
                     append_timestamped_log(raw_log_file, elapsed, line)
                     sys.stdout.write(f"[+{elapsed:07.3f}s] {line}")
                     analyzer.consume_line(line, elapsed)
-                    if trigger_command and trigger_marker and analyzer.has_marker(trigger_marker):
-                        start_trigger()
                 sys.stdout.flush()
 
                 if failure_detected_at is None and analyzer.first_error() is not None:
@@ -683,8 +611,6 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
 
                 if failure_detected_at is not None and (time.time() - failure_detected_at) >= 3.0:
                     break
-                if trigger_failed_at is not None and (time.time() - trigger_failed_at) >= 3.0:
-                    break
             else:
                 now = time.time()
                 if now - last_progress_print >= 15:
@@ -695,28 +621,9 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
                         f"last_stage={analyzer.last_progress_stage}"
                     )
                     last_progress_print = now
-            poll_trigger()
             time.sleep(0.1)
     finally:
         ser.close()
-        poll_trigger()
-        if trigger_proc is not None and trigger_proc.poll() is None:
-            try:
-                trigger_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                trigger_proc.terminate()
-                try:
-                    trigger_proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    trigger_proc.kill()
-                    trigger_proc.wait()
-                trigger_state["timed_out"] = True
-            if trigger_proc.returncode is None:
-                trigger_proc.kill()
-                trigger_proc.wait()
-            trigger_state["completed"] = True
-            trigger_state["returncode"] = trigger_proc.returncode
-        close_trigger_log()
 
     if partial_line:
         elapsed = time.time() - start
@@ -730,19 +637,7 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
     print(f"Monitoring completed in {elapsed:.1f}s")
     print(f"Total UART bytes received: {total_bytes}")
 
-    summary = analyzer.build_summary(total_bytes=total_bytes, elapsed=elapsed, success=analyzer.is_success())
-    if trigger_command:
-        if not trigger_state["started"]:
-            summary["success"] = False
-            summary["classification"] = "trigger_not_started"
-        elif trigger_state["timed_out"]:
-            summary["success"] = False
-            summary["classification"] = "trigger_timed_out"
-        elif trigger_state["returncode"] not in (0, None):
-            summary["success"] = False
-            summary["classification"] = "trigger_failed"
-        summary["trigger"] = trigger_state
-    return summary
+    return analyzer.build_summary(total_bytes=total_bytes, elapsed=elapsed, success=analyzer.is_success())
 
 
 def write_summary(summary_path, summary):
@@ -784,7 +679,7 @@ def print_summary(summary):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Analyze or monitor OTA progress for RX hardware")
+    parser = argparse.ArgumentParser(description="Analyze or monitor OTA progress for CK-RX65N")
     source_group = parser.add_mutually_exclusive_group(required=True)
     source_group.add_argument("--input-log", help="Analyze an existing UART log file")
     source_group.add_argument("--port", help="Serial port (for live UART monitor, e.g. COM6)")
@@ -799,13 +694,6 @@ def main():
     parser.add_argument("--reset-after-open", action="store_true",
                         help="Open UART first, then execute --reset-cmd before monitoring")
     parser.add_argument("--no-reset", action="store_true", help="Skip UART reset in live mode")
-    parser.add_argument("--trigger-command", default=None,
-                        help="Shell command to start once the trigger marker is observed")
-    parser.add_argument("--trigger-marker", default="waiting_for_job",
-                        help="Marker ID that starts --trigger-command")
-    parser.add_argument("--trigger-log", default=None, help="Write trigger command output to this path")
-    parser.add_argument("--trigger-timeout", type=int, default=180,
-                        help="Timeout for --trigger-command in seconds")
     parser.add_argument(
         "--expected-version",
         default=None,
@@ -814,10 +702,6 @@ def main():
     parser.add_argument("--raw-log", default=None, help="Write timestamped UART log to this path")
     parser.add_argument("--summary-json", default=None, help="Write JSON summary to this path")
     args = parser.parse_args()
-
-    if args.trigger_command and args.trigger_marker not in {marker.marker_id for marker in MARKERS}:
-        print(f"ERROR: unknown trigger marker: {args.trigger_marker}")
-        return 1
 
     print("=" * 60)
     print("iot-reference-rx OTA Observability Helper")
@@ -830,9 +714,6 @@ def main():
         print(f"Port:        {args.port}")
         print(f"Baud:        {args.baud}")
         print(f"Timeout:     {args.timeout}s")
-        if args.trigger_command:
-            print(f"Trigger:     marker={args.trigger_marker}, timeout={args.trigger_timeout}s")
-            print(f"Trigger log: {args.trigger_log or '(disabled)'}")
         if args.reset_cmd and args.reset_after_open and args.no_reset:
             print("Reset:       external command after UART open; UART 'reset' skipped")
         elif args.reset_cmd and args.no_reset:
@@ -877,10 +758,6 @@ def main():
             skip_reset=args.no_reset,
             reset_after_open=args.reset_after_open,
             raw_log_path=args.raw_log,
-            trigger_command=args.trigger_command,
-            trigger_marker=args.trigger_marker,
-            trigger_log_path=args.trigger_log,
-            trigger_timeout=args.trigger_timeout,
         )
 
     write_summary(args.summary_json, summary)

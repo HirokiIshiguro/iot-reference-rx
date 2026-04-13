@@ -478,12 +478,65 @@ build_rx72n_ota_candidate:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
+create_rx72n_ota_update:
+  stage: ota_create
+  allow_failure: true
+  tags:
+    - run_ishiguro_machine
+  needs:
+    - job: build_rx72n_ota_candidate
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Create RX72N AWS IoT OTA update ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      foreach ($name in @("RX72N_DEVICE_ID", "RX72N_OTA_CANDIDATE_VERSION", "AWS_OTA_S3_BUCKET_RX72N_02", "AWS_OTA_SIGNING_PROFILE_RX72N_02", "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02", "AWS_DEFAULT_REGION")) {
+        if (-not [Environment]::GetEnvironmentVariable($name)) {
+          Write-Error "$name not set"
+          exit 1
+        }
+      }
+      $otaRoleArn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
+      if ($otaRoleArn -and -not $otaRoleArn.StartsWith("arn:")) {
+        $otaRoleArn = "arn:aws:iam::$otaRoleArn"
+      }
+
+      $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
+      $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota_candidate\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
+      if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
+
+      python tools/create_ota_update.py `
+        --artifact-dir "$artifactDir" `
+        --thing-name "$env:RX72N_DEVICE_ID" `
+        --input-rsu "$candidateRsu" `
+        --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
+        --bucket "$env:AWS_OTA_S3_BUCKET_RX72N_02" `
+        --signing-profile "$env:AWS_OTA_SIGNING_PROFILE_RX72N_02" `
+        --role-arn "$otaRoleArn" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --ota-id-prefix "${env:RX72N_DEVICE_ID}-ota" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/rx72n_ota/
+    expire_in: 7 days
+
 test_ota_rx72n_linux:
   stage: ota_test
   allow_failure: true
   extends: .rx72n_linux_hw_job
   needs:
-    - job: build_rx72n_ota_candidate
+    - job: create_rx72n_ota_update
       artifacts: true
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
@@ -495,50 +548,12 @@ test_ota_rx72n_linux:
     - echo "=== Verify RX72N OTA over MQTT on Linux runner ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_ota_rx72n_linux"
-      ota_artifact_dir="$CI_PROJECT_DIR/artifacts/rx72n_ota"
       mkdir -p "$artifact_dir"
-      mkdir -p "$ota_artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
-      python -m pip install --quiet awscli
-      aws --version 2>&1 | tee "$artifact_dir/aws_cli_version.txt"
-      if ! aws sts get-caller-identity --region "$AWS_DEFAULT_REGION" > "$artifact_dir/aws_identity.json" 2> "$artifact_dir/aws_identity_error.log"; then
-        cat "$artifact_dir/aws_identity_error.log" >&2
-        exit 1
-      fi
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
-      ota_role_arn="$AWS_OTA_SERVICE_ROLE_ARN_RX72N_02"
-      if [[ -n "$ota_role_arn" && "$ota_role_arn" != arn:* ]]; then
-        ota_role_arn="arn:aws:iam::$ota_role_arn"
-      fi
 
-      cat > "$artifact_dir/create_rx72n_ota_update.sh" <<'SCRIPT'
-      #!/usr/bin/env bash
-      set -euo pipefail
-
-      version_underscore="${RX72N_OTA_CANDIDATE_VERSION//./_}"
-      candidate_rsu="$CI_PROJECT_DIR/artifacts/rx72n_ota_candidate/${RX72N_DEVICE_ID}_${version_underscore}.rsu"
-      if [[ ! -f "$candidate_rsu" ]]; then
-        echo "OTA candidate .rsu missing: $candidate_rsu" >&2
-        exit 1
-      fi
-
-      python tools/create_ota_update.py \
-        --artifact-dir "$OTA_ARTIFACT_DIR" \
-        --thing-name "$RX72N_DEVICE_ID" \
-        --input-rsu "$candidate_rsu" \
-        --file-version "$RX72N_OTA_CANDIDATE_VERSION" \
-        --bucket "$AWS_OTA_S3_BUCKET_RX72N_02" \
-        --signing-profile "$AWS_OTA_SIGNING_PROFILE_RX72N_02" \
-        --role-arn "$OTA_ROLE_ARN_FOR_TRIGGER" \
-        --region "$AWS_DEFAULT_REGION" \
-        --ota-id-prefix "${RX72N_DEVICE_ID}-ota"
-      SCRIPT
-      chmod +x "$artifact_dir/create_rx72n_ota_update.sh"
-
-      OTA_ARTIFACT_DIR="$ota_artifact_dir" \
-      OTA_ROLE_ARN_FOR_TRIGGER="$ota_role_arn" \
-        python tools/test_ota.py \
+      python tools/test_ota.py \
         --port "$RX72N_LINUX_UART_PORT" \
         --baud "$RX72N_LINUX_UART_BAUD_RATE" \
         --timeout "$RX72N_OTA_OBSERVE_TIMEOUT" \
@@ -546,9 +561,6 @@ test_ota_rx72n_linux:
         --reset-cmd "$reset_cmd" \
         --reset-after-open \
         --no-reset \
-        --trigger-command "$artifact_dir/create_rx72n_ota_update.sh" \
-        --trigger-marker waiting_for_job \
-        --trigger-log "$artifact_dir/create_ota_console.log" \
         --raw-log "$artifact_dir/ota_uart_raw.log" \
         --summary-json "$artifact_dir/ota_summary.json" \
         2>&1 | tee "$artifact_dir/test_ota_console.log"
@@ -560,6 +572,5 @@ test_ota_rx72n_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/rx72n_ota/
       - artifacts/test_ota_rx72n_linux/
     expire_in: 7 days
