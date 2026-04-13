@@ -629,6 +629,37 @@ static OtaPalJobDocProcessingResult_t receivedJobDocumentHandler(OtaJobEventData
      */
     /* Cast to type "const char **" to be compatible with parameter type */
     jobIdLength = Jobs_GetJobId((char *)jobDoc->jobData, jobDoc->jobDataLength, (const char **)jobIdptr);
+    {
+        const char * directJobId = NULL;
+        const char * directJobDoc = NULL;
+        size_t directJobIdLength = 0U;
+        size_t directJobDocLength = 0U;
+        JSONStatus_t directJobIdStatus = JSON_SearchConst((char *)jobDoc->jobData,
+                                                          jobDoc->jobDataLength,
+                                                          "execution.jobId",
+                                                          strlen("execution.jobId"),
+                                                          &directJobId,
+                                                          &directJobIdLength,
+                                                          NULL);
+        directJobDocLength = Jobs_GetJobDocument((char *)jobDoc->jobData,
+                                                 jobDoc->jobDataLength,
+                                                 &directJobDoc);
+        LogInfo(("OTA diag: jobDataLength=%u Jobs_GetJobId=%u directJobIdStatus=%d directJobIdLength=%u jobDocLength=%u",
+                 (unsigned int)jobDoc->jobDataLength,
+                 (unsigned int)jobIdLength,
+                 (int)directJobIdStatus,
+                 (unsigned int)directJobIdLength,
+                 (unsigned int)directJobDocLength));
+        LogInfo(("OTA diag: payload head: %.*s",
+                 (int)((jobDoc->jobDataLength > 240U) ? 240U : jobDoc->jobDataLength),
+                 (char *)jobDoc->jobData));
+        if (directJobIdLength > 0U)
+        {
+            LogInfo(("OTA diag: direct jobId: %.*s",
+                     (int)directJobIdLength,
+                     directJobId));
+        }
+    }
 
     if (jobIdLength)
     {
