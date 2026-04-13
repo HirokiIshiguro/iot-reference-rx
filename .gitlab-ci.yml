@@ -501,6 +501,10 @@ test_ota_rx72n_linux:
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       python -m pip install --quiet awscli
       aws --version 2>&1 | tee "$artifact_dir/aws_cli_version.txt"
+      if ! aws sts get-caller-identity --region "$AWS_DEFAULT_REGION" > "$artifact_dir/aws_identity.json" 2> "$artifact_dir/aws_identity_error.log"; then
+        cat "$artifact_dir/aws_identity_error.log" >&2
+        exit 1
+      fi
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
       ota_role_arn="$AWS_OTA_SERVICE_ROLE_ARN_RX72N_02"
