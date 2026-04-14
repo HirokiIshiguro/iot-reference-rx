@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -69,6 +70,11 @@ typedef struct OtaRsuHeader
     uint32_t hardwareId;
     uint8_t reserved2[OTA_HEADER_RESERVED2_BYTES];
 } OtaRsuHeader_t;
+
+typedef char OtaRsuHeaderCoversPayloadBase_t[
+    (sizeof(OtaRsuHeader_t) >= OTA_PAYLOAD_BASE_OFFSET) ? 1 : -1];
+typedef char OtaRsuHeaderSequenceAtPayloadBase_t[
+    (offsetof(OtaRsuHeader_t, sequenceNumber) == OTA_PAYLOAD_BASE_OFFSET) ? 1 : -1];
 
 typedef struct OtaFlashBlock
 {
@@ -616,7 +622,7 @@ static BaseType_t prvWriteImageHeader(AfrOtaJobDocumentFields_t * pFileContext,
 
     return prvWriteFlashBlocking(FWUP_CFG_BUF_AREA_ADDR_L,
                                  (const uint8_t *)&xHeader,
-                                 sizeof(xHeader));
+                                 OTA_PAYLOAD_BASE_OFFSET);
 }
 
 static OtaPalStatus_t prvVerifyReceivedPayload(AfrOtaJobDocumentFields_t * pFileContext)
