@@ -67,6 +67,10 @@ available. */
 #define configCLI_BAUD_RATE (115200)
 #endif
 
+#ifndef configLCD_LOG_STRING
+    #define configLCD_LOG_STRING( pcString, usStringLength )    do { } while( 0 )
+#endif
+
 /*-----------------------------------------------------------*/
 
 /*
@@ -286,8 +290,12 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
 void vOutputString(const char *pcMessage)
 {
     {
+        unsigned short usStringLength = (unsigned short)strlen(pcMessage);
+
+        configLCD_LOG_STRING(pcMessage, usStringLength);
+
         /* Cast to type "signed char *" and (unsigned short) to be compatible with parameter type */
-        vSerialPutString((signed char *)pcMessage, (unsigned short)strlen(pcMessage));
+        vSerialPutString((signed char *)pcMessage, usStringLength);
     }
 }
 /**********************************************************************************************************************

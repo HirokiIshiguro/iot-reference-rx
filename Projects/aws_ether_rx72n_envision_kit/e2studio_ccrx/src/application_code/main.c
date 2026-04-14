@@ -26,11 +26,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* C runtime includes. */
 #include <stdio.h>
+#include <string.h>
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "event_groups.h"
+
+/* Renesas includes. */
+#include "platform.h"
 
 /* Logging includes. */
 #include "iot_logging_task.h"
@@ -109,10 +113,6 @@ extern BaseType_t KVStore_xCommitChanges(void);
 /* The priority used by the UART command console task. */
 #define mainUART_COMMAND_CONSOLE_TASK_PRIORITY  ( 1 )
 
-#define mainLCD_STATUS_TASK_STACK_SIZE          ( configMINIMAL_STACK_SIZE * 4UL )
-#define mainLCD_STATUS_TASK_PRIORITY            ( tskIDLE_PRIORITY )
-#define mainLCD_STATUS_UPDATE_PERIOD_MS         ( 5000UL )
-
 /* The MAC address array is not declared const as the MAC address will
 normally be read from an EEPROM and not hard coded (in real deployed
 applications).*/
@@ -174,8 +174,8 @@ void vApplicationDaemonTaskStartupHook (void);
 void prvMiscInitialization (void);
 static BaseType_t prvShouldAutoProvisionFromClientCredentials( void );
 static void prvDisplayInitialize( void );
+static void prvDisplayWriteBanner( void );
 static void prvDisplayWrite( const char * pcMessage );
-static void prvLcdStatusTask( void * pvParameters );
 
 extern void UserInitialization (void);
 extern void CLI_Support_Settings (void);
@@ -292,13 +292,6 @@ void main_task(void *pvParameters)
                         vStartOtaDemo();
                         prvDisplayWrite("OTA task start\r\n");
             #endif
-
-            xTaskCreate(prvLcdStatusTask,
-                        "LCD_STATUS",
-                        mainLCD_STATUS_TASK_STACK_SIZE,
-                        NULL,
-                        mainLCD_STATUS_TASK_PRIORITY,
-                        NULL);
     }
     else
     {
@@ -345,8 +338,39 @@ static void prvDisplayInitialize( void )
         R_SIMPLE_GLCDC_CONFIG_Open();
         R_SIMPLE_GRAPHIC_Open();
         xDisplayInitialized = pdTRUE;
-        prvDisplayWrite("\r\niot-reference-rx\r\nRX72N app running\r\n");
+        prvDisplayWriteBanner();
     }
+}
+/*-----------------------------------------------------------*/
+
+static void prvDisplayWriteBanner( void )
+{
+    char cVersionLine[96];
+
+    prvDisplayWrite("\r\n");
+    prvDisplayWrite("RX72N Envision Kit\r\n");
+    prvDisplayWrite("AWS FreeRTOS IoT Reference\r\n");
+    prvDisplayWrite("Implementation Demo\r\n");
+    prvDisplayWrite("----------------------------------------\r\n");
+
+    (void) sprintf(cVersionLine,
+                   "Firmware: %u.%u.%u\r\n",
+                   (unsigned int) APP_VERSION_MAJOR,
+                   (unsigned int) APP_VERSION_MINOR,
+                   (unsigned int) APP_VERSION_BUILD);
+    prvDisplayWrite(cVersionLine);
+
+    prvDisplayWrite("OS: " democonfigOS_NAME " " democonfigOS_VERSION "\r\n");
+    prvDisplayWrite("MQTT: " democonfigMQTT_LIB "\r\n");
+
+    (void) sprintf(cVersionLine,
+                   "BSP: %u.%u\r\n",
+                   (unsigned int) R_BSP_VERSION_MAJOR,
+                   (unsigned int) R_BSP_VERSION_MINOR);
+    prvDisplayWrite(cVersionLine);
+
+    prvDisplayWrite("Built: " __DATE__ " " __TIME__ "\r\n");
+    prvDisplayWrite("----------------------------------------\r\n");
 }
 /*-----------------------------------------------------------*/
 
@@ -354,29 +378,21 @@ static void prvDisplayWrite( const char * pcMessage )
 {
     if( ( pdFALSE != xDisplayInitialized ) && ( NULL != pcMessage ) )
     {
-        while( '\0' != *pcMessage )
-        {
-            R_SIMPLE_GRAPHIC_PutCharacter(*pcMessage);
-            pcMessage++;
-        }
+        vApplicationLcdLogString(pcMessage, (unsigned short) strlen(pcMessage));
     }
 }
 /*-----------------------------------------------------------*/
 
-static void prvLcdStatusTask( void * pvParameters )
+void vApplicationLcdLogString( const char * pcMessage, unsigned short usStringLength )
 {
-    char cStatusLine[96];
+    unsigned short usIndex;
 
-    (void) pvParameters;
-
-    for( ;; )
+    if( ( pdFALSE != xDisplayInitialized ) && ( NULL != pcMessage ) )
     {
-        (void) sprintf(cStatusLine,
-                       "tick %lu heap %lu\r\n",
-                       (unsigned long) xTaskGetTickCount(),
-                       (unsigned long) xPortGetFreeHeapSize());
-        prvDisplayWrite(cStatusLine);
-        vTaskDelay(pdMS_TO_TICKS(mainLCD_STATUS_UPDATE_PERIOD_MS));
+        for( usIndex = 0; usIndex < usStringLength; usIndex++ )
+        {
+            R_SIMPLE_GRAPHIC_PutCharacter(pcMessage[usIndex]);
+        }
     }
 }
 /*-----------------------------------------------------------*/
