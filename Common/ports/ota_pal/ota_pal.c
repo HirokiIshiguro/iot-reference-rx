@@ -41,7 +41,9 @@
 #define OTA_IMAGE_FLAG_TESTING      (0xFEU)
 #define OTA_MAGIC_CODE_LEN          (7U)
 #define OTA_SIG_TYPE_LENGTH         (32U)
-#define OTA_HEADER_RESERVED_BYTES   (400U)
+#define OTA_LEGACY_SIGNATURE_BYTES  (256U)
+#define OTA_HEADER_RESERVED1_BYTES  (200U)
+#define OTA_HEADER_RESERVED2_BYTES  (236U)
 #define OTA_IMAGE_STATE_UNKNOWN_STR  ("unknown")
 #define OTA_IMAGE_STATE_TESTING_STR  ("testing")
 #define OTA_IMAGE_STATE_ACCEPTED_STR ("accepted")
@@ -54,9 +56,17 @@ typedef struct OtaRsuHeader
     uint8_t imageFlag;
     uint8_t sigType[OTA_SIG_TYPE_LENGTH];
     uint32_t sigSize;
-    uint8_t sig[MAX_SIG_LENGTH];
-    uint32_t imageFileSize;
-    uint8_t reserved[OTA_HEADER_RESERVED_BYTES];
+    uint8_t sig[OTA_LEGACY_SIGNATURE_BYTES];
+    uint32_t dataflashFlag;
+    uint32_t dataflashStartAddress;
+    uint32_t dataflashEndAddress;
+    uint8_t reserved1[OTA_HEADER_RESERVED1_BYTES];
+    uint32_t sequenceNumber;
+    uint32_t startAddress;
+    uint32_t endAddress;
+    uint32_t executionAddress;
+    uint32_t hardwareId;
+    uint8_t reserved2[OTA_HEADER_RESERVED2_BYTES];
 } OtaRsuHeader_t;
 
 typedef struct OtaFlashBlock
@@ -523,7 +533,7 @@ static BaseType_t prvWriteImageHeader(AfrOtaJobDocumentFields_t * pFileContext,
     (void)memcpy(xHeader.sigType, OTA_JsonFileSignatureKey, strlen(OTA_JsonFileSignatureKey));
     xHeader.sigSize = MAX_SIG_LENGTH;
     (void)memcpy(xHeader.sig, pRawSignature, MAX_SIG_LENGTH);
-    xHeader.imageFileSize = pFileContext->fileSize;
+    (void)pFileContext;
 
     return prvWriteFlashBlocking(FWUP_CFG_BUF_AREA_ADDR_L,
                                  (const uint8_t *)&xHeader,
