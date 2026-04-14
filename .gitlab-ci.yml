@@ -24,8 +24,17 @@ variables:
   UART_BAUD_RATE: "921600"
   RX72N_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
   RX72N_DEVICE_ID: "rx72n-02"
+  # RX72N_TEST_SCOPE:
+  #   auto  - main/tag/manual pipelines run the full MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
+  #   build - build/package only, no hardware test.
+  #   mqtt  - flash/provision/MQTT only, no OTA.
+  #   ota   - flash/provision/MQTT + OTA.
+  #   full  - same as ota, intended for explicit full validation.
+  RX72N_TEST_SCOPE: "auto"
   RUN_RX72N_HW_TESTS: "false"
   RUN_RX72N_OTA_TESTS: "false"
+  RX72N_SKIP_HW_TESTS: "false"
+  RX72N_SKIP_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
   RX72N_LINUX_RFP_CLI: "rfp-cli"
@@ -41,6 +50,8 @@ variables:
 
 workflow:
   rules:
+    - if: $CI_COMMIT_TAG
+      when: always
     - if: $CI_COMMIT_BRANCH
       when: always
     - if: $CI_MERGE_REQUEST_IID
@@ -119,7 +130,13 @@ flash_rx72n_linux:
   needs:
     - build_rx72n
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -170,7 +187,13 @@ provision_rx72n_linux:
     - build_rx72n
     - flash_rx72n_linux
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -219,7 +242,13 @@ test_mqtt_rx72n_linux:
     - flash_rx72n_linux
     - provision_rx72n_linux
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -451,7 +480,6 @@ package_rx72n_mqtt_candidate_rsu:
 
 build_rx72n_ota_candidate:
   stage: ota_build
-  allow_failure: true
   tags:
     - exec-shell
     - os-windows
@@ -459,7 +487,13 @@ build_rx72n_ota_candidate:
   needs:
     - test_mqtt_rx72n_linux
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -510,14 +544,19 @@ build_rx72n_ota_candidate:
 
 park_rx72n_ota_cli_linux:
   stage: ota_prepare
-  allow_failure: true
   extends: .rx72n_linux_hw_job
   needs:
     - job: build_rx72n
       artifacts: true
     - test_mqtt_rx72n_linux
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -564,7 +603,6 @@ park_rx72n_ota_cli_linux:
 
 create_rx72n_ota_update:
   stage: ota_create
-  allow_failure: true
   tags:
     - exec-shell
     - os-windows
@@ -575,7 +613,13 @@ create_rx72n_ota_update:
     - job: park_rx72n_ota_cli_linux
       artifacts: true
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -623,13 +667,18 @@ create_rx72n_ota_update:
 
 test_ota_rx72n_linux:
   stage: ota_test
-  allow_failure: true
   extends: .rx72n_linux_hw_job
   needs:
     - job: create_rx72n_ota_update
       artifacts: true
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE != "build" && $RX72N_TEST_SCOPE != "none" && $RX72N_TEST_SCOPE != "mqtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
