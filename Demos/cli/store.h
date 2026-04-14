@@ -58,6 +58,7 @@ typedef enum KVStoreKey
 	KVS_CLAIM_CERT_ID,
 	KVS_CLAIM_PRIVKEY_ID,
     KVS_CODE_SIGN_CERT_ID,
+    KVS_OTA_IMAGE_STATE,
 	KVS_TSIP_ROOTCA_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PRIKEY_ID,
@@ -91,7 +92,8 @@ typedef struct KeyValueStore
 		[ KVS_TEMPLATE_NAME ] = "template_name",         \
 		[ KVS_CLAIM_CERT_ID ] = pkcs11configLABEL_CLAIM_CERTIFICATE,         \
 		[ KVS_CLAIM_PRIVKEY_ID ] = pkcs11configLABEL_CLAIM_PRIVATE_KEY,         \
-		[ KVS_CODE_SIGN_CERT_ID ] = "code_sign_cert_id",         \
+        [ KVS_CODE_SIGN_CERT_ID ] = "code_sign_cert_id",         \
+        [ KVS_OTA_IMAGE_STATE ] = "ota_image_state",         \
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsip_rootca_pub_id",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsip_client_pub_id",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsip_client_pri_id",         \
@@ -108,6 +110,7 @@ typedef struct KeyValueStore
 		[ KVS_CLAIM_CERT_ID ] = "claimcert",                \
 		[ KVS_CLAIM_PRIVKEY_ID ] = "claimkey",         \
         [ KVS_CODE_SIGN_CERT_ID ] = "codesigncert",         \
+        [ KVS_OTA_IMAGE_STATE ] = "otastate",         \
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsiprootkey",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsippubkey",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsipprikey",         \
