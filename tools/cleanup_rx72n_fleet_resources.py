@@ -79,7 +79,14 @@ def main():
     if cert_arn and cert_arn not in principals:
         principals.append(cert_arn)
 
+    certificate_ids_to_delete = set()
+    if certificate_id:
+        certificate_ids_to_delete.add(certificate_id)
+
     for principal in principals:
+        if ":cert/" in principal:
+            certificate_ids_to_delete.add(principal.rsplit(":cert/", 1)[1])
+
         if thing_name:
             run_aws(
                 ["iot", "detach-thing-principal", "--thing-name", thing_name, "--principal", principal],
@@ -104,20 +111,21 @@ def main():
             )
             cleanup["actions"].append({"action": "detach_policy", "policy": policy_name, "principal": principal})
 
-    if certificate_id:
+    cleanup["certificate_ids_to_delete"] = sorted(certificate_ids_to_delete)
+    for certificate_id_to_delete in sorted(certificate_ids_to_delete):
         run_aws(
-            ["iot", "update-certificate", "--certificate-id", certificate_id, "--new-status", "INACTIVE"],
+            ["iot", "update-certificate", "--certificate-id", certificate_id_to_delete, "--new-status", "INACTIVE"],
             region=args.region,
             allow_failure=True,
         )
-        cleanup["actions"].append({"action": "update_certificate", "status": "INACTIVE"})
+        cleanup["actions"].append({"action": "update_certificate", "certificate_id": certificate_id_to_delete, "status": "INACTIVE"})
 
         run_aws(
-            ["iot", "delete-certificate", "--certificate-id", certificate_id],
+            ["iot", "delete-certificate", "--certificate-id", certificate_id_to_delete],
             region=args.region,
             allow_failure=True,
         )
-        cleanup["actions"].append({"action": "delete_certificate"})
+        cleanup["actions"].append({"action": "delete_certificate", "certificate_id": certificate_id_to_delete})
 
     if thing_name:
         run_aws(
