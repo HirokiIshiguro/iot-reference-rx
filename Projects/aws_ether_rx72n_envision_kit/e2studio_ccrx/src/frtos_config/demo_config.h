@@ -393,7 +393,7 @@
  * @note Specified in bytes.  Must be large enough to hold the maximum
  * anticipated MQTT payload.
  */
-#define MQTT_AGENT_NETWORK_BUFFER_SIZE          ( 20000 )
+#define MQTT_AGENT_NETWORK_BUFFER_SIZE          ( 32768 )
 
 #define MQTT_COMMAND_CONTEXTS_POOL_SIZE              ( 10 )
 
