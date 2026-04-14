@@ -36,6 +36,7 @@
 #define HALF_SIG_LENGTH             (MAX_SIG_LENGTH / 2U)
 #define OTA_FLASH_QUEUE_LENGTH      (2U)
 #define OTA_PAYLOAD_BASE_OFFSET     (0x200U)
+#define OTA_MAX_PAYLOAD_SIZE        (FWUP_CFG_AREA_SIZE - OTA_PAYLOAD_BASE_OFFSET)
 #define OTA_FLASH_PAD_VALUE         (0xFFU)
 #define OTA_HASH_READ_CHUNK_SIZE    (1024U)
 #define OTA_IMAGE_FLAG_TESTING      (0xFEU)
@@ -73,6 +74,7 @@ typedef struct OtaFlashBlock
 {
     uint32_t offset;
     uint32_t length;
+    uint32_t paddedLength;
     uint8_t * pData;
 } OtaFlashBlock_t;
 
@@ -98,6 +100,11 @@ static void prvResetDownloadState(void);
 static void prvIncrementPendingBlocks(void);
 static void prvDecrementPendingBlocks(void);
 static BaseType_t prvWaitForFlashQueueDrained(void);
+static BaseType_t prvGetPaddedLength(uint32_t length,
+                                     uint32_t * pulPaddedLength);
+static BaseType_t prvValidatePayloadRange(uint32_t offset,
+                                          uint32_t length,
+                                          uint32_t * pulPaddedLength);
 static BaseType_t prvEraseBufferArea(void);
 static BaseType_t prvWriteFlashBlocking(uint32_t destAddr,
                                         const uint8_t * pData,
@@ -122,9 +129,11 @@ OtaPalJobDocProcessingResult_t otaPal_CreateFileForRx(AfrOtaJobDocumentFields_t 
         return OtaPalJobDocFileCreateFailed;
     }
 
-    pFileContext->fileId = hdl++;
-    prvResetDownloadState();
-    (void) prvPersistImageState(OtaImageStateUnknown);
+    if ((0U == pFileContext->fileSize) || (pFileContext->fileSize > OTA_MAX_PAYLOAD_SIZE))
+    {
+        LogError(("otaPal_CreateFileForRx: invalid payload size %u", (unsigned int)pFileContext->fileSize));
+        return OtaPalJobDocFileCreateFailed;
+    }
 
     if (pdTRUE != prvEnsureFlashResources())
     {
@@ -132,13 +141,18 @@ OtaPalJobDocProcessingResult_t otaPal_CreateFileForRx(AfrOtaJobDocumentFields_t 
         return OtaPalJobDocFileCreateFailed;
     }
 
+    (void)prvWaitForFlashQueueDrained();
+    prvResetDownloadState();
+    pFileContext->fileId = hdl++;
+    OtaImageState = OtaImageStateUnknown;
+    (void) prvPersistImageState(OtaImageState);
+
     if (pdTRUE != prvEraseBufferArea())
     {
         LogError(("otaPal_CreateFileForRx: buffer erase failed"));
         return OtaPalJobDocFileCreateFailed;
     }
 
-    OtaImageState = OtaImageStateUnknown;
     LogInfo(("otaPal_CreateFileForRx: direct queued flash path initialized"));
     return OtaPalJobDocFileCreated;
 }
@@ -148,17 +162,37 @@ int16_t otaPal_WriteBlock(AfrOtaJobDocumentFields_t * const pFileContext,
                           uint8_t * const pData,
                           uint32_t ulBlockSize)
 {
-    (void) pFileContext;
-
     OtaFlashBlock_t xBlock = {0};
+    uint32_t paddedLength = 0U;
 
-    if ((NULL == pData) || (0U == ulBlockSize) || (NULL == xOtaFlashQueue))
+    if ((NULL == pFileContext) || (NULL == pData) || (0U == ulBlockSize) || (NULL == xOtaFlashQueue))
     {
         return 0;
     }
 
     if (pdTRUE == xOtaFlashError)
     {
+        return 0;
+    }
+
+    if (ulBlockSize > mqttFileDownloader_CONFIG_BLOCK_SIZE)
+    {
+        xOtaFlashError = pdTRUE;
+        LogError(("otaPal_WriteBlock: block too large: %u", (unsigned int)ulBlockSize));
+        return 0;
+    }
+
+    if ((ulOffset > pFileContext->fileSize) || (ulBlockSize > (pFileContext->fileSize - ulOffset)))
+    {
+        xOtaFlashError = pdTRUE;
+        LogError(("otaPal_WriteBlock: block exceeds job file size"));
+        return 0;
+    }
+
+    if (pdTRUE != prvValidatePayloadRange(ulOffset, ulBlockSize, &paddedLength))
+    {
+        xOtaFlashError = pdTRUE;
+        LogError(("otaPal_WriteBlock: block exceeds OTA flash buffer"));
         return 0;
     }
 
@@ -172,6 +206,7 @@ int16_t otaPal_WriteBlock(AfrOtaJobDocumentFields_t * const pFileContext,
     (void)memcpy(xBlock.pData, pData, ulBlockSize);
     xBlock.offset = ulOffset;
     xBlock.length = ulBlockSize;
+    xBlock.paddedLength = paddedLength;
 
     prvIncrementPendingBlocks();
     if (pdPASS != xQueueSend(xOtaFlashQueue, &xBlock, portMAX_DELAY))
@@ -274,6 +309,9 @@ OtaPalStatus_t otaPal_Abort(AfrOtaJobDocumentFields_t * const pFileContext)
     {
         pFileContext->fileId = 0U;
     }
+
+    xOtaFlashError = pdTRUE;
+    (void)prvWaitForFlashQueueDrained();
 
     OtaImageState = OtaImageStateAborted;
     (void) prvPersistImageState(OtaImageState);
@@ -432,6 +470,52 @@ static BaseType_t prvWaitForFlashQueueDrained(void)
     return (pdTRUE == xOtaFlashError) ? pdFALSE : pdTRUE;
 }
 
+static BaseType_t prvGetPaddedLength(uint32_t length,
+                                     uint32_t * pulPaddedLength)
+{
+    uint32_t paddedLength = length;
+    uint32_t remainder;
+
+    if ((0U == length) || (NULL == pulPaddedLength))
+    {
+        return pdFALSE;
+    }
+
+    remainder = paddedLength % FLASH_CF_MIN_PGM_SIZE;
+    if (0U != remainder)
+    {
+        paddedLength += FLASH_CF_MIN_PGM_SIZE - remainder;
+    }
+
+    if (paddedLength < length)
+    {
+        return pdFALSE;
+    }
+
+    *pulPaddedLength = paddedLength;
+    return pdTRUE;
+}
+
+static BaseType_t prvValidatePayloadRange(uint32_t offset,
+                                          uint32_t length,
+                                          uint32_t * pulPaddedLength)
+{
+    uint32_t paddedLength = 0U;
+
+    if (pdTRUE != prvGetPaddedLength(length, &paddedLength))
+    {
+        return pdFALSE;
+    }
+
+    if ((offset > OTA_MAX_PAYLOAD_SIZE) || (paddedLength > (OTA_MAX_PAYLOAD_SIZE - offset)))
+    {
+        return pdFALSE;
+    }
+
+    *pulPaddedLength = paddedLength;
+    return pdTRUE;
+}
+
 static BaseType_t prvEraseBufferArea(void)
 {
     uint32_t numBlocks = FWUP_CFG_AREA_SIZE / FWUP_CFG_CF_BLK_SIZE;
@@ -492,12 +576,7 @@ static void prvOtaFlashTask(void * pvParameters)
     {
         if (pdPASS == xQueueReceive(xOtaFlashQueue, &xBlock, portMAX_DELAY))
         {
-            uint32_t paddedLength = xBlock.length;
-
-            if ((paddedLength % FLASH_CF_MIN_PGM_SIZE) != 0U)
-            {
-                paddedLength = FLASH_CF_MIN_PGM_SIZE * ((paddedLength / FLASH_CF_MIN_PGM_SIZE) + 1U);
-            }
+            uint32_t paddedLength = xBlock.paddedLength;
 
             if (paddedLength > sizeof(flashWriteBuffer))
             {
@@ -569,6 +648,7 @@ static OtaPalStatus_t prvVerifyReceivedPayload(AfrOtaJobDocumentFields_t * pFile
     pSignerCert = prvGetSignerCert(&signerCertSize);
     if (NULL == pSignerCert)
     {
+        (void)CRYPTO_SignatureVerificationFinal(pCryptoContext, NULL, 0U, NULL, 0U);
         xOk = pdFALSE;
     }
     else if (pdFALSE == CRYPTO_SignatureVerificationFinal(pCryptoContext,
