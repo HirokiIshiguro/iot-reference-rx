@@ -1,411 +1,265 @@
 /*
- * FreeRTOS OTA PAL for Renesas RX65N V1.0.0
- * Copyright (C) 2021 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
- * Modifications Copyright (C) 2023-2025 Renesas Electronics Corporation or its affiliates.
+ * FreeRTOS OTA PAL for Renesas RX72N.
+ *
+ * This implementation writes OTA payloads directly to the inactive bank using
+ * the Flash FIT BGO callback path. Incoming MQTT blocks are queued quickly and
+ * a dedicated flash task serializes erase/write completion, so MQTT block
+ * download can overlap with flash programming.
  *
  * SPDX-License-Identifier: MIT
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * http://aws.amazon.com/freertos
- * http://www.FreeRTOS.org
  */
 
-/* C Runtime includes. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* FreeRTOS include. */
 #include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
 
-/* OTA PAL Port include. */
 #include "ota_pal.h"
 #include "MQTTFileDownloader_config.h"
 
-/* Renesas RX Driver Package include */
 #include "platform.h"
-#include "r_fwup_if.h"
-#include "r_fwup_private.h"
+#include "r_flash_rx_if.h"
 #include "./src/targets/rx72n/r_flash_rx72n.h"
-#include "mbedtls/ecdsa.h"
+#include "r_fwup_config.h"
+#include "r_common_api_flash.h"
+#include "store.h"
+#include "iot_crypto.h"
+
 #include "mbedtls/asn1.h"
+#include "mbedtls/ecdsa.h"
 #include "mbedtls/error.h"
 
-#define MAX_LENGTH      (32)
-#define MAX_SIG_LENGTH  (64)
-#define HALF_SIG_LENGTH (MAX_SIG_LENGTH/2)
+#define MAX_SIG_LENGTH              (64U)
+#define HALF_SIG_LENGTH             (MAX_SIG_LENGTH / 2U)
+#define OTA_FLASH_QUEUE_LENGTH      (2U)
+#define OTA_PAYLOAD_BASE_OFFSET     (0x200U)
+#define OTA_FLASH_PAD_VALUE         (0xFFU)
+#define OTA_HASH_READ_CHUNK_SIZE    (1024U)
+#define OTA_IMAGE_FLAG_TESTING      (0xFEU)
+#define OTA_MAGIC_CODE_LEN          (7U)
+#define OTA_SIG_TYPE_LENGTH         (32U)
+#define OTA_HEADER_RESERVED_BYTES   (400U)
+
+typedef struct OtaRsuHeader
+{
+    uint8_t magicCode[OTA_MAGIC_CODE_LEN];
+    uint8_t imageFlag;
+    uint8_t sigType[OTA_SIG_TYPE_LENGTH];
+    uint32_t sigSize;
+    uint8_t sig[MAX_SIG_LENGTH];
+    uint32_t imageFileSize;
+    uint8_t reserved[OTA_HEADER_RESERVED_BYTES];
+} OtaRsuHeader_t;
+
+typedef struct OtaFlashBlock
+{
+    uint32_t offset;
+    uint32_t length;
+    uint8_t * pData;
+} OtaFlashBlock_t;
 
 const char OTA_JsonFileSignatureKey[OTA_FILE_SIG_KEY_STR_MAX_LENGTH] = "sig-sha256-ecdsa";
-static OtaImageState_t OtaImageState;
-uint32_t receiving_count = 0;
-BaseType_t first_block_received = pdFALSE;
-uint8_t * first_ota_blocks[mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST];
 
 AfrOtaJobDocumentFields_t * pOTAFileContext = NULL;
 
-static int ExtractECDSASignature (const unsigned char * derSignature, size_t derSignatureLength, unsigned char * rawSignature);
+extern volatile UPDATA_DATA_FLASH_CONTROL_BLOCK update_data_flash_control_block;
 
-/* Function Name: otaPal_CreateFileForRx */
-/**********************************************************************************************************************
- * @brief Creates OTA file for receiving
- * @param[in] pFileContext
- * @return OTA Job processing result
- * @retval OtaPalJobDocFileCreateFailed
- * @retval OtaPalJobDocProcessingStateInvalid
- * @retval OtaPalJobDocFileCreated
- *********************************************************************************************************************/
+static OtaImageState_t OtaImageState = OtaImageStateUnknown;
+static QueueHandle_t xOtaFlashQueue = NULL;
+static TaskHandle_t xOtaFlashTask = NULL;
+static volatile uint32_t ulOtaFlashPendingBlocks = 0U;
+static volatile BaseType_t xOtaFlashError = pdFALSE;
+static uint32_t ulOtaPayloadBytesReceived = 0U;
+
+static int ExtractECDSASignature(const unsigned char * derSignature,
+                                 size_t derSignatureLength,
+                                 unsigned char * rawSignature);
+static void prvOtaFlashTask(void * pvParameters);
+static BaseType_t prvEnsureFlashResources(void);
+static void prvResetDownloadState(void);
+static void prvIncrementPendingBlocks(void);
+static void prvDecrementPendingBlocks(void);
+static BaseType_t prvWaitForFlashQueueDrained(void);
+static BaseType_t prvEraseBufferArea(void);
+static BaseType_t prvWriteFlashBlocking(uint32_t destAddr,
+                                        const uint8_t * pData,
+                                        uint32_t length);
+static BaseType_t prvWriteImageHeader(AfrOtaJobDocumentFields_t * pFileContext,
+                                      const uint8_t * pRawSignature);
+static OtaPalStatus_t prvVerifyReceivedPayload(AfrOtaJobDocumentFields_t * pFileContext);
+static uint8_t * prvGetSignerCert(uint32_t * pulSignerCertSize);
+static void prvResetDevice(void);
+static BaseType_t prvActivateBank(void);
+
 OtaPalJobDocProcessingResult_t otaPal_CreateFileForRx(AfrOtaJobDocumentFields_t * const pFileContext)
 {
-    OtaPalJobDocProcessingResult_t eResult = OtaPalJobDocProcessingStateInvalid;
-
-    static uint8_t hdl;
-    pFileContext->fileId = hdl;
-
-    receiving_count      = 0;
-    first_block_received = pdFALSE;
-
-    for (uint8_t i = 0; i < mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST; i++)
-    {
-        first_ota_blocks[i] = NULL;
-    }
-
-    if (FWUP_SUCCESS != R_FWUP_Open())
-    {
-        eResult = OtaPalJobDocFileCreateFailed;
-        LogError(("otaPal_CreateFileForRx: failed!"));
-    }
-    else
-    {
-        OtaImageState = OtaImageStateUnknown;
-        eResult       = OtaPalJobDocFileCreated;
-    }
-
-    LogDebug(("otaPal_CreateFileForRx: receives %d data blocks at the same time", mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST));
-
-    return eResult;
-}
-/**********************************************************************************************************************
- End of function otaPal_CreateFileForRx
- *********************************************************************************************************************/
-
-/* Function Name: otaPal_WriteBlock */
-/**********************************************************************************************************************
- * @brief Write OTA data blocks
- * @param[in] pFileContext
- * @param[in] ulOffset
- * @param[in] pData
- * @param[in] ulBlockSize
- * @return Size of written block
- * @retval 0
- * @retval ulBlockSize
- *********************************************************************************************************************/
-int16_t otaPal_WriteBlock(AfrOtaJobDocumentFields_t * const pFileContext,
-                           uint32_t ulOffset,
-                           uint8_t * const pData,
-                           uint32_t ulBlockSize)
-{
-    (void) pFileContext;
-
-    e_fwup_err_t eResult = FWUP_SUCCESS;
-
-    uint16_t usBlockIndx = ulOffset/ulBlockSize;
-
-    LogDebug(("otaPal_WriteBlock: receives OTA block #%d with size = %d!", usBlockIndx, ulBlockSize));
-
-    if (0 == ulOffset)
-    {
-        R_FWUP_Close();
-        R_FWUP_Open();
-
-        R_FWUP_EraseArea(FWUP_AREA_BUFFER);
-
-        first_block_received = pdTRUE;
-    }
-
-    if ((ulBlockSize % FLASH_CF_MIN_PGM_SIZE) != 0)
-    {
-        uint32_t  paddingsize = FLASH_CF_MIN_PGM_SIZE*((int32_t)(ulBlockSize/FLASH_CF_MIN_PGM_SIZE)+1); // cast to int32_t
-        uint8_t * pBuffTmp    = pvPortMalloc(paddingsize);
-        configASSERT(pBuffTmp);
-        memset(pBuffTmp, 0xFF, paddingsize);
-        (void)memcpy(pBuffTmp, pData, ulBlockSize);
- 
-        eResult = R_FWUP_WriteImageProgram(FWUP_AREA_BUFFER, pBuffTmp,
-                ulOffset + sizeof(st_fw_header_t),
-                paddingsize);
-        vPortFree(pBuffTmp);
-        pBuffTmp = NULL;
- 
-    }
-    else
-    {
-    /* Calculate the offset from top of RSU file */
-    uint32_t rsu_offset = ulOffset+sizeof(st_fw_header_t);
-
-    eResult = R_FWUP_WriteImageProgram(FWUP_AREA_BUFFER,
-                            pData, rsu_offset, ulBlockSize);
-    }
-    
-    if ((FWUP_ERR_FLASH == eResult))
-    {
-        LogDebug(("otaPal_WriteBlock: index = %d, NG, error = %d\r\n", usBlockIndx, eResult));
-        return 0;
-    }
-    LogDebug (("otaPal_WriteBlock: index = %d, OK, %d bytes\r\n", usBlockIndx, ulBlockSize));
-    return (int16_t)ulBlockSize; // casting to the correct data type for return value
-}
-/**********************************************************************************************************************
- End of function otaPal_WriteBlock
- *********************************************************************************************************************/
-
-/* Function Name: otaPal_CheckFileSignature */
-/**********************************************************************************************************************
- * @brief Verify the signature of the received file
- * @param[in] pFileContext
- * @return Signature verification result
- * @retval OtaPalNullFileContext
- * @retval OtaPalSignatureCheckFailed
- * @retval OtaPalBadSignerCert
- * @retval OtaPalSuccess
- *********************************************************************************************************************/
-static OtaPalStatus_t otaPal_CheckFileSignature(AfrOtaJobDocumentFields_t * const pFileContext)
-{
-    OtaPalStatus_t eResult = OtaPalUninitialized;
-    e_fwup_err_t   eRet    = FWUP_SUCCESS;
-
-    /* Buffer to hold the raw ECDSA signature */
-    unsigned char rawSignature[MAX_SIG_LENGTH];
-
-    pOTAFileContext = pFileContext; // store the OTA file context to be used by FWUP verify wrapper
-
-    /*
-     * C->pxSignature->ucData includes some ASN1 tags.
-     * 30 44 02 20 32byte(R) 02 20 32byte(S)  <- need to remove ^.
-     * ^^^^^^^^^^^           ^^^^^
-     * <tag><size><tag><size1><R-byte-sequence><tag><size2><S-byte-sequence>
-     */
+    static uint8_t hdl = 0U;
 
     if (NULL == pFileContext)
     {
-        LogError(("otaPal_CheckFileSignature: null file context"));
-        return OtaPalNullFileContext;
+        return OtaPalJobDocFileCreateFailed;
     }
 
-    if (NULL == pFileContext->signature)
+    pFileContext->fileId = hdl++;
+    prvResetDownloadState();
+
+    if (pdTRUE != prvEnsureFlashResources())
     {
-        LogError(("otaPal_CheckFileSignature: null file signature"));
-        return OtaPalSignatureCheckFailed;
+        LogError(("otaPal_CreateFileForRx: flash resource init failed"));
+        return OtaPalJobDocFileCreateFailed;
     }
 
-    LogDebug(("otaPal_CheckFileSignature: signature size in OTA file context = %d", pFileContext->signatureLen));
-
-    if (0 >= pFileContext->signatureLen)
+    if (pdTRUE != prvEraseBufferArea())
     {
-        LogError(("otaPal_CheckFileSignature: file signature size is invalid"));
-        return OtaPalSignatureCheckFailed;
+        LogError(("otaPal_CreateFileForRx: buffer erase failed"));
+        return OtaPalJobDocFileCreateFailed;
     }
 
-
-    if (0 != ExtractECDSASignature((const unsigned char*)pFileContext->signature, // cast to const unsigned char*
-                                    pFileContext->signatureLen, rawSignature))
-    {
-        eResult = OtaPalBadSignerCert;
-        LogError(("Error ECDSASignature extraction\r\n"));
-        return eResult;
-    }
-
-    eRet = R_FWUP_WriteImageHeader(FWUP_AREA_BUFFER,
-                                (uint8_t FWUP_FAR *)OTA_JsonFileSignatureKey, rawSignature, MAX_SIG_LENGTH);
-
-    if (FWUP_SUCCESS != eRet)
-    {
-        eResult = OtaPalBadSignerCert;
-        LogError(("otaPal_CheckFileSignature: R_FWUP_WriteImageHeader returns error = %d\r\n", eRet));
-
-        return eResult;
-    }
-
-
-    /* Verify the signature */
-    eRet = R_FWUP_VerifyImage(FWUP_AREA_BUFFER);
-
-    if (FWUP_SUCCESS != eRet)
-    {
-        eResult = OtaPalSignatureCheckFailed;
-        LogError(("otaPal_CheckFileSignature: R_FWUP_VerifyImage returns error = %d\r\n", eRet));
-
-        return eResult;
-    }
-    else
-    {
-        eResult = OtaPalSuccess;
-    }
-
-    return eResult;
+    OtaImageState = OtaImageStateUnknown;
+    LogInfo(("otaPal_CreateFileForRx: direct queued flash path initialized"));
+    return OtaPalJobDocFileCreated;
 }
-/**********************************************************************************************************************
- End of function otaPal_CheckFileSignature
- *********************************************************************************************************************/
 
-/* Function Name: otaPal_CloseFile */
-/**********************************************************************************************************************
- * @brief Close OTA file
- * @param[in] pFileContext
- * @return Close file result
- * @retval OtaPalNullFileContext
- * @retval OtaPalSignatureCheckFailed
- * @retval OtaPalBadSignerCert
- * @retval OtaPalSuccess
- *********************************************************************************************************************/
+int16_t otaPal_WriteBlock(AfrOtaJobDocumentFields_t * const pFileContext,
+                          uint32_t ulOffset,
+                          uint8_t * const pData,
+                          uint32_t ulBlockSize)
+{
+    (void) pFileContext;
+
+    OtaFlashBlock_t xBlock = {0};
+
+    if ((NULL == pData) || (0U == ulBlockSize) || (NULL == xOtaFlashQueue))
+    {
+        return 0;
+    }
+
+    if (pdTRUE == xOtaFlashError)
+    {
+        return 0;
+    }
+
+    xBlock.pData = pvPortMalloc(ulBlockSize);
+    if (NULL == xBlock.pData)
+    {
+        LogError(("otaPal_WriteBlock: pvPortMalloc failed for %u bytes", (unsigned int)ulBlockSize));
+        return 0;
+    }
+
+    (void)memcpy(xBlock.pData, pData, ulBlockSize);
+    xBlock.offset = ulOffset;
+    xBlock.length = ulBlockSize;
+
+    prvIncrementPendingBlocks();
+    if (pdPASS != xQueueSend(xOtaFlashQueue, &xBlock, portMAX_DELAY))
+    {
+        prvDecrementPendingBlocks();
+        vPortFree(xBlock.pData);
+        LogError(("otaPal_WriteBlock: flash queue send failed"));
+        return 0;
+    }
+
+    if ((ulOffset + ulBlockSize) > ulOtaPayloadBytesReceived)
+    {
+        ulOtaPayloadBytesReceived = ulOffset + ulBlockSize;
+    }
+
+    return (int16_t)ulBlockSize;
+}
+
 OtaPalStatus_t otaPal_CloseFile(AfrOtaJobDocumentFields_t * const pFileContext)
 {
     OtaPalStatus_t eResult = OtaPalSuccess;
+    unsigned char rawSignature[MAX_SIG_LENGTH] = {0};
 
-    eResult = otaPal_CheckFileSignature(pFileContext);
-    if (OtaPalSuccess != eResult)
+    if (pdTRUE != prvWaitForFlashQueueDrained())
     {
         OtaImageState = OtaImageStateRejected;
-    }
-    else
-    {
-        OtaImageState = OtaImageStateTesting;
+        return OtaPalFileClose;
     }
 
-    if (NULL != pFileContext)
+    if ((NULL == pFileContext) || (NULL == pFileContext->signature) || (0 >= pFileContext->signatureLen))
     {
-        pFileContext->fileId = 0;
+        OtaImageState = OtaImageStateRejected;
+        return OtaPalSignatureCheckFailed;
     }
 
-    R_FWUP_Close();
+    pOTAFileContext = pFileContext;
+
+    if (0 != ExtractECDSASignature((const unsigned char *)pFileContext->signature,
+                                   pFileContext->signatureLen,
+                                   rawSignature))
+    {
+        OtaImageState = OtaImageStateRejected;
+        LogError(("otaPal_CloseFile: ECDSA signature extraction failed"));
+        return OtaPalBadSignerCert;
+    }
+
+    if (pdTRUE != prvWriteImageHeader(pFileContext, rawSignature))
+    {
+        OtaImageState = OtaImageStateRejected;
+        return OtaPalBadSignerCert;
+    }
+
+    eResult = prvVerifyReceivedPayload(pFileContext);
+    OtaImageState = (OtaPalSuccess == eResult) ? OtaImageStateTesting : OtaImageStateRejected;
+    pFileContext->fileId = 0U;
 
     return eResult;
 }
-/**********************************************************************************************************************
- End of function otaPal_CloseFile
- *********************************************************************************************************************/
 
-/* Function Name: otaPal_CloseFileNoSignatureCheck */
-/**********************************************************************************************************************
- * @brief Close OTA file without verifying the signature
- * @param[in] pFileContext
- * @return Close file result
- * @retval OtaPalSuccess
- *********************************************************************************************************************/
 OtaPalStatus_t otaPal_CloseFileNoSignatureCheck(AfrOtaJobDocumentFields_t * const pFileContext)
 {
-    OtaPalStatus_t eResult = OtaPalSuccess;
-    pFileContext->fileId = 0;
+    if (NULL != pFileContext)
+    {
+        pFileContext->fileId = 0U;
+    }
 
-    R_FWUP_Close();
-
-    return eResult;
+    return (pdTRUE == prvWaitForFlashQueueDrained()) ? OtaPalSuccess : OtaPalFileClose;
 }
-/**********************************************************************************************************************
- End of function otaPal_CloseFileNoSignatureCheck
- *********************************************************************************************************************/
 
-
-/* Function Name: otaPal_ResetDevice */
-/**********************************************************************************************************************
- * @brief Reset the device
- * @param[in] pFileContext
- * @return Reset result
- * @retval OtaPalSuccess
- *********************************************************************************************************************/
 OtaPalStatus_t otaPal_ResetDevice(AfrOtaJobDocumentFields_t * const pFileContext)
 {
     (void) pFileContext;
 
-    R_FWUP_SoftwareReset();
+    prvResetDevice();
     return OtaPalSuccess;
 }
-/**********************************************************************************************************************
- End of function otaPal_ResetDevice
- *********************************************************************************************************************/
 
-/* Function Name: otaPal_ActivateNewImage */
-/**********************************************************************************************************************
- * @brief Activate the new OTA image
- * @param[in] pFileContext
- * @return Activation result
- * @retval OtaPalSuccess
- * @retval OtaPalActivateFailed
- *********************************************************************************************************************/
 OtaPalStatus_t otaPal_ActivateNewImage(AfrOtaJobDocumentFields_t * const pFileContext)
 {
     (void) pFileContext;
 
-    e_fwup_err_t eResult = R_FWUP_ActivateImage();
-
-    if (FWUP_SUCCESS != eResult)
+    if (pdTRUE != prvWaitForFlashQueueDrained())
     {
         return OtaPalActivateFailed;
     }
 
-    R_FWUP_SoftwareReset();
+    if (pdTRUE != prvActivateBank())
+    {
+        return OtaPalActivateFailed;
+    }
+
+    prvResetDevice();
     return OtaPalSuccess;
 }
-/**********************************************************************************************************************
- End of function otaPal_ActivateNewImage
- *********************************************************************************************************************/
 
-/* Function Name: otaPal_Abort */
-/**********************************************************************************************************************
- * @brief Abort the OTA process
- * @param[in] pFileContext
- * @return Abortion result
- * @retval OtaPalSuccess
- * @retval OtaPalFileClose
- *********************************************************************************************************************/
 OtaPalStatus_t otaPal_Abort(AfrOtaJobDocumentFields_t * const pFileContext)
 {
-    OtaPalStatus_t eResult = OtaPalSuccess;
-
-    if (NULL == pFileContext)
+    if (NULL != pFileContext)
     {
-        eResult = OtaPalFileClose;
+        pFileContext->fileId = 0U;
     }
 
-    if (OtaPalSuccess == eResult)
-    {
-        pFileContext->fileId = 0;
-    }
-
-    return eResult;
-
+    OtaImageState = OtaImageStateAborted;
+    return OtaPalSuccess;
 }
-/**********************************************************************************************************************
- End of function otaPal_Abort
- *********************************************************************************************************************/
 
-/* Function Name: otaPal_SetPlatformImageState */
-/**********************************************************************************************************************
- * @brief Set the state of the image
- * @param[in] pFileContext
- * @param[in] eState
- * @return Setting result
- * @retval OtaPalSuccess
- * @retval OtaPalBadImageState
- * @retval OtaPalCommitFailed
- *********************************************************************************************************************/
 OtaPalStatus_t otaPal_SetPlatformImageState(AfrOtaJobDocumentFields_t * const pFileContext,
-                                             OtaImageState_t eState)
+                                            OtaImageState_t eState)
 {
     (void) pFileContext;
 
@@ -416,29 +270,17 @@ OtaPalStatus_t otaPal_SetPlatformImageState(AfrOtaJobDocumentFields_t * const pF
         switch (eState)
         {
             case OtaImageStateAccepted:
-                R_FWUP_Close();
-                R_FWUP_Open();
                 LogInfo(("Accepted and committed final image."));
                 eResult = OtaPalSuccess;
                 break;
 
             case OtaImageStateRejected:
-                LogInfo(("Rejected image."));
-                eResult = OtaPalSuccess;
-                break;
-
             case OtaImageStateAborted:
-                LogInfo(("Aborted image."));
-                eResult = OtaPalSuccess;
-                break;
-
             case OtaImageStateTesting:
-                LogInfo(("Testing."));
                 eResult = OtaPalSuccess;
                 break;
 
             default:
-                LogError(("Unknown state received %d.", (int32_t)eState)); // cast eState to int32_t
                 eResult = OtaPalBadImageState;
                 break;
         }
@@ -448,125 +290,362 @@ OtaPalStatus_t otaPal_SetPlatformImageState(AfrOtaJobDocumentFields_t * const pF
         switch (eState)
         {
             case OtaImageStateAccepted:
-                LogError(("Not in commit pending so can not mark image valid (%d)."));
                 eResult = OtaPalCommitFailed;
                 break;
 
             case OtaImageStateRejected:
-                LogInfo(("Rejected image."));
-                eResult = OtaPalSuccess;
-                break;
-
             case OtaImageStateAborted:
-                LogInfo(("Aborted image."));
-                eResult = OtaPalSuccess;
-                break;
-
             case OtaImageStateTesting:
-                LogInfo(("Testing."));
                 eResult = OtaPalSuccess;
                 break;
 
             default:
-                LogError(("Unknown state received %d.", (int32_t)eState)); // cast eState to int32_t
                 eResult = OtaPalBadImageState;
                 break;
         }
     }
 
     OtaImageState = eState;
-
     return eResult;
-
 }
-/**********************************************************************************************************************
- End of function otaPal_SetPlatformImageState
- *********************************************************************************************************************/
 
-/* Function Name: otaPal_GetPlatformImageState */
-/**********************************************************************************************************************
- * @brief Get the state of the image
- * @param[in] pFileContext
- * @return The image state
- * @retval OtaPalImageStatePendingCommit
- * @retval OtaPalImageStateValid
- * @retval OtaPalImageStateUnknown
- *********************************************************************************************************************/
 OtaPalImageState_t otaPal_GetPlatformImageState(AfrOtaJobDocumentFields_t * const pFileContext)
 {
     (void) pFileContext;
 
-    OtaPalImageState_t ePalState = OtaPalImageStateUnknown;
-
     switch (OtaImageState)
     {
         case OtaImageStateTesting:
-            ePalState = OtaPalImageStatePendingCommit;
-            break;
-
+            return OtaPalImageStatePendingCommit;
         case OtaImageStateAccepted:
-            ePalState = OtaPalImageStateValid;
-            break;
-
-        case OtaImageStateUnknown: /* Uninitialized image state, assume a factory image */
-            ePalState = OtaPalImageStateValid;
-            break;
-
+        case OtaImageStateUnknown:
+            return OtaPalImageStateValid;
         case OtaImageStateRejected:
         case OtaImageStateAborted:
         default:
-            ePalState = OtaPalImageStateInvalid;
-            break;
+            return OtaPalImageStateInvalid;
+    }
+}
+
+OtaPalStatus_t otaPal_EraseArea(uint8_t area)
+{
+    if (1U != area)
+    {
+        LogError(("otaPal_EraseArea: only buffer area erase is supported in direct flash path"));
+        return OtaPalEraseFailed;
     }
 
-    LogDebug(("Function called is otaPal_GetPlatformImageState: Platform State is [%d]", ePalState));
-    return ePalState;
+    return (pdTRUE == prvEraseBufferArea()) ? OtaPalSuccess : OtaPalEraseFailed;
 }
-/**********************************************************************************************************************
- End of function otaPal_GetPlatformImageState
- *********************************************************************************************************************/
 
-/* Function Name: ExtractECDSASignature */
-/**********************************************************************************************************************
- * @brief .
- * @param[in]  derSignature
- * @param[in]  derSignatureLength
- * @param[out] rawSignature
- * @return Extraction result
- * @retval .
- *********************************************************************************************************************/
-static int ExtractECDSASignature(const unsigned char *derSignature, size_t derSignatureLength, unsigned char *rawSignature)
+static BaseType_t prvEnsureFlashResources(void)
 {
-    unsigned char *       p   = (unsigned char*) derSignature; // cast to unsigned char
-    const unsigned char * end = derSignature+derSignatureLength;
-    int                   ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+    if (COMMONAPI_SUCCESS != R_Demo_Common_API_Flash_Open())
+    {
+        return pdFALSE;
+    }
 
+    if (NULL == xOtaFlashQueue)
+    {
+        xOtaFlashQueue = xQueueCreate(OTA_FLASH_QUEUE_LENGTH, sizeof(OtaFlashBlock_t));
+        if (NULL == xOtaFlashQueue)
+        {
+            return pdFALSE;
+        }
+    }
+
+    if (NULL == xOtaFlashTask)
+    {
+        if (pdPASS != xTaskCreate(prvOtaFlashTask,
+                                  "OTA_FLASH",
+                                  configMINIMAL_STACK_SIZE * 2U,
+                                  NULL,
+                                  configMAX_PRIORITIES - 1U,
+                                  &xOtaFlashTask))
+        {
+            return pdFALSE;
+        }
+    }
+
+    return pdTRUE;
+}
+
+static void prvResetDownloadState(void)
+{
+    ulOtaFlashPendingBlocks = 0U;
+    xOtaFlashError = pdFALSE;
+    ulOtaPayloadBytesReceived = 0U;
+}
+
+static void prvIncrementPendingBlocks(void)
+{
+    taskENTER_CRITICAL();
+    ulOtaFlashPendingBlocks++;
+    taskEXIT_CRITICAL();
+}
+
+static void prvDecrementPendingBlocks(void)
+{
+    taskENTER_CRITICAL();
+    if (ulOtaFlashPendingBlocks > 0U)
+    {
+        ulOtaFlashPendingBlocks--;
+    }
+    taskEXIT_CRITICAL();
+}
+
+static BaseType_t prvWaitForFlashQueueDrained(void)
+{
+    while (ulOtaFlashPendingBlocks > 0U)
+    {
+        vTaskDelay(pdMS_TO_TICKS(1U));
+    }
+
+    return (pdTRUE == xOtaFlashError) ? pdFALSE : pdTRUE;
+}
+
+static BaseType_t prvEraseBufferArea(void)
+{
+    uint32_t numBlocks = FWUP_CFG_AREA_SIZE / FWUP_CFG_CF_BLK_SIZE;
+    uint32_t eraseAddr = FWUP_CFG_BUF_AREA_ADDR_L + (FWUP_CFG_CF_BLK_SIZE * (numBlocks - 1U));
+    flash_err_t flashError;
+
+    if (pdTRUE != prvWaitForFlashQueueDrained())
+    {
+        return pdFALSE;
+    }
+
+    xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+    update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_ERASE_WAIT_COMPLETE;
+    flashError = R_FLASH_Erase((flash_block_address_t)eraseAddr, numBlocks);
+
+    if (FLASH_SUCCESS == flashError)
+    {
+        xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+        xSemaphoreGive(xSemaphoreFlashAccess);
+        return pdTRUE;
+    }
+
+    xSemaphoreGive(xSemaphoreFlashAccess);
+    LogError(("prvEraseBufferArea: R_FLASH_Erase failed: %d", flashError));
+    return pdFALSE;
+}
+
+static BaseType_t prvWriteFlashBlocking(uint32_t destAddr,
+                                        const uint8_t * pData,
+                                        uint32_t length)
+{
+    flash_err_t flashError;
+
+    xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+    update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_WRITE_WAIT_COMPLETE;
+    flashError = R_FLASH_Write((uint32_t)pData, destAddr, length);
+
+    if (FLASH_SUCCESS == flashError)
+    {
+        xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+        xSemaphoreGive(xSemaphoreFlashAccess);
+        return pdTRUE;
+    }
+
+    xSemaphoreGive(xSemaphoreFlashAccess);
+    LogError(("prvWriteFlashBlocking: R_FLASH_Write failed: %d at %08x", flashError, (unsigned int)destAddr));
+    return pdFALSE;
+}
+
+static void prvOtaFlashTask(void * pvParameters)
+{
+    (void) pvParameters;
+
+    static uint8_t flashWriteBuffer[mqttFileDownloader_CONFIG_BLOCK_SIZE + FLASH_CF_MIN_PGM_SIZE];
+    OtaFlashBlock_t xBlock;
+
+    for (;;)
+    {
+        if (pdPASS == xQueueReceive(xOtaFlashQueue, &xBlock, portMAX_DELAY))
+        {
+            uint32_t paddedLength = xBlock.length;
+
+            if ((paddedLength % FLASH_CF_MIN_PGM_SIZE) != 0U)
+            {
+                paddedLength = FLASH_CF_MIN_PGM_SIZE * ((paddedLength / FLASH_CF_MIN_PGM_SIZE) + 1U);
+            }
+
+            if (paddedLength > sizeof(flashWriteBuffer))
+            {
+                xOtaFlashError = pdTRUE;
+            }
+            else
+            {
+                (void)memset(flashWriteBuffer, OTA_FLASH_PAD_VALUE, paddedLength);
+                (void)memcpy(flashWriteBuffer, xBlock.pData, xBlock.length);
+
+                if (pdTRUE != prvWriteFlashBlocking(FWUP_CFG_BUF_AREA_ADDR_L + OTA_PAYLOAD_BASE_OFFSET + xBlock.offset,
+                                                    flashWriteBuffer,
+                                                    paddedLength))
+                {
+                    xOtaFlashError = pdTRUE;
+                }
+            }
+
+            vPortFree(xBlock.pData);
+            prvDecrementPendingBlocks();
+        }
+    }
+}
+
+static BaseType_t prvWriteImageHeader(AfrOtaJobDocumentFields_t * pFileContext,
+                                      const uint8_t * pRawSignature)
+{
+    OtaRsuHeader_t xHeader;
+
+    (void)memset(&xHeader, 0, sizeof(xHeader));
+    (void)memcpy(xHeader.magicCode, "RELFWV2", OTA_MAGIC_CODE_LEN);
+    xHeader.imageFlag = OTA_IMAGE_FLAG_TESTING;
+    (void)memcpy(xHeader.sigType, OTA_JsonFileSignatureKey, strlen(OTA_JsonFileSignatureKey));
+    xHeader.sigSize = MAX_SIG_LENGTH;
+    (void)memcpy(xHeader.sig, pRawSignature, MAX_SIG_LENGTH);
+    xHeader.imageFileSize = pFileContext->fileSize;
+
+    return prvWriteFlashBlocking(FWUP_CFG_BUF_AREA_ADDR_L,
+                                 (const uint8_t *)&xHeader,
+                                 sizeof(xHeader));
+}
+
+static OtaPalStatus_t prvVerifyReceivedPayload(AfrOtaJobDocumentFields_t * pFileContext)
+{
+    void * pCryptoContext = NULL;
+    uint8_t * pSignerCert = NULL;
+    uint32_t signerCertSize = 0U;
+    uint32_t remaining = ulOtaPayloadBytesReceived;
+    uint32_t offset = 0U;
+    uint8_t * pReadAddr;
+    BaseType_t xOk = pdTRUE;
+
+    if (pdFALSE == CRYPTO_SignatureVerificationStart(&pCryptoContext,
+                                                     cryptoASYMMETRIC_ALGORITHM_ECDSA,
+                                                     cryptoHASH_ALGORITHM_SHA256))
+    {
+        return OtaPalSignatureCheckFailed;
+    }
+
+    while (remaining > 0U)
+    {
+        uint32_t chunkSize = (remaining > OTA_HASH_READ_CHUNK_SIZE) ? OTA_HASH_READ_CHUNK_SIZE : remaining;
+        pReadAddr = (uint8_t *)(FWUP_CFG_BUF_AREA_ADDR_L + OTA_PAYLOAD_BASE_OFFSET + offset);
+        CRYPTO_SignatureVerificationUpdate(pCryptoContext, (const uint8_t *)pReadAddr, chunkSize);
+        offset += chunkSize;
+        remaining -= chunkSize;
+    }
+
+    pSignerCert = prvGetSignerCert(&signerCertSize);
+    if (NULL == pSignerCert)
+    {
+        xOk = pdFALSE;
+    }
+    else if (pdFALSE == CRYPTO_SignatureVerificationFinal(pCryptoContext,
+                                                          (char *)pSignerCert,
+                                                          signerCertSize,
+                                                          (uint8_t *)pFileContext->signature,
+                                                          pFileContext->signatureLen))
+    {
+        xOk = pdFALSE;
+    }
+
+    if (NULL != pSignerCert)
+    {
+        vPortFree(pSignerCert);
+    }
+
+    if (pdTRUE != xOk)
+    {
+        LogError(("prvVerifyReceivedPayload: signature verification failed"));
+        return OtaPalSignatureCheckFailed;
+    }
+
+    LogInfo(("prvVerifyReceivedPayload: signature verification passed"));
+    return OtaPalSuccess;
+}
+
+static uint8_t * prvGetSignerCert(uint32_t * pulSignerCertSize)
+{
+    uint8_t * pucCertData;
+    uint8_t * pucSignerCert = NULL;
+    size_t valueLength = prvGetCacheEntryLength(KVS_CODE_SIGN_CERT_ID);
+
+    if (0U == valueLength)
+    {
+        LogError(("prvGetSignerCert: code signing certificate is not stored"));
+        return NULL;
+    }
+
+    pucCertData = (uint8_t *)GetStringValue(KVS_CODE_SIGN_CERT_ID, valueLength);
+    if (NULL == pucCertData)
+    {
+        return NULL;
+    }
+
+    pucSignerCert = pvPortMalloc(valueLength + 1U);
+    if (NULL != pucSignerCert)
+    {
+        (void)memcpy(pucSignerCert, pucCertData, valueLength);
+        pucSignerCert[valueLength] = 0U;
+        *pulSignerCertSize = (uint32_t)valueLength + 1U;
+    }
+
+    vPortFree(pucCertData);
+    return pucSignerCert;
+}
+
+static void prvResetDevice(void)
+{
+    R_BSP_SoftwareReset();
+}
+
+static BaseType_t prvActivateBank(void)
+{
+    flash_err_t err;
+
+    R_BSP_SoftwareDelay(5000U, BSP_DELAY_MILLISECS);
+    err = R_FLASH_Control(FLASH_CMD_BANK_TOGGLE, NULL);
+
+    if (FLASH_SUCCESS != err)
+    {
+        LogError(("prvActivateBank: bank toggle failed: %d", err));
+        return pdFALSE;
+    }
+
+    R_BSP_SoftwareDelay(500U, BSP_DELAY_MILLISECS);
+    return pdTRUE;
+}
+
+static int ExtractECDSASignature(const unsigned char * derSignature,
+                                 size_t derSignatureLength,
+                                 unsigned char * rawSignature)
+{
+    unsigned char * p = (unsigned char *)derSignature;
+    const unsigned char * end = derSignature + derSignatureLength;
+    int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
     size_t len;
-
     mbedtls_mpi r;
     mbedtls_mpi s;
 
-    /* Start reusing the process of mbedtls_ecdsa_read_signature_restartable function */
-
-    /* Check the parameters. */
     configASSERT(NULL != derSignature);
     mbedtls_mpi_init(&r);
     mbedtls_mpi_init(&s);
 
     if (0 != (ret = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)))
     {
-    ret += MBEDTLS_ERR_ECP_BAD_INPUT_DATA;
+        ret += MBEDTLS_ERR_ECP_BAD_INPUT_DATA;
         goto cleanup;
     }
 
     if ((p + len) != end)
     {
-        ret = MBEDTLS_ERROR_ADD(MBEDTLS_ERR_ECP_BAD_INPUT_DATA,
-                                MBEDTLS_ERR_ASN1_LENGTH_MISMATCH);
-    goto cleanup;
+        ret = MBEDTLS_ERROR_ADD(MBEDTLS_ERR_ECP_BAD_INPUT_DATA, MBEDTLS_ERR_ASN1_LENGTH_MISMATCH);
+        goto cleanup;
     }
 
-    /* Get R,S component */
     if ((0 != (ret = mbedtls_asn1_get_mpi(&p, end, &r))) ||
         (0 != (ret = mbedtls_asn1_get_mpi(&p, end, &s))))
     {
@@ -574,26 +653,18 @@ static int ExtractECDSASignature(const unsigned char *derSignature, size_t derSi
         goto cleanup;
     }
 
-    /* Finished reusing the process of mbedtls_ecdsa_read_signature_restartable function */
-
-    /* Convert MPIs to raw byte strings
-       The raw ECDSA signature in rawSignature */
     ret = mbedtls_mpi_write_binary(&r, &rawSignature[0], HALF_SIG_LENGTH);
     if (0 != ret)
     {
         goto cleanup;
     }
+
     ret = mbedtls_mpi_write_binary(&s, &rawSignature[HALF_SIG_LENGTH], HALF_SIG_LENGTH);
     if (0 != ret)
     {
         goto cleanup;
     }
 
-    /* Start reusing the process of mbedtls_ecdsa_read_signature_restartable function */
-
-    /* At this point we know that the buffer starts with a valid signature.
-    * Return 0 if the buffer just contains the signature, and a specific
-    * error code if the valid signature is followed by more data. */
     if (p != end)
     {
         ret = MBEDTLS_ERR_ECP_SIG_LEN_MISMATCH;
@@ -602,40 +673,5 @@ static int ExtractECDSASignature(const unsigned char *derSignature, size_t derSi
 cleanup:
     mbedtls_mpi_free(&r);
     mbedtls_mpi_free(&s);
-
-    /* Finished reusing the process of mbedtls_ecdsa_read_signature_restartable function */
-
     return ret;
 }
-/**********************************************************************************************************************
- End of function ExtractECDSASignature
- *********************************************************************************************************************/
-
-/* Function Name: otaPal_EraseArea */
-/**********************************************************************************************************************
- * @brief Erase FWUP area
- * @param[in] area
- * @return The erasure result
- * @retval OtaPalEraseFailed
- * @retval OtaPalSuccess
- *********************************************************************************************************************/
-OtaPalStatus_t otaPal_EraseArea(uint8_t area)
-{
-    OtaPalStatus_t eResult      = OtaPalEraseFailed;
-    e_fwup_err_t   eEraseResult = FWUP_ERR_FAILURE;
-
-    eEraseResult = R_FWUP_EraseArea((e_fwup_area_t)area); // cast to e_fwup_area_t
-    if (FWUP_SUCCESS == eEraseResult)
-    {
-        eResult = OtaPalSuccess;
-    }
-    else
-    {
-        LogError(("Error R_FWUP_EraseArea()\r\n"));
-    }
-
-    return eResult;
-}
-/**********************************************************************************************************************
- End of function otaPal_EraseArea
- *********************************************************************************************************************/
