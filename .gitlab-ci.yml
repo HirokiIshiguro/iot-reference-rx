@@ -5,6 +5,7 @@ stages:
   - test
   - package
   - ota_build
+  - ota_prepare
   - ota_create
   - ota_test
 
@@ -48,7 +49,9 @@ workflow:
 build_rx72n:
   stage: build
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   script:
     - Write-Host "=== Build RX72N projects ==="
     - pip install cryptography --quiet
@@ -62,6 +65,15 @@ build_rx72n:
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "app .abs missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "app .x missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\shift_srec_addresses.py" `
+        --input "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot" `
+        --output "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot" `
+        --range-start 0xFFE00000 `
+        --range-end 0xFFFFFFFF `
+        --shift -0x200000 `
+        --drop-out-of-range
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
     - |
       python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
         --mot "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot" `
@@ -92,7 +104,8 @@ build_rx72n:
     - exec-shell
     - os-linux
     - hw-raspi
-    - dev-rx72n-02
+    - dev-ek-rx72n
+    - dev-ek-rx72n-set1
   resource_group: $RX72N_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail
@@ -126,7 +139,12 @@ flash_rx72n_linux:
       "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
         -auth id "$RFP_AUTH" \
         -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot" \
-        -v -run -noquery
+        -v -noquery
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" \
+        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot" \
+        -v -noquery
 
       python tools/test_uart_download_rx72n.py \
         --rsu "$CI_PROJECT_DIR/rx72n_app.rsu" \
@@ -231,7 +249,9 @@ test_mqtt_rx72n_linux:
 flash_rx72n:
   stage: flash
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n
@@ -280,7 +300,9 @@ flash_rx72n:
 provision_rx72n:
   stage: provision
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n
@@ -326,7 +348,9 @@ provision_rx72n:
 test_mqtt_rx72n:
   stage: test
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n
@@ -362,7 +386,9 @@ test_mqtt_rx72n:
 build_rx72n_mqtt_candidate:
   stage: build
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   rules:
     - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -395,7 +421,9 @@ build_rx72n_mqtt_candidate:
 package_rx72n_mqtt_candidate_rsu:
   stage: package
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   needs:
     - job: build_rx72n_mqtt_candidate
       artifacts: true
@@ -425,7 +453,9 @@ build_rx72n_ota_candidate:
   stage: ota_build
   allow_failure: true
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   needs:
     - test_mqtt_rx72n_linux
   rules:
@@ -478,13 +508,71 @@ build_rx72n_ota_candidate:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
+park_rx72n_ota_cli_linux:
+  stage: ota_prepare
+  allow_failure: true
+  extends: .rx72n_linux_hw_job
+  needs:
+    - job: build_rx72n
+      artifacts: true
+    - test_mqtt_rx72n_linux
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Park RX72N in CLI before Windows OTA job creation ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/park_rx72n_ota_cli_linux"
+      mkdir -p "$artifact_dir"
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      shadow_args=()
+      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
+        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
+      fi
+
+      python tools/provision_rx72n.py \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --thing-name "$RX72N_DEVICE_ID" \
+        --endpoint "$AWS_IOT_ENDPOINT" \
+        --cert "$AWS_CLIENT_CERT_RX72N_02" \
+        --key "$AWS_PRIVATE_KEY_RX72N_02" \
+        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem" \
+        --reset-cmd "$reset_cmd" \
+        --reset-after-open \
+        --boot-wait 12 \
+        --cli-timeout 25 \
+        --attempts 3 \
+        --no-reset \
+        "${shadow_args[@]}" \
+        2>&1 | tee "$artifact_dir/park_rx72n_ota_cli.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+      touch "$artifact_dir/parked.ok"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/park_rx72n_ota_cli_linux/
+    expire_in: 7 days
+
 create_rx72n_ota_update:
   stage: ota_create
   allow_failure: true
   tags:
-    - run_ishiguro_machine
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
   needs:
     - job: build_rx72n_ota_candidate
+      artifacts: true
+    - job: park_rx72n_ota_cli_linux
       artifacts: true
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
@@ -512,6 +600,8 @@ create_rx72n_ota_update:
       $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
       $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota_candidate\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
       if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
+      $parkMarker = "$env:CI_PROJECT_DIR\artifacts\park_rx72n_ota_cli_linux\parked.ok"
+      if (-not (Test-Path $parkMarker)) { Write-Error "RX72N CLI park marker missing: $parkMarker"; exit 1 }
 
       python tools/create_ota_update.py `
         --artifact-dir "$artifactDir" `
@@ -559,6 +649,8 @@ test_ota_rx72n_linux:
         --timeout "$RX72N_OTA_OBSERVE_TIMEOUT" \
         --expected-version "$RX72N_OTA_CANDIDATE_VERSION" \
         --reset-cmd "$reset_cmd" \
+        --reset-after-open \
+        --no-reset \
         --raw-log "$artifact_dir/ota_uart_raw.log" \
         --summary-json "$artifact_dir/ota_summary.json" \
         2>&1 | tee "$artifact_dir/test_ota_console.log"
