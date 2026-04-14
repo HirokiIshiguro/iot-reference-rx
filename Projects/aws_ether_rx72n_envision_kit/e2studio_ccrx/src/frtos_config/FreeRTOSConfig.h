@@ -186,6 +186,9 @@ extern void vOutputString( const char * pcMessage );
 /* Map the logging task's printf to the board specific output function. */
 #define configPRINT_STRING( x )    vOutputString(x)
 
+extern void vApplicationLcdLogString( const char * pcMessage, unsigned short usStringLength );
+#define configLCD_LOG_STRING( pcMessage, usStringLength )    vApplicationLcdLogString( ( pcMessage ), ( usStringLength ) )
+
 /* Sets the length of the buffers into which logging messages are written - so
  * also defines the maximum length of each log message. */
 #define configLOGGING_MAX_MESSAGE_LENGTH            192

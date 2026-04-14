@@ -42,6 +42,10 @@
 
 #define U_SCI_UART_CLI_PINSET()  R_Pins_Create()
 
+#ifndef configLCD_LOG_STRING
+    #define configLCD_LOG_STRING( pcString, usStringLength )    do { } while( 0 )
+#endif
+
 
 /* FreeRTOS CLI Command Console */
 #if !defined(BSP_CFG_SCI_UART_TERMINAL_ENABLE)
@@ -282,6 +286,8 @@ void vSerialPutString(const signed char * pcString, unsigned short usStringLengt
 
         if ( xSemaphoreTake( xTransmitMutex, xMaxBlockTime ) == pdPASS )
         {
+            configLCD_LOG_STRING((const char *)pcString, usStringLength);
+
             while ((retry > 0) && (str_length > 0))
             {
                 R_SCI_Control(xSerialSciHandle, SCI_CMD_TX_Q_BYTES_FREE, &transmit_length);
