@@ -79,17 +79,13 @@
  * (0) : Pre-provisioning
  * (1) : Fleet provisioning
  */
-#define ENABLE_FLEET_PROVISIONING_DEMO      (0)
+#define ENABLE_FLEET_PROVISIONING_DEMO      (1)
 
 /* Please select whether to enable or disable the OTA demo
  * (0) : OTA demo is disabled
  * (1) : OTA over MQTT demo is enabled
  */
-#define ENABLE_OTA_UPDATE_DEMO              (1)
-
-#if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
-	#error "Fleet Provisioning demo is not supported!"
-#endif
+#define ENABLE_OTA_UPDATE_DEMO              (0)
 
 /**
  * @brief Path of the file containing the provisioning claim certificate. This
@@ -156,7 +152,7 @@
  *!!! be read by software, such as a production serial number, instead of a
  *!!! hard coded constant.
  */
-#define democonfigFP_DEMO_ID    "FPDemoID"
+#define democonfigFP_DEMO_ID    "rx72n-02-fp"
 
 /**
  * @brief The MQTT client identifier used in this example.  Each client identifier
@@ -217,7 +213,7 @@
  * the provisioning template name is "FleetProvisioningDemoTemplate".
  * However, if you used CloudFormation to set up the demo, the template name is "CF_FleetProvisioningDemoTemplate"
  */
- #define democonfigPROVISIONING_TEMPLATE_NAME    "...insert here..."
+ #define democonfigPROVISIONING_TEMPLATE_NAME    "rx72n_fleet_provisioning_template"
 
 /**
  * @brief Subject name to use when creating the certificate signing request (CSR)

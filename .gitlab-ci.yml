@@ -3,6 +3,7 @@ stages:
   - flash
   - provision
   - test
+  - fleet_cleanup
   - package
   - ota_build
   - ota_prepare
@@ -30,9 +31,11 @@ variables:
   #   mqtt  - flash/provision/MQTT only, no OTA.
   #   ota   - flash/provision/MQTT + OTA.
   #   full  - same as ota, intended for explicit full validation.
-  RX72N_TEST_SCOPE: "auto"
+  RX72N_TEST_SCOPE: "build"
   RUN_RX72N_HW_TESTS: "false"
   RUN_RX72N_OTA_TESTS: "false"
+  RUN_RX72N_FLEET_TESTS: "false"
+  RX72N_CLEANUP_FLEET_RESOURCES: "true"
   RX72N_SKIP_HW_TESTS: "false"
   RX72N_SKIP_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
@@ -142,6 +145,8 @@ flash_rx72n_linux:
       when: on_success
     - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
+    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
@@ -238,6 +243,51 @@ provision_rx72n_linux:
       - artifacts/provision_rx72n_linux/
     expire_in: 7 days
 
+provision_rx72n_fleet_linux:
+  stage: provision
+  extends: .rx72n_linux_hw_job
+  needs:
+    - build_rx72n
+    - flash_rx72n_linux
+  rules:
+    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Provision RX72N fleet claim credentials on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_fleet_linux"
+      mkdir -p "$artifact_dir"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      shadow_args=()
+      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
+        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
+      fi
+
+      python tools/provision_rx72n.py \
+        --fleet-provisioning \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --endpoint "$AWS_IOT_ENDPOINT" \
+        --template-name "$AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02" \
+        --claim-cert "$AWS_FLEET_CLAIM_CERT_RX72N_02" \
+        --claim-key "$AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02" \
+        --format \
+        --no-reset \
+        --reset-cmd "$reset_cmd" \
+        --reset-after-open \
+        --boot-wait 12 \
+        --cli-timeout 25 \
+        --attempts 3 \
+        "${shadow_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_rx72n_fleet.log"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/provision_rx72n_fleet_linux/
+    expire_in: 7 days
+
 test_mqtt_rx72n_linux:
   stage: test
   extends: .rx72n_linux_hw_job
@@ -279,6 +329,76 @@ test_mqtt_rx72n_linux:
     when: always
     paths:
       - artifacts/test_mqtt_rx72n_linux/
+    expire_in: 7 days
+
+test_fleet_rx72n_linux:
+  stage: test
+  extends: .rx72n_linux_hw_job
+  needs:
+    - build_rx72n
+    - flash_rx72n_linux
+    - provision_rx72n_fleet_linux
+  rules:
+    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Verify RX72N fleet provisioning on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_fleet_rx72n_linux"
+      mkdir -p "$artifact_dir"
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      python tools/test_fleet_rx72n.py \
+        --log-port "$RX72N_LINUX_UART_PORT" \
+        --log-baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout 240 \
+        --reset-cmd "$reset_cmd" \
+        --summary-json "$artifact_dir/fleet_summary.json" \
+        2>&1 | tee "$artifact_dir/test_fleet_rx72n.log"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_fleet_rx72n_linux/
+    expire_in: 7 days
+
+cleanup_rx72n_fleet_resources:
+  stage: fleet_cleanup
+  allow_failure: true
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  needs:
+    - job: test_fleet_rx72n_linux
+      artifacts: true
+  rules:
+    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $AWS_DEFAULT_REGION'
+      when: always
+    - when: never
+  script:
+    - Write-Host "=== Cleanup RX72N Fleet Provisioning AWS resources ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_fleet_resources"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $summary = "$env:CI_PROJECT_DIR\artifacts\test_fleet_rx72n_linux\fleet_summary.json"
+      if (-not (Test-Path $summary)) {
+        Write-Host "Fleet summary not found; nothing to cleanup: $summary"
+        exit 0
+      }
+
+      python tools/cleanup_rx72n_fleet_resources.py `
+        --summary-json "$summary" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --policy-name "rx72n-envision-kit-policy" `
+        --output-json "$artifactDir\cleanup_summary.json" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_fleet_resources.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/cleanup_rx72n_fleet_resources/
     expire_in: 7 days
 
 flash_rx72n:
