@@ -24,6 +24,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  http://www.FreeRTOS.org
 */
 
+/* C runtime includes. */
+#include <stdio.h>
+
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "task.h"
@@ -43,6 +46,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
+#include "r_simple_glcdc_config_rx_if.h"
+#include "r_simple_graphic_if.h"
 
 EventGroupHandle_t xStartDemoEventGroup = NULL;
 
@@ -104,6 +109,10 @@ extern BaseType_t KVStore_xCommitChanges(void);
 /* The priority used by the UART command console task. */
 #define mainUART_COMMAND_CONSOLE_TASK_PRIORITY  ( 1 )
 
+#define mainLCD_STATUS_TASK_STACK_SIZE          ( configMINIMAL_STACK_SIZE * 4UL )
+#define mainLCD_STATUS_TASK_PRIORITY            ( tskIDLE_PRIORITY )
+#define mainLCD_STATUS_UPDATE_PERIOD_MS         ( 5000UL )
+
 /* The MAC address array is not declared const as the MAC address will
 normally be read from an EEPROM and not hard coded (in real deployed
 applications).*/
@@ -164,11 +173,16 @@ void vApplicationDaemonTaskStartupHook (void);
  */
 void prvMiscInitialization (void);
 static BaseType_t prvShouldAutoProvisionFromClientCredentials( void );
+static void prvDisplayInitialize( void );
+static void prvDisplayWrite( const char * pcMessage );
+static void prvLcdStatusTask( void * pvParameters );
 
 extern void UserInitialization (void);
 extern void CLI_Support_Settings (void);
 extern void vUARTCommandConsoleStart (uint16_t usStackSize, UBaseType_t uxPriority);
 extern void vRegisterSampleCLICommands (void);
+
+static BaseType_t xDisplayInitialized = pdFALSE;
 
 /*-----------------------------------------------------------*/
 
@@ -192,6 +206,8 @@ void main_task(void *pvParameters)
 
     prvMiscInitialization();
     UserInitialization();
+    prvDisplayInitialize();
+    prvDisplayWrite("FreeRTOS init\r\n");
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 1)
     /* Register the standard CLI commands. */
@@ -200,8 +216,10 @@ void main_task(void *pvParameters)
 #endif
 
     xResults = littlFs_init();
+    prvDisplayWrite((LFS_ERR_OK == xResults) ? "LittleFS OK\r\n" : "LittleFS ERROR\r\n");
 
     xMQTTAgentInit();
+    prvDisplayWrite("MQTT agent init\r\n");
 
     if (LFS_ERR_OK == xResults)
     {
@@ -238,6 +256,7 @@ void main_task(void *pvParameters)
         /* Initialise the RTOS's TCP/IP stack.  The tasks that use the network
             are created in the vApplicationIPNetworkEventHook() hook function
             below.  The hook function is called when the network connects. */
+        prvDisplayWrite("Network init\r\n");
 
         FreeRTOS_IPInit(ucIPAddress,
                         ucNetMask,
@@ -252,8 +271,10 @@ void main_task(void *pvParameters)
         }
 
         FreeRTOS_printf(("Initialise the RTOS's TCP/IP stack\n"));
+        prvDisplayWrite("Network up\r\n");
 
         FreeRTOS_printf(("---------STARTING DEMO---------\r\n"));
+        prvDisplayWrite("Starting demo\r\n");
 
             #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
                 vStartFleetProvisioningDemo();
@@ -262,12 +283,26 @@ void main_task(void *pvParameters)
             #endif
 
             vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
+            prvDisplayWrite("MQTT task start\r\n");
 
             vStartSimplePubSubDemo ();
+            prvDisplayWrite("PubSub task start\r\n");
 
             #if (ENABLE_OTA_UPDATE_DEMO == 1)
                         vStartOtaDemo();
+                        prvDisplayWrite("OTA task start\r\n");
             #endif
+
+            xTaskCreate(prvLcdStatusTask,
+                        "LCD_STATUS",
+                        mainLCD_STATUS_TASK_STACK_SIZE,
+                        NULL,
+                        mainLCD_STATUS_TASK_PRIORITY,
+                        NULL);
+    }
+    else
+    {
+        prvDisplayWrite("CLI mode active\r\n");
     }
 
     while (1)
@@ -301,6 +336,49 @@ void prvMiscInitialization(void)
 /*****************************************************************************************
 End of function prvMiscInitialization
 ****************************************************************************************/
+/*-----------------------------------------------------------*/
+
+static void prvDisplayInitialize( void )
+{
+    if( pdFALSE == xDisplayInitialized )
+    {
+        R_SIMPLE_GLCDC_CONFIG_Open();
+        R_SIMPLE_GRAPHIC_Open();
+        xDisplayInitialized = pdTRUE;
+        prvDisplayWrite("\r\niot-reference-rx\r\nRX72N app running\r\n");
+    }
+}
+/*-----------------------------------------------------------*/
+
+static void prvDisplayWrite( const char * pcMessage )
+{
+    if( ( pdFALSE != xDisplayInitialized ) && ( NULL != pcMessage ) )
+    {
+        while( '\0' != *pcMessage )
+        {
+            R_SIMPLE_GRAPHIC_PutCharacter(*pcMessage);
+            pcMessage++;
+        }
+    }
+}
+/*-----------------------------------------------------------*/
+
+static void prvLcdStatusTask( void * pvParameters )
+{
+    char cStatusLine[96];
+
+    (void) pvParameters;
+
+    for( ;; )
+    {
+        (void) sprintf(cStatusLine,
+                       "tick %lu heap %lu\r\n",
+                       (unsigned long) xTaskGetTickCount(),
+                       (unsigned long) xPortGetFreeHeapSize());
+        prvDisplayWrite(cStatusLine);
+        vTaskDelay(pdMS_TO_TICKS(mainLCD_STATUS_UPDATE_PERIOD_MS));
+    }
+}
 /*-----------------------------------------------------------*/
 
 /**********************************************************************************************************************

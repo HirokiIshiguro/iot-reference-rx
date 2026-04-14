@@ -370,8 +370,8 @@
         <Item currentVect="23" id="FCU_FRDYI" priority="15" usedState="未使用"/>
         <Item currentVect="26" id="ICU_SWINT2" priority="15" usedState="未使用"/>
         <Item currentVect="27" id="ICU_SWINT" priority="15" usedState="未使用"/>
-        <Item currentVect="28" id="CMT0_CMI0" priority="15" usedState="未使用"/>
-        <Item currentVect="29" id="CMT1_CMI1" priority="15" usedState="未使用"/>
+        <Item currentVect="28" id="CMT0_CMI0" priority="5" usedState="使用中"/>
+        <Item currentVect="29" id="CMT1_CMI1" priority="5" usedState="使用中"/>
         <Item currentVect="30" id="CMTW0_CMWI0" priority="15" usedState="未使用"/>
         <Item currentVect="31" id="CMTW1_CMWI1" priority="15" usedState="未使用"/>
         <Item currentVect="34" id="USB0_D0FIFO0" priority="15" usedState="未使用"/>
@@ -459,8 +459,8 @@
         <Item currentVect="125" id="OST_OSTDI" priority="15" usedState="未使用"/>
         <Item currentVect="126" id="EXDMAC_EXDMAC0I" priority="15" usedState="未使用"/>
         <Item currentVect="127" id="EXDMAC_EXDMAC1I" priority="15" usedState="未使用"/>
-        <Item currentVect="128" defaultVect="128" id="CMT2_CMI2" priority="15" usedState="未使用"/>
-        <Item currentVect="129" defaultVect="129" id="CMT3_CMI3" priority="15" usedState="未使用"/>
+        <Item currentVect="128" defaultVect="128" id="CMT2_CMI2" priority="5" usedState="使用中"/>
+        <Item currentVect="129" defaultVect="129" id="CMT3_CMI3" priority="5" usedState="使用中"/>
         <Item currentVect="130" defaultVect="130" id="TPU0_TGI0A" priority="15" usedState="未使用"/>
         <Item currentVect="131" defaultVect="131" id="TPU0_TGI0B" priority="15" usedState="未使用"/>
         <Item currentVect="132" defaultVect="132" id="TPU0_TGI0C" priority="15" usedState="未使用"/>
@@ -591,6 +591,9 @@
     <tool id="Pins" version="1.0.1.0">
         <pinItem allocation="10" comments="" direction="None" id="EMLE" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="20" comments="" direction="None" id="XTAL" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="84$B" comments="" direction="None" id="LCD_TCON3" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="83$B" comments="" direction="None" id="LCD_TCON2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="81$B" comments="" direction="None" id="LCD_TCON0" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="50" comments="" direction="None" id="CLKOUT25M" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="124" comments="" direction="None" id="IRQ2" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
         <pinItem allocation="45" comments="" direction="None" id="RXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
@@ -604,10 +607,17 @@
         <pinItem allocation="131" comments="" direction="None" id="TXD7" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="58" comments="" direction="None" id="ET0_CRS" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="44" comments="" direction="None" id="TXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="80$B" comments="" direction="None" id="LCD_CLK" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="22" comments="" direction="None" id="EXTAL" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="16" comments="" direction="None" id="FINED" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="70" comments="" direction="None" id="ET0_RX_DV" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="110$B" comments="" direction="None" id="LCD_DATA15" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="102$B" comments="" direction="None" id="LCD_DATA10" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="68" comments="" direction="None" id="ET0_RX_ER" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="109$B" comments="" direction="None" id="LCD_DATA14" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="108$B" comments="" direction="None" id="LCD_DATA13" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="107$B" comments="" direction="None" id="LCD_DATA12" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="106$B" comments="" direction="None" id="LCD_DATA11" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="61" comments="" direction="None" id="ET0_ETXD3" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="62" comments="" direction="None" id="ET0_ETXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="63" comments="" direction="None" id="ET0_ETXD1" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
@@ -619,6 +629,16 @@
         <pinItem allocation="71" comments="" direction="None" id="ET0_ERXD0" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="66" comments="" direction="None" id="ET0_TX_CLK" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="86" comments="" direction="None" id="ET0_MDIO" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="87$B" comments="" direction="None" id="LCD_DATA0" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="88$B" comments="" direction="None" id="LCD_DATA1" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="89$B" comments="" direction="None" id="LCD_DATA2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="90$B" comments="" direction="None" id="LCD_DATA3" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="92$B" comments="" direction="None" id="LCD_DATA4" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="94$B" comments="" direction="None" id="LCD_DATA5" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="95$B" comments="" direction="None" id="LCD_DATA6" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="96$B" comments="" direction="None" id="LCD_DATA7" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="97$B" comments="" direction="None" id="LCD_DATA8" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="101$B" comments="" direction="None" id="LCD_DATA9" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinnumItem comment="LCD-B4" id="88" symbolicname=""/>
         <pinnumItem comment="LCD-B5" id="89" symbolicname=""/>
         <pinnumItem comment="LCD-R7" id="110" symbolicname=""/>
@@ -1316,7 +1336,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="c121d714-ef1d-472f-816a-32f621b8d713" inuse="true" name="FreeRTOS_IP">
+        <configuration enable="true" exclude="false" id="9bf3e4f5-9ce9-41c3-b24b-bba82511eea4" inuse="true" name="FreeRTOS_IP">
             <component description="依存モジュール: r_ether_rx&#10;FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." detailDescription="FreeRTOS-Plus-TCP is a scalable, open source and thread safe TCP/IP stack for FreeRTOS." display="FreeRTOS-Plus-TCP" id="FreeRTOS_IP202406.01-LTS-rx-1.1.1" version="4.2.2">
                 <gridItem id="ipconfigBYTE_ORDER" selectedIndex="0"/>
                 <gridItem id="ipconfigHAS_DEBUG_PRINTF" selectedIndex="0"/>
@@ -1341,7 +1361,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="139d21d9-9fce-48bc-8ad3-f2dac391fdae" inuse="true" name="FreeRTOS Object">
+        <configuration enable="true" exclude="false" id="4aaa6dce-bf28-49cd-9ecf-df0cbd5f7b80" inuse="true" name="FreeRTOS Object">
             <allocatable id="OBJECT" name="OBJECT" type="">
                 <allocatable id="TASK" name="TASK" type="">
                     <allocatable id="TASKOBJECTLINK1" name="TASK" readonly="true" type="">
@@ -1377,7 +1397,7 @@
             <component description="This component is a part of RTOS Configurator feature that allow user to use the GUI to create and configure new object of FreeRTOS." detailDescription="" display="FreeRTOS_Object" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.object" version="202406.01-LTS-rx-1.1.1"/>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="4cb4782f-7f59-425f-9b58-bf1b157eca9f" inuse="true" name="LittleFS">
+        <configuration enable="true" exclude="false" id="142536aa-d7d7-413b-a6fa-20077a20fd2c" inuse="true" name="LittleFS">
             <component description="依存モジュール: なし&#10;LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." detailDescription="LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." display="LittleFS" id="LittleFS202406.01-LTS-rx-1.1.1" version="2.5.1">
                 <gridItem id="LFS_FLASH_READ_SIZE" selectedIndex="1"/>
                 <gridItem id="LFS_FLASH_PROGRAM_SIZE" selectedIndex="4"/>
@@ -1387,7 +1407,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="8b67923f-bf0d-4b05-8665-6e2f3f6429a2" inuse="true" name="FreeRTOS_Kernel">
+        <configuration enable="true" exclude="false" id="ad70dd8c-5c58-4288-8f66-b150afef3473" inuse="true" name="FreeRTOS_Kernel">
             <component description="依存モジュール: なし&#10;FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." detailDescription="FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." display="FreeRTOS Kernel" id="FreeRTOS_Kernel202406.01-LTS-rx-1.1.1" version="11.1.0">
                 <gridItem id="configENABLE_BACKWARD_COMPATIBILITY" selectedIndex="1"/>
                 <gridItem id="configUSE_PREEMPTION" selectedIndex="1"/>
@@ -1599,6 +1619,71 @@
                 <gridItem id="ETHER_CFG_PMGI_HOLD_TIME" selectedIndex="0"/>
                 <gridItem id="ETHER_CFG_PMGI_CAPTURE_TIME" selectedIndex="0"/>
                 <gridItem id="ETHER_CFG_PMGI_INT_PRIORTY" selectedIndex="1"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_simple_glcdc_config_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.52&#10;依存モジュール: r_glcdc_rx バージョン 1.30&#10;This module wraps r_glcdc_rx setup for a 480x272 RGB565 LCD panel and exposes R_SIMPLE_GLCDC_CONFIG_Open/Close plus lcd_get_frame_buffer_pointer. It is extracted from the RX72N Envision Kit bootloader display path and is intended to be used together with r_simple_graphic_rx for basic text output." detailDescription="Simple GLCDC configuration helper for RX72N Envision Kit style RGB565 LCD output." display="r_simple_glcdc_config_rx" id="r_simple_glcdc_config_rx1.00" version="1.00">
+                <gridItem id="XSIZE_PHYS" selectedIndex="480"/>
+                <gridItem id="YSIZE_PHYS" selectedIndex="272"/>
+                <gridItem id="XSIZE_OUTOF_DISPLAY" selectedIndex="32"/>
+                <gridItem id="_BRIGHTNESS" selectedIndex="0x200"/>
+                <gridItem id="_CONTRAST" selectedIndex="0x80"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_simple_graphic_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.52&#10;依存モジュール: r_cmt_rx バージョン 5.20&#10;依存モジュール: r_simple_glcdc_config_rx バージョン 1.00&#10;This module provides a tiny fixed-font text renderer with R_SIMPLE_GRAPHIC_Open/Close/PutCharacter. It uses a frame buffer supplied by r_simple_glcdc_config_rx and periodically refreshes the display through r_cmt_rx." detailDescription="Simple text renderer for CLUT8 LCD frame buffers on RX." display="r_simple_graphic_rx" id="r_simple_graphic_rx1.00" version="1.00"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_cmt_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.70&#10;This module creates a timer tick using a CMT channel based on a frequency input by the user." detailDescription="CMT driver" display="r_cmt_rx" id="r_cmt_rx5.80" version="5.80">
+                <gridItem id="CMT_RX_CFG_IPR" selectedIndex="5"/>
+                <gridItem id="CMT_CFG_CH0_EN_NESTED_INT" selectedIndex="0"/>
+                <gridItem id="CMT_CFG_CH1_EN_NESTED_INT" selectedIndex="0"/>
+                <gridItem id="CMT_CFG_CH2_EN_NESTED_INT" selectedIndex="0"/>
+                <gridItem id="CMT_CFG_CH3_EN_NESTED_INT" selectedIndex="0"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_glcdc_rx">
+            <component description="依存モジュール: r_bsp バージョン 5.20, 5.50&#10;The GLCDC FIT module provides the method to output image data read from memory to the LCD panel. " detailDescription="Graphics LCD Controller Module." display="r_glcdc_rx" id="r_glcdc_rx1.30" version="1.30">
+                <gridItem id="LCD_CLK" selectedIndex="1"/>
+                <gridItem id="LCD_TCON0" selectedIndex="1"/>
+                <gridItem id="LCD_TCON1" selectedIndex="0"/>
+                <gridItem id="LCD_TCON2" selectedIndex="1"/>
+                <gridItem id="LCD_TCON3" selectedIndex="1"/>
+                <gridItem id="LCD_DATA0" selectedIndex="1"/>
+                <gridItem id="LCD_DATA1" selectedIndex="1"/>
+                <gridItem id="LCD_DATA2" selectedIndex="1"/>
+                <gridItem id="LCD_DATA3" selectedIndex="1"/>
+                <gridItem id="LCD_DATA4" selectedIndex="1"/>
+                <gridItem id="LCD_DATA5" selectedIndex="1"/>
+                <gridItem id="LCD_DATA6" selectedIndex="1"/>
+                <gridItem id="LCD_DATA7" selectedIndex="1"/>
+                <gridItem id="LCD_DATA8" selectedIndex="1"/>
+                <gridItem id="LCD_DATA9" selectedIndex="1"/>
+                <gridItem id="LCD_DATA10" selectedIndex="1"/>
+                <gridItem id="LCD_DATA11" selectedIndex="1"/>
+                <gridItem id="LCD_DATA12" selectedIndex="1"/>
+                <gridItem id="LCD_DATA13" selectedIndex="1"/>
+                <gridItem id="LCD_DATA14" selectedIndex="1"/>
+                <gridItem id="LCD_DATA15" selectedIndex="1"/>
+                <gridItem id="LCD_DATA16" selectedIndex="0"/>
+                <gridItem id="LCD_DATA17" selectedIndex="0"/>
+                <gridItem id="LCD_DATA18" selectedIndex="0"/>
+                <gridItem id="LCD_DATA19" selectedIndex="0"/>
+                <gridItem id="LCD_DATA20" selectedIndex="0"/>
+                <gridItem id="LCD_DATA21" selectedIndex="0"/>
+                <gridItem id="LCD_DATA22" selectedIndex="0"/>
+                <gridItem id="LCD_DATA23" selectedIndex="0"/>
+                <gridItem id="LCD_EXTCLK" selectedIndex="0"/>
+                <gridItem id="GLCDC_CFG_PARAM_CHECKING_ENABLE" selectedIndex="1"/>
+                <gridItem id="GLCDC_CFG_INTERRUPT_PRIORITY_LEVEL" selectedIndex="5"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
