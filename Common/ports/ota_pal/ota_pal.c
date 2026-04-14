@@ -42,6 +42,11 @@
 #define OTA_MAGIC_CODE_LEN          (7U)
 #define OTA_SIG_TYPE_LENGTH         (32U)
 #define OTA_HEADER_RESERVED_BYTES   (400U)
+#define OTA_IMAGE_STATE_UNKNOWN_STR  ("unknown")
+#define OTA_IMAGE_STATE_TESTING_STR  ("testing")
+#define OTA_IMAGE_STATE_ACCEPTED_STR ("accepted")
+#define OTA_IMAGE_STATE_REJECTED_STR ("rejected")
+#define OTA_IMAGE_STATE_ABORTED_STR  ("aborted")
 
 typedef struct OtaRsuHeader
 {
@@ -91,6 +96,10 @@ static BaseType_t prvWriteImageHeader(AfrOtaJobDocumentFields_t * pFileContext,
                                       const uint8_t * pRawSignature);
 static OtaPalStatus_t prvVerifyReceivedPayload(AfrOtaJobDocumentFields_t * pFileContext);
 static uint8_t * prvGetSignerCert(uint32_t * pulSignerCertSize);
+static BaseType_t prvPersistImageState(OtaImageState_t eState);
+static OtaImageState_t prvLoadPersistedImageState(void);
+static const char * prvImageStateToString(OtaImageState_t eState);
+static OtaImageState_t prvImageStateFromString(const char * pcState);
 static void prvResetDevice(void);
 static BaseType_t prvActivateBank(void);
 
@@ -105,6 +114,7 @@ OtaPalJobDocProcessingResult_t otaPal_CreateFileForRx(AfrOtaJobDocumentFields_t 
 
     pFileContext->fileId = hdl++;
     prvResetDownloadState();
+    (void) prvPersistImageState(OtaImageStateUnknown);
 
     if (pdTRUE != prvEnsureFlashResources())
     {
@@ -206,6 +216,7 @@ OtaPalStatus_t otaPal_CloseFile(AfrOtaJobDocumentFields_t * const pFileContext)
 
     eResult = prvVerifyReceivedPayload(pFileContext);
     OtaImageState = (OtaPalSuccess == eResult) ? OtaImageStateTesting : OtaImageStateRejected;
+    (void) prvPersistImageState(OtaImageState);
     pFileContext->fileId = 0U;
 
     return eResult;
@@ -255,6 +266,7 @@ OtaPalStatus_t otaPal_Abort(AfrOtaJobDocumentFields_t * const pFileContext)
     }
 
     OtaImageState = OtaImageStateAborted;
+    (void) prvPersistImageState(OtaImageState);
     return OtaPalSuccess;
 }
 
@@ -306,12 +318,18 @@ OtaPalStatus_t otaPal_SetPlatformImageState(AfrOtaJobDocumentFields_t * const pF
     }
 
     OtaImageState = eState;
+    (void) prvPersistImageState(OtaImageState);
     return eResult;
 }
 
 OtaPalImageState_t otaPal_GetPlatformImageState(AfrOtaJobDocumentFields_t * const pFileContext)
 {
     (void) pFileContext;
+
+    if (OtaImageStateUnknown == OtaImageState)
+    {
+        OtaImageState = prvLoadPersistedImageState();
+    }
 
     switch (OtaImageState)
     {
@@ -595,6 +613,87 @@ static uint8_t * prvGetSignerCert(uint32_t * pulSignerCertSize)
 
     vPortFree(pucCertData);
     return pucSignerCert;
+}
+
+static const char * prvImageStateToString(OtaImageState_t eState)
+{
+    switch (eState)
+    {
+        case OtaImageStateTesting:
+            return OTA_IMAGE_STATE_TESTING_STR;
+
+        case OtaImageStateAccepted:
+            return OTA_IMAGE_STATE_ACCEPTED_STR;
+
+        case OtaImageStateRejected:
+            return OTA_IMAGE_STATE_REJECTED_STR;
+
+        case OtaImageStateAborted:
+            return OTA_IMAGE_STATE_ABORTED_STR;
+
+        case OtaImageStateUnknown:
+        default:
+            return OTA_IMAGE_STATE_UNKNOWN_STR;
+    }
+}
+
+static OtaImageState_t prvImageStateFromString(const char * pcState)
+{
+    if (NULL == pcState)
+    {
+        return OtaImageStateUnknown;
+    }
+
+    if (0 == strcmp(pcState, OTA_IMAGE_STATE_TESTING_STR))
+    {
+        return OtaImageStateTesting;
+    }
+
+    if (0 == strcmp(pcState, OTA_IMAGE_STATE_ACCEPTED_STR))
+    {
+        return OtaImageStateAccepted;
+    }
+
+    if (0 == strcmp(pcState, OTA_IMAGE_STATE_REJECTED_STR))
+    {
+        return OtaImageStateRejected;
+    }
+
+    if (0 == strcmp(pcState, OTA_IMAGE_STATE_ABORTED_STR))
+    {
+        return OtaImageStateAborted;
+    }
+
+    return OtaImageStateUnknown;
+}
+
+static BaseType_t prvPersistImageState(OtaImageState_t eState)
+{
+    const char * pcState = prvImageStateToString(eState);
+    size_t xStateLength = strlen(pcState) + 1U;
+
+    return (xprvWriteValueToImpl(KVS_OTA_IMAGE_STATE, (char *) pcState, (uint32_t) xStateLength) > 0) ? pdTRUE : pdFALSE;
+}
+
+static OtaImageState_t prvLoadPersistedImageState(void)
+{
+    size_t xStateLength = prvGetCacheEntryLength(KVS_OTA_IMAGE_STATE);
+    char * pcState = NULL;
+    OtaImageState_t eState = OtaImageStateUnknown;
+
+    if (0U == xStateLength)
+    {
+        return OtaImageStateUnknown;
+    }
+
+    pcState = GetStringValue(KVS_OTA_IMAGE_STATE, xStateLength);
+    if (NULL != pcState)
+    {
+        eState = prvImageStateFromString(pcState);
+        vPortFree(pcState);
+    }
+
+    return eState;
 }
 
 static void prvResetDevice(void)
