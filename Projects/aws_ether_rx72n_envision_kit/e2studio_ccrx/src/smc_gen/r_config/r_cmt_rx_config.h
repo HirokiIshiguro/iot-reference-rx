@@ -23,7 +23,7 @@
 Configuration Options
 ***********************************************************************************************************************/
 /* The interrupt priority level to be used for CMT interrupts. */
-#define CMT_RX_CFG_IPR         (5)
+#define CMT_RX_CFG_IPR         (4)
 
 /* SPECIFY WHETHER TO INCLUDE CODE FOR NESTED INTERRUPT CMT CHANNEL 0 */
 /* 1=included, 0=not */

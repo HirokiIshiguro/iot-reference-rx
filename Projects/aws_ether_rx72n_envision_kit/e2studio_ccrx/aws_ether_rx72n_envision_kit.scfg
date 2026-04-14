@@ -1403,7 +1403,7 @@
                 <gridItem id="LFS_FLASH_PROGRAM_SIZE" selectedIndex="4"/>
                 <gridItem id="LFS_FLASH_BLOCK_SIZE" selectedIndex="128"/>
                 <gridItem id="LFS_FLASH_BLOCK_COUNT" selectedIndex="70"/>
-                <gridItem id="RM_LITTLEFS_FLASH_DATA_START" selectedIndex="FLASH_DF_BLOCK_0_MACRO"/>
+                <gridItem id="RM_LITTLEFS_FLASH_DATA_START" selectedIndex="FLASH_DF_BLOCK_32_MACRO"/>
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
@@ -1604,7 +1604,7 @@
                 <gridItem id="ETHER_CFG_EMAC_RX_DESCRIPTORS" selectedIndex="1"/>
                 <gridItem id="ETHER_CFG_EMAC_TX_DESCRIPTORS" selectedIndex="1"/>
                 <gridItem id="ETHER_CFG_BUFSIZE" selectedIndex="1536"/>
-                <gridItem id="ETHER_CFG_AL1_INT_PRIORTY" selectedIndex="13"/>
+                <gridItem id="ETHER_CFG_AL1_INT_PRIORTY" selectedIndex="3"/>
                 <gridItem id="ETHER_CFG_CH0_PHY_ACCESS" selectedIndex="0"/>
                 <gridItem id="ETHER_CFG_CH1_PHY_ACCESS" selectedIndex="1"/>
                 <gridItem id="ETHER_CFG_PHY_MII_WAIT" selectedIndex="8"/>
@@ -1641,7 +1641,7 @@
         </configuration>
         <configuration inuse="true" name="r_cmt_rx">
             <component description="依存モジュール: r_bsp バージョン 7.70&#10;This module creates a timer tick using a CMT channel based on a frequency input by the user." detailDescription="CMT driver" display="r_cmt_rx" id="r_cmt_rx5.80" version="5.80">
-                <gridItem id="CMT_RX_CFG_IPR" selectedIndex="5"/>
+                <gridItem id="CMT_RX_CFG_IPR" selectedIndex="4"/>
                 <gridItem id="CMT_CFG_CH0_EN_NESTED_INT" selectedIndex="0"/>
                 <gridItem id="CMT_CFG_CH1_EN_NESTED_INT" selectedIndex="0"/>
                 <gridItem id="CMT_CFG_CH2_EN_NESTED_INT" selectedIndex="0"/>
@@ -1683,7 +1683,7 @@
                 <gridItem id="LCD_DATA23" selectedIndex="0"/>
                 <gridItem id="LCD_EXTCLK" selectedIndex="0"/>
                 <gridItem id="GLCDC_CFG_PARAM_CHECKING_ENABLE" selectedIndex="1"/>
-                <gridItem id="GLCDC_CFG_INTERRUPT_PRIORITY_LEVEL" selectedIndex="5"/>
+                <gridItem id="GLCDC_CFG_INTERRUPT_PRIORITY_LEVEL" selectedIndex="4"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>

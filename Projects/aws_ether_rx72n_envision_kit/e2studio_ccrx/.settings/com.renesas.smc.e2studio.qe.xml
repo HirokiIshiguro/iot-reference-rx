@@ -164,7 +164,7 @@
             <Setting id="BSP_CFG_EBMAPCR_1ST_PRIORITY" value="0"/>
         </Segment>
         <Segment component="r_glcdc_rx1.30" id="r_glcdc_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
-            <Setting id="GLCDC_CFG_INTERRUPT_PRIORITY_LEVEL" value="5"/>
+            <Setting id="GLCDC_CFG_INTERRUPT_PRIORITY_LEVEL" value="4"/>
             <Setting id="GLCDC_CFG_PARAM_CHECKING_ENABLE" value="1"/>
         </Segment>
         <Segment component="r_tsip_rx1.21" id="r_tsip_rx" source="com.renesas.smc.tools.swcomponent.fit.source"/>
@@ -443,7 +443,7 @@
             <Setting id="ETHER_CFG_PMGI_HOLD_TIME" value="0"/>
             <Setting id="ETHER_CFG_PMGI_CAPTURE_TIME" value="0"/>
             <Setting id="ETHER_CFG_USE_LINKSTA" value="0"/>
-            <Setting id="ETHER_CFG_AL1_INT_PRIORTY" value="14"/>
+            <Setting id="ETHER_CFG_AL1_INT_PRIORTY" value="4"/>
             <Setting id="ETHER_CFG_PMGI_ENABLE_PREAMBLE" value="0"/>
             <Setting id="ETHER_CFG_CH1_PHY_ADDRESS" value="1"/>
             <Setting id="ETHER_CFG_PMGI_INT_PRIORTY" value="2"/>
@@ -456,7 +456,7 @@
             <Setting id="CMT_CFG_CH1_EN_NESTED_INT" value="0"/>
             <Setting id="CMT_CFG_CH3_EN_NESTED_INT" value="0"/>
             <Setting id="CMT_CFG_CH0_EN_NESTED_INT" value="0"/>
-            <Setting id="CMT_RX_CFG_IPR" value="5"/>
+            <Setting id="CMT_RX_CFG_IPR" value="4"/>
         </Segment>
         <Segment component="r_irq_rx4.80" id="r_irq_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="IRQ_CFG_FILT_PLCK_IRQ1" value="IRQ_CFG_PCLK_DIV64"/>
