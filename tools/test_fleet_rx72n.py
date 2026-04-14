@@ -62,7 +62,7 @@ def reset_device_via_command(reset_cmd):
                 print(f"  [reset-cmd] {stripped}")
 
     if result.stderr:
-        progress_re = re.compile(r"^\\d+%\\s*\\[")
+        progress_re = re.compile(r"^\d+%\s*\[")
         for line in result.stderr.strip().splitlines():
             stripped = line.strip()
             if stripped and not progress_re.match(stripped):
