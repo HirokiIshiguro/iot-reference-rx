@@ -481,9 +481,8 @@ cleanup_rx72n_fleet_resources:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
-  needs:
-    - job: test_fleet_rx72n_linux
-      artifacts: true
+  dependencies:
+    - test_fleet_rx72n_linux
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: always
