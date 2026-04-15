@@ -26,12 +26,12 @@ variables:
   RX72N_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
   RX72N_DEVICE_ID: "rx72n-02"
   # RX72N_TEST_SCOPE:
-  #   auto  - main/tag/manual pipelines run the full MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
+  #   auto  - main/tag/manual pipelines run the MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
   #   build - build/package only, no hardware test.
   #   mqtt  - flash/provision/MQTT only, no OTA.
   #   ota   - flash/provision/MQTT + OTA.
-  #   full  - same as ota, intended for explicit full validation.
-  RX72N_TEST_SCOPE: "auto"
+  #   full  - flash/provision/MQTT + OTA + Fleet Provisioning cleanup path.
+  RX72N_TEST_SCOPE: "full"
   RUN_RX72N_HW_TESTS: "false"
   RUN_RX72N_OTA_TESTS: "false"
   RUN_RX72N_FLEET_TESTS: "false"
