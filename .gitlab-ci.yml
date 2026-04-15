@@ -122,7 +122,7 @@ build_rx72n_fleet_candidate:
     - os-windows
     - hw-ishiguro-pc
   rules:
-    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -229,7 +229,7 @@ flash_rx72n_fleet_linux:
   needs:
     - build_rx72n_fleet_candidate
   rules:
-    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -332,7 +332,7 @@ provision_rx72n_fleet_linux:
     - build_rx72n_fleet_candidate
     - flash_rx72n_fleet_linux
   rules:
-    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -421,7 +421,7 @@ test_fleet_rx72n_linux:
     - flash_rx72n_fleet_linux
     - provision_rx72n_fleet_linux
   rules:
-    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -456,7 +456,7 @@ cleanup_rx72n_fleet_resources:
     - job: test_fleet_rx72n_linux
       artifacts: true
   rules:
-    - if: '$RUN_RX72N_FLEET_TESTS == "true" && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $AWS_DEFAULT_REGION'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $AWS_DEFAULT_REGION'
       when: always
     - when: never
   script:
