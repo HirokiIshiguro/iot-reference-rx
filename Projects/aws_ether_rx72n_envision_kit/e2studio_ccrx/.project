@@ -140,7 +140,7 @@
 			<type>5</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
-				<arguments>1.0-name-matches-false-true-pkcs11_operations.c|pkcs11_operations.h</arguments>
+				<arguments>1.0-name-matches-false-true-FleetProvisioningDemoExample.c|pkcs11_operations.c|pkcs11_operations.h|tinycbor_serializer.c|tinycbor_serializer.h</arguments>
 			</matcher>
 		</filter>
 		<filter>
@@ -158,7 +158,16 @@
 			<type>9</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
-				<arguments>1.0-name-matches-false-true-aws-iot-core-mqtt-file-streams-embedded-c|Jobs-for-AWS-IoT-embedded-sdk</arguments>
+				<arguments>1.0-name-matches-false-true-aws-iot-core-mqtt-file-streams-embedded-c|Fleet-Provisioning-for-AWS-IoT-embedded-sdk|Jobs-for-AWS-IoT-embedded-sdk</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1776155000000</id>
+			<name>Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk</name>
+			<type>9</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-source</arguments>
 			</matcher>
 		</filter>
 		<filter>

@@ -87,10 +87,6 @@
  */
 #define ENABLE_OTA_UPDATE_DEMO              (1)
 
-#if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
-	#error "Fleet Provisioning demo is not supported!"
-#endif
-
 /**
  * @brief Path of the file containing the provisioning claim certificate. This
  * certificate is used to connect to AWS IoT Core and use Fleet Provisioning

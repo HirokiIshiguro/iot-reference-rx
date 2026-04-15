@@ -121,6 +121,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/OtaOverMqtt}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/common/mqtt-wrapper}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Common/patches/Jobs-for-AWS-IoT-embedded-sdk/source/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/source/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk/source/otaJobParser/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c/source/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/3rdparty/tinycbor/src}&quot;"/>
@@ -249,7 +250,9 @@
 									<listOptionValue builtIn="false" value="&quot;.\Common/common_api\r_common_api_tsip.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Common/littlefs_common\lfs_common_data.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Common/patches/FreeRTOS-Plus-TCP/source/portable/NetworkInterface/RX\NetworkInterface.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Demos/Fleet_Provisioning_With_CSR_Demo\FleetProvisioningDemoExample.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/Fleet_Provisioning_With_CSR_Demo\pkcs11_operations.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Demos/Fleet_Provisioning_With_CSR_Demo\tinycbor_serializer.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/SimplePubSub\simple_pub_sub_task.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/cli\CLIcommands.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/cli\UARTCommandConsole.obj&quot;"/>
@@ -737,6 +740,7 @@
 									<listOptionValue builtIn="false" value="&quot;.\src/smc_gen/r_tsip_rx/src/targets/rx65n\r_tsip_tdes_rx.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\src/smc_gen/r_tsip_rx/src/targets/rx65n\r_tsip_tls_rx.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Common/patches/Jobs-for-AWS-IoT-embedded-sdk/source\jobs.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/source\fleet_provisioning.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/OtaOverMqtt\OtaOverMqttDemo.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/OtaOverMqtt/ota_os\ota_os_freertos.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/common/mqtt-wrapper\mqtt_wrapper.obj&quot;"/>

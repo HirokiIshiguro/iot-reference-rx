@@ -247,16 +247,29 @@ def resolve_device_args(args, parser):
 
     if not args.endpoint:
         parser.error("--endpoint is required (or use --device-id)")
-    if not args.thing_name:
-        parser.error("--thing-name is required (or use --device-id)")
-    if not args.cert:
-        parser.error("--cert is required (or use --device-id)")
-    if not args.key:
-        parser.error("--key is required (or use --device-id)")
 
-    for path, desc in ((args.cert, "Certificate"), (args.key, "Private key")):
-        if not os.path.isfile(path):
-            parser.error(f"{desc} file not found: {path}")
+    if args.fleet_provisioning:
+        if not args.template_name:
+            parser.error("--template-name is required with --fleet-provisioning")
+        if not args.claim_cert:
+            parser.error("--claim-cert is required with --fleet-provisioning")
+        if not args.claim_key:
+            parser.error("--claim-key is required with --fleet-provisioning")
+
+        for path, desc in ((args.claim_cert, "Claim certificate"), (args.claim_key, "Claim private key")):
+            if not os.path.isfile(path):
+                parser.error(f"{desc} file not found: {path}")
+    else:
+        if not args.thing_name:
+            parser.error("--thing-name is required (or use --device-id)")
+        if not args.cert:
+            parser.error("--cert is required (or use --device-id)")
+        if not args.key:
+            parser.error("--key is required (or use --device-id)")
+
+        for path, desc in ((args.cert, "Certificate"), (args.key, "Private key")):
+            if not os.path.isfile(path):
+                parser.error(f"{desc} file not found: {path}")
     if args.codesigner_cert and not os.path.isfile(args.codesigner_cert):
         parser.error(f"Code signer certificate file not found: {args.codesigner_cert}")
 
@@ -267,10 +280,16 @@ def provision(args):
     print("=" * 60)
     print(f"Port:       {args.port}")
     print(f"Baud:       {args.baud}")
-    print(f"Thing Name: {args.thing_name}")
+    if args.fleet_provisioning:
+        print("Mode:       fleet provisioning")
+        print(f"Template:   {args.template_name}")
+        print(f"Claim Cert: {args.claim_cert}")
+        print(f"Claim Key:  {args.claim_key}")
+    else:
+        print(f"Thing Name: {args.thing_name}")
+        print(f"Cert:       {args.cert}")
+        print(f"Key:        {args.key}")
     print(f"Endpoint:   {args.endpoint}")
-    print(f"Cert:       {args.cert}")
-    print(f"Key:        {args.key}")
     if args.shadow_port:
         print(f"Shadow Port:{args.shadow_port} @ {args.shadow_baud}")
     if args.codesigner_cert:
@@ -358,30 +377,44 @@ def provision(args):
             else:
                 print(f"  Format response: {mask_sensitive_output(str(resp).strip()) if resp else 'No response'}")
 
-        print(f"\n--- Set thing name: {args.thing_name} ---")
-        if send_command(ser, f"conf set thingname {args.thing_name}",
-                        args.char_delay, args.line_delay, required_tokens=("OK",)) is None:
-            return 1
-
         print(f"\n--- Set endpoint: {args.endpoint} ---")
         if send_command(ser, f"conf set endpoint {args.endpoint}",
                         args.char_delay, args.line_delay, required_tokens=("OK",)) is None:
             return 1
 
-        print("\n--- Set device certificate ---")
-        if not send_pem_command(ser, "cert", args.cert, args.char_delay, args.line_delay):
-            return 1
+        if args.fleet_provisioning:
+            print(f"\n--- Set provisioning template: {args.template_name} ---")
+            if send_command(ser, f"conf set template {args.template_name}",
+                            args.char_delay, args.line_delay, required_tokens=("OK",)) is None:
+                return 1
 
-        print("\n--- Set private key ---")
-        if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay):
-            return 1
+            print("\n--- Set claim certificate ---")
+            if not send_pem_command(ser, "claimcert", args.claim_cert, args.char_delay, args.line_delay):
+                return 1
 
-        if args.codesigner_cert:
-            print("\n--- Set code signing certificate ---")
-            if not send_pem_command(ser, "codesigncert", args.codesigner_cert, args.char_delay, args.line_delay):
+            print("\n--- Set claim private key ---")
+            if not send_pem_command(ser, "claimkey", args.claim_key, args.char_delay, args.line_delay):
                 return 1
         else:
-            print("\nWARNING: No code signing certificate provided; OTA signature verification will fail")
+            print(f"\n--- Set thing name: {args.thing_name} ---")
+            if send_command(ser, f"conf set thingname {args.thing_name}",
+                            args.char_delay, args.line_delay, required_tokens=("OK",)) is None:
+                return 1
+
+            print("\n--- Set device certificate ---")
+            if not send_pem_command(ser, "cert", args.cert, args.char_delay, args.line_delay):
+                return 1
+
+            print("\n--- Set private key ---")
+            if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay):
+                return 1
+
+            if args.codesigner_cert:
+                print("\n--- Set code signing certificate ---")
+                if not send_pem_command(ser, "codesigncert", args.codesigner_cert, args.char_delay, args.line_delay):
+                    return 1
+            else:
+                print("\nWARNING: No code signing certificate provided; OTA signature verification will fail")
 
         print("\n--- Commit to data flash ---")
         ser.reset_input_buffer()
@@ -428,6 +461,11 @@ def main():
     parser.add_argument("--endpoint", help="AWS IoT MQTT endpoint URL")
     parser.add_argument("--cert", help="Path to device certificate PEM file")
     parser.add_argument("--key", help="Path to device private key PEM file")
+    parser.add_argument("--fleet-provisioning", action="store_true",
+                        help="Provision claim credentials and template name instead of device credentials")
+    parser.add_argument("--template-name", help="AWS IoT Fleet Provisioning template name")
+    parser.add_argument("--claim-cert", help="Path to fleet provisioning claim certificate PEM file")
+    parser.add_argument("--claim-key", help="Path to fleet provisioning claim private key PEM file")
     parser.add_argument("--codesigner-cert", help="Path to OTA code signing certificate PEM file")
     parser.add_argument("--char-delay", type=float, default=DEFAULT_CHAR_DELAY,
                         help=f"Delay between characters in seconds (default: {DEFAULT_CHAR_DELAY})")

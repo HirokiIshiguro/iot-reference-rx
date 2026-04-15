@@ -80,8 +80,11 @@
       </Category>
       <Category Name="Demos">
         <Category Name="Fleet_Provisioning_With_CSR_Demo">
+          <Path>..\..\..\Demos\Fleet_Provisioning_With_CSR_Demo\FleetProvisioningDemoExample.c</Path>
           <Path>..\..\..\Demos\Fleet_Provisioning_With_CSR_Demo\pkcs11_operations.c</Path>
           <Path>..\..\..\Demos\Fleet_Provisioning_With_CSR_Demo\pkcs11_operations.h</Path>
+          <Path>..\..\..\Demos\Fleet_Provisioning_With_CSR_Demo\tinycbor_serializer.c</Path>
+          <Path>..\..\..\Demos\Fleet_Provisioning_With_CSR_Demo\tinycbor_serializer.h</Path>
         </Category>
         <Category Name="OtaOverMqtt">
           <Path>..\..\..\Demos\OtaOverMqtt\OtaOverMqttDemo.c</Path>
@@ -454,6 +457,11 @@
           </Category>
         </Category>
         <Category Name="AWS">
+          <Category Name="Fleet-Provisioning-for-AWS-IoT-embedded-sdk">
+            <Category Name="source">
+              <Path>..\..\..\Middleware\AWS\Fleet-Provisioning-for-AWS-IoT-embedded-sdk\source\fleet_provisioning.c</Path>
+            </Category>
+          </Category>
           <Category Name="Jobs-for-AWS-IoT-embedded-sdk">
             <Category Name="source">
               <Category Name="otaJobParser">
@@ -1570,6 +1578,7 @@
           <Option>-include="C:\ai\codex\_work_iot_reference_rx_20240604\Demos\OtaOverMqtt"</Option>
           <Option>-include="C:\ai\codex\_work_iot_reference_rx_20240604\Demos\common\mqtt-wrapper"</Option>
           <Option>-include="C:\ai\codex\_work_iot_reference_rx_20240604\Common\patches\Jobs-for-AWS-IoT-embedded-sdk\source\include"</Option>
+          <Option>-include="C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\AWS\Fleet-Provisioning-for-AWS-IoT-embedded-sdk\source\include"</Option>
           <Option>-include="C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\AWS\Jobs-for-AWS-IoT-embedded-sdk\source\otaJobParser\include"</Option>
           <Option>-include="C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\AWS\aws-iot-core-mqtt-file-streams-embedded-c\source\include"</Option>
           <Option>-include="C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\3rdparty\tinycbor\src"</Option>
@@ -1700,7 +1709,9 @@
           <Path>HardwareDebug\r_common_api_tsip.obj</Path>
           <Path>HardwareDebug\lfs_common_data.obj</Path>
           <Path>HardwareDebug\NetworkInterface.obj</Path>
+          <Path>HardwareDebug\FleetProvisioningDemoExample.obj</Path>
           <Path>HardwareDebug\pkcs11_operations.obj</Path>
+          <Path>HardwareDebug\tinycbor_serializer.obj</Path>
           <Path>HardwareDebug\simple_pub_sub_task.obj</Path>
           <Path>HardwareDebug\CLIcommands.obj</Path>
           <Path>HardwareDebug\UARTCommandConsole.obj</Path>
@@ -1929,6 +1940,7 @@
           <Path>HardwareDebug\r_sci_rx72n.obj</Path>
           <Path>HardwareDebug\r_sci_rx72n_data.obj</Path>
           <Path>HardwareDebug\jobs.obj</Path>
+          <Path>HardwareDebug\fleet_provisioning.obj</Path>
           <Path>HardwareDebug\OtaOverMqttDemo.obj</Path>
           <Path>HardwareDebug\ota_os_freertos.obj</Path>
           <Path>HardwareDebug\mqtt_wrapper.obj</Path>
@@ -2308,6 +2320,7 @@
           <IncludePathForC>"C:\ai\codex\_work_iot_reference_rx_20240604\Demos\OtaOverMqtt"</IncludePathForC>
           <IncludePathForC>"C:\ai\codex\_work_iot_reference_rx_20240604\Demos\common\mqtt-wrapper"</IncludePathForC>
           <IncludePathForC>"C:\ai\codex\_work_iot_reference_rx_20240604\Common\patches\Jobs-for-AWS-IoT-embedded-sdk\source\include"</IncludePathForC>
+          <IncludePathForC>"C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\AWS\Fleet-Provisioning-for-AWS-IoT-embedded-sdk\source\include"</IncludePathForC>
           <IncludePathForC>"C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\AWS\Jobs-for-AWS-IoT-embedded-sdk\source\otaJobParser\include"</IncludePathForC>
           <IncludePathForC>"C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\AWS\aws-iot-core-mqtt-file-streams-embedded-c\source\include"</IncludePathForC>
           <IncludePathForC>"C:\ai\codex\_work_iot_reference_rx_20240604\Middleware\3rdparty\tinycbor\src"</IncludePathForC>
