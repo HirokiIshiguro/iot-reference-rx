@@ -63,9 +63,13 @@
 #endif /* MBEDTLS_PSA_CRYPTO_C */
 
 #include "mbedtls/debug.h"
+#include "mbedtls/platform_util.h"
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
+
+/* Logging task include. */
+#include "iot_logging_task.h"
 
 /* MbedTLS Bio TCP sockets wrapper include. */
 #include "mbedtls_bio_tcp_sockets_wrapper.h"
@@ -115,6 +119,17 @@ static const char * pNoHighLevelMbedTlsCodeStr = "<No-High-Level-Code>";
  */
 static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
 
+/* Enable only on throw-away analysis branches. These lines decrypt captured TLS sessions. */
+#ifndef IOT_REFERENCE_RX_ENABLE_TLS_KEYLOG
+    #define IOT_REFERENCE_RX_ENABLE_TLS_KEYLOG    ( 1 )
+#endif
+
+#if ( IOT_REFERENCE_RX_ENABLE_TLS_KEYLOG == 1 )
+    #define TLS_KEYLOG_CLIENT_RANDOM_LEN          ( 32U )
+    #define TLS_KEYLOG_MASTER_SECRET_LEN          ( 48U )
+    #define TLS_KEYLOG_LINE_LEN                   ( 14U + ( TLS_KEYLOG_CLIENT_RANDOM_LEN * 2U ) + 1U + ( TLS_KEYLOG_MASTER_SECRET_LEN * 2U ) + 2U + 1U )
+#endif
+
 /**
  * @brief Utility for converting the high-level code in an mbedTLS error to string,
  * if the code-contains a high-level code; otherwise, using a default string.
@@ -160,6 +175,80 @@ static void sslContextFree( SSLContext_t * pSslContext );
 static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                       const char * pHostName,
                                       const NetworkCredentials_t * pNetworkCredentials );
+
+#if ( IOT_REFERENCE_RX_ENABLE_TLS_KEYLOG == 1 )
+static void prvAppendHex( char ** ppcOut,
+                          const unsigned char * pucData,
+                          size_t xDataLen );
+
+static void prvTlsKeylogExport( void * pvContext,
+                                mbedtls_ssl_key_export_type xType,
+                                const unsigned char * pucSecret,
+                                size_t xSecretLen,
+                                const unsigned char pucClientRandom[ TLS_KEYLOG_CLIENT_RANDOM_LEN ],
+                                const unsigned char pucServerRandom[ TLS_KEYLOG_CLIENT_RANDOM_LEN ],
+                                mbedtls_tls_prf_types xTlsPrfType );
+#endif
+
+/*-----------------------------------------------------------*/
+
+#if ( IOT_REFERENCE_RX_ENABLE_TLS_KEYLOG == 1 )
+static void prvAppendHex( char ** ppcOut,
+                          const unsigned char * pucData,
+                          size_t xDataLen )
+{
+    static const char pcHex[] = "0123456789abcdef";
+    size_t xIndex;
+    char * pcOut = *ppcOut;
+
+    for( xIndex = 0; xIndex < xDataLen; xIndex++ )
+    {
+        *pcOut = pcHex[ pucData[ xIndex ] >> 4 ];
+        pcOut++;
+        *pcOut = pcHex[ pucData[ xIndex ] & 0x0FU ];
+        pcOut++;
+    }
+
+    *ppcOut = pcOut;
+}
+
+static void prvTlsKeylogExport( void * pvContext,
+                                mbedtls_ssl_key_export_type xType,
+                                const unsigned char * pucSecret,
+                                size_t xSecretLen,
+                                const unsigned char pucClientRandom[ TLS_KEYLOG_CLIENT_RANDOM_LEN ],
+                                const unsigned char pucServerRandom[ TLS_KEYLOG_CLIENT_RANDOM_LEN ],
+                                mbedtls_tls_prf_types xTlsPrfType )
+{
+    char pcLine[ TLS_KEYLOG_LINE_LEN ];
+    char * pcOut = pcLine;
+
+    ( void ) pvContext;
+    ( void ) pucServerRandom;
+    ( void ) xTlsPrfType;
+
+    if( ( xType != MBEDTLS_SSL_KEY_EXPORT_TLS12_MASTER_SECRET ) ||
+        ( xSecretLen < TLS_KEYLOG_MASTER_SECRET_LEN ) )
+    {
+        return;
+    }
+
+    ( void ) memcpy( pcOut, "CLIENT_RANDOM ", 14U );
+    pcOut += 14U;
+    prvAppendHex( &pcOut, pucClientRandom, TLS_KEYLOG_CLIENT_RANDOM_LEN );
+    *pcOut = ' ';
+    pcOut++;
+    prvAppendHex( &pcOut, pucSecret, TLS_KEYLOG_MASTER_SECRET_LEN );
+    *pcOut = '\r';
+    pcOut++;
+    *pcOut = '\n';
+    pcOut++;
+    *pcOut = '\0';
+
+    vLoggingPrint( pcLine );
+    mbedtls_platform_zeroize( pcLine, sizeof( pcLine ) );
+}
+#endif
 
 /*-----------------------------------------------------------*/
 
@@ -467,6 +556,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                  xMbedTLSBioTCPSocketsWrapperSend,
                                  xMbedTLSBioTCPSocketsWrapperRecv,
                                  NULL );
+
+            #if ( IOT_REFERENCE_RX_ENABLE_TLS_KEYLOG == 1 )
+                mbedtls_ssl_set_export_keys_cb( &( pTlsTransportParams->sslContext.context ),
+                                                prvTlsKeylogExport,
+                                                NULL );
+            #endif
         }
     }
 
