@@ -136,8 +136,30 @@ build_rx72n_fleet_candidate:
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_fleet.log" `
         -FleetDemoId "$env:RX72N_DEVICE_ID-fp"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "fleet app .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "fleet app .abs missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "fleet app .x missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\shift_srec_addresses.py" `
+        --input "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot" `
+        --output "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot" `
+        --range-start 0xFFE00000 `
+        --range-end 0xFFFFFFFF `
+        --shift -0x200000 `
+        --drop-out-of-range
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
+        --mot "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot" `
+        --prm "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
+        --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\generate_signer_cert.py" `
+        --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
+        --out "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem")) { Write-Error "rx72n_codesign_cert.pem missing"; exit 1 }
     - Write-Host "BUILD RX72N FLEET CANDIDATE SUCCESS"
   artifacts:
     when: always
@@ -456,7 +478,7 @@ cleanup_rx72n_fleet_resources:
     - job: test_fleet_rx72n_linux
       artifacts: true
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $AWS_DEFAULT_REGION'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: always
     - when: never
   script:
