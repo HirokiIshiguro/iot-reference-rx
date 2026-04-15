@@ -3,6 +3,7 @@ stages:
   - flash
   - provision
   - test
+  - fleet_cleanup
   - package
   - ota_build
   - ota_prepare
@@ -33,6 +34,9 @@ variables:
   RX72N_TEST_SCOPE: "auto"
   RUN_RX72N_HW_TESTS: "false"
   RUN_RX72N_OTA_TESTS: "false"
+  RUN_RX72N_FLEET_TESTS: "false"
+  RX72N_CLEANUP_FLEET_RESOURCES: "true"
+  RX72N_FLEET_POLICY_NAME: "rx72n-envision-kit-policy"
   RX72N_SKIP_HW_TESTS: "false"
   RX72N_SKIP_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
@@ -47,6 +51,7 @@ variables:
   RX72N_OTA_OBSERVE_TIMEOUT: "420"
   AWS_DEFAULT_REGION: "ap-northeast-1"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
+  E2STUDIO_WORKSPACE_FLEET: "C:/Temp/e2ws_iot_ref_rx72n_fleet"
 
 workflow:
   rules:
@@ -102,6 +107,64 @@ build_rx72n:
     when: always
     paths:
       - rx72n_e2studio_build.log
+      - rx72n_app.rsu
+      - rx72n_codesign_cert.pem
+      - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 7 days
+
+build_rx72n_fleet_candidate:
+  stage: build
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  rules:
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Build RX72N Fleet Provisioning candidate ==="
+    - pip install cryptography --quiet
+    - |
+      & "$env:CI_PROJECT_DIR\tools\build_headless_rx72n_fleet.ps1" `
+        -ProjectRoot "$env:CI_PROJECT_DIR" `
+        -E2Studio "$env:E2STUDIO_CLI" `
+        -Workspace "$env:E2STUDIO_WORKSPACE_FLEET" `
+        -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_fleet.log" `
+        -FleetDemoId "$env:RX72N_DEVICE_ID-fp"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "fleet app .mot missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "fleet app .abs missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "fleet app .x missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\shift_srec_addresses.py" `
+        --input "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot" `
+        --output "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot" `
+        --range-start 0xFFE00000 `
+        --range-end 0xFFFFFFFF `
+        --shift -0x200000 `
+        --drop-out-of-range
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
+        --mot "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot" `
+        --prm "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
+        --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
+    - |
+      python "$env:CI_PROJECT_DIR\tools\generate_signer_cert.py" `
+        --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
+        --out "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem"
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem")) { Write-Error "rx72n_codesign_cert.pem missing"; exit 1 }
+    - Write-Host "BUILD RX72N FLEET CANDIDATE SUCCESS"
+  artifacts:
+    when: always
+    paths:
+      - rx72n_e2studio_build_fleet.log
       - rx72n_app.rsu
       - rx72n_codesign_cert.pem
       - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
@@ -182,6 +245,52 @@ flash_rx72n_linux:
       - artifacts/flash_rx72n_linux/
     expire_in: 7 days
 
+flash_rx72n_fleet_linux:
+  stage: flash
+  extends: .rx72n_linux_hw_job
+  needs:
+    - build_rx72n_fleet_candidate
+  rules:
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Flash RX72N Fleet Provisioning image on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx72n_fleet_linux"
+      mkdir -p "$artifact_dir"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" -erase-chip -noquery
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" \
+        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot" \
+        -v -noquery
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" \
+        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot" \
+        -v -noquery
+
+      python tools/test_uart_download_rx72n.py \
+        --rsu "$CI_PROJECT_DIR/rx72n_app.rsu" \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout 420 \
+        --post-tx-wait 120 \
+        --diag \
+        --wait-for-ready \
+        --ready-timeout 90 \
+        --reset-cmd "$reset_cmd" \
+        2>&1 | tee "$artifact_dir/flash_rx72n_fleet.log"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/flash_rx72n_fleet_linux/
+    expire_in: 7 days
+
 provision_rx72n_linux:
   stage: provision
   extends: .rx72n_linux_hw_job
@@ -238,6 +347,51 @@ provision_rx72n_linux:
       - artifacts/provision_rx72n_linux/
     expire_in: 7 days
 
+provision_rx72n_fleet_linux:
+  stage: provision
+  extends: .rx72n_linux_hw_job
+  needs:
+    - build_rx72n_fleet_candidate
+    - flash_rx72n_fleet_linux
+  rules:
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Provision RX72N fleet claim credentials on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_fleet_linux"
+      mkdir -p "$artifact_dir"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      shadow_args=()
+      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
+        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
+      fi
+
+      python tools/provision_rx72n.py \
+        --fleet-provisioning \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --endpoint "$AWS_IOT_ENDPOINT" \
+        --template-name "$AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02" \
+        --claim-cert "$AWS_FLEET_CLAIM_CERT_RX72N_02" \
+        --claim-key "$AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02" \
+        --format \
+        --no-reset \
+        --reset-cmd "$reset_cmd" \
+        --reset-after-open \
+        --boot-wait 12 \
+        --cli-timeout 25 \
+        --attempts 3 \
+        "${shadow_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_rx72n_fleet.log"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/provision_rx72n_fleet_linux/
+    expire_in: 7 days
+
 test_mqtt_rx72n_linux:
   stage: test
   extends: .rx72n_linux_hw_job
@@ -279,6 +433,76 @@ test_mqtt_rx72n_linux:
     when: always
     paths:
       - artifacts/test_mqtt_rx72n_linux/
+    expire_in: 7 days
+
+test_fleet_rx72n_linux:
+  stage: test
+  extends: .rx72n_linux_hw_job
+  needs:
+    - build_rx72n_fleet_candidate
+    - flash_rx72n_fleet_linux
+    - provision_rx72n_fleet_linux
+  rules:
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Verify RX72N fleet provisioning on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_fleet_rx72n_linux"
+      mkdir -p "$artifact_dir"
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      python tools/test_fleet_rx72n.py \
+        --log-port "$RX72N_LINUX_UART_PORT" \
+        --log-baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout 240 \
+        --reset-cmd "$reset_cmd" \
+        --summary-json "$artifact_dir/fleet_summary.json" \
+        2>&1 | tee "$artifact_dir/test_fleet_rx72n.log"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_fleet_rx72n_linux/
+    expire_in: 7 days
+
+cleanup_rx72n_fleet_resources:
+  stage: fleet_cleanup
+  allow_failure: true
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  needs:
+    - job: test_fleet_rx72n_linux
+      artifacts: true
+  rules:
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: always
+    - when: never
+  script:
+    - Write-Host "=== Cleanup RX72N Fleet Provisioning AWS resources ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_fleet_resources"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $summary = "$env:CI_PROJECT_DIR\artifacts\test_fleet_rx72n_linux\fleet_summary.json"
+      if (-not (Test-Path $summary)) {
+        Write-Host "Fleet summary not found; nothing to cleanup: $summary"
+        exit 0
+      }
+
+      python tools\cleanup_rx72n_fleet_resources.py `
+        --summary-json "$summary" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --policy-name "$env:RX72N_FLEET_POLICY_NAME" `
+        --output-json "$artifactDir\cleanup_summary.json" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_fleet_resources.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/cleanup_rx72n_fleet_resources/
     expire_in: 7 days
 
 flash_rx72n:
