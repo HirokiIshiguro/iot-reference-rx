@@ -3,12 +3,15 @@ stages:
   - flash
   - provision
   - test
-  - fleet_cleanup
   - package
   - ota_build
   - ota_prepare
   - ota_create
   - ota_test
+  - fleet_flash
+  - fleet_provision
+  - fleet_test
+  - fleet_cleanup
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -246,7 +249,7 @@ flash_rx72n_linux:
     expire_in: 7 days
 
 flash_rx72n_fleet_linux:
-  stage: flash
+  stage: fleet_flash
   extends: .rx72n_linux_hw_job
   needs:
     - build_rx72n_fleet_candidate
@@ -348,7 +351,7 @@ provision_rx72n_linux:
     expire_in: 7 days
 
 provision_rx72n_fleet_linux:
-  stage: provision
+  stage: fleet_provision
   extends: .rx72n_linux_hw_job
   needs:
     - build_rx72n_fleet_candidate
@@ -436,7 +439,7 @@ test_mqtt_rx72n_linux:
     expire_in: 7 days
 
 test_fleet_rx72n_linux:
-  stage: test
+  stage: fleet_test
   extends: .rx72n_linux_hw_job
   needs:
     - build_rx72n_fleet_candidate
