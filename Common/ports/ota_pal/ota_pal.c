@@ -36,6 +36,8 @@
 #define MAX_SIG_LENGTH              (64U)
 #define HALF_SIG_LENGTH             (MAX_SIG_LENGTH / 2U)
 #define OTA_FLASH_QUEUE_LENGTH      (2U)
+/* Keep flash programming below OTA/MQTT so the next stream request is sent before programming starts. */
+#define OTA_FLASH_TASK_PRIORITY     (tskIDLE_PRIORITY)
 #define OTA_PAYLOAD_BASE_OFFSET     (0x200U)
 #define OTA_MAX_PAYLOAD_SIZE        (FWUP_CFG_AREA_SIZE - OTA_PAYLOAD_BASE_OFFSET)
 #define OTA_FLASH_PAD_VALUE         (0xFFU)
@@ -432,7 +434,7 @@ static BaseType_t prvEnsureFlashResources(void)
                                   "OTA_FLASH",
                                   configMINIMAL_STACK_SIZE * 2U,
                                   NULL,
-                                  configMAX_PRIORITIES - 1U,
+                                  OTA_FLASH_TASK_PRIORITY,
                                   &xOtaFlashTask))
         {
             return pdFALSE;

@@ -76,6 +76,29 @@ extern void vLoggingPrintf (const char *pcFormatString,
 #endif
 
 /**
+ * @brief TCP stream buffer and window sizing for MQTT/TLS traffic.
+ *
+ * RX72N OTA streams deliver each 16 KiB block as a roughly 22 KiB JSON/Base64
+ * MQTT PUBLISH. The FreeRTOS+TCP default RX buffer is only 4 * MSS, which makes
+ * the peer hit TCP Window Full repeatedly during each block response.
+ */
+#ifndef FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH
+#define FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH (32768)
+#endif
+
+#ifndef FREERTOS_SOCKETS_WRAPPER_TCP_TX_BUFFER_LENGTH
+#define FREERTOS_SOCKETS_WRAPPER_TCP_TX_BUFFER_LENGTH (8192)
+#endif
+
+#ifndef FREERTOS_SOCKETS_WRAPPER_TCP_RX_WINDOW_SIZE
+#define FREERTOS_SOCKETS_WRAPPER_TCP_RX_WINDOW_SIZE (20)
+#endif
+
+#ifndef FREERTOS_SOCKETS_WRAPPER_TCP_TX_WINDOW_SIZE
+#define FREERTOS_SOCKETS_WRAPPER_TCP_TX_WINDOW_SIZE (4)
+#endif
+
+/**
  * @brief negative error code indicating a network failure.
  */
 #define FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR (-1)
@@ -128,6 +151,29 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
     else
     {
         LogDebug(("Created new TCP socket."));
+
+        #if (ipconfigUSE_TCP_WIN == 1)
+        {
+            WinProperties_t xWinProps =
+            {
+                FREERTOS_SOCKETS_WRAPPER_TCP_TX_BUFFER_LENGTH,
+                FREERTOS_SOCKETS_WRAPPER_TCP_TX_WINDOW_SIZE,
+                FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH,
+                FREERTOS_SOCKETS_WRAPPER_TCP_RX_WINDOW_SIZE
+            };
+
+            socketStatus = FreeRTOS_setsockopt(tcpSocket,
+                                               0,
+                                               FREERTOS_SO_WIN_PROPERTIES,
+                                               (void *)&xWinProps,
+                                               sizeof(xWinProps));
+
+            if (0 != socketStatus)
+            {
+                LogError(("Failed to configure TCP window properties: ReturnCode=%d.", socketStatus));
+            }
+        }
+        #endif
 
         /* Connection parameters. */
         serverAddress.sin_family = FREERTOS_AF_INET;
