@@ -1241,16 +1241,17 @@ CK_RV xPreProvisionDevice(CK_SESSION_HANDLE xSession, KVStoreKey_t ID, PreProvis
                             else
                             {
                                 DEV_MODE_KEY_PROVISIONING_PRINT(("Destroyed Certificate.\r\n"));
-                                xResult = xProvisionCertificate(xSession,
-                                                                (uint8_t *)pxParams->pucClientCredential,
-                                                                pxParams->ulClientCredentialLength,
-                                                                (uint8_t *)pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
-                                                                &xObject);
+                            }
 
-                                if ((CKR_OK != xResult) || (CK_INVALID_HANDLE == xObject))
-                                {
-                                    DEV_MODE_KEY_PROVISIONING_PRINT(("ERROR: Failed to provision device certificate. %d \r\n", xResult));
-                                }
+                            xResult = xProvisionCertificate(xSession,
+                                                            (uint8_t *)pxParams->pucClientCredential,
+                                                            pxParams->ulClientCredentialLength,
+                                                            (uint8_t *)pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
+                                                            &xObject);
+
+                            if ((CKR_OK != xResult) || (CK_INVALID_HANDLE == xObject))
+                            {
+                                DEV_MODE_KEY_PROVISIONING_PRINT(("ERROR: Failed to provision device certificate. %d \r\n", xResult));
                             }
                         }
                         if (KVS_DEVICE_PRIVKEY_ID == ID)
