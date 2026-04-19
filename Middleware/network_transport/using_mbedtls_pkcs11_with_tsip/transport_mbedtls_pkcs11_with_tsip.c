@@ -123,6 +123,10 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
         #define TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED    ( 0 )
     #endif
 
+    #ifndef TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED
+        #define TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED    ( 0 )
+    #endif
+
     extern BaseType_t xTsipProvisioningReadRootCaSignature( uint8_t * pucBuffer,
                                                             uint32_t ulBufferSize,
                                                             uint32_t * pulActualSize );
@@ -334,8 +338,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
 
         /* Set SSL authmode and the RNG context. */
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE) && \
+    ( TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED != 1 )
+        mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
+                                   MBEDTLS_SSL_VERIFY_OPTIONAL );
+#else
         mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
                                    MBEDTLS_SSL_VERIFY_REQUIRED );
+#endif
         mbedtls_ssl_conf_rng( &( pTlsTransportParams->sslContext.config ),
                               generateRandomBytes,
                               &pTlsTransportParams->sslContext );
