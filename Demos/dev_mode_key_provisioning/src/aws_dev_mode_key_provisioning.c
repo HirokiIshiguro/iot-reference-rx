@@ -1059,7 +1059,7 @@ CK_RV xDestroyDefaultObjects(KVStoreKey_t ID, CK_SESSION_HANDLE xSession)
             };
         CK_OBJECT_CLASS xClass[] =
             {
-                CKO_PRIVATE_KEY};
+                CKO_CERTIFICATE};
         xResult = xDestroyProvidedObjects(xSession,
                                           pxPkcsLabels,
                                           xClass,
