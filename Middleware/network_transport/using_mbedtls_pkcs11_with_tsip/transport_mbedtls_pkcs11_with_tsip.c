@@ -119,6 +119,10 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     #define TSIP_ROOT_CA_SIGNATURE_SIZE    ( 256U )
 
+    #ifndef TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED
+        #define TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED    ( 0 )
+    #endif
+
     extern BaseType_t xTsipProvisioningReadRootCaSignature( uint8_t * pucBuffer,
                                                             uint32_t ulBufferSize,
                                                             uint32_t * pulActualSize );
@@ -397,8 +401,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                     &tsip_rootca_rsa_pubkey[tsip_rootca_rsa_pubkey_scnt][0]);
     if (TSIP_SUCCESS != mbedtlsError)
     {
-        LogError(("Failed to RootCA certificate verification"));
-        returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        #if ( TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED == 1 )
+            LogError(("Failed to RootCA certificate verification"));
+            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        #else
+            LogWarn(("Failed to RootCA certificate verification; continuing with mbed TLS CA verification."));
+        #endif
     }
     }
 
