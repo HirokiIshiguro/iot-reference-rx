@@ -45,7 +45,10 @@ variables:
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
   RX72N_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
-  RX72N_LINUX_RFP_TOOL: "e2l"
+  # RPi#2 hosts RX72N_EK2 (OBE110008) and CK-RX65N V1 (OBE110020).
+  # Generic "e2l" can select the CK-RX65N debugger and flash RX72N images to
+  # the wrong target, so RX72N Linux jobs must pin the E2 Lite serial.
+  RX72N_LINUX_RFP_TOOL: "e2l:OBE110008"
   RX72N_LINUX_UART_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN6_RPI2}"
   RX72N_LINUX_COMMAND_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN8_RPI2}"
   RX72N_LINUX_UART_BAUD_RATE: "921600"

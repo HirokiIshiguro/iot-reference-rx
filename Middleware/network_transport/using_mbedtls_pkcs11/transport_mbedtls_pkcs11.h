@@ -124,6 +124,9 @@ typedef struct NetworkCredentials
     size_t passwordSize;             /**< @brief Size associated with #NetworkCredentials.pPassword. */
     const char * pClientCertLabel;   /**< @brief PKCS #11 label string of the client certificate. */
     const char * pPrivateKeyLabel;   /**< @brief PKCS #11 label for the private key. */
+    const int * pCipherSuites;       /**< @brief Optional NULL-terminated mbed TLS cipher suite list. */
+    const uint16_t * pSigAlgs;       /**< @brief Optional NULL-terminated TLS signature algorithm list. */
+    uint32_t tlsDebugLevel;          /**< @brief Optional mbed TLS debug level. Zero disables debug logs. */
 } NetworkCredentials_t;
 
 /**
