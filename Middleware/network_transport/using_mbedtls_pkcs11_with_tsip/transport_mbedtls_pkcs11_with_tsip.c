@@ -43,6 +43,7 @@
 #include "mbedtls/private_access.h"
 
 /* Standard includes. */
+#include <stdint.h>
 #include <string.h>
 
 /* FreeRTOS includes. */
@@ -114,6 +115,16 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
 #define mbedtlsLowLevelCodeOrDefault( mbedTlsCode )       \
     ( mbedtls_low_level_strerr( mbedTlsCode ) != NULL ) ? \
     mbedtls_low_level_strerr( mbedTlsCode ) : pNoLowLevelMbedTlsCodeStr
+
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    #define TSIP_ROOT_CA_SIGNATURE_SIZE    ( 256U )
+
+    extern BaseType_t xTsipProvisioningReadRootCaSignature( uint8_t * pucBuffer,
+                                                            uint32_t ulBufferSize,
+                                                            uint32_t * pulActualSize );
+    extern BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor( void );
+    extern BaseType_t xTsipProvisioningLoadClientRsa2048KeyPair( void );
+#endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
 
 /*-----------------------------------------------------------*/
 
@@ -266,9 +277,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #if defined(TSIP_TLS_API_ENABLE)
     extern mbedtls_threading_mutex_t 						mutexUseTsip;
     extern tsip_tls_ca_certification_public_key_index_t		system_user_rsa2048_ne_key_index;
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    uint8_t trust_ca_root_rsa_certificate_signature[ TSIP_ROOT_CA_SIGNATURE_SIZE ] = { 0 };
+    uint32_t ulRootCaSignatureSize = 0;
+#else
 	const char trust_ca_root_rsa_certificate_signature[] = {
 		#include "AmazonRootCA1_sig_array.txt"
     };
+#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
 #endif
 
     configASSERT( pNetworkContext != NULL );
@@ -344,6 +360,24 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     }
 
     /* RootCA certificate verification */
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    if( returnStatus == TLS_TRANSPORT_SUCCESS )
+    {
+        if( ( pdTRUE != xTsipProvisioningPrepareTlsRootCaTrustAnchor() ) ||
+            ( pdTRUE != xTsipProvisioningLoadClientRsa2048KeyPair() ) ||
+            ( pdTRUE != xTsipProvisioningReadRootCaSignature( trust_ca_root_rsa_certificate_signature,
+                                                              sizeof( trust_ca_root_rsa_certificate_signature ),
+                                                              &ulRootCaSignatureSize ) ) ||
+            ( TSIP_ROOT_CA_SIGNATURE_SIZE != ulRootCaSignatureSize ) )
+        {
+            LogError( ( "Failed to load TSIP runtime provisioning data." ) );
+            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        }
+    }
+#endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
+
+    if( returnStatus == TLS_TRANSPORT_SUCCESS )
+    {
     mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
     mbedtlsError = R_TSIP_TlsRootCertificateVerification(
                     (uint32_t)R_TSIP_TLS_PUBLIC_KEY_TYPE_RSA2048, // 0 : RSA 2048bit
@@ -365,6 +399,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
         LogError(("Failed to RootCA certificate verification"));
         returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+    }
     }
 
     if (TLS_TRANSPORT_SUCCESS == returnStatus)
