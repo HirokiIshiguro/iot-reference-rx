@@ -41,6 +41,7 @@
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
 
 #include "mbedtls/private_access.h"
+#include "mbedtls/debug.h"
 
 /* Standard includes. */
 #include <stdint.h>
@@ -195,6 +196,11 @@ static CK_RV readCertificateIntoContext( SSLContext_t * pSslContext,
                                          const char * pcLabelName,
                                          CK_OBJECT_CLASS xClass,
                                          mbedtls_x509_crt * pxCertificateContext );
+static void tlsDebugCallback( void * pvContext,
+                              int level,
+                              const char * pcFile,
+                              int line,
+                              const char * pcMessage );
 
 /**
  * @brief Helper for setting up potentially hardware-based cryptographic context
@@ -351,6 +357,23 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                               &pTlsTransportParams->sslContext );
         mbedtls_ssl_conf_cert_profile( &( pTlsTransportParams->sslContext.config ),
                                        &( pTlsTransportParams->sslContext.certProfile ) );
+        if( pNetworkCredentials->pCipherSuites != NULL )
+        {
+            mbedtls_ssl_conf_ciphersuites( &( pTlsTransportParams->sslContext.config ),
+                                           pNetworkCredentials->pCipherSuites );
+        }
+        if( pNetworkCredentials->pSigAlgs != NULL )
+        {
+            mbedtls_ssl_conf_sig_algs( &( pTlsTransportParams->sslContext.config ),
+                                       pNetworkCredentials->pSigAlgs );
+        }
+        if( pNetworkCredentials->tlsDebugLevel > 0U )
+        {
+            mbedtls_debug_set_threshold( (int)pNetworkCredentials->tlsDebugLevel );
+            mbedtls_ssl_conf_dbg( &( pTlsTransportParams->sslContext.config ),
+                                  tlsDebugCallback,
+                                  NULL );
+        }
 
         /* Parse the server root CA certificate into the SSL context. */
         mbedtlsError = mbedtls_x509_crt_parse( &( pTlsTransportParams->sslContext.rootCa ),
@@ -550,10 +573,26 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
+        uint32_t ulHandshakeAttempt = 0U;
+
         /* Perform the TLS handshake. */
         do
         {
+            if( pNetworkCredentials->tlsDebugLevel > 0U )
+            {
+                LogInfo( ( "TLS handshake call begin: attempt=%lu state=%ld",
+                           (unsigned long)ulHandshakeAttempt,
+                           (long)pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
+            }
             mbedtlsError = mbedtls_ssl_handshake( &( pTlsTransportParams->sslContext.context ) );
+            if( pNetworkCredentials->tlsDebugLevel > 0U )
+            {
+                LogInfo( ( "TLS handshake call end: attempt=%lu state=%ld ret=%ld",
+                           (unsigned long)ulHandshakeAttempt,
+                           (long)pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ),
+                           (long)mbedtlsError ) );
+            }
+            ulHandshakeAttempt++;
         } while( ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_READ ) ||
                  ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_WRITE ) );
 
@@ -598,6 +637,20 @@ static int generateRandomBytes( void * pvCtx,
     }
 
     return xResult;
+}
+
+static void tlsDebugCallback( void * pvContext,
+                              int level,
+                              const char * pcFile,
+                              int line,
+                              const char * pcMessage )
+{
+    (void)pvContext;
+
+    if( pcMessage != NULL )
+    {
+        LogInfo( ( "mbedTLS[%d] %s:%d %s", level, pcFile, line, pcMessage ) );
+    }
 }
 
 /*-----------------------------------------------------------*/
