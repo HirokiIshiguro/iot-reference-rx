@@ -483,7 +483,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     }
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
 
-    if( returnStatus == TLS_TRANSPORT_SUCCESS )
+    if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+        ( glTlsServerCertAuthModeOverride != MBEDTLS_SSL_VERIFY_NONE ) )
     {
     tsip_rootca_rsa_pubkey_scnt = 0U;
     mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
@@ -521,6 +522,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
         tsip_rootca_rsa_pubkey_scnt = 1U;
     }
+    }
+    else if( glTlsServerCertAuthModeOverride == MBEDTLS_SSL_VERIFY_NONE )
+    {
+        tsip_rootca_rsa_pubkey_scnt = 0U;
     }
 
     if (TLS_TRANSPORT_SUCCESS == returnStatus)
