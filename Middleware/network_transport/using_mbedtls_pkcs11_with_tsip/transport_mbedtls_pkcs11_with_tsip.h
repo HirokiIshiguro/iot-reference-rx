@@ -139,6 +139,8 @@ typedef enum TlsTransportStatus
 void vTlsTransportSetRootCaSignatureOverride( const unsigned char * pucSignature,
                                               size_t xSignatureSize );
 void vTlsTransportClearRootCaSignatureOverride( void );
+void vTlsTransportSetServerCertAuthModeOverride( int lAuthMode );
+void vTlsTransportClearServerCertAuthModeOverride( void );
 
 /**
  * @brief Create a TLS connection with FreeRTOS sockets.

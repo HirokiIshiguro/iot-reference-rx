@@ -136,6 +136,7 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
     static const unsigned char * gpTlsRootCaSignatureOverride = NULL;
     static size_t gxTlsRootCaSignatureOverrideSize = 0U;
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
+static int glTlsServerCertAuthModeOverride = -1;
 
 /*-----------------------------------------------------------*/
 
@@ -271,6 +272,16 @@ void vTlsTransportClearRootCaSignatureOverride( void )
 #endif
 }
 
+void vTlsTransportSetServerCertAuthModeOverride( int lAuthMode )
+{
+    glTlsServerCertAuthModeOverride = lAuthMode;
+}
+
+void vTlsTransportClearServerCertAuthModeOverride( void )
+{
+    glTlsServerCertAuthModeOverride = -1;
+}
+
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 static const unsigned char * prvGetRootCaSignatureForTsip( uint8_t * pucBuffer,
                                                            uint32_t * pulActualSize )
@@ -392,14 +403,23 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
 
         /* Set SSL authmode and the RNG context. */
-#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE) && \
-    ( TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED != 1 )
-        mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
-                                   MBEDTLS_SSL_VERIFY_OPTIONAL );
-#else
-        mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
-                                   MBEDTLS_SSL_VERIFY_REQUIRED );
+        if( glTlsServerCertAuthModeOverride >= 0 )
+        {
+            mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
+                                       glTlsServerCertAuthModeOverride );
+        }
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+        else if( TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED != 1 )
+        {
+            mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
+                                       MBEDTLS_SSL_VERIFY_OPTIONAL );
+        }
 #endif
+        else
+        {
+            mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
+                                       MBEDTLS_SSL_VERIFY_REQUIRED );
+        }
         mbedtls_ssl_conf_rng( &( pTlsTransportParams->sslContext.config ),
                               generateRandomBytes,
                               &pTlsTransportParams->sslContext );
