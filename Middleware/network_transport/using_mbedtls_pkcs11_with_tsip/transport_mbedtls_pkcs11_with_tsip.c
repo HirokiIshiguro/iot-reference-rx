@@ -291,9 +291,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #if defined(TSIP_TLS_API_ENABLE)
     extern mbedtls_threading_mutex_t 						mutexUseTsip;
     extern tsip_tls_ca_certification_public_key_index_t		system_user_rsa2048_ne_key_index;
+    extern uint8_t                                         tsip_rootca_rsa_pubkey_scnt;
+    extern uint32_t                                        tsip_rootca_rsa_pubkey[5][140];
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     uint8_t trust_ca_root_rsa_certificate_signature[ TSIP_ROOT_CA_SIGNATURE_SIZE ] = { 0 };
     uint32_t ulRootCaSignatureSize = 0;
+    const unsigned char * pTsipRootCaSignature = NULL;
 #else
 	const char trust_ca_root_rsa_certificate_signature[] = {
 		#include "AmazonRootCA1_sig_array.txt"
@@ -401,20 +404,35 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
         if( ( pdTRUE != xTsipProvisioningPrepareTlsRootCaTrustAnchor() ) ||
-            ( pdTRUE != xTsipProvisioningLoadClientRsa2048KeyPair() ) ||
-            ( pdTRUE != xTsipProvisioningReadRootCaSignature( trust_ca_root_rsa_certificate_signature,
-                                                              sizeof( trust_ca_root_rsa_certificate_signature ),
-                                                              &ulRootCaSignatureSize ) ) ||
-            ( TSIP_ROOT_CA_SIGNATURE_SIZE != ulRootCaSignatureSize ) )
+            ( pdTRUE != xTsipProvisioningLoadClientRsa2048KeyPair() ) )
         {
             LogError( ( "Failed to load TSIP runtime provisioning data." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        }
+        else if( ( NULL != pNetworkCredentials->pRootCaTsipSignature ) &&
+                 ( TSIP_ROOT_CA_SIGNATURE_SIZE == pNetworkCredentials->rootCaTsipSignatureSize ) )
+        {
+            pTsipRootCaSignature = pNetworkCredentials->pRootCaTsipSignature;
+            ulRootCaSignatureSize = (uint32_t)pNetworkCredentials->rootCaTsipSignatureSize;
+        }
+        else if( ( pdTRUE != xTsipProvisioningReadRootCaSignature( trust_ca_root_rsa_certificate_signature,
+                                                                   sizeof( trust_ca_root_rsa_certificate_signature ),
+                                                                   &ulRootCaSignatureSize ) ) ||
+                 ( TSIP_ROOT_CA_SIGNATURE_SIZE != ulRootCaSignatureSize ) )
+        {
+            LogError( ( "Failed to load Root CA signature for TSIP runtime provisioning." ) );
+            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        }
+        else
+        {
+            pTsipRootCaSignature = trust_ca_root_rsa_certificate_signature;
         }
     }
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
 
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
+    tsip_rootca_rsa_pubkey_scnt = 0U;
     mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
     mbedtlsError = R_TSIP_TlsRootCertificateVerification(
                     (uint32_t)R_TSIP_TLS_PUBLIC_KEY_TYPE_RSA2048, // 0 : RSA 2048bit
@@ -430,7 +448,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                     (uint32_t)(p_tmprsa->pubkey_e_spos -    //
                         (uint32_t)(uint8_t *)pTlsTransportParams->sslContext.rootCa.raw.p) +    //
                         (p_tmprsa->pubkey_e_epos - 1), //
-                    (uint8_t *)trust_ca_root_rsa_certificate_signature, //
+                    (uint8_t *)
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+                    pTsipRootCaSignature,
+#else
+                    trust_ca_root_rsa_certificate_signature,
+#endif
                     &tsip_rootca_rsa_pubkey[tsip_rootca_rsa_pubkey_scnt][0]);
     if (TSIP_SUCCESS != mbedtlsError)
     {
@@ -440,6 +463,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         #else
             LogWarn(("Failed to RootCA certificate verification; continuing with mbed TLS CA verification."));
         #endif
+    }
+    else
+    {
+        tsip_rootca_rsa_pubkey_scnt = 1U;
     }
     }
 

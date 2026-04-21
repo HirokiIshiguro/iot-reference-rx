@@ -111,6 +111,8 @@ typedef struct NetworkCredentials
 
     const unsigned char * pRootCa;   /**< @brief String representing a trusted server root certificate. */
     size_t rootCaSize;               /**< @brief Size associated with #NetworkCredentials.pRootCa. */
+    const unsigned char * pRootCaTsipSignature; /**< @brief Optional Root CA signature buffer for TSIP root verification. */
+    size_t rootCaTsipSignatureSize;             /**< @brief Size associated with #NetworkCredentials.pRootCaTsipSignature. */
     const unsigned char * pUserName; /**< @brief username for MQTT. */
     size_t userNameSize;             /**< @brief Size associated with #NetworkCredentials.pUserName. */
     const unsigned char * pPassword; /**< @brief String representing the password for MQTT. */
