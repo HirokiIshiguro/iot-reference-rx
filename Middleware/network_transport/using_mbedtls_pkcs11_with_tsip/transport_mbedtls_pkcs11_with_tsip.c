@@ -133,6 +133,8 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
                                                             uint32_t * pulActualSize );
     extern BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor( void );
     extern BaseType_t xTsipProvisioningLoadClientRsa2048KeyPair( void );
+    static const unsigned char * gpTlsRootCaSignatureOverride = NULL;
+    static size_t gxTlsRootCaSignatureOverrideSize = 0U;
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
 
 /*-----------------------------------------------------------*/
@@ -248,6 +250,49 @@ static int32_t privateKeySigningCallback( void * pvContext,
 
 
 /*-----------------------------------------------------------*/
+
+void vTlsTransportSetRootCaSignatureOverride( const unsigned char * pucSignature,
+                                              size_t xSignatureSize )
+{
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    gpTlsRootCaSignatureOverride = pucSignature;
+    gxTlsRootCaSignatureOverrideSize = xSignatureSize;
+#else
+    (void)pucSignature;
+    (void)xSignatureSize;
+#endif
+}
+
+void vTlsTransportClearRootCaSignatureOverride( void )
+{
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    gpTlsRootCaSignatureOverride = NULL;
+    gxTlsRootCaSignatureOverrideSize = 0U;
+#endif
+}
+
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+static const unsigned char * prvGetRootCaSignatureForTsip( uint8_t * pucBuffer,
+                                                           uint32_t * pulActualSize )
+{
+    if( ( NULL != gpTlsRootCaSignatureOverride ) &&
+        ( TSIP_ROOT_CA_SIGNATURE_SIZE == gxTlsRootCaSignatureOverrideSize ) )
+    {
+        *pulActualSize = (uint32_t)gxTlsRootCaSignatureOverrideSize;
+        return gpTlsRootCaSignatureOverride;
+    }
+
+    if( ( pdTRUE == xTsipProvisioningReadRootCaSignature( pucBuffer,
+                                                          TSIP_ROOT_CA_SIGNATURE_SIZE,
+                                                          pulActualSize ) ) &&
+        ( TSIP_ROOT_CA_SIGNATURE_SIZE == *pulActualSize ) )
+    {
+        return pucBuffer;
+    }
+
+    return NULL;
+}
+#endif
 
 static void sslContextInit( SSLContext_t * pSslContext )
 {
@@ -409,23 +454,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             LogError( ( "Failed to load TSIP runtime provisioning data." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         }
-        else if( ( NULL != pNetworkCredentials->pRootCaTsipSignature ) &&
-                 ( TSIP_ROOT_CA_SIGNATURE_SIZE == pNetworkCredentials->rootCaTsipSignatureSize ) )
-        {
-            pTsipRootCaSignature = pNetworkCredentials->pRootCaTsipSignature;
-            ulRootCaSignatureSize = (uint32_t)pNetworkCredentials->rootCaTsipSignatureSize;
-        }
-        else if( ( pdTRUE != xTsipProvisioningReadRootCaSignature( trust_ca_root_rsa_certificate_signature,
-                                                                   sizeof( trust_ca_root_rsa_certificate_signature ),
-                                                                   &ulRootCaSignatureSize ) ) ||
-                 ( TSIP_ROOT_CA_SIGNATURE_SIZE != ulRootCaSignatureSize ) )
+        else if( NULL == ( pTsipRootCaSignature = prvGetRootCaSignatureForTsip( trust_ca_root_rsa_certificate_signature,
+                                                                                &ulRootCaSignatureSize ) ) )
         {
             LogError( ( "Failed to load Root CA signature for TSIP runtime provisioning." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
-        }
-        else
-        {
-            pTsipRootCaSignature = trust_ca_root_rsa_certificate_signature;
         }
     }
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
