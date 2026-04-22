@@ -7815,6 +7815,18 @@ static int ssl_tls12_populate_transform( mbedtls_ssl_transform *transform,
     /*
      * Compute key block using the PRF
      */
+#if defined(TSIP_TLS_API_ENABLE)
+    if( ssl->disable_tsip_tls_accel != 0U )
+    {
+        ret = tls_prf( master, 48, "key expansion", randbytes, 64, keyblk, 256 );
+        if( ret != 0 )
+        {
+            MBEDTLS_SSL_DEBUG_RET( 1, "prf", ret );
+            return( ret );
+        }
+    }
+    else
+#endif /* TSIP_TLS_API_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
     if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
