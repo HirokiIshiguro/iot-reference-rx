@@ -5951,7 +5951,8 @@ void ssl_calc_verify_tls_sha256( const mbedtls_ssl_context *ssl,
     MBEDTLS_SSL_DEBUG_MSG( 2, ( "<= PSA calc verify" ) );
 #else
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
+    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
