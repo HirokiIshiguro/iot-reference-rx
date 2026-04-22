@@ -28,7 +28,7 @@
 /* This file is modified to demonstrate usage of TSIP driver. */
 
 #define TSIP_TLS_API_ENABLE // TSIP API enable flag
-//#define MBEDTLS_FUNC_ENABLE // mbedTLS function enable flag
+#define MBEDTLS_FUNC_ENABLE // mbedTLS function enable flag
 
 /**
  * This is an optional version symbol that enables compatibility handling of
