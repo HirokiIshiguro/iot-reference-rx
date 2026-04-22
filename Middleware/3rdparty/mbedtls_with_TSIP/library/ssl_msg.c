@@ -736,6 +736,10 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
         {
+            if( ssl->disable_tsip_tls_accel != 0U )
+            {
+                MBEDTLS_SSL_DEBUG_MSG( 2, ( "using software record hmac fallback" ) );
+            }
             ret = mbedtls_md_hmac_update( &transform->md_ctx_enc, add_data,
                                           add_data_len );
             if( ret != 0 )
@@ -1001,6 +1005,10 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
         {
+            if( ssl->disable_tsip_tls_accel != 0U )
+            {
+                MBEDTLS_SSL_DEBUG_MSG( 2, ( "using software record encrypt fallback" ) );
+            }
             if( ( ret = mbedtls_cipher_auth_encrypt_ext( &transform->cipher_ctx_enc,
                        iv, transform->ivlen,
                        add_data, add_data_len,

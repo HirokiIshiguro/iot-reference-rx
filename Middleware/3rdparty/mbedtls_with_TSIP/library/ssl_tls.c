@@ -7119,10 +7119,15 @@ static void ssl_calc_finished_tls_sha256(
     mbedtls_platform_zeroize(  padbuf, sizeof(  padbuf ) );
 #else /* MBEDTLS_USE_PSA_CRYPTO */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
+    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
+        if( ssl->disable_tsip_tls_accel != 0U )
+        {
+            MBEDTLS_SSL_DEBUG_MSG( 2, ( "using software finished-data fallback" ) );
+        }
         mbedtls_sha256_init( &sha256 );
 
         MBEDTLS_SSL_DEBUG_MSG( 2, ( "=> calc  finished tls sha256" ) );
@@ -7820,6 +7825,7 @@ static int ssl_tls12_populate_transform( mbedtls_ssl_transform *transform,
 #if defined(TSIP_TLS_API_ENABLE)
     if( ssl->disable_tsip_tls_accel != 0U )
     {
+        MBEDTLS_SSL_DEBUG_MSG( 2, ( "using software key expansion fallback" ) );
         ret = tls_prf( master, 48, "key expansion", randbytes, 64, keyblk, 256 );
         if( ret != 0 )
         {
