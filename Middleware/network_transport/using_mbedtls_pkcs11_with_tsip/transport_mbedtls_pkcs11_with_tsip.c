@@ -137,6 +137,7 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
     static size_t gxTlsRootCaSignatureOverrideSize = 0U;
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
 static int glTlsServerCertAuthModeOverride = -1;
+static int glTlsDisableTsipTlsAccelOverride = 0;
 
 /*-----------------------------------------------------------*/
 
@@ -282,6 +283,16 @@ void vTlsTransportClearServerCertAuthModeOverride( void )
     glTlsServerCertAuthModeOverride = -1;
 }
 
+void vTlsTransportSetDisableTsipTlsAccelOverride( int lDisable )
+{
+    glTlsDisableTsipTlsAccelOverride = lDisable;
+}
+
+void vTlsTransportClearDisableTsipTlsAccelOverride( void )
+{
+    glTlsDisableTsipTlsAccelOverride = 0;
+}
+
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 static const unsigned char * prvGetRootCaSignatureForTsip( uint8_t * pucBuffer,
                                                            uint32_t * pulActualSize )
@@ -313,6 +324,10 @@ static void sslContextInit( SSLContext_t * pSslContext )
     mbedtls_x509_crt_init( &( pSslContext->rootCa ) );
     mbedtls_x509_crt_init( &( pSslContext->clientCert ) );
     mbedtls_ssl_init( &( pSslContext->context ) );
+#if defined(TSIP_TLS_API_ENABLE)
+    pSslContext->context.tsip_cipher_suite = 0U;
+    pSslContext->context.disable_tsip_tls_accel = 0U;
+#endif
 
     xInitializePkcs11Session( &( pSslContext->xP11Session ) );
     C_GetFunctionList( &( pSslContext->pxP11FunctionList ) );
@@ -372,6 +387,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     /* Initialize the mbed TLS context structures. */
     sslContextInit( &( pTlsTransportParams->sslContext ) );
+#if defined(TSIP_TLS_API_ENABLE)
+    pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
+        ( glTlsDisableTsipTlsAccelOverride != 0 ) ? 1U : 0U;
+#endif
 
     mbedtlsError = mbedtls_ssl_config_defaults( &( pTlsTransportParams->sslContext.config ),
                                                 MBEDTLS_SSL_IS_CLIENT,

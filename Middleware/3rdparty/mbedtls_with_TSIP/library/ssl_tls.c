@@ -5706,7 +5706,8 @@ static int ssl_compute_master( mbedtls_ssl_handshake_params *handshake,
 #endif
     {
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-        if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
+        if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
+            ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
         {
@@ -5733,6 +5734,7 @@ static int ssl_compute_master( mbedtls_ssl_handshake_params *handshake,
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE)
         {
+            ssl->tsip_cipher_suite = 0U;
             switch( session->ciphersuite )
             {
             case MBEDTLS_TLS_RSA_WITH_AES_128_CBC_SHA256:
