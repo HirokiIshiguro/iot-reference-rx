@@ -141,6 +141,8 @@ void vTlsTransportSetRootCaSignatureOverride( const unsigned char * pucSignature
 void vTlsTransportClearRootCaSignatureOverride( void );
 void vTlsTransportSetServerCertAuthModeOverride( int lAuthMode );
 void vTlsTransportClearServerCertAuthModeOverride( void );
+void vTlsTransportSetDisableTsipTlsAccelOverride( int lDisable );
+void vTlsTransportClearDisableTsipTlsAccelOverride( void );
 
 /**
  * @brief Create a TLS connection with FreeRTOS sockets.

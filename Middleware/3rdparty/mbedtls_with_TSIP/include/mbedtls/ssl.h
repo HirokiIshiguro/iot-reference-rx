@@ -1732,6 +1732,7 @@ struct mbedtls_ssl_context
 
 #if defined(TSIP_TLS_API_ENABLE)
     uint32_t                        tsip_cipher_suite;
+    uint8_t                         disable_tsip_tls_accel;
 
     uint8_t                         client_server_random_value[64];
     uint32_t                        tsip_premaster_secret[20];

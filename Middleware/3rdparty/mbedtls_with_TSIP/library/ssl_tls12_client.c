@@ -1983,15 +1983,11 @@ static int ssl_write_encrypted_pms( mbedtls_ssl_context *ssl,
 {
     size_t len_bytes = 2;
     mbedtls_pk_context * peer_pk;
+    unsigned char *p = ssl->handshake->premaster + pms_offset;
+    int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
 #if defined(TSIP_TLS_API_ENABLE)
     uint8_t e_pms[256];
     e_tsip_err_t tsip_ret;
-#if defined(MBEDTLS_THREADING_C)
-    int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
-#endif /* MBEDTLS_THREADING_C */
-#else /* TSIP_TLS_API_ENABLE */
-    unsigned char *p = ssl->handshake->premaster + pms_offset;
-    int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
 #endif /* TSIP_TLS_API_ENABLE */
 
     if( offset + len_bytes > MBEDTLS_SSL_OUT_CONTENT_LEN )
@@ -2008,6 +2004,8 @@ static int ssl_write_encrypted_pms( mbedtls_ssl_context *ssl,
      *  } PreMasterSecret;
      */
 #if defined(TSIP_TLS_API_ENABLE)
+    if( ssl->disable_tsip_tls_accel == 0U )
+    {
 #if defined(MBEDTLS_THREADING_C)
     if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
         return( ret );
@@ -2022,6 +2020,18 @@ static int ssl_write_encrypted_pms( mbedtls_ssl_context *ssl,
     {
         APP_ALL_PRINT( 1, "R_TSIP_TlsGeneratePreMasterSecret ret:%d \r\n", tsip_ret );
         return( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
+    }
+    }
+    else
+    {
+        mbedtls_ssl_write_version( p, ssl->conf->transport,
+                                   MBEDTLS_SSL_VERSION_TLS1_2 );
+
+        if( ( ret = ssl->conf->f_rng( ssl->conf->p_rng, p + 2, 46 ) ) != 0 )
+        {
+            MBEDTLS_SSL_DEBUG_RET( 1, "f_rng", ret );
+            return( ret );
+        }
     }
 #else /* TSIP_TLS_API_ENABLE */
     mbedtls_ssl_write_version( p, ssl->conf->transport,
@@ -2056,6 +2066,8 @@ static int ssl_write_encrypted_pms( mbedtls_ssl_context *ssl,
         return( MBEDTLS_ERR_SSL_PK_TYPE_MISMATCH );
     }
 #if defined(TSIP_TLS_API_ENABLE)
+    if( ssl->disable_tsip_tls_accel == 0U )
+    {
 #if defined(MBEDTLS_THREADING_C)
     if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
         return( ret );
@@ -2078,6 +2090,19 @@ static int ssl_write_encrypted_pms( mbedtls_ssl_context *ssl,
 
     unsigned char *p_e_pms = ssl->out_msg;
     memcpy( p_e_pms + offset + len_bytes, &e_pms, sizeof(e_pms) );
+    }
+    else
+    {
+        if( ( ret = mbedtls_pk_encrypt( peer_pk,
+                                p, ssl->handshake->pmslen,
+                                ssl->out_msg + offset + len_bytes, olen,
+                                MBEDTLS_SSL_OUT_CONTENT_LEN - offset - len_bytes,
+                                ssl->conf->f_rng, ssl->conf->p_rng ) ) != 0 )
+        {
+            MBEDTLS_SSL_DEBUG_RET( 1, "mbedtls_rsa_pkcs1_encrypt", ret );
+            return( ret );
+        }
+    }
 #else /* TSIP_TLS_API_ENABLE */
     if( ( ret = mbedtls_pk_encrypt( peer_pk,
                             p, ssl->handshake->pmslen,
@@ -2474,9 +2499,7 @@ start_processing:
         mbedtls_pk_type_t pk_alg = MBEDTLS_PK_NONE;
         unsigned char *params = ssl->in_msg + mbedtls_ssl_hs_hdr_len( ssl );
         size_t params_len = p - params;
-#if !defined(TSIP_TLS_API_ENABLE)
         void *rs_ctx = NULL;
-#endif /* TSIP_TLS_API_ENABLE */
         mbedtls_pk_context * peer_pk;
 
         /*
@@ -2602,6 +2625,28 @@ start_processing:
             return( ret );
         }
 #else /* TSIP_TLS_API_ENABLE */
+        if( ssl->disable_tsip_tls_accel != 0U )
+        {
+            if( ( ret = mbedtls_pk_verify_restartable( peer_pk,
+                            md_alg, hash, hashlen, p, sig_len, rs_ctx ) ) != 0 )
+            {
+#if defined(MBEDTLS_SSL_ECP_RESTARTABLE_ENABLED)
+                if( ret != MBEDTLS_ERR_ECP_IN_PROGRESS )
+#endif
+                    mbedtls_ssl_send_alert_message(
+                        ssl,
+                        MBEDTLS_SSL_ALERT_LEVEL_FATAL,
+                        MBEDTLS_SSL_ALERT_MSG_DECRYPT_ERROR );
+                MBEDTLS_SSL_DEBUG_RET( 1, "mbedtls_pk_verify", ret );
+#if defined(MBEDTLS_SSL_ECP_RESTARTABLE_ENABLED)
+                if( ret == MBEDTLS_ERR_ECP_IN_PROGRESS )
+                    ret = MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS;
+#endif
+                return( ret );
+            }
+        }
+        else
+        {
         // set random number of client and server
         memcpy ( &ssl_handshake_randbytes[0],
                  &ssl->handshake->randbytes[0],
@@ -2714,6 +2759,7 @@ start_processing:
                                             MBEDTLS_SSL_ALERT_MSG_DECRYPT_ERROR );
             MBEDTLS_SSL_DEBUG_RET( 1, "mbedtls_pk_verify", ret );
             return( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
+        }
         }
 #endif /* TSIP_TLS_API_ENABLE */
 
@@ -3153,6 +3199,15 @@ static int ssl_write_client_key_exchange( mbedtls_ssl_context *ssl )
                                 ssl->conf->f_rng, ssl->conf->p_rng );
 
 #else /* TSIP_TLS_API_ENABLE */
+        if( ssl->disable_tsip_tls_accel != 0U )
+        {
+            ret = mbedtls_ecdh_make_public( &ssl->handshake->ecdh_ctx,
+                                    &content_len,
+                                    &ssl->out_msg[header_len], 1000,
+                                    ssl->conf->f_rng, ssl->conf->p_rng );
+        }
+        else
+        {
 #if defined(MBEDTLS_THREADING_C)
         if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
             return( ret );
@@ -3170,6 +3225,7 @@ static int ssl_write_client_key_exchange( mbedtls_ssl_context *ssl )
             return( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
         }
         ret = tsip_ret;
+        }
 #endif /* TSIP_TLS_API_ENABLE */
         if( ret != 0 )
         {
@@ -3210,6 +3266,24 @@ ecdh_calc_secret:
             return( ret );
         }
 #else /* TSIP_TLS_API_ENABLE */
+        if( ssl->disable_tsip_tls_accel != 0U )
+        {
+            if( ( ret = mbedtls_ecdh_calc_secret( &ssl->handshake->ecdh_ctx,
+                                      &ssl->handshake->pmslen,
+                                      ssl->handshake->premaster,
+                                      MBEDTLS_MPI_MAX_SIZE,
+                                      ssl->conf->f_rng, ssl->conf->p_rng ) ) != 0 )
+            {
+                MBEDTLS_SSL_DEBUG_RET( 1, "mbedtls_ecdh_calc_secret", ret );
+#if defined(MBEDTLS_SSL_ECP_RESTARTABLE_ENABLED)
+                if( ret == MBEDTLS_ERR_ECP_IN_PROGRESS )
+                    ret = MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS;
+#endif
+                return( ret );
+            }
+        }
+        else
+        {
 #if defined(MBEDTLS_THREADING_C)
         if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
             return( ret );
@@ -3240,6 +3314,7 @@ ecdh_calc_secret:
             APP_ALL_PRINT( 1, "R_TSIP_TlsGeneratePreMasterSecretWithEccP256Key ret:%d \r\n", tsip_ret );
             MBEDTLS_SSL_DEBUG_RET( 1, "mbedtls_ecdh_calc_secret", tsip_ret );
             return( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
+        }
         }
 #endif /* TSIP_TLS_API_ENABLE */
 
