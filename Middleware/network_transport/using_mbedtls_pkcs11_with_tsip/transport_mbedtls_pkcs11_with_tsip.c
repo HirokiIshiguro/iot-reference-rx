@@ -387,10 +387,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     /* Initialize the mbed TLS context structures. */
     sslContextInit( &( pTlsTransportParams->sslContext ) );
-#if defined(TSIP_TLS_API_ENABLE)
-    pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
-        ( glTlsDisableTsipTlsAccelOverride != 0 ) ? 1U : 0U;
-#endif
 
     mbedtlsError = mbedtls_ssl_config_defaults( &( pTlsTransportParams->sslContext.config ),
                                                 MBEDTLS_SSL_IS_CLIENT,
@@ -614,6 +610,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
         else
         {
+#if defined(TSIP_TLS_API_ENABLE)
+            pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
+                ( glTlsDisableTsipTlsAccelOverride != 0 ) ? 1U : 0U;
+#endif
             /* Set the underlying IO for the TLS connection. */
 
             /* MISRA Rule 11.2 flags the following line for casting the second
