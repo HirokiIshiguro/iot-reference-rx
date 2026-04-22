@@ -921,7 +921,8 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
         {
             if( transform->ivlen == 12 &&
                 transform->fixed_ivlen == 4 &&
-                ssl->tsip_cipher_suite != 0 )
+                ssl->tsip_cipher_suite != 0 &&
+                ssl->disable_tsip_tls_accel == 0U )
             {
                 APP_ALL_PRINT( 5, "R_TSIP_TlsGenerateSessionKey called.\r\n" );
 #if defined(MBEDTLS_THREADING_C)
@@ -1700,7 +1701,8 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
         {
             if( transform->ivlen == 12 &&
                 transform->fixed_ivlen == 4 &&
-                ssl->tsip_cipher_suite != 0 )
+                ssl->tsip_cipher_suite != 0 &&
+                ssl->disable_tsip_tls_accel == 0U )
             {
                 e_tsip_err_t tsip_ret;
                 APP_ALL_PRINT( 5, "R_TSIP_TlsGenerateSessionKey called.\r\n" );

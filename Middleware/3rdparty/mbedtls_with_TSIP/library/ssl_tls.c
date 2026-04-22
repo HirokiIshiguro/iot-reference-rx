@@ -633,7 +633,8 @@ static void ssl_update_checksum_start( mbedtls_ssl_context *ssl,
     psa_hash_update( &ssl->handshake->fin_sha256_psa, buf, len );
 #else
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
+    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
