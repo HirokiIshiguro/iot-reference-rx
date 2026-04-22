@@ -5705,6 +5705,28 @@ static int ssl_compute_master( mbedtls_ssl_handshake_params *handshake,
     else
 #endif
     {
+#if defined(TSIP_TLS_API_ENABLE)
+        if( ssl->disable_tsip_tls_accel != 0U )
+        {
+            ret = handshake->tls_prf( handshake->premaster, handshake->pmslen,
+                                      lbl, seed, seed_len,
+                                      master,
+                                      master_secret_len );
+            if( ret != 0 )
+            {
+                MBEDTLS_SSL_DEBUG_RET( 1, "prf", ret );
+                return( ret );
+            }
+
+            MBEDTLS_SSL_DEBUG_BUF( 3, "premaster secret",
+                                   handshake->premaster,
+                                   handshake->pmslen );
+
+            mbedtls_platform_zeroize( handshake->premaster,
+                                      sizeof(handshake->premaster) );
+        }
+        else
+#endif /* TSIP_TLS_API_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
         if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
             ssl->disable_tsip_tls_accel != 0U )
