@@ -5056,7 +5056,8 @@ static int ssl_get_handshake_transcript_sha256( mbedtls_ssl_context *ssl,
         return( MBEDTLS_ERR_SSL_INTERNAL_ERROR );
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
+    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
