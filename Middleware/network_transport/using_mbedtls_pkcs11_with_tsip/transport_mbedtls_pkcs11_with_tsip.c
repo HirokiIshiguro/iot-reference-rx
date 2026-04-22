@@ -613,6 +613,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #if defined(TSIP_TLS_API_ENABLE)
             pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
                 ( glTlsDisableTsipTlsAccelOverride != 0 ) ? 1U : 0U;
+            if( pNetworkCredentials->tlsDebugLevel > 0U )
+            {
+                LogInfo( ( "TSIP TLS accel override=%ld",
+                           (long)pTlsTransportParams->sslContext.context.disable_tsip_tls_accel ) );
+            }
 #endif
             /* Set the underlying IO for the TLS connection. */
 
