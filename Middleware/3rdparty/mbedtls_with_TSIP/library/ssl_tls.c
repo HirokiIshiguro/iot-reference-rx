@@ -5864,7 +5864,8 @@ int mbedtls_ssl_derive_keys( mbedtls_ssl_context *ssl )
      * - MS derivation wanted client+server (RFC 5246 8.1)
      * - key derivation wants server+client (RFC 5246 6.3) */
 #if defined(TSIP_TLS_API_ENABLE)
-    if( ssl->conf->endpoint == MBEDTLS_SSL_IS_SERVER )  // Server only
+    if( ssl->conf->endpoint == MBEDTLS_SSL_IS_SERVER ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE */
     {
         unsigned char tmp[64];
