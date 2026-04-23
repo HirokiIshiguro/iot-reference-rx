@@ -5627,7 +5627,8 @@ static int ssl_compute_master( mbedtls_ssl_handshake_params *handshake,
 #endif /* MBEDTLS_SSL_EXTENDED_MASTER_SECRET */
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( MBEDTLS_SSL_IS_CLIENT == ssl->conf->endpoint )
+    if( MBEDTLS_SSL_IS_CLIENT == ssl->conf->endpoint ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE)
     {
@@ -7837,7 +7838,8 @@ static int ssl_tls12_populate_transform( mbedtls_ssl_transform *transform,
     else
 #endif /* TSIP_TLS_API_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
+    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
@@ -8283,7 +8285,8 @@ int mbedtls_ssl_get_key_exchange_md_tls1_2( mbedtls_ssl_context *ssl,
     int ret = 0;
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint )
+    if( MBEDTLS_SSL_IS_SERVER == ssl->conf->endpoint ||
+        ssl->disable_tsip_tls_accel != 0U )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
