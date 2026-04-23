@@ -7017,6 +7017,11 @@ crt_verify:
         memcpy( &ssl->tsip_server_rsa_pubkey[0],
                 &temp_tsip_server_rsa_pubkey[0],
                 560 );
+        APP_ALL_PRINT( 1,
+                       "copied server RSA public key type=%lu head=%08lx %08lx\r\n",
+                       (unsigned long)tsip_server_pubkey_type,
+                       (unsigned long)ssl->tsip_server_rsa_pubkey[0],
+                       (unsigned long)ssl->tsip_server_rsa_pubkey[1] );
         memset( &temp_tsip_server_rsa_pubkey[0],
                 0,
                 sizeof( temp_tsip_server_rsa_pubkey ) );
@@ -7027,6 +7032,11 @@ crt_verify:
         memcpy( &ssl->tsip_server_ecdsa_pubkey[0],
                 &temp_tsip_server_ecdsa_pubkey[0],
                 96 );
+        APP_ALL_PRINT( 1,
+                       "copied server ECDSA public key type=%lu head=%08lx %08lx\r\n",
+                       (unsigned long)tsip_server_pubkey_type,
+                       (unsigned long)ssl->tsip_server_ecdsa_pubkey[0],
+                       (unsigned long)ssl->tsip_server_ecdsa_pubkey[1] );
         memset( &temp_tsip_server_ecdsa_pubkey[0],
                 0,
                 sizeof( temp_tsip_server_ecdsa_pubkey ) );

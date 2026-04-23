@@ -2072,6 +2072,11 @@ static int ssl_write_encrypted_pms( mbedtls_ssl_context *ssl,
     if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
         return( ret );
 #endif /* MBEDTLS_THREADING_C */
+    APP_ALL_PRINT( 1,
+                   "using server RSA public key head=%08lx %08lx premaster=%08lx\r\n",
+                   (unsigned long)ssl->tsip_server_rsa_pubkey[0],
+                   (unsigned long)ssl->tsip_server_rsa_pubkey[1],
+                   (unsigned long)ssl->tsip_premaster_secret[0] );
     APP_ALL_PRINT( 5, "R_TSIP_TlsEncryptPreMasterSecretWithRsa2048PublicKey called.\r\n" );
     tsip_ret = R_TSIP_TlsEncryptPreMasterSecretWithRsa2048PublicKey(
                     &ssl->tsip_server_rsa_pubkey[0],

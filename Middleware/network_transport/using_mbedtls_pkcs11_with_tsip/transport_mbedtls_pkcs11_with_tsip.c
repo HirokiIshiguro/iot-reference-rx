@@ -527,10 +527,16 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     if (TSIP_SUCCESS != mbedtlsError)
     {
         #if ( TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED == 1 )
-            LogError(("Failed to RootCA certificate verification"));
+            LogError(("Failed to RootCA certificate verification: tsip=%ld rootCaLen=%lu sigLen=%lu",
+                      (long)mbedtlsError,
+                      (unsigned long)pTlsTransportParams->sslContext.rootCa.raw.len,
+                      (unsigned long)ulRootCaSignatureSize));
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         #else
-            LogWarn(("Failed to RootCA certificate verification; continuing with mbed TLS CA verification."));
+            LogWarn(("Failed to RootCA certificate verification; continuing with mbed TLS CA verification: tsip=%ld rootCaLen=%lu sigLen=%lu",
+                     (long)mbedtlsError,
+                     (unsigned long)pTlsTransportParams->sslContext.rootCa.raw.len,
+                     (unsigned long)ulRootCaSignatureSize));
         #endif
     }
     else
