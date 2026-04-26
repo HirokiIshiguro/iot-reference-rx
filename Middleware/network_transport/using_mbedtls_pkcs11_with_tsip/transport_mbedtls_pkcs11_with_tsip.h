@@ -117,6 +117,9 @@ typedef struct NetworkCredentials
     size_t passwordSize;             /**< @brief Size associated with #NetworkCredentials.pPassword. */
     const char * pClientCertLabel;   /**< @brief PKCS #11 label string of the client certificate. */
     const char * pPrivateKeyLabel;   /**< @brief PKCS #11 label for the private key. */
+    const int * pCipherSuites;       /**< @brief Optional NULL-terminated mbed TLS cipher suite list. */
+    const uint16_t * pSigAlgs;       /**< @brief Optional NULL-terminated TLS signature algorithm list. */
+    uint32_t tlsDebugLevel;          /**< @brief Optional mbed TLS debug level. Zero disables debug logs. */
 } NetworkCredentials_t;
 
 /**
@@ -132,6 +135,16 @@ typedef enum TlsTransportStatus
     TLS_TRANSPORT_INTERNAL_ERROR,      /**< A call to a system API resulted in an internal error. */
     TLS_TRANSPORT_CONNECT_FAILURE      /**< Initial connection to the server failed. */
 } TlsTransportStatus_t;
+
+void vTlsTransportSetRootCaSignatureOverride( const unsigned char * pucSignature,
+                                              size_t xSignatureSize );
+void vTlsTransportClearRootCaSignatureOverride( void );
+void vTlsTransportSetServerCertAuthModeOverride( int lAuthMode );
+void vTlsTransportClearServerCertAuthModeOverride( void );
+void vTlsTransportSetDisableTsipTlsAccelOverride( int lDisable );
+void vTlsTransportClearDisableTsipTlsAccelOverride( void );
+void vTlsTransportSetDisableMaxFragmentLengthOverride( int lDisable );
+void vTlsTransportClearDisableMaxFragmentLengthOverride( void );
 
 /**
  * @brief Create a TLS connection with FreeRTOS sockets.

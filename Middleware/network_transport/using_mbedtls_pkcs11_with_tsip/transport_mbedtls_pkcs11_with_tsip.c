@@ -41,8 +41,10 @@
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
 
 #include "mbedtls/private_access.h"
+#include "mbedtls/debug.h"
 
 /* Standard includes. */
+#include <stdint.h>
 #include <string.h>
 
 /* FreeRTOS includes. */
@@ -115,6 +117,29 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
     ( mbedtls_low_level_strerr( mbedTlsCode ) != NULL ) ? \
     mbedtls_low_level_strerr( mbedTlsCode ) : pNoLowLevelMbedTlsCodeStr
 
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    #define TSIP_ROOT_CA_SIGNATURE_SIZE    ( 256U )
+
+    #ifndef TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED
+        #define TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED    ( 0 )
+    #endif
+
+    #ifndef TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED
+        #define TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED    ( 0 )
+    #endif
+
+    extern BaseType_t xTsipProvisioningReadRootCaSignature( uint8_t * pucBuffer,
+                                                            uint32_t ulBufferSize,
+                                                            uint32_t * pulActualSize );
+    extern BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor( void );
+    extern BaseType_t xTsipProvisioningLoadClientRsa2048KeyPair( void );
+    static const unsigned char * gpTlsRootCaSignatureOverride = NULL;
+    static size_t gxTlsRootCaSignatureOverrideSize = 0U;
+#endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
+static int glTlsServerCertAuthModeOverride = -1;
+static int glTlsDisableTsipTlsAccelOverride = 0;
+static int glTlsDisableMaxFragmentLengthOverride = 0;
+
 /*-----------------------------------------------------------*/
 
 /**
@@ -176,6 +201,11 @@ static CK_RV readCertificateIntoContext( SSLContext_t * pSslContext,
                                          const char * pcLabelName,
                                          CK_OBJECT_CLASS xClass,
                                          mbedtls_x509_crt * pxCertificateContext );
+static void tlsDebugCallback( void * pvContext,
+                              int level,
+                              const char * pcFile,
+                              int line,
+                              const char * pcMessage );
 
 /**
  * @brief Helper for setting up potentially hardware-based cryptographic context
@@ -224,6 +254,79 @@ static int32_t privateKeySigningCallback( void * pvContext,
 
 /*-----------------------------------------------------------*/
 
+void vTlsTransportSetRootCaSignatureOverride( const unsigned char * pucSignature,
+                                              size_t xSignatureSize )
+{
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    gpTlsRootCaSignatureOverride = pucSignature;
+    gxTlsRootCaSignatureOverrideSize = xSignatureSize;
+#else
+    (void)pucSignature;
+    (void)xSignatureSize;
+#endif
+}
+
+void vTlsTransportClearRootCaSignatureOverride( void )
+{
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    gpTlsRootCaSignatureOverride = NULL;
+    gxTlsRootCaSignatureOverrideSize = 0U;
+#endif
+}
+
+void vTlsTransportSetServerCertAuthModeOverride( int lAuthMode )
+{
+    glTlsServerCertAuthModeOverride = lAuthMode;
+}
+
+void vTlsTransportClearServerCertAuthModeOverride( void )
+{
+    glTlsServerCertAuthModeOverride = -1;
+}
+
+void vTlsTransportSetDisableTsipTlsAccelOverride( int lDisable )
+{
+    glTlsDisableTsipTlsAccelOverride = lDisable;
+}
+
+void vTlsTransportClearDisableTsipTlsAccelOverride( void )
+{
+    glTlsDisableTsipTlsAccelOverride = 0;
+}
+
+void vTlsTransportSetDisableMaxFragmentLengthOverride( int lDisable )
+{
+    glTlsDisableMaxFragmentLengthOverride = lDisable;
+}
+
+void vTlsTransportClearDisableMaxFragmentLengthOverride( void )
+{
+    glTlsDisableMaxFragmentLengthOverride = 0;
+}
+
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+static const unsigned char * prvGetRootCaSignatureForTsip( uint8_t * pucBuffer,
+                                                           uint32_t * pulActualSize )
+{
+    if( ( NULL != gpTlsRootCaSignatureOverride ) &&
+        ( TSIP_ROOT_CA_SIGNATURE_SIZE == gxTlsRootCaSignatureOverrideSize ) )
+    {
+        *pulActualSize = (uint32_t)gxTlsRootCaSignatureOverrideSize;
+        return gpTlsRootCaSignatureOverride;
+    }
+
+    if( ( pdTRUE == xTsipProvisioningReadRootCaSignature( pucBuffer,
+                                                          TSIP_ROOT_CA_SIGNATURE_SIZE,
+                                                          pulActualSize ) ) &&
+        ( TSIP_ROOT_CA_SIGNATURE_SIZE == *pulActualSize ) )
+    {
+        return pucBuffer;
+    }
+
+    return NULL;
+}
+#endif
+
 static void sslContextInit( SSLContext_t * pSslContext )
 {
     configASSERT( pSslContext != NULL );
@@ -232,6 +335,10 @@ static void sslContextInit( SSLContext_t * pSslContext )
     mbedtls_x509_crt_init( &( pSslContext->rootCa ) );
     mbedtls_x509_crt_init( &( pSslContext->clientCert ) );
     mbedtls_ssl_init( &( pSslContext->context ) );
+#if defined(TSIP_TLS_API_ENABLE)
+    pSslContext->context.tsip_cipher_suite = 0U;
+    pSslContext->context.disable_tsip_tls_accel = 0U;
+#endif
 
     xInitializePkcs11Session( &( pSslContext->xP11Session ) );
     C_GetFunctionList( &( pSslContext->pxP11FunctionList ) );
@@ -266,9 +373,17 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #if defined(TSIP_TLS_API_ENABLE)
     extern mbedtls_threading_mutex_t 						mutexUseTsip;
     extern tsip_tls_ca_certification_public_key_index_t		system_user_rsa2048_ne_key_index;
+    extern uint8_t                                         tsip_rootca_rsa_pubkey_scnt;
+    extern uint32_t                                        tsip_rootca_rsa_pubkey[5][140];
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    uint8_t trust_ca_root_rsa_certificate_signature[ TSIP_ROOT_CA_SIGNATURE_SIZE ] = { 0 };
+    uint32_t ulRootCaSignatureSize = 0;
+    const unsigned char * pTsipRootCaSignature = NULL;
+#else
 	const char trust_ca_root_rsa_certificate_signature[] = {
 		#include "AmazonRootCA1_sig_array.txt"
     };
+#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
 #endif
 
     configASSERT( pNetworkContext != NULL );
@@ -314,13 +429,45 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
 
         /* Set SSL authmode and the RNG context. */
-        mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
-                                   MBEDTLS_SSL_VERIFY_REQUIRED );
+        if( glTlsServerCertAuthModeOverride >= 0 )
+        {
+            mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
+                                       glTlsServerCertAuthModeOverride );
+        }
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+        else if( TSIP_RUNTIME_SERVER_CERT_VERIFY_REQUIRED != 1 )
+        {
+            mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
+                                       MBEDTLS_SSL_VERIFY_OPTIONAL );
+        }
+#endif
+        else
+        {
+            mbedtls_ssl_conf_authmode( &( pTlsTransportParams->sslContext.config ),
+                                       MBEDTLS_SSL_VERIFY_REQUIRED );
+        }
         mbedtls_ssl_conf_rng( &( pTlsTransportParams->sslContext.config ),
                               generateRandomBytes,
                               &pTlsTransportParams->sslContext );
         mbedtls_ssl_conf_cert_profile( &( pTlsTransportParams->sslContext.config ),
                                        &( pTlsTransportParams->sslContext.certProfile ) );
+        if( pNetworkCredentials->pCipherSuites != NULL )
+        {
+            mbedtls_ssl_conf_ciphersuites( &( pTlsTransportParams->sslContext.config ),
+                                           pNetworkCredentials->pCipherSuites );
+        }
+        if( pNetworkCredentials->pSigAlgs != NULL )
+        {
+            mbedtls_ssl_conf_sig_algs( &( pTlsTransportParams->sslContext.config ),
+                                       pNetworkCredentials->pSigAlgs );
+        }
+        if( pNetworkCredentials->tlsDebugLevel > 0U )
+        {
+            mbedtls_debug_set_threshold( (int)pNetworkCredentials->tlsDebugLevel );
+            mbedtls_ssl_conf_dbg( &( pTlsTransportParams->sslContext.config ),
+                                  tlsDebugCallback,
+                                  NULL );
+        }
 
         /* Parse the server root CA certificate into the SSL context. */
         mbedtlsError = mbedtls_x509_crt_parse( &( pTlsTransportParams->sslContext.rootCa ),
@@ -344,6 +491,28 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     }
 
     /* RootCA certificate verification */
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    if( returnStatus == TLS_TRANSPORT_SUCCESS )
+    {
+        if( ( pdTRUE != xTsipProvisioningPrepareTlsRootCaTrustAnchor() ) ||
+            ( pdTRUE != xTsipProvisioningLoadClientRsa2048KeyPair() ) )
+        {
+            LogError( ( "Failed to load TSIP runtime provisioning data." ) );
+            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        }
+        else if( NULL == ( pTsipRootCaSignature = prvGetRootCaSignatureForTsip( trust_ca_root_rsa_certificate_signature,
+                                                                                &ulRootCaSignatureSize ) ) )
+        {
+            LogError( ( "Failed to load Root CA signature for TSIP runtime provisioning." ) );
+            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        }
+    }
+#endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
+
+    if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+        ( glTlsServerCertAuthModeOverride != MBEDTLS_SSL_VERIFY_NONE ) )
+    {
+    tsip_rootca_rsa_pubkey_scnt = 0U;
     mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
     mbedtlsError = R_TSIP_TlsRootCertificateVerification(
                     (uint32_t)R_TSIP_TLS_PUBLIC_KEY_TYPE_RSA2048, // 0 : RSA 2048bit
@@ -359,12 +528,30 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                     (uint32_t)(p_tmprsa->pubkey_e_spos -    //
                         (uint32_t)(uint8_t *)pTlsTransportParams->sslContext.rootCa.raw.p) +    //
                         (p_tmprsa->pubkey_e_epos - 1), //
-                    (uint8_t *)trust_ca_root_rsa_certificate_signature, //
+                    (uint8_t *)
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+                    pTsipRootCaSignature,
+#else
+                    trust_ca_root_rsa_certificate_signature,
+#endif
                     &tsip_rootca_rsa_pubkey[tsip_rootca_rsa_pubkey_scnt][0]);
     if (TSIP_SUCCESS != mbedtlsError)
     {
-        LogError(("Failed to RootCA certificate verification"));
-        returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        #if ( TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED == 1 )
+            LogError(("Failed to RootCA certificate verification"));
+            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        #else
+            LogWarn(("Failed to RootCA certificate verification; continuing with mbed TLS CA verification."));
+        #endif
+    }
+    else
+    {
+        tsip_rootca_rsa_pubkey_scnt = 1U;
+    }
+    }
+    else if( glTlsServerCertAuthModeOverride == MBEDTLS_SSL_VERIFY_NONE )
+    {
+        tsip_rootca_rsa_pubkey_scnt = 0U;
     }
 
     if (TLS_TRANSPORT_SUCCESS == returnStatus)
@@ -434,6 +621,15 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
         else
         {
+#if defined(TSIP_TLS_API_ENABLE)
+            pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
+                ( glTlsDisableTsipTlsAccelOverride != 0 ) ? 1U : 0U;
+            if( pNetworkCredentials->tlsDebugLevel > 0U )
+            {
+                LogInfo( ( "TSIP TLS accel override=%ld",
+                           (long)pTlsTransportParams->sslContext.context.disable_tsip_tls_accel ) );
+            }
+#endif
             /* Set the underlying IO for the TLS connection. */
 
             /* MISRA Rule 11.2 flags the following line for casting the second
@@ -476,7 +672,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     /* Set Maximum Fragment Length if enabled. */
     #ifdef MBEDTLS_SSL_MAX_FRAGMENT_LENGTH
-        if( returnStatus == TLS_TRANSPORT_SUCCESS )
+        if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+            ( 0 == glTlsDisableMaxFragmentLengthOverride ) )
         {
             /* Enable the max fragment extension. 4096 bytes is currently the largest fragment size permitted.
              * See RFC 8449 https://tools.ietf.org/html/rfc8449 for more information.
@@ -497,10 +694,26 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
+        uint32_t ulHandshakeAttempt = 0U;
+
         /* Perform the TLS handshake. */
         do
         {
+            if( pNetworkCredentials->tlsDebugLevel > 0U )
+            {
+                LogInfo( ( "TLS handshake call begin: attempt=%lu state=%ld",
+                           (unsigned long)ulHandshakeAttempt,
+                           (long)pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
+            }
             mbedtlsError = mbedtls_ssl_handshake( &( pTlsTransportParams->sslContext.context ) );
+            if( pNetworkCredentials->tlsDebugLevel > 0U )
+            {
+                LogInfo( ( "TLS handshake call end: attempt=%lu state=%ld ret=%ld",
+                           (unsigned long)ulHandshakeAttempt,
+                           (long)pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ),
+                           (long)mbedtlsError ) );
+            }
+            ulHandshakeAttempt++;
         } while( ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_READ ) ||
                  ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_WRITE ) );
 
@@ -545,6 +758,20 @@ static int generateRandomBytes( void * pvCtx,
     }
 
     return xResult;
+}
+
+static void tlsDebugCallback( void * pvContext,
+                              int level,
+                              const char * pcFile,
+                              int line,
+                              const char * pcMessage )
+{
+    (void)pvContext;
+
+    if( pcMessage != NULL )
+    {
+        LogInfo( ( "mbedTLS[%d] %s:%d %s", level, pcFile, line, pcMessage ) );
+    }
 }
 
 /*-----------------------------------------------------------*/
