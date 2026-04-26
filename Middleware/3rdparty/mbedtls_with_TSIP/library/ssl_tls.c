@@ -62,6 +62,8 @@
 
 #if defined(TSIP_TLS_API_ENABLE)
 #include "mbedtls/x509_crt.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include <platform.h> /* include bsp's platform.h before r_tsip_rx_if.h */
 #include "r_tsip_rx_if.h"
 #if defined(MBEDTLS_THREADING_C)
@@ -94,6 +96,12 @@ volatile uint32_t gTsipTlsProbeSha256TsipUpdates = 0U;
 volatile uint32_t gTsipTlsProbeSha256TsipBytes = 0U;
 volatile uint32_t gTsipTlsProbeSha256SoftwareUpdates = 0U;
 volatile uint32_t gTsipTlsProbeSha256SoftwareBytes = 0U;
+volatile uint32_t gTsipTlsProbeSessionKeyTicks = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmEncryptTicks = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmDecryptTicks = 0U;
+volatile uint32_t gTsipTlsProbeSocketSendCalls = 0U;
+volatile uint32_t gTsipTlsProbeSocketSendBytes = 0U;
+volatile uint32_t gTsipTlsProbeSocketSendTicks = 0U;
 #endif /* TSIP_TLS_API_ENABLE */
 
 #if defined(MBEDTLS_TEST_HOOKS)
@@ -7890,6 +7898,7 @@ static int ssl_tls12_populate_transform( mbedtls_ssl_transform *transform,
     {
         memset( &nonce_explicit[0], 0x00, 8 );
         APP_ALL_PRINT( 5, "R_TSIP_TlsGenerateSessionKey called.\r\n" );
+        TickType_t xProbeStart = xTaskGetTickCount();
 #if defined(MBEDTLS_THREADING_C)
         if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
             return( ret );
@@ -7910,6 +7919,8 @@ static int ssl_tls12_populate_transform( mbedtls_ssl_transform *transform,
 #if defined(MBEDTLS_THREADING_C)
         mbedtls_mutex_unlock( &mutexUseTsip );
 #endif /* MBEDTLS_THREADING_C */
+        gTsipTlsProbeSessionKeyTicks +=
+            (uint32_t)( xTaskGetTickCount() - xProbeStart );
         if( TSIP_SUCCESS != tsip_ret )
         {
             APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateSessionKey ret:%d \r\n", tsip_ret );

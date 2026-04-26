@@ -57,6 +57,8 @@
 #endif
 
 #if defined(TSIP_TLS_API_ENABLE)
+#include "FreeRTOS.h"
+#include "task.h"
 #if defined(MBEDTLS_THREADING_C)
 #include "mbedtls/threading.h"
 extern mbedtls_threading_mutex_t mutexUseTsip;
@@ -70,6 +72,12 @@ extern volatile uint32_t gTsipTlsProbeAesGcmEncryptSoftwareBytes;
 extern volatile uint32_t gTsipTlsProbeAesGcmDecryptSoftwareRecords;
 extern volatile uint32_t gTsipTlsProbeAesGcmDecryptSoftwareBytes;
 extern volatile uint32_t gTsipTlsProbeSessionKeyTsipCalls;
+extern volatile uint32_t gTsipTlsProbeSessionKeyTicks;
+extern volatile uint32_t gTsipTlsProbeAesGcmEncryptTicks;
+extern volatile uint32_t gTsipTlsProbeAesGcmDecryptTicks;
+extern volatile uint32_t gTsipTlsProbeSocketSendCalls;
+extern volatile uint32_t gTsipTlsProbeSocketSendBytes;
+extern volatile uint32_t gTsipTlsProbeSocketSendTicks;
 #endif /* TSIP_TLS_API_ENABLE */
 
 static uint32_t ssl_get_hs_total_len( mbedtls_ssl_context const *ssl );
@@ -941,6 +949,7 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
                 ssl->disable_tsip_tls_accel == 0U )
             {
                 APP_ALL_PRINT( 5, "R_TSIP_TlsGenerateSessionKey called.\r\n" );
+                TickType_t xProbeStart = xTaskGetTickCount();
 #if defined(MBEDTLS_THREADING_C)
                 if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
                     return( ret );
@@ -962,6 +971,8 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
 #if defined(MBEDTLS_THREADING_C)
                 mbedtls_mutex_unlock( &mutexUseTsip );
 #endif /* MBEDTLS_THREADING_C */
+                gTsipTlsProbeSessionKeyTicks +=
+                    (uint32_t)( xTaskGetTickCount() - xProbeStart );
                 if( TSIP_SUCCESS != tsip_ret )
                 {
                     APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateSessionKey ret:%d\r\n", tsip_ret );
@@ -1044,6 +1055,7 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
         {
             ret = 0;
             APP_ALL_PRINT( 5, "R_TSIP_Aes128GcmEncryptInit called.\r\n" );
+            TickType_t xProbeStart = xTaskGetTickCount();
 #if defined(MBEDTLS_THREADING_C)
             if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
                 return( ret );
@@ -1093,6 +1105,8 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
 #if defined(MBEDTLS_THREADING_C)
             mbedtls_mutex_unlock( &mutexUseTsip );
 #endif /* MBEDTLS_THREADING_C */
+            gTsipTlsProbeAesGcmEncryptTicks +=
+                (uint32_t)( xTaskGetTickCount() - xProbeStart );
             if( TSIP_SUCCESS != tsip_ret )
             {
                 APP_ALL_PRINT( 1, "R_TSIP_Aes128GcmEncryptFinal ret:%d \r\n", tsip_ret );
@@ -1736,6 +1750,7 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
             {
                 e_tsip_err_t tsip_ret;
                 APP_ALL_PRINT( 5, "R_TSIP_TlsGenerateSessionKey called.\r\n" );
+                TickType_t xProbeStart = xTaskGetTickCount();
 #if defined(MBEDTLS_THREADING_C)
                 if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
                     return( ret );
@@ -1757,6 +1772,8 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
 #if defined(MBEDTLS_THREADING_C)
                 mbedtls_mutex_unlock( &mutexUseTsip );
 #endif /* MBEDTLS_THREADING_C */
+                gTsipTlsProbeSessionKeyTicks +=
+                    (uint32_t)( xTaskGetTickCount() - xProbeStart );
                 if( TSIP_SUCCESS != tsip_ret )
                 {
                     APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateSessionKey ret:%d \r\n", tsip_ret );
@@ -1840,6 +1857,7 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
             e_tsip_err_t tsip_ret;
 
             APP_ALL_PRINT( 5, "R_TSIP_Aes128GcmDecryptInit called.\r\n" );
+            TickType_t xProbeStart = xTaskGetTickCount();
 #if defined(MBEDTLS_THREADING_C)
             if( ( ret = mbedtls_mutex_lock( &mutexUseTsip ) ) != 0 )
                 return( ret );
@@ -1888,6 +1906,8 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
 #if defined(MBEDTLS_THREADING_C)
             mbedtls_mutex_unlock( &mutexUseTsip );
 #endif /* MBEDTLS_THREADING_C */
+            gTsipTlsProbeAesGcmDecryptTicks +=
+                (uint32_t)( xTaskGetTickCount() - xProbeStart );
             if( TSIP_SUCCESS != tsip_ret )
             {
                 APP_ALL_PRINT( 1, "R_TSIP_Aes128GcmDecryptFinal ret:%d \r\n", tsip_ret );
@@ -2960,7 +2980,19 @@ int mbedtls_ssl_flush_output( mbedtls_ssl_context *ssl )
                        mbedtls_ssl_out_hdr_len( ssl ) + ssl->out_msglen, ssl->out_left ) );
 
         buf = ssl->out_hdr - ssl->out_left;
+#if defined(TSIP_TLS_API_ENABLE)
+        TickType_t xProbeStart = xTaskGetTickCount();
+#endif /* TSIP_TLS_API_ENABLE */
         ret = ssl->f_send( ssl->p_bio, buf, ssl->out_left );
+#if defined(TSIP_TLS_API_ENABLE)
+        gTsipTlsProbeSocketSendTicks +=
+            (uint32_t)( xTaskGetTickCount() - xProbeStart );
+        if( ret > 0 )
+        {
+            gTsipTlsProbeSocketSendCalls++;
+            gTsipTlsProbeSocketSendBytes += (uint32_t) ret;
+        }
+#endif /* TSIP_TLS_API_ENABLE */
 
         MBEDTLS_SSL_DEBUG_RET( 2, "ssl->f_send", ret );
 
