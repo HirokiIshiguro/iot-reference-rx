@@ -143,6 +143,8 @@ void vTlsTransportSetServerCertAuthModeOverride( int lAuthMode );
 void vTlsTransportClearServerCertAuthModeOverride( void );
 void vTlsTransportSetDisableTsipTlsAccelOverride( int lDisable );
 void vTlsTransportClearDisableTsipTlsAccelOverride( void );
+void vTlsTransportSetDisableMaxFragmentLengthOverride( int lDisable );
+void vTlsTransportClearDisableMaxFragmentLengthOverride( void );
 
 /**
  * @brief Create a TLS connection with FreeRTOS sockets.
