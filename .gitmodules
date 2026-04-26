@@ -64,3 +64,6 @@
 [submodule "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/rx_bootloader"]
 	path = Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/rx_bootloader
 	url = ../../../../experiment/embedded/mcu/renesas/rx/bootloader/submodule.git
+[submodule "Middleware/3rdparty/mbedtls_with_TSIP"]
+	path = Middleware/3rdparty/mbedtls_with_TSIP
+	url = git@gitlab-codex:oss/import/github/mbed-tls/mbedtls.git
