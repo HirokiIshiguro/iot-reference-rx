@@ -61,6 +61,15 @@
 #include "mbedtls/threading.h"
 extern mbedtls_threading_mutex_t mutexUseTsip;
 #endif /* MBEDTLS_THREADING_C */
+extern volatile uint32_t gTsipTlsProbeAesGcmEncryptTsipRecords;
+extern volatile uint32_t gTsipTlsProbeAesGcmEncryptTsipBytes;
+extern volatile uint32_t gTsipTlsProbeAesGcmDecryptTsipRecords;
+extern volatile uint32_t gTsipTlsProbeAesGcmDecryptTsipBytes;
+extern volatile uint32_t gTsipTlsProbeAesGcmEncryptSoftwareRecords;
+extern volatile uint32_t gTsipTlsProbeAesGcmEncryptSoftwareBytes;
+extern volatile uint32_t gTsipTlsProbeAesGcmDecryptSoftwareRecords;
+extern volatile uint32_t gTsipTlsProbeAesGcmDecryptSoftwareBytes;
+extern volatile uint32_t gTsipTlsProbeSessionKeyTsipCalls;
 #endif /* TSIP_TLS_API_ENABLE */
 
 static uint32_t ssl_get_hs_total_len( mbedtls_ssl_context const *ssl );
@@ -879,6 +888,7 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
         psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
 #endif /* MBEDTLS_USE_PSA_CRYPTO */
         int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+        size_t plain_data_len = rec->data_len;
 #if defined(TSIP_TLS_API_ENABLE)
         uint32_t    gcm_len;
         size_t      olen;
@@ -957,6 +967,7 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
                     APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateSessionKey ret:%d\r\n", tsip_ret );
                     return ( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
                 }
+                gTsipTlsProbeSessionKeyTsipCalls++;
             }
         }
 #endif /* TSIP_TLS_API_ENABLE */
@@ -1020,6 +1031,10 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
                 MBEDTLS_SSL_DEBUG_RET( 1, "mbedtls_cipher_auth_encrypt_ext", ret );
                 return( ret );
             }
+#if defined(TSIP_TLS_API_ENABLE)
+            gTsipTlsProbeAesGcmEncryptSoftwareRecords++;
+            gTsipTlsProbeAesGcmEncryptSoftwareBytes += (uint32_t) plain_data_len;
+#endif /* TSIP_TLS_API_ENABLE */
         }
 #endif /* MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
@@ -1087,6 +1102,8 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
 
             memcpy( data, &enc_client_cipher_text[0], olen );
             rec->data_len += transform->taglen;
+            gTsipTlsProbeAesGcmEncryptTsipRecords++;
+            gTsipTlsProbeAesGcmEncryptTsipBytes += (uint32_t) plain_data_len;
         }
 #endif /* TSIP_TLS_API_ENABLE */
 #endif /* MBEDTLS_USE_PSA_CRYPTO */
@@ -1745,6 +1762,7 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
                     APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateSessionKey ret:%d \r\n", tsip_ret );
                     return ( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
                 }
+                gTsipTlsProbeSessionKeyTsipCalls++;
             }
         }
 #endif /* TSIP_TLS_API_ENABLE */
@@ -1808,6 +1826,10 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
 
                 return( ret );
             }
+#if defined(TSIP_TLS_API_ENABLE)
+            gTsipTlsProbeAesGcmDecryptSoftwareRecords++;
+            gTsipTlsProbeAesGcmDecryptSoftwareBytes += (uint32_t) rec->data_len;
+#endif /* TSIP_TLS_API_ENABLE */
         } 
 #endif /* MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
@@ -1874,6 +1896,8 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context *ssl,
             memcpy( data, &dec_client_plain_text[0],  olen );
 
             ret = tsip_ret;
+            gTsipTlsProbeAesGcmDecryptTsipRecords++;
+            gTsipTlsProbeAesGcmDecryptTsipBytes += (uint32_t) rec->data_len;
         }
 #endif /* TSIP_TLS_API_ENABLE */
 #endif /* MBEDTLS_USE_PSA_CRYPTO */

@@ -79,6 +79,21 @@ static inline void tsip_tls_sha256_clone(tsip_sha_md5_handle_t *dst,
 #if defined(MBEDTLS_FUNC_ENABLE)
 unsigned char g_tsip_endpointflg;
 #endif /* MBEDTLS_FUNC_ENABLE */
+volatile uint32_t gTsipTlsProbeAesGcmEncryptTsipRecords = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmEncryptTsipBytes = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmDecryptTsipRecords = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmDecryptTsipBytes = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmEncryptSoftwareRecords = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmEncryptSoftwareBytes = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmDecryptSoftwareRecords = 0U;
+volatile uint32_t gTsipTlsProbeAesGcmDecryptSoftwareBytes = 0U;
+volatile uint32_t gTsipTlsProbeSessionKeyTsipCalls = 0U;
+volatile uint32_t gTsipTlsProbeMasterSecretTsipCalls = 0U;
+volatile uint32_t gTsipTlsProbeVerifyDataTsipCalls = 0U;
+volatile uint32_t gTsipTlsProbeSha256TsipUpdates = 0U;
+volatile uint32_t gTsipTlsProbeSha256TsipBytes = 0U;
+volatile uint32_t gTsipTlsProbeSha256SoftwareUpdates = 0U;
+volatile uint32_t gTsipTlsProbeSha256SoftwareBytes = 0U;
 #endif /* TSIP_TLS_API_ENABLE */
 
 #if defined(MBEDTLS_TEST_HOOKS)
@@ -639,6 +654,10 @@ static void ssl_update_checksum_start( mbedtls_ssl_context *ssl,
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
         mbedtls_sha256_update( &ssl->handshake->fin_sha256, buf, len );
+#if defined(TSIP_TLS_API_ENABLE)
+        gTsipTlsProbeSha256SoftwareUpdates++;
+        gTsipTlsProbeSha256SoftwareBytes += (uint32_t) len;
+#endif /* TSIP_TLS_API_ENABLE */
     }
 #endif /* MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
@@ -669,6 +688,8 @@ static void ssl_update_checksum_start( mbedtls_ssl_context *ssl,
             APP_ALL_PRINT( 1, "R_TSIP_Sha256Update ret:%d \r\n", tsip_ret );
             return;
         }
+        gTsipTlsProbeSha256TsipUpdates++;
+        gTsipTlsProbeSha256TsipBytes += (uint32_t) len;
 
 #if defined(MBEDTLS_THREADING_C)
         mbedtls_mutex_unlock( &mutexUseTsip );
@@ -701,6 +722,10 @@ static void ssl_update_checksum_sha256( mbedtls_ssl_context *ssl,
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
         mbedtls_sha256_update( &ssl->handshake->fin_sha256, buf, len );
+#if defined(TSIP_TLS_API_ENABLE)
+        gTsipTlsProbeSha256SoftwareUpdates++;
+        gTsipTlsProbeSha256SoftwareBytes += (uint32_t) len;
+#endif /* TSIP_TLS_API_ENABLE */
     }
 #endif /* MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
@@ -731,6 +756,8 @@ static void ssl_update_checksum_sha256( mbedtls_ssl_context *ssl,
             APP_ALL_PRINT( 1, "R_TSIP_Sha256Update ret:%d \r\n", tsip_ret );
             return;
         }
+        gTsipTlsProbeSha256TsipUpdates++;
+        gTsipTlsProbeSha256TsipBytes += (uint32_t) len;
 
 #if defined(MBEDTLS_THREADING_C)
         mbedtls_mutex_unlock( &mutexUseTsip );
@@ -5804,6 +5831,7 @@ static int ssl_compute_master( mbedtls_ssl_handshake_params *handshake,
                 APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateExtendedMasterSecret ret:%d \r\n", tsip_ret );
                 return ( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
             }
+            gTsipTlsProbeMasterSecretTsipCalls++;
 #else /* MBEDTLS_SSL_EXTENDED_MASTER_SECRET */
             APP_ALL_PRINT( 5, "R_TSIP_TlsGenerateMasterSecret called.\r\n" );
 #if defined(MBEDTLS_THREADING_C)
@@ -5823,6 +5851,7 @@ static int ssl_compute_master( mbedtls_ssl_handshake_params *handshake,
                 APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateMasterSecret ret:%d \r\n", tsip_ret );
                 return ( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
             }
+            gTsipTlsProbeMasterSecretTsipCalls++;
 #endif /* MBEDTLS_SSL_EXTENDED_MASTER_SECRET */
             mbedtls_platform_zeroize( ssl->tsip_premaster_secret,
                                       sizeof(ssl->tsip_premaster_secret) );
@@ -7215,6 +7244,7 @@ static void ssl_calc_finished_tls_sha256(
                 APP_ALL_PRINT( 1, "Client R_TSIP_TlsGenerateVerifyData tsip_ret:%d \r\n", tsip_ret );
                 return;
             }
+            gTsipTlsProbeVerifyDataTsipCalls++;
         }
         else
         {
@@ -7239,6 +7269,7 @@ static void ssl_calc_finished_tls_sha256(
                 APP_ALL_PRINT( 1, "Server R_TSIP_TlsGenerateVerifyData tsip_ret:%d \r\n", tsip_ret );
                 return;
             }
+            gTsipTlsProbeVerifyDataTsipCalls++;
         }
     }
 #endif /* TSIP_TLS_API_ENABLE */
@@ -7884,6 +7915,7 @@ static int ssl_tls12_populate_transform( mbedtls_ssl_transform *transform,
             APP_ALL_PRINT( 1, "R_TSIP_TlsGenerateSessionKey ret:%d \r\n", tsip_ret );
             return ( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
         }
+        gTsipTlsProbeSessionKeyTsipCalls++;
     }
 #endif /* TSIP_TLS_API_ENABLE */
 
@@ -8331,6 +8363,13 @@ int mbedtls_ssl_get_key_exchange_md_tls1_2( mbedtls_ssl_context *ssl,
             MBEDTLS_SSL_DEBUG_RET( 1, "mbedtls_md_finish", ret );
             goto exit;
         }
+#if defined(TSIP_TLS_API_ENABLE)
+        if( MBEDTLS_MD_SHA256 == md_alg )
+        {
+            gTsipTlsProbeSha256SoftwareUpdates += 2U;
+            gTsipTlsProbeSha256SoftwareBytes += (uint32_t)( 64U + data_len );
+        }
+#endif /* TSIP_TLS_API_ENABLE */
 
     exit:
         mbedtls_md_free( &ctx );
@@ -8398,6 +8437,8 @@ int mbedtls_ssl_get_key_exchange_md_tls1_2( mbedtls_ssl_context *ssl,
             APP_ALL_PRINT( 1, "R_TSIP_Sha256Final ret:%d \r\n", tsip_ret );
             return ( MBEDTLS_ERR_SSL_HW_ACCEL_FAILED );
         }
+        gTsipTlsProbeSha256TsipUpdates += 2U;
+        gTsipTlsProbeSha256TsipBytes += (uint32_t)( 64U + data_len );
 
         mbedtls_platform_zeroize( &ctx, sizeof( tsip_sha_md5_handle_t ) );
         ret = tsip_ret;
