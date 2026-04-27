@@ -54,6 +54,7 @@ variables:
   RX72N_LINUX_UART_BAUD_RATE: "921600"
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
   RX72N_MQTT_TEST_TIMEOUT: "600"
+  RX72N_FLEET_TEST_TIMEOUT: "600"
   RX72N_OTA_CANDIDATE_VERSION: "0.9.3"
   RX72N_OTA_OBSERVE_TIMEOUT: "900"
   AWS_DEFAULT_REGION: "ap-northeast-1"
@@ -478,7 +479,7 @@ test_fleet_rx72n_linux:
       python tools/test_fleet_rx72n.py \
         --log-port "$RX72N_LINUX_UART_PORT" \
         --log-baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --timeout 240 \
+        --timeout "$RX72N_FLEET_TEST_TIMEOUT" \
         --reset-cmd "$reset_cmd" \
         --summary-json "$artifact_dir/fleet_summary.json" \
         2>&1 | tee "$artifact_dir/test_fleet_rx72n.log"
