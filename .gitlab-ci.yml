@@ -194,7 +194,7 @@ build_rx72n_fleet_candidate:
     - os-linux
     - hw-raspi
     - dev-ek-rx72n
-    - dev-ek-rx72n-set1
+    - dev-ek-rx72n-set2
   resource_group: $RX72N_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail
