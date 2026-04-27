@@ -42,7 +42,7 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 
 | Role | URL |
 |------|-----|
-| GitLab (primary) | https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx |
+| GitLab (primary) | https://shelty2.servegame.com/oss/import/github/renesas/iot-reference-rx |
 | GitHub (mirror) | https://github.com/HirokiIshiguro/iot-reference-rx |
 | GitHub (upstream) | https://github.com/renesas/iot-reference-rx |
 
@@ -141,7 +141,7 @@ pwsh -File tools/build_headless_rx72n.ps1 \
 
 ### Runner 接続情報
 
-> 詳細なハードウェア構成は [hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config/-/blob/main/CLAUDE.md) を参照。
+> 詳細なハードウェア構成は [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config/-/blob/main/CLAUDE.md) を参照。
 
 | Item | Value |
 |------|-------|
@@ -567,10 +567,10 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 
 | Project | Relation |
 |---------|----------|
-| [rx72n-envision-kit](https://gitlab.saffti.jp/oss/import/github/renesas/rx72n-envision-kit) | Phase 8 の親プロジェクト。移植先 |
-| [OTA ナレッジベース](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/elemental/ota) | MCU OTA 技術全般のナレッジ |
-| [AWS IoT Core ナレッジ](https://gitlab.saffti.jp/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
-| [hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
+| [rx72n-envision-kit](https://shelty2.servegame.com/oss/import/github/renesas/rx72n-envision-kit) | Phase 8 の親プロジェクト。移植先 |
+| [OTA ナレッジベース](https://shelty2.servegame.com/oss/experiment/embedded/mcu/elemental/ota) | MCU OTA 技術全般のナレッジ |
+| [AWS IoT Core ナレッジ](https://shelty2.servegame.com/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
+| [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
 
 ## Known Pitfalls / 既知の注意事項
 

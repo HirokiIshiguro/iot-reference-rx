@@ -292,12 +292,8 @@ void vOutputString(const char *pcMessage)
     {
         unsigned short usStringLength = (unsigned short)strlen(pcMessage);
 
-        if (strstr(pcMessage, "[ERROR]") != NULL)
-        {
-            configLCD_LOG_STRING(pcMessage, usStringLength);
-        }
+        configLCD_LOG_STRING(pcMessage, usStringLength);
 
-        /* Keep high-volume non-error logging on UART only to avoid stalling the LCD path. */
         /* Cast to type "signed char *" and (unsigned short) to be compatible with parameter type */
         vSerialPutString((signed char *)pcMessage, usStringLength);
     }

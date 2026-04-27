@@ -138,7 +138,6 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
 static int glTlsServerCertAuthModeOverride = -1;
 static int glTlsDisableTsipTlsAccelOverride = 0;
-static int glTlsDisableMaxFragmentLengthOverride = 0;
 
 /*-----------------------------------------------------------*/
 
@@ -292,16 +291,6 @@ void vTlsTransportSetDisableTsipTlsAccelOverride( int lDisable )
 void vTlsTransportClearDisableTsipTlsAccelOverride( void )
 {
     glTlsDisableTsipTlsAccelOverride = 0;
-}
-
-void vTlsTransportSetDisableMaxFragmentLengthOverride( int lDisable )
-{
-    glTlsDisableMaxFragmentLengthOverride = lDisable;
-}
-
-void vTlsTransportClearDisableMaxFragmentLengthOverride( void )
-{
-    glTlsDisableMaxFragmentLengthOverride = 0;
 }
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
@@ -672,8 +661,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     /* Set Maximum Fragment Length if enabled. */
     #ifdef MBEDTLS_SSL_MAX_FRAGMENT_LENGTH
-        if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
-            ( 0 == glTlsDisableMaxFragmentLengthOverride ) )
+        if( returnStatus == TLS_TRANSPORT_SUCCESS )
         {
             /* Enable the max fragment extension. 4096 bytes is currently the largest fragment size permitted.
              * See RFC 8449 https://tools.ietf.org/html/rfc8449 for more information.
