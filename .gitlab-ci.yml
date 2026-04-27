@@ -83,6 +83,7 @@ build_rx72n:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
+  resource_group: rx72n-e2studio-build
   script:
     - Write-Host "=== Build RX72N projects ==="
     - pip install cryptography --quiet
@@ -136,6 +137,7 @@ build_rx72n_fleet_candidate:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
+  resource_group: rx72n-e2studio-build
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -666,6 +668,7 @@ build_rx72n_mqtt_candidate:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
+  resource_group: rx72n-e2studio-build
   rules:
     - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -732,6 +735,7 @@ build_rx72n_ota_candidate:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
+  resource_group: rx72n-e2studio-build
   needs:
     - test_mqtt_rx72n_linux
   rules:
