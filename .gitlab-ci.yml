@@ -43,14 +43,14 @@ variables:
   RX72N_SKIP_HW_TESTS: "false"
   RX72N_SKIP_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
-  RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
+  RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-03"
   RX72N_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
-  # RPi#2 hosts RX72N_EK2 (OBE110008) and CK-RX65N V1 (OBE110020).
-  # Generic "e2l" can select the CK-RX65N debugger and flash RX72N images to
-  # the wrong target, so RX72N Linux jobs must pin the E2 Lite serial.
+  # The restore pipeline is pinned to the RX72N set2 runner on RPi#1.
+  # RPi#1 and RPi#2 both expose an RX72N E2 Lite as OBE110008, but the runner
+  # tag scopes the host, so the pinned serial remains unambiguous.
   RX72N_LINUX_RFP_TOOL: "e2l:OBE110008"
-  RX72N_LINUX_UART_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN6_RPI2}"
-  RX72N_LINUX_COMMAND_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN8_RPI2}"
+  RX72N_LINUX_UART_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN6_RPI1}"
+  RX72N_LINUX_COMMAND_PORT: ""
   RX72N_LINUX_UART_BAUD_RATE: "921600"
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
   RX72N_MQTT_TEST_TIMEOUT: "300"
