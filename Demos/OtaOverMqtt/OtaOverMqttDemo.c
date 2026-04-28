@@ -111,6 +111,7 @@
 #define JOB_MSG_LENGTH                           (128U)
 #define MAX_NUM_OF_OTA_DATA_BUFFERS              (2)
 #define MAX_RETRY_ERASE_AREA                     (3)
+#define MAX_NUM_OF_OTA_FILE_BLOCKS               (128U)
 
 /* Max bytes supported for a file signature (3072 bit RSA is 384 bytes). */
 #define OTA_MAX_SIGNATURE_SIZE                   (384U)
@@ -126,6 +127,8 @@
 static MqttFileDownloaderContext_t mqttFileDownloaderContext = {0};
 static uint32_t numOfBlocksRemaining = 0;
 static uint32_t currentBlockOffset = 0;
+static uint32_t totalNumOfBlocks = 0;
+static uint32_t nextBlockOffsetToRequest = 0;
 static uint8_t currentFileId = 0;
 static uint32_t totalBytesReceived = 0;
 char globalJobId[MAX_JOB_ID_LENGTH] = {0};
@@ -139,6 +142,7 @@ char   notifyTopicBuffer[TOPIC_BUFFER_SIZE+1] = {0};
 size_t notifyTopicBufferLength                = 0U;
 
 static OtaDataEvent_t dataBuffers[MAX_NUM_OF_OTA_DATA_BUFFERS] = {0};
+static uint8_t receivedBlockBitmap[MAX_NUM_OF_OTA_FILE_BLOCKS] = {0};
 static OtaJobEventData_t jobDocBuffer = {0};
 static AfrOtaJobDocumentFields_t jobFields = {0};
 static uint8_t OtaImageSingatureDecoded[OTA_MAX_SIGNATURE_SIZE] = {0};
@@ -222,7 +226,8 @@ static void requestDataBlock(void);
 /**
  * @brief
  */
-static int16_t handleMqttStreamsBlockArrived(uint8_t *data,
+static int16_t handleMqttStreamsBlockArrived(uint32_t blockId,
+                                             uint8_t *data,
                                              size_t dataLength);
 
 /**
@@ -442,10 +447,13 @@ static void initMqttDownloader(AfrOtaJobDocumentFields_t *jobFields)
                            mqttFileDownloader_CONFIG_BLOCK_SIZE;
     numOfBlocksRemaining += (((jobFields->fileSize %
                             mqttFileDownloader_CONFIG_BLOCK_SIZE) > 0) ? 1 : 0);
+    totalNumOfBlocks = numOfBlocksRemaining;
 
     currentFileId = (uint8_t)jobFields->fileId; // cast the file ID
     currentBlockOffset = 0;
+    nextBlockOffsetToRequest = 0;
     totalBytesReceived = 0;
+    (void)memset(receivedBlockBitmap, 0x00, sizeof(receivedBlockBitmap));
 
     mqttWrapper_getThingName(thingName, &thingNameLength);
 
@@ -512,21 +520,24 @@ static bool convertSignatureToDER(AfrOtaJobDocumentFields_t *jobFields)
  *              : dataLength
  * Return Value : Size of received data block in bytes
  *****************************************************************************/
-static int16_t handleMqttStreamsBlockArrived(uint8_t *data,
+static int16_t handleMqttStreamsBlockArrived(uint32_t blockId,
+                                             uint8_t *data,
                                              size_t dataLength)
 {
     int16_t writeblockRes = -1;
+    uint32_t blockOffset = blockId * mqttFileDownloader_CONFIG_BLOCK_SIZE;
 
-    LogInfo(("Downloaded block %u of %u. \n", currentBlockOffset, (currentBlockOffset + numOfBlocksRemaining)));
+    LogInfo(("Downloaded block %u of %u. \n", blockId, totalNumOfBlocks));
 
     writeblockRes = otaPal_WriteBlock(&jobFields,
-                                      totalBytesReceived,
+                                      blockOffset,
                                       data,
                                       dataLength);
 
-    if (writeblockRes > 0)
+    if ((writeblockRes > 0) &&
+        ((blockOffset + (uint32_t)writeblockRes) > totalBytesReceived))
     {
-        totalBytesReceived += writeblockRes;
+        totalBytesReceived = blockOffset + (uint32_t)writeblockRes;
     }
     
     return writeblockRes;
@@ -544,6 +555,18 @@ static void requestDataBlock(void)
 {
     char getStreamRequest[GET_STREAM_REQUEST_BUFFER_SIZE];
     size_t getStreamRequestLength = 0U;
+    uint32_t numOfBlocksToRequest = NUM_OF_BLOCKS_REQUESTED;
+    uint32_t blockOffsetToRequest = nextBlockOffsetToRequest;
+
+    if (blockOffsetToRequest >= totalNumOfBlocks)
+    {
+        return;
+    }
+
+    if (numOfBlocksToRequest > (totalNumOfBlocks - blockOffsetToRequest))
+    {
+        numOfBlocksToRequest = totalNumOfBlocks - blockOffsetToRequest;
+    }
 
     /*
      * MQTT streams Library:
@@ -554,15 +577,18 @@ static void requestDataBlock(void)
     getStreamRequestLength = mqttDownloader_createGetDataBlockRequest((DataType_t)mqttFileDownloaderContext.dataType,
                                                                       currentFileId,
                                                                       mqttFileDownloader_CONFIG_BLOCK_SIZE,
-                                                                      (uint16_t)currentBlockOffset,
-                                                                      NUM_OF_BLOCKS_REQUESTED,
+                                                                      (uint16_t)blockOffsetToRequest,
+                                                                      numOfBlocksToRequest,
                                                                       getStreamRequest,
                                                                       GET_STREAM_REQUEST_BUFFER_SIZE);
 
-    mqttWrapper_publish(mqttFileDownloaderContext.topicGetStream,
-                        mqttFileDownloaderContext.topicGetStreamLength,
-                        (uint8_t *)getStreamRequest, // cast the parameter
-                        getStreamRequestLength);
+    if (mqttWrapper_publish(mqttFileDownloaderContext.topicGetStream,
+                            mqttFileDownloaderContext.topicGetStreamLength,
+                            (uint8_t *)getStreamRequest, // cast the parameter
+                            getStreamRequestLength))
+    {
+        nextBlockOffsetToRequest += numOfBlocksToRequest;
+    }
 }
 /******************************************************************************
  End of function requestDataBlock
@@ -1132,7 +1158,6 @@ static void processOTAEvents(void)
     OtaEvent_t        recvEventId         = OtaAgentEventStart;
     static OtaEvent_t lastRecvEventId     = OtaAgentEventStart;
     OtaEventMsg_t     nextEvent           = {0};
-    static int32_t    lastReceivedblockId = -1;
     bool              bResult             = false;
 
     OtaReceiveEvent_FreeRTOS(&recvEvent);
@@ -1166,6 +1191,13 @@ static void processOTAEvents(void)
             {
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
+        }
+        else if ((OtaAgentEventReceivedFileBlock == lastRecvEventId) &&
+                 (0U < numOfBlocksRemaining) &&
+                 (currentBlockOffset < nextBlockOffsetToRequest))
+        {
+            nextBlockOffsetToRequest = currentBlockOffset;
+            recvEventId = OtaAgentEventRequestFileBlock;
         }
         else
         {
@@ -1223,7 +1255,6 @@ static void processOTAEvents(void)
         {
         case OtaPalJobDocFileCreated:
             LogInfo(("Received OTA Job. \n"));
-            lastReceivedblockId = -1;
             nextEvent.eventId = OtaAgentEventRequestFileBlock;
             OtaSendEvent_FreeRTOS(&nextEvent);
             otaAgentState = OtaAgentStateCreatingFile;
@@ -1322,6 +1353,7 @@ static void processOTAEvents(void)
         int32_t fileId;
         int32_t blockId;
         int32_t blockSize;
+        uint32_t receivedBlockId = 0U;
 
         /*
          * MQTT streams Library:
@@ -1353,28 +1385,38 @@ static void processOTAEvents(void)
              * the last block may or may not be of exact size. */
             LogError(("File block size mismatched\n"));
         }
-        else if (blockId <= lastReceivedblockId)
+        else if ((blockId < 0) ||
+                 ((uint32_t)blockId >= totalNumOfBlocks) ||
+                 ((uint32_t)blockId >= MAX_NUM_OF_OTA_FILE_BLOCKS))
         {
-            /* Ignore this block. */
-            LogInfo(("Received file block #%d that received before (%d). Ignored this block\n", blockId, lastReceivedblockId));
-
+            LogError(("Received invalid file block #%d. Ignored this block\n", blockId));
             freeOtaDataEventBuffer(recvEvent.dataEvent);
-            nextEvent.eventId = OtaAgentEventRequestFileBlock;
-            OtaSendEvent_FreeRTOS(&nextEvent);
+            break;
+        }
+        else if (0U != receivedBlockBitmap[(uint32_t)blockId])
+        {
+            LogInfo(("Received duplicate file block #%d. Ignored this block\n", blockId));
+            freeOtaDataEventBuffer(recvEvent.dataEvent);
             break;
         }
         else
         {
-            result = handleMqttStreamsBlockArrived(decodedData, decodedDataLength);
-            lastReceivedblockId = blockId;
+            receivedBlockId = (uint32_t)blockId;
+            result = handleMqttStreamsBlockArrived(receivedBlockId, decodedData, decodedDataLength);
         }
 
         freeOtaDataEventBuffer(recvEvent.dataEvent);
 
         if (result > 0)
         {
+            receivedBlockBitmap[receivedBlockId] = 1U;
             numOfBlocksRemaining--;
-            currentBlockOffset++;
+
+            while ((currentBlockOffset < totalNumOfBlocks) &&
+                   (0U != receivedBlockBitmap[currentBlockOffset]))
+            {
+                currentBlockOffset++;
+            }
         }
 
         /* File block cannot be written */
@@ -1385,9 +1427,10 @@ static void processOTAEvents(void)
                     "Terminating the OTA job...\n"));
 
             /* Reset block counters */
-            lastReceivedblockId = -1;
             currentBlockOffset = 0;
+            nextBlockOffsetToRequest = 0;
             totalBytesReceived = 0;
+            (void)memset(receivedBlockBitmap, 0x00, sizeof(receivedBlockBitmap));
 
             sendFailedMessage();
             vTaskDelay(pdMS_TO_TICKS(5000));
@@ -1410,7 +1453,7 @@ static void processOTAEvents(void)
         }
         else
         {
-            if ((currentBlockOffset % NUM_OF_BLOCKS_REQUESTED) == 0)
+            if (currentBlockOffset == nextBlockOffsetToRequest)
             {
                 nextEvent.eventId = OtaAgentEventRequestFileBlock;
                 OtaSendEvent_FreeRTOS(&nextEvent);
@@ -1521,8 +1564,9 @@ static void processOTAEvents(void)
 
         /* Reset the block count */
         currentBlockOffset = 0;
+        nextBlockOffsetToRequest = 0;
         totalBytesReceived = 0;
-        lastReceivedblockId = -1;
+        (void)memset(receivedBlockBitmap, 0x00, sizeof(receivedBlockBitmap));
 
         /* Start requesting for new job after suspended for some time (reset OTA-agent to initial state) */
         nextEvent.eventId = OtaAgentEventRequestJobDocument;

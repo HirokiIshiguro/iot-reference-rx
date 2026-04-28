@@ -38,11 +38,15 @@
  *
  */
 #ifndef mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST
-#define mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST (1U)
+#define mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST (2U)
 #endif
 
-#if mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST > 1
-#error "Requesting multiple data blocks is not supported in this version of the library. Please set mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST to 1."
+#if mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST == 0
+#error "mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST must be greater than zero."
+#endif
+
+#if (mqttFileDownloader_CONFIG_BLOCK_SIZE * mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST) > (128U * 1024U)
+#error "The requested MQTT stream response can exceed the AWS IoT MQTT streams 128 KB response limit."
 #endif
 
 #endif /* #ifndef MQTT_FILE_DOWNLOADER_DEFAULT_H */
