@@ -78,7 +78,7 @@ out the application messages. */
  * For zero-copy transmission, no network buffers are permanently
  * "reserved" for transmission.
  */
-#define ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS    ( 12 )
+#define ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS    ( 8 )
 
 /* Related to the macro 'ipconfigEVENT_QUEUE_LENGTH' here above:
  * when developing a new networking application, it can be helpful

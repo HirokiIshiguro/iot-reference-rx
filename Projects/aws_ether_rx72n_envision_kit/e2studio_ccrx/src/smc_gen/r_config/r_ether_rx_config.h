@@ -62,7 +62,7 @@
     #define ETHER_CFG_CH1_PHY_ADDRESS                   (1)
 
 /* The number of Rx descriptors. */
-    #define ETHER_CFG_EMAC_RX_DESCRIPTORS               (4)
+    #define ETHER_CFG_EMAC_RX_DESCRIPTORS               (2)
 
 /* The number of Tx descriptors. */
     #define ETHER_CFG_EMAC_TX_DESCRIPTORS               (2)
