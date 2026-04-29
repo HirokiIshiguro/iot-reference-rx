@@ -79,11 +79,12 @@ extern void vLoggingPrintf (const char *pcFormatString,
  * @brief TCP stream buffer and window sizing for MQTT/TLS traffic.
  *
  * RX72N OTA streams deliver each 16 KiB block as a roughly 22 KiB JSON/Base64
- * MQTT PUBLISH. The FreeRTOS+TCP default RX buffer is only 4 * MSS, which makes
- * the peer hit TCP Window Full repeatedly during each block response.
+ * MQTT PUBLISH. OTA requests can ask AWS IoT Streams for multiple blocks, so
+ * the socket needs enough RX space for adjacent PUBLISH packets while flash
+ * programming is in progress.
  */
 #ifndef FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH
-#define FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH (32768)
+#define FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH (65536)
 #endif
 
 #ifndef FREERTOS_SOCKETS_WRAPPER_TCP_TX_BUFFER_LENGTH
@@ -91,7 +92,7 @@ extern void vLoggingPrintf (const char *pcFormatString,
 #endif
 
 #ifndef FREERTOS_SOCKETS_WRAPPER_TCP_RX_WINDOW_SIZE
-#define FREERTOS_SOCKETS_WRAPPER_TCP_RX_WINDOW_SIZE (20)
+#define FREERTOS_SOCKETS_WRAPPER_TCP_RX_WINDOW_SIZE (44)
 #endif
 
 #ifndef FREERTOS_SOCKETS_WRAPPER_TCP_TX_WINDOW_SIZE
