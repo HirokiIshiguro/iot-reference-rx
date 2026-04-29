@@ -58,8 +58,9 @@
 #define configMAX_PRIORITIES                       (7)
 #define configTICK_RATE_HZ                         (( TickType_t ) 1000)
 #define configMINIMAL_STACK_SIZE                   (768)
-#define configTOTAL_HEAP_SIZE_N						(256)
+#define configTOTAL_HEAP_SIZE_N						(320)
 #define configTOTAL_HEAP_SIZE                      (( size_t ) ( configTOTAL_HEAP_SIZE_N * 1024 ))
+#define configAPPLICATION_ALLOCATED_HEAP           1
 #define configMAX_TASK_NAME_LEN                    (12)
 #define configUSE_TRACE_FACILITY                   1
 #define configUSE_16_BIT_TICKS                     0
@@ -257,23 +258,23 @@ extern void vApplicationLcdLogString( const char * pcMessage, unsigned short usS
  * ipconfigUSE_DHCP is set to 1 but a DNS server cannot be contacted. */
 #define configIP_ADDR0                       192
 #define configIP_ADDR1                       168
-#define configIP_ADDR2                       11
-#define configIP_ADDR3                       12
+#define configIP_ADDR2                       10
+#define configIP_ADDR3                       114
 
 /* Default gateway IP address configuration.  Used in ipconfigUSE_DHCP is set to
  * 0, or ipconfigUSE_DHCP is set to 1 but a DNS server cannot be contacted. */
-#define configGATEWAY_ADDR0                  172
-#define configGATEWAY_ADDR1                  27
-#define configGATEWAY_ADDR2                  49
+#define configGATEWAY_ADDR0                  192
+#define configGATEWAY_ADDR1                  168
+#define configGATEWAY_ADDR2                  10
 #define configGATEWAY_ADDR3                  1
 
 /* Default DNS server configuration.  OpenDNS addresses are 208.67.222.222 and
  * 208.67.220.220.  Used in ipconfigUSE_DHCP is set to 0, or ipconfigUSE_DHCP is
  * set to 1 but a DNS server cannot be contacted.*/
-#define configDNS_SERVER_ADDR0               143
-#define configDNS_SERVER_ADDR1               103
-#define configDNS_SERVER_ADDR2               47
-#define configDNS_SERVER_ADDR3               193
+#define configDNS_SERVER_ADDR0               192
+#define configDNS_SERVER_ADDR1               168
+#define configDNS_SERVER_ADDR2               10
+#define configDNS_SERVER_ADDR3               1
 
 /* Default netmask configuration.  Used in ipconfigUSE_DHCP is set to 0, or
  * ipconfigUSE_DHCP is set to 1 but a DNS server cannot be contacted. */

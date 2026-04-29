@@ -1489,16 +1489,16 @@
                 <gridItem id="configMAC_ADDR5" selectedIndex="0x03"/>
                 <gridItem id="configIP_ADDR0" selectedIndex="192"/>
                 <gridItem id="configIP_ADDR1" selectedIndex="168"/>
-                <gridItem id="configIP_ADDR2" selectedIndex="11"/>
-                <gridItem id="configIP_ADDR3" selectedIndex="12"/>
-                <gridItem id="configGATEWAY_ADDR0" selectedIndex="172"/>
-                <gridItem id="configGATEWAY_ADDR1" selectedIndex="27"/>
-                <gridItem id="configGATEWAY_ADDR2" selectedIndex="49"/>
+                <gridItem id="configIP_ADDR2" selectedIndex="10"/>
+                <gridItem id="configIP_ADDR3" selectedIndex="114"/>
+                <gridItem id="configGATEWAY_ADDR0" selectedIndex="192"/>
+                <gridItem id="configGATEWAY_ADDR1" selectedIndex="168"/>
+                <gridItem id="configGATEWAY_ADDR2" selectedIndex="10"/>
                 <gridItem id="configGATEWAY_ADDR3" selectedIndex="1"/>
-                <gridItem id="configDNS_SERVER_ADDR0" selectedIndex="143"/>
-                <gridItem id="configDNS_SERVER_ADDR1" selectedIndex="103"/>
-                <gridItem id="configDNS_SERVER_ADDR2" selectedIndex="47"/>
-                <gridItem id="configDNS_SERVER_ADDR3" selectedIndex="193"/>
+                <gridItem id="configDNS_SERVER_ADDR0" selectedIndex="192"/>
+                <gridItem id="configDNS_SERVER_ADDR1" selectedIndex="168"/>
+                <gridItem id="configDNS_SERVER_ADDR2" selectedIndex="10"/>
+                <gridItem id="configDNS_SERVER_ADDR3" selectedIndex="1"/>
                 <gridItem id="configNET_MASK0" selectedIndex="8"/>
                 <gridItem id="configNET_MASK1" selectedIndex="8"/>
                 <gridItem id="configNET_MASK2" selectedIndex="8"/>
