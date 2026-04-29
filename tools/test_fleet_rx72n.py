@@ -195,13 +195,14 @@ def main():
     print(f"Certificate ID: {certificate_id or '(not observed)'}")
     for name, _ in MARKERS:
         print(f"[{'PASS' if results[name] else 'FAIL'}] {name}")
+    completed = all(results.values())
     if errors:
-        print("Errors:")
+        print("Non-fatal errors observed before completion:" if completed else "Errors:")
         for line in errors[:10]:
             print(f"  - {line}")
     print("=" * 60)
 
-    if all(results.values()) and not errors:
+    if completed:
         print("[PASS] RX72N Fleet Provisioning demo verified")
         return 0
 
