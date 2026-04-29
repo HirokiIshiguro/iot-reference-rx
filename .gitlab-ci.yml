@@ -43,13 +43,13 @@ variables:
   RX72N_SKIP_HW_TESTS: "false"
   RX72N_SKIP_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
-  RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-03"
+  RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
   RX72N_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
-  # The restore pipeline is pinned to the RX72N set2 runner on RPi#1.
+  # The restore pipeline is pinned to the RX72N set1 runner on RPi#2.
   # RPi#1 and RPi#2 both expose an RX72N E2 Lite as OBE110008, but the runner
   # tag scopes the host, so the pinned serial remains unambiguous.
   RX72N_LINUX_RFP_TOOL: "e2l:OBE110008"
-  RX72N_LINUX_UART_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN6_RPI1}"
+  RX72N_LINUX_UART_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN6_RPI2}"
   RX72N_LINUX_COMMAND_PORT: ""
   RX72N_LINUX_UART_BAUD_RATE: "921600"
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
@@ -197,7 +197,7 @@ build_rx72n_fleet_candidate:
     - os-linux
     - hw-raspi
     - dev-ek-rx72n
-    - dev-ek-rx72n-set2
+    - dev-ek-rx72n-set1
   resource_group: $RX72N_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail
