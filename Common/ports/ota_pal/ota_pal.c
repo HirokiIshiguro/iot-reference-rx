@@ -35,7 +35,7 @@
 
 #define MAX_SIG_LENGTH              (64U)
 #define HALF_SIG_LENGTH             (MAX_SIG_LENGTH / 2U)
-#define OTA_FLASH_QUEUE_LENGTH      (3U)
+#define OTA_FLASH_QUEUE_LENGTH      (2U)
 /* Keep flash programming below OTA/MQTT so the next stream request is sent before programming starts. */
 #define OTA_FLASH_TASK_PRIORITY     (tskIDLE_PRIORITY)
 #define OTA_PAYLOAD_BASE_OFFSET     (0x200U)
