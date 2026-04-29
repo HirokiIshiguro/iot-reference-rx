@@ -38,7 +38,7 @@
  *
  */
 #ifndef mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST
-#define mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST (4U)
+#define mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST (3U)
 #endif
 
 #if mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST == 0
