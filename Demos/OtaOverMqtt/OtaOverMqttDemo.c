@@ -109,7 +109,7 @@
 #define MAX_THING_NAME_SIZE                      (128U)
 #define MAX_JOB_ID_LENGTH                        (64U)
 #define JOB_MSG_LENGTH                           (128U)
-#define MAX_NUM_OF_OTA_DATA_BUFFERS              (3)
+#define MAX_NUM_OF_OTA_DATA_BUFFERS              (2)
 #define MAX_RETRY_ERASE_AREA                     (3)
 #define MAX_NUM_OF_OTA_FILE_BLOCKS               (128U)
 
