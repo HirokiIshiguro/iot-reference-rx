@@ -1486,7 +1486,7 @@
                 <gridItem id="configMAC_ADDR2" selectedIndex="0x50"/>
                 <gridItem id="configMAC_ADDR3" selectedIndex="0x00"/>
                 <gridItem id="configMAC_ADDR4" selectedIndex="0x79"/>
-                <gridItem id="configMAC_ADDR5" selectedIndex="0x03"/>
+                <gridItem id="configMAC_ADDR5" selectedIndex="0x02"/>
                 <gridItem id="configIP_ADDR0" selectedIndex="192"/>
                 <gridItem id="configIP_ADDR1" selectedIndex="168"/>
                 <gridItem id="configIP_ADDR2" selectedIndex="10"/>
