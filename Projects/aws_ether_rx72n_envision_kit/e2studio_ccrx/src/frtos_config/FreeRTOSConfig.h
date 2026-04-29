@@ -258,23 +258,23 @@ extern void vApplicationLcdLogString( const char * pcMessage, unsigned short usS
  * ipconfigUSE_DHCP is set to 1 but a DNS server cannot be contacted. */
 #define configIP_ADDR0                       192
 #define configIP_ADDR1                       168
-#define configIP_ADDR2                       11
-#define configIP_ADDR3                       12
+#define configIP_ADDR2                       10
+#define configIP_ADDR3                       114
 
 /* Default gateway IP address configuration.  Used in ipconfigUSE_DHCP is set to
  * 0, or ipconfigUSE_DHCP is set to 1 but a DNS server cannot be contacted. */
-#define configGATEWAY_ADDR0                  172
-#define configGATEWAY_ADDR1                  27
-#define configGATEWAY_ADDR2                  49
+#define configGATEWAY_ADDR0                  192
+#define configGATEWAY_ADDR1                  168
+#define configGATEWAY_ADDR2                  10
 #define configGATEWAY_ADDR3                  1
 
 /* Default DNS server configuration.  OpenDNS addresses are 208.67.222.222 and
  * 208.67.220.220.  Used in ipconfigUSE_DHCP is set to 0, or ipconfigUSE_DHCP is
  * set to 1 but a DNS server cannot be contacted.*/
-#define configDNS_SERVER_ADDR0               143
-#define configDNS_SERVER_ADDR1               103
-#define configDNS_SERVER_ADDR2               47
-#define configDNS_SERVER_ADDR3               193
+#define configDNS_SERVER_ADDR0               192
+#define configDNS_SERVER_ADDR1               168
+#define configDNS_SERVER_ADDR2               10
+#define configDNS_SERVER_ADDR3               1
 
 /* Default netmask configuration.  Used in ipconfigUSE_DHCP is set to 0, or
  * ipconfigUSE_DHCP is set to 1 but a DNS server cannot be contacted. */
