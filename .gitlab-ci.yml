@@ -991,7 +991,8 @@ provision_rx65n_bg96_ota_signer_certificate:
       fi
 
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
-      code_signer_cert="${AWS_IOT_CODE_SIGNING_CERT_PEM_FILE_CK_RX65N_01:-artifacts/rx65n_bg96_ota_candidate/bg96_ota_codesign_cert.pem}"
+      code_signer_cert="${RX65N_BG96_OTA_CODE_SIGNING_CERT:-${BG96_OTA_CODE_SIGNING_CERT:-artifacts/rx65n_bg96_ota_candidate/bg96_ota_codesign_cert.pem}}"
+      echo "Using RX65N BG96 OTA code signer certificate: ${code_signer_cert}"
       python3 tools/bg96_ota_prepare.py \
         --uart-port "${uart_port}" \
         --code-signer-cert "${code_signer_cert}" \
