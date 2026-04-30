@@ -945,6 +945,33 @@ build_rx65n_bg96_ota_candidate:
         --signing-key "$signingKey" `
         --e2studio-cli "$env:E2STUDIO_CLI_BG96" `
         --workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_OTA"
+
+      $explicitCodeSignerCert = Get-FirstEnv @(
+        "RX65N_BG96_OTA_CODE_SIGNING_CERT",
+        "AWS_IOT_CODE_SIGNING_CERT_PEM_FILE_CK_RX65N_01",
+        "BG96_OTA_CODE_SIGNING_CERT"
+      )
+      if ($explicitCodeSignerCert) {
+        Write-Host "Using externally supplied RX65N BG96 OTA code signer certificate from CI variable: $($explicitCodeSignerCert.Name)"
+      } else {
+        $regionItem = Get-FirstEnv @("AWS_DEFAULT_REGION", "AWS_REGION", "AWS_OTA_REGION_CK_RX65N_01", "BG96_OTA_REGION")
+        $signingProfileItem = Get-FirstEnv @(
+          "AWS_OTA_SIGNING_PROFILE_CK_RX65N_01",
+          "RX65N_BG96_OTA_SIGNING_PROFILE",
+          "BG96_AWS_OTA_SIGNING_PROFILE",
+          "BG96_OTA_SIGNING_PROFILE",
+          "OTA_SIGNING_PROFILE"
+        )
+        if ($regionItem -and $signingProfileItem) {
+          $awsCodeSignerCert = Join-Path $artifactDir "bg96_ota_aws_codesign_cert.pem"
+          python tools/fetch_aws_signer_certificate.py `
+            --signing-profile "$($signingProfileItem.Value)" `
+            --region "$($regionItem.Value)" `
+            --out "$awsCodeSignerCert"
+        } else {
+          Write-Host "AWS Signer profile or region is unavailable; falling back to locally generated code signer certificate."
+        }
+      }
   after_script:
     - $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate"
     - $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\aws_bg96_ck_rx65n\e2studio_ccrx"
@@ -991,7 +1018,17 @@ provision_rx65n_bg96_ota_signer_certificate:
       fi
 
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
-      code_signer_cert="${RX65N_BG96_OTA_CODE_SIGNING_CERT:-${BG96_OTA_CODE_SIGNING_CERT:-artifacts/rx65n_bg96_ota_candidate/bg96_ota_codesign_cert.pem}}"
+      if [ -n "${RX65N_BG96_OTA_CODE_SIGNING_CERT:-}" ]; then
+        code_signer_cert="${RX65N_BG96_OTA_CODE_SIGNING_CERT}"
+      elif [ -n "${AWS_IOT_CODE_SIGNING_CERT_PEM_FILE_CK_RX65N_01:-}" ]; then
+        code_signer_cert="${AWS_IOT_CODE_SIGNING_CERT_PEM_FILE_CK_RX65N_01}"
+      elif [ -n "${BG96_OTA_CODE_SIGNING_CERT:-}" ]; then
+        code_signer_cert="${BG96_OTA_CODE_SIGNING_CERT}"
+      elif [ -f artifacts/rx65n_bg96_ota_candidate/bg96_ota_aws_codesign_cert.pem ]; then
+        code_signer_cert="artifacts/rx65n_bg96_ota_candidate/bg96_ota_aws_codesign_cert.pem"
+      else
+        code_signer_cert="artifacts/rx65n_bg96_ota_candidate/bg96_ota_codesign_cert.pem"
+      fi
       echo "Using RX65N BG96 OTA code signer certificate: ${code_signer_cert}"
       python3 tools/bg96_ota_prepare.py \
         --uart-port "${uart_port}" \
