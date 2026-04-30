@@ -32,6 +32,27 @@ variables:
   RX72N_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
   RX65N_BG96_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
   RUN_RX65N_BG96_BUILD: "true"
+  # RX65N_BG96_TEST_SCOPE:
+  #   build - build/package only, no hardware test.
+  #   flash - flash the CK-RX65N BG96 boot loader.
+  #   mqtt  - flash, download app, provision credentials, and verify MQTT.
+  #   ota   - mqtt + AWS IoT OTA.
+  #   full  - ota + Fleet Provisioning path.
+  RX65N_BG96_TEST_SCOPE: "build"
+  RX65N_BG96_SKIP_HW_TESTS: "false"
+  RX65N_BG96_DEVICE_RESOURCE_GROUP: "ck-rx65n-rpi2-hardware"
+  RX65N_BG96_LINUX_RFP_CLI: "/usr/local/bin/rfp-cli"
+  RX65N_BG96_RFP_DEVICE: "RX65x"
+  RX65N_BG96_RFP_INTERFACE: "fine"
+  RX65N_BG96_RFP_SPEED: "1500K"
+  RX65N_BG96_RFP_AUTH_ID: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+  RX65N_BG96_RFP_TOOL: "e2l:OBE110020"
+  RX65N_BG96_UART_PORT: ""
+  RX65N_BG96_RUNNER_HOSTNAME: "ef-saffti-001-rpi-002"
+  RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS: "180"
+  RX65N_BG96_APP_STARTUP_TIMEOUT_SECONDS: "420"
+  RX65N_BG96_APP_RESET_RETRIES: "2"
+  RX65N_BG96_MQTT_TIMEOUT_SECONDS: "900"
   RX72N_DEVICE_ID: "rx72n-02"
   # RX72N_TEST_SCOPE:
   #   auto  - main/tag/manual pipelines run the MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
@@ -270,6 +291,26 @@ build_rx72n_fleet_candidate:
     - source .venv-pi/bin/activate
     - python -m pip install --quiet pyserial cryptography
 
+.rx65n_bg96_linux_hw_job:
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-raspi
+    - dev-ek-rx72n
+    - dev-ek-rx72n-set1
+  resource_group: $RX65N_BG96_DEVICE_RESOURCE_GROUP
+  before_script:
+    - set -o pipefail
+    - python3 -m venv .venv-pi
+    - source .venv-pi/bin/activate
+    - python -m pip install --quiet pyserial cryptography
+
+.rx65n_bg96_flash_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|mqtt|ota|full)$/'
+      when: on_success
+    - when: never
+
 flash_rx72n_linux:
   stage: flash
   extends: .rx72n_linux_hw_job
@@ -326,6 +367,46 @@ flash_rx72n_linux:
     when: always
     paths:
       - artifacts/flash_rx72n_linux/
+    expire_in: 7 days
+
+flash_rx65n_bg96_bootloader:
+  stage: flash
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_flash_rules
+  needs:
+    - job: build_rx65n_bg96
+      artifacts: true
+  script:
+    - echo "=== Flash CK-RX65N BG96 boot loader on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx65n_bg96_bootloader"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-unused}}"
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action flash-bootloader \
+        --bootloader-mot artifacts/rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --uart-port "${uart_port}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/flash_bootloader.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/flash_rx65n_bg96_bootloader/
     expire_in: 7 days
 
 flash_rx72n_fleet_linux:
