@@ -3,6 +3,7 @@ stages:
   - flash
   - bootloader_download
   - app_run
+  - credential_prepare
   - provision
   - app_reset
   - pre_test_cleanup
@@ -16,6 +17,7 @@ stages:
   - fleet_provision
   - fleet_test
   - fleet_cleanup
+  - credential_cleanup
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -62,6 +64,9 @@ variables:
   RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS: "25"
   RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS: "0.002"
   RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS: "0.5"
+  RX65N_BG96_DYNAMIC_IOT_CREDENTIALS: "true"
+  RX65N_BG96_IOT_POLICY_NAME: "ck-rx65n-policy"
+  RX65N_BG96_THING_NAME_PREFIX: "rx65n-bg96"
   RX72N_DEVICE_ID: "rx72n-02"
   # RX72N_TEST_SCOPE:
   #   auto  - main/tag/manual pipelines run the MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
@@ -344,6 +349,12 @@ build_rx72n_fleet_candidate:
       when: on_success
     - when: never
 
+.rx65n_bg96_credential_prepare_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota|full)$/'
+      when: on_success
+    - when: never
+
 flash_rx72n_linux:
   stage: flash
   extends: .rx72n_linux_hw_job
@@ -535,12 +546,73 @@ run_rx65n_bg96_app:
       - artifacts/run_rx65n_bg96_app/
     expire_in: 7 days
 
+prepare_rx65n_bg96_mqtt_credentials:
+  stage: credential_prepare
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  resource_group: rx65n-bg96-aws-iot-credentials
+  extends:
+    - .rx65n_bg96_credential_prepare_rules
+  script:
+    - $ErrorActionPreference = "Stop"
+    - |
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_mqtt_credentials"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      function Get-FirstEnv {
+        param([string[]]$Names)
+        foreach ($name in $Names) {
+          $value = [Environment]::GetEnvironmentVariable($name)
+          if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return @{ Name = $name; Value = $value }
+          }
+        }
+        return $null
+      }
+
+      $thing = Get-FirstEnv @("AWS_IOT_THING_NAME_CK_RX65N_01", "RX65N_BG96_AWS_IOT_THING_NAME", "BG96_AWS_IOT_THING_NAME", "BG96_MQTT_THING_NAME", "AWS_IOT_THING_NAME")
+      $cert = Get-FirstEnv @("AWS_IOT_DEVICE_CERT_PEM_FILE_CK_RX65N_01", "AWS_IOT_DEVICE_CERT_PEM_CK_RX65N_01", "AWS_IOT_CLIENT_CERT_PEM_CK_RX65N_01", "AWS_IOT_CLIENT_CERTIFICATE_PEM_CK_RX65N_01", "BG96_AWS_IOT_DEVICE_CERT_PEM_FILE", "BG96_AWS_IOT_DEVICE_CERT_PEM", "BG96_AWS_IOT_CLIENT_CERTIFICATE_PEM", "AWS_IOT_DEVICE_CERT_PEM_FILE", "AWS_IOT_DEVICE_CERT_PEM", "AWS_IOT_CLIENT_CERTIFICATE_PEM", "AWS_IOT_CERT")
+      $key = Get-FirstEnv @("AWS_IOT_DEVICE_PRIVATE_KEY_PEM_FILE_CK_RX65N_01", "AWS_IOT_DEVICE_PRIVATE_KEY_PEM_CK_RX65N_01", "AWS_IOT_CLIENT_PRIVATE_KEY_PEM_CK_RX65N_01", "AWS_IOT_PRIVATE_KEY_PEM_CK_RX65N_01", "BG96_AWS_IOT_DEVICE_PRIVATE_KEY_PEM_FILE", "BG96_AWS_IOT_DEVICE_PRIVATE_KEY_PEM", "BG96_AWS_IOT_PRIVATE_KEY_PEM", "AWS_IOT_DEVICE_PRIVATE_KEY_PEM_FILE", "AWS_IOT_DEVICE_PRIVATE_KEY_PEM", "AWS_IOT_PRIVATE_KEY_PEM", "AWS_IOT_PRIVKEY", "AWS_IOT_PRIVATE_KEY")
+      if ($thing -and $cert -and $key) {
+        Write-Host "Static BG96 MQTT credentials are available from CI variables: $($thing.Name), $($cert.Name), $($key.Name)"
+        Set-Content -Path (Join-Path $artifactDir "mode.txt") -Value "static" -Encoding ascii
+        exit 0
+      }
+
+      if ($env:RX65N_BG96_DYNAMIC_IOT_CREDENTIALS -ne "true") {
+        throw "BG96 MQTT credentials are not available and RX65N_BG96_DYNAMIC_IOT_CREDENTIALS is not true."
+      }
+
+      $endpoint = Get-FirstEnv @("AWS_IOT_MQTT_BROKER_ENDPOINT_CK_RX65N_01", "BG96_AWS_IOT_ENDPOINT", "BG96_AWS_IOT_MQTT_BROKER_ENDPOINT", "BG96_MQTT_ENDPOINT", "BG96_MQTT_BROKER_ENDPOINT", "AWS_IOT_ENDPOINT", "AWS_IOT_MQTT_BROKER_ENDPOINT")
+      $thingName = "$env:RX65N_BG96_THING_NAME_PREFIX-$env:CI_PIPELINE_ID"
+      $args = @(
+        "tools/create_bg96_iot_credentials.py",
+        "--artifact-dir", $artifactDir,
+        "--thing-name", $thingName,
+        "--policy-name", $env:RX65N_BG96_IOT_POLICY_NAME,
+        "--region", $env:AWS_DEFAULT_REGION,
+        "--policy-document", "tools/iot_policy.json"
+      )
+      if ($endpoint) {
+        $args += @("--endpoint", $endpoint.Value)
+      }
+      python @args
+  artifacts:
+    when: always
+    paths:
+      - artifacts/rx65n_bg96_mqtt_credentials/
+    expire_in: 7 days
+
 provision_rx65n_bg96_mqtt_credentials:
   stage: provision
   extends:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_provision_rules
   needs:
+    - job: prepare_rx65n_bg96_mqtt_credentials
+      artifacts: true
     - job: download_rx65n_bg96_rsu_via_bootloader
       artifacts: true
     - job: run_rx65n_bg96_app
@@ -564,6 +636,17 @@ provision_rx65n_bg96_mqtt_credentials:
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
         exit 1
+      fi
+
+      credential_dir="$CI_PROJECT_DIR/artifacts/rx65n_bg96_mqtt_credentials"
+      if [ -f "$credential_dir/iot_credentials_meta.json" ]; then
+        export RX65N_BG96_AWS_IOT_THING_NAME="$(tr -d '\r\n' < "$credential_dir/thing_name.txt")"
+        export AWS_IOT_CERT="$credential_dir/certificate.pem"
+        export AWS_IOT_PRIVKEY="$credential_dir/private_key.pem"
+        if [ -z "${AWS_IOT_ENDPOINT:-}" ] && [ -f "$credential_dir/endpoint.txt" ]; then
+          export AWS_IOT_ENDPOINT="$(tr -d '\r\n' < "$credential_dir/endpoint.txt")"
+        fi
+        echo "Using temporary BG96 AWS IoT credentials from $credential_dir"
       fi
 
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
@@ -687,6 +770,39 @@ verify_rx65n_bg96_mqtt:
     when: always
     paths:
       - artifacts/verify_rx65n_bg96_mqtt/
+    expire_in: 7 days
+
+cleanup_rx65n_bg96_mqtt_credentials:
+  stage: credential_cleanup
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  resource_group: rx65n-bg96-aws-iot-credentials
+  dependencies:
+    - prepare_rx65n_bg96_mqtt_credentials
+  allow_failure: true
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_DYNAMIC_IOT_CREDENTIALS == "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt)$/'
+      when: always
+    - when: never
+  script:
+    - $ErrorActionPreference = "Continue"
+    - |
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_mqtt_credentials"
+      $metaPath = Join-Path $artifactDir "iot_credentials_meta.json"
+      $outPath = Join-Path $artifactDir "cleanup_summary.json"
+      if (-not (Test-Path -LiteralPath $metaPath)) {
+        Write-Host "Temporary BG96 credential metadata missing; cleanup skipped."
+        exit 0
+      }
+      python tools/cleanup_bg96_iot_credentials.py `
+        --meta-json "$metaPath" `
+        --output-json "$outPath"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/rx65n_bg96_mqtt_credentials/
     expire_in: 7 days
 
 flash_rx72n_fleet_linux:
