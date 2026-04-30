@@ -46,6 +46,7 @@ variables:
   #   provision - flash, download app, and provision BG96 MQTT/APN credentials.
   #   mqtt  - flash, download app, provision credentials, and verify MQTT.
   #   ota   - mqtt + AWS IoT OTA.
+  #   fleet - build and verify the Fleet Provisioning image.
   #   full  - ota + Fleet Provisioning path.
   RX65N_BG96_TEST_SCOPE: "build"
   RX65N_BG96_SKIP_HW_TESTS: "false"
@@ -77,6 +78,11 @@ variables:
   RX65N_BG96_OTA_APP_RESET_RETRIES: "2"
   RX65N_BG96_OTA_ACTIVATE_RESET_DELAY_SECONDS: "15"
   E2STUDIO_WORKSPACE_RX65N_BG96_OTA: "C:/Temp/e2ws_iot_ref_rx65n_bg96_ota"
+  RX65N_BG96_FLEET_DEMO_ID_PREFIX: "rx65n-bg96-fp"
+  RX65N_BG96_FLEET_TEST_TIMEOUT_SECONDS: "900"
+  RX65N_BG96_FLEET_CLEANUP_RESOURCES: "true"
+  RX65N_BG96_FLEET_POLICY_NAME: "ck-rx65n-policy"
+  E2STUDIO_WORKSPACE_RX65N_BG96_FLEET: "C:/Temp/e2ws_iot_ref_rx65n_bg96_fleet"
   RX72N_DEVICE_ID: "rx72n-02"
   # RX72N_TEST_SCOPE:
   #   auto  - main/tag/manual pipelines run the MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
@@ -242,6 +248,71 @@ build_rx65n_bg96:
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
+build_rx65n_bg96_fleet_candidate:
+  stage: build
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  resource_group: rx65n-bg96-e2studio-build
+  extends:
+    - .rx65n_bg96_fleet_rules
+  script:
+    - Write-Host "=== Build CK-RX65N BG96 Fleet Provisioning candidate ==="
+    - python -m pip install --user cryptography
+    - |
+      $demoIdPrefix = $env:RX65N_BG96_FLEET_DEMO_ID_PREFIX
+      if (-not $demoIdPrefix) { $demoIdPrefix = "rx65n-bg96-fp" }
+      $demoId = "$demoIdPrefix-$env:CI_PIPELINE_ID"
+
+      & "$env:CI_PROJECT_DIR\tools\build_headless_rx65n_bg96_fleet.ps1" `
+        -ProjectRoot "$env:CI_PROJECT_DIR" `
+        -E2Studio "$env:E2STUDIO_CLI_BG96" `
+        -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_FLEET" `
+        -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build_fleet.log" `
+        -FleetDemoId "$demoId"
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96_fleet_candidate"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      $bootMot = "$env:CI_PROJECT_DIR\Projects\boot_loader_ck_rx65n\e2studio_ccrx\HardwareDebug\boot_loader_ck_rx65n.mot"
+      $appMot = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.mot"
+      $appAbs = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.abs"
+      $appX = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.x"
+      foreach ($path in @($bootMot, $appMot, $appAbs, $appX)) {
+        if (-not (Test-Path $path)) { Write-Error "fleet build artifact missing: $path"; exit 1 }
+      }
+
+      Copy-Item $bootMot "$artifactDir\boot_loader_ck_rx65n.mot"
+      Copy-Item $appMot "$artifactDir\aws_bg96_ck_rx65n_fleet.mot"
+      $demoIdPrefix = $env:RX65N_BG96_FLEET_DEMO_ID_PREFIX
+      if (-not $demoIdPrefix) { $demoIdPrefix = "rx65n-bg96-fp" }
+      Set-Content -Path "$artifactDir\fleet_demo_id.txt" -Value "$demoIdPrefix-$env:CI_PIPELINE_ID" -Encoding ascii
+
+      $signingKey = $env:RX65N_BG96_SIGNING_KEY
+      if (-not [System.IO.Path]::IsPathRooted($signingKey)) {
+        $signingKey = Join-Path $env:CI_PROJECT_DIR $signingKey
+      }
+      if (-not (Test-Path $signingKey)) { Write-Error "RX65N BG96 signing key not found: $signingKey"; exit 1 }
+
+      python "$env:CI_PROJECT_DIR\tools\create_bg96_rsu.py" `
+        --mot "$appMot" `
+        --key "$signingKey" `
+        --output "$artifactDir\aws_bg96_ck_rx65n_fleet.rsu"
+
+      if (-not (Test-Path "$artifactDir\aws_bg96_ck_rx65n_fleet.rsu")) { Write-Error "RX65N BG96 Fleet RSU missing"; exit 1 }
+    - Write-Host "BUILD CK-RX65N BG96 FLEET CANDIDATE SUCCESS"
+  artifacts:
+    when: always
+    paths:
+      - rx65n_bg96_e2studio_build_fleet.log
+      - artifacts/rx65n_bg96_fleet_candidate/
+      - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 7 days
+
 build_rx72n_fleet_candidate:
   stage: build
   tags:
@@ -369,6 +440,18 @@ build_rx72n_fleet_candidate:
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(ota|full)$/'
       when: on_success
+    - when: never
+
+.rx65n_bg96_fleet_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(fleet|full)$/ && $AWS_IOT_ENDPOINT && ($AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01 || $RX65N_BG96_FLEET_PROVISIONING_TEMPLATE || $BG96_FLEET_PROVISIONING_TEMPLATE || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($AWS_FLEET_CLAIM_CERT_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_CERT_PEM || $RX65N_BG96_FLEET_CLAIM_CERT || $BG96_FLEET_CLAIM_CERT_PEM || $BG96_FLEET_CLAIM_CERT || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY || $BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $BG96_FLEET_CLAIM_PRIVATE_KEY || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+      when: on_success
+    - when: never
+
+.rx65n_bg96_fleet_cleanup_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(fleet|full)$/ && $RX65N_BG96_FLEET_CLEANUP_RESOURCES != "false" && $AWS_DEFAULT_REGION && ($AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01 || $RX65N_BG96_FLEET_PROVISIONING_TEMPLATE || $BG96_FLEET_PROVISIONING_TEMPLATE || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($AWS_FLEET_CLAIM_CERT_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_CERT_PEM || $RX65N_BG96_FLEET_CLAIM_CERT || $BG96_FLEET_CLAIM_CERT_PEM || $BG96_FLEET_CLAIM_CERT || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY || $BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $BG96_FLEET_CLAIM_PRIVATE_KEY || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+      when: always
     - when: never
 
 flash_rx72n_linux:
@@ -827,10 +910,23 @@ build_rx65n_bg96_ota_candidate:
       }
       Set-Content -Path (Join-Path $artifactDir "version.txt") -Value $version -Encoding ascii
 
-      $signingKey = $env:RX65N_BG96_OTA_SIGNING_KEY
-      if ([string]::IsNullOrWhiteSpace($signingKey)) {
-        $signingKey = $env:RX65N_BG96_SIGNING_KEY
+      function Get-FirstEnv {
+        param([string[]]$Names)
+        foreach ($name in $Names) {
+          $value = [Environment]::GetEnvironmentVariable($name)
+          if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return @{ Name = $name; Value = $value }
+          }
+        }
+        return ""
       }
+
+      $signingKeyItem = Get-FirstEnv @("RX65N_BG96_OTA_SIGNING_KEY", "BG96_OTA_SIGNING_KEY", "RX65N_BG96_SIGNING_KEY")
+      if (-not $signingKeyItem) {
+        throw "RX65N BG96 OTA signing key is not configured."
+      }
+      $signingKey = $signingKeyItem.Value
+      Write-Host "Using RX65N BG96 OTA signing key from CI variable: $($signingKeyItem.Name)"
       if (-not [System.IO.Path]::IsPathRooted($signingKey)) {
         $signingKey = Join-Path $env:CI_PROJECT_DIR $signingKey
       }
@@ -1457,6 +1553,212 @@ cleanup_rx72n_fleet_resources:
     when: always
     paths:
       - artifacts/cleanup_rx72n_fleet_resources/
+    expire_in: 7 days
+
+flash_rx65n_bg96_fleet_bootloader:
+  stage: fleet_flash
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_fleet_rules
+  needs:
+    - job: build_rx65n_bg96_fleet_candidate
+      artifacts: true
+  script:
+    - echo "=== Flash CK-RX65N BG96 bootloader for Fleet Provisioning ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx65n_bg96_fleet_bootloader"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action flash-bootloader \
+        --bootloader-mot "$CI_PROJECT_DIR/artifacts/rx65n_bg96_fleet_candidate/boot_loader_ck_rx65n.mot" \
+        --uart-port "unused" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/flash_fleet_bootloader.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/flash_rx65n_bg96_fleet_bootloader/
+    expire_in: 7 days
+
+provision_rx65n_bg96_fleet_credentials:
+  stage: fleet_provision
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_fleet_rules
+  needs:
+    - job: build_rx65n_bg96_fleet_candidate
+      artifacts: true
+    - job: flash_rx65n_bg96_fleet_bootloader
+      artifacts: true
+  script:
+    - echo "=== Download and provision CK-RX65N BG96 Fleet Provisioning image ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_fleet_credentials"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action download-rsu \
+        --userprog-rsu "$CI_PROJECT_DIR/artifacts/rx65n_bg96_fleet_candidate/aws_bg96_ck_rx65n_fleet.rsu" \
+        --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
+        --uart-port "${uart_port}" \
+        --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/download_fleet_rsu.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      if [ -f "$artifact_dir/selected_uart_port.txt" ]; then
+        uart_port="$(tr -d '\r\n' < "$artifact_dir/selected_uart_port.txt")"
+      fi
+      if [ -z "$uart_port" ]; then
+        echo "RX65N BG96 UART port was not selected." >&2
+        exit 1
+      fi
+
+      python3 tools/bg96_bootloader_integration.py \
+        --action run-app \
+        --uart-port "${uart_port}" \
+        --app-startup-timeout "${RX65N_BG96_APP_STARTUP_TIMEOUT_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/run_fleet_app.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      python3 tools/bg96_bootloader_integration.py \
+        --action provision-fleet \
+        --uart-port "${uart_port}" \
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}" \
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}" \
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/provision_fleet.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/provision_rx65n_bg96_fleet_credentials/
+    expire_in: 7 days
+
+test_rx65n_bg96_fleet:
+  stage: fleet_test
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_fleet_rules
+  needs:
+    - job: provision_rx65n_bg96_fleet_credentials
+      artifacts: true
+  script:
+    - echo "=== Verify CK-RX65N BG96 Fleet Provisioning ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_fleet"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
+      if [ -z "$uart_port" ] && [ -f artifacts/provision_rx65n_bg96_fleet_credentials/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/provision_rx65n_bg96_fleet_credentials/selected_uart_port.txt)"
+      fi
+      if [ -z "$uart_port" ]; then
+        echo "RX65N BG96 UART port was not selected." >&2
+        exit 1
+      fi
+
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      reset_cmd="${RX65N_BG96_LINUX_RFP_CLI} -device ${RX65N_BG96_RFP_DEVICE} -tool ${rfp_tool} -if ${RX65N_BG96_RFP_INTERFACE} -speed ${RX65N_BG96_RFP_SPEED} -auth id ${RX65N_BG96_RFP_AUTH_ID} -sig -run -noquery"
+      python tools/test_fleet_rx72n.py \
+        --label "CK-RX65N BG96" \
+        --log-port "$uart_port" \
+        --log-baud "$UART_BAUD_RATE" \
+        --timeout "$RX65N_BG96_FLEET_TEST_TIMEOUT_SECONDS" \
+        --reset-cmd "$reset_cmd" \
+        --summary-json "$artifact_dir/fleet_summary.json" \
+        2>&1 | tee "$artifact_dir/test_fleet_bg96.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_rx65n_bg96_fleet/
+    expire_in: 7 days
+
+cleanup_rx65n_bg96_fleet_resources:
+  stage: fleet_cleanup
+  allow_failure: true
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  dependencies:
+    - test_rx65n_bg96_fleet
+  extends:
+    - .rx65n_bg96_fleet_cleanup_rules
+  script:
+    - Write-Host "=== Cleanup CK-RX65N BG96 Fleet Provisioning AWS resources ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx65n_bg96_fleet_resources"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $summary = "$env:CI_PROJECT_DIR\artifacts\test_rx65n_bg96_fleet\fleet_summary.json"
+      if (-not (Test-Path $summary)) {
+        Write-Error "Fleet summary not found; cleanup cannot determine generated resources: $summary"
+        exit 1
+      }
+
+      python tools\cleanup_rx72n_fleet_resources.py `
+        --summary-json "$summary" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --policy-name "$env:RX65N_BG96_FLEET_POLICY_NAME" `
+        --output-json "$artifactDir\cleanup_summary.json" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx65n_bg96_fleet_resources.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/cleanup_rx65n_bg96_fleet_resources/
     expire_in: 7 days
 
 flash_rx72n:

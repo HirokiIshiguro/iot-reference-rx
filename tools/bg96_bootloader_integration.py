@@ -124,6 +124,31 @@ CELLULAR_APN_AUTH_VARS = (
     "BG96_MQTT_APN_AUTH",
     "CELLULAR_APN_AUTH",
 )
+FLEET_TEMPLATE_VARS = (
+    "AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01",
+    "RX65N_BG96_FLEET_PROVISIONING_TEMPLATE",
+    "BG96_FLEET_PROVISIONING_TEMPLATE",
+    "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+    "AWS_FLEET_PROVISIONING_TEMPLATE",
+)
+FLEET_CLAIM_CERT_VARS = (
+    "AWS_FLEET_CLAIM_CERT_CK_RX65N_01",
+    "RX65N_BG96_FLEET_CLAIM_CERT_PEM",
+    "RX65N_BG96_FLEET_CLAIM_CERT",
+    "BG96_FLEET_CLAIM_CERT_PEM",
+    "BG96_FLEET_CLAIM_CERT",
+    "AWS_FLEET_CLAIM_CERT_RX72N_02",
+    "AWS_FLEET_CLAIM_CERT",
+)
+FLEET_CLAIM_KEY_VARS = (
+    "AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01",
+    "RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM",
+    "RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY",
+    "BG96_FLEET_CLAIM_PRIVATE_KEY_PEM",
+    "BG96_FLEET_CLAIM_PRIVATE_KEY",
+    "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
+    "AWS_FLEET_CLAIM_PRIVATE_KEY",
+)
 @dataclass
 class SerialCandidate:
     path: str
@@ -421,6 +446,65 @@ def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) ->
         success_tokens=("Configuration save",),
     )
     print("\n[CLI] MQTT credential provisioning complete; resetting app")
+    port.reset_input_buffer()
+    run_rfp(args, ["-sig", "-run"])
+
+
+def provision_fleet_credentials(args: argparse.Namespace, port: serial.Serial) -> None:
+    endpoint, endpoint_var = env_text(ENDPOINT_VARS)
+    template, template_var = env_text(FLEET_TEMPLATE_VARS)
+    claim_cert, claim_cert_var = env_text(FLEET_CLAIM_CERT_VARS)
+    claim_key, claim_key_var = env_text(FLEET_CLAIM_KEY_VARS)
+    missing = [
+        name
+        for name, value in (
+            ("endpoint", endpoint),
+            ("template", template),
+            ("claim_cert", claim_cert),
+            ("claim_key", claim_key),
+        )
+        if not value
+    ]
+    if missing:
+        raise RuntimeError("cannot provision Fleet credentials; missing " + ", ".join(missing))
+
+    print(
+        "\n[CLI] provisioning Fleet credentials from variables: "
+        + ", ".join(name for name in (endpoint_var, template_var, claim_cert_var, claim_key_var) if name)
+    )
+    enter_cli_mode(port, args.provision_cli_timeout, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
+    send_cli_command(
+        port,
+        "format",
+        char_delay=args.provision_char_delay,
+        line_delay=args.provision_line_delay,
+        timeout=6.0,
+        success_tokens=("OK",),
+    )
+    provision_cellular_apn(args, port)
+    send_cli_command(
+        port,
+        f"conf set endpoint {endpoint}",
+        char_delay=args.provision_char_delay,
+        line_delay=args.provision_line_delay,
+    )
+    send_cli_command(
+        port,
+        f"conf set template {template}",
+        char_delay=args.provision_char_delay,
+        line_delay=args.provision_line_delay,
+    )
+    send_cli_pem(port, "claimcert", claim_cert, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
+    send_cli_pem(port, "claimkey", claim_key, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
+    send_cli_command(
+        port,
+        "conf commit",
+        char_delay=args.provision_char_delay,
+        line_delay=args.provision_line_delay,
+        timeout=30.0,
+        success_tokens=("Configuration save",),
+    )
+    print("\n[CLI] Fleet credential provisioning complete; resetting app")
     port.reset_input_buffer()
     run_rfp(args, ["-sig", "-run"])
 
@@ -853,6 +937,14 @@ def provision_mqtt(args: argparse.Namespace) -> None:
     print("[CLI] MQTT credential provisioning job complete")
 
 
+def provision_fleet(args: argparse.Namespace) -> None:
+    with open_uart(args) as port:
+        port.reset_input_buffer()
+        run_rfp(args, ["-sig", "-run"])
+        provision_fleet_credentials(args, port)
+    print("[CLI] Fleet credential provisioning job complete")
+
+
 def reset_app(args: argparse.Namespace) -> None:
     run_rfp(args, ["-sig", "-run"])
     print("[APP] reset issued")
@@ -901,6 +993,7 @@ def parse_args() -> argparse.Namespace:
             "download-rsu",
             "run-app",
             "provision-mqtt",
+            "provision-fleet",
             "reset-app",
             "verify-mqtt",
         ),
@@ -946,6 +1039,7 @@ def main() -> int:
         "download-rsu": download_rsu_via_bootloader,
         "run-app": run_app,
         "provision-mqtt": provision_mqtt,
+        "provision-fleet": provision_fleet,
         "reset-app": reset_app,
         "verify-mqtt": verify_mqtt,
     }

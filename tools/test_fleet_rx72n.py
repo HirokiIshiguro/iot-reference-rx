@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Monitor RX72N UART logs and verify the Fleet Provisioning demo completes.
-"""
+"""Monitor UART logs and verify the Fleet Provisioning demo completes."""
 
 import argparse
 import json
@@ -152,16 +150,17 @@ def monitor_uart(port, baud, timeout, reset_cmd):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verify RX72N Fleet Provisioning demo from log UART")
+    parser = argparse.ArgumentParser(description="Verify Fleet Provisioning demo from log UART")
     parser.add_argument("--log-port", default=DEFAULT_LOG_PORT)
     parser.add_argument("--log-baud", type=int, default=DEFAULT_LOG_BAUD)
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
     parser.add_argument("--reset-cmd", required=True)
+    parser.add_argument("--label", default=os.environ.get("FLEET_TEST_LABEL", "RX72N"))
     parser.add_argument("--summary-json", help="Optional path to write fleet provisioning summary JSON")
     args = parser.parse_args()
 
     print("=" * 60)
-    print("RX72N Fleet Provisioning Test")
+    print(f"{args.label} Fleet Provisioning Test")
     print("=" * 60)
     print(f"Log Port: {args.log_port}")
     print(f"Log Baud: {args.log_baud}")
@@ -203,10 +202,10 @@ def main():
     print("=" * 60)
 
     if completed:
-        print("[PASS] RX72N Fleet Provisioning demo verified")
+        print(f"[PASS] {args.label} Fleet Provisioning demo verified")
         return 0
 
-    print("[FAIL] RX72N Fleet Provisioning demo incomplete")
+    print(f"[FAIL] {args.label} Fleet Provisioning demo incomplete")
     return 1
 
 
