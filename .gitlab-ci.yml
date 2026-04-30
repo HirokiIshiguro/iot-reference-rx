@@ -2,6 +2,7 @@ stages:
   - build
   - flash
   - provision
+  - pre_test_cleanup
   - test
   - package
   - ota_build
@@ -415,6 +416,48 @@ provision_rx72n_fleet_linux:
       - artifacts/provision_rx72n_fleet_linux/
     expire_in: 7 days
 
+cleanup_rx72n_ota_jobs:
+  stage: pre_test_cleanup
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  needs:
+    - provision_rx72n_linux
+  rules:
+    - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: on_success
+    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Cleanup stale RX72N OTA IoT Jobs ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ota_jobs"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      python tools\cleanup_iot_jobs.py `
+        --thing-name "$env:RX72N_DEVICE_ID" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --job-id-prefix "AFR_OTA-" `
+        --output-json "$artifactDir\cleanup_summary.json" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ota_jobs.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/cleanup_rx72n_ota_jobs/
+    expire_in: 7 days
+
 test_mqtt_rx72n_linux:
   stage: test
   extends: .rx72n_linux_hw_job
@@ -422,6 +465,7 @@ test_mqtt_rx72n_linux:
     - build_rx72n
     - flash_rx72n_linux
     - provision_rx72n_linux
+    - cleanup_rx72n_ota_jobs
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
