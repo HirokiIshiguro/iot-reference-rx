@@ -46,6 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--signing-key", required=True, type=Path)
     parser.add_argument("--e2studio-cli", required=True, type=Path)
     parser.add_argument("--workspace", required=True, type=Path)
+    parser.add_argument("--e2studio-timeout", type=int, default=600)
     return parser.parse_args()
 
 
@@ -104,7 +105,18 @@ def main() -> int:
                 ],
             ):
                 print("+ " + " ".join(command))
-                result = subprocess.run(command, cwd=str(repo_root), stdout=log, stderr=subprocess.STDOUT)
+                try:
+                    result = subprocess.run(
+                        command,
+                        cwd=str(repo_root),
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        timeout=args.e2studio_timeout,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    raise RuntimeError(
+                        f"e2 studio command timed out after {args.e2studio_timeout} seconds: {' '.join(command)}"
+                    ) from exc
                 if result.returncode != 0:
                     raise RuntimeError(f"e2 studio command failed with exit {result.returncode}: {' '.join(command)}")
 

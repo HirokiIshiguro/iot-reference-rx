@@ -3,7 +3,8 @@ param(
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studio-cli.exe",
     [string]$Workspace = "C:\iotref-rx65n-bg96-fleet-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build_fleet.log"),
-    [string]$FleetDemoId = "rx65n-bg96-fp"
+    [string]$FleetDemoId = "rx65n-bg96-fp",
+    [int]$E2StudioTimeoutSeconds = 600
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +40,8 @@ try {
         -ProjectRoot $projectRoot `
         -E2Studio $E2Studio `
         -Workspace $Workspace `
-        -LogFile $LogFile
+        -LogFile $LogFile `
+        -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds
 }
 finally {
     [System.IO.File]::WriteAllText(

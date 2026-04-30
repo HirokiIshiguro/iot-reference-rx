@@ -66,6 +66,7 @@ variables:
   RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS: "25"
   RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS: "0.002"
   RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS: "0.5"
+  RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS: "600"
   RX65N_BG96_DYNAMIC_IOT_CREDENTIALS: "true"
   RX65N_BG96_IOT_POLICY_NAME: "ck-rx65n-policy"
   RX65N_BG96_THING_NAME_PREFIX: "rx65n-bg96"
@@ -205,10 +206,11 @@ build_rx65n_bg96:
     - python -m pip install --user cryptography
     - |
       & "$env:CI_PROJECT_DIR\tools\build_headless_rx65n_bg96.ps1" `
-        -ProjectRoot "$env:CI_PROJECT_DIR" `
-        -E2Studio "$env:E2STUDIO_CLI_BG96" `
-        -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96" `
-        -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log"
+      -ProjectRoot "$env:CI_PROJECT_DIR" `
+      -E2Studio "$env:E2STUDIO_CLI_BG96" `
+      -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96" `
+      -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log" `
+      -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -267,10 +269,11 @@ build_rx65n_bg96_fleet_candidate:
 
       & "$env:CI_PROJECT_DIR\tools\build_headless_rx65n_bg96_fleet.ps1" `
         -ProjectRoot "$env:CI_PROJECT_DIR" `
-        -E2Studio "$env:E2STUDIO_CLI_BG96" `
-        -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_FLEET" `
-        -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build_fleet.log" `
-        -FleetDemoId "$demoId"
+      -E2Studio "$env:E2STUDIO_CLI_BG96" `
+      -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_FLEET" `
+      -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build_fleet.log" `
+      -FleetDemoId "$demoId" `
+      -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96_fleet_candidate"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -944,7 +947,8 @@ build_rx65n_bg96_ota_candidate:
         --output-dir "$artifactDir" `
         --signing-key "$signingKey" `
         --e2studio-cli "$env:E2STUDIO_CLI_BG96" `
-        --workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_OTA"
+        --workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_OTA" `
+        --e2studio-timeout "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS"
 
       $explicitCodeSignerCert = Get-FirstEnv @(
         "RX65N_BG96_OTA_CODE_SIGNING_CERT",
