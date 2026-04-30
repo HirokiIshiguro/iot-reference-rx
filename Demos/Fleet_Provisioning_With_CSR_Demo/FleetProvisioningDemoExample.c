@@ -298,9 +298,12 @@ static uint16_t xRejectTopicLength;
  * @param[in] pPublishInfo Pointer to publish info of the incoming publish.
  * @param[in] usPacketIdentifier Packet identifier of the incoming publish.
  */
-static void prvProvisioningPublishCallback (MQTTContext_t *pxMqttContext,
-                                           MQTTPacketInfo_t *pxPacketInfo,
-                                           MQTTDeserializedInfo_t *pxDeserializedInfo);
+static bool prvProvisioningPublishCallback (MQTTContext_t *pxMqttContext,
+                                            MQTTPacketInfo_t *pxPacketInfo,
+                                            MQTTDeserializedInfo_t *pxDeserializedInfo,
+                                            MQTTSuccessFailReasonCode_t *pxReasonCode,
+                                            MQTTPropBuilder_t *pxSendPropsBuffer,
+                                            MQTTPropBuilder_t *pxGetPropsBuffer);
 
 /**
  * @brief Subscribe to the CreateCertificateFromCsr accepted and rejected topics.
@@ -350,9 +353,12 @@ void vStartFleetProvisioningDemo (void);
  *              : pxDeserializedInfo
  * Return Value : .
  *********************************************************************************************************************/
-static void prvProvisioningPublishCallback(MQTTContext_t *pxMqttContext,
+static bool prvProvisioningPublishCallback(MQTTContext_t *pxMqttContext,
                                            MQTTPacketInfo_t *pxPacketInfo,
-                                           MQTTDeserializedInfo_t *pxDeserializedInfo)
+                                           MQTTDeserializedInfo_t *pxDeserializedInfo,
+                                           MQTTSuccessFailReasonCode_t *pxReasonCode,
+                                           MQTTPropBuilder_t *pxSendPropsBuffer,
+                                           MQTTPropBuilder_t *pxGetPropsBuffer)
 {
     FleetProvisioningStatus_t xStatus;
     FleetProvisioningTopic_t xApi;
@@ -365,6 +371,9 @@ static void prvProvisioningPublishCallback(MQTTContext_t *pxMqttContext,
     /* Suppress the unused parameter warning when asserts are disabled in
      * build. */
     (void)pxMqttContext;
+    (void)pxReasonCode;
+    (void)pxSendPropsBuffer;
+    (void)pxGetPropsBuffer;
 
     /* Handle an incoming publish. The lower 4 bits of the publish packet
      * type is used for the dup, QoS, and retain flags. Hence masking
@@ -437,6 +446,8 @@ static void prvProvisioningPublishCallback(MQTTContext_t *pxMqttContext,
         vHandleOtherIncomingPacket(pxPacketInfo, pxDeserializedInfo->packetIdentifier);
         xResponseStatus = ResponseAccepted;
     }
+
+    return true;
 }
 /**********************************************************************************************************************
  End of function prvProvisioningPublishCallback

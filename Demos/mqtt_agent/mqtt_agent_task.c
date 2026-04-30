@@ -560,7 +560,9 @@ static MQTTStatus_t prvCreateMQTTConnection(bool xIsReconnect)
                            &xConnectInfo,
                            NULL,
                            mqttexampleCONNACK_RECV_TIMEOUT_MS,
-                           &xSessionPresent);
+                           &xSessionPresent,
+                           NULL,
+                           NULL);
 
     if ((MQTTSuccess == xResult) && (true == xIsReconnect))
     {
