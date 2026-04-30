@@ -60,6 +60,7 @@ variables:
   AWS_DEFAULT_REGION: "ap-northeast-1"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
   E2STUDIO_WORKSPACE_FLEET: "C:/Temp/e2ws_iot_ref_rx72n_fleet"
+  E2STUDIO_WORKSPACE_MQTT: "C:/Temp/e2ws_iot_ref_rx72n_mqtt"
 
 workflow:
   rules:
@@ -683,6 +684,8 @@ build_rx72n_mqtt_candidate:
         -Endpoint "$env:AWS_IOT_ENDPOINT" `
         -CertInput "$env:AWS_CLIENT_CERT_RX72N_02" `
         -KeyInput "$env:AWS_PRIVATE_KEY_RX72N_02" `
+        -E2Studio "$env:E2STUDIO_CLI" `
+        -Workspace "$env:E2STUDIO_WORKSPACE_MQTT" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_mqtt_candidate.log"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
