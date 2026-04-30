@@ -47,28 +47,27 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 | GitHub (upstream) | https://github.com/renesas/iot-reference-rx |
 
 - GitLab プロジェクト ID: **38**
-- ベースバージョン: **v202406.04-LTS-rx-1.2.0**（FreeRTOS 202406.04 LTS）
+- ベースバージョン: **202604.00-LTS-rx**（FreeRTOS 202604.00 LTS）
 - デフォルトブランチ: `main`（protected）
 
 ## Version Information / バージョン情報
 
 | Component | Version | LTS Until |
 |-----------|---------|-----------|
-| FreeRTOS Kernel | 11.1.0 | 2026/06/30 |
-| FreeRTOS-Plus-TCP | 4.2.2 | 2026/06/30 |
-| coreMQTT | 2.3.1 | 2026/06/30 |
-| coreMQTT-Agent | 1.3.1 | -- |
-| corePKCS11 | 3.6.1 | 2026/06/30 |
-| coreJSON | 3.3.0 | 2026/06/30 |
-| AWS IoT Jobs | 1.5.1 | 2026/06/30 |
-| AWS IoT MQTT File Streams | 1.1.0 | 2026/06/30 |
-| Fleet Provisioning | 1.2.1 | -- |
-| mbedTLS | 3.6.3 | -- |
+| FreeRTOS Kernel | 11.3.0 | 2028/06/30 |
+| FreeRTOS-Plus-TCP | 4.4.1 | 2028/06/30 |
+| coreMQTT | 5.0.2 | 2028/06/30 |
+| coreMQTT-Agent | 1.3.1 + local coreMQTT v5 adapter | -- |
+| corePKCS11 | 3.6.4 | 2028/06/30 |
+| coreJSON | 3.3.1 | 2028/06/30 |
+| AWS IoT Jobs | 2.0.1 | 2028/06/30 |
+| AWS IoT MQTT File Streams | 1.2.0 | 2028/06/30 |
+| Fleet Provisioning | 1.2.2 | 2028/06/30 |
+| mbedTLS | 3.6.4 | -- |
 | littlefs | 2.5.1 | -- |
 | r_fwup | 2.04 | -- |
 
-**注意:** v202406.04-LTS-rx-1.2.0 より Fleet Provisioning デモが正式サポート（`Demos/Fleet_Provisioning_With_CSR_Demo/`）。
-SBOM (`sbom.spdx`) および Wi-Fi OTA (DA16600) 対応も追加（DA16600 は本 fork 非対象）。
+**注意:** 202604.00-LTS では coreMQTT が v5、Jobs が v2 へ更新されるため、RX72N プロジェクトでは `Common/patches/coreMQTT-Agent/` と `Common/patches/Jobs-for-AWS-IoT-embedded-sdk/` に互換差分を保持する。
 
 ## Build Environment / ビルド環境
 

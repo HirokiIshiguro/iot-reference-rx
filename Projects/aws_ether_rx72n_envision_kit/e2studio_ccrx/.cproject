@@ -364,7 +364,7 @@
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Kernel\event_groups.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Kernel\list.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Kernel/portable/MemMang\heap_4.obj&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU\port.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Common/patches/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU\port.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Kernel\queue.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Kernel\stream_buffer.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Kernel\tasks.obj&quot;"/>
@@ -415,10 +415,13 @@
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/FreeRTOS-Plus-TCP/source/portable/NetworkInterface/RX\ether_callback.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/backoffAlgorithm/source\backoff_algorithm.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT/source\core_mqtt.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT/source\core_mqtt_prop_deserializer.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT/source\core_mqtt_prop_serializer.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT/source\core_mqtt_serializer.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT/source\core_mqtt_serializer_private.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT/source\core_mqtt_state.obj&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT-Agent/source\core_mqtt_agent.obj&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/coreMQTT-Agent/source\core_mqtt_agent_command_functions.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Common/patches/coreMQTT-Agent/source\core_mqtt_agent.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Common/patches/coreMQTT-Agent/source\core_mqtt_agent_command_functions.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/corePKCS11/source\core_pkcs11.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/corePKCS11/source\core_pki_utils.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/FreeRTOS/corePKCS11/source/dependency/3rdparty/mbedtls_utils\mbedtls_utils.obj&quot;"/>
@@ -826,7 +829,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="trash/|src/smc_gen/r_bsp/board/generic_rx65n|src/smc_gen/r_bsp/mcu/rx65n|src/smc_gen/r_ether_rx/src/targets/rx65n|src/smc_gen/r_s12ad_rx/src/targets/rx65n|src/smc_gen/r_sci_rx/src/targets/rx65n" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="trash/|src/smc_gen/r_bsp/board/generic_rx65n|src/smc_gen/r_bsp/mcu/rx65n|src/smc_gen/r_ether_rx/src/targets/rx65n|src/smc_gen/r_s12ad_rx/src/targets/rx65n|src/smc_gen/r_sci_rx/src/targets/rx65n|Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU/port.c|Middleware/FreeRTOS/coreMQTT-Agent/source/core_mqtt_agent.c|Middleware/FreeRTOS/coreMQTT-Agent/source/core_mqtt_agent_command_functions.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

@@ -63,6 +63,21 @@
               </Category>
             </Category>
           </Category>
+          <Category Name="FreeRTOS-Kernel">
+            <Category Name="portable">
+              <Category Name="Renesas">
+                <Category Name="RX700v3_DPFPU">
+                  <Path>..\..\..\Common\patches\FreeRTOS-Kernel\portable\Renesas\RX700v3_DPFPU\port.c</Path>
+                </Category>
+              </Category>
+            </Category>
+          </Category>
+          <Category Name="coreMQTT-Agent">
+            <Category Name="source">
+              <Path>..\..\..\Common\patches\coreMQTT-Agent\source\core_mqtt_agent.c</Path>
+              <Path>..\..\..\Common\patches\coreMQTT-Agent\source\core_mqtt_agent_command_functions.c</Path>
+            </Category>
+          </Category>
           <Category Name="Jobs-for-AWS-IoT-embedded-sdk">
             <Category Name="source">
               <Path>..\..\..\Common\patches\Jobs-for-AWS-IoT-embedded-sdk\source\jobs.c</Path>
@@ -674,11 +689,16 @@
             <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\requirements.txt</Path>
             <Category Name="source">
               <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\core_mqtt.c</Path>
+              <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\core_mqtt_prop_deserializer.c</Path>
+              <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\core_mqtt_prop_serializer.c</Path>
               <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\core_mqtt_serializer.c</Path>
+              <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\core_mqtt_serializer_private.c</Path>
               <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\core_mqtt_state.c</Path>
               <Category Name="include">
                 <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\include\core_mqtt.h</Path>
                 <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\include\core_mqtt_config_defaults.h</Path>
+                <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\include\core_mqtt_prop_deserializer.h</Path>
+                <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\include\core_mqtt_prop_serializer.h</Path>
                 <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\include\core_mqtt_serializer.h</Path>
                 <Path>..\..\..\Middleware\FreeRTOS\coreMQTT\source\include\core_mqtt_state.h</Path>
               </Category>
@@ -689,8 +709,6 @@
           </Category>
           <Category Name="coreMQTT-Agent">
             <Category Name="source">
-              <Path>..\..\..\Middleware\FreeRTOS\coreMQTT-Agent\source\core_mqtt_agent.c</Path>
-              <Path>..\..\..\Middleware\FreeRTOS\coreMQTT-Agent\source\core_mqtt_agent_command_functions.c</Path>
               <Category Name="include">
                 <Path>..\..\..\Middleware\FreeRTOS\coreMQTT-Agent\source\include\core_mqtt_agent.h</Path>
                 <Path>..\..\..\Middleware\FreeRTOS\coreMQTT-Agent\source\include\core_mqtt_agent_command_functions.h</Path>
@@ -1874,7 +1892,10 @@
           <Path>HardwareDebug\ether_callback.obj</Path>
           <Path>HardwareDebug\backoff_algorithm.obj</Path>
           <Path>HardwareDebug\core_mqtt.obj</Path>
+          <Path>HardwareDebug\core_mqtt_prop_deserializer.obj</Path>
+          <Path>HardwareDebug\core_mqtt_prop_serializer.obj</Path>
           <Path>HardwareDebug\core_mqtt_serializer.obj</Path>
+          <Path>HardwareDebug\core_mqtt_serializer_private.obj</Path>
           <Path>HardwareDebug\core_mqtt_state.obj</Path>
           <Path>HardwareDebug\core_mqtt_agent.obj</Path>
           <Path>HardwareDebug\core_mqtt_agent_command_functions.obj</Path>

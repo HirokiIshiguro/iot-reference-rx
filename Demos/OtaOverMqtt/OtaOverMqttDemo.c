@@ -1096,6 +1096,8 @@ static bool jobDocumentParser(char *message,
             fileIndex = otaParser_parseJobDocFile(jobDoc,
                                                   jobDocLength,
                                                   fileIndex,
+                                                  "MQTT",
+                                                  (sizeof("MQTT") - 1U),
                                                   jobFields);
         } while (fileIndex > 0);
     }

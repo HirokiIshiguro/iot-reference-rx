@@ -1,5 +1,5 @@
 /*
- * coreSNTP v1.2.0
+ * coreSNTP v2.0.0
  * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2024-2025 Renesas Electronics Corporation or its affiliates.
  *

@@ -1,5 +1,5 @@
 /*
- * coreMQTT v2.1.1
+ * coreMQTT v5.0.2
  * Copyright (C) 2022 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  * Modifications Copyright (C) 2024-2025 Renesas Electronics Corporation or its affiliates.
  *
