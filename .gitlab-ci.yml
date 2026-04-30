@@ -338,6 +338,12 @@ build_rx72n_fleet_candidate:
       when: on_success
     - when: never
 
+.rx65n_bg96_mqtt_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(mqtt|ota|full)$/'
+      when: on_success
+    - when: never
+
 flash_rx72n_linux:
   stage: flash
   extends: .rx72n_linux_hw_job
@@ -537,6 +543,9 @@ provision_rx65n_bg96_mqtt_credentials:
   needs:
     - job: download_rx65n_bg96_rsu_via_bootloader
       artifacts: true
+    - job: run_rx65n_bg96_app
+      artifacts: true
+      optional: true
   script:
     - echo "=== Provision CK-RX65N BG96 MQTT/APN credentials ==="
     - |
@@ -577,6 +586,107 @@ provision_rx65n_bg96_mqtt_credentials:
     when: always
     paths:
       - artifacts/provision_rx65n_bg96_mqtt_credentials/
+    expire_in: 7 days
+
+reset_rx65n_bg96_app:
+  stage: app_reset
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_mqtt_rules
+  needs:
+    - job: download_rx65n_bg96_rsu_via_bootloader
+      artifacts: true
+    - job: provision_rx65n_bg96_mqtt_credentials
+      artifacts: true
+  script:
+    - echo "=== Reset CK-RX65N BG96 app after provisioning ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/reset_rx65n_bg96_app"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      fi
+      if [ -z "$uart_port" ]; then
+        uart_port="unused"
+      fi
+
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action reset-app \
+        --uart-port "${uart_port}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/reset_app.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/reset_rx65n_bg96_app/
+    expire_in: 7 days
+
+verify_rx65n_bg96_mqtt:
+  stage: test
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_mqtt_rules
+  needs:
+    - job: download_rx65n_bg96_rsu_via_bootloader
+      artifacts: true
+    - job: reset_rx65n_bg96_app
+      artifacts: true
+  script:
+    - echo "=== Verify CK-RX65N BG96 MQTT Pub/Sub ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/verify_rx65n_bg96_mqtt"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      fi
+      if [ -z "$uart_port" ]; then
+        echo "RX65N BG96 UART port was not selected." >&2
+        exit 1
+      fi
+
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action verify-mqtt \
+        --uart-port "${uart_port}" \
+        --require-mqtt-pubsub \
+        --app-startup-timeout "${RX65N_BG96_APP_STARTUP_TIMEOUT_SECONDS}" \
+        --mqtt-timeout "${RX65N_BG96_MQTT_TIMEOUT_SECONDS}" \
+        --app-reset-retries "${RX65N_BG96_APP_RESET_RETRIES}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/verify_mqtt.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/verify_rx65n_bg96_mqtt/
     expire_in: 7 days
 
 flash_rx72n_fleet_linux:
