@@ -70,6 +70,9 @@ variables:
   RX65N_BG96_THING_NAME_PREFIX: "rx65n-bg96"
   RX65N_BG96_OTA_CANDIDATE_VERSION: ""
   RX65N_BG96_OTA_SIGNING_KEY: ""
+  RX65N_BG96_OTA_S3_BUCKET: "rx65n-ota"
+  RX65N_BG96_OTA_SIGNING_PROFILE: "rx65n_ota_profile_testkey"
+  RX65N_BG96_OTA_SERVICE_ROLE_ARN: "arn:aws:iam::094025684215:role/rx72n-ota-service-role"
   RX65N_BG96_OTA_OBSERVE_TIMEOUT_SECONDS: "900"
   RX65N_BG96_OTA_APP_RESET_RETRIES: "2"
   RX65N_BG96_OTA_ACTIVATE_RESET_DELAY_SECONDS: "15"
@@ -995,9 +998,9 @@ create_rx65n_bg96_ota_update:
       $region = Resolve-AwsRegion
       $thingName = Require-Value "AWS IoT thing name" $thingName
       $targetArn = Get-FirstEnv @("AWS_OTA_TARGET_ARN_CK_RX65N_01", "BG96_OTA_TARGET_ARN", "OTA_TARGET_ARN")
-      $bucket = Require-Value "AWS OTA S3 bucket" (Get-FirstEnv @("AWS_OTA_S3_BUCKET_CK_RX65N_01", "BG96_AWS_OTA_S3_BUCKET", "BG96_OTA_S3_BUCKET", "OTA_S3_BUCKET"))
-      $signingProfile = Require-Value "AWS OTA signing profile" (Get-FirstEnv @("AWS_OTA_SIGNING_PROFILE_CK_RX65N_01", "BG96_AWS_OTA_SIGNING_PROFILE", "BG96_OTA_SIGNING_PROFILE", "OTA_SIGNING_PROFILE"))
-      $roleArn = Require-Value "AWS OTA service role ARN" (Get-FirstEnv @("AWS_OTA_SERVICE_ROLE_ARN_CK_RX65N_01", "BG96_AWS_OTA_SERVICE_ROLE_ARN", "BG96_OTA_SERVICE_ROLE_ARN", "BG96_OTA_ROLE_ARN", "OTA_SERVICE_ROLE_ARN", "OTA_ROLE_ARN"))
+      $bucket = Require-Value "AWS OTA S3 bucket" (Get-FirstEnv @("AWS_OTA_S3_BUCKET_CK_RX65N_01", "RX65N_BG96_OTA_S3_BUCKET", "BG96_AWS_OTA_S3_BUCKET", "BG96_OTA_S3_BUCKET", "OTA_S3_BUCKET"))
+      $signingProfile = Require-Value "AWS OTA signing profile" (Get-FirstEnv @("AWS_OTA_SIGNING_PROFILE_CK_RX65N_01", "RX65N_BG96_OTA_SIGNING_PROFILE", "BG96_AWS_OTA_SIGNING_PROFILE", "BG96_OTA_SIGNING_PROFILE", "OTA_SIGNING_PROFILE"))
+      $roleArn = Require-Value "AWS OTA service role ARN" (Get-FirstEnv @("AWS_OTA_SERVICE_ROLE_ARN_CK_RX65N_01", "RX65N_BG96_OTA_SERVICE_ROLE_ARN", "BG96_AWS_OTA_SERVICE_ROLE_ARN", "BG96_OTA_SERVICE_ROLE_ARN", "BG96_OTA_ROLE_ARN", "OTA_SERVICE_ROLE_ARN", "OTA_ROLE_ARN"))
       $roleArn = Resolve-IamRoleArn $roleArn
 
       $targetArgs = @()
