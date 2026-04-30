@@ -1,8 +1,18 @@
 # CLAUDE.md — iot-reference-rx
 
 > Current scope note:
-> This fork now retains only the RX72N Envision Kit projects under `Projects/`.
-> Historical CK-RX65N / DA16600 / RYZ014A notes below are preserved as reference and may not match the current repository layout.
+> This fork maintains the RX72N Envision Kit Ethernet reference and the CK-RX65N V1 + BG96 cellular reference under `Projects/`.
+> Historical CK-RX65N / DA16600 / RYZ014A notes below are preserved as reference and may not match the current maintained project set.
+
+## Maintained Projects
+
+| Board | Connectivity | Application | Boot loader | Status |
+|-------|--------------|-------------|-------------|--------|
+| RX72N Envision Kit | Ethernet | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | Maintained |
+| CK-RX65N V1 | BG96 cellular | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | Maintained |
+
+CK-RX65N + BG96 was ported from the stable OSS OTA reference group:
+`https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-ota`.
 
 ## Background / 背景
 

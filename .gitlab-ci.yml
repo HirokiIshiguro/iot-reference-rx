@@ -20,7 +20,9 @@ variables:
   GIT_CONFIG_KEY_0: "core.longpaths"
   GIT_CONFIG_VALUE_0: "true"
   E2STUDIO_CLI: "C:/Renesas/e2_studio_2025_12/eclipse/e2studioc.exe"
+  E2STUDIO_CLI_BG96: "C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe"
   E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref_rx72n"
+  E2STUDIO_WORKSPACE_RX65N_BG96: "C:/Temp/e2ws_iot_ref_rx65n_bg96"
   RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
   RFP_SPEED: "1500K"
   RFP_AUTH: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -28,6 +30,8 @@ variables:
   UART_PORT: "COM7"
   UART_BAUD_RATE: "921600"
   RX72N_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
+  RX65N_BG96_SIGNING_KEY: "sample_keys/secp256r1.privatekey"
+  RUN_RX65N_BG96_BUILD: "true"
   RX72N_DEVICE_ID: "rx72n-02"
   # RX72N_TEST_SCOPE:
   #   auto  - main/tag/manual pipelines run the MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
@@ -132,6 +136,65 @@ build_rx72n:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 7 days
+
+build_rx65n_bg96:
+  stage: build
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+  resource_group: rx65n-bg96-e2studio-build
+  rules:
+    - if: '$RUN_RX65N_BG96_BUILD == "true"'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Build CK-RX65N BG96 projects ==="
+    - python -m pip install --user cryptography
+    - |
+      & "$env:CI_PROJECT_DIR\tools\build_headless_rx65n_bg96.ps1" `
+        -ProjectRoot "$env:CI_PROJECT_DIR" `
+        -E2Studio "$env:E2STUDIO_CLI_BG96" `
+        -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96" `
+        -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log"
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      $bootMot = "$env:CI_PROJECT_DIR\Projects\boot_loader_ck_rx65n\e2studio_ccrx\HardwareDebug\boot_loader_ck_rx65n.mot"
+      $appMot = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.mot"
+      $appAbs = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.abs"
+      $appX = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.x"
+      foreach ($path in @($bootMot, $appMot, $appAbs, $appX)) {
+        if (-not (Test-Path $path)) { Write-Error "build artifact missing: $path"; exit 1 }
+      }
+
+      Copy-Item $bootMot "$artifactDir\boot_loader_ck_rx65n.mot"
+      Copy-Item $appMot "$artifactDir\aws_bg96_ck_rx65n.mot"
+
+      $signingKey = $env:RX65N_BG96_SIGNING_KEY
+      if (-not [System.IO.Path]::IsPathRooted($signingKey)) {
+        $signingKey = Join-Path $env:CI_PROJECT_DIR $signingKey
+      }
+      if (-not (Test-Path $signingKey)) { Write-Error "RX65N BG96 signing key not found: $signingKey"; exit 1 }
+
+      python "$env:CI_PROJECT_DIR\tools\create_bg96_rsu.py" `
+        --mot "$appMot" `
+        --key "$signingKey" `
+        --output "$artifactDir\aws_bg96_ck_rx65n.rsu"
+
+      if (-not (Test-Path "$artifactDir\aws_bg96_ck_rx65n.rsu")) { Write-Error "RX65N BG96 RSU missing"; exit 1 }
+    - Write-Host "BUILD CK-RX65N BG96 SUCCESS"
+  artifacts:
+    when: always
+    paths:
+      - rx65n_bg96_e2studio_build.log
+      - artifacts/rx65n_bg96/
+      - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
 build_rx72n_fleet_candidate:
