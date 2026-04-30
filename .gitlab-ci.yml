@@ -1,6 +1,7 @@
 stages:
   - build
   - flash
+  - bootloader_download
   - provision
   - pre_test_cleanup
   - test
@@ -35,6 +36,7 @@ variables:
   # RX65N_BG96_TEST_SCOPE:
   #   build - build/package only, no hardware test.
   #   flash - flash the CK-RX65N BG96 boot loader.
+  #   download - flash and download the application RSU via the boot loader.
   #   mqtt  - flash, download app, provision credentials, and verify MQTT.
   #   ota   - mqtt + AWS IoT OTA.
   #   full  - ota + Fleet Provisioning path.
@@ -307,7 +309,13 @@ build_rx72n_fleet_candidate:
 
 .rx65n_bg96_flash_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|mqtt|ota|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|download|mqtt|ota|full)$/'
+      when: on_success
+    - when: never
+
+.rx65n_bg96_download_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(download|mqtt|ota|full)$/'
       when: on_success
     - when: never
 
@@ -407,6 +415,51 @@ flash_rx65n_bg96_bootloader:
     when: always
     paths:
       - artifacts/flash_rx65n_bg96_bootloader/
+    expire_in: 7 days
+
+download_rx65n_bg96_rsu_via_bootloader:
+  stage: bootloader_download
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_download_rules
+  needs:
+    - job: build_rx65n_bg96
+      artifacts: true
+    - job: flash_rx65n_bg96_bootloader
+      artifacts: true
+  script:
+    - echo "=== Download CK-RX65N BG96 app RSU via boot loader ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/download_rx65n_bg96_rsu"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action download-rsu \
+        --bootloader-mot artifacts/rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --userprog-rsu artifacts/rx65n_bg96/aws_bg96_ck_rx65n.rsu \
+        --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
+        --uart-port "${uart_port}" \
+        --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/download_rsu.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/download_rx65n_bg96_rsu/
     expire_in: 7 days
 
 flash_rx72n_fleet_linux:
