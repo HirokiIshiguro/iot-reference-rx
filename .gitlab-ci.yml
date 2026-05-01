@@ -52,7 +52,7 @@ variables:
   RX65N_BG96_TEST_SCOPE: "full"
   RX65N_BG96_SKIP_HW_TESTS: "false"
   RX65N_BG96_DEVICE_RESOURCE_GROUP: "ck-rx65n-rpi2-hardware"
-  RX65N_BG96_LINUX_RFP_CLI: "/usr/local/bin/rfp-cli"
+  RX65N_BG96_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
   RX65N_BG96_RFP_DEVICE: "RX65x"
   RX65N_BG96_RFP_INTERFACE: "fine"
   RX65N_BG96_RFP_SPEED: "1500K"

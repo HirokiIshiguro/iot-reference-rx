@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-LOCK_DIR="${RX72N_RFP_CLI_LOCK_DIR:-/tmp/rx72n-e2lite-rfp-cli.lock.d}"
+LOCK_DIR="${RFP_CLI_LOCK_DIR:-${RX72N_RFP_CLI_LOCK_DIR:-/tmp/rx72n-e2lite-rfp-cli.lock.d}}"
 LOCK_FILE="${LOCK_DIR}/rfp-cli.lock"
-REAL_RFP_CLI="${RX72N_REAL_RFP_CLI:-rfp-cli}"
+REAL_RFP_CLI="${REAL_RFP_CLI:-${RX72N_REAL_RFP_CLI:-rfp-cli}}"
 
 umask 000
 mkdir -p "$LOCK_DIR"
