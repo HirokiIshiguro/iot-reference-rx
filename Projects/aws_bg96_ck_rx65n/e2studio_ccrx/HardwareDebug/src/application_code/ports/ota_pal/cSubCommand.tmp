@@ -31,7 +31,7 @@
 -include="..\Common\littlefs_common\rm_littlefs_df\targets\rx65n"
 -include="..\Common\common_api"
 -include="..\Common\patches\Jobs-for-AWS-IoT-embedded-sdk\source\include"
--include="..\Common\ports\ota_pal"
+-include="..\..\..\..\Common\ports\ota_pal"
 -include="..\Demos\cli"
 -include="..\Demos\mqtt_agent"
 -include="..\Demos\Fleet_Provisioning_With_CSR_Demo"

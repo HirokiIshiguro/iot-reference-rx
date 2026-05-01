@@ -49,7 +49,7 @@ variables:
   #   ota   - mqtt + AWS IoT OTA.
   #   fleet - build and verify the Fleet Provisioning image.
   #   full  - ota + Fleet Provisioning path.
-  RX65N_BG96_TEST_SCOPE: "build"
+  RX65N_BG96_TEST_SCOPE: "full"
   RX65N_BG96_SKIP_HW_TESTS: "false"
   RX65N_BG96_DEVICE_RESOURCE_GROUP: "ck-rx65n-rpi2-hardware"
   RX65N_BG96_LINUX_RFP_CLI: "/usr/local/bin/rfp-cli"
@@ -1249,7 +1249,7 @@ cleanup_rx65n_bg96_mqtt_credentials:
     - prepare_rx65n_bg96_mqtt_credentials
   allow_failure: true
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_DYNAMIC_IOT_CREDENTIALS == "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_DYNAMIC_IOT_CREDENTIALS == "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota|full)$/'
       when: always
     - when: never
   script:

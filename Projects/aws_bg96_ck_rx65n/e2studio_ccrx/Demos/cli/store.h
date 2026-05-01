@@ -65,6 +65,7 @@ typedef enum KVStoreKey
 	KVS_TSIP_ROOTCA_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PRIKEY_ID,
+    KVS_OTA_IMAGE_STATE,
     KVS_NUM_KEYS
 } KVStoreKey_t;
 
@@ -103,6 +104,7 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsip_rootca_pub_id",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsip_client_pub_id",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsip_client_pri_id",         \
+        [ KVS_OTA_IMAGE_STATE ] = "ota_image_state",         \
 }
 #define CLICMDKEYS                                       \
     {                                                      \
@@ -123,6 +125,7 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsiprootkey",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsippubkey",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsipprikey",         \
+        [ KVS_OTA_IMAGE_STATE ] = "otastate",         \
     }
 typedef enum KVStoreKeytype
 {

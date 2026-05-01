@@ -42,7 +42,7 @@
 		<link>
 			<name>src/application_code/ports</name>
 			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Common/ports</locationURI>
+			<locationURI>AWS_IOT_MCU_REPO_ROOT/Common/ports</locationURI>
 		</link>
 	</linkedResources>
 	<filteredResources>
@@ -366,6 +366,10 @@
 		<variable>
 			<name>AWS_IOT_MCU_ROOT</name>
 			<value>$%7BPROJECT_LOC%7D</value>
+		</variable>
+		<variable>
+			<name>AWS_IOT_MCU_REPO_ROOT</name>
+			<value>$%7BPARENT-3-PROJECT_LOC%7D</value>
 		</variable>
 		<variable>
 			<name>SMC_GENERATED_LOC</name>

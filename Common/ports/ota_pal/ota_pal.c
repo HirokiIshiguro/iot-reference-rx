@@ -1,5 +1,5 @@
 /*
- * FreeRTOS OTA PAL for Renesas RX72N.
+ * FreeRTOS OTA PAL for Renesas RX MCUs.
  *
  * This implementation writes OTA payloads directly to the inactive bank using
  * the Flash FIT BGO callback path. Incoming MQTT blocks are queued quickly and
@@ -23,7 +23,13 @@
 
 #include "platform.h"
 #include "r_flash_rx_if.h"
+#if defined(BSP_MCU_RX65N)
+#include "./src/targets/rx65n/r_flash_rx65n.h"
+#elif defined(BSP_MCU_RX72N)
 #include "./src/targets/rx72n/r_flash_rx72n.h"
+#else
+#error "Unsupported RX MCU for OTA PAL flash programming"
+#endif
 #include "r_fwup_config.h"
 #include "r_common_api_flash.h"
 #include "store.h"

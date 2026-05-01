@@ -681,8 +681,8 @@
           </Category>
           <Category Name="ports">
             <Category Name="ota_pal">
-              <Path>Common\ports\ota_pal\ota_pal.c</Path>
-              <Path>Common\ports\ota_pal\ota_pal.h</Path>
+              <Path>..\..\..\Common\ports\ota_pal\ota_pal.c</Path>
+              <Path>..\..\..\Common\ports\ota_pal\ota_pal.h</Path>
             </Category>
             <Category Name="rm_aws_pkcs11_pal_littlefs">
               <Path>Common\ports\rm_aws_pkcs11_pal_littlefs\rm_aws_pkcs11_pal_littlefs.c</Path>
@@ -1512,7 +1512,7 @@
           <Option>-include="${ProjDirPath}\Common\FreeRTOS_common\network_support"</Option>
           <Option>-include="${ProjDirPath}\Common\common_api"</Option>
           <Option>-include="${ProjDirPath}\Common\patches\Jobs-for-AWS-IoT-embedded-sdk\source\include"</Option>
-          <Option>-include="${ProjDirPath}\Common\ports\ota_pal"</Option>
+          <Option>-include="${ProjDirPath}\..\..\..\Common\ports\ota_pal"</Option>
           <Option>-include="${ProjDirPath}\Demos\cli"</Option>
           <Option>-include="${ProjDirPath}\Demos\mqtt_agent"</Option>
           <Option>-include="${ProjDirPath}\Demos\Fleet_Provisioning_With_CSR_Demo"</Option>
@@ -2323,7 +2323,7 @@
           <IncludePathForC>"${ProjDirPath}\Common\FreeRTOS_common\network_support"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\Common\common_api"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\Common\patches\Jobs-for-AWS-IoT-embedded-sdk\source\include"</IncludePathForC>
-          <IncludePathForC>"${ProjDirPath}\Common\ports\ota_pal"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\..\..\..\Common\ports\ota_pal"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\Demos\cli"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\Demos\mqtt_agent"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\Demos\Fleet_Provisioning_With_CSR_Demo"</IncludePathForC>
