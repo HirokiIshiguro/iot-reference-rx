@@ -7,6 +7,7 @@ param(
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
     [string]$Workspace = "C:\iotref-rx72n-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build_mqtt_candidate.log"),
+    [int]$E2StudioTimeoutSeconds = 600,
     [switch]$KeepRenderedHeaders
 )
 
@@ -97,7 +98,8 @@ try {
         -ProjectRoot $projectRoot `
         -E2Studio $E2Studio `
         -Workspace $Workspace `
-        -LogFile $LogFile
+        -LogFile $LogFile `
+        -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds
 }
 finally {
     if (-not $KeepRenderedHeaders) {

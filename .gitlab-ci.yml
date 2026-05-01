@@ -86,6 +86,7 @@ variables:
   RX65N_BG96_FLEET_POLICY_NAME: "ck-rx65n-policy"
   E2STUDIO_WORKSPACE_RX65N_BG96_FLEET: "C:/Temp/e2ws_iot_ref_rx65n_bg96_fleet"
   RX72N_DEVICE_ID: "rx72n-02"
+  RUN_RX72N_BUILD: "true"
   # RX72N_TEST_SCOPE:
   #   auto  - main/tag/manual pipelines run the MQTT + OTA path; feature push/MR pipelines stay build-only unless explicitly enabled.
   #   build - build/package only, no hardware test.
@@ -144,6 +145,10 @@ build_rx72n:
     - os-windows
     - hw-ishiguro-pc
   resource_group: rx72n-e2studio-build
+  rules:
+    - if: '$RUN_RX72N_BUILD == "false"'
+      when: never
+    - when: on_success
   script:
     - Write-Host "=== Build RX72N projects ==="
     - pip install cryptography --quiet
@@ -1951,6 +1956,8 @@ build_rx72n_mqtt_candidate:
     - hw-ishiguro-pc
   resource_group: rx72n-e2studio-build
   rules:
+    - if: '$RUN_RX72N_BUILD == "false"'
+      when: never
     - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
@@ -1965,7 +1972,8 @@ build_rx72n_mqtt_candidate:
         -KeyInput "$env:AWS_PRIVATE_KEY_RX72N_02" `
         -E2Studio "$env:E2STUDIO_CLI" `
         -Workspace "$env:E2STUDIO_WORKSPACE_MQTT" `
-        -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_mqtt_candidate.log"
+        -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_mqtt_candidate.log" `
+        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "app .abs missing"; exit 1 }
@@ -1991,6 +1999,8 @@ package_rx72n_mqtt_candidate_rsu:
     - job: build_rx72n_mqtt_candidate
       artifacts: true
   rules:
+    - if: '$RUN_RX72N_BUILD == "false"'
+      when: never
     - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
