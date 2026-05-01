@@ -3,24 +3,15 @@ param(
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studio-cli.exe",
     [string]$Workspace = "C:\iotref-rx65n-bg96-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build.log"),
-    [int]$E2StudioTimeoutSeconds = 600
+    [int]$E2StudioTimeoutSeconds = 600,
+    [string]$Make = $env:RX65N_BG96_MAKE,
+    [string]$CcrxBin = $env:BIN_RX
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-if (-not (Test-Path $E2Studio)) {
-    throw "e2studio executable not found: $E2Studio"
-}
-
 $projectRoot = (Resolve-Path $ProjectRoot).Path
-$e2studioHeadless = $E2Studio
-if ((Split-Path -Leaf $e2studioHeadless) -ieq "e2studio-cli.exe") {
-    $candidate = Join-Path (Split-Path -Parent $e2studioHeadless) "e2studioc.exe"
-    if (Test-Path $candidate) {
-        $e2studioHeadless = $candidate
-    }
-}
 $workspace = $Workspace
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
 $bootProject = Join-Path $projectRoot "Projects\boot_loader_ck_rx65n\e2studio_ccrx"
@@ -30,6 +21,9 @@ $patchBackup = Join-Path $projectRoot "artifacts\rx65n_bg96_aws_dev_mode_key_pro
 foreach ($projectDir in @($bootProject, $appProject)) {
     if (-not (Test-Path (Join-Path $projectDir ".project"))) {
         throw "e2 studio project not found: $projectDir"
+    }
+    if (-not (Test-Path (Join-Path $projectDir "HardwareDebug\makefile"))) {
+        throw "generated HardwareDebug makefile not found: $projectDir"
     }
 }
 
@@ -54,12 +48,6 @@ function Restore-ProjectMetadata {
     foreach ($path in $Snapshots.Keys) {
         [System.IO.File]::WriteAllBytes($path, $Snapshots[$path])
     }
-}
-
-function Convert-ToFileUri {
-    param([string]$Path)
-
-    return "file:///" + ($Path -replace "\\", "/" -replace " ", "%20")
 }
 
 function Convert-ToArgumentString {
@@ -98,16 +86,22 @@ function Stop-ProcessTree {
     Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
 }
 
-function Invoke-E2StudioCli {
-    param([string[]]$Arguments)
+function Invoke-Tool {
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments,
+        [string]$WorkingDirectory
+    )
 
-    Write-Host "+ $e2studioHeadless $($Arguments -join ' ')"
-    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("iotref_rx65n_bg96_e2studio_" + [System.Guid]::NewGuid().ToString("N"))
+    Write-Host "+ $FilePath $($Arguments -join ' ')"
+    Add-Content -LiteralPath $logFile -Value "+ $FilePath $($Arguments -join ' ')"
+    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("iotref_rx65n_bg96_make_" + [System.Guid]::NewGuid().ToString("N"))
     $stdoutPath = "$tempBase.out"
     $stderrPath = "$tempBase.err"
     $process = Start-Process `
-        -FilePath $e2studioHeadless `
+        -FilePath $FilePath `
         -ArgumentList (Convert-ToArgumentString $Arguments) `
+        -WorkingDirectory $WorkingDirectory `
         -RedirectStandardOutput $stdoutPath `
         -RedirectStandardError $stderrPath `
         -NoNewWindow `
@@ -117,11 +111,11 @@ function Invoke-E2StudioCli {
         if (-not $process.WaitForExit($E2StudioTimeoutSeconds * 1000)) {
             Stop-ProcessTree -ProcessId $process.Id
             Write-ProcessOutput @($stdoutPath, $stderrPath)
-            throw "e2 studio CLI timed out after $E2StudioTimeoutSeconds seconds: $e2studioHeadless $($Arguments -join ' ')"
+            throw "build command timed out after $E2StudioTimeoutSeconds seconds: $FilePath $($Arguments -join ' ')"
         }
         Write-ProcessOutput @($stdoutPath, $stderrPath)
         if ($process.ExitCode -ne 0) {
-            throw "e2 studio CLI failed with exit code $($process.ExitCode)"
+            throw "build command failed with exit code $($process.ExitCode): $FilePath $($Arguments -join ' ')"
         }
     }
     finally {
@@ -129,78 +123,178 @@ function Invoke-E2StudioCli {
     }
 }
 
-function Require-Artifact {
+function Get-E2StudioPluginDir {
+    if (-not $E2Studio -or -not (Test-Path -LiteralPath $E2Studio)) {
+        return $null
+    }
+
+    $e2studioPath = (Resolve-Path -LiteralPath $E2Studio).Path
+    $baseDir = Split-Path -Parent $e2studioPath
+    foreach ($plugins in @(
+        (Join-Path $baseDir "plugins"),
+        (Join-Path (Join-Path $baseDir "eclipse") "plugins")
+    )) {
+        if (Test-Path -LiteralPath $plugins) {
+            return $plugins
+        }
+    }
+    return $null
+}
+
+function Resolve-PluginTool {
+    param(
+        [string]$PluginFilter,
+        [string]$RelativePath
+    )
+
+    $plugins = Get-E2StudioPluginDir
+    if (-not $plugins) {
+        return $null
+    }
+
+    $pluginDirs = Get-ChildItem -LiteralPath $plugins -Directory -Filter $PluginFilter -ErrorAction SilentlyContinue |
+        Sort-Object -Property Name -Descending
+    foreach ($pluginDir in $pluginDirs) {
+        $candidate = Join-Path $pluginDir.FullName $RelativePath
+        if (Test-Path -LiteralPath $candidate) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+    return $null
+}
+
+function Resolve-Make {
+    if ($Make) {
+        if (-not (Test-Path -LiteralPath $Make)) {
+            throw "make executable not found: $Make"
+        }
+        return (Resolve-Path -LiteralPath $Make).Path
+    }
+
+    $candidate = Resolve-PluginTool "com.renesas.ide.exttools.gnumake.win32.x86_64_*" "mk\make.exe"
+    if ($candidate) {
+        return $candidate
+    }
+
+    $command = Get-Command make.exe -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    throw "GNU make was not found. Set RX65N_BG96_MAKE or provide a valid e2 studio path."
+}
+
+function Add-PathEntry {
     param([string]$Path)
 
-    if (-not (Test-Path $Path)) {
-        throw "build artifact missing: $Path"
+    if ($Path -and (Test-Path -LiteralPath $Path)) {
+        $resolved = (Resolve-Path -LiteralPath $Path).Path
+        $entries = $env:Path -split ';'
+        if ($entries -notcontains $resolved) {
+            $env:Path = "$resolved;$env:Path"
+        }
     }
+}
+
+function Resolve-CcrxBin {
+    if ($CcrxBin) {
+        if (-not (Test-Path -LiteralPath $CcrxBin)) {
+            throw "CC-RX bin directory not found: $CcrxBin"
+        }
+        return (Resolve-Path -LiteralPath $CcrxBin).Path
+    }
+
+    if ($env:CCRX_BIN -and (Test-Path -LiteralPath $env:CCRX_BIN)) {
+        return (Resolve-Path -LiteralPath $env:CCRX_BIN).Path
+    }
+
+    $default = "C:\Program Files (x86)\Renesas\RX\3_7_0\bin"
+    if (Test-Path -LiteralPath $default) {
+        return (Resolve-Path -LiteralPath $default).Path
+    }
+
+    throw "CC-RX bin directory was not found. Set BIN_RX or CCRX_BIN."
+}
+
+function Find-FirstArtifact {
+    param([string[]]$Paths)
+
+    foreach ($path in $Paths) {
+        if (Test-Path -LiteralPath $path) {
+            return (Resolve-Path -LiteralPath $path).Path
+        }
+    }
+    throw "build artifact missing: $($Paths -join ', ')"
+}
+
+function Invoke-MakeBuild {
+    param(
+        [string]$BuildDir,
+        [string]$Target
+    )
+
+    Invoke-Tool -FilePath $makeExe -Arguments @("clean") -WorkingDirectory $BuildDir
+    Invoke-Tool -FilePath $makeExe -Arguments @("-j2", $Target) -WorkingDirectory $BuildDir
 }
 
 if (-not (Test-Path (Join-Path $appProject "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h"))) {
     throw "CK-RX65N BG96 project middleware is incomplete."
 }
 
-foreach ($dir in @(
-    (Join-Path $bootProject "HardwareDebug"),
-    (Join-Path $appProject "HardwareDebug"),
-    $workspace
-)) {
-    if (Test-Path $dir) {
-        Remove-Item -Recurse -Force $dir
-        Write-Host "Cleared: $dir"
-    }
-}
-
-$metadataSnapshots = Save-ProjectMetadata @($bootProject, $appProject)
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $patchBackup) | Out-Null
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logFile) | Out-Null
 if (Test-Path $logFile) {
     Remove-Item -Force $logFile
 }
 
+$makeExe = Resolve-Make
+$ccrxBinDir = Resolve-CcrxBin
+$busyBoxBin = Resolve-PluginTool "com.renesas.ide.exttools.busybox.win32.x86_64_*" "bin"
+Add-PathEntry $ccrxBinDir
+Add-PathEntry $busyBoxBin
+
+Write-Host "Using GNU make: $makeExe"
+Write-Host "Using CC-RX bin: $ccrxBinDir"
+if ($busyBoxBin) {
+    Write-Host "Using e2 studio BusyBox tools: $busyBoxBin"
+}
+if ($workspace) {
+    Write-Host "Workspace parameter is unused for direct make builds: $workspace"
+}
+
+$metadataSnapshots = Save-ProjectMetadata @($bootProject, $appProject)
+
 try {
     python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") patch --aws-root $appProject --backup $patchBackup
 
-    New-Item -ItemType Directory -Force -Path $workspace | Out-Null
-    $bootWorkspace = Join-Path $workspace "bootloader"
-    $appWorkspace = Join-Path $workspace "bg96"
-    New-Item -ItemType Directory -Force -Path $bootWorkspace, $appWorkspace | Out-Null
+    $bootBuildDir = Join-Path $bootProject "HardwareDebug"
+    $appBuildDir = Join-Path $appProject "HardwareDebug"
+    $normalizedBootMot = Join-Path $bootBuildDir "boot_loader_ck_rx65n.mot"
+    Remove-Item -Force -LiteralPath $normalizedBootMot -ErrorAction SilentlyContinue
 
-    Write-Host "=== CK-RX65N BG96 boot loader build ==="
-    Invoke-E2StudioCli @(
-        "--launcher.suppressErrors",
-        "-nosplash",
-        "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
-        "-data", $bootWorkspace,
-        "-import", $bootProject,
-        "-build", "boot_loader_ck_rx65n/HardwareDebug"
+    Write-Host "=== CK-RX65N BG96 boot loader make build ==="
+    Invoke-MakeBuild -BuildDir $bootBuildDir -Target "bootloader.mot"
+
+    Write-Host "=== CK-RX65N BG96 application make build ==="
+    Invoke-MakeBuild -BuildDir $appBuildDir -Target "aws_bg96_ck_rx65n.mot"
+
+    $bootMot = Find-FirstArtifact @(
+        (Join-Path $bootBuildDir "boot_loader_ck_rx65n.mot"),
+        (Join-Path $bootBuildDir "bootloader.mot")
     )
+    if ($bootMot -ne $normalizedBootMot) {
+        Copy-Item -Force -LiteralPath $bootMot -Destination $normalizedBootMot
+        $bootMot = $normalizedBootMot
+    }
 
-    Write-Host "=== CK-RX65N BG96 application build ==="
-    Invoke-E2StudioCli @(
-        "--launcher.suppressErrors",
-        "-nosplash",
-        "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
-        "-data", $appWorkspace,
-        "-import", $appProject,
-        "-build", "aws_bg96_ck_rx65n/HardwareDebug"
-    )
-
-    $bootMot = Join-Path $bootProject "HardwareDebug\boot_loader_ck_rx65n.mot"
-    $appMot = Join-Path $appProject "HardwareDebug\aws_bg96_ck_rx65n.mot"
-    $appAbs = Join-Path $appProject "HardwareDebug\aws_bg96_ck_rx65n.abs"
-    $appX = Join-Path $appProject "HardwareDebug\aws_bg96_ck_rx65n.x"
-    Require-Artifact $bootMot
-    Require-Artifact $appMot
-    Require-Artifact $appAbs
-    Require-Artifact $appX
+    $appMot = Find-FirstArtifact @((Join-Path $appBuildDir "aws_bg96_ck_rx65n.mot"))
+    $appAbs = Find-FirstArtifact @((Join-Path $appBuildDir "aws_bg96_ck_rx65n.abs"))
 
     Write-Host ""
-    Write-Host "CK-RX65N BG96 headless build succeeded."
+    Write-Host "CK-RX65N BG96 make build succeeded."
     Write-Host "  boot_loader .mot: $bootMot"
     Write-Host "  app         .mot: $appMot"
     Write-Host "  app         .abs: $appAbs"
-    Write-Host "  app           .x: $appX"
 }
 finally {
     python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") restore --aws-root $appProject --backup $patchBackup

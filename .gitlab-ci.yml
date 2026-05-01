@@ -225,8 +225,7 @@ build_rx65n_bg96:
       $bootMot = "$env:CI_PROJECT_DIR\Projects\boot_loader_ck_rx65n\e2studio_ccrx\HardwareDebug\boot_loader_ck_rx65n.mot"
       $appMot = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.mot"
       $appAbs = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.abs"
-      $appX = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.x"
-      foreach ($path in @($bootMot, $appMot, $appAbs, $appX)) {
+      foreach ($path in @($bootMot, $appMot, $appAbs)) {
         if (-not (Test-Path $path)) { Write-Error "build artifact missing: $path"; exit 1 }
       }
 
@@ -254,7 +253,6 @@ build_rx65n_bg96:
       - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
-      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
 build_rx65n_bg96_fleet_candidate:
@@ -288,8 +286,7 @@ build_rx65n_bg96_fleet_candidate:
       $bootMot = "$env:CI_PROJECT_DIR\Projects\boot_loader_ck_rx65n\e2studio_ccrx\HardwareDebug\boot_loader_ck_rx65n.mot"
       $appMot = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.mot"
       $appAbs = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.abs"
-      $appX = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.x"
-      foreach ($path in @($bootMot, $appMot, $appAbs, $appX)) {
+      foreach ($path in @($bootMot, $appMot, $appAbs)) {
         if (-not (Test-Path $path)) { Write-Error "fleet build artifact missing: $path"; exit 1 }
       }
 
@@ -320,7 +317,6 @@ build_rx65n_bg96_fleet_candidate:
       - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
-      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
 build_rx72n_fleet_candidate:
@@ -994,7 +990,6 @@ build_rx65n_bg96_ota_candidate:
       - artifacts/rx65n_bg96_ota_candidate/
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
-      - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
 provision_rx65n_bg96_ota_signer_certificate:
