@@ -1741,6 +1741,7 @@ test_rx65n_bg96_fleet:
         --log-port "$uart_port" \
         --log-baud "$UART_BAUD_RATE" \
         --timeout "$RX65N_BG96_FLEET_TEST_TIMEOUT_SECONDS" \
+        --app-reset-retries "$RX65N_BG96_APP_RESET_RETRIES" \
         --reset-cmd "$reset_cmd" \
         --summary-json "$artifact_dir/fleet_summary.json" \
         2>&1 | tee "$artifact_dir/test_fleet_bg96.log"
