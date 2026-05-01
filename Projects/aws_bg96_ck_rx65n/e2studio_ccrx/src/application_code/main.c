@@ -203,11 +203,12 @@ void main_task(void)
 
         vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
 
-        vStartSimplePubSubDemo ();
-
         #if (ENABLE_OTA_UPDATE_DEMO == 1)
-                    vStartOtaDemo();
+            configPRINTF(("Starting OTA demo task\r\n"));
+            vStartOtaDemo();
         #endif
+
+        vStartSimplePubSubDemo ();
     }
 #if (ENABLE_CREDENTIAL_BY_CLI == 1)
     }
