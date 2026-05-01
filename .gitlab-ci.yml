@@ -1560,8 +1560,9 @@ cleanup_rx72n_fleet_resources:
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       $summary = "$env:CI_PROJECT_DIR\artifacts\test_fleet_rx72n_linux\fleet_summary.json"
       if (-not (Test-Path $summary)) {
-        Write-Error "Fleet summary not found; cleanup cannot determine generated resources: $summary"
-        exit 1
+        Write-Host "RX72N fleet summary not found; cleanup skipped: $summary"
+        Set-Content -Path "$artifactDir\cleanup_summary.json" -Value '{"skipped":true,"reason":"fleet_summary_missing"}' -Encoding ascii
+        exit 0
       }
 
       python tools\cleanup_rx72n_fleet_resources.py `

@@ -13,6 +13,66 @@ Set-StrictMode -Version Latest
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $demoConfig = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\src\frtos_config\demo_config.h"
 $buildScript = Join-Path $projectRoot "tools\build_headless_rx65n_bg96.ps1"
+$fleetSubdirMk = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\Demos\Fleet_Provisioning_With_CSR_Demo\subdir.mk"
+$linkerSubCommand = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\LinkerSubCommand.tmp"
+$linkerAppCommand = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\Linkeraws_bg96_ck_rx65n.tmp"
+
+function Set-FleetDemoBuildInputs {
+    param(
+        [string]$SubdirMk,
+        [string[]]$LinkerFiles
+    )
+
+    $subdirContent = @'
+################################################################################
+# Automatically-generated file. Do not edit!
+################################################################################
+
+# Add inputs and outputs from these tool invocations to the build variables
+C_SRCS += \
+../Demos/Fleet_Provisioning_With_CSR_Demo/FleetProvisioningDemoExample.c \
+../Demos/Fleet_Provisioning_With_CSR_Demo/pkcs11_operations.c \
+../Demos/Fleet_Provisioning_With_CSR_Demo/tinycbor_serializer.c
+
+COMPILER_OBJS += \
+Demos/Fleet_Provisioning_With_CSR_Demo/FleetProvisioningDemoExample.obj \
+Demos/Fleet_Provisioning_With_CSR_Demo/pkcs11_operations.obj \
+Demos/Fleet_Provisioning_With_CSR_Demo/tinycbor_serializer.obj
+
+C_DEPS += \
+Demos/Fleet_Provisioning_With_CSR_Demo/FleetProvisioningDemoExample.d \
+Demos/Fleet_Provisioning_With_CSR_Demo/pkcs11_operations.d \
+Demos/Fleet_Provisioning_With_CSR_Demo/tinycbor_serializer.d
+
+# Each subdirectory must supply rules for building sources it contributes
+Demos/Fleet_Provisioning_With_CSR_Demo/%.obj: ../Demos/Fleet_Provisioning_With_CSR_Demo/%.c Demos/Fleet_Provisioning_With_CSR_Demo/Compiler.sub
+	@echo 'Scanning and building file: $<'
+	ccrx -subcommand="Demos\Fleet_Provisioning_With_CSR_Demo\cDepSubCommand.tmp" -output=dep="$(@:%.obj=%.d)" -MT="$(@:%.d=%.obj)" -MT="$(@:%.obj=%.d)" "$<"
+	ccrx -subcommand="Demos\Fleet_Provisioning_With_CSR_Demo\cSubCommand.tmp" "$<"
+'@
+
+    [System.IO.File]::WriteAllText(
+        $SubdirMk,
+        $subdirContent,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+
+    $fleetInput = '-input=".\Demos/Fleet_Provisioning_With_CSR_Demo\FleetProvisioningDemoExample.obj"'
+    $pkcsInput = '-input=".\Demos/Fleet_Provisioning_With_CSR_Demo\pkcs11_operations.obj"'
+    $tinycborInput = '-input=".\Demos/Fleet_Provisioning_With_CSR_Demo\tinycbor_serializer.obj"'
+
+    foreach ($linkerFile in $LinkerFiles) {
+        $content = [System.IO.File]::ReadAllText($linkerFile)
+        if (-not $content.Contains($fleetInput)) {
+            $content = $content.Replace($pkcsInput, "$fleetInput`r`n$pkcsInput`r`n$tinycborInput")
+        }
+        [System.IO.File]::WriteAllText(
+            $linkerFile,
+            $content,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+    }
+}
 
 if (-not (Test-Path $demoConfig)) {
     throw "demo_config.h not found: $demoConfig"
@@ -20,8 +80,17 @@ if (-not (Test-Path $demoConfig)) {
 if (-not (Test-Path $buildScript)) {
     throw "build script not found: $buildScript"
 }
+foreach ($path in @($fleetSubdirMk, $linkerSubCommand, $linkerAppCommand)) {
+    if (-not (Test-Path $path)) {
+        throw "generated build file not found: $path"
+    }
+}
 
 $originalDemoConfig = [System.IO.File]::ReadAllText($demoConfig)
+$originalGeneratedBuildFiles = @{}
+foreach ($path in @($fleetSubdirMk, $linkerSubCommand, $linkerAppCommand)) {
+    $originalGeneratedBuildFiles[$path] = [System.IO.File]::ReadAllText($path)
+}
 
 try {
     $updated = $originalDemoConfig
@@ -36,6 +105,10 @@ try {
         [System.Text.UTF8Encoding]::new($false)
     )
 
+    Set-FleetDemoBuildInputs `
+        -SubdirMk $fleetSubdirMk `
+        -LinkerFiles @($linkerSubCommand, $linkerAppCommand)
+
     & $buildScript `
         -ProjectRoot $projectRoot `
         -E2Studio $E2Studio `
@@ -49,4 +122,11 @@ finally {
         $originalDemoConfig,
         [System.Text.UTF8Encoding]::new($false)
     )
+    foreach ($path in $originalGeneratedBuildFiles.Keys) {
+        [System.IO.File]::WriteAllText(
+            $path,
+            $originalGeneratedBuildFiles[$path],
+            [System.Text.UTF8Encoding]::new($false)
+        )
+    }
 }
