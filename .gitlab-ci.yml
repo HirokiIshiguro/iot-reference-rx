@@ -661,6 +661,9 @@ prepare_rx65n_bg96_mqtt_credentials:
   resource_group: rx65n-bg96-aws-iot-credentials
   extends:
     - .rx65n_bg96_credential_prepare_rules
+  needs:
+    - job: download_rx65n_bg96_rsu_via_bootloader
+      artifacts: false
   script:
     - $ErrorActionPreference = "Stop"
     - |
