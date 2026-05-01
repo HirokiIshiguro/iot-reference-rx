@@ -807,6 +807,15 @@ static void prvResetDevice(void)
 
 static BaseType_t prvActivateBank(void)
 {
+#if defined(BSP_MCU_RX65N)
+    /*
+     * CK-RX65N uses the common RX bootloader. The application leaves the
+     * temporary bank marked TESTING; the bootloader verifies it, refreshes its
+     * mirrored boot area, then performs FLASH_CMD_BANK_TOGGLE.
+     */
+    LogInfo(("prvActivateBank: defer bank toggle to RX65N bootloader"));
+    return pdTRUE;
+#elif defined(BSP_MCU_RX72N)
     flash_err_t err;
 
     R_BSP_SoftwareDelay(5000U, BSP_DELAY_MILLISECS);
@@ -820,6 +829,9 @@ static BaseType_t prvActivateBank(void)
 
     R_BSP_SoftwareDelay(500U, BSP_DELAY_MILLISECS);
     return pdTRUE;
+#else
+#error "Unsupported RX MCU for OTA PAL activation"
+#endif
 }
 
 static int ExtractECDSASignature(const unsigned char * derSignature,
