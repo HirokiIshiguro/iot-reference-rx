@@ -29,6 +29,7 @@ variables:
   E2STUDIO_CLI_BG96: "C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe"
   E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref_rx72n"
   E2STUDIO_WORKSPACE_RX65N_BG96: "C:/Temp/e2ws_iot_ref_rx65n_bg96"
+  RX72N_E2STUDIO_TIMEOUT_SECONDS: "600"
   RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
   RFP_SPEED: "1500K"
   RFP_AUTH: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -151,7 +152,8 @@ build_rx72n:
         -ProjectRoot "$env:CI_PROJECT_DIR" `
         -E2Studio "$env:E2STUDIO_CLI" `
         -Workspace "$env:E2STUDIO_WORKSPACE" `
-        -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build.log"
+        -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build.log" `
+        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "app .abs missing"; exit 1 }
@@ -336,7 +338,8 @@ build_rx72n_fleet_candidate:
         -E2Studio "$env:E2STUDIO_CLI" `
         -Workspace "$env:E2STUDIO_WORKSPACE_FLEET" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_fleet.log" `
-        -FleetDemoId "$env:RX72N_DEVICE_ID-fp"
+        -FleetDemoId "$env:RX72N_DEVICE_ID-fp" `
+        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "fleet app .mot missing"; exit 1 }
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "fleet app .abs missing"; exit 1 }
