@@ -504,9 +504,8 @@ def provision_fleet_credentials(args: argparse.Namespace, port: serial.Serial) -
         timeout=30.0,
         success_tokens=("Configuration save",),
     )
-    print("\n[CLI] Fleet credential provisioning complete; resetting app")
+    print("\n[CLI] Fleet credential provisioning complete; leaving app in CLI mode for test reset")
     port.reset_input_buffer()
-    run_rfp(args, ["-sig", "-run"])
 
 
 def serial_display_name(path: str) -> str:
