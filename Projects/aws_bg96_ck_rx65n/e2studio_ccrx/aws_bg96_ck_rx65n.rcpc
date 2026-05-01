@@ -59,8 +59,11 @@
       </Category>
       <Category Name="Demos">
         <Category Name="Fleet_Provisioning_With_CSR_Demo">
+          <Path>Demos\Fleet_Provisioning_With_CSR_Demo\FleetProvisioningDemoExample.c</Path>
           <Path>Demos\Fleet_Provisioning_With_CSR_Demo\pkcs11_operations.c</Path>
           <Path>Demos\Fleet_Provisioning_With_CSR_Demo\pkcs11_operations.h</Path>
+          <Path>Demos\Fleet_Provisioning_With_CSR_Demo\tinycbor_serializer.c</Path>
+          <Path>Demos\Fleet_Provisioning_With_CSR_Demo\tinycbor_serializer.h</Path>
         </Category>
         <Category Name="OtaOverMqtt">
           <Path>Demos\OtaOverMqtt\OtaOverMqttDemo.c</Path>
@@ -1662,7 +1665,9 @@
           <Path>HardwareDebug\r_common_api_tsip.obj</Path>
           <Path>HardwareDebug\lfs_common_data.obj</Path>
           <Path>HardwareDebug\jobs.obj</Path>
+          <Path>HardwareDebug\FleetProvisioningDemoExample.obj</Path>
           <Path>HardwareDebug\pkcs11_operations.obj</Path>
+          <Path>HardwareDebug\tinycbor_serializer.obj</Path>
           <Path>HardwareDebug\OtaOverMqttDemo.obj</Path>
           <Path>HardwareDebug\ota_os_freertos.obj</Path>
           <Path>HardwareDebug\simple_pub_sub_task.obj</Path>
