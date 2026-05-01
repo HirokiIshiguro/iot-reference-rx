@@ -14,6 +14,13 @@ if (-not (Test-Path $E2Studio)) {
 }
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
+$e2studioHeadless = $E2Studio
+if ((Split-Path -Leaf $e2studioHeadless) -ieq "e2studio-cli.exe") {
+    $candidate = Join-Path (Split-Path -Parent $e2studioHeadless) "e2studioc.exe"
+    if (Test-Path $candidate) {
+        $e2studioHeadless = $candidate
+    }
+}
 $workspace = $Workspace
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
 $bootProject = Join-Path $projectRoot "Projects\boot_loader_ck_rx65n\e2studio_ccrx"
@@ -94,12 +101,12 @@ function Stop-ProcessTree {
 function Invoke-E2StudioCli {
     param([string[]]$Arguments)
 
-    Write-Host "+ $E2Studio $($Arguments -join ' ')"
+    Write-Host "+ $e2studioHeadless $($Arguments -join ' ')"
     $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("iotref_rx65n_bg96_e2studio_" + [System.Guid]::NewGuid().ToString("N"))
     $stdoutPath = "$tempBase.out"
     $stderrPath = "$tempBase.err"
     $process = Start-Process `
-        -FilePath $E2Studio `
+        -FilePath $e2studioHeadless `
         -ArgumentList (Convert-ToArgumentString $Arguments) `
         -RedirectStandardOutput $stdoutPath `
         -RedirectStandardError $stderrPath `
@@ -110,7 +117,7 @@ function Invoke-E2StudioCli {
         if (-not $process.WaitForExit($E2StudioTimeoutSeconds * 1000)) {
             Stop-ProcessTree -ProcessId $process.Id
             Write-ProcessOutput @($stdoutPath, $stderrPath)
-            throw "e2 studio CLI timed out after $E2StudioTimeoutSeconds seconds: $E2Studio $($Arguments -join ' ')"
+            throw "e2 studio CLI timed out after $E2StudioTimeoutSeconds seconds: $e2studioHeadless $($Arguments -join ' ')"
         }
         Write-ProcessOutput @($stdoutPath, $stderrPath)
         if ($process.ExitCode -ne 0) {
@@ -160,12 +167,24 @@ try {
     New-Item -ItemType Directory -Force -Path $bootWorkspace, $appWorkspace | Out-Null
 
     Write-Host "=== CK-RX65N BG96 boot loader build ==="
-    Invoke-E2StudioCli @("-consoleLog", "-data", $bootWorkspace, "project", "import", (Convert-ToFileUri $bootProject))
-    Invoke-E2StudioCli @("-consoleLog", "-data", $bootWorkspace, "project", "build", "boot_loader_ck_rx65n/HardwareDebug")
+    Invoke-E2StudioCli @(
+        "--launcher.suppressErrors",
+        "-nosplash",
+        "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+        "-data", $bootWorkspace,
+        "-import", $bootProject,
+        "-build", "boot_loader_ck_rx65n/HardwareDebug"
+    )
 
     Write-Host "=== CK-RX65N BG96 application build ==="
-    Invoke-E2StudioCli @("-consoleLog", "-data", $appWorkspace, "project", "import", (Convert-ToFileUri $appProject))
-    Invoke-E2StudioCli @("-consoleLog", "-data", $appWorkspace, "project", "build", "aws_bg96_ck_rx65n/HardwareDebug")
+    Invoke-E2StudioCli @(
+        "--launcher.suppressErrors",
+        "-nosplash",
+        "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+        "-data", $appWorkspace,
+        "-import", $appProject,
+        "-build", "aws_bg96_ck_rx65n/HardwareDebug"
+    )
 
     $bootMot = Join-Path $bootProject "HardwareDebug\boot_loader_ck_rx65n.mot"
     $appMot = Join-Path $appProject "HardwareDebug\aws_bg96_ck_rx65n.mot"

@@ -66,6 +66,12 @@ def main() -> int:
         if not path.exists():
             raise RuntimeError(f"required path not found: {path}")
 
+    e2studio_headless = args.e2studio_cli
+    if e2studio_headless.name.lower() == "e2studio-cli.exe":
+        candidate = e2studio_headless.with_name("e2studioc.exe")
+        if candidate.exists():
+            e2studio_headless = candidate
+
     output_dir.mkdir(parents=True, exist_ok=True)
     version_text = ".".join(str(part) for part in args.version)
     version_token = version_text.replace(".", "_")
@@ -90,35 +96,35 @@ def main() -> int:
             shutil.rmtree(args.workspace)
         args.workspace.mkdir(parents=True, exist_ok=True)
 
-        project_uri = "file:///" + str(app_dir).replace("\\", "/").replace(" ", "%20")
         with log_path.open("w", encoding="utf-8", errors="replace") as log:
-            for command in (
-                [str(args.e2studio_cli), "-consoleLog", "-data", str(args.workspace), "project", "import", project_uri],
-                [
-                    str(args.e2studio_cli),
-                    "-consoleLog",
-                    "-data",
-                    str(args.workspace),
-                    "project",
-                    "build",
-                    "aws_bg96_ck_rx65n/HardwareDebug",
-                ],
-            ):
-                print("+ " + " ".join(command))
-                try:
-                    result = subprocess.run(
-                        command,
-                        cwd=str(repo_root),
-                        stdout=log,
-                        stderr=subprocess.STDOUT,
-                        timeout=args.e2studio_timeout,
-                    )
-                except subprocess.TimeoutExpired as exc:
-                    raise RuntimeError(
-                        f"e2 studio command timed out after {args.e2studio_timeout} seconds: {' '.join(command)}"
-                    ) from exc
-                if result.returncode != 0:
-                    raise RuntimeError(f"e2 studio command failed with exit {result.returncode}: {' '.join(command)}")
+            command = [
+                str(e2studio_headless),
+                "--launcher.suppressErrors",
+                "-nosplash",
+                "-application",
+                "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+                "-data",
+                str(args.workspace),
+                "-import",
+                str(app_dir),
+                "-build",
+                "aws_bg96_ck_rx65n/HardwareDebug",
+            ]
+            print("+ " + " ".join(command))
+            try:
+                result = subprocess.run(
+                    command,
+                    cwd=str(repo_root),
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    timeout=args.e2studio_timeout,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError(
+                    f"e2 studio command timed out after {args.e2studio_timeout} seconds: {' '.join(command)}"
+                ) from exc
+            if result.returncode != 0:
+                raise RuntimeError(f"e2 studio command failed with exit {result.returncode}: {' '.join(command)}")
 
         if not app_mot.exists():
             raise RuntimeError(f"aws_bg96_ck_rx65n.mot was not generated: {app_mot}")
