@@ -1,22 +1,24 @@
-# FreeRTOS LTS IoT Reference for RX72N Envision Kit
+# FreeRTOS LTS IoT Reference for Renesas RX
 
 ## About This Fork / このフォークについて
 
-This repository is a fork of [renesas/iot-reference-rx](https://github.com/renesas/iot-reference-rx), modified and maintained for the **RX72N Envision Kit**.
+This repository is a fork of [renesas/iot-reference-rx](https://github.com/renesas/iot-reference-rx), modified and maintained for Renesas RX IoT reference work.
 
 The upstream repository officially supports only the CK-RX65N v2 board and does **not** include RX72N projects. This fork extends the original by:
 
 1. **Adding RX72N Envision Kit support** — porting the FreeRTOS + AWS IoT demo (Ethernet, MQTT PubSub, OTA) to the RX72N Envision Kit, which is not covered upstream
-2. **Improving the boot loader** — replacing the upstream's simple dual-bank boot loader with a production-grade design, with the ultimate goal of integrating [MCUboot](https://www.mcuboot.com/) as the secure boot loader
-3. **CI/CD integration** — automated build, flash, provisioning, and MQTT/OTA testing via GitLab CI with hardware-in-the-loop
+2. **Adding CK-RX65N + BG96 cellular support** — carrying the proven OSS CK-RX65N/BG96 OTA reference into this tree as the recommended cellular modem path for this fork
+3. **Improving the boot loader** — replacing the upstream's simple dual-bank boot loader with a production-grade design, with the ultimate goal of integrating [MCUboot](https://www.mcuboot.com/) as the secure boot loader
+4. **CI/CD integration** — automated build, flash, provisioning, and MQTT/OTA testing via GitLab CI with hardware-in-the-loop
 
 本リポジトリは [renesas/iot-reference-rx](https://github.com/renesas/iot-reference-rx) のフォークです。
 upstream は CK-RX65N v2 のみを公式サポートしており、**RX72N には対応していません**。
 本フォークでは以下の改造を行っています:
 
 1. **RX72N Envision Kit 対応の追加** — upstream にない RX72N 向け FreeRTOS + AWS IoT デモ（Ethernet / MQTT PubSub / OTA）の移植
-2. **ブートローダの本格化** — upstream の簡易デュアルバンクブートローダを本格仕様に変更。最終的には [MCUboot](https://www.mcuboot.com/) への換装を予定
-3. **CI/CD 統合** — GitLab CI による自動ビルド・フラッシュ・プロビジョニング・MQTT/OTA テスト（実機接続 Runner）
+2. **CK-RX65N + BG96 Cellular 対応の追加** — 安定してOTA可能なOSS版CK-RX65N/BG96構成を、このフォークの推奨セルラー構成として取り込み
+3. **ブートローダの本格化** — upstream の簡易デュアルバンクブートローダを本格仕様に変更。最終的には [MCUboot](https://www.mcuboot.com/) への換装を予定
+4. **CI/CD 統合** — GitLab CI による自動ビルド・フラッシュ・プロビジョニング・MQTT/OTA テスト（実機接続 Runner）
 
 ### Upstream
 
@@ -33,8 +35,9 @@ Base version: **202604.00-LTS-rx** (FreeRTOS 202604.00 LTS)
 | Board | MCU | Core | Code Flash | RAM | Connectivity |
 |-------|-----|------|------------|-----|--------------|
 | **RX72N Envision Kit** | RX72N (R5F572NN) | RXv3 | 4 MB (dual-bank) | 1 MB + 512 KB | Ethernet (on-board) |
+| **CK-RX65N V1 + BG96** | RX65N dual-bank | RXv2 | 2 MB (dual-bank) | 640 KB | Cellular Cat-M1/NB-IoT (Quectel BG96) |
 
-> **Note:** The upstream supports CK-RX65N v2 (RX65N, RXv2). Historical CK-RX65N documentation may remain in this repository as reference but those projects are no longer shipped in `Projects/`.
+> **Note:** The upstream RYZ014A cellular project is obsolete in practice. This fork keeps BG96 as the maintained cellular reference path.
 
 ## Projects / e2 studio プロジェクト
 
@@ -44,6 +47,8 @@ The following e2 studio projects are maintained under `Projects/`:
 |---------|------|-------------|
 | Boot Loader | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | RX72N dual-bank boot loader for OTA firmware update |
 | AWS Ether Demo | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | FreeRTOS + AWS IoT demo (MQTT PubSub, OTA) over Ethernet |
+| CK-RX65N BG96 Boot Loader | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | RX65N dual-bank boot loader for BG96 OTA |
+| CK-RX65N BG96 AWS Demo | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | FreeRTOS + AWS IoT demo (MQTT PubSub, OTA) over BG96 cellular |
 
 ### Boot Loader Architecture / ブートローダ構成
 
@@ -99,6 +104,17 @@ pwsh -File tools/build_headless_rx72n.ps1 \
 ```
 
 The script imports and builds both `boot_loader_rx72n_envision_kit` and `aws_ether_rx72n_envision_kit`, then verifies `.mot` / `.abs` / `.x` outputs.
+
+For the CK-RX65N + BG96 cellular reference:
+
+```bash
+pwsh -File tools/build_headless_rx65n_bg96.ps1 \
+  -ProjectRoot <repo_root> \
+  -E2Studio C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe \
+  -Workspace <temp_workspace>
+```
+
+The script imports and builds both `boot_loader_ck_rx65n` and `aws_bg96_ck_rx65n`, then verifies `.mot` / `.abs` / `.x` outputs.
 
 ### Flash / 書き込み方法
 
@@ -159,6 +175,7 @@ The GitLab CI pipeline provides:
 | Stage | Description |
 |-------|-------------|
 | `build_rx72n` | Build boot loader and application (no credentials) |
+| `build_rx65n_bg96` | Build CK-RX65N BG96 boot loader and application, then package the app as `.rsu` |
 | `flash_rx72n` | Write firmware to RX72N Envision Kit via rfp-cli |
 | `provision_rx72n` | Provision AWS IoT credentials over UART CLI |
 | `test_mqtt_rx72n` | Verify MQTT PubSub connectivity on hardware |

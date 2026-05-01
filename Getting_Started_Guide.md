@@ -2,7 +2,8 @@
 
 * This document explains demo and how to run them.  
 * This demo supports the FreeRTOS 202406.04 LTS libraries.  
-* This demo only works with CK-RX65N v2.
+* This upstream document primarily describes CK-RX65N v2.
+* This fork also provides a CK-RX65N V1 + Quectel BG96 cellular OTA reference in `Projects/aws_bg96_ck_rx65n/`.
 
 ## Summary of demos
 
@@ -41,6 +42,9 @@ When you create as a new project (PG) according to the FAQ below, you can skip s
   * [RYZ014A](https://www.renesas.com/br/en/products/wireless-connectivity/cellular-iot-modules/ryz014a-lte-cat-m1-cellular-iot-module)[(Obsolete)](https://www.renesas.com/document/eln/plc-240004-end-life-eol-process-select-part-numbers?r=1503996) as Cellular (CAT-M1) module if you use Cellular communication
     * This product is no longer in production and technical support may be limited.  
   * [DA16600](https://www.renesas.com/us/en/products/wireless-connectivity/wi-fi/low-power-wi-fi/da16600mod-ultra-low-power-wi-fi-bluetooth-low-energy-combo-modules-battery-powered-iot-devices) as Wi-Fi module if you use Wi-Fi communication
+* CK-RX65N V1 + BG96 for this fork's maintained cellular reference
+  * Application: `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/`
+  * Boot loader: `Projects/boot_loader_ck_rx65n/e2studio_ccrx/`
 
 #### Software requirements
 
@@ -62,6 +66,7 @@ Each connectivity has a corresponding sample project as described in the followi
 | CK-RX65N v2 | Ethernet | aws_ether_ck_rx65n_v2 | boot_loader_ck_rx65n_v2 | CC-RX/GCC |
 | CK-RX65N v2 | Cellular (Cat-M1)(Obsolete) | aws_ryz014a_ck_rx65n_v2 | boot_loader_ck_rx65n_v2 |CC-RX/GCC|   |
 | CK-RX65N v2 | Wi-Fi (DA16600) | aws_da16600_ck_rx65n_v2 | boot_loader_ck_rx65n_v2 | CC-RX/GCC |  |
+| CK-RX65N V1 | Cellular (BG96) | aws_bg96_ck_rx65n | boot_loader_ck_rx65n | CC-RX | This fork's maintained cellular reference |
 
 The following are combinations of demos that can be tried for each procedure.
 

@@ -1,0 +1,9 @@
+-MAKEUD=".\\aws_bg96_ck_rx65n_c.ud"
+-input="aws_bg96_ck_rx65n.abs"
+-form=stype
+-output="aws_bg96_ck_rx65n.mot"
+-byte_count=10
+-nologo
+-nomessage
+-change_message=information=2220
+-exit

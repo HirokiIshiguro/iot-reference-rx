@@ -3,7 +3,8 @@ param(
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
     [string]$Workspace = "C:\iotref-rx72n-ws",
     [string]$ProjectsPath = "Projects",
-    [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log")
+    [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log"),
+    [int]$E2StudioTimeoutSeconds = 600
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,9 +86,74 @@ function Find-Artifacts {
     }
 }
 
+function Convert-ToArgumentString {
+    param([string[]]$Arguments)
+
+    return (($Arguments | ForEach-Object {
+        $arg = [string]$_
+        if ($arg -match '[\s"]') {
+            '"' + ($arg -replace '"', '\"') + '"'
+        } else {
+            $arg
+        }
+    }) -join " ")
+}
+
+function Write-ProcessOutput {
+    param([string[]]$Paths)
+
+    foreach ($path in $Paths) {
+        if (Test-Path -LiteralPath $path) {
+            $lines = Get-Content -LiteralPath $path -ErrorAction SilentlyContinue
+            if ($lines) {
+                Add-Content -LiteralPath $logFile -Value $lines
+                $lines | ForEach-Object { Write-Host $_ }
+            }
+        }
+    }
+}
+
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+
+    Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessId" -ErrorAction SilentlyContinue | ForEach-Object {
+        Stop-ProcessTree -ProcessId $_.ProcessId
+    }
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+function Invoke-E2StudioCli {
+    param([string[]]$Arguments)
+
+    Write-Host "+ $E2Studio $($Arguments -join ' ')"
+    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("iotref_rx72n_e2studio_" + [System.Guid]::NewGuid().ToString("N"))
+    $stdoutPath = "$tempBase.out"
+    $stderrPath = "$tempBase.err"
+    $process = Start-Process `
+        -FilePath $E2Studio `
+        -ArgumentList (Convert-ToArgumentString $Arguments) `
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath `
+        -NoNewWindow `
+        -PassThru
+
+    try {
+        if (-not $process.WaitForExit($E2StudioTimeoutSeconds * 1000)) {
+            Stop-ProcessTree -ProcessId $process.Id
+            Write-ProcessOutput @($stdoutPath, $stderrPath)
+            throw "e2 studio CLI timed out after $E2StudioTimeoutSeconds seconds: $E2Studio $($Arguments -join ' ')"
+        }
+        Write-ProcessOutput @($stdoutPath, $stderrPath)
+        return $process.ExitCode
+    }
+    finally {
+        Remove-Item -Force -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
+    }
+}
+
 try {
-    & $E2Studio @e2base @imports -build all 2>&1 | Tee-Object -FilePath $logFile | Out-Null
-    $e2exit = $LASTEXITCODE
+    Remove-Item -Force -LiteralPath $logFile -ErrorAction SilentlyContinue
+    $e2exit = Invoke-E2StudioCli (@() + $e2base + $imports + @("-build", "all"))
 
     Write-Host "e2studio exit code: $e2exit"
     $logLines = Get-Content $logFile -ErrorAction SilentlyContinue

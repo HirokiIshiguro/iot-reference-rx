@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Monitor RX72N UART logs and verify the Fleet Provisioning demo completes.
-"""
+"""Monitor UART logs and verify the Fleet Provisioning demo completes."""
 
 import argparse
 import json
@@ -31,6 +29,8 @@ MARKERS = [
 ]
 
 ERROR_PATTERNS = [
+    "Cellular init failed",
+    "Cellular Open Failed",
     "Failed to establish MQTT session",
     "Failed to publish to fleet provisioning topic",
     "Failed to parse the CreateCertificatefromCsr API response",
@@ -84,6 +84,7 @@ def monitor_uart(port, baud, timeout, reset_cmd):
     total_bytes = 0
     total_lines = 0
     buffer = ""
+    fatal_cellular_error = False
 
     ser = serial.Serial(
         port=port,
@@ -133,8 +134,12 @@ def monitor_uart(port, baud, timeout, reset_cmd):
                         if pattern in line:
                             errors.append(line)
                             print(f"[ERROR] {line}")
+                            if pattern in ("Cellular init failed", "Cellular Open Failed"):
+                                fatal_cellular_error = True
 
                 if all(results.values()):
+                    break
+                if fatal_cellular_error:
                     break
             else:
                 time.sleep(0.05)
@@ -152,28 +157,50 @@ def monitor_uart(port, baud, timeout, reset_cmd):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verify RX72N Fleet Provisioning demo from log UART")
+    parser = argparse.ArgumentParser(description="Verify Fleet Provisioning demo from log UART")
     parser.add_argument("--log-port", default=DEFAULT_LOG_PORT)
     parser.add_argument("--log-baud", type=int, default=DEFAULT_LOG_BAUD)
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
     parser.add_argument("--reset-cmd", required=True)
+    parser.add_argument("--label", default=os.environ.get("FLEET_TEST_LABEL", "RX72N"))
     parser.add_argument("--summary-json", help="Optional path to write fleet provisioning summary JSON")
+    parser.add_argument("--app-reset-retries", type=int, default=int(os.environ.get("FLEET_APP_RESET_RETRIES", "0")))
     args = parser.parse_args()
 
     print("=" * 60)
-    print("RX72N Fleet Provisioning Test")
+    print(f"{args.label} Fleet Provisioning Test")
     print("=" * 60)
     print(f"Log Port: {args.log_port}")
     print(f"Log Baud: {args.log_baud}")
     print(f"Timeout:  {args.timeout}s")
     print("=" * 60)
 
-    results, errors, total_bytes, total_lines, thing_name, certificate_id = monitor_uart(
-        args.log_port,
-        args.log_baud,
-        args.timeout,
-        args.reset_cmd,
-    )
+    attempts = []
+    for attempt in range(1, args.app_reset_retries + 2):
+        if attempt > 1:
+            print(f"[RETRY] restarting fleet test after cellular init failure ({attempt}/{args.app_reset_retries + 1})")
+        results, errors, total_bytes, total_lines, thing_name, certificate_id = monitor_uart(
+            args.log_port,
+            args.log_baud,
+            args.timeout,
+            args.reset_cmd,
+        )
+        attempts.append(
+            {
+                "attempt": attempt,
+                "results": dict(results),
+                "errors": list(errors),
+                "total_bytes": total_bytes,
+                "total_lines": total_lines,
+                "thing_name": thing_name,
+                "certificate_id": certificate_id,
+            }
+        )
+        if all(results.values()):
+            break
+        retryable = any("Cellular init failed" in error or "Cellular Open Failed" in error for error in errors)
+        if not retryable or attempt > args.app_reset_retries:
+            break
 
     summary = {
         "results": results,
@@ -182,6 +209,7 @@ def main():
         "total_lines": total_lines,
         "thing_name": thing_name,
         "certificate_id": certificate_id,
+        "attempts": attempts,
     }
     if args.summary_json:
         with open(args.summary_json, "w", encoding="utf-8") as handle:
@@ -203,10 +231,10 @@ def main():
     print("=" * 60)
 
     if completed:
-        print("[PASS] RX72N Fleet Provisioning demo verified")
+        print(f"[PASS] {args.label} Fleet Provisioning demo verified")
         return 0
 
-    print("[FAIL] RX72N Fleet Provisioning demo incomplete")
+    print(f"[FAIL] {args.label} Fleet Provisioning demo incomplete")
     return 1
 
 

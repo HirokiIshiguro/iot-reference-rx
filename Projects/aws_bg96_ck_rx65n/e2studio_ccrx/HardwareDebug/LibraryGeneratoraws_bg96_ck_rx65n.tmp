@@ -1,0 +1,9 @@
+-MAKEUD_LBG=".\\aws_bg96_ck_rx65n_lbg.ud"
+-isa=rxv2
+-fpu
+-branch=32
+-lang=c99
+-head=runtime,ctype,math,mathf,stdarg,stdio,stdlib,string,new,fenv,inttypes,wchar,wctype
+-output="aws_bg96_ck_rx65n.lib"
+-goptimize
+-nologo

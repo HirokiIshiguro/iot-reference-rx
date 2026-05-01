@@ -1,0 +1,8 @@
+-MAKEUD=".\\bootloader_c.ud"
+-input="bootloader.abs"
+-form=stype
+-output="bootloader.mot"
+-byte_count=10
+-nologo
+-nomessage
+-exit

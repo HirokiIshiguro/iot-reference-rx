@@ -1,0 +1,27 @@
+# e2 studio build output
+HardwareDebug/
+Debug/
+Release/
+
+# Compiler and linker products
+*.abs
+*.bin
+*.d
+*.hex
+*.lib
+*.lst
+*.map
+*.mot
+*.obj
+*.rsu
+*.srec
+*.tmp
+*.ud
+*.udm
+*.x
+
+# IDE-derived build databases
+compile_commands.json
+
+# Local build/test logs
+*.log
