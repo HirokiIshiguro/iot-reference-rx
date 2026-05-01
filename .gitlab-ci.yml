@@ -1645,6 +1645,7 @@ provision_rx65n_bg96_fleet_credentials:
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
       python3 tools/bg96_bootloader_integration.py \
         --action download-rsu \
+        --bootloader-mot "$CI_PROJECT_DIR/artifacts/rx65n_bg96_fleet_candidate/boot_loader_ck_rx65n.mot" \
         --userprog-rsu "$CI_PROJECT_DIR/artifacts/rx65n_bg96_fleet_candidate/aws_bg96_ck_rx65n_fleet.rsu" \
         --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
         --uart-port "${uart_port}" \
