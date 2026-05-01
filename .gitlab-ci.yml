@@ -954,32 +954,7 @@ build_rx65n_bg96_ota_candidate:
         --workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_OTA" `
         --e2studio-timeout "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS"
 
-      $explicitCodeSignerCert = Get-FirstEnv @(
-        "RX65N_BG96_OTA_CODE_SIGNING_CERT",
-        "AWS_IOT_CODE_SIGNING_CERT_PEM_FILE_CK_RX65N_01",
-        "BG96_OTA_CODE_SIGNING_CERT"
-      )
-      if ($explicitCodeSignerCert) {
-        Write-Host "Using externally supplied RX65N BG96 OTA code signer certificate from CI variable: $($explicitCodeSignerCert.Name)"
-      } else {
-        $regionItem = Get-FirstEnv @("AWS_DEFAULT_REGION", "AWS_REGION", "AWS_OTA_REGION_CK_RX65N_01", "BG96_OTA_REGION")
-        $signingProfileItem = Get-FirstEnv @(
-          "AWS_OTA_SIGNING_PROFILE_CK_RX65N_01",
-          "RX65N_BG96_OTA_SIGNING_PROFILE",
-          "BG96_AWS_OTA_SIGNING_PROFILE",
-          "BG96_OTA_SIGNING_PROFILE",
-          "OTA_SIGNING_PROFILE"
-        )
-        if ($regionItem -and $signingProfileItem) {
-          $awsCodeSignerCert = Join-Path $artifactDir "bg96_ota_aws_codesign_cert.pem"
-          python tools/fetch_aws_signer_certificate.py `
-            --signing-profile "$($signingProfileItem.Value)" `
-            --region "$($regionItem.Value)" `
-            --out "$awsCodeSignerCert"
-        } else {
-          Write-Host "AWS Signer profile or region is unavailable; falling back to locally generated code signer certificate."
-        }
-      }
+      Write-Host "Using locally generated RX65N BG96 OTA code signer certificate and customCodeSigning signature."
   after_script:
     - $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate"
     - $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\aws_bg96_ck_rx65n\e2studio_ccrx"
@@ -1031,8 +1006,6 @@ provision_rx65n_bg96_ota_signer_certificate:
         code_signer_cert="${AWS_IOT_CODE_SIGNING_CERT_PEM_FILE_CK_RX65N_01}"
       elif [ -n "${BG96_OTA_CODE_SIGNING_CERT:-}" ]; then
         code_signer_cert="${BG96_OTA_CODE_SIGNING_CERT}"
-      elif [ -f artifacts/rx65n_bg96_ota_candidate/bg96_ota_aws_codesign_cert.pem ]; then
-        code_signer_cert="artifacts/rx65n_bg96_ota_candidate/bg96_ota_aws_codesign_cert.pem"
       else
         code_signer_cert="artifacts/rx65n_bg96_ota_candidate/bg96_ota_codesign_cert.pem"
       fi
@@ -1132,7 +1105,11 @@ create_rx65n_bg96_ota_update:
       $version = (Get-Content (Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\version.txt") -Raw).Trim()
       $versionToken = $version -replace '\.', '_'
       $payload = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\bg96_${versionToken}_ota_payload.bin"
+      $payloadSignature = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\bg96_${versionToken}_ota_payload.sig.der"
+      $codeSignerCert = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\bg96_ota_codesign_cert.pem"
       if (-not (Test-Path -LiteralPath $payload)) { throw "RX65N BG96 OTA payload missing: $payload" }
+      if (-not (Test-Path -LiteralPath $payloadSignature)) { throw "RX65N BG96 OTA payload signature missing: $payloadSignature" }
+      if (-not (Test-Path -LiteralPath $codeSignerCert)) { throw "RX65N BG96 OTA code signer certificate missing: $codeSignerCert" }
       $parkMarker = Join-Path $env:CI_PROJECT_DIR "artifacts\provision_rx65n_bg96_ota_signer_certificate\parked.ok"
       if (-not (Test-Path -LiteralPath $parkMarker)) { throw "RX65N BG96 OTA signer provisioning marker missing: $parkMarker" }
 
@@ -1140,7 +1117,6 @@ create_rx65n_bg96_ota_update:
       $thingName = Require-Value "AWS IoT thing name" $thingName
       $targetArn = Get-FirstEnv @("AWS_OTA_TARGET_ARN_CK_RX65N_01", "BG96_OTA_TARGET_ARN", "OTA_TARGET_ARN")
       $bucket = Require-Value "AWS OTA S3 bucket" (Get-FirstEnv @("AWS_OTA_S3_BUCKET_CK_RX65N_01", "RX65N_BG96_OTA_S3_BUCKET", "BG96_AWS_OTA_S3_BUCKET", "BG96_OTA_S3_BUCKET", "OTA_S3_BUCKET"))
-      $signingProfile = Require-Value "AWS OTA signing profile" (Get-FirstEnv @("AWS_OTA_SIGNING_PROFILE_CK_RX65N_01", "RX65N_BG96_OTA_SIGNING_PROFILE", "BG96_AWS_OTA_SIGNING_PROFILE", "BG96_OTA_SIGNING_PROFILE", "OTA_SIGNING_PROFILE"))
       $roleArn = Require-Value "AWS OTA service role ARN" (Get-FirstEnv @("AWS_OTA_SERVICE_ROLE_ARN_CK_RX65N_01", "RX65N_BG96_OTA_SERVICE_ROLE_ARN", "BG96_AWS_OTA_SERVICE_ROLE_ARN", "BG96_OTA_SERVICE_ROLE_ARN", "BG96_OTA_ROLE_ARN", "OTA_SERVICE_ROLE_ARN", "OTA_ROLE_ARN"))
       $roleArn = Resolve-IamRoleArn $roleArn
 
@@ -1156,7 +1132,8 @@ create_rx65n_bg96_ota_update:
         --input-payload "$payload" `
         --file-version "$version" `
         --bucket "$bucket" `
-        --signing-profile "$signingProfile" `
+        --custom-signature-der "$payloadSignature" `
+        --code-signer-cert "$codeSignerCert" `
         --role-arn "$roleArn" `
         --region "$region" `
         --ota-id-prefix "rx65n-bg96-ota"

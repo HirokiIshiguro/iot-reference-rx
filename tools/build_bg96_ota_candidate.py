@@ -168,6 +168,7 @@ def main() -> int:
     version_token = version_text.replace(".", "_")
     full_rsu = output_dir / f"bg96_{version_token}.rsu"
     ota_payload = output_dir / f"bg96_{version_token}_ota_payload.bin"
+    ota_payload_sig_der = output_dir / f"bg96_{version_token}_ota_payload.sig.der"
     code_sign_cert = output_dir / "bg96_ota_codesign_cert.pem"
     log_path = output_dir / "build_bg96_ota_candidate.log"
 
@@ -204,6 +205,8 @@ def main() -> int:
                 str(ota_payload),
                 "--format",
                 "rtos-ota-payload",
+                "--signature-der-output",
+                str(ota_payload_sig_der),
             ],
             repo_root,
         )
@@ -216,6 +219,7 @@ def main() -> int:
     print(f"  version: {version_text}")
     print(f"  full_rsu: {full_rsu}")
     print(f"  ota_payload: {ota_payload}")
+    print(f"  ota_payload_sig_der: {ota_payload_sig_der}")
     print(f"  code_sign_cert: {code_sign_cert}")
     return 0
 

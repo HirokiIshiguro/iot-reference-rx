@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import subprocess
 import sys
@@ -41,6 +42,11 @@ def write_meta(path: Path, meta: dict, **updates: object) -> None:
     write_json(path, meta)
 
 
+def encode_custom_signature_for_cli(der_signature: bytes) -> str:
+    """Return the double-base64 form needed for AWS CLI blob JSON input."""
+    return base64.b64encode(base64.b64encode(der_signature)).decode("ascii")
+
+
 def wait_for_ota(ota_update_id: str, region: str, timeout: int, poll_interval: int) -> dict:
     deadline = time.time() + timeout
     last_payload: dict | None = None
@@ -63,7 +69,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-payload", required=True, type=Path)
     parser.add_argument("--file-version", required=True)
     parser.add_argument("--bucket", required=True)
-    parser.add_argument("--signing-profile", required=True)
+    parser.add_argument("--signing-profile", default=None)
+    parser.add_argument("--custom-signature-der", type=Path, default=None)
+    parser.add_argument("--code-signer-cert", type=Path, default=None)
+    parser.add_argument("--certificate-name", default=None)
     parser.add_argument("--role-arn", required=True)
     parser.add_argument("--region", required=True)
     parser.add_argument("--ota-id-prefix", default="bg96-ota")
@@ -78,6 +87,10 @@ def main() -> int:
     args = parse_args()
     if not args.input_payload.is_file():
         raise SystemExit(f"OTA payload not found: {args.input_payload}")
+    if args.custom_signature_der is not None and not args.custom_signature_der.is_file():
+        raise SystemExit(f"custom signature not found: {args.custom_signature_der}")
+    if args.custom_signature_der is None and not args.signing_profile:
+        raise SystemExit("--signing-profile is required when --custom-signature-der is not used")
 
     artifact_dir = args.artifact_dir.resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -112,6 +125,7 @@ def main() -> int:
     if "VersionId" in put_output:
         file_location["s3Location"]["version"] = put_output["VersionId"]
 
+    code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
     meta = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "region": args.region,
@@ -123,10 +137,42 @@ def main() -> int:
         "s3_key": s3_key,
         "s3_version": file_location["s3Location"].get("version"),
         "signing_profile": args.signing_profile,
+        "code_signing_mode": code_signing_mode,
+        "custom_signature_der": str(args.custom_signature_der.resolve()) if args.custom_signature_der else None,
+        "code_signer_cert": str(args.code_signer_cert.resolve()) if args.code_signer_cert else None,
         "file_version": args.file_version,
         "input_payload": str(payload),
     }
     write_json(meta_path, meta)
+
+    if args.custom_signature_der is not None:
+        certificate_name = args.certificate_name
+        if certificate_name is None:
+            certificate_name = args.code_signer_cert.name if args.code_signer_cert is not None else "bg96_ota_codesign_cert.pem"
+        code_signing = {
+            "customCodeSigning": {
+                "signature": {
+                    "inlineDocument": encode_custom_signature_for_cli(args.custom_signature_der.read_bytes()),
+                },
+                "certificateChain": {
+                    "certificateName": certificate_name,
+                },
+                "hashAlgorithm": "SHA256",
+                "signatureAlgorithm": "ECDSA",
+            }
+        }
+    else:
+        code_signing = {
+            "startSigningJobParameter": {
+                "signingProfileName": args.signing_profile,
+                "destination": {
+                    "s3Destination": {
+                        "bucket": args.bucket,
+                        "prefix": signed_prefix,
+                    }
+                },
+            }
+        }
 
     create_input = {
         "otaUpdateId": ota_update_id,
@@ -135,17 +181,7 @@ def main() -> int:
         "targetSelection": "SNAPSHOT",
         "files": [
             {
-                "codeSigning": {
-                    "startSigningJobParameter": {
-                        "signingProfileName": args.signing_profile,
-                        "destination": {
-                            "s3Destination": {
-                                "bucket": args.bucket,
-                                "prefix": signed_prefix,
-                            }
-                        },
-                    }
-                },
+                "codeSigning": code_signing,
                 "fileVersion": args.file_version,
                 "fileName": s3_key,
                 "fileLocation": file_location,

@@ -25,6 +25,8 @@ def parse_args():
     parser.add_argument("--key", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--sequence", type=int, default=1)
+    parser.add_argument("--signature-raw-output", type=Path, default=None)
+    parser.add_argument("--signature-der-output", type=Path, default=None)
     parser.add_argument(
         "--format",
         choices=("bootloader-rsu", "rtos-ota-payload"),
@@ -35,6 +37,16 @@ def parse_args():
         ),
     )
     return parser.parse_args()
+
+
+def sign_payload(payload, key_path):
+    with key_path.open("rb") as handle:
+        private_key = serialization.load_pem_private_key(handle.read(), password=None)
+    der_sig = private_key.sign(payload, ec.ECDSA(hashes.SHA256()))
+    r, s = utils.decode_dss_signature(der_sig)
+    raw_sig = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+    private_key.public_key().verify(utils.encode_dss_signature(r, s), payload, ec.ECDSA(hashes.SHA256()))
+    return der_sig, raw_sig
 
 
 def iter_srec_records(mot_path):
@@ -98,12 +110,7 @@ def main():
     struct.pack_into("<I", image, 0x210, HARDWARE_ID)
 
     payload = bytes(image[HEADER_SIZE:])
-    with args.key.open("rb") as handle:
-        private_key = serialization.load_pem_private_key(handle.read(), password=None)
-    der_sig = private_key.sign(payload, ec.ECDSA(hashes.SHA256()))
-    r, s = utils.decode_dss_signature(der_sig)
-    raw_sig = r.to_bytes(32, "big") + s.to_bytes(32, "big")
-    private_key.public_key().verify(utils.encode_dss_signature(r, s), payload, ec.ECDSA(hashes.SHA256()))
+    _, raw_sig = sign_payload(payload, args.key)
 
     struct.pack_into("<I", image, 0x28, len(raw_sig))
     image[0x2C:0x2C + len(raw_sig)] = raw_sig
@@ -117,12 +124,25 @@ def main():
         rtos_descriptor += b"\xff" * 240
         rtos_descriptor += struct.pack("<I", 1)
         output = bytes(rtos_descriptor) + bytes(image[USER_START - BASE_ADDRESS:])
+        output_der_sig, output_raw_sig = sign_payload(output, args.key)
     else:
         output = bytes(image)
+        output_der_sig, output_raw_sig = sign_payload(payload, args.key)
+
+    if args.signature_raw_output is not None:
+        args.signature_raw_output.parent.mkdir(parents=True, exist_ok=True)
+        args.signature_raw_output.write_bytes(output_raw_sig)
+    if args.signature_der_output is not None:
+        args.signature_der_output.parent.mkdir(parents=True, exist_ok=True)
+        args.signature_der_output.write_bytes(output_der_sig)
 
     args.output.write_bytes(output)
     print(f"Generated {args.output}")
     print(f"  format={args.format} size={len(output)} written_bytes={written} ignored_bytes={ignored}")
+    if args.signature_raw_output is not None:
+        print(f"  signature_raw={args.signature_raw_output} size={len(output_raw_sig)}")
+    if args.signature_der_output is not None:
+        print(f"  signature_der={args.signature_der_output} size={len(output_der_sig)}")
 
 
 if __name__ == "__main__":
