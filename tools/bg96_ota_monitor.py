@@ -50,6 +50,10 @@ ERROR_PATTERNS = (
     "OTA is failed",
     "rollback",
 )
+RETRYABLE_ERROR_PATTERNS = (
+    "Cellular init failed",
+    "Cellular Open Failed",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -173,6 +177,52 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
     }
 
 
+def is_retryable_error(error: str) -> bool:
+    return any(pattern.lower() in error.lower() for pattern in RETRYABLE_ERROR_PATTERNS)
+
+
+def aggregate_summaries(summaries: list[dict], expected_version: str) -> dict:
+    detected: dict[str, dict] = {}
+    versions: list[str] = []
+    errors: list[str] = []
+    total_bytes = 0
+    duration_seconds = 0.0
+
+    for summary in summaries:
+        attempt = summary["attempt"]
+        total_bytes += summary.get("total_bytes", 0)
+        duration_seconds += summary.get("duration_seconds", 0.0)
+        for version in summary.get("versions_seen", []):
+            if version not in versions:
+                versions.append(version)
+        for marker_id, marker in summary.get("detected_markers", {}).items():
+            if marker_id not in detected:
+                detected[marker_id] = dict(marker, attempt=attempt)
+        errors.extend(summary.get("errors", []))
+
+    blocking_errors = [error for error in errors if not is_retryable_error(error)]
+    success = (
+        all(marker in detected for marker in REQUIRED)
+        and expected_version in versions
+        and not blocking_errors
+    )
+
+    return {
+        "success": success,
+        "expected_version": expected_version,
+        "versions_seen": versions,
+        "detected_markers": detected,
+        "missing_required": [marker for marker in REQUIRED if marker not in detected],
+        "errors": errors,
+        "blocking_errors": blocking_errors,
+        "retryable_errors": [error for error in errors if is_retryable_error(error)],
+        "total_bytes": total_bytes,
+        "duration_seconds": round(duration_seconds, 3),
+        "attempt_count": len(summaries),
+        "attempts": summaries,
+    }
+
+
 def main() -> int:
     args = parse_args()
     summaries: list[dict] = []
@@ -202,8 +252,7 @@ def main() -> int:
     finally:
         port.close()
 
-    summary = dict(summaries[-1])
-    summary["attempts"] = summaries
+    summary = aggregate_summaries(summaries, args.expected_version)
     if args.summary_json:
         args.summary_json.parent.mkdir(parents=True, exist_ok=True)
         args.summary_json.write_text(json.dumps(summary, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
