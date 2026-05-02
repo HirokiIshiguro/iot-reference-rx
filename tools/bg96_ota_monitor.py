@@ -94,7 +94,6 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
     partial = ""
     start = time.time()
     last_rx_time = start
-    activate_seen_time: float | None = None
     activate_reset_done = False
     total_bytes = 0
 
@@ -107,13 +106,13 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
         if (
             not activate_reset_done
             and args.activate_reset_delay >= 0
-            and activate_seen_time is not None
-            and now - activate_seen_time >= args.activate_reset_delay
+            and any(marker in detected for marker in ("activate_image", "selfcheck_mode"))
+            and now - last_rx_time >= args.activate_reset_delay
         ):
             elapsed = now - start
             message = (
-                f"\n[OTA] activate/selfcheck reached; resetting app "
-                f"{args.activate_reset_delay:g}s after detection\n"
+                f"\n[OTA] activate/selfcheck reached; resetting app after "
+                f"{args.activate_reset_delay:g}s quiet\n"
             )
             print(message, end="")
             log_raw(args.raw_log, elapsed, message)
@@ -146,8 +145,6 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
             for marker_id, marker in MARKERS.items():
                 if marker in stripped and marker_id not in detected:
                     detected[marker_id] = {"seen_at": round(elapsed, 3), "line": stripped}
-                    if marker_id in ("activate_image", "selfcheck_mode") and activate_seen_time is None:
-                        activate_seen_time = time.time()
             match = VERSION_RE.search(stripped)
             if match:
                 version = ".".join(match.groups())
@@ -157,7 +154,10 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
                 if pattern.lower() in stripped.lower():
                     errors.append(stripped)
 
-        if all(marker in detected for marker in REQUIRED) and args.expected_version in versions:
+        if (
+            all(marker in detected for marker in REQUIRED)
+            or "image_accepted" in detected
+        ) and args.expected_version in versions:
             break
         if errors:
             break
