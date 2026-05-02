@@ -30,6 +30,10 @@
 #include "cellular_private_api.h"
 #include "at_command.h"
 #include "bg96_private.h"   /* CELLULAR_TARGET_BG96 master switch */
+#if BSP_CFG_RTOS_USED == (1)
+#include "FreeRTOS.h"
+#include "task.h"
+#endif
 
 /**********************************************************************************************************************
  * Macro definitions
@@ -42,6 +46,11 @@
 #define CHAR_CHECK_6    (' ')
 #define CHAR_CHECK_7    ('\r')
 #define CHAR_END        ('\0')
+#if defined(CELLULAR_TARGET_BG96)
+#define BG96_QIRD_READ_CHUNK_MAX   (256U)
+#define BG96_QIRD_UNREAD_LIMIT     (32767)
+#define BG96_RECV_URC_COALESCE_DELAY_MS  (0U)
+#endif /* CELLULAR_TARGET_BG96 */
 
 /**********************************************************************************************************************
  * Typedef definitions
@@ -65,7 +74,6 @@ static const uint8_t s_atc_res_data_receive_qird[]  = ATC_RES_DATA_RECEIVE_QIRD;
 static const uint8_t s_atc_res_read_dns[]           = ATC_RES_READ_DNS;
 static const uint8_t s_atc_res_pin_lock_status[]    = ATC_RES_PIN_LOCK_STATUS;
 static const uint8_t s_atc_res_socket_close[]       = ATC_RES_SOCKET_CLOSE;
-static const uint8_t s_atc_res_socket_open[]        = ATC_RES_SOCKET_OPEN;
 static const uint8_t s_atc_res_system_start[]       = ATC_RES_SYSTEM_START;
 static const uint8_t s_atc_res_attach_status[]      = ATC_RES_ATTACH_STATUS;
 static const uint8_t s_atc_res_ap_connect_config[]  = ATC_RES_AP_CONNECT_CONFIG;
@@ -110,7 +118,6 @@ static const uint8_t * const sp_cellular_atc_res_tbl[CELLULAR_RES_MAX] =
     s_atc_res_read_dns,
     s_atc_res_pin_lock_status,
     s_atc_res_socket_close,
-    s_atc_res_socket_open,
     s_atc_res_system_start,
     s_atc_res_attach_status,
     s_atc_res_ap_connect_config,
@@ -161,7 +168,6 @@ static void cellular_get_time (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_
 static void cellular_get_imei (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void cellular_get_imsi (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void cellular_system_start (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
-static void cellular_socket_open_result (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void cellular_disconnect_socket (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void cellular_get_timezone (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void cellular_get_service_status (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
@@ -190,11 +196,21 @@ static void cellular_get_revision (st_cellular_ctrl_t * p_ctrl, st_cellular_rece
 static void cellular_response_skip (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void cellular_memclear (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void cellular_exit (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
-
+#if defined(CELLULAR_TARGET_BG96)
+static void cellular_qiopen_result (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
+static bool cellular_bg96_qird_status (st_cellular_ctrl_t * p_ctrl,
+                                       st_cellular_receive_t * cellular_receive,
+                                       const char * p_response);
+static bool cellular_bg96_qird_fast_drain (st_cellular_ctrl_t * p_ctrl,
+                                           st_cellular_receive_t * cellular_receive,
+                                           const int32_t length);
+static bool cellular_bg96_read_exact (st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst, uint16_t length);
+static bool cellular_bg96_read_qird_trailer (st_cellular_ctrl_t * p_ctrl, const int32_t length);
+#endif /* CELLULAR_TARGET_BG96 */
 static void         cellular_system_state_change (st_cellular_ctrl_t * p_ctrl, int32_t stat);
 static e_atc_list_t cellular_get_at_command (st_cellular_ctrl_t * const p_ctrl);
-
 static void    cellular_set_atc_response (st_cellular_ctrl_t * const p_ctrl, const e_cellular_atc_return_t result);
+static void    cellular_notify_socket_rx_waiter (st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_idx);
 static void    cellular_cleardata (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static void    cellular_charcheck (st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive);
 static int32_t binary_conversion (int32_t binary);
@@ -212,7 +228,6 @@ static void(* p_cellular_recvtask_api[])(st_cellular_ctrl_t * p_ctrl, st_cellula
         cellular_dns_result,
         cellular_cpin_status,
         cellular_disconnect_socket,
-        cellular_socket_open_result,
         cellular_system_start,
         cellular_get_ap_connect_status,
         cellular_get_ap_connect_config,
@@ -281,7 +296,20 @@ void cellular_recv_task(ULONG p_pvParameters)
         sci_ret = R_SCI_Receive(p_ctrl->sci_ctrl.sci_hdl, &cellular_receive.data, 1);
         if (SCI_SUCCESS != sci_ret)
         {
+#if BSP_CFG_RTOS_USED == (1)
+            if ((0U != cellular_receive.recv_count) ||
+                (JOB_STATUS_NONE != cellular_receive.job_status) ||
+                (CELLULAR_RES_NONE != cellular_receive.job_no))
+            {
+                taskYIELD();
+            }
+            else
+            {
+                vTaskDelay(1);
+            }
+#else
             cellular_delay_task(1);
+#endif
         }
         else
         {
@@ -604,13 +632,14 @@ static void cellular_get_data_reception(st_cellular_ctrl_t * p_ctrl, st_cellular
 {
     st_cellular_receive_t * p_cellular_receive = cellular_receive;
 #if defined(CELLULAR_TARGET_BG96)
-    /* BG96 data-available URC: +QIURC: "recv",<cid>
-     * (no length in the URC — different from RYZ014A +SQNSRING:
-     *  <cid>,<len>). The actual available length is retrieved by a
-     *  subsequent AT+QIRD=<cid>,<read_len> call that the application
-     *  drives via R_CELLULAR_ReceiveSocket. Here we just flag "data is
-     *  available, come read it" by stamping a max-size value to
-     *  receive_unprocessed_size; AT+QIRD returns the real length. */
+    /* BG96 data-available URC:
+     *   +QIURC: "recv",<cid>
+     *   +QIURC: "recv",<cid>,<data_len>   when AT+QICFG="recvind",1 is set
+     *
+     * Use <data_len> when BG96 provides it so the socket task can drain the
+     * queued TCP data without a preceding AT+QIRD=<cid>,0 status query. Older
+     * firmware/settings without <data_len> still fall back to QIRD status by
+     * setting the pending size to zero and waking the socket task. */
     if (CHAR_CHECK_4 == p_cellular_receive->data)
     {
         const char * slice =
@@ -619,19 +648,60 @@ static void cellular_get_data_reception(st_cellular_ctrl_t * p_ctrl, st_cellular
         if (NULL != comma)
         {
             int32_t socket_no = 0;
-            if (1 == sscanf(comma + 1, "%ld", &socket_no))
+            int32_t data_len  = 0;
+            int32_t parsed    = sscanf(comma + 1, "%ld,%ld", &socket_no, &data_len);
+            if (1 <= parsed)
             {
                 uint8_t sidx = (uint8_t)socket_no - CELLULAR_START_SOCKET_NUMBER;
                 if (sidx < p_ctrl->creatable_socket)
                 {
+                    int32_t pending_size = 0;
+
+                    if (2 == parsed)
+                    {
+                        pending_size = data_len;
+                        if (pending_size > BG96_QIRD_UNREAD_LIMIT)
+                        {
+                            pending_size = BG96_QIRD_UNREAD_LIMIT;
+                        }
+                        else if (0 > pending_size)
+                        {
+                            pending_size = 0;
+                        }
+                    }
+
                     p_cellular_receive->socket_no = sidx;
-                    p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = (int16_t)CELLULAR_MAX_RX_SIZE;
+                    if (2 == parsed)
+                    {
+                        int32_t accumulated_size =
+                            (int32_t)p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size + pending_size;
+
+                        if (accumulated_size > BG96_QIRD_UNREAD_LIMIT)
+                        {
+                            accumulated_size = BG96_QIRD_UNREAD_LIMIT;
+                        }
+                        p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = (int16_t)accumulated_size;
+                    }
+                    else
+                    {
+                        p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = 0;
+                    }
                     p_ctrl->p_socket_ctrl[sidx].receive_count            = 0;
+#if BG96_RECV_URC_COALESCE_DELAY_MS > 0U
+                    if (pending_size > 0)
+                    {
+                        cellular_delay_task(BG96_RECV_URC_COALESCE_DELAY_MS);
+                    }
+#endif
                     p_ctrl->p_socket_ctrl[sidx].receive_flg              = CELLULAR_RECEIVE_FLAG_ON;
+                    cellular_notify_socket_rx_waiter(p_ctrl, sidx);
                 }
             }
         }
         cellular_cleardata(p_ctrl, p_cellular_receive);
+#if BSP_CFG_RTOS_USED == (1)
+        taskYIELD();
+#endif
     }
     return;
 #else
@@ -657,6 +727,7 @@ static void cellular_get_data_reception(st_cellular_ctrl_t * p_ctrl, st_cellular
                 p_ctrl->p_socket_ctrl[p_cellular_receive->socket_no].receive_count             = 0;
 
                 p_ctrl->p_socket_ctrl[p_cellular_receive->socket_no].receive_flg = CELLULAR_RECEIVE_FLAG_ON;
+                cellular_notify_socket_rx_waiter(p_ctrl, p_cellular_receive->socket_no);
             }
             cellular_cleardata(p_ctrl, p_cellular_receive);
         }
@@ -683,63 +754,53 @@ static void cellular_request_data(st_cellular_ctrl_t * p_ctrl, st_cellular_recei
     int32_t                 length             = 0;
     st_cellular_receive_t * p_cellular_receive = cellular_receive;
 #if defined(CELLULAR_TARGET_BG96)
-    /* BG96 AT+QIRD response: "+QIRD: <actual_length>\r\n<binary data>\r\nOK\r\n"
-     * (only a single length field; no socket number — the caller of
-     *  atc_sqnsrecv already knows which socket it queried). Use the
-     *  socket_no previously stamped by cellular_get_data_reception. */
+    /* BG96 AT+QIRD data response:
+     *   "+QIRD: <actual_length>\r\n<binary data>\r\n\r\nOK\r\n"
+     * BG96 AT+QIRD status response:
+     *   "+QIRD: <total_receive_length>,<have_read_length>,<unread_length>\r\n\r\nOK\r\n"
+     * Neither response carries the socket number, so the caller of
+     * atc_sqnsrecv records the socket index before issuing AT+QIRD. */
     if (CHAR_CHECK_4 == p_cellular_receive->data)
     {
-        /* Use strtol on the post-":" slice for robust parsing of
-         * "+QIRD: <length>" regardless of sscanf("%ld") portability
-         * quirks. Skip until the first digit and convert. */
         const char * p = (const char *)&p_ctrl->sci_ctrl.receive_buff[p_cellular_receive->tmp_recvcnt];
-        while ((*p != '\0') && ((*p < '0') || (*p > '9'))) { p++; }
-        if ('\0' != *p)
+
+        if (0U == p_ctrl->sci_ctrl.active_recv_request_size)
         {
-            length     = (int32_t)strtol(p, NULL, 10);
-            sscanf_ret = 1;
-        }
-        if ((1 == sscanf_ret) && (length > 0))
-        {
-            /* Use the socket index stamped by atc_sqnsrecv (persists across
-             * cellular_cleardata, unlike p_cellular_receive->socket_no). */
-            uint8_t sidx = p_ctrl->sci_ctrl.active_recv_socket;
-            uint16_t requested = p_ctrl->sci_ctrl.active_recv_request_size;
-            p_cellular_receive->socket_no = sidx;
-            /* BG96 recv URC does not report the buffered byte count. When
-             * AT+QIRD returns exactly the number of bytes we asked for, the
-             * modem may still hold more unread data. Keep receive_flg ON so a
-             * subsequent ReceiveSocket call can immediately drain the next
-             * chunk without waiting for another +QIURC: "recv". Only a short
-             * read (< requested) or zero-length read proves the modem buffer
-             * is drained. */
-            if ((0U != requested) && ((uint32_t)length >= requested))
+            if (false == cellular_bg96_qird_status(p_ctrl, p_cellular_receive, p))
             {
-                p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = (int16_t)CELLULAR_MAX_RX_SIZE;
-                p_ctrl->p_socket_ctrl[sidx].receive_flg              = CELLULAR_RECEIVE_FLAG_ON;
+                cellular_memclear(p_ctrl, p_cellular_receive);
+                cellular_set_atc_response(p_ctrl, ATC_RETURN_ERROR);
+                CELLULAR_LOG_ERROR(("Incoming data status request failed.\n"));
             }
-            else
-            {
-                p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = 0;
-                p_ctrl->p_socket_ctrl[sidx].receive_flg              = CELLULAR_RECEIVE_FLAG_OFF;
-            }
-            p_ctrl->p_socket_ctrl[sidx].receive_num   = (uint32_t)length;
-            p_ctrl->p_socket_ctrl[sidx].receive_count = 0;
-            p_cellular_receive->job_no                = CELLULAR_RES_PUT_CHAR;
-        }
-        else if ((1 == sscanf_ret) && (0 == length))
-        {
-            /* No data this read — finish read cycle cleanly without error. */
-            uint8_t sidx = p_ctrl->sci_ctrl.active_recv_socket;
-            p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = 0;
-            p_ctrl->p_socket_ctrl[sidx].receive_flg              = CELLULAR_RECEIVE_FLAG_OFF;
-            cellular_memclear(p_ctrl, p_cellular_receive);
         }
         else
         {
-            cellular_memclear(p_ctrl, p_cellular_receive);
-            cellular_set_atc_response(p_ctrl, ATC_RETURN_ERROR);
-            CELLULAR_LOG_ERROR(("Incoming data request failed.\n"));
+            /* Use strtol on the post-":" slice for robust parsing of
+             * "+QIRD: <length>" regardless of sscanf("%ld") portability
+             * quirks. Skip until the first digit and convert. */
+            while ((*p != '\0') && ((*p < '0') || (*p > '9'))) { p++; }
+            if ('\0' != *p)
+            {
+                length     = (int32_t)strtol(p, NULL, 10);
+                sscanf_ret = 1;
+            }
+            if (1 == sscanf_ret)
+            {
+                /* Use the socket index stamped by atc_sqnsrecv (persists across
+                 * cellular_cleardata, unlike p_cellular_receive->socket_no). */
+                if (false == cellular_bg96_qird_fast_drain(p_ctrl, p_cellular_receive, length))
+                {
+                    cellular_memclear(p_ctrl, p_cellular_receive);
+                    cellular_set_atc_response(p_ctrl, ATC_RETURN_ERROR);
+                    CELLULAR_LOG_ERROR(("Incoming data request failed.\n"));
+                }
+            }
+            else
+            {
+                cellular_memclear(p_ctrl, p_cellular_receive);
+                cellular_set_atc_response(p_ctrl, ATC_RETURN_ERROR);
+                CELLULAR_LOG_ERROR(("Incoming data request failed.\n"));
+            }
         }
     }
     return;
@@ -782,6 +843,262 @@ static void cellular_request_data(st_cellular_ctrl_t * p_ctrl, st_cellular_recei
 /**********************************************************************************************************************
  * End of function cellular_request_data
  *********************************************************************************************************************/
+
+#if defined(CELLULAR_TARGET_BG96)
+/***********************************************************************************************
+ * Function Name  @fn            cellular_bg96_qird_status
+ * Description    @details       Parse AT+QIRD=<cid>,0 status and cache unread byte count.
+ **********************************************************************************************/
+static bool cellular_bg96_qird_status(st_cellular_ctrl_t * p_ctrl,
+                                        st_cellular_receive_t * cellular_receive,
+                                        const char * p_response)
+{
+    bool                    ret                = true;
+    int32_t                 sscanf_ret         = 0;
+    int32_t                 total_length       = 0;
+    int32_t                 read_length        = 0;
+    int32_t                 unread_length      = 0;
+    uint8_t                 sidx               = p_ctrl->sci_ctrl.active_recv_socket;
+    st_cellular_receive_t * p_cellular_receive = cellular_receive;
+    const char *            p_payload          = strchr(p_response, CHAR_CHECK_3);
+
+    if (sidx >= p_ctrl->creatable_socket)
+    {
+        ret = false;
+    }
+    else
+    {
+        if (NULL != p_payload)
+        {
+            p_payload++;
+        }
+        else
+        {
+            p_payload = p_response;
+        }
+        sscanf_ret = sscanf(p_payload, " %ld,%ld,%ld", &total_length, &read_length, &unread_length);
+        if ((3 != sscanf_ret) || (0 > total_length) || (0 > read_length) || (0 > unread_length))
+        {
+            ret = false;
+        }
+    }
+
+    if (true == ret)
+    {
+        ret = cellular_bg96_read_qird_trailer(p_ctrl, 0);
+    }
+
+    if (true == ret)
+    {
+        int32_t pending_size = unread_length;
+
+        if (pending_size > BG96_QIRD_UNREAD_LIMIT)
+        {
+            pending_size = BG96_QIRD_UNREAD_LIMIT;
+        }
+
+        p_cellular_receive->socket_no = sidx;
+        p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = (int16_t)pending_size;
+        p_ctrl->p_socket_ctrl[sidx].receive_count            = 0;
+        p_ctrl->p_socket_ctrl[sidx].receive_num              = 0;
+
+        if (pending_size > 0)
+        {
+            p_ctrl->p_socket_ctrl[sidx].receive_flg = CELLULAR_RECEIVE_FLAG_ON;
+            cellular_notify_socket_rx_waiter(p_ctrl, sidx);
+        }
+        else
+        {
+            p_ctrl->p_socket_ctrl[sidx].receive_flg = CELLULAR_RECEIVE_FLAG_OFF;
+        }
+
+        cellular_set_atc_response(p_ctrl, ATC_RETURN_OK);
+        cellular_memclear(p_ctrl, p_cellular_receive);
+#if BSP_CFG_RTOS_USED == (1)
+        taskYIELD();
+#endif
+    }
+
+    return ret;
+}
+/**********************************************************************************************************************
+ * End of function cellular_bg96_qird_status
+ *********************************************************************************************************************/
+
+/***********************************************************************************************
+ * Function Name  @fn            cellular_bg96_qird_fast_drain
+ * Description    @details       Drain BG96 QIRD payload and terminal response in one receive-task pass.
+ **********************************************************************************************/
+static bool cellular_bg96_qird_fast_drain(st_cellular_ctrl_t * p_ctrl,
+                                            st_cellular_receive_t * cellular_receive,
+                                            const int32_t length)
+{
+    bool                    ret                = true;
+    uint8_t                 sidx               = p_ctrl->sci_ctrl.active_recv_socket;
+    uint16_t                requested_size     = p_ctrl->sci_ctrl.active_recv_request_size;
+    int32_t                 pending_size       = 0;
+    st_cellular_receive_t * p_cellular_receive = cellular_receive;
+
+    if ((sidx >= p_ctrl->creatable_socket) ||
+        ((length > 0) && (NULL == p_ctrl->p_socket_ctrl[sidx].p_recv)) ||
+        (length > (int32_t)requested_size))
+    {
+        ret = false;
+    }
+
+    if (true == ret)
+    {
+        pending_size = (int32_t)p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size;
+    }
+
+    if ((true == ret) && (length > 0))
+    {
+        uint8_t * p_dst =
+            p_ctrl->p_socket_ctrl[sidx].p_recv + p_ctrl->p_socket_ctrl[sidx].total_recv_count;
+
+        ret = cellular_bg96_read_exact(p_ctrl, p_dst, (uint16_t)length);
+        if (true == ret)
+        {
+            p_ctrl->p_socket_ctrl[sidx].total_recv_count += (uint32_t)length;
+        }
+    }
+
+    if (true == ret)
+    {
+        ret = cellular_bg96_read_qird_trailer(p_ctrl, length);
+    }
+
+    if (true == ret)
+    {
+        p_cellular_receive->socket_no = sidx;
+
+        if (length > 0)
+        {
+            if (pending_size > length)
+            {
+                pending_size -= length;
+                p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = (int16_t)pending_size;
+                p_ctrl->p_socket_ctrl[sidx].receive_flg              = CELLULAR_RECEIVE_FLAG_ON;
+                cellular_notify_socket_rx_waiter(p_ctrl, sidx);
+            }
+            else
+            {
+                p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = 0;
+                p_ctrl->p_socket_ctrl[sidx].receive_flg              = CELLULAR_RECEIVE_FLAG_OFF;
+            }
+        }
+        else
+        {
+            p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size = 0;
+            p_ctrl->p_socket_ctrl[sidx].receive_flg              = CELLULAR_RECEIVE_FLAG_OFF;
+        }
+
+        p_ctrl->p_socket_ctrl[sidx].receive_count = 0;
+        p_ctrl->p_socket_ctrl[sidx].receive_num   = 0;
+        cellular_set_atc_response(p_ctrl, ATC_RETURN_OK);
+        cellular_memclear(p_ctrl, p_cellular_receive);
+#if BSP_CFG_RTOS_USED == (1)
+        taskYIELD();
+#endif
+    }
+
+    return ret;
+}
+/**********************************************************************************************************************
+ * End of function cellular_bg96_qird_fast_drain
+ *********************************************************************************************************************/
+
+/***********************************************************************************************
+ * Function Name  @fn            cellular_bg96_read_exact
+ * Description    @details       Read already queued SCI bytes in chunks, waiting until the requested size is present.
+ **********************************************************************************************/
+static bool cellular_bg96_read_exact(st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst, uint16_t length)
+{
+    bool                       ret        = true;
+    uint16_t                   copied     = 0;
+    e_cellular_timeout_check_t timeout    = CELLULAR_NOT_TIMEOUT;
+
+    while (copied < length)
+    {
+        uint16_t avail = 0;
+
+        if (SCI_SUCCESS != R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl,
+                                         SCI_CMD_RX_Q_BYTES_AVAIL_TO_READ,
+                                         &avail))
+        {
+            ret = false;
+            break;
+        }
+
+        if (0U == avail)
+        {
+            timeout = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
+            if (CELLULAR_TIMEOUT == timeout)
+            {
+                ret = false;
+                break;
+            }
+            R_BSP_NOP();
+            continue;
+        }
+
+        if (avail > (uint16_t)(length - copied))
+        {
+            avail = (uint16_t)(length - copied);
+        }
+        if (avail > BG96_QIRD_READ_CHUNK_MAX)
+        {
+            avail = BG96_QIRD_READ_CHUNK_MAX;
+        }
+
+        if (SCI_SUCCESS == R_SCI_Receive(p_ctrl->sci_ctrl.sci_hdl, &p_dst[copied], avail))
+        {
+            copied = (uint16_t)(copied + avail);
+        }
+    }
+
+    return ret;
+}
+/**********************************************************************************************************************
+ * End of function cellular_bg96_read_exact
+ *********************************************************************************************************************/
+
+/***********************************************************************************************
+ * Function Name  @fn            cellular_bg96_read_qird_trailer
+ * Description    @details       Consume BG96 QIRD terminal CR/LF framing and OK.
+ **********************************************************************************************/
+static bool cellular_bg96_read_qird_trailer(st_cellular_ctrl_t * p_ctrl, const int32_t length)
+{
+    static const uint8_t qird_trailer_with_payload[] =
+    {
+        CHAR_CHECK_7, CHAR_CHECK_4, CHAR_CHECK_7, CHAR_CHECK_4, 'O', 'K', CHAR_CHECK_7, CHAR_CHECK_4
+    };
+    static const uint8_t qird_trailer_without_payload[] =
+    {
+        CHAR_CHECK_7, CHAR_CHECK_4, 'O', 'K', CHAR_CHECK_7, CHAR_CHECK_4
+    };
+    const uint8_t * p_expected   = qird_trailer_without_payload;
+    uint16_t        expected_len = (uint16_t)sizeof(qird_trailer_without_payload);
+    uint8_t         trailer[sizeof(qird_trailer_with_payload)] = {0};
+    bool            ret          = false;
+
+    if (length > 0)
+    {
+        p_expected   = qird_trailer_with_payload;
+        expected_len = (uint16_t)sizeof(qird_trailer_with_payload);
+    }
+
+    if (true == cellular_bg96_read_exact(p_ctrl, trailer, expected_len))
+    {
+        ret = (0 == memcmp(trailer, p_expected, expected_len));
+    }
+
+    return ret;
+}
+/**********************************************************************************************************************
+ * End of function cellular_bg96_read_qird_trailer
+ *********************************************************************************************************************/
+#endif /* CELLULAR_TARGET_BG96 */
 
 /***********************************************************************************************
  * Function Name  @fn            cellular_store_data
@@ -1261,48 +1578,6 @@ static void cellular_system_start(st_cellular_ctrl_t * p_ctrl, st_cellular_recei
 }
 /**********************************************************************************************************************
  * End of function cellular_system_start
- *********************************************************************************************************************/
-
-/***********************************************************************************************
- * Function Name  @fn            cellular_socket_open_result
- * Description    @details       Handling of BG96 Socket Connection Notification.
- * Arguments      @param[in/out] p_ctrl -
- *                                  Pointer to managed structure.
- *                @param[in/out] cellular_receive -
- *                                  Pointer to structure for analysis processing.
- **********************************************************************************************/
-static void cellular_socket_open_result(st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive)
-{
-#if defined(CELLULAR_TARGET_BG96)
-    int32_t                 sscanf_ret         = 0;
-    int32_t                 socket_no          = 0;
-    int32_t                 result             = -1;
-#endif /* CELLULAR_TARGET_BG96 */
-    st_cellular_receive_t * p_cellular_receive = cellular_receive;
-#if !defined(CELLULAR_TARGET_BG96)
-    (void) p_ctrl;
-#endif /* !CELLULAR_TARGET_BG96 */
-
-    if (CHAR_CHECK_4 == p_cellular_receive->data)
-    {
-#if defined(CELLULAR_TARGET_BG96)
-        sscanf_ret = sscanf((char *) //(uint8_t *)->(char *)
-                        &p_ctrl->sci_ctrl.receive_buff[p_cellular_receive->tmp_recvcnt],
-                            " %ld,%ld" , &socket_no, &result);
-        if ((2 == sscanf_ret) && (socket_no == p_ctrl->sci_ctrl.active_connect_socket))
-        {
-            p_ctrl->sci_ctrl.active_connect_result   = result;
-            p_ctrl->sci_ctrl.active_connect_complete = 1u;
-        }
-#endif /* CELLULAR_TARGET_BG96 */
-
-        cellular_cleardata(p_ctrl, p_cellular_receive);
-    }
-
-    return;
-}
-/**********************************************************************************************************************
- * End of function cellular_socket_open_result
  *********************************************************************************************************************/
 
 /***********************************************************************************************
@@ -2220,6 +2495,9 @@ static void cellular_response_skip(st_cellular_ctrl_t * p_ctrl, st_cellular_rece
 
     if (CHAR_CHECK_4 == p_cellular_receive->data)
     {
+#if defined(CELLULAR_TARGET_BG96)
+        cellular_qiopen_result(p_ctrl, p_cellular_receive);
+#endif /* CELLULAR_TARGET_BG96 */
         CELLULAR_LOG_DEBUG(("SKIP URC\n"));
         cellular_cleardata(p_ctrl, p_cellular_receive);
     }
@@ -2229,6 +2507,43 @@ static void cellular_response_skip(st_cellular_ctrl_t * p_ctrl, st_cellular_rece
 /**********************************************************************************************************************
  * End of function cellular_response_skip
  *********************************************************************************************************************/
+
+#if defined(CELLULAR_TARGET_BG96)
+/***********************************************************************************************
+ * Function Name  @fn            cellular_qiopen_result
+ * Description    @details       Process BG96 socket connect completion URC.
+ **********************************************************************************************/
+static void cellular_qiopen_result(st_cellular_ctrl_t * p_ctrl, st_cellular_receive_t * cellular_receive)
+{
+    int32_t                 socket_no          = 0;
+    int32_t                 result             = -1;
+    int32_t                 sscanf_ret         = 0;
+    st_cellular_receive_t * p_cellular_receive = cellular_receive;
+
+    if (NULL != strstr((char *)&p_ctrl->sci_ctrl.receive_buff[p_cellular_receive->tmp_recvcnt], "+QIOPEN:"))
+    {
+        sscanf_ret = sscanf((char *)&p_ctrl->sci_ctrl.receive_buff[p_cellular_receive->tmp_recvcnt],
+                            "+QIOPEN: %ld,%ld",
+                            &socket_no,
+                            &result);
+        if (2 == sscanf_ret)
+        {
+            uint8_t sidx = (uint8_t)socket_no - CELLULAR_START_SOCKET_NUMBER;
+            if (sidx < p_ctrl->creatable_socket)
+            {
+                p_ctrl->sci_ctrl.active_connect_socket = sidx;
+                p_ctrl->sci_ctrl.active_connect_result = (int16_t)result;
+                p_ctrl->sci_ctrl.active_connect_flg    = 1;
+            }
+        }
+    }
+
+    return;
+}
+/**********************************************************************************************************************
+ * End of function cellular_qiopen_result
+ *********************************************************************************************************************/
+#endif /* CELLULAR_TARGET_BG96 */
 
 /***************************************************************************************************
  * Function Name  @fn            cellular_exit
@@ -2340,12 +2655,43 @@ static void cellular_set_atc_response(st_cellular_ctrl_t * const p_ctrl, const e
     {
         p_ctrl->sci_ctrl.atc_res = result;
         p_ctrl->sci_ctrl.atc_flg = CELLULAR_ATC_RESPONSE_CONFIRMED;
+#if BSP_CFG_RTOS_USED == (1)
+        if (NULL != p_ctrl->sci_ctrl.atc_wait_taskhandle)
+        {
+            (void)xTaskNotifyGiveIndexed((TaskHandle_t)p_ctrl->sci_ctrl.atc_wait_taskhandle,
+                                            CELLULAR_TASK_NOTIFY_INDEX);
+        }
+#endif
         CELLULAR_LOG_DEBUG(("received AT command response: %s", p_ctrl->sci_ctrl.receive_buff));
     }
     return;
 }
 /**********************************************************************************************************************
  * End of function cellular_set_atc_response
+ *********************************************************************************************************************/
+
+/***********************************************************************************************
+ * Function Name  @fn            cellular_notify_socket_rx_waiter
+ * Description    @details       Wake the task blocked in R_CELLULAR_ReceiveSocket when a socket
+ *                               receive URC makes data available.
+ **********************************************************************************************/
+static void cellular_notify_socket_rx_waiter(st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_idx)
+{
+#if BSP_CFG_RTOS_USED == (1)
+    if ((socket_idx < p_ctrl->creatable_socket) &&
+        (NULL != p_ctrl->p_socket_ctrl[socket_idx].rx_wait_taskhandle))
+    {
+        (void)xTaskNotifyGiveIndexed((TaskHandle_t)p_ctrl->p_socket_ctrl[socket_idx].rx_wait_taskhandle,
+                                        CELLULAR_TASK_NOTIFY_INDEX);
+    }
+#else
+    (void)p_ctrl;
+    (void)socket_idx;
+#endif
+    return;
+}
+/**********************************************************************************************************************
+ * End of function cellular_notify_socket_rx_waiter
  *********************************************************************************************************************/
 
 /***********************************************************************************************

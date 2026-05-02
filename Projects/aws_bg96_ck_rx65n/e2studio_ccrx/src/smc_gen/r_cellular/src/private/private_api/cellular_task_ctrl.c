@@ -67,7 +67,7 @@ e_cellular_err_t cellular_start_recv_task(st_cellular_ctrl_t * const p_ctrl)
                                     CELLULAR_RECV_TASK_NAME,
                                     thread_size,
                                     (void *)p_ctrl, //(st_cellular_ctrl_t *)->(void *)
-                                    CELLULAR_IDLE_PRIORITY,
+                                    CELLULAR_RECV_TASK_PRIORITY,
                                     &p_ctrl->recv_taskhandle);
     }
 
@@ -88,7 +88,7 @@ e_cellular_err_t cellular_start_ring_task(st_cellular_ctrl_t * const p_ctrl)
                                 CELLULAR_RING_TASK_NAME,
                                 CELLULAR_RING_THREAD_SIZE,
                                 (void *)p_ctrl, //(st_cellular_ctrl_t *)->(void *)
-                                CELLULAR_IDLE_PRIORITY,
+                                CELLULAR_RING_TASK_PRIORITY,
                                 &p_ctrl->ring_ctrl.ring_taskhandle);
 
     return ret;

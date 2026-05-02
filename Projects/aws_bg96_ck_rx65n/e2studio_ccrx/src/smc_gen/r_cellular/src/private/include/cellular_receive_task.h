@@ -33,7 +33,9 @@
 /**********************************************************************************************************************
  * Macro definitions
  *********************************************************************************************************************/
-#define CELLULAR_IDLE_PRIORITY      (6)
+#define CELLULAR_RECV_TASK_PRIORITY (5)
+#define CELLULAR_RING_TASK_PRIORITY (4)
+#define CELLULAR_IDLE_PRIORITY      CELLULAR_RECV_TASK_PRIORITY
 
 #define ATC_RES_BEGIN_OR_END        "\r\n"
 
@@ -56,14 +58,12 @@
 #define ATC_RES_READ_DNS            "+QIURC: \"dnsgip\""
 #define ATC_RES_PIN_LOCK_STATUS     "+CPIN:"
 #define ATC_RES_SOCKET_CLOSE        "+QIURC: \"closed\""
-#define ATC_RES_SOCKET_OPEN         "+QIOPEN:"
 #else
 #define ATC_RES_DATA_RECEIVE        "+SQNSRING:"
 #define ATC_RES_DATA_RECEIVE_QIRD   "+SQNSRECV:"
 #define ATC_RES_READ_DNS            "+SQNDNSLKUP:"
 #define ATC_RES_PIN_LOCK_STATUS     "+CPIN:"
 #define ATC_RES_SOCKET_CLOSE        "+SQNSH:"
-#define ATC_RES_SOCKET_OPEN         "+QIOPEN:"
 #endif /* CELLULAR_TARGET_BG96 */
 /* BG96 does not emit "+SYSSTART\r\n" (RYZ014A only). Boot readiness on BG96 is
  * inferred from the STATUS pin going Low, not from a URC. Keeping the legacy
@@ -118,7 +118,6 @@ typedef enum
     CELLULAR_RES_READ_DNS,              // DNS query results
     CELLULAR_RES_PIN_LOCK_STATUS,       // Check SIM lock status
     CELLULAR_RES_SOCKET_CLOSE,          // Socket Disconnection Notification
-    CELLULAR_RES_SOCKET_OPEN,           // Socket Connection Notification
     CELLULAR_RES_SYSTEM_START,          // Module activation notification
     CELLULAR_RES_ATTACH_STATUS,         // Connection status to access point
     CELLULAR_GET_AP_CONNECT_CONFIG,     // Get AP connect config

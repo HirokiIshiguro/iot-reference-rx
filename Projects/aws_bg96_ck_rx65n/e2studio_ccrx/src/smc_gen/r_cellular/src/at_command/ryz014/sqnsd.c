@@ -26,7 +26,7 @@
  *********************************************************************************************************************/
 #include "at_command.h"
 #include "cellular_private_api.h"
-#include "cellular_freertos.h"  /* cellular_delay_task */
+#include "cellular_freertos.h"
 
 /**********************************************************************************************************************
  * Macro definitions
@@ -43,6 +43,11 @@
 /**********************************************************************************************************************
  * Private (static) variables and functions
  *********************************************************************************************************************/
+#if defined(CELLULAR_TARGET_BG96)
+static e_cellular_err_t cellular_wait_qiopen_result (st_cellular_ctrl_t * const p_ctrl,
+                                                        const uint8_t socket_no,
+                                                        const uint32_t timeout_ms);
+#endif /* CELLULAR_TARGET_BG96 */
 
 /*************************************************************************************************
  * Function Name  @fn            atc_sqnsd
@@ -58,17 +63,19 @@
  *
  * Note: BG96 AT+QIOPEN returns OK immediately as "command accepted", then
  * emits "+QIOPEN: <connectID>,<err>" URC when the connection attempt
- * completes. Wait for that URC before reporting the socket connected.
+ * completes. Wait for that URC before reporting the socket as connected.
+ * RYZ014A AT+SQNSD was effectively synchronous, which is why the original
+ * wrapper only checked OK.
  ************************************************************************************************/
 e_cellular_err_t atc_sqnsd(st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_no,
                             const uint8_t * const p_ip_addr, const uint16_t port)
 {
     uint8_t          cid_str[4]                            = {0};
     uint8_t          port_str[8]                           = {0};
+    uint32_t         timeout_ms                            = 0;
     const uint8_t *  type_str                              = (const uint8_t *) "TCP";
     const uint8_t *  p_command_arg[CELLULAR_MAX_ARG_COUNT] = {0};
     e_cellular_err_t ret                                   = CELLULAR_SUCCESS;
-    uint32_t         connect_wait_ms                       = 0;
 
     sprintf((char *)cid_str,  "%d", socket_no); /*(uint8_t *)->(char *)*/
     sprintf((char *)port_str, "%u", port);      /*(uint8_t *)->(char *)*/
@@ -84,64 +91,30 @@ e_cellular_err_t atc_sqnsd(st_cellular_ctrl_t * const p_ctrl, const uint8_t sock
 
     atc_generate(p_ctrl->sci_ctrl.atc_buff, gp_at_command[ATC_CONNECT_SOCKET], p_command_arg);
 
+    timeout_ms = ((uint32_t)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].connect_timeout * 100)
+                    + CELLULAR_SOCKETCONNECT_DELAY;
+
 #if defined(CELLULAR_TARGET_BG96)
-    p_ctrl->sci_ctrl.active_connect_socket   = socket_no;
-    p_ctrl->sci_ctrl.active_connect_complete = 0u;
-    p_ctrl->sci_ctrl.active_connect_result   = -1;
+    p_ctrl->sci_ctrl.active_connect_socket = (uint8_t)(socket_no - CELLULAR_START_SOCKET_NUMBER);
+    p_ctrl->sci_ctrl.active_connect_result = -1;
+    p_ctrl->sci_ctrl.active_connect_flg    = 0;
 #endif /* CELLULAR_TARGET_BG96 */
 
     if (p_ctrl->sci_ctrl.atc_timeout >
-        ((p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].connect_timeout * 100)
-                + CELLULAR_SOCKETCONNECT_DELAY))
+        timeout_ms)
     {
-        connect_wait_ms = p_ctrl->sci_ctrl.atc_timeout;
         ret = cellular_execute_at_command(p_ctrl, p_ctrl->sci_ctrl.atc_timeout, ATC_RETURN_OK, ATC_CONNECT_SOCKET);
     }
     else
     {
-        connect_wait_ms =
-                ((uint32_t)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].connect_timeout * 100)
-                    + CELLULAR_SOCKETCONNECT_DELAY;
-        ret = cellular_execute_at_command(p_ctrl,
-                connect_wait_ms, ATC_RETURN_OK, ATC_CONNECT_SOCKET);
+        ret = cellular_execute_at_command(p_ctrl, timeout_ms, ATC_RETURN_OK, ATC_CONNECT_SOCKET);
     }
 
 #if defined(CELLULAR_TARGET_BG96)
     if (CELLULAR_SUCCESS == ret)
     {
-        const uint32_t poll_interval_ms = 100u;
-        uint32_t       poll_limit       = connect_wait_ms / poll_interval_ms;
-        uint32_t       cnt              = 0u;
-
-        if (0u == poll_limit)
-        {
-            poll_limit = 1u;
-        }
-
-        while (cnt < poll_limit)
-        {
-            if (0u != p_ctrl->sci_ctrl.active_connect_complete)
-            {
-                break;
-            }
-            cellular_delay_task(poll_interval_ms);
-            cnt++;
-        }
-
-        if (0u == p_ctrl->sci_ctrl.active_connect_complete)
-        {
-            CELLULAR_LOG_ERROR(("QIOPEN URC timeout - socket %d did not report completion.", socket_no));
-            ret = CELLULAR_ERR_MODULE_TIMEOUT;
-        }
-        else if (0 != p_ctrl->sci_ctrl.active_connect_result)
-        {
-            CELLULAR_LOG_ERROR(("QIOPEN failed - socket %d, result %ld.",
-                                socket_no, p_ctrl->sci_ctrl.active_connect_result));
-            ret = CELLULAR_ERR_MODULE_COM;
-        }
+        ret = cellular_wait_qiopen_result(p_ctrl, socket_no, timeout_ms);
     }
-
-    p_ctrl->sci_ctrl.active_connect_socket = 0u;
 #endif /* CELLULAR_TARGET_BG96 */
 
     return ret;
@@ -149,3 +122,46 @@ e_cellular_err_t atc_sqnsd(st_cellular_ctrl_t * const p_ctrl, const uint8_t sock
 /**********************************************************************************************************************
  * End of function atc_sqnsd
  *********************************************************************************************************************/
+
+#if defined(CELLULAR_TARGET_BG96)
+/*************************************************************************************************
+ * Function Name  @fn            cellular_wait_qiopen_result
+ ************************************************************************************************/
+static e_cellular_err_t cellular_wait_qiopen_result(st_cellular_ctrl_t * const p_ctrl,
+                                                        const uint8_t socket_no,
+                                                        const uint32_t timeout_ms)
+{
+    st_cellular_time_ctrl_t    timeout_ctrl;
+    e_cellular_timeout_check_t timeout = CELLULAR_NOT_TIMEOUT;
+    uint8_t                    sidx    = (uint8_t)(socket_no - CELLULAR_START_SOCKET_NUMBER);
+    e_cellular_err_t           ret     = CELLULAR_SUCCESS;
+
+    cellular_timeout_init(&timeout_ctrl, timeout_ms);
+
+    /* WAIT_LOOP */
+    while (0 == p_ctrl->sci_ctrl.active_connect_flg)
+    {
+        timeout = cellular_check_timeout(&timeout_ctrl);
+        if (CELLULAR_TIMEOUT == timeout)
+        {
+            ret = CELLULAR_ERR_MODULE_TIMEOUT;
+            break;
+        }
+        cellular_delay_task(1);
+    }
+
+    if (CELLULAR_SUCCESS == ret)
+    {
+        if ((sidx != p_ctrl->sci_ctrl.active_connect_socket) ||
+            (0 != p_ctrl->sci_ctrl.active_connect_result))
+        {
+            ret = CELLULAR_ERR_MODULE_COM;
+        }
+    }
+
+    return ret;
+}
+/**********************************************************************************************************************
+ * End of function cellular_wait_qiopen_result
+ *********************************************************************************************************************/
+#endif /* CELLULAR_TARGET_BG96 */

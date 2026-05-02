@@ -58,16 +58,16 @@
 #define CELLULAR_BAUDRATE_TARGET        (921600)    /* Runtime BG96 AT UART baud */
 #define CELLULAR_BAUDRATE_PERSIST_NV    (0)         /* 1: save target baud with AT&W */
 #define CELLULAR_CREATABLE_SOCKETS      (6)         /* Number of sockets to create (1~6) */
-#define CELLULAR_MAX_TX_SIZE            (1500)      /* Data processing size per transmission (1~1500) */
-#define CELLULAR_MAX_RX_SIZE            (1500)      /* Data processing size per reception (1~1500) */
+#define CELLULAR_MAX_TX_SIZE            (1460)      /* BG96 AT+QISEND max payload per transmission */
+#define CELLULAR_MAX_RX_SIZE            (16384)     /* Data processing size per reception */
 
 #define CELLULAR_PACKET_DATA_SIZE_LIMIT     (1500)      /* Packet data size limit */
 #define CELLULAR_CONNECT_TIMEOUT_LIMIT_L    (10)        /* Minimum connection time */
 #define CELLULAR_CONNECT_TIMEOUT_LIMIT_H    (1200)      /* Connection time limit  */
 #define CELLULAR_TX_SIZE_LIMIT_L            (1)         /* Minimum Sending size */
-#define CELLULAR_TX_SIZE_LIMIT_H            (1500)      /* Sending size limit */
+#define CELLULAR_TX_SIZE_LIMIT_H            (1460)      /* BG96 AT+QISEND sending size limit */
 #define CELLULAR_RX_SIZE_LIMIT_L            (1)         /* Minimum Receive size */
-#define CELLULAR_RX_SIZE_LIMIT_H            (1500)      /* Receive size limit */
+#define CELLULAR_RX_SIZE_LIMIT_H            (16384)     /* Receive size limit */
 #define CELLULAR_YEAR_LIMIT                 (99)        /* Year limit */
 #define CELLULAR_MONTH_LIMIT                (12)        /* Month limit */
 #define CELLULAR_DAY_LIMIT                  (31)        /* Day limit */
@@ -128,6 +128,7 @@
 #define BG96_ATC_AP_CONFIG                "AT+QICSGP=1,1,\"%s\",\"\",\"\",1\r"
 #define BG96_ATC_PRIVATE_AP_CONFIG        "AT+QICSGP=%s,1,\"%s\",\"\",\"\",1\r"
 #define BG96_ATC_AP_CONFIG_CHECK          "AT+QICSGP?\r"
+#define BG96_ATC_RECV_INDICATION          "AT+QICFG=\"recvind\",1\r"
 #define BG96_ATC_USER_CONFIG              "AT+CGAUTH=1,%s,\"%s\",\"%s\"\r"
 #define BG96_ATC_CLEAR_CONFIG             "AT+CGAUTH=1,0\r"
 #define BG96_ATC_SOCKET_CONFIG_1          "AT+SQNSCFG=%s,1,%s,%s,%s,%s\r"

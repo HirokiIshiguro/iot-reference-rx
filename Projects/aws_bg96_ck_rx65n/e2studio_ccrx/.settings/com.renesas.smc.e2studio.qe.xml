@@ -45,6 +45,7 @@
         <Setting id="r_flash_rx" value="FIT"/>
         <Setting id="FreeRTOS_Kernel" value=""/>
         <Segment component="r_cellular1.13.saffti-custom" id="r_cellular" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="CELLULAR_CFG_BG96_DTR_PIN" value="7"/>
             <Setting id="CELLULAR_CFG_BG96_PWRKEY_PIN" value="7"/>
             <Setting id="CELLULAR_CFG_RING_LINE_ACTIVE_TIME" value="1000"/>
             <Setting id="CELLULAR_CFG_RESET_PORT" value="5"/>
@@ -52,26 +53,32 @@
             <Setting id="CELLULAR_CFG_PSM_WAKEUP_LATENCY" value="5000"/>
             <Setting id="CELLULAR_CFG_CTS_PORT" value="J"/>
             <Setting id="CELLULAR_CFG_UART_SCI_CH" value="6"/>
+            <Setting id="CELLULAR_CFG_BG96_PWRKEY_ACTIVE_LEVEL" value="1"/>
             <Setting id="CELLULAR_CFG_BG96_STATUS_PIN" value="6"/>
             <Setting id="CELLULAR_CFG_AP_NAME" value="iot.truphone.com"/>
             <Setting id="CELLULAR_CFG_DEBUGLOG" value="4"/>
             <Setting id="CELLULAR_CFG_BG96_USE_HW_CTS" value="0"/>
             <Setting id="CELLULAR_CFG_UPGRADE_TIME" value="60"/>
             <Setting id="CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL" value="1"/>
+            <Setting id="CELLULAR_CFG_BG96_DTR_IDLE_LEVEL" value="1"/>
             <Setting id="CELLULAR_CFG_RESET_SIGNAL_LOGIC" value="1"/>
             <Setting id="CELLULAR_CFG_CTS_SW_CTRL" value="0"/>
             <Setting id="CELLULAR_CFG_PFS_SET_VALUE" value="0x0BU"/>
             <Setting id="CELLULAR_CFG_NETWORK_NOTIFY_LEVEL" value="2"/>
             <Setting id="CELLULAR_CFG_BG96_PWRKEY_PORT" value="B"/>
+            <Setting id="CELLULAR_CFG_BG96_POWER_ENABLE_ACTIVE_LEVEL" value="1"/>
             <Setting id="CELLULAR_CFG_PIN_CODE" value=""/>
+            <Setting id="CELLULAR_CFG_BG96_DTR_ENABLE" value="0"/>
             <Setting id="CELLULAR_CFG_IRQ_NUM" value="4"/>
-            <Setting id="CELLULAR_CFG_SCI_PRIORITY" value="4"/>
+            <Setting id="CELLULAR_CFG_SCI_PRIORITY" value="6"/>
             <Setting id="CELLULAR_CFG_RESET_PIN" value="5"/>
             <Setting id="CELLULAR_CFG_RTS_PORT" value="0"/>
             <Setting id="CELLULAR_CFG_ATC_RETRY_CGATT" value="600"/>
             <Setting id="CELLULAR_CFG_URC_CHARGET_FUNCTION" value="my_sw_urc_charget_function"/>
             <Setting id="CELLULAR_CFG_AP_PASSWORD" value=""/>
+            <Setting id="CELLULAR_CFG_BG96_POWER_ENABLE" value="0"/>
             <Setting id="CELLULAR_CFG_RTS_PIN" value="2"/>
+            <Setting id="CELLULAR_CFG_BG96_POWER_ENABLE_PORT" value="B"/>
             <Setting id="CELLULAR_CFG_URC_CHARGET_ENABLED" value="0"/>
             <Setting id="CELLULAR_CFG_AUTH_TYPE" value="2"/>
             <Setting id="CELLULAR_CFG_CTS_PIN" value="3"/>
@@ -79,6 +86,9 @@
             <Setting id="CELLULAR_CFG_AP_USERID" value=""/>
             <Setting id="CELLULAR_CFG_SEMAPHORE_BLOCK_TIME" value="15000"/>
             <Setting id="CELLULAR_CFG_PSM_PREPARATION_TIME" value="100"/>
+            <Setting id="CELLULAR_CFG_BG96_POWER_ENABLE_PIN" value="5"/>
+            <Setting id="CELLULAR_CFG_BG96_DTR_PORT" value="A"/>
+            <Setting id="CELLULAR_CFG_BG96_RTS_IDLE_LEVEL" value="0"/>
         </Segment>
         <Segment component="r_s12ad_rx5.40" id="r_s12ad_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="ADC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>

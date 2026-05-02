@@ -80,6 +80,15 @@ if (-not (Test-Path $demoConfig)) {
 if (-not (Test-Path $buildScript)) {
     throw "build script not found: $buildScript"
 }
+
+& $buildScript `
+    -ProjectRoot $projectRoot `
+    -E2Studio $E2Studio `
+    -Workspace $Workspace `
+    -LogFile $LogFile `
+    -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
+    -PrepareBuildFilesOnly
+
 foreach ($path in @($fleetSubdirMk, $linkerSubCommand, $linkerAppCommand)) {
     if (-not (Test-Path $path)) {
         throw "generated build file not found: $path"

@@ -27,6 +27,10 @@
 #include "cellular_private_api.h"
 #include "cellular_freertos.h"
 #include "at_command.h"
+#if BSP_CFG_RTOS_USED == (1)
+#include "FreeRTOS.h"
+#include "task.h"
+#endif
 
 /**********************************************************************************************************************
  * Macro definitions
@@ -46,6 +50,11 @@
 static e_cellular_err_atc_t cellular_send_atc (st_cellular_ctrl_t * const p_ctrl);
 static e_cellular_err_atc_t cellular_res_check (st_cellular_ctrl_t * const p_ctrl,
                                                 const e_cellular_atc_return_t expect_code);
+#if BSP_CFG_RTOS_USED == (1)
+static void cellular_prepare_atc_wait (st_cellular_ctrl_t * const p_ctrl);
+static void cellular_clear_atc_wait (st_cellular_ctrl_t * const p_ctrl);
+static void cellular_wait_atc_event (void);
+#endif
 #if CELLULAR_CFG_CTS_SW_CTRL == 1
 static e_cellular_timeout_check_t cellular_tx_flag_check (st_cellular_ctrl_t * const p_ctrl);
 #endif
@@ -214,6 +223,10 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
     e_cellular_atc_return_t    res         = ATC_RETURN_NONE;
     e_cellular_timeout_check_t timeout_ret = CELLULAR_NOT_TIMEOUT;
 
+#if BSP_CFG_RTOS_USED == (1)
+    cellular_prepare_atc_wait(p_ctrl);
+#endif
+
     /* WAIT_LOOP */
     while (1)
     {
@@ -233,13 +246,63 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
             ret = CELLULAR_ATC_ERR_TIMEOUT;
             break;
         }
+
+#if BSP_CFG_RTOS_USED == (1)
+        cellular_wait_atc_event();
+#endif
     }
+
+#if BSP_CFG_RTOS_USED == (1)
+    cellular_clear_atc_wait(p_ctrl);
+#endif
 
     return ret;
 }
 /**********************************************************************************************************************
  * End of function cellular_res_check
  *********************************************************************************************************************/
+
+#if BSP_CFG_RTOS_USED == (1)
+/****************************************************************************
+ * Function Name  @fn            cellular_prepare_atc_wait
+ ***************************************************************************/
+static void cellular_prepare_atc_wait(st_cellular_ctrl_t * const p_ctrl)
+{
+#if configTASK_NOTIFICATION_ARRAY_ENTRIES <= CELLULAR_TASK_NOTIFY_INDEX
+#error "configTASK_NOTIFICATION_ARRAY_ENTRIES must reserve CELLULAR_TASK_NOTIFY_INDEX."
+#endif
+    p_ctrl->sci_ctrl.atc_wait_taskhandle = (void *)xTaskGetCurrentTaskHandle();
+    while (0U != ulTaskNotifyTakeIndexed(CELLULAR_TASK_NOTIFY_INDEX, pdTRUE, 0))
+    {
+        R_BSP_NOP();
+    }
+}
+/**********************************************************************************************************************
+ * End of function cellular_prepare_atc_wait
+ *********************************************************************************************************************/
+
+/****************************************************************************
+ * Function Name  @fn            cellular_clear_atc_wait
+ ***************************************************************************/
+static void cellular_clear_atc_wait(st_cellular_ctrl_t * const p_ctrl)
+{
+    p_ctrl->sci_ctrl.atc_wait_taskhandle = NULL;
+}
+/**********************************************************************************************************************
+ * End of function cellular_clear_atc_wait
+ *********************************************************************************************************************/
+
+/****************************************************************************
+ * Function Name  @fn            cellular_wait_atc_event
+ ***************************************************************************/
+static void cellular_wait_atc_event(void)
+{
+    (void)ulTaskNotifyTakeIndexed(CELLULAR_TASK_NOTIFY_INDEX, pdTRUE, pdMS_TO_TICKS(1));
+}
+/**********************************************************************************************************************
+ * End of function cellular_wait_atc_event
+ *********************************************************************************************************************/
+#endif /* BSP_CFG_RTOS_USED == (1) */
 
 #if CELLULAR_CFG_CTS_SW_CTRL == 1
 /*************************************************************************************************

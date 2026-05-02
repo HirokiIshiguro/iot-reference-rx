@@ -42,14 +42,22 @@
 #define CELLULAR_TX_TIMEOUT             (10)        /* Transmit timeout (0.1sec,0~255,0=no_limit) */
 #define CELLULAR_BAUDRATE               (921600)    /* Baudrate */
 #define CELLULAR_CREATABLE_SOCKETS      (6)         /* Number of sockets to create (1~6) */
+#if defined(CELLULAR_TARGET_BG96)
+#define CELLULAR_MAX_TX_SIZE            (1460)      /* BG96 AT+QISEND max payload per transmission */
+#else
 #define CELLULAR_MAX_TX_SIZE            (1500)      /* Data processing size per transmission (1~1500) */
+#endif /* CELLULAR_TARGET_BG96 */
 #define CELLULAR_MAX_RX_SIZE            (1500)      /* Data processing size per reception (1~1500) */
 
 #define CELLULAR_PACKET_DATA_SIZE_LIMIT     (1500)      /* Packet data size limit */
 #define CELLULAR_CONNECT_TIMEOUT_LIMIT_L    (10)        /* Minimum connection time */
 #define CELLULAR_CONNECT_TIMEOUT_LIMIT_H    (1200)      /* Connection time limit  */
 #define CELLULAR_TX_SIZE_LIMIT_L            (1)         /* Minimum Sending size */
+#if defined(CELLULAR_TARGET_BG96)
+#define CELLULAR_TX_SIZE_LIMIT_H            (1460)      /* BG96 AT+QISEND sending size limit */
+#else
 #define CELLULAR_TX_SIZE_LIMIT_H            (1500)      /* Sending size limit */
+#endif /* CELLULAR_TARGET_BG96 */
 #define CELLULAR_RX_SIZE_LIMIT_L            (1)         /* Minimum Receive size */
 #define CELLULAR_RX_SIZE_LIMIT_H            (1500)      /* Receive size limit */
 #define CELLULAR_YEAR_LIMIT                 (99)        /* Year limit */

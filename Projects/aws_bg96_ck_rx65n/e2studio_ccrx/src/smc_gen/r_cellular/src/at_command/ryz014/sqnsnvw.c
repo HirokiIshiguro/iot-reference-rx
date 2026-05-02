@@ -46,7 +46,7 @@
 /*************************************************************************************************
  * Function Name  @fn            atc_sqnsnvw
  ************************************************************************************************/
-e_cellular_err_t atc_sqnsnvw(st_cellular_ctrl_t * const p_ctrl, const e_cellular_nvm_type_t data_type, 
+e_cellular_err_t atc_sqnsnvw(st_cellular_ctrl_t * const p_ctrl, const e_cellular_nvm_type_t data_type,
                                     const uint8_t index, const uint32_t size)
 {
     uint8_t          str[3][12]                            = {0};

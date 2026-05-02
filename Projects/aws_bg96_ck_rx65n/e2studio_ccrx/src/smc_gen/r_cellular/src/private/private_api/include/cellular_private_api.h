@@ -144,11 +144,11 @@
 #if R_SCI_CFG_RX_BUFSIZE < (2048)
 #error "The SCI receive buffer size is too small."
 #endif
-#if BSP_CFG_RTOS_USED == (1)
-#if CELLULAR_CFG_SCI_PRIORITY > configMAX_SYSCALL_INTERRUPT_PRIORITY
-#error "SCI interrupt priority is outside the control of the FreeRTOS."
-#endif
-#endif
+/*
+ * The r_cellular SCI callback does not call FreeRTOS APIs. Allow its interrupt
+ * priority to run above configMAX_SYSCALL_INTERRUPT_PRIORITY so UART RX is not
+ * masked by kernel critical sections at high baud rates.
+ */
 
 /**********************************************************************************************************************
  * Exported global variables
