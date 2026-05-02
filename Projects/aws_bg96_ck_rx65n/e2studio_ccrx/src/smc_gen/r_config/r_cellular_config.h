@@ -42,7 +42,7 @@
 #define CELLULAR_CFG_NETWORK_NOTIFY_LEVEL   (2)         /* Network status notification level */
 #define CELLULAR_CFG_ATC_RETRY_CGATT        (600)       /* Connection retry limit */
 #define CELLULAR_CFG_EX_TIMEOUT             (0)         /* Exchange timeout (1sec,0~65535,0=no_limit) */
-#define CELLULAR_CFG_SCI_PRIORITY           (4)         /* SCI interrupt priority */
+#define CELLULAR_CFG_SCI_PRIORITY           (6)         /* SCI interrupt priority */
 #define CELLULAR_CFG_SEMAPHORE_BLOCK_TIME   (15000)     /* Maximum semaphore acquisition latency(msec) */
 #define CELLULAR_CFG_PSM_PREPARATION_TIME   (100)       /* Reception guard time before the module transitions to PSM(1msec,100~10000) */
 #define CELLULAR_CFG_PSM_WAKEUP_LATENCY     (5000)      /* Maximum authorized wake-up latency(1msec,0~10000) */
@@ -75,14 +75,24 @@
 
 #define CELLULAR_CFG_RTS_PORT               0
 #define CELLULAR_CFG_RTS_PIN                2
+#define CELLULAR_CFG_BG96_RTS_IDLE_LEVEL    (0)
 
 #define CELLULAR_CFG_RESET_PORT             5
 #define CELLULAR_CFG_RESET_PIN              5
 #define CELLULAR_CFG_BG96_PWRKEY_PORT       B
 #define CELLULAR_CFG_BG96_PWRKEY_PIN        7
+#define CELLULAR_CFG_BG96_PWRKEY_ACTIVE_LEVEL (1)
 #define CELLULAR_CFG_BG96_STATUS_PORT       B
 #define CELLULAR_CFG_BG96_STATUS_PIN        6
 #define CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL (1)
+#define CELLULAR_CFG_BG96_POWER_ENABLE      (0)
+#define CELLULAR_CFG_BG96_POWER_ENABLE_PORT B
+#define CELLULAR_CFG_BG96_POWER_ENABLE_PIN  5
+#define CELLULAR_CFG_BG96_POWER_ENABLE_ACTIVE_LEVEL (1)
+#define CELLULAR_CFG_BG96_DTR_ENABLE        (0)
+#define CELLULAR_CFG_BG96_DTR_PORT          A
+#define CELLULAR_CFG_BG96_DTR_PIN           7
+#define CELLULAR_CFG_BG96_DTR_IDLE_LEVEL    (1)
 
 #define CELLULAR_CFG_IRQ_NUM                (4)
 
@@ -107,7 +117,7 @@ In the above preprocessor list, please use one of the values listed on the right
 On the right side, each column corresponds to each confirmed board number.
 
 Note1:
-When you use RX671 Target Board, you need pattern cut and so on to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1). 
+When you use RX671 Target Board, you need pattern cut and so on to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1).
 Please refer to User's Manual: https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus/rtk5rx6710c00000bj-target-board-rx671
 
 Note2:
@@ -116,7 +126,7 @@ E2 emulator supplying power to RYZ014A-PMOD may result in insufficient power sou
 The E2 emulator can provide 200mA, but RYZ014A needs more current while connecting to the network.
 
 Note3:
-When you use RX66N Target Board, you need remodeling of the board to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1). 
+When you use RX66N Target Board, you need remodeling of the board to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1).
 Please refer to User's Manual: https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus/rtk5rx66n0c00000bj-target-board-rx66n
 
 */

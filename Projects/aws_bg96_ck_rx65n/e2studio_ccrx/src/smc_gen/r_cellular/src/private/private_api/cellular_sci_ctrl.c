@@ -86,11 +86,7 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
 #endif
         R_SCI_CFG_PINSET_CELLULAR_SERIAL();
 #if CELLULAR_CFG_CTS_SW_CTRL == 0
-    #if defined(CELLULAR_TARGET_BG96)
-        CELLULAR_SET_PODR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = 1;
-    #else
         CELLULAR_SET_PODR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = 0;
-    #endif
         CELLULAR_SET_PDR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN)  = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
 #endif
     }

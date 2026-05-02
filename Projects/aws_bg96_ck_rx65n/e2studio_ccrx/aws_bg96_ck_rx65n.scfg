@@ -722,7 +722,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="ae6350b4-390e-4a01-aac4-7667954b8c59" inuse="true" name="FreeRTOS Object">
+        <configuration enable="true" exclude="false" id="095d2f2c-92a3-42f2-92f9-38012dba98e9" inuse="true" name="FreeRTOS Object">
             <allocatable id="OBJECT" name="OBJECT" type="">
                 <allocatable id="TASK" name="TASK" type="">
                     <allocatable id="TASKOBJECTLINK1" name="TASK" readonly="true" type="">
@@ -1031,7 +1031,7 @@
                 <gridItem id="SCI_CFG_CH3_RX_BUFSIZ" selectedIndex="80"/>
                 <gridItem id="SCI_CFG_CH4_RX_BUFSIZ" selectedIndex="80"/>
                 <gridItem id="SCI_CFG_CH5_RX_BUFSIZ" selectedIndex="80"/>
-                <gridItem id="SCI_CFG_CH6_RX_BUFSIZ" selectedIndex="8192"/>
+                <gridItem id="SCI_CFG_CH6_RX_BUFSIZ" selectedIndex="32768"/>
                 <gridItem id="SCI_CFG_CH7_RX_BUFSIZ" selectedIndex="80"/>
                 <gridItem id="SCI_CFG_CH8_RX_BUFSIZ" selectedIndex="80"/>
                 <gridItem id="SCI_CFG_CH9_RX_BUFSIZ" selectedIndex="80"/>
@@ -1161,7 +1161,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="6da58b24-572a-42f7-95ba-f5c2cc822df0" inuse="true" name="FreeRTOS_Kernel">
+        <configuration enable="true" exclude="false" id="10af64d3-e676-423c-a5c6-a834eb64813c" inuse="true" name="FreeRTOS_Kernel">
             <component description="依存モジュール: なし&#10;FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." detailDescription="FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications." display="FreeRTOS Kernel" id="FreeRTOS_Kernel202406.01-LTS-rx-1.1.1" version="11.1.0">
                 <gridItem id="configENABLE_BACKWARD_COMPATIBILITY" selectedIndex="1"/>
                 <gridItem id="configUSE_PREEMPTION" selectedIndex="1"/>
@@ -1266,7 +1266,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="ea14317b-2eb1-4e66-82f7-ec4a6372f6ef" inuse="true" name="LittleFS">
+        <configuration enable="true" exclude="false" id="25b9794d-0501-46c2-9ea6-4546b92a7606" inuse="true" name="LittleFS">
             <component description="依存モジュール: なし&#10;LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." detailDescription="LittleFS is a lightweight, fail-safe filesystem designed for microcontrollers." display="LittleFS" id="LittleFS202406.01-LTS-rx-1.1.1" version="2.5.1">
                 <gridItem id="LFS_FLASH_READ_SIZE" selectedIndex="1"/>
                 <gridItem id="LFS_FLASH_PROGRAM_SIZE" selectedIndex="4"/>
@@ -1342,7 +1342,7 @@
                 <gridItem id="CELLULAR_CFG_NETWORK_NOTIFY_LEVEL" selectedIndex="2"/>
                 <gridItem id="CELLULAR_CFG_ATC_RETRY_CGATT" selectedIndex="600"/>
                 <gridItem id="CELLULAR_CFG_EX_TIMEOUT" selectedIndex="0"/>
-                <gridItem id="CELLULAR_CFG_SCI_PRIORITY" selectedIndex="4"/>
+                <gridItem id="CELLULAR_CFG_SCI_PRIORITY" selectedIndex="6"/>
                 <gridItem id="CELLULAR_CFG_SEMAPHORE_BLOCK_TIME" selectedIndex="15000"/>
                 <gridItem id="CELLULAR_CFG_PSM_PREPARATION_TIME" selectedIndex="100"/>
                 <gridItem id="CELLULAR_CFG_PSM_WAKEUP_LATENCY" selectedIndex="5000"/>
@@ -1360,13 +1360,23 @@
                 <gridItem id="CELLULAR_CFG_BG96_USE_HW_CTS" selectedIndex="0"/>
                 <gridItem id="CELLULAR_CFG_RTS_PORT" selectedIndex="0"/>
                 <gridItem id="CELLULAR_CFG_RTS_PIN" selectedIndex="2"/>
+                <gridItem id="CELLULAR_CFG_BG96_RTS_IDLE_LEVEL" selectedIndex="0"/>
                 <gridItem id="CELLULAR_CFG_RESET_PORT" selectedIndex="5"/>
                 <gridItem id="CELLULAR_CFG_RESET_PIN" selectedIndex="5"/>
                 <gridItem id="CELLULAR_CFG_BG96_PWRKEY_PORT" selectedIndex="B"/>
                 <gridItem id="CELLULAR_CFG_BG96_PWRKEY_PIN" selectedIndex="7"/>
+                <gridItem id="CELLULAR_CFG_BG96_PWRKEY_ACTIVE_LEVEL" selectedIndex="1"/>
                 <gridItem id="CELLULAR_CFG_BG96_STATUS_PORT" selectedIndex="B"/>
                 <gridItem id="CELLULAR_CFG_BG96_STATUS_PIN" selectedIndex="6"/>
                 <gridItem id="CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE_PORT" selectedIndex="B"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE_PIN" selectedIndex="5"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE_ACTIVE_LEVEL" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_ENABLE" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_PORT" selectedIndex="A"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_PIN" selectedIndex="7"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_IDLE_LEVEL" selectedIndex="1"/>
                 <gridItem id="CELLULAR_CFG_IRQ_NUM" selectedIndex="4"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>

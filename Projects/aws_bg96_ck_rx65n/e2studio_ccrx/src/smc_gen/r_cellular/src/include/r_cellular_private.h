@@ -51,6 +51,7 @@
 
 #define CELLULAR_MAIN_TASK_BIT              (0x01u << 1)
 #define CELLULAR_RECV_TASK_BIT              (0x01u << 2)
+#define CELLULAR_TASK_NOTIFY_INDEX          (1U)
 
 #define CELLULAR_TIME_WAIT_TASK_START       (10000u)
 #define CELLULAR_TIME_OUT_MAX_DELAY         (0xffffffffu)
@@ -109,7 +110,6 @@
 /* Set the port I/O. */
 #define CELLULAR_SET_PODR_PREPROC(x, y)     ((PORT ## x .PODR.BIT.B ## y))
 
-#if CELLULAR_CFG_CTS_SW_CTRL == 1
 /* PIDR port macros. */
 #define CELLULAR_GET_PIDR(x, y)             (CELLULAR_GET_PIDR_PREPROC(x, y))
 /* Get the port I/O. */
@@ -118,12 +118,14 @@
 #define CELLULAR_SET_PMR(x, y)              (CELLULAR_SET_PMR_PREPROC(x, y))
 /* SET the port I/O. */
 #define CELLULAR_SET_PMR_PREPROC(x, y)      ((PORT ## x .PMR.BIT.B ## y))
+#if CELLULAR_CFG_CTS_SW_CTRL == 1
 /* PFS port macros. */
 #define CELLULAR_SET_PFS(x, y)              (CELLULAR_SET_PFS_PREPROC(x, y))
 /* SET the PFS value. */
 #define CELLULAR_SET_PFS_PREPROC(x, y)      ((MPC.P ## x ## y ##PFS.BYTE))
 #endif
 
+#define CELLULAR_PIN_DIRECTION_MODE_INPUT      (0)
 #define CELLULAR_PIN_DIRECTION_MODE_OUTPUT     (1)
 
 #if SCI_CFG_TEI_INCLUDED == (0)

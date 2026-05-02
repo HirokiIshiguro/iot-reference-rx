@@ -50,8 +50,8 @@
 e_cellular_err_t atc_sqnspcfg(st_cellular_ctrl_t * const p_ctrl,
                                     const uint8_t security_profile_id,
                                     const e_cellular_cert_validate_level_t cert_valid_level,
-                                    const uint8_t ca_certificate_id, 
-                                    const uint8_t client_certificate_id, 
+                                    const uint8_t ca_certificate_id,
+                                    const uint8_t client_certificate_id,
                                     const uint8_t client_privatekey_id)
 {
     uint8_t          str[5][4]                             = {0};

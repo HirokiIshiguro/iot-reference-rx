@@ -27,11 +27,19 @@
 #include "cellular_private_api.h"
 #include "cellular_freertos.h"
 #include "at_command.h"
+#if BSP_CFG_RTOS_USED == (1)
+#include "FreeRTOS.h"
+#include "task.h"
+#endif
 
 /**********************************************************************************************************************
  * Macro definitions
  *********************************************************************************************************************/
 #define CELLULAR_RECONNECT_TIMEOUT    (120000)
+#if defined(CELLULAR_TARGET_BG96)
+#define CELLULAR_BG96_QIRD_MAX_READ_SIZE   (1500)
+#define CELLULAR_BG96_QIRD_FRAME_MARGIN    (128U)
+#endif /* CELLULAR_TARGET_BG96 */
 
 /**********************************************************************************************************************
  * Typedef definitions
@@ -58,6 +66,11 @@ static e_cellular_timeout_check_t cellular_receive_flag_check (st_cellular_ctrl_
                                         st_cellular_time_ctrl_t * const p_cellular_timeout_ctrl,
                                         const uint8_t socket_no, const uint32_t timeout_ms);
 static e_cellular_reconnect_status_t cellular_connect_check (st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_no);
+#if BSP_CFG_RTOS_USED == (1)
+static void cellular_prepare_socket_rx_wait (st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_no);
+static void cellular_clear_socket_rx_wait (st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_no);
+static void cellular_wait_socket_rx_event (void);
+#endif
 
 /*************************************************************************************************
  * Function Name  @fn            R_CELLULAR_ReceiveSocket
@@ -245,6 +258,7 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
                 {
                     break; /* Break of the data receive loop */
                 }
+
             }
             else
             {
@@ -293,6 +307,10 @@ static e_cellular_timeout_check_t cellular_receive_flag_check(st_cellular_ctrl_t
     e_cellular_timeout_check_t    timeout = CELLULAR_NOT_TIMEOUT;
     e_cellular_reconnect_status_t status  = CELLULAR_AP_RECONNECTED;
 
+#if BSP_CFG_RTOS_USED == (1)
+    cellular_prepare_socket_rx_wait(p_ctrl, socket_no);
+#endif
+
     /* WAIT_LOOP */
     while (1)
     {
@@ -324,13 +342,64 @@ static e_cellular_timeout_check_t cellular_receive_flag_check(st_cellular_ctrl_t
                 break;
             }
         }
+
+#if BSP_CFG_RTOS_USED == (1)
+        cellular_wait_socket_rx_event();
+#endif
     }
+
+#if BSP_CFG_RTOS_USED == (1)
+    cellular_clear_socket_rx_wait(p_ctrl, socket_no);
+#endif
 
     return timeout;
 }
 /**********************************************************************************************************************
  * End of function cellular_receive_flag_check
  *********************************************************************************************************************/
+
+#if BSP_CFG_RTOS_USED == (1)
+/*************************************************************************************************
+ * Function Name  @fn            cellular_prepare_socket_rx_wait
+ ************************************************************************************************/
+static void cellular_prepare_socket_rx_wait(st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_no)
+{
+#if configTASK_NOTIFICATION_ARRAY_ENTRIES <= CELLULAR_TASK_NOTIFY_INDEX
+#error "configTASK_NOTIFICATION_ARRAY_ENTRIES must reserve CELLULAR_TASK_NOTIFY_INDEX."
+#endif
+    p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].rx_wait_taskhandle =
+        (void *)xTaskGetCurrentTaskHandle();
+    while (0U != ulTaskNotifyTakeIndexed(CELLULAR_TASK_NOTIFY_INDEX, pdTRUE, 0))
+    {
+        R_BSP_NOP();
+    }
+}
+/**********************************************************************************************************************
+ * End of function cellular_prepare_socket_rx_wait
+ *********************************************************************************************************************/
+
+/*************************************************************************************************
+ * Function Name  @fn            cellular_clear_socket_rx_wait
+ ************************************************************************************************/
+static void cellular_clear_socket_rx_wait(st_cellular_ctrl_t * const p_ctrl, const uint8_t socket_no)
+{
+    p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].rx_wait_taskhandle = NULL;
+}
+/**********************************************************************************************************************
+ * End of function cellular_clear_socket_rx_wait
+ *********************************************************************************************************************/
+
+/*************************************************************************************************
+ * Function Name  @fn            cellular_wait_socket_rx_event
+ ************************************************************************************************/
+static void cellular_wait_socket_rx_event(void)
+{
+    (void)ulTaskNotifyTakeIndexed(CELLULAR_TASK_NOTIFY_INDEX, pdTRUE, pdMS_TO_TICKS(1));
+}
+/**********************************************************************************************************************
+ * End of function cellular_wait_socket_rx_event
+ *********************************************************************************************************************/
+#endif /* BSP_CFG_RTOS_USED == (1) */
 
 /*************************************************************************************************
  * Function Name  @fn            cellular_connect_check
@@ -409,6 +478,10 @@ static int32_t cellular_recv_size_check(st_cellular_ctrl_t * const p_ctrl,
                                             const uint8_t socket_no, const int32_t length)
 {
     int32_t receive_size = 0;
+#if defined(CELLULAR_TARGET_BG96)
+    uint16_t rx_queue_used = 0;
+    uint32_t rx_queue_free = 0;
+#endif /* CELLULAR_TARGET_BG96 */
 
     if (p_ctrl->sci_ctrl.rx_buff_size > p_ctrl->sci_ctrl.rx_process_size)
     {
@@ -429,6 +502,40 @@ static int32_t cellular_recv_size_check(st_cellular_ctrl_t * const p_ctrl,
     {
         receive_size = length;
     }
+
+#if defined(CELLULAR_TARGET_BG96)
+    if (receive_size > CELLULAR_BG96_QIRD_MAX_READ_SIZE)
+    {
+        receive_size = CELLULAR_BG96_QIRD_MAX_READ_SIZE;
+    }
+
+    if (0 < receive_size)
+    {
+        if (SCI_SUCCESS == R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl,
+                                         SCI_CMD_RX_Q_BYTES_AVAIL_TO_READ,
+                                         &rx_queue_used))
+        {
+            if (p_ctrl->sci_ctrl.rx_buff_size > (uint32_t)rx_queue_used)
+            {
+                rx_queue_free = p_ctrl->sci_ctrl.rx_buff_size - (uint32_t)rx_queue_used;
+            }
+
+            if (rx_queue_free > CELLULAR_BG96_QIRD_FRAME_MARGIN)
+            {
+                rx_queue_free -= CELLULAR_BG96_QIRD_FRAME_MARGIN;
+            }
+            else
+            {
+                rx_queue_free = 0;
+            }
+
+            if ((uint32_t)receive_size > rx_queue_free)
+            {
+                receive_size = (int32_t)rx_queue_free;
+            }
+        }
+    }
+#endif /* CELLULAR_TARGET_BG96 */
 
     return receive_size;
 }

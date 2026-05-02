@@ -49,6 +49,7 @@ void cellular_set_atc_number(st_cellular_ctrl_t * const p_ctrl, const e_atc_list
 {
     p_ctrl->sci_ctrl.at_command = command;
     p_ctrl->sci_ctrl.atc_flg    = CELLULAR_ATC_RESPONSE_UNCONFIRMED;
+    p_ctrl->sci_ctrl.atc_wait_taskhandle = NULL;
     return;
 }
 /**********************************************************************************************************************

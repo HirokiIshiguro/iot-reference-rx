@@ -87,6 +87,15 @@ e_cellular_err_t atc_cgdcont(st_cellular_ctrl_t * const p_ctrl, const st_cellula
                     (long)auth_type);
 
     ret = cellular_execute_at_command(p_ctrl, p_ctrl->sci_ctrl.atc_timeout, ATC_RETURN_OK, ATC_AP_CONFIG);
+    if (CELLULAR_SUCCESS == ret)
+    {
+        memset(p_ctrl->sci_ctrl.atc_buff, 0x00, CELLULAR_ATC_BUFF_SIZE);
+        (void) snprintf((char *)p_ctrl->sci_ctrl.atc_buff,
+                        CELLULAR_ATC_BUFF_SIZE,
+                        "%s",
+                        BG96_ATC_RECV_INDICATION);
+        ret = cellular_execute_at_command(p_ctrl, p_ctrl->sci_ctrl.atc_timeout, ATC_RETURN_OK, ATC_AP_CONFIG);
+    }
     memset(apn, 0x00, sizeof(apn));
     memset(user, 0x00, sizeof(user));
     memset(pass, 0x00, sizeof(pass));

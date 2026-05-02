@@ -38,6 +38,8 @@
 #define CELLULAR_RESTART_LIMIT      (100)
 #define BG96_READY_POLL_INTERVAL_MS (250U)
 #define BG96_READY_WAIT_MS          (8000U)
+#define BG96_STATUS_READY_WAIT_MS   (15000U)
+#define BG96_BOOT_URC_QUIET_MS      (3000U)
 
 /**********************************************************************************************************************
  * Typedef definitions
@@ -54,10 +56,12 @@
 static void             cellular_bg96_prepare_pins (void);
 static void             cellular_bg96_pulse_pwrkey (void);
 static void             cellular_bg96_pulse_reset (void);
+static e_cellular_err_t cellular_bg96_ensure_running (st_cellular_ctrl_t * const p_ctrl);
 static e_cellular_err_t cellular_bg96_quick_ate0 (st_cellular_ctrl_t * const p_ctrl, uint32_t timeout_ms);
 static e_cellular_err_t cellular_bg96_wait_ready_ate0 (st_cellular_ctrl_t * const p_ctrl, uint32_t wait_ms);
 static uint8_t          cellular_bg96_status_is_running (void);
-static void             cellular_bg96_wait_status_running (uint32_t wait_ms);
+static uint8_t          cellular_bg96_wait_status_running (uint32_t wait_ms);
+static e_cellular_err_t cellular_bg96_reset_n_recovery (st_cellular_ctrl_t * const p_ctrl);
 static e_cellular_err_t cellular_baud_upgrade (st_cellular_ctrl_t * const p_ctrl, uint32_t new_baud);
 #else
 static e_cellular_err_t cellular_pin_reset (st_cellular_ctrl_t * const p_ctrl);
@@ -127,10 +131,23 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
     (void) type;
     p_ctrl->recv_data = NULL;
     cellular_bg96_prepare_pins();
+    p_ctrl->module_status    = CELLULAR_MODULE_OPERATING_RESET;
+    p_ctrl->sci_ctrl.atc_flg = CELLULAR_ATC_RESPONSE_CONFIRMED;
+
+    if (0U == cellular_bg96_status_is_running())
+    {
+        ret = cellular_bg96_ensure_running(p_ctrl);
+        if (CELLULAR_SUCCESS != ret)
+        {
+            p_ctrl->recv_data = NULL;
+            return ret;
+        }
+    }
 
     semaphore_ret = cellular_take_semaphore(p_ctrl->at_semaphore);
     if (CELLULAR_SEMAPHORE_SUCCESS != semaphore_ret)
     {
+        p_ctrl->recv_data = NULL;
         return CELLULAR_ERR_OTHER_ATCOMMAND_RUNNING;
     }
 
@@ -138,21 +155,42 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 
     if (CELLULAR_SUCCESS != ret)
     {
-        CELLULAR_LOG_INFO(("BG96 STATUS sampled as %u before recovery", (unsigned int) cellular_bg96_status_is_running()));
-        if (0U != cellular_bg96_status_is_running())
+#if CELLULAR_BAUDRATE_TARGET != CELLULAR_BAUDRATE
+        CELLULAR_LOG_INFO(("ATE0 at %lu bps timed out - probing %lu bps.",
+                           (unsigned long)p_ctrl->sci_ctrl.baud_rate,
+                           (unsigned long)CELLULAR_BAUDRATE_TARGET));
+        ret = cellular_serial_reopen(p_ctrl, CELLULAR_BAUDRATE_TARGET);
+        if (CELLULAR_SUCCESS == ret)
         {
-            CELLULAR_LOG_INFO(("BG96 STATUS indicates running — issuing RESET_N pulse"));
-            cellular_bg96_pulse_reset();
-            cellular_bg96_wait_status_running(BG96_READY_WAIT_MS);
+            cellular_delay_task(500);
+            ret = cellular_bg96_quick_ate0(p_ctrl, 3000U);
         }
-        else
+#endif
+    }
+
+    if (CELLULAR_SUCCESS != ret)
+    {
+        CELLULAR_LOG_INFO(("ATE0 probes failed - issuing BG96 control pulse."));
+        ret = cellular_bg96_ensure_running(p_ctrl);
+        if (CELLULAR_SUCCESS == ret)
         {
-            CELLULAR_LOG_INFO(("BG96 STATUS indicates stopped — issuing PWRKEY start pulse"));
-            cellular_bg96_pulse_pwrkey();
-            cellular_bg96_wait_status_running(BG96_READY_WAIT_MS);
+            ret = cellular_bg96_wait_ready_ate0(p_ctrl, BG96_READY_WAIT_MS);
         }
-        CELLULAR_LOG_INFO(("BG96 STATUS sampled as %u after recovery pulse", (unsigned int) cellular_bg96_status_is_running()));
-        ret = cellular_bg96_wait_ready_ate0(p_ctrl, BG96_READY_WAIT_MS);
+
+#if CELLULAR_BAUDRATE_TARGET != CELLULAR_BAUDRATE
+        if (CELLULAR_SUCCESS != ret)
+        {
+            CELLULAR_LOG_INFO(("ATE0 after control pulse at %lu bps timed out - probing %lu bps.",
+                               (unsigned long)p_ctrl->sci_ctrl.baud_rate,
+                               (unsigned long)CELLULAR_BAUDRATE_TARGET));
+            ret = cellular_serial_reopen(p_ctrl, CELLULAR_BAUDRATE_TARGET);
+            if (CELLULAR_SUCCESS == ret)
+            {
+                cellular_delay_task(500);
+                ret = cellular_bg96_wait_ready_ate0(p_ctrl, BG96_READY_WAIT_MS);
+            }
+        }
+#endif
     }
 
 #if CELLULAR_BAUDRATE_TARGET != CELLULAR_BAUDRATE
@@ -216,18 +254,36 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
  ***********************************************************************/
 static void cellular_bg96_prepare_pins(void)
 {
+#if CELLULAR_CFG_BG96_POWER_ENABLE == 1
+    CELLULAR_SET_PMR(CELLULAR_CFG_BG96_POWER_ENABLE_PORT, CELLULAR_CFG_BG96_POWER_ENABLE_PIN) = 0U;
+    CELLULAR_SET_PDR(CELLULAR_CFG_BG96_POWER_ENABLE_PORT, CELLULAR_CFG_BG96_POWER_ENABLE_PIN) =
+            CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
+    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_POWER_ENABLE_PORT, CELLULAR_CFG_BG96_POWER_ENABLE_PIN) =
+            CELLULAR_CFG_BG96_POWER_ENABLE_ACTIVE_LEVEL;
+    cellular_delay_task(30);
+#endif
+
+    CELLULAR_SET_PMR(CELLULAR_CFG_RESET_PORT, CELLULAR_CFG_RESET_PIN) = 0U;
     CELLULAR_SET_PDR(CELLULAR_CFG_RESET_PORT, CELLULAR_CFG_RESET_PIN) = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
     CELLULAR_SET_PODR(CELLULAR_CFG_RESET_PORT, CELLULAR_CFG_RESET_PIN) = CELLULAR_CFG_RESET_SIGNAL_OFF;
 
+    CELLULAR_SET_PMR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) = 0U;
     CELLULAR_SET_PDR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
-    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) = 0;
+    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) =
+            (uint8_t)!CELLULAR_CFG_BG96_PWRKEY_ACTIVE_LEVEL;
 
+    CELLULAR_SET_PMR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = 0U;
     CELLULAR_SET_PDR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
-    CELLULAR_SET_PODR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = 1;
+    CELLULAR_SET_PODR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = CELLULAR_CFG_BG96_RTS_IDLE_LEVEL;
 
-    /* PMOD1 pin10 -> PB6 is wired to BG96 STATUS. Keep it as plain GPIO input. */
-    PORTB.PMR.BIT.B6 = 0U;
-    PORTB.PDR.BIT.B6 = 0U;
+#if CELLULAR_CFG_BG96_DTR_ENABLE == 1
+    CELLULAR_SET_PMR(CELLULAR_CFG_BG96_DTR_PORT, CELLULAR_CFG_BG96_DTR_PIN) = 0U;
+    CELLULAR_SET_PDR(CELLULAR_CFG_BG96_DTR_PORT, CELLULAR_CFG_BG96_DTR_PIN) = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
+    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_DTR_PORT, CELLULAR_CFG_BG96_DTR_PIN) = CELLULAR_CFG_BG96_DTR_IDLE_LEVEL;
+#endif
+
+    CELLULAR_SET_PMR(CELLULAR_CFG_BG96_STATUS_PORT, CELLULAR_CFG_BG96_STATUS_PIN) = 0U;
+    CELLULAR_SET_PDR(CELLULAR_CFG_BG96_STATUS_PORT, CELLULAR_CFG_BG96_STATUS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
 }
 
 /************************************************************************
@@ -235,9 +291,11 @@ static void cellular_bg96_prepare_pins(void)
  ***********************************************************************/
 static void cellular_bg96_pulse_pwrkey(void)
 {
-    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) = 1;
-    cellular_delay_task(700);
-    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) = 0;
+    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) =
+            CELLULAR_CFG_BG96_PWRKEY_ACTIVE_LEVEL;
+    cellular_delay_task(600);
+    CELLULAR_SET_PODR(CELLULAR_CFG_BG96_PWRKEY_PORT, CELLULAR_CFG_BG96_PWRKEY_PIN) =
+            (uint8_t)!CELLULAR_CFG_BG96_PWRKEY_ACTIVE_LEVEL;
 }
 
 /************************************************************************
@@ -294,13 +352,68 @@ static e_cellular_err_t cellular_bg96_wait_ready_ate0(st_cellular_ctrl_t * const
  ***********************************************************************/
 static uint8_t cellular_bg96_status_is_running(void)
 {
-    return (uint8_t)(PORTB.PIDR.BIT.B6 == CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL);
+    return (uint8_t)(CELLULAR_GET_PIDR(CELLULAR_CFG_BG96_STATUS_PORT, CELLULAR_CFG_BG96_STATUS_PIN) ==
+                     CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL);
+}
+
+/************************************************************************
+ * Function Name  @fn            cellular_bg96_ensure_running
+ ***********************************************************************/
+static e_cellular_err_t cellular_bg96_ensure_running(st_cellular_ctrl_t * const p_ctrl)
+{
+    uint32_t cnt = 0U;
+    e_cellular_err_t ret = CELLULAR_SUCCESS;
+
+    p_ctrl->recv_data = NULL;
+    cellular_serial_close(p_ctrl);
+
+    CELLULAR_LOG_INFO(("BG96 STATUS sampled as %u before control pulse",
+                       (unsigned int) cellular_bg96_status_is_running()));
+
+    if (0U != cellular_bg96_status_is_running())
+    {
+        CELLULAR_LOG_INFO(("BG96 STATUS indicates running - issuing RESET_N pulse"));
+        cellular_bg96_pulse_reset();
+    }
+    else
+    {
+        CELLULAR_LOG_INFO(("BG96 STATUS indicates stopped - issuing PWRKEY start pulse"));
+        cellular_bg96_pulse_pwrkey();
+    }
+
+    CELLULAR_LOG_INFO(("BG96 control pulse complete - waiting for STATUS running"));
+
+    while (cnt < BG96_STATUS_READY_WAIT_MS)
+    {
+        if (0U != cellular_bg96_status_is_running())
+        {
+            CELLULAR_LOG_INFO(("BG96 STATUS running observed after %lu ms.", (unsigned long) cnt));
+            cellular_delay_task(BG96_BOOT_URC_QUIET_MS);
+            p_ctrl->module_status    = CELLULAR_MODULE_OPERATING_RESET;
+            p_ctrl->sci_ctrl.atc_flg = CELLULAR_ATC_RESPONSE_CONFIRMED;
+            p_ctrl->sci_ctrl.baud_rate = CELLULAR_BAUDRATE;
+            ret = cellular_serial_open(p_ctrl);
+            if (CELLULAR_SUCCESS != ret)
+            {
+                CELLULAR_LOG_ERROR(("BG96 SCI reopen failed after boot quiet."));
+            }
+            return ret;
+        }
+
+        cellular_delay_task(1);
+        cnt++;
+    }
+
+    CELLULAR_LOG_ERROR(("BG96 control pulse failed: STATUS did not become running."));
+    p_ctrl->sci_ctrl.baud_rate = CELLULAR_BAUDRATE;
+    (void) cellular_serial_open(p_ctrl);
+    return CELLULAR_ERR_RECV_TASK;
 }
 
 /************************************************************************
  * Function Name  @fn            cellular_bg96_wait_status_running
  ***********************************************************************/
-static void cellular_bg96_wait_status_running(uint32_t wait_ms)
+static uint8_t cellular_bg96_wait_status_running(uint32_t wait_ms)
 {
     uint32_t elapsed_ms = 0U;
 
@@ -308,12 +421,41 @@ static void cellular_bg96_wait_status_running(uint32_t wait_ms)
     {
         if (0U != cellular_bg96_status_is_running())
         {
-            return;
+            return 1U;
         }
 
         cellular_delay_task(BG96_READY_POLL_INTERVAL_MS);
         elapsed_ms += BG96_READY_POLL_INTERVAL_MS;
     }
+
+    return 0U;
+}
+
+/************************************************************************
+ * Function Name  @fn            cellular_bg96_reset_n_recovery
+ ***********************************************************************/
+static e_cellular_err_t cellular_bg96_reset_n_recovery(st_cellular_ctrl_t * const p_ctrl)
+{
+    e_cellular_err_t ret = CELLULAR_SUCCESS;
+
+    cellular_serial_close(p_ctrl);
+    cellular_bg96_pulse_reset();
+
+    if (0U == cellular_bg96_wait_status_running(BG96_STATUS_READY_WAIT_MS))
+    {
+        ret = CELLULAR_ERR_RECV_TASK;
+    }
+    else
+    {
+        CELLULAR_LOG_INFO(("BG96 RESET_N recovery observed STATUS running."));
+        cellular_delay_task(BG96_BOOT_URC_QUIET_MS);
+        p_ctrl->module_status    = CELLULAR_MODULE_OPERATING_RESET;
+        p_ctrl->sci_ctrl.atc_flg = CELLULAR_ATC_RESPONSE_CONFIRMED;
+        p_ctrl->sci_ctrl.baud_rate = CELLULAR_BAUDRATE;
+        ret = cellular_serial_open(p_ctrl);
+    }
+
+    return ret;
 }
 
 /************************************************************************

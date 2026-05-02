@@ -498,7 +498,12 @@ typedef struct cellular_sci_ctrl
     e_atc_list_t                     at_command;                                    // Running AT command
     e_cellular_atc_return_t          atc_res;                                       // AT command response
     e_cellular_atc_res_check_t       atc_flg;                                       // Response status of AT command
+    void * volatile                  atc_wait_taskhandle;                           // Task waiting for AT command response
     sci_hdl_t                        sci_hdl;                                       // SCI control block handle
+    volatile uint8_t                  active_connect_socket;                         // BG96: socket index (0-based) of the
+                                                                                    // in-flight AT+QIOPEN connection.
+    volatile int16_t                  active_connect_result;                         // BG96: result code from +QIOPEN.
+    volatile uint8_t                  active_connect_flg;                            // BG96: +QIOPEN result received flag.
     uint8_t                          active_recv_socket;                            // BG96: socket index (0-based) of the
                                                                                     // in-flight AT+QIRD so +QIRD: <length>
                                                                                     // (no socket field) can be routed to the
@@ -507,10 +512,6 @@ typedef struct cellular_sci_ctrl
                                                                                     // in-flight AT+QIRD. If the modem returns
                                                                                     // exactly this many bytes, there may still
                                                                                     // be buffered data pending.
-    uint8_t                          active_connect_socket;                         // BG96: socket number of the in-flight
-                                                                                    // AT+QIOPEN command.
-    volatile uint8_t                  active_connect_complete;                       // BG96: +QIOPEN URC completion flag.
-    volatile int32_t                  active_connect_result;                         // BG96: +QIOPEN result code.
 } st_cellular_sci_ctrl_t;
 
 typedef struct cellular_socket_ctrl
@@ -531,6 +532,7 @@ typedef struct cellular_socket_ctrl
     st_cellular_ipaddr_t              ip_addr;                  // Destination address
     uint32_t                          port;                     // Destination port number
     void *                            rx_semaphore;             // Semaphore handle (for receiving)
+    void * volatile                   rx_wait_taskhandle;       // Task waiting for socket receive notification
     st_cellular_time_ctrl_t           cellular_tx_timeout_ctrl; // Transmission timeout management structure
     st_cellular_time_ctrl_t           cellular_rx_timeout_ctrl; // Receive timeout management structure
 } st_cellular_socket_ctrl_t;
@@ -577,7 +579,7 @@ typedef struct cellular_cfg
     uint16_t    ap_cgatt_retry_count;   // AP connection retry limit
     uint32_t    sci_timeout;            // Communication timeout with module
     uint16_t    tx_process_size;        // Size per send(in bytes)(1~1500)
-    uint16_t    rx_process_size;        // Size per receive(in bytes)(1~1500)
+    uint16_t    rx_process_size;        // Size per receive(in bytes)
     uint16_t    packet_data_size;       // Data size per packet(in bytes)(0~1500)
     uint16_t    exchange_timeout;       // Exchange timeout(in seconds)(0~65535)
     uint16_t    connect_timeout;        // Socket connection timeout(in hundreds of milliseconds)(0,10~1200)
