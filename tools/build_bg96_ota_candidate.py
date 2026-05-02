@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -101,6 +102,41 @@ def resolve_make(e2studio_cli: Path, explicit_make: Path | None) -> Path:
     raise RuntimeError("GNU make was not found. Set RX65N_BG96_MAKE or provide a valid e2 studio path.")
 
 
+def resolve_e2studio_headless(e2studio_cli: Path) -> Path:
+    if not e2studio_cli.exists():
+        raise RuntimeError(f"e2 studio executable not found: {e2studio_cli}")
+    console = e2studio_cli.resolve().parent / "e2studioc.exe"
+    if console.exists():
+        return console.resolve()
+    return e2studio_cli.resolve()
+
+
+def run_e2studio_managed_build(
+    e2studio_cli: Path,
+    workspace: Path,
+    app_dir: Path,
+    log,
+    timeout: int,
+) -> None:
+    if workspace.exists():
+        shutil.rmtree(workspace)
+
+    command = [
+        str(resolve_e2studio_headless(e2studio_cli)),
+        "--launcher.suppressErrors",
+        "-nosplash",
+        "-application",
+        "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+        "-data",
+        str(workspace),
+        "-import",
+        str(app_dir),
+        "-build",
+        "all",
+    ]
+    run_logged(command, app_dir, log, os.environ.copy(), timeout)
+
+
 def build_environment(e2studio_cli: Path, ccrx_bin_arg: Path | None) -> dict[str, str]:
     env = os.environ.copy()
     if ccrx_bin_arg is not None:
@@ -156,7 +192,7 @@ def main() -> int:
     rsu_tool = repo_root / "tools/create_bg96_rsu.py"
     cert_tool = repo_root / "tools/generate_bg96_ota_signer_cert.py"
 
-    for path in (demo_config, signing_key, args.e2studio_cli, app_makefile, rsu_tool, cert_tool):
+    for path in (demo_config, signing_key, args.e2studio_cli, rsu_tool, cert_tool):
         if not path.exists():
             raise RuntimeError(f"required path not found: {path}")
 
@@ -174,15 +210,34 @@ def main() -> int:
 
     snapshot_paths = [
         demo_config,
+        app_dir / ".project",
+        app_dir / ".cproject",
         app_dir / ".settings/com.renesas.smc.generationsetting.properties",
         app_dir / ".settings/com.renesas.smc.tools.swcomponent.fit.properties",
     ]
+    snapshot_paths.extend(app_dir.glob("*.rcpc"))
+    snapshot_paths.extend(app_dir.glob("*.scfg"))
+    settings_dir = app_dir / ".settings"
+    if settings_dir.exists():
+        snapshot_paths.extend(path for path in settings_dir.iterdir() if path.is_file())
     snapshots = {path: path.read_bytes() for path in snapshot_paths if path.exists()}
     original = snapshots[demo_config].decode("utf-8")
     try:
+        if not app_makefile.exists():
+            with log_path.open("w", encoding="utf-8", errors="replace") as log:
+                run_e2studio_managed_build(
+                    args.e2studio_cli,
+                    args.workspace,
+                    app_dir,
+                    log,
+                    args.e2studio_timeout,
+                )
+        if not app_makefile.exists():
+            raise RuntimeError(f"required path not found after e2 studio build: {app_makefile}")
+
         write_utf8(demo_config, replace_version(original, args.version))
 
-        with log_path.open("w", encoding="utf-8", errors="replace") as log:
+        with log_path.open("a", encoding="utf-8", errors="replace") as log:
             app_build_dir = app_dir / "HardwareDebug"
             run_logged([str(make_exe), "clean"], app_build_dir, log, build_env, args.e2studio_timeout)
             run_logged([str(make_exe), "-j2", "aws_bg96_ck_rx65n.mot"], app_build_dir, log, build_env, args.e2studio_timeout)

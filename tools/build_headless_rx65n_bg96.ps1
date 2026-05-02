@@ -5,7 +5,8 @@ param(
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build.log"),
     [int]$E2StudioTimeoutSeconds = 600,
     [string]$Make = $env:RX65N_BG96_MAKE,
-    [string]$CcrxBin = $env:BIN_RX
+    [string]$CcrxBin = $env:BIN_RX,
+    [switch]$PrepareBuildFilesOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,9 +23,6 @@ foreach ($projectDir in @($bootProject, $appProject)) {
     if (-not (Test-Path (Join-Path $projectDir ".project"))) {
         throw "e2 studio project not found: $projectDir"
     }
-    if (-not (Test-Path (Join-Path $projectDir "HardwareDebug\makefile"))) {
-        throw "generated HardwareDebug makefile not found: $projectDir"
-    }
 }
 
 function Save-ProjectMetadata {
@@ -33,8 +31,15 @@ function Save-ProjectMetadata {
     $snapshots = @{}
     foreach ($projectDir in $ProjectDirs) {
         $paths = @()
+        foreach ($fileName in @(".project", ".cproject")) {
+            $path = Join-Path $projectDir $fileName
+            if (Test-Path -LiteralPath $path) {
+                $paths += Get-Item -LiteralPath $path
+            }
+        }
         $paths += Get-ChildItem -Path (Join-Path $projectDir ".settings") -File -ErrorAction SilentlyContinue
         $paths += Get-ChildItem -Path $projectDir -Filter "*.rcpc" -File -ErrorAction SilentlyContinue
+        $paths += Get-ChildItem -Path $projectDir -Filter "*.scfg" -File -ErrorAction SilentlyContinue
         foreach ($path in $paths) {
             $snapshots[$path.FullName] = [System.IO.File]::ReadAllBytes($path.FullName)
         }
@@ -237,6 +242,68 @@ function Invoke-MakeBuild {
     Invoke-Tool -FilePath $makeExe -Arguments @("-j2", $Target) -WorkingDirectory $BuildDir
 }
 
+function Resolve-E2StudioHeadless {
+    if (-not $E2Studio -or -not (Test-Path -LiteralPath $E2Studio)) {
+        throw "e2 studio executable not found: $E2Studio"
+    }
+
+    $resolved = (Resolve-Path -LiteralPath $E2Studio).Path
+    $baseDir = Split-Path -Parent $resolved
+    $console = Join-Path $baseDir "e2studioc.exe"
+    if (Test-Path -LiteralPath $console) {
+        return (Resolve-Path -LiteralPath $console).Path
+    }
+    return $resolved
+}
+
+function Get-MissingManagedBuildFiles {
+    $missing = @()
+    foreach ($projectDir in @($bootProject, $appProject)) {
+        $makefile = Join-Path $projectDir "HardwareDebug\makefile"
+        if (-not (Test-Path -LiteralPath $makefile)) {
+            $missing += $makefile
+        }
+    }
+    return ,$missing
+}
+
+function Invoke-E2StudioManagedBuild {
+    $headless = Resolve-E2StudioHeadless
+    if ($workspace -and (Test-Path -LiteralPath $workspace)) {
+        Remove-Item -Recurse -Force -LiteralPath $workspace
+    }
+
+    Write-Host "=== CK-RX65N BG96 e2 studio managed build file generation ==="
+    Invoke-Tool `
+        -FilePath $headless `
+        -Arguments @(
+            "--launcher.suppressErrors",
+            "-nosplash",
+            "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+            "-data", $workspace,
+            "-import", $bootProject,
+            "-import", $appProject,
+            "-build", "all"
+        ) `
+        -WorkingDirectory $projectRoot
+}
+
+function Ensure-ManagedBuildFiles {
+    $missing = Get-MissingManagedBuildFiles
+    if ($missing.Count -eq 0) {
+        return
+    }
+
+    Write-Host "Generated HardwareDebug makefiles are missing:"
+    $missing | ForEach-Object { Write-Host "  $_" }
+    Invoke-E2StudioManagedBuild
+
+    $missing = Get-MissingManagedBuildFiles
+    if ($missing.Count -ne 0) {
+        throw "generated HardwareDebug makefile not found after e2 studio build: $($missing -join ', ')"
+    }
+}
+
 if (-not (Test-Path (Join-Path $appProject "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h"))) {
     throw "CK-RX65N BG96 project middleware is incomplete."
 }
@@ -263,9 +330,17 @@ if ($workspace) {
 }
 
 $metadataSnapshots = Save-ProjectMetadata @($bootProject, $appProject)
+$patchApplied = $false
 
 try {
+    Ensure-ManagedBuildFiles
+    if ($PrepareBuildFilesOnly) {
+        Write-Host "CK-RX65N BG96 generated build files are ready."
+        return
+    }
+
     python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") patch --aws-root $appProject --backup $patchBackup
+    $patchApplied = $true
 
     $bootBuildDir = Join-Path $bootProject "HardwareDebug"
     $appBuildDir = Join-Path $appProject "HardwareDebug"
@@ -273,7 +348,7 @@ try {
     Remove-Item -Force -LiteralPath $normalizedBootMot -ErrorAction SilentlyContinue
 
     Write-Host "=== CK-RX65N BG96 boot loader make build ==="
-    Invoke-MakeBuild -BuildDir $bootBuildDir -Target "bootloader.mot"
+    Invoke-MakeBuild -BuildDir $bootBuildDir -Target "boot_loader_ck_rx65n.mot"
 
     Write-Host "=== CK-RX65N BG96 application make build ==="
     Invoke-MakeBuild -BuildDir $appBuildDir -Target "aws_bg96_ck_rx65n.mot"
@@ -297,6 +372,8 @@ try {
     Write-Host "  app         .abs: $appAbs"
 }
 finally {
-    python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") restore --aws-root $appProject --backup $patchBackup
+    if ($patchApplied) {
+        python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") restore --aws-root $appProject --backup $patchBackup
+    }
     Restore-ProjectMetadata $metadataSnapshots
 }
