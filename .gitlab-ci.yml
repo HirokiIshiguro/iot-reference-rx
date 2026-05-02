@@ -1,12 +1,12 @@
 stages:
   - build
+  - pre_test_cleanup
   - flash
   - bootloader_download
   - app_run
   - credential_prepare
   - provision
   - app_reset
-  - pre_test_cleanup
   - test
   - package
   - ota_build
@@ -465,7 +465,11 @@ flash_rx72n_linux:
   stage: flash
   extends: .rx72n_linux_hw_job
   needs:
-    - build_rx72n
+    - job: build_rx72n
+      artifacts: true
+    - job: cleanup_rx72n_ota_jobs
+      artifacts: false
+      optional: true
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -1432,7 +1436,8 @@ cleanup_rx72n_ota_jobs:
     - os-windows
     - hw-ishiguro-pc
   needs:
-    - provision_rx72n_linux
+    - job: build_rx72n
+      artifacts: false
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -1589,6 +1594,9 @@ flash_rx65n_bg96_fleet_bootloader:
   needs:
     - job: build_rx65n_bg96_fleet_candidate
       artifacts: true
+    - job: cleanup_rx65n_bg96_ota_update
+      artifacts: false
+      optional: true
   script:
     - echo "=== Flash CK-RX65N BG96 bootloader for Fleet Provisioning ==="
     - |
