@@ -290,8 +290,6 @@ static void sslContextFree( SSLContext_t * pSslContext )
     pSslContext->pxP11FunctionList->C_CloseSession( pSslContext->xP11Session );
 }
 
-/*-----------------------------------------------------------*/
-
 static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                       const char * pHostName,
                                       const NetworkCredentials_t * pNetworkCredentials )
@@ -533,13 +531,28 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             }
             else
             {
-            LogError( ( "Failed to perform TLS handshake: mbedTLSError= %s : %s.",
-                        mbedtlsHighLevelCodeOrDefault( mbedtlsError ),
-                        mbedtlsLowLevelCodeOrDefault( mbedtlsError ) ) );
+                uint32_t verifyFlags = mbedtls_ssl_get_verify_result( &( pTlsTransportParams->sslContext.context ) );
 
-            returnStatus = TLS_TRANSPORT_HANDSHAKE_FAILED;
+                LogError( ( "Failed to perform TLS handshake: mbedTLSError= %s : %s.",
+                            mbedtlsHighLevelCodeOrDefault( mbedtlsError ),
+                            mbedtlsLowLevelCodeOrDefault( mbedtlsError ) ) );
+
+                if( verifyFlags != 0U )
+                {
+                    char verifyInfo[ 256 ];
+
+                    mbedtls_x509_crt_verify_info( verifyInfo,
+                                                  sizeof( verifyInfo ),
+                                                  "  ! ",
+                                                  verifyFlags );
+                    LogError( ( "Server certificate verify flags=0x%08lx:%s",
+                                ( unsigned long ) verifyFlags,
+                                verifyInfo ) );
+                }
+
+                returnStatus = TLS_TRANSPORT_HANDSHAKE_FAILED;
+            }
         }
-    }
     }
 
     if( returnStatus != TLS_TRANSPORT_SUCCESS )
@@ -548,8 +561,9 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     }
     else
     {
-        LogInfo( ( "(Network connection %p) TLS handshake successful.",
-                   pNetworkContext ) );
+        LogInfo( ( "(Network connection %p) TLS handshake successful: version %s",
+                   pNetworkContext,
+                   mbedtls_ssl_get_version( &( pTlsTransportParams->sslContext.context ) ) ) );
     }
 
     return returnStatus;

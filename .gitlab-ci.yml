@@ -102,6 +102,7 @@ variables:
   RX72N_SKIP_HW_TESTS: "false"
   RX72N_SKIP_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
+  RX72N_REQUIRE_TLS_VERSION: ""
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
   RX72N_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
   # The restore pipeline is pinned to the RX72N set2 runner on RPi#2.
@@ -1503,12 +1504,17 @@ test_mqtt_rx72n_linux:
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+      tls_version_args=()
+      if [ -n "${RX72N_REQUIRE_TLS_VERSION:-}" ]; then
+        tls_version_args+=(--require-tls-version "$RX72N_REQUIRE_TLS_VERSION")
+      fi
 
       python tools/test_mqtt_rx72n.py \
         --log-port "$RX72N_LINUX_UART_PORT" \
         --log-baud "$RX72N_LINUX_UART_BAUD_RATE" \
         --timeout "$RX72N_MQTT_TEST_TIMEOUT" \
         --reset-cmd "$reset_cmd" \
+        "${tls_version_args[@]}" \
         2>&1 | tee "$artifact_dir/test_mqtt_rx72n.log"
   artifacts:
     when: always
