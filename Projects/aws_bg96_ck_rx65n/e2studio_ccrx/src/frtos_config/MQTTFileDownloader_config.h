@@ -22,7 +22,7 @@
  * maximum is 128KB.
  */
 #ifndef mqttFileDownloader_CONFIG_BLOCK_SIZE
-#define mqttFileDownloader_CONFIG_BLOCK_SIZE    (7808U)
+#define mqttFileDownloader_CONFIG_BLOCK_SIZE    (7424U)
 #endif
 
 /**
