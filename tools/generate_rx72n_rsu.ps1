@@ -3,7 +3,8 @@ param(
     [string]$AppMot = "",
     [string]$PrmCsv = "",
     [string]$SigningKey = "",
-    [string]$Output = ""
+    [string]$Output = "",
+    [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,12 +12,18 @@ Set-StrictMode -Version Latest
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $rsuBuilder = Join-Path $projectRoot "tools\build_fwup_v2_rsu.py"
+$normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
+switch ($normalizedTlsBackend) {
+    "software" { $appProjectName = "aws_ether_rx72n_envision_kit" }
+    "tsip" { $appProjectName = "aws_ether_rx72n_envision_kit_tsip" }
+    default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
+}
 
 if ([string]::IsNullOrWhiteSpace($AppMot)) {
-    $AppMot = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot"
+    $AppMot = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\HardwareDebug\$appProjectName.mot"
 }
 if ([string]::IsNullOrWhiteSpace($PrmCsv)) {
-    $PrmCsv = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
+    $PrmCsv = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
 }
 if ([string]::IsNullOrWhiteSpace($SigningKey)) {
     $SigningKey = Join-Path $projectRoot "sample_keys\secp256r1.privatekey"

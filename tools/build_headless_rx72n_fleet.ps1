@@ -4,14 +4,21 @@ param(
     [string]$Workspace = "C:\iotref-rx72n-fleet-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build_fleet.log"),
     [string]$FleetDemoId = "rx72n-02-fp",
-    [int]$E2StudioTimeoutSeconds = 600
+    [int]$E2StudioTimeoutSeconds = 600,
+    [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" })
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
-$demoConfig = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\frtos_config\demo_config.h"
+$normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
+switch ($normalizedTlsBackend) {
+    "software" { $appProjectName = "aws_ether_rx72n_envision_kit" }
+    "tsip" { $appProjectName = "aws_ether_rx72n_envision_kit_tsip" }
+    default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
+}
+$demoConfig = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\src\frtos_config\demo_config.h"
 $buildScript = Join-Path $projectRoot "tools\build_headless_rx72n.ps1"
 
 if (-not (Test-Path $demoConfig)) {
@@ -41,7 +48,8 @@ try {
         -E2Studio $E2Studio `
         -Workspace $Workspace `
         -LogFile $LogFile `
-        -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds
+        -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
+        -TlsBackend $normalizedTlsBackend
 }
 finally {
     [System.IO.File]::WriteAllText(

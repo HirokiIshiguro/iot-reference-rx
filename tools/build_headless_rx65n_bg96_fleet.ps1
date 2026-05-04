@@ -4,18 +4,25 @@ param(
     [string]$Workspace = "C:\iotref-rx65n-bg96-fleet-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build_fleet.log"),
     [string]$FleetDemoId = "rx65n-bg96-fp",
-    [int]$E2StudioTimeoutSeconds = 600
+    [int]$E2StudioTimeoutSeconds = 600,
+    [string]$TlsBackend = $(if ($env:RX65N_BG96_TLS_BACKEND) { $env:RX65N_BG96_TLS_BACKEND } else { "software" })
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
-$demoConfig = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\src\frtos_config\demo_config.h"
+$normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
+switch ($normalizedTlsBackend) {
+    "software" { $appProjectName = "aws_bg96_ck_rx65n" }
+    "tsip" { $appProjectName = "aws_bg96_ck_rx65n_tsip" }
+    default { throw "Unsupported RX65N BG96 TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
+}
+$demoConfig = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\src\frtos_config\demo_config.h"
 $buildScript = Join-Path $projectRoot "tools\build_headless_rx65n_bg96.ps1"
-$fleetSubdirMk = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\Demos\Fleet_Provisioning_With_CSR_Demo\subdir.mk"
-$linkerSubCommand = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\LinkerSubCommand.tmp"
-$linkerAppCommand = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\Linkeraws_bg96_ck_rx65n.tmp"
+$fleetSubdirMk = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\HardwareDebug\Demos\Fleet_Provisioning_With_CSR_Demo\subdir.mk"
+$linkerSubCommand = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\HardwareDebug\LinkerSubCommand.tmp"
+$linkerAppCommand = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\HardwareDebug\Linker$appProjectName.tmp"
 
 function Set-FleetDemoBuildInputs {
     param(
@@ -87,6 +94,7 @@ if (-not (Test-Path $buildScript)) {
     -Workspace $Workspace `
     -LogFile $LogFile `
     -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
+    -TlsBackend $normalizedTlsBackend `
     -PrepareBuildFilesOnly
 
 foreach ($path in @($fleetSubdirMk, $linkerSubCommand, $linkerAppCommand)) {
@@ -123,7 +131,8 @@ try {
         -E2Studio $E2Studio `
         -Workspace $Workspace `
         -LogFile $LogFile `
-        -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds
+        -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
+        -TlsBackend $normalizedTlsBackend
 }
 finally {
     [System.IO.File]::WriteAllText(

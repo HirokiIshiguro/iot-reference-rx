@@ -4,7 +4,8 @@ param(
     [string]$Workspace = "C:\iotref-rx72n-ws",
     [string]$ProjectsPath = "Projects",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log"),
-    [int]$E2StudioTimeoutSeconds = 600
+    [int]$E2StudioTimeoutSeconds = 600,
+    [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,9 +19,15 @@ $projectRoot = (Resolve-Path $ProjectRoot).Path
 $workspace = $Workspace
 $projectsPath = $ProjectsPath -replace "/", "\"
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
+$normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
+switch ($normalizedTlsBackend) {
+    "software" { $appProjectName = "aws_ether_rx72n_envision_kit" }
+    "tsip" { $appProjectName = "aws_ether_rx72n_envision_kit_tsip" }
+    default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
+}
 $projectNames = @(
     "boot_loader_rx72n_envision_kit",
-    "aws_ether_rx72n_envision_kit"
+    $appProjectName
 )
 $rcpcSnapshots = @{}
 
@@ -70,6 +77,7 @@ $e2base = @(
 Write-Host "=== RX72N import + build all ==="
 Write-Host "Workspace: $workspace"
 Write-Host "Log file:  $logFile"
+Write-Host "TLS backend: $normalizedTlsBackend"
 foreach ($projectName in $projectNames) {
     Write-Host "Import:    $(Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx")"
 }
@@ -170,22 +178,22 @@ try {
     Get-Content $logFile -Tail 30 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
 
     $bootMot = Find-Artifacts "$projectsPath\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\*.mot"
-    $appMot = Find-Artifacts "$projectsPath\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\*.mot"
-    $appAbs = Find-Artifacts "$projectsPath\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\*.abs"
-    $appX = Find-Artifacts "$projectsPath\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\*.x"
+    $appMot = Find-Artifacts "$projectsPath\$appProjectName\e2studio_ccrx\HardwareDebug\*.mot"
+    $appAbs = Find-Artifacts "$projectsPath\$appProjectName\e2studio_ccrx\HardwareDebug\*.abs"
+    $appX = Find-Artifacts "$projectsPath\$appProjectName\e2studio_ccrx\HardwareDebug\*.x"
 
     Write-Host ""
     Write-Host "--- RX72N artifact search ---"
     Write-Host "  boot_loader .mot: $(if ($bootMot) { $bootMot.FullName } else { 'NOT FOUND' })"
-    Write-Host "  aws_ether   .mot: $(if ($appMot) { $appMot.FullName } else { 'NOT FOUND' })"
-    Write-Host "  aws_ether   .abs: $(if ($appAbs) { $appAbs.FullName } else { 'NOT FOUND' })"
-    Write-Host "  aws_ether     .x: $(if ($appX) { $appX.FullName } else { 'NOT FOUND' })"
+    Write-Host "  $appProjectName .mot: $(if ($appMot) { $appMot.FullName } else { 'NOT FOUND' })"
+    Write-Host "  $appProjectName .abs: $(if ($appAbs) { $appAbs.FullName } else { 'NOT FOUND' })"
+    Write-Host "  $appProjectName   .x: $(if ($appX) { $appX.FullName } else { 'NOT FOUND' })"
 
     $missing = @()
     if (-not $bootMot) { $missing += "boot_loader_rx72n_envision_kit .mot" }
-    if (-not $appMot) { $missing += "aws_ether_rx72n_envision_kit .mot" }
-    if (-not $appAbs) { $missing += "aws_ether_rx72n_envision_kit .abs" }
-    if (-not $appX) { $missing += "aws_ether_rx72n_envision_kit .x" }
+    if (-not $appMot) { $missing += "$appProjectName .mot" }
+    if (-not $appAbs) { $missing += "$appProjectName .abs" }
+    if (-not $appX) { $missing += "$appProjectName .x" }
 
     if ($e2exit -ne 0) {
         throw "e2studio failed with exit code $e2exit. See $logFile"

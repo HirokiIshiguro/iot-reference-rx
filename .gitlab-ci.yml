@@ -68,6 +68,8 @@ variables:
   RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS: "0.002"
   RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS: "0.5"
   RX65N_BG96_REQUIRE_TLS_VERSION: ""
+  # RX65N_BG96_TLS_BACKEND: software or tsip.
+  RX65N_BG96_TLS_BACKEND: "software"
   RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS: "600"
   RX65N_BG96_DYNAMIC_IOT_CREDENTIALS: "true"
   RX65N_BG96_IOT_POLICY_NAME: "ck-rx65n-policy"
@@ -116,6 +118,8 @@ variables:
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
   RX72N_MQTT_TEST_TIMEOUT: "600"
   RX72N_FLEET_TEST_TIMEOUT: "600"
+  # RX72N_TLS_BACKEND: software or tsip.
+  RX72N_TLS_BACKEND: "software"
   RX72N_OTA_CANDIDATE_VERSION: "0.9.3"
   RX72N_OTA_OBSERVE_TIMEOUT: "900"
   AWS_DEFAULT_REGION: "ap-northeast-1"
@@ -160,11 +164,18 @@ build_rx72n:
         -E2Studio "$env:E2STUDIO_CLI" `
         -Workspace "$env:E2STUDIO_WORKSPACE" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build.log" `
-        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS
+        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS `
+        -TlsBackend "$env:RX72N_TLS_BACKEND"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "app .abs missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "app .x missing"; exit 1 }
+    - |
+      $rx72nAppProject = if ($env:RX72N_TLS_BACKEND -eq "tsip") { "aws_ether_rx72n_envision_kit_tsip" } else { "aws_ether_rx72n_envision_kit" }
+      $rx72nAppRoot = "$env:CI_PROJECT_DIR\Projects\$rx72nAppProject\e2studio_ccrx"
+      $rx72nAppMot = "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.mot"
+      $rx72nAppAbs = "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.abs"
+      $rx72nAppX = "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.x"
+      foreach ($path in @($rx72nAppMot, $rx72nAppAbs, $rx72nAppX)) {
+        if (-not (Test-Path $path)) { Write-Error "app artifact missing: $path"; exit 1 }
+      }
     - |
       python "$env:CI_PROJECT_DIR\tools\shift_srec_addresses.py" `
         --input "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot" `
@@ -176,8 +187,8 @@ build_rx72n:
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
     - |
       python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
-        --mot "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot" `
-        --prm "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --mot "$rx72nAppMot" `
+        --prm "$rx72nAppRoot\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
         --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
         --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
@@ -197,6 +208,9 @@ build_rx72n:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
 build_rx65n_bg96:
@@ -219,14 +233,17 @@ build_rx65n_bg96:
       -E2Studio "$env:E2STUDIO_CLI_BG96" `
       -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96" `
       -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log" `
-      -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS
+      -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS `
+      -TlsBackend "$env:RX65N_BG96_TLS_BACKEND"
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
+      $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
+      $rx65nBg96AppRoot = "$env:CI_PROJECT_DIR\Projects\$rx65nBg96AppProject\e2studio_ccrx"
       $bootMot = "$env:CI_PROJECT_DIR\Projects\boot_loader_ck_rx65n\e2studio_ccrx\HardwareDebug\boot_loader_ck_rx65n.mot"
-      $appMot = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.mot"
-      $appAbs = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.abs"
+      $appMot = "$rx65nBg96AppRoot\HardwareDebug\$rx65nBg96AppProject.mot"
+      $appAbs = "$rx65nBg96AppRoot\HardwareDebug\$rx65nBg96AppProject.abs"
       foreach ($path in @($bootMot, $appMot, $appAbs)) {
         if (-not (Test-Path $path)) { Write-Error "build artifact missing: $path"; exit 1 }
       }
@@ -255,6 +272,8 @@ build_rx65n_bg96:
       - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
 
 build_rx65n_bg96_fleet_candidate:
@@ -280,14 +299,17 @@ build_rx65n_bg96_fleet_candidate:
       -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_FLEET" `
       -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build_fleet.log" `
       -FleetDemoId "$demoId" `
-      -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS
+      -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS `
+      -TlsBackend "$env:RX65N_BG96_TLS_BACKEND"
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96_fleet_candidate"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
+      $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
+      $rx65nBg96AppRoot = "$env:CI_PROJECT_DIR\Projects\$rx65nBg96AppProject\e2studio_ccrx"
       $bootMot = "$env:CI_PROJECT_DIR\Projects\boot_loader_ck_rx65n\e2studio_ccrx\HardwareDebug\boot_loader_ck_rx65n.mot"
-      $appMot = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.mot"
-      $appAbs = "$env:CI_PROJECT_DIR\Projects\aws_bg96_ck_rx65n\e2studio_ccrx\HardwareDebug\aws_bg96_ck_rx65n.abs"
+      $appMot = "$rx65nBg96AppRoot\HardwareDebug\$rx65nBg96AppProject.mot"
+      $appAbs = "$rx65nBg96AppRoot\HardwareDebug\$rx65nBg96AppProject.abs"
       foreach ($path in @($bootMot, $appMot, $appAbs)) {
         if (-not (Test-Path $path)) { Write-Error "fleet build artifact missing: $path"; exit 1 }
       }
@@ -319,6 +341,8 @@ build_rx65n_bg96_fleet_candidate:
       - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
 
 build_rx72n_fleet_candidate:
@@ -342,11 +366,18 @@ build_rx72n_fleet_candidate:
         -Workspace "$env:E2STUDIO_WORKSPACE_FLEET" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_fleet.log" `
         -FleetDemoId "$env:RX72N_DEVICE_ID-fp" `
-        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS
+        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS `
+        -TlsBackend "$env:RX72N_TLS_BACKEND"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "fleet app .mot missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "fleet app .abs missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "fleet app .x missing"; exit 1 }
+    - |
+      $rx72nAppProject = if ($env:RX72N_TLS_BACKEND -eq "tsip") { "aws_ether_rx72n_envision_kit_tsip" } else { "aws_ether_rx72n_envision_kit" }
+      $rx72nAppRoot = "$env:CI_PROJECT_DIR\Projects\$rx72nAppProject\e2studio_ccrx"
+      $rx72nAppMot = "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.mot"
+      $rx72nAppAbs = "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.abs"
+      $rx72nAppX = "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.x"
+      foreach ($path in @($rx72nAppMot, $rx72nAppAbs, $rx72nAppX)) {
+        if (-not (Test-Path $path)) { Write-Error "fleet app artifact missing: $path"; exit 1 }
+      }
     - |
       python "$env:CI_PROJECT_DIR\tools\shift_srec_addresses.py" `
         --input "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot" `
@@ -358,8 +389,8 @@ build_rx72n_fleet_candidate:
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
     - |
       python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
-        --mot "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot" `
-        --prm "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --mot "$rx72nAppMot" `
+        --prm "$rx72nAppRoot\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
         --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
         --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
@@ -379,6 +410,9 @@ build_rx72n_fleet_candidate:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
 .rx72n_linux_hw_job:
@@ -955,12 +989,13 @@ build_rx65n_bg96_ota_candidate:
         throw "RX65N BG96 OTA signing key not found: $signingKey"
       }
 
-      $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\aws_bg96_ck_rx65n\e2studio_ccrx"
+      $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
+      $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\$rx65nBg96AppProject\e2studio_ccrx"
       python tools/patch_bg96_aws_iot_mcu.py patch --aws-root "$appRoot" --backup "$artifactDir\aws_dev_mode_key_provisioning.c.orig"
       python tools/configure_bg96_mqtt_credentials.py --app-dir "$appRoot" --marker "$artifactDir\mqtt_credentials_configured" --require
       python tools/build_bg96_ota_candidate.py `
         --repo-root "$env:CI_PROJECT_DIR" `
-        --app-dir "Projects/aws_bg96_ck_rx65n/e2studio_ccrx" `
+        --app-dir "Projects/$rx65nBg96AppProject/e2studio_ccrx" `
         --version "$version" `
         --output-dir "$artifactDir" `
         --signing-key "$signingKey" `
@@ -971,7 +1006,8 @@ build_rx65n_bg96_ota_candidate:
       Write-Host "Using locally generated RX65N BG96 OTA code signer certificate and customCodeSigning signature."
   after_script:
     - $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate"
-    - $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\aws_bg96_ck_rx65n\e2studio_ccrx"
+    - $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
+    - $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\$rx65nBg96AppProject\e2studio_ccrx"
     - python tools/patch_bg96_aws_iot_mcu.py restore --aws-root "$appRoot" --backup "$artifactDir\aws_dev_mode_key_provisioning.c.orig"
   artifacts:
     when: always
@@ -979,6 +1015,8 @@ build_rx65n_bg96_ota_candidate:
       - artifacts/rx65n_bg96_ota_candidate/
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
 
 provision_rx65n_bg96_ota_signer_certificate:
@@ -1971,11 +2009,19 @@ build_rx72n_mqtt_candidate:
         -E2Studio "$env:E2STUDIO_CLI" `
         -Workspace "$env:E2STUDIO_WORKSPACE_MQTT" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_mqtt_candidate.log" `
-        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS
+        -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS `
+        -TlsBackend "$env:RX72N_TLS_BACKEND"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot")) { Write-Error "app .mot missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.abs")) { Write-Error "app .abs missing"; exit 1 }
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.x")) { Write-Error "app .x missing"; exit 1 }
+    - |
+      $rx72nAppProject = if ($env:RX72N_TLS_BACKEND -eq "tsip") { "aws_ether_rx72n_envision_kit_tsip" } else { "aws_ether_rx72n_envision_kit" }
+      $rx72nAppRoot = "$env:CI_PROJECT_DIR\Projects\$rx72nAppProject\e2studio_ccrx"
+      foreach ($path in @(
+        "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.mot",
+        "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.abs",
+        "$rx72nAppRoot\HardwareDebug\$rx72nAppProject.x"
+      )) {
+        if (-not (Test-Path $path)) { Write-Error "app artifact missing: $path"; exit 1 }
+      }
     - Write-Host "BUILD MQTT CANDIDATE SUCCESS"
   artifacts:
     when: always
@@ -1985,6 +2031,9 @@ build_rx72n_mqtt_candidate:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
 package_rx72n_mqtt_candidate_rsu:
@@ -2008,7 +2057,8 @@ package_rx72n_mqtt_candidate_rsu:
     - |
       & "$env:CI_PROJECT_DIR\tools\generate_rx72n_rsu.ps1" `
         -ProjectRoot "$env:CI_PROJECT_DIR" `
-        -Output "$env:CI_PROJECT_DIR\artifacts\rx72n_mqtt_candidate.rsu"
+        -Output "$env:CI_PROJECT_DIR\artifacts\rx72n_mqtt_candidate.rsu" `
+        -TlsBackend "$env:RX72N_TLS_BACKEND"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\artifacts\rx72n_mqtt_candidate.rsu")) { Write-Error "RSU missing"; exit 1 }
     - Write-Host "PACKAGE MQTT CANDIDATE SUCCESS"
   artifacts:
@@ -2018,6 +2068,9 @@ package_rx72n_mqtt_candidate_rsu:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
 build_rx72n_ota_candidate:
@@ -2069,6 +2122,7 @@ build_rx72n_ota_candidate:
         --signing-key "$signingKey" `
         --e2studio-cli "$env:E2STUDIO_CLI" `
         --workspace "$env:E2STUDIO_WORKSPACE_OTA" `
+        --tls-backend "$env:RX72N_TLS_BACKEND" `
         --code-sign-cert-out "$candidateCodeSignCert" `
         2>&1 | Tee-Object -FilePath "$artifactDir\build_ota_candidate.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -2085,6 +2139,9 @@ build_rx72n_ota_candidate:
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.x
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
 park_rx72n_ota_cli_linux:
