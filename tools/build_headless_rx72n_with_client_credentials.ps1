@@ -75,21 +75,34 @@ New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
 try {
     $certPath = Resolve-PemInput -InputValue $CertInput -Label "device-cert" -TempDir $tempDir
-    $keyPath = Resolve-PemInput -InputValue $KeyInput -Label "device-key" -TempDir $tempDir
+    $omitPrivateKey = ($TlsBackend -eq "tsip")
+    $keyPath = $null
+    if (-not $omitPrivateKey) {
+        $keyPath = Resolve-PemInput -InputValue $KeyInput -Label "device-key" -TempDir $tempDir
+    }
 
     Write-Host "=== Render RX72N client credential headers ==="
     Write-Host "Thing name: $ThingName"
     Write-Host "Endpoint:   $Endpoint"
     Write-Host "Cert input: $certPath"
-    Write-Host "Key input:  $keyPath"
+    Write-Host "Key input:  $(if ($omitPrivateKey) { '<omitted for TSIP>' } else { $keyPath })"
 
-    python $renderScript `
-        --thing-name $ThingName `
-        --endpoint $Endpoint `
-        --cert $certPath `
-        --key $keyPath `
-        --credential-header $credentialHeader `
-        --keys-header $keysHeader
+    $renderArgs = @(
+        $renderScript,
+        "--thing-name", $ThingName,
+        "--endpoint", $Endpoint,
+        "--cert", $certPath,
+        "--credential-header", $credentialHeader,
+        "--keys-header", $keysHeader
+    )
+    if ($omitPrivateKey) {
+        $renderArgs += "--omit-private-key"
+    }
+    else {
+        $renderArgs += @("--key", $keyPath)
+    }
+
+    python @renderArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "credential render failed: $LASTEXITCODE"

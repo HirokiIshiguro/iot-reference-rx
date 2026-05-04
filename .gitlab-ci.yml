@@ -70,6 +70,13 @@ variables:
   RX65N_BG96_REQUIRE_TLS_VERSION: ""
   # RX65N_BG96_TLS_BACKEND: software or tsip.
   RX65N_BG96_TLS_BACKEND: "software"
+  RX65N_BG96_UART_BAUD_RATE: "921600"
+  # Public Root CA data is fixed by the submodule. Tier 2 TSIP blobs are read
+  # from masked CI/CD variables by tools/provision_tsip_over_uart.py.
+  RX65N_BG96_TSIP_PROVISIONING_DATA_DIR: "external/tsip_provisioning_data/rx72n_ek2"
+  RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE: "128"
+  RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS: "30"
+  RX65N_BG96_TSIP_FLEET_ENABLE: "false"
   RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS: "600"
   RX65N_BG96_DYNAMIC_IOT_CREDENTIALS: "true"
   RX65N_BG96_IOT_POLICY_NAME: "ck-rx65n-policy"
@@ -120,6 +127,12 @@ variables:
   RX72N_FLEET_TEST_TIMEOUT: "600"
   # RX72N_TLS_BACKEND: software or tsip.
   RX72N_TLS_BACKEND: "software"
+  # Public Root CA data is fixed by the submodule. Tier 2 TSIP blobs are read
+  # from masked CI/CD variables by tools/provision_tsip_over_uart.py.
+  RX72N_TSIP_PROVISIONING_DATA_DIR: "external/tsip_provisioning_data/rx72n_ek2"
+  RX72N_TSIP_PROVISION_CHUNK_SIZE: "128"
+  RX72N_TSIP_PROVISION_TIMEOUT_SECONDS: "30"
+  RX72N_TSIP_FLEET_ENABLE: "false"
   RX72N_OTA_CANDIDATE_VERSION: "0.9.3"
   RX72N_OTA_OBSERVE_TIMEOUT: "900"
   AWS_DEFAULT_REGION: "ap-northeast-1"
@@ -361,7 +374,7 @@ build_rx72n_fleet_candidate:
     - hw-ishiguro-pc
   resource_group: rx72n-e2studio-build
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -495,13 +508,13 @@ build_rx72n_fleet_candidate:
 
 .rx65n_bg96_fleet_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(fleet|full)$/ && $AWS_IOT_ENDPOINT && ($AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01 || $RX65N_BG96_FLEET_PROVISIONING_TEMPLATE || $BG96_FLEET_PROVISIONING_TEMPLATE || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($AWS_FLEET_CLAIM_CERT_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_CERT_PEM || $RX65N_BG96_FLEET_CLAIM_CERT || $BG96_FLEET_CLAIM_CERT_PEM || $BG96_FLEET_CLAIM_CERT || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY || $BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $BG96_FLEET_CLAIM_PRIVATE_KEY || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(fleet|full)$/ && ($RX65N_BG96_TLS_BACKEND != "tsip" || $RX65N_BG96_TSIP_FLEET_ENABLE == "true") && $AWS_IOT_ENDPOINT && ($AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01 || $RX65N_BG96_FLEET_PROVISIONING_TEMPLATE || $BG96_FLEET_PROVISIONING_TEMPLATE || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($AWS_FLEET_CLAIM_CERT_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_CERT_PEM || $RX65N_BG96_FLEET_CLAIM_CERT || $BG96_FLEET_CLAIM_CERT_PEM || $BG96_FLEET_CLAIM_CERT || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY || $BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $BG96_FLEET_CLAIM_PRIVATE_KEY || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
       when: on_success
     - when: never
 
 .rx65n_bg96_fleet_cleanup_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(fleet|full)$/ && $RX65N_BG96_FLEET_CLEANUP_RESOURCES != "false" && $AWS_DEFAULT_REGION && ($AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01 || $RX65N_BG96_FLEET_PROVISIONING_TEMPLATE || $BG96_FLEET_PROVISIONING_TEMPLATE || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($AWS_FLEET_CLAIM_CERT_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_CERT_PEM || $RX65N_BG96_FLEET_CLAIM_CERT || $BG96_FLEET_CLAIM_CERT_PEM || $BG96_FLEET_CLAIM_CERT || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY || $BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $BG96_FLEET_CLAIM_PRIVATE_KEY || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(fleet|full)$/ && ($RX65N_BG96_TLS_BACKEND != "tsip" || $RX65N_BG96_TSIP_FLEET_ENABLE == "true") && $RX65N_BG96_FLEET_CLEANUP_RESOURCES != "false" && $AWS_DEFAULT_REGION && ($AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01 || $RX65N_BG96_FLEET_PROVISIONING_TEMPLATE || $BG96_FLEET_PROVISIONING_TEMPLATE || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($AWS_FLEET_CLAIM_CERT_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_CERT_PEM || $RX65N_BG96_FLEET_CLAIM_CERT || $BG96_FLEET_CLAIM_CERT_PEM || $BG96_FLEET_CLAIM_CERT || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY || $BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $BG96_FLEET_CLAIM_PRIVATE_KEY || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
       when: always
     - when: never
 
@@ -732,6 +745,14 @@ prepare_rx65n_bg96_mqtt_credentials:
       $thing = Get-FirstEnv @("AWS_IOT_THING_NAME_CK_RX65N_01", "RX65N_BG96_AWS_IOT_THING_NAME", "BG96_AWS_IOT_THING_NAME", "BG96_MQTT_THING_NAME", "AWS_IOT_THING_NAME")
       $cert = Get-FirstEnv @("AWS_IOT_DEVICE_CERT_PEM_FILE_CK_RX65N_01", "AWS_IOT_DEVICE_CERT_PEM_CK_RX65N_01", "AWS_IOT_CLIENT_CERT_PEM_CK_RX65N_01", "AWS_IOT_CLIENT_CERTIFICATE_PEM_CK_RX65N_01", "BG96_AWS_IOT_DEVICE_CERT_PEM_FILE", "BG96_AWS_IOT_DEVICE_CERT_PEM", "BG96_AWS_IOT_CLIENT_CERTIFICATE_PEM", "AWS_IOT_DEVICE_CERT_PEM_FILE", "AWS_IOT_DEVICE_CERT_PEM", "AWS_IOT_CLIENT_CERTIFICATE_PEM", "AWS_IOT_CERT")
       $key = Get-FirstEnv @("AWS_IOT_DEVICE_PRIVATE_KEY_PEM_FILE_CK_RX65N_01", "AWS_IOT_DEVICE_PRIVATE_KEY_PEM_CK_RX65N_01", "AWS_IOT_CLIENT_PRIVATE_KEY_PEM_CK_RX65N_01", "AWS_IOT_PRIVATE_KEY_PEM_CK_RX65N_01", "BG96_AWS_IOT_DEVICE_PRIVATE_KEY_PEM_FILE", "BG96_AWS_IOT_DEVICE_PRIVATE_KEY_PEM", "BG96_AWS_IOT_PRIVATE_KEY_PEM", "AWS_IOT_DEVICE_PRIVATE_KEY_PEM_FILE", "AWS_IOT_DEVICE_PRIVATE_KEY_PEM", "AWS_IOT_PRIVATE_KEY_PEM", "AWS_IOT_PRIVKEY", "AWS_IOT_PRIVATE_KEY")
+      if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") {
+        if ($thing -and $cert) {
+          Write-Host "Static BG96 MQTT certificate metadata is available for TSIP: $($thing.Name), $($cert.Name)"
+          Set-Content -Path (Join-Path $artifactDir "mode.txt") -Value "static-tsip" -Encoding ascii
+          exit 0
+        }
+        throw "RX65N/BG96 TSIP requires static thing/certificate variables matching the masked TSIP wrapped key blobs; dynamic AWS IoT credentials cannot be used."
+      }
       if ($thing -and $cert -and $key) {
         Write-Host "Static BG96 MQTT credentials are available from CI variables: $($thing.Name), $($cert.Name), $($key.Name)"
         Set-Content -Path (Join-Path $artifactDir "mode.txt") -Value "static" -Encoding ascii
@@ -807,20 +828,59 @@ provision_rx65n_bg96_mqtt_credentials:
       fi
 
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
-      python3 tools/bg96_bootloader_integration.py \
-        --action provision-mqtt \
-        --uart-port "${uart_port}" \
-        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}" \
-        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}" \
-        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}" \
-        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
-        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
-        --rfp-tool "${rfp_tool}" \
-        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
-        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
-        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+      bg96_provision_args=(
+        --action provision-mqtt
+        --uart-port "${uart_port}"
+        --baud "${RX65N_BG96_UART_BAUD_RATE}"
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}"
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}"
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}"
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}"
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}"
+        --rfp-tool "${rfp_tool}"
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}"
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}"
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}"
+      )
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        bg96_provision_args+=(--skip-private-key --no-reset-after-provision)
+      fi
+
+      python3 tools/bg96_bootloader_integration.py "${bg96_provision_args[@]}" \
         2>&1 | tee "$artifact_dir/provision_mqtt.log"
       status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        python3 tools/provision_tsip_over_uart.py \
+          --target rx65n \
+          --port "${uart_port}" \
+          --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+          --data-dir "$CI_PROJECT_DIR/${RX65N_BG96_TSIP_PROVISIONING_DATA_DIR}" \
+          --chunk-size "${RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+        status="${PIPESTATUS[0]}"
+        if [ "$status" -ne 0 ]; then
+          exit "$status"
+        fi
+
+        python3 tools/bg96_bootloader_integration.py \
+          --action reset-app \
+          --uart-port "${uart_port}" \
+          --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+          --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+          --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+          --rfp-tool "${rfp_tool}" \
+          --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+          --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+          --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+          2>&1 | tee "$artifact_dir/reset_after_tsip.log"
+        status="${PIPESTATUS[0]}"
+      fi
       exit "$status"
   artifacts:
     when: always
@@ -1000,7 +1060,7 @@ build_rx65n_bg96_ota_candidate:
       $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
       $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\$rx65nBg96AppProject\e2studio_ccrx"
       python tools/patch_bg96_aws_iot_mcu.py patch --aws-root "$appRoot" --backup "$artifactDir\aws_dev_mode_key_provisioning.c.orig"
-      python tools/configure_bg96_mqtt_credentials.py --app-dir "$appRoot" --marker "$artifactDir\mqtt_credentials_configured" --require
+      python tools/configure_bg96_mqtt_credentials.py --app-dir "$appRoot" --marker "$artifactDir\mqtt_credentials_configured" --require --tls-backend "$env:RX65N_BG96_TLS_BACKEND"
       python tools/build_bg96_ota_candidate.py `
         --repo-root "$env:CI_PROJECT_DIR" `
         --app-dir "Projects/$rx65nBg96AppProject/e2studio_ccrx" `
@@ -1341,7 +1401,7 @@ flash_rx72n_fleet_linux:
       artifacts: true
       optional: true
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -1415,22 +1475,46 @@ provision_rx72n_linux:
         shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
       fi
 
-      python tools/provision_rx72n.py \
-        --port "$RX72N_LINUX_UART_PORT" \
-        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --thing-name "$RX72N_DEVICE_ID" \
-        --endpoint "$AWS_IOT_ENDPOINT" \
-        --cert "$AWS_CLIENT_CERT_RX72N_02" \
-        --key "$AWS_PRIVATE_KEY_RX72N_02" \
-        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem" \
-        --format \
-        --reset-cmd "$reset_cmd" \
-        --reset-after-open \
-        --boot-wait 12 \
-        --cli-timeout 25 \
-        --attempts 3 \
-        "${shadow_args[@]}" \
+      provision_args=(
+        --port "$RX72N_LINUX_UART_PORT"
+        --baud "$RX72N_LINUX_UART_BAUD_RATE"
+        --thing-name "$RX72N_DEVICE_ID"
+        --endpoint "$AWS_IOT_ENDPOINT"
+        --cert "$AWS_CLIENT_CERT_RX72N_02"
+        --key "$AWS_PRIVATE_KEY_RX72N_02"
+        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem"
+        --format
+        --reset-cmd "$reset_cmd"
+        --reset-after-open
+        --boot-wait 12
+        --cli-timeout 25
+        --attempts 3
+      )
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        provision_args+=(--skip-private-key --no-reset)
+      fi
+
+      python tools/provision_rx72n.py "${provision_args[@]}" "${shadow_args[@]}" \
         2>&1 | tee "$artifact_dir/provision_rx72n.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        python tools/provision_tsip_over_uart.py \
+          --target rx72n \
+          --port "$RX72N_LINUX_UART_PORT" \
+          --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+          --data-dir "$CI_PROJECT_DIR/${RX72N_TSIP_PROVISIONING_DATA_DIR}" \
+          --chunk-size "${RX72N_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX72N_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          --reset-after \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+        status="${PIPESTATUS[0]}"
+      fi
+      exit "$status"
   artifacts:
     when: always
     paths:
@@ -1444,7 +1528,7 @@ provision_rx72n_fleet_linux:
     - build_rx72n_fleet_candidate
     - flash_rx72n_fleet_linux
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -1582,7 +1666,7 @@ test_fleet_rx72n_linux:
     - flash_rx72n_fleet_linux
     - provision_rx72n_fleet_linux
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -1616,7 +1700,7 @@ cleanup_rx72n_fleet_resources:
   dependencies:
     - test_fleet_rx72n_linux
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: always
     - when: never
   script:
@@ -2186,21 +2270,26 @@ park_rx72n_ota_cli_linux:
         shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
       fi
 
-      python tools/provision_rx72n.py \
-        --port "$RX72N_LINUX_UART_PORT" \
-        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --thing-name "$RX72N_DEVICE_ID" \
-        --endpoint "$AWS_IOT_ENDPOINT" \
-        --cert "$AWS_CLIENT_CERT_RX72N_02" \
-        --key "$AWS_PRIVATE_KEY_RX72N_02" \
-        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem" \
-        --reset-cmd "$reset_cmd" \
-        --reset-after-open \
-        --boot-wait 12 \
-        --cli-timeout 25 \
-        --attempts 3 \
-        --no-reset \
-        "${shadow_args[@]}" \
+      provision_args=(
+        --port "$RX72N_LINUX_UART_PORT"
+        --baud "$RX72N_LINUX_UART_BAUD_RATE"
+        --thing-name "$RX72N_DEVICE_ID"
+        --endpoint "$AWS_IOT_ENDPOINT"
+        --cert "$AWS_CLIENT_CERT_RX72N_02"
+        --key "$AWS_PRIVATE_KEY_RX72N_02"
+        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem"
+        --reset-cmd "$reset_cmd"
+        --reset-after-open
+        --boot-wait 12
+        --cli-timeout 25
+        --attempts 3
+        --no-reset
+      )
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        provision_args+=(--skip-private-key)
+      fi
+
+      python tools/provision_rx72n.py "${provision_args[@]}" "${shadow_args[@]}" \
         2>&1 | tee "$artifact_dir/park_rx72n_ota_cli.log"
       status="${PIPESTATUS[0]}"
       if [ "$status" -ne 0 ]; then

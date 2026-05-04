@@ -228,7 +228,7 @@ def write_credentials(app_dir: Path, credentials: dict[str, str]) -> None:
     endpoint = c_string_literal(credentials["endpoint"])
     thing_name = c_string_literal(credentials["thing_name"])
     cert = pem_c_string_literal(credentials["client_cert"])
-    private_key = pem_c_string_literal(credentials["private_key"])
+    private_key = pem_c_string_literal(credentials["private_key"]) if credentials.get("private_key") else "(NULL)"
 
     (frtos_config / "aws_clientcredential.h").write_text(
         f"""#ifndef __AWS_CLIENTCREDENTIAL__H__
@@ -300,6 +300,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app-dir", type=Path, default=Path("Projects/aws_bg96_ck_rx65n/e2studio_ccrx"))
     parser.add_argument("--marker", type=Path, default=Path("artifacts/mqtt_credentials_configured"))
     parser.add_argument("--require", action="store_true", default=os.environ.get("BG96_MQTT_REQUIRE_CREDENTIALS") == "true")
+    parser.add_argument("--tls-backend", choices=("software", "tsip"),
+                        default=os.environ.get("RX65N_BG96_TLS_BACKEND", "software"))
     return parser.parse_args()
 
 
@@ -313,13 +315,14 @@ def main() -> int:
     root_ca, root_ca_var = env_value(ROOT_CA_VARS)
 
     normalized_client_cert = normalize_certificate_pem(client_cert)
-    normalized_private_key = normalize_private_key_pem(private_key)
+    normalized_private_key = None if args.tls_backend == "tsip" else normalize_private_key_pem(private_key)
     required = {
         "endpoint": endpoint,
         "thing_name": thing_name,
         "client_cert": normalized_client_cert,
-        "private_key": normalized_private_key,
     }
+    if args.tls_backend != "tsip":
+        required["private_key"] = normalized_private_key
     missing = [name for name, value in required.items() if not value]
     if missing:
         message = f"MQTT credential variables incomplete; missing {', '.join(missing)}. Leaving CLI provisioning enabled."
@@ -328,20 +331,26 @@ def main() -> int:
         print(message)
         return 0
 
-    for line in credential_summary(required["client_cert"], required["private_key"]):  # type: ignore[arg-type]
-        print(line)
+    if args.tls_backend == "tsip":
+        print("MQTT credential private key PEM is omitted for TSIP backend.")
+    else:
+        for line in credential_summary(required["client_cert"], required["private_key"]):  # type: ignore[arg-type]
+            print(line)
 
     write_credentials(
         args.app_dir,
         {
             **required,  # type: ignore[arg-type]
+            "private_key": normalized_private_key or "",
             "root_ca": root_ca or "",
         },
     )
     args.marker.parent.mkdir(parents=True, exist_ok=True)
     args.marker.write_text("configured\n", encoding="utf-8")
 
-    used = [endpoint_var, thing_name_var, client_cert_var, private_key_var]
+    used = [endpoint_var, thing_name_var, client_cert_var]
+    if args.tls_backend != "tsip":
+        used.append(private_key_var)
     if root_ca_var:
         used.append(root_ca_var)
     print("Configured MQTT credentials from CI variables: " + ", ".join(name for name in used if name))
