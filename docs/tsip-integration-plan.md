@@ -89,8 +89,23 @@ CIではsoftware TLSをデフォルトとし、TSIPは明示的なpipeline varia
 - `RX72N_TLS_BACKEND=software|tsip`
 - `RX65N_BG96_TLS_BACKEND=software|tsip`
 
+通常のpipelineでは両方とも`software`を使う。TSIP確認時はpipeline variableで
+`tsip`を指定し、同じbuild scriptが対応するTSIP版e2 studioプロジェクトを
+import/buildする。後段ジョブが使うRSU/artifact名は従来名へ正規化し、通常版と
+TSIP版の切り替えをbuild profileの差分に閉じ込める。
+
 TSIP jobではwrapped provisioning blob用のmasked CI/CD Variablesを追加で要求する。
 software TLS jobでは既存のAWS IoT証明書・秘密鍵変数を継続利用する。
+
+## 実装メモ
+
+- `Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/` は共有
+  `Demos/` / `Middleware/` を参照するRX72N TSIP版アプリケーションプロジェクト。
+- `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` は既存RX65N/BG96プロジェクトと
+  同じく自己完結型のTSIP版アプリケーションプロジェクト。
+- `Demos/tsip_provisioning/` にruntime provisioning store / CLIを置き、
+  TSIP版アプリケーションから`tsipprov` CLIとして登録する。
+- ブートローダはRX72N/RX65Nとも共通`rx_bootloader` submoduleを参照する。
 
 ## 初期検証範囲
 

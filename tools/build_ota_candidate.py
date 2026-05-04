@@ -9,6 +9,7 @@ version after the command finishes.
 """
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -83,16 +84,30 @@ def main():
         default=None,
         help="Optional PEM output path for generate_signer_cert.py",
     )
+    parser.add_argument(
+        "--tls-backend",
+        choices=("software", "tsip"),
+        default=None,
+        help="TLS backend profile to build. Defaults to RX72N_TLS_BACKEND or software.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
     tools_dir = repo_root / "tools"
-    demo_config = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "src" / "frtos_config" / "demo_config.h"
+    tls_backend = args.tls_backend or os.environ.get("RX72N_TLS_BACKEND", "software")
+    if tls_backend == "software":
+        app_project_name = "aws_ether_rx72n_envision_kit"
+    elif tls_backend == "tsip":
+        app_project_name = "aws_ether_rx72n_envision_kit_tsip"
+    else:
+        raise RuntimeError(f"unsupported RX72N TLS backend: {tls_backend}")
+    app_project = repo_root / "Projects" / app_project_name / "e2studio_ccrx"
+    demo_config = app_project / "src" / "frtos_config" / "demo_config.h"
     build_script = tools_dir / "build_headless_rx72n.ps1"
     generate_cert = tools_dir / "generate_signer_cert.py"
     rsu_builder = tools_dir / "build_fwup_v2_rsu.py"
-    app_mot = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "HardwareDebug" / "aws_ether_rx72n_envision_kit.mot"
-    prm_csv = repo_root / "Projects" / "aws_ether_rx72n_envision_kit" / "e2studio_ccrx" / "src" / "smc_gen" / "r_fwup" / "tool" / "RX72N_DualBank_ImageGenerator_PRM.csv"
+    app_mot = app_project / "HardwareDebug" / f"{app_project_name}.mot"
+    prm_csv = app_project / "src" / "smc_gen" / "r_fwup" / "tool" / "RX72N_DualBank_ImageGenerator_PRM.csv"
 
     signing_key = Path(args.signing_key).resolve() if args.signing_key else repo_root / "sample_keys" / "secp256r1.privatekey"
     code_sign_cert_out = Path(args.code_sign_cert_out).resolve() if args.code_sign_cert_out else Path(f"{args.output_prefix}_codesign_cert.pem")
@@ -121,6 +136,7 @@ def main():
             build_cmd.extend(["-E2Studio", args.e2studio_cli])
         if args.workspace:
             build_cmd.extend(["-Workspace", args.workspace])
+        build_cmd.extend(["-TlsBackend", tls_backend])
         run(build_cmd, repo_root)
 
         run(

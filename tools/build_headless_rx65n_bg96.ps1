@@ -6,6 +6,7 @@ param(
     [int]$E2StudioTimeoutSeconds = 600,
     [string]$Make = $env:RX65N_BG96_MAKE,
     [string]$CcrxBin = $env:BIN_RX,
+    [string]$TlsBackend = $(if ($env:RX65N_BG96_TLS_BACKEND) { $env:RX65N_BG96_TLS_BACKEND } else { "software" }),
     [switch]$PrepareBuildFilesOnly
 )
 
@@ -15,8 +16,14 @@ Set-StrictMode -Version Latest
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $workspace = $Workspace
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
+$normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
+switch ($normalizedTlsBackend) {
+    "software" { $appProjectName = "aws_bg96_ck_rx65n" }
+    "tsip" { $appProjectName = "aws_bg96_ck_rx65n_tsip" }
+    default { throw "Unsupported RX65N BG96 TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
+}
 $bootProject = Join-Path $projectRoot "Projects\boot_loader_ck_rx65n\e2studio_ccrx"
-$appProject = Join-Path $projectRoot "Projects\aws_bg96_ck_rx65n\e2studio_ccrx"
+$appProject = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx"
 $patchBackup = Join-Path $projectRoot "artifacts\rx65n_bg96_aws_dev_mode_key_provisioning.c.orig"
 
 foreach ($projectDir in @($bootProject, $appProject)) {
@@ -322,6 +329,7 @@ Add-PathEntry $busyBoxBin
 
 Write-Host "Using GNU make: $makeExe"
 Write-Host "Using CC-RX bin: $ccrxBinDir"
+Write-Host "TLS backend: $normalizedTlsBackend"
 if ($busyBoxBin) {
     Write-Host "Using e2 studio BusyBox tools: $busyBoxBin"
 }
@@ -351,7 +359,7 @@ try {
     Invoke-MakeBuild -BuildDir $bootBuildDir -Target "boot_loader_ck_rx65n.mot"
 
     Write-Host "=== CK-RX65N BG96 application make build ==="
-    Invoke-MakeBuild -BuildDir $appBuildDir -Target "aws_bg96_ck_rx65n.mot"
+    Invoke-MakeBuild -BuildDir $appBuildDir -Target "$appProjectName.mot"
 
     $bootMot = Find-FirstArtifact @(
         (Join-Path $bootBuildDir "boot_loader_ck_rx65n.mot"),
@@ -362,8 +370,8 @@ try {
         $bootMot = $normalizedBootMot
     }
 
-    $appMot = Find-FirstArtifact @((Join-Path $appBuildDir "aws_bg96_ck_rx65n.mot"))
-    $appAbs = Find-FirstArtifact @((Join-Path $appBuildDir "aws_bg96_ck_rx65n.abs"))
+    $appMot = Find-FirstArtifact @((Join-Path $appBuildDir "$appProjectName.mot"))
+    $appAbs = Find-FirstArtifact @((Join-Path $appBuildDir "$appProjectName.abs"))
 
     Write-Host ""
     Write-Host "CK-RX65N BG96 make build succeeded."

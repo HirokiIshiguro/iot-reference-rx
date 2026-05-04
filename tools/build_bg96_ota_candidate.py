@@ -182,12 +182,13 @@ def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
     app_dir = (repo_root / args.app_dir).resolve() if not args.app_dir.is_absolute() else args.app_dir.resolve()
+    app_project_name = app_dir.parent.name
     output_dir = (repo_root / args.output_dir).resolve() if not args.output_dir.is_absolute() else args.output_dir.resolve()
     signing_key = (repo_root / args.signing_key).resolve() if not args.signing_key.is_absolute() else args.signing_key.resolve()
 
     demo_config = app_dir / "src/frtos_config/demo_config.h"
-    app_mot = app_dir / "HardwareDebug/aws_bg96_ck_rx65n.mot"
-    app_abs = app_dir / "HardwareDebug/aws_bg96_ck_rx65n.abs"
+    app_mot = app_dir / f"HardwareDebug/{app_project_name}.mot"
+    app_abs = app_dir / f"HardwareDebug/{app_project_name}.abs"
     app_makefile = app_dir / "HardwareDebug/makefile"
     rsu_tool = repo_root / "tools/create_bg96_rsu.py"
     cert_tool = repo_root / "tools/generate_bg96_ota_signer_cert.py"
@@ -240,12 +241,12 @@ def main() -> int:
         with log_path.open("a", encoding="utf-8", errors="replace") as log:
             app_build_dir = app_dir / "HardwareDebug"
             run_logged([str(make_exe), "clean"], app_build_dir, log, build_env, args.e2studio_timeout)
-            run_logged([str(make_exe), "-j2", "aws_bg96_ck_rx65n.mot"], app_build_dir, log, build_env, args.e2studio_timeout)
+            run_logged([str(make_exe), "-j2", f"{app_project_name}.mot"], app_build_dir, log, build_env, args.e2studio_timeout)
 
         if not app_mot.exists():
-            raise RuntimeError(f"aws_bg96_ck_rx65n.mot was not generated: {app_mot}")
+            raise RuntimeError(f"{app_project_name}.mot was not generated: {app_mot}")
         if not app_abs.exists():
-            raise RuntimeError(f"aws_bg96_ck_rx65n.abs was not generated: {app_abs}")
+            raise RuntimeError(f"{app_project_name}.abs was not generated: {app_abs}")
 
         run(["python", str(rsu_tool), "--mot", str(app_mot), "--key", str(signing_key), "--output", str(full_rsu)], repo_root)
         run(
