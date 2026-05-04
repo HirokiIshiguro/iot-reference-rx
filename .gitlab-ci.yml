@@ -141,6 +141,14 @@ workflow:
       when: always
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
       when: never
+    # Feature branch push pipelines are build-only. The merge request pipeline
+    # owns hardware sequences so independent push pipelines cannot interleave
+    # RX65N/BG96 OTA and Fleet images on the same board.
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      variables:
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX72N_TEST_SCOPE: "build"
+      when: always
     - if: $CI_COMMIT_BRANCH
       when: always
 

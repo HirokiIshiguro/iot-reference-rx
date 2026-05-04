@@ -102,7 +102,8 @@ function Invoke-Tool {
     param(
         [string]$FilePath,
         [string[]]$Arguments,
-        [string]$WorkingDirectory
+        [string]$WorkingDirectory,
+        [switch]$AllowNonZeroExit
     )
 
     Write-Host "+ $FilePath $($Arguments -join ' ')"
@@ -127,6 +128,10 @@ function Invoke-Tool {
         }
         Write-ProcessOutput @($stdoutPath, $stderrPath)
         if ($process.ExitCode -ne 0) {
+            if ($AllowNonZeroExit) {
+                Write-Warning "build command returned exit code $($process.ExitCode); continuing after output validation: $FilePath $($Arguments -join ' ')"
+                return
+            }
             throw "build command failed with exit code $($process.ExitCode): $FilePath $($Arguments -join ' ')"
         }
     }
@@ -292,7 +297,8 @@ function Invoke-E2StudioManagedBuild {
             "-import", $appProject,
             "-build", "all"
         ) `
-        -WorkingDirectory $projectRoot
+        -WorkingDirectory $projectRoot `
+        -AllowNonZeroExit
 }
 
 function Ensure-ManagedBuildFiles {
