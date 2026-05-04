@@ -1,6 +1,7 @@
 /*
  * Runtime accessors for TSIP provisioning blobs stored in littlefs.
  */
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 
 #include <stdint.h>
 #include <string.h>
@@ -445,3 +446,5 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
                         (const uint8_t *)&rsa2048_private_key,
                         sizeof(rsa2048_private_key));
 }
+
+#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */

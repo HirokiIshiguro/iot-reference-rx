@@ -6,6 +6,8 @@
  * define them in the application project and let the existing threading_alt
  * hooks initialize them from corePKCS11.
  */
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+
 #include "mbedtls/threading.h"
 
 #if defined(MBEDTLS_THREADING_C) && defined(MBEDTLS_PSA_CRYPTO_C)
@@ -37,3 +39,5 @@ void vTsipMbedtlsThreadingCompatInit( void )
     }
 }
 #endif
+
+#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */

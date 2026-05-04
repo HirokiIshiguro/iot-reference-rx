@@ -4,6 +4,7 @@
  * The command writes TSIP provisioning blobs delivered over UART into the
  * littlefs-backed key-value store used by iot-reference-rx.
  */
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 
 #include <stdint.h>
 #include <stdio.h>
@@ -455,3 +456,5 @@ static void prvEraseFileIfExists(const char * pcStorageName)
     result = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, pcStorageName);
     (void)result;
 }
+
+#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
