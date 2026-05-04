@@ -67,6 +67,7 @@ variables:
   RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS: "25"
   RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS: "0.002"
   RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS: "0.5"
+  RX65N_BG96_REQUIRE_TLS_VERSION: ""
   RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS: "600"
   RX65N_BG96_DYNAMIC_IOT_CREDENTIALS: "true"
   RX65N_BG96_IOT_POLICY_NAME: "ck-rx65n-policy"
@@ -864,6 +865,10 @@ verify_rx65n_bg96_mqtt:
       fi
 
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      tls_version_args=()
+      if [ -n "${RX65N_BG96_REQUIRE_TLS_VERSION:-}" ]; then
+        tls_version_args+=(--require-tls-version "${RX65N_BG96_REQUIRE_TLS_VERSION}")
+      fi
       python3 tools/bg96_bootloader_integration.py \
         --action verify-mqtt \
         --uart-port "${uart_port}" \
@@ -871,6 +876,7 @@ verify_rx65n_bg96_mqtt:
         --app-startup-timeout "${RX65N_BG96_APP_STARTUP_TIMEOUT_SECONDS}" \
         --mqtt-timeout "${RX65N_BG96_MQTT_TIMEOUT_SECONDS}" \
         --app-reset-retries "${RX65N_BG96_APP_RESET_RETRIES}" \
+        "${tls_version_args[@]}" \
         --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
         --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
         --rfp-tool "${rfp_tool}" \

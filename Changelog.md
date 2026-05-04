@@ -15,10 +15,14 @@
 ロジアナ波形観測で見えたセルラー特有の待ち時間をもとに、MQTT受信待ち時間と
 OTAブロックサイズを調整し、実機CIで安定して再現できる保守的な設定に寄せました。
 
-[調査中] RX65N + BG96環境でのTLS 1.3接続を検証中です。
+[追加] CK-RX65N + BG96 Cellularでも、AWS IoT CoreへのTLS 1.3 MQTT接続に対応しました。
 この構成ではTLS層はRX65N上のmbedTLSで処理し、TCP接続管理はソケットラッパー経由で
-BG96内部TCP/IPにATコマンドで委託します。そのため原理的にはTLS 1.3を利用できる見込みですが、
-リリースノートへ載せる前に実機パイプラインで確認します。
+BG96内部TCP/IPにATコマンドで委託します。
+実機スコープパイプラインでは、BG96経由のMQTTログに
+`TLS handshake successful: version TLSv1.3` と
+`[PASS] Required TLS version: TLSv1.3` が出ることを確認しています。
+TLS 1.3のRSA-PSS CertificateVerifyに必要なRSA秘密鍵処理は、BG96プロジェクト内蔵の
+mbedTLS/PKCS #11連携にも反映しました。
 
 [予定] 次のsafftiタグでは、202604ベース以降のBG96 OTA性能チューニング、
 RX72N TLS 1.3対応、実機CI運用の改善をまとめる予定です。
