@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import time
@@ -735,7 +736,13 @@ def download_rsu(port: serial.Serial, rsu_path: Path, ready_observed: bool = Fal
         raise RuntimeError("bank swap was not observed")
 
 
-def verify_app_mqtt(port: serial.Serial, startup_timeout: int, timeout: int, require_pubsub: bool) -> None:
+def verify_app_mqtt(
+    port: serial.Serial,
+    startup_timeout: int,
+    timeout: int,
+    require_pubsub: bool,
+    require_tls_version: str | None = None,
+) -> None:
     print("\n[APP] waiting for app startup markers")
     marker = wait_for_any(port, APP_START_MARKERS, startup_timeout, APP_STARTUP_ERROR_MARKERS)
     if marker is None:
@@ -747,6 +754,7 @@ def verify_app_mqtt(port: serial.Serial, startup_timeout: int, timeout: int, req
     missing_credentials: set[str] = set()
     errors: list[str] = []
     cellular_state: dict[str, str] = {}
+    tls_version: str | None = None
     last_qisend_at = 0.0
     qisend_errors = 0
     qisend_error_limit = int(os.environ.get("BG96_MQTT_QISEND_ERROR_LIMIT", "30"))
@@ -767,6 +775,11 @@ def verify_app_mqtt(port: serial.Serial, startup_timeout: int, timeout: int, req
             stripped = line.strip()
             if not stripped:
                 continue
+
+            tls_match = re.search(r"TLS handshake successful: version\s+(\S+)", stripped)
+            if tls_match:
+                tls_version = tls_match.group(1)
+                print(f"\n  >>> [FOUND] TLS version {tls_version} <<<")
 
             for marker in MQTT_SUCCESS_MARKERS:
                 if marker in stripped:
@@ -821,6 +834,13 @@ def verify_app_mqtt(port: serial.Serial, startup_timeout: int, timeout: int, req
         if "Successfully sent QoS" in detected and (
             "Successfully subscribed to topic" in detected or "---------Finish PubSub Demo Task" in detected
         ):
+            if require_tls_version:
+                if tls_version != require_tls_version:
+                    raise RuntimeError(
+                        f"required TLS version {require_tls_version} was not observed; "
+                        f"observed={tls_version or 'none'}"
+                    )
+                print(f"\n[PASS] Required TLS version: {require_tls_version}")
             print("\n[PASS] app MQTT Pub/Sub activity verified")
             return
 
@@ -840,7 +860,7 @@ def verify_app_mqtt(port: serial.Serial, startup_timeout: int, timeout: int, req
         "timed out waiting for app MQTT success; "
         f"detected={sorted(detected)} mqtt_reached={sorted(mqtt_reached)} "
         f"missing_credentials={sorted(missing_credentials)} cellular_state={cellular_state} "
-        f"errors={errors[-5:]}"
+        f"tls_version={tls_version} errors={errors[-5:]}"
     )
 
 
@@ -850,7 +870,13 @@ def verify_app_activity_with_reset_retries(
 ) -> None:
     for attempt in range(args.app_reset_retries + 1):
         try:
-            verify_app_mqtt(port, args.app_startup_timeout, args.mqtt_timeout, args.require_mqtt_pubsub)
+            verify_app_mqtt(
+                port,
+                args.app_startup_timeout,
+                args.mqtt_timeout,
+                args.require_mqtt_pubsub,
+                args.require_tls_version,
+            )
             return
         except RuntimeError as exc:
             retryable = ("Cellular init failed", "MQTT QISEND returned ERROR")
@@ -1010,6 +1036,8 @@ def parse_args() -> argparse.Namespace:
                         default=int(os.environ.get("BG96_BOOTLOADER_READY_TIMEOUT_SECONDS", str(DEFAULT_READY_TIMEOUT_SECONDS))))
     parser.add_argument("--require-mqtt-pubsub", action="store_true",
                         default=os.environ.get("BG96_MQTT_REQUIRE_PUBSUB") == "true")
+    parser.add_argument("--require-tls-version",
+                        default=os.environ.get("BG96_MQTT_REQUIRE_TLS_VERSION") or None)
     parser.add_argument("--app-reset-retries", type=int,
                         default=int(os.environ.get("BG96_APP_RESET_RETRIES", "1")))
     parser.add_argument("--provision-mqtt-credentials", action="store_true",
