@@ -145,6 +145,7 @@ def monitor_uart(port, baud, timeout, reset_cmd=None):
     results = {marker["name"]: False for marker in MARKERS}
     infos = []
     errors = []
+    tls_versions = []
     total_bytes = 0
     total_lines = 0
     boot_lines = []
@@ -196,6 +197,12 @@ def monitor_uart(port, baud, timeout, reset_cmd=None):
                             infos.append(line)
                             print(f"[INFO] {line}")
 
+                    tls_match = re.search(r"TLS handshake successful: version\s+(\S+)", line)
+                    if tls_match:
+                        tls_version = tls_match.group(1)
+                        tls_versions.append(tls_version)
+                        print(f"[INFO] TLS version: {tls_version}")
+
                     for error_pattern in ERROR_PATTERNS:
                         if error_pattern in line:
                             errors.append(line)
@@ -215,7 +222,7 @@ def monitor_uart(port, baud, timeout, reset_cmd=None):
         ser.close()
         print(f"Closed {port}")
 
-    return results, infos, errors, total_bytes, total_lines, boot_lines
+    return results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines
 
 
 def main():
@@ -233,6 +240,8 @@ def main():
                         help="External reset command to execute while the log port is open")
     parser.add_argument("--no-reset", action="store_true",
                         help="Skip reset and only monitor the current UART stream")
+    parser.add_argument("--require-tls-version",
+                        help="Require the logged TLS handshake version to contain this string")
     args = parser.parse_args()
 
     if args.device_id:
@@ -255,7 +264,7 @@ def main():
     print(f"Reset Mode:  {'external reset command' if args.reset_cmd else 'monitor only'}")
     print("=" * 60)
 
-    results, infos, errors, total_bytes, total_lines, boot_lines = monitor_uart(
+    results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines = monitor_uart(
         args.log_port,
         args.log_baud,
         args.timeout,
@@ -272,6 +281,10 @@ def main():
         print("Info markers:")
         for line in infos[:5]:
             print(f"  - {line}")
+    if tls_versions:
+        print("TLS versions:")
+        for tls_version in tls_versions[:5]:
+            print(f"  - {tls_version}")
     if errors:
         print("Errors:")
         for line in errors[:5]:
@@ -282,7 +295,13 @@ def main():
             print(f"  - {line}")
     print("=" * 60)
 
-    if all(results.values()):
+    tls_ok = True
+    if args.require_tls_version:
+        tls_ok = any(args.require_tls_version in tls_version for tls_version in tls_versions)
+        status = "PASS" if tls_ok else "FAIL"
+        print(f"[{status}] Required TLS version: {args.require_tls_version}")
+
+    if all(results.values()) and tls_ok:
         print("[PASS] phase8b MQTT baseline verified")
         return 0
 

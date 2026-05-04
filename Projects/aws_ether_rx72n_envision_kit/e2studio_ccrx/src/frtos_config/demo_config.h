@@ -377,7 +377,7 @@
  * "-----END CERTIFICATE-----\n"
  *
  */
-#define democonfigROOT_CA_PEM                   tlsATS1_ROOT_CERTIFICATE_PEM
+#define democonfigROOT_CA_PEM                   tlsSTARFIELD_ROOT_CERTIFICATE_PEM
 
 /**
  * @brief The length of the queue used to hold commands for the agent.

@@ -66,6 +66,7 @@
 #include "mbedtls/platform.h"
 #include "mbedtls/asn1write.h"
 #include "mbedtls/ecdsa.h"
+#include "mbedtls/rsa.h"
 #include "pk_wrap.h"
 
 #include "core_pkcs11_config.h"
@@ -266,6 +267,11 @@ static CK_RV p11_rsa_ctx_init( mbedtls_pk_context * pk,
                                CK_FUNCTION_LIST_PTR pxFunctionList,
                                CK_SESSION_HANDLE xSessionHandle,
                                CK_OBJECT_HANDLE xPkHandle );
+
+static CK_RV p11_rsa_import_private_key( mbedtls_rsa_context * pxMbedRsaCtx,
+                                         CK_FUNCTION_LIST_PTR pxFunctionList,
+                                         CK_SESSION_HANDLE xSessionHandle,
+                                         CK_OBJECT_HANDLE xPkHandle );
 
 static void p11_rsa_ctx_free( void * pvCtx );
 
@@ -1120,24 +1126,13 @@ static CK_RV p11_rsa_ctx_init( mbedtls_pk_context * pk,
         xResult = CKR_FUNCTION_FAILED;
     }
 
-    /*
-     * TODO: corePKCS11 does not allow exporting RSA public attributes.
-     * This function should be updated to properly initialize the
-     * mbedtls_rsa_context when this is addressed.
-     */
-
-    /* CK_ATTRIBUTE pxAttrs[ 2 ] = */
-    /* { */
-    /*     { .type = CKA_MODULUS, .ulValueLen = 0, .pValue = NULL }, */
-    /*     { .type = CKA_PUBLIC_EXPONENT,  .ulValueLen = 0, .pValue = NULL }, */
-    /*     { .type = CKA_PRIME_1,  .ulValueLen = 0, .pValue = NULL }, */
-    /*     { .type = CKA_PRIME_2,  .ulValueLen = 0, .pValue = NULL }, */
-    /*     { .type = CKA_EXPONENT_1,  .ulValueLen = 0, .pValue = NULL }, */
-    /*     { .type = CKA_EXPONENT_2,  .ulValueLen = 0, .pValue = NULL }, */
-    /*     { .type = CKA_COEFFICIENT,  .ulValueLen = 0, .pValue = NULL }, */
-    /* }; */
-
-    ( void ) pxMbedRsaCtx;
+    if( xResult == CKR_OK )
+    {
+        xResult = p11_rsa_import_private_key( pxMbedRsaCtx,
+                                              pxFunctionList,
+                                              xSessionHandle,
+                                              xPkHandle );
+    }
 
     if( xResult == CKR_OK )
     {
@@ -1145,6 +1140,76 @@ static CK_RV p11_rsa_ctx_init( mbedtls_pk_context * pk,
         pxP11RsaCtx->xP11PkCtx.xSessionHandle = xSessionHandle;
         pxP11RsaCtx->xP11PkCtx.xPkHandle = xPkHandle;
     }
+
+    return xResult;
+}
+
+/*-----------------------------------------------------------*/
+
+static CK_RV p11_rsa_import_private_key( mbedtls_rsa_context * pxMbedRsaCtx,
+                                         CK_FUNCTION_LIST_PTR pxFunctionList,
+                                         CK_SESSION_HANDLE xSessionHandle,
+                                         CK_OBJECT_HANDLE xPkHandle )
+{
+    CK_RV xResult = CKR_OK;
+    int32_t lMbedResult = 0;
+
+    mbedtls_mpi xN;
+    mbedtls_mpi xE;
+    mbedtls_mpi xD;
+    mbedtls_mpi xP;
+    mbedtls_mpi xQ;
+
+    CK_ATTRIBUTE xAttrs[] =
+    {
+        { .type = CKA_MODULUS,          .pValue = &xN, .ulValueLen = sizeof( mbedtls_mpi ) },
+        { .type = CKA_PUBLIC_EXPONENT,  .pValue = &xE, .ulValueLen = sizeof( mbedtls_mpi ) },
+        { .type = CKA_PRIVATE_EXPONENT, .pValue = &xD, .ulValueLen = sizeof( mbedtls_mpi ) },
+        { .type = CKA_PRIME_1,          .pValue = &xP, .ulValueLen = sizeof( mbedtls_mpi ) },
+        { .type = CKA_PRIME_2,          .pValue = &xQ, .ulValueLen = sizeof( mbedtls_mpi ) },
+    };
+
+    mbedtls_mpi_init( &xN );
+    mbedtls_mpi_init( &xE );
+    mbedtls_mpi_init( &xD );
+    mbedtls_mpi_init( &xP );
+    mbedtls_mpi_init( &xQ );
+
+    xResult = pxFunctionList->C_GetAttributeValue( xSessionHandle,
+                                                   xPkHandle,
+                                                   xAttrs,
+                                                   sizeof( xAttrs ) / sizeof( xAttrs[ 0 ] ) );
+
+    if( xResult == CKR_OK )
+    {
+        lMbedResult = mbedtls_rsa_import( pxMbedRsaCtx,
+                                          &xN,
+                                          &xP,
+                                          &xQ,
+                                          &xD,
+                                          &xE );
+    }
+
+    if( ( xResult == CKR_OK ) && ( lMbedResult == 0 ) )
+    {
+        lMbedResult = mbedtls_rsa_complete( pxMbedRsaCtx );
+    }
+
+    if( xResult != CKR_OK )
+    {
+        LogError( ( "Failed to read RSA private key attributes from PKCS #11 with error code %02X.", xResult ) );
+    }
+    else if( lMbedResult != 0 )
+    {
+        LogError( ( "Failed to import RSA private key attributes into mbed TLS with error code %d.", ( int ) lMbedResult ) );
+        xResult = CKR_FUNCTION_FAILED;
+    }
+
+    mbedtls_mpi_free( &xQ );
+    mbedtls_mpi_free( &xP );
+    mbedtls_mpi_free( &xD );
+    mbedtls_mpi_free( &xE );
+    mbedtls_mpi_free( &xN );
 
     return xResult;
 }
