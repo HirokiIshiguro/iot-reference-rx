@@ -190,6 +190,8 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
         return pdFALSE;
     }
 
+    vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_ROOT_CA_DER);
+
     xResult = prvReadFile(TSIP_ROOT_SIGNER_KEY_INDEX_STORAGE_NAME,
                           (uint8_t *)&xRootSignerPublicKeyIndex,
                           sizeof(xRootSignerPublicKeyIndex),
@@ -206,6 +208,8 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
             return pdFALSE;
         }
     }
+
+    vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_ROOT_SIGNER_PUBLIC_KEY);
 
     (void)R_Demo_Common_API_TSIP_Close();
 
@@ -374,6 +378,7 @@ static BaseType_t prvLoadOrImportClientPublicKey(void)
                           &ulStoredLength);
     if ((pdTRUE == xResult) && (sizeof(rsa2048_public_key) == ulStoredLength))
     {
+        vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_CLIENT_PUBLIC_KEY);
         return pdTRUE;
     }
 
@@ -399,9 +404,15 @@ static BaseType_t prvLoadOrImportClientPublicKey(void)
         return pdFALSE;
     }
 
-    return prvWriteFile(TSIP_CLIENT_PUBLIC_KEY_INDEX_STORAGE_NAME,
-                        (const uint8_t *)&rsa2048_public_key,
-                        sizeof(rsa2048_public_key));
+    xResult = prvWriteFile(TSIP_CLIENT_PUBLIC_KEY_INDEX_STORAGE_NAME,
+                           (const uint8_t *)&rsa2048_public_key,
+                           sizeof(rsa2048_public_key));
+    if (pdTRUE == xResult)
+    {
+        vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_CLIENT_PUBLIC_KEY);
+    }
+
+    return xResult;
 }
 
 static BaseType_t prvLoadOrImportClientPrivateKey(void)
@@ -417,6 +428,7 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
                           &ulStoredLength);
     if ((pdTRUE == xResult) && (sizeof(rsa2048_private_key) == ulStoredLength))
     {
+        vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_CLIENT_PRIVATE_KEY);
         return pdTRUE;
     }
 
@@ -442,9 +454,15 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
         return pdFALSE;
     }
 
-    return prvWriteFile(TSIP_CLIENT_PRIVATE_KEY_INDEX_STORAGE_NAME,
-                        (const uint8_t *)&rsa2048_private_key,
-                        sizeof(rsa2048_private_key));
+    xResult = prvWriteFile(TSIP_CLIENT_PRIVATE_KEY_INDEX_STORAGE_NAME,
+                           (const uint8_t *)&rsa2048_private_key,
+                           sizeof(rsa2048_private_key));
+    if (pdTRUE == xResult)
+    {
+        vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_CLIENT_PRIVATE_KEY);
+    }
+
+    return xResult;
 }
 
 #endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */

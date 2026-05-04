@@ -62,7 +62,8 @@ TARGET_ENV_NAMES = {
     },
 }
 
-SLOTS = ("rootca-sig", "rootca-der", "root-signer", "client-pub", "client-pri")
+ALL_SLOTS = ("rootca-sig", "rootca-der", "root-signer", "client-pub", "client-pri")
+DEFAULT_SLOTS = ("rootca-sig", "root-signer", "client-pub", "client-pri")
 SENSITIVE_SLOTS = {"root-signer", "client-pub", "client-pri"}
 LONG_HEX_RE = re.compile(r"\b[0-9a-fA-F]{64,}\b")
 WRITE_COMMAND_RE = re.compile(r"(tsipprov\s+write\s+\d+\s+)([0-9a-fA-F]+)")
@@ -153,7 +154,7 @@ def send_command(
 
 
 def load_payloads(args: argparse.Namespace) -> list[tuple[str, bytes, str]]:
-    selected = set(args.only or SLOTS)
+    selected = set(args.only or DEFAULT_SLOTS)
     root_ca_files = ROOT_CA_FILES[args.root_ca]
     custom_env_names = {
         "root-signer": tuple(filter(None, (args.root_signer_hex_env,))),
@@ -162,7 +163,7 @@ def load_payloads(args: argparse.Namespace) -> list[tuple[str, bytes, str]]:
     }
     payloads: list[tuple[str, bytes, str]] = []
 
-    for slot in SLOTS:
+    for slot in ALL_SLOTS:
         if slot not in selected:
             continue
         if slot in root_ca_files:
@@ -229,7 +230,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--refresh-credentials", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--skip-prepare", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--reset-after", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--only", choices=SLOTS, action="append")
+    parser.add_argument("--only", choices=ALL_SLOTS, action="append")
     return parser.parse_args()
 
 
