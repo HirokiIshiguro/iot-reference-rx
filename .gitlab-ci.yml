@@ -106,6 +106,10 @@ variables:
   E2STUDIO_WORKSPACE_RX65N_BG96_FLEET: "C:/Temp/e2ws_iot_ref_rx65n_bg96_fleet"
   RX72N_DEVICE_ID: "rx72n-02"
   RUN_RX72N_BUILD: "true"
+  # Legacy credential-injected RX72N MQTT candidate build. The current hardware
+  # pipeline provisions credentials over UART, so keep this off unless a focused
+  # pipeline explicitly needs the old RSU packaging path.
+  RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
   # RX72N_TEST_SCOPE:
   #   build - build/package only, no hardware test.
   #   mqtt  - flash/provision/MQTT only, no OTA.
@@ -2119,7 +2123,7 @@ build_rx72n_mqtt_candidate:
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
-    - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+    - if: '$RUN_RX72N_MQTT_CANDIDATE_BUILD == "true" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -2173,7 +2177,7 @@ package_rx72n_mqtt_candidate_rsu:
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
-    - if: '$AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+    - if: '$RUN_RX72N_MQTT_CANDIDATE_BUILD == "true" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:

@@ -179,8 +179,8 @@ The GitLab CI pipeline provides:
 | `flash_rx72n` | Write firmware to RX72N Envision Kit via rfp-cli |
 | `provision_rx72n` | Provision AWS IoT credentials over UART CLI |
 | `test_mqtt_rx72n` | Verify MQTT PubSub connectivity on hardware |
-| `build_rx72n_mqtt_candidate` | Build with injected AWS credentials |
-| `package_rx72n_mqtt_candidate_rsu` | Package signed `.rsu` image for OTA |
+| `build_rx72n_mqtt_candidate` | Legacy focused path: build with injected AWS credentials when `RUN_RX72N_MQTT_CANDIDATE_BUILD=true` |
+| `package_rx72n_mqtt_candidate_rsu` | Legacy focused path: package signed `.rsu` image when `RUN_RX72N_MQTT_CANDIDATE_BUILD=true` |
 
 ### Pipeline Profiles
 
