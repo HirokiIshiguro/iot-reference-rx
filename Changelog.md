@@ -8,6 +8,12 @@
 
 ### 追加
 
+- RX72N Envision Kit EthernetとCK-RX65N + BG96 Cellularに、TSIP連携TLS backendを
+  選択して実機CIへ流すための基盤を追加しています。
+  TSIP用アプリケーションプロジェクト、UART経由の`tsipprov` provisioning、
+  公開可能なRoot CA素材を固定する`tsip_provisioning_data` submodule、
+  masked CI/CD Variablesからのwrapped key blob投入に対応しました。
+
 - RX72N Envision Kit Ethernetで、AWS IoT CoreへのTLS 1.3 MQTT接続に対応しました。
   実機スコープパイプラインでは、RX72N実機ログに
   `TLS handshake successful: version TLSv1.3` が出ることを確認しています。
@@ -31,7 +37,7 @@
 ### 予定
 
 - 次のsafftiタグでは、202604ベース以降のBG96 OTA性能チューニング、RX72N TLS 1.3対応、
-  RX65N BG96 TLS 1.3対応、実機CI運用の改善をまとめる予定です。
+  RX65N BG96 TLS 1.3対応、TSIP連携TLS backend、実機CI運用の改善をまとめる予定です。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.0.0
 

@@ -97,6 +97,35 @@ TSIP版の切り替えをbuild profileの差分に閉じ込める。
 TSIP jobではwrapped provisioning blob用のmasked CI/CD Variablesを追加で要求する。
 software TLS jobでは既存のAWS IoT証明書・秘密鍵変数を継続利用する。
 
+TSIP実機provisioningは次の2段に分ける。
+
+1. 既存CLIでAWS IoT endpoint / thing name / client certificate / OTA code
+   signer certificateを投入する。このときclient private key PEMは投入しない。
+2. `tools/provision_tsip_over_uart.py` で `tsipprov` CLIへTSIP素材を投入し、
+   `tsipprov prepare` でデバイス上のKeyIndexを生成する。
+
+Root CA DERとRoot CA signatureは公開可能なTier 0素材として
+`external/tsip_provisioning_data` submoduleから読む。Root signer public key、
+client public key、client private keyのwrapped blobはTier 2素材なのでGitには置かず、
+masked CI/CD Variablesから読む。
+
+RX72Nで既定参照するmasked variables:
+
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PRIVATE_HEX`
+
+RX65N/BG96で既定参照するmasked variables:
+
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PRIVATE_HEX`
+
+RX65N/BG96のTSIP経路では、AWS IoT証明書はwrapped client private keyと対応している
+必要がある。そのため、software経路で使う一時的なdynamic AWS IoT credentialsは
+TSIP経路では使わない。TSIP経路は静的なthing name / client certificateとmasked
+TSIP blobの組み合わせで検証する。
+
 ## 実装メモ
 
 - `Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/` は共有
@@ -116,7 +145,8 @@ software TLS jobでは既存のAWS IoT証明書・秘密鍵変数を継続利用
 3. RX72N TSIP版firmwareへUARTでprovisioningできる
 4. RX72N TSIP版firmwareがTLS 1.2でAWS IoT Coreへ接続できる
 5. RX72N TSIP版firmwareで既存のMQTT / OTAフローが動く
-6. CK-RX65N + BG96 TSIP版は別途feasibility確認する
+6. CK-RX65N + BG96 TSIP版も、対応するwrapped blobと静的証明書が用意できる
+   条件では同じCIフローでMQTT / OTAまで検証する
 
 CK-RX65N + BG96はBG96内部TCP/IPへソケット処理を委譲するため、Ethernet版と
 同じtransport切り替えだけで成立するかは実機で確認する。

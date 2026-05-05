@@ -232,7 +232,7 @@ def resolve_device_args(args, parser):
             if not args.cert:
                 parser.error(f"Environment variable {cert_var} not set")
             print(f"Certificate path from ${cert_var}")
-        if not args.key:
+        if (not args.skip_private_key) and (not args.key):
             key_var = get_key_env_var_name(args.device_id)
             args.key = os.environ.get(key_var)
             if not args.key:
@@ -264,10 +264,13 @@ def resolve_device_args(args, parser):
             parser.error("--thing-name is required (or use --device-id)")
         if not args.cert:
             parser.error("--cert is required (or use --device-id)")
-        if not args.key:
+        if (not args.skip_private_key) and (not args.key):
             parser.error("--key is required (or use --device-id)")
 
-        for path, desc in ((args.cert, "Certificate"), (args.key, "Private key")):
+        paths = [(args.cert, "Certificate")]
+        if not args.skip_private_key:
+            paths.append((args.key, "Private key"))
+        for path, desc in paths:
             if not os.path.isfile(path):
                 parser.error(f"{desc} file not found: {path}")
     if args.codesigner_cert and not os.path.isfile(args.codesigner_cert):
@@ -288,7 +291,7 @@ def provision(args):
     else:
         print(f"Thing Name: {args.thing_name}")
         print(f"Cert:       {args.cert}")
-        print(f"Key:        {args.key}")
+        print(f"Key:        {'<skipped for TSIP>' if args.skip_private_key else args.key}")
     print(f"Endpoint:   {args.endpoint}")
     if args.shadow_port:
         print(f"Shadow Port:{args.shadow_port} @ {args.shadow_baud}")
@@ -405,9 +408,12 @@ def provision(args):
             if not send_pem_command(ser, "cert", args.cert, args.char_delay, args.line_delay):
                 return 1
 
-            print("\n--- Set private key ---")
-            if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay):
-                return 1
+            if args.skip_private_key:
+                print("\n--- Skip private key PEM (TSIP runtime key provisioning is expected) ---")
+            else:
+                print("\n--- Set private key ---")
+                if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay):
+                    return 1
 
             if args.codesigner_cert:
                 print("\n--- Set code signing certificate ---")
@@ -461,6 +467,8 @@ def main():
     parser.add_argument("--endpoint", help="AWS IoT MQTT endpoint URL")
     parser.add_argument("--cert", help="Path to device certificate PEM file")
     parser.add_argument("--key", help="Path to device private key PEM file")
+    parser.add_argument("--skip-private-key", "--skip-key", action="store_true", dest="skip_private_key",
+                        help="Do not provision a plaintext client private key PEM")
     parser.add_argument("--fleet-provisioning", action="store_true",
                         help="Provision claim credentials and template name instead of device credentials")
     parser.add_argument("--template-name", help="AWS IoT Fleet Provisioning template name")

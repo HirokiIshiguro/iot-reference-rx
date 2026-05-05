@@ -403,7 +403,7 @@ def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) ->
             ("endpoint", endpoint),
             ("thing_name", thing_name),
             ("client_cert", client_cert),
-            ("private_key", private_key),
+            ("private_key", private_key if not args.skip_private_key else "skipped"),
         )
         if not value
     ]
@@ -412,7 +412,7 @@ def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) ->
 
     print(
         "\n[CLI] provisioning MQTT credentials from variables: "
-        + ", ".join(name for name in (endpoint_var, thing_name_var, cert_var, key_var) if name)
+        + ", ".join(name for name in (endpoint_var, thing_name_var, cert_var, None if args.skip_private_key else key_var) if name)
     )
     enter_cli_mode(port, args.provision_cli_timeout, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
     send_cli_command(
@@ -437,7 +437,10 @@ def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) ->
         line_delay=args.provision_line_delay,
     )
     send_cli_pem(port, "cert", client_cert, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
-    send_cli_pem(port, "key", private_key, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
+    if args.skip_private_key:
+        print("[CLI] skipping plaintext private key provisioning; TSIP runtime key provisioning is expected")
+    else:
+        send_cli_pem(port, "key", private_key, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
     send_cli_command(
         port,
         "conf commit",
@@ -446,6 +449,11 @@ def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) ->
         timeout=30.0,
         success_tokens=("Configuration save",),
     )
+    if args.no_reset_after_provision:
+        print("\n[CLI] MQTT credential provisioning complete; app remains in CLI mode")
+        port.reset_input_buffer()
+        return
+
     print("\n[CLI] MQTT credential provisioning complete; resetting app")
     port.reset_input_buffer()
     run_rfp(args, ["-sig", "-run"])
@@ -1042,6 +1050,10 @@ def parse_args() -> argparse.Namespace:
                         default=int(os.environ.get("BG96_APP_RESET_RETRIES", "1")))
     parser.add_argument("--provision-mqtt-credentials", action="store_true",
                         default=os.environ.get("BG96_MQTT_PROVISION_CREDENTIALS") == "true")
+    parser.add_argument("--skip-private-key", "--skip-key", action="store_true", dest="skip_private_key",
+                        help="Do not provision a plaintext MQTT private key PEM")
+    parser.add_argument("--no-reset-after-provision", action="store_true",
+                        help="Leave the app in CLI mode after MQTT credential provisioning")
     parser.add_argument("--provision-cli-timeout", type=float,
                         default=float(os.environ.get("BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS", "25")))
     parser.add_argument("--provision-char-delay", type=float,

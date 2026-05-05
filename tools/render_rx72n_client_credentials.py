@@ -45,8 +45,7 @@ KEYS_TEMPLATE = """/*
 
 #define keyJITR_DEVICE_CERTIFICATE_AUTHORITY_PEM    (NULL)
 
-#define keyCLIENT_PRIVATE_KEY_PEM                   \\
-{private_key}
+#define keyCLIENT_PRIVATE_KEY_PEM                   {private_key}
 
 #endif /* AWS_CLIENT_CREDENTIAL_KEYS_H */
 """
@@ -57,7 +56,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--thing-name", required=True, help="AWS IoT Thing name")
     parser.add_argument("--endpoint", required=True, help="AWS IoT endpoint")
     parser.add_argument("--cert", required=True, type=Path, help="Client certificate PEM")
-    parser.add_argument("--key", required=True, type=Path, help="Client private key PEM")
+    parser.add_argument("--key", type=Path, help="Client private key PEM")
+    parser.add_argument("--omit-private-key", action="store_true",
+                        help="Render keyCLIENT_PRIVATE_KEY_PEM as NULL for TSIP builds")
     parser.add_argument("--credential-header", required=True, type=Path, help="Output aws_clientcredential.h path")
     parser.add_argument("--keys-header", required=True, type=Path, help="Output aws_clientcredential_keys.h path")
     return parser.parse_args()
@@ -82,7 +83,12 @@ def main() -> int:
     args = parse_args()
 
     cert_pem = read_pem(args.cert)
-    key_pem = read_pem(args.key)
+    if args.omit_private_key:
+        private_key = "(NULL)"
+    else:
+        if args.key is None:
+            raise SystemExit("--key is required unless --omit-private-key is used")
+        private_key = to_c_multiline_string(read_pem(args.key))
 
     args.credential_header.parent.mkdir(parents=True, exist_ok=True)
     args.keys_header.parent.mkdir(parents=True, exist_ok=True)
@@ -99,7 +105,7 @@ def main() -> int:
     args.keys_header.write_text(
         KEYS_TEMPLATE.format(
             certificate=to_c_multiline_string(cert_pem),
-            private_key=to_c_multiline_string(key_pem),
+            private_key=private_key,
         ),
         encoding="utf-8",
         newline="\n",

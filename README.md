@@ -179,8 +179,30 @@ The GitLab CI pipeline provides:
 | `flash_rx72n` | Write firmware to RX72N Envision Kit via rfp-cli |
 | `provision_rx72n` | Provision AWS IoT credentials over UART CLI |
 | `test_mqtt_rx72n` | Verify MQTT PubSub connectivity on hardware |
-| `build_rx72n_mqtt_candidate` | Build with injected AWS credentials |
-| `package_rx72n_mqtt_candidate_rsu` | Package signed `.rsu` image for OTA |
+| `build_rx72n_mqtt_candidate` | Legacy focused path: build with injected AWS credentials when `RUN_RX72N_MQTT_CANDIDATE_BUILD=true` |
+| `package_rx72n_mqtt_candidate_rsu` | Legacy focused path: package signed `.rsu` image when `RUN_RX72N_MQTT_CANDIDATE_BUILD=true` |
+
+### Pipeline Profiles
+
+This project is treated as an advanced hardware CI pipeline: the full matrix spans multiple boards and configurations, so merge request pipelines run representative hardware paths and scheduled pipelines run the heavier regression set.
+
+| Profile | Pipeline source | Default scope |
+|---------|-----------------|---------------|
+| `branch` | Feature branch push | Build only. Hardware jobs are kept out of push pipelines to avoid interleaving board state with MR pipelines. |
+| `mr` | Merge request | `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=mqtt`. This covers Ethernet OTA and Cellular MQTT while keeping review feedback short. |
+| `focused` | Manual/API | Build only unless the caller sets `RX72N_TEST_SCOPE`, `RX65N_BG96_TEST_SCOPE`, `RX72N_TLS_BACKEND`, `RX65N_BG96_TLS_BACKEND`, or TLS version variables explicitly. |
+| `release` | `main`/tag | Full software-TLS regression for RX72N and RX65N/BG96. |
+| `nightly` | GitLab pipeline schedule | Full regression. The default schedule uses the same full scope as release, and additional focused schedules can cover TLS 1.3 or TSIP-specific paths. |
+
+Focused examples:
+
+```bash
+# RX72N TSIP OTA only
+PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=ota RX65N_BG96_TEST_SCOPE=build RX72N_TLS_BACKEND=tsip
+
+# RX65N/BG96 TLS 1.3 MQTT only
+PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=build RX65N_BG96_TEST_SCOPE=mqtt RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3
+```
 
 ## Limitations
 
