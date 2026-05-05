@@ -269,7 +269,7 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
 */
 
 /* Input clock frequency in Hz (XTAL or EXTAL). */
-#define BSP_CFG_XTAL_HZ                 (16000000) /* Generated value. Do not edit this manually */
+#define BSP_CFG_XTAL_HZ                 (24000000) /* Generated value. Do not edit this manually */
 
 /* The HOCO can operate at several different frequencies. Choose which one using the macro below.
    Available frequency settings:
@@ -612,7 +612,7 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
    3 = MicroC_OS is used.(This is not available.)
    4 = Renesas ITRON OS (RI600V4 or RI600PX) is used.
 */
-#define BSP_CFG_RTOS_USED               (0) /* Generated value. Do not edit this manually */
+#define BSP_CFG_RTOS_USED               (0)
 
 /* This macro is used to select which Renesas ITRON OS.
    0 = RI600V4 is used.

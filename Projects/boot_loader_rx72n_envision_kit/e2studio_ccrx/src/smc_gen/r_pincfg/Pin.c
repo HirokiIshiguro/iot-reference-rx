@@ -1,28 +1,14 @@
-/***********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products.
-* No other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
-* applicable laws, including copyright laws. 
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING THIS SOFTWARE, WHETHER EXPRESS, IMPLIED
-* OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-* NON-INFRINGEMENT.  ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED.TO THE MAXIMUM EXTENT PERMITTED NOT PROHIBITED BY
-* LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES SHALL BE LIABLE FOR ANY DIRECT,
-* INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS SOFTWARE, EVEN IF RENESAS OR
-* ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability 
-* of this software. By using this software, you agree to the additional terms and conditions found by accessing the 
-* following link:
-* http://www.renesas.com/disclaimer
+/*
+* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2018 Renesas Electronics Corporation. All rights reserved.
-***********************************************************************************************************************/
+* SPDX-License-Identifier: BSD-3-Clause
+*/
 
 /***********************************************************************************************************************
-* File Name    : Pin.c
-* Version      : 1.0.2
-* Device(s)    : R5F572NNHxFB
-* Description  : This file implements SMC pin code generation.
-* Creation Date: 2020-04-23
+* File Name        : Pin.c
+* Version          : 1.0.2
+* Device(s)        : R5F572NNHxFB
+* Description      : This file implements SMC pin code generation.
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -152,12 +138,14 @@ void R_Pins_Create(void)
     PORT1.PODR.BYTE |= 0x08U;
     MPC.P13PFS.BYTE = 0x0AU;
     PORT1.PDR.BYTE |= 0x08U;
+    // PORT1.PMR.BIT.B3 = 1U; // Please set the PMR bit after TE bit is set to 1.
 
     /* Set TXD7 pin */
     PORT9.PODR.BYTE |= 0x01U;
     MPC.P90PFS.BYTE = 0x0AU;
     PORT9.PDR.BYTE |= 0x01U;
+    // PORT9.PMR.BIT.B0 = 1U; // Please set the PMR bit after TE bit is set to 1.
 
     R_BSP_RegisterProtectEnable(BSP_REG_PROTECT_MPC);
-}   
+}
 

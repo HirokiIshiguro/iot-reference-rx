@@ -166,8 +166,8 @@ static CLI_Command_Definition_t xCommandConfig =
     .pcHelpString                = "\r\n"
                                    "conf:\r\n"
                                    "    Command to change or retrieve configuration for the device.\r\n"
-                                   "    Usage: conf get {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert}\r\n"
-                                   "    Usage: conf set {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert} VALUE\r\n"
+                                   "    Usage: conf get {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert|codesignpubkey}\r\n"
+                                   "    Usage: conf set {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert|codesignpubkey} VALUE\r\n"
                                    "           get     : to retrieve configuration from Data Flash Memory\r\n"
                                    "           set     : to change configuration for the device\r\n"
                                    "           {cert}     : select client certificate as input target element\r\n"
@@ -179,6 +179,7 @@ static CLI_Command_Definition_t xCommandConfig =
                                    "           {template} : select template name as input target element\r\n"
                                    "           {rootca}   : select root CA certificate as input target element\r\n"
                                    "           {codesigncert} : select code signer certificate as input target element\r\n"
+                                   "           {codesignpubkey}: select bootloader code signer public key as input target element\r\n"
                                    "           VALUE : the value of input target element, this is only required for 'conf set' command\r\n"
                                    "    Usage: conf commit\r\n"
                                    "           commit   : to write the configured value to Internal Data Flash Memory\r\n",
