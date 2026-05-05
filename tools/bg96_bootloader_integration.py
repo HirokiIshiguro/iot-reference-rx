@@ -58,6 +58,11 @@ APP_ERROR_MARKERS = (
     "MQTT Agent connect fail",
     "MQTT connection failed",
 )
+APP_RECOVERABLE_MQTT_ERROR_MARKERS = (
+    "failed to connect",
+    "MQTT Agent connect fail",
+    "MQTT connection failed",
+)
 ENDPOINT_VARS = (
     "AWS_IOT_MQTT_BROKER_ENDPOINT_CK_RX65N_01",
     "BG96_AWS_IOT_ENDPOINT",
@@ -766,6 +771,8 @@ def verify_app_mqtt(
     last_qisend_at = 0.0
     qisend_errors = 0
     qisend_error_limit = int(os.environ.get("BG96_MQTT_QISEND_ERROR_LIMIT", "30"))
+    mqtt_connect_errors = 0
+    mqtt_connect_error_limit = int(os.environ.get("BG96_MQTT_CONNECT_ERROR_LIMIT", "3"))
     deadline = time.time() + timeout
     buffer = ""
     while time.time() < deadline:
@@ -801,12 +808,30 @@ def verify_app_mqtt(
                 if marker in stripped:
                     missing_credentials.add(marker)
 
-            for marker in APP_ERROR_MARKERS:
-                if marker.lower() in stripped.lower():
-                    errors.append(stripped)
-                    if marker == "Cellular init failed":
-                        raise RuntimeError(f"app reported fatal connectivity error: {stripped}")
-                    if require_pubsub:
+            error_marker = next(
+                (marker for marker in APP_ERROR_MARKERS if marker.lower() in stripped.lower()),
+                None,
+            )
+            if error_marker:
+                errors.append(stripped)
+                if error_marker == "Cellular init failed":
+                    raise RuntimeError(f"app reported fatal connectivity error: {stripped}")
+                if require_pubsub:
+                    is_recoverable = any(
+                        marker.lower() in stripped.lower()
+                        for marker in APP_RECOVERABLE_MQTT_ERROR_MARKERS
+                    )
+                    if is_recoverable:
+                        mqtt_connect_errors += 1
+                        if mqtt_connect_errors >= mqtt_connect_error_limit:
+                            raise RuntimeError(
+                                f"MQTT connect failed {mqtt_connect_errors} times without Pub/Sub success: {stripped}"
+                            )
+                        print(
+                            "\n[APP] observed recoverable MQTT connectivity error; "
+                            f"waiting for cellular recovery ({mqtt_connect_errors}/{mqtt_connect_error_limit}): {stripped}"
+                        )
+                    else:
                         raise RuntimeError(f"app reported MQTT error: {stripped}")
 
             if "generated AT command: AT+QISEND" in stripped:
