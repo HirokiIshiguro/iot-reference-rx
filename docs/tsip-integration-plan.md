@@ -151,6 +151,28 @@ TSIP blobの組み合わせで検証する。
 CK-RX65N + BG96はBG96内部TCP/IPへソケット処理を委譲するため、Ethernet版と
 同じtransport切り替えだけで成立するかは実機で確認する。
 
+## 定期検証
+
+TSIP経路は通常のMR pipelineへ全直積で載せず、focused pipelineとscheduleで段階的に
+厚くする。
+
+現在の定期検証方針:
+
+1. RX72N TSIPは `RX72N_TLS_BACKEND=tsip`、`RX72N_TEST_SCOPE=ota` の
+   focused scheduleでMQTT / OTAまで確認する。
+2. software TLS 1.3はTSIPとは分け、`AWS_IOT_ENDPOINT` を
+   `IoTSecurityPolicy_TLS13_1_2_2022_10` のAWS IoT Core domain
+   (`d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`) に切り替え、
+   `RX72N_REQUIRE_TLS_VERSION=TLSv1.3` と
+   `RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3` を指定したfocused scheduleで
+   両ボードのMQTT接続を確認する。
+3. RX65N/BG96 TSIPは、RX65N用wrapped blob variablesと対応する静的AWS IoT
+   証明書が用意できた後に、まず `RX65N_BG96_TEST_SCOPE=mqtt` のfocused
+   manual/API pipelineで確認し、安定後にscheduleへ昇格する。
+
+TSIPとTLS 1.3を同時に有効にする経路は別作業とし、ここではTSIP TLS 1.2系と
+software TLS 1.3系を別々に監視する。
+
 ## スコープ外
 
 TSIPとTLS 1.3の連携は、この変更のスコープ外とする。今回のTSIP構成はまず
