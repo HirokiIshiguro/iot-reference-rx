@@ -1102,7 +1102,9 @@ build_rx65n_bg96_ota_candidate:
       $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
       $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\$rx65nBg96AppProject\e2studio_ccrx"
       python tools/patch_bg96_aws_iot_mcu.py patch --aws-root "$appRoot" --backup "$artifactDir\aws_dev_mode_key_provisioning.c.orig"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       python tools/configure_bg96_mqtt_credentials.py --app-dir "$appRoot" --marker "$artifactDir\mqtt_credentials_configured" --require --tls-backend "$env:RX65N_BG96_TLS_BACKEND"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       python tools/build_bg96_ota_candidate.py `
         --repo-root "$env:CI_PROJECT_DIR" `
         --app-dir "Projects/$rx65nBg96AppProject/e2studio_ccrx" `
@@ -1112,6 +1114,20 @@ build_rx65n_bg96_ota_candidate:
         --e2studio-cli "$env:E2STUDIO_CLI_BG96" `
         --workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_OTA" `
         --e2studio-timeout "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      $versionToken = $version -replace '\.', '_'
+      $requiredArtifacts = @(
+        (Join-Path $artifactDir ("bg96_{0}.rsu" -f $versionToken)),
+        (Join-Path $artifactDir ("bg96_{0}_ota_payload.bin" -f $versionToken)),
+        (Join-Path $artifactDir ("bg96_{0}_ota_payload.sig.der" -f $versionToken)),
+        (Join-Path $artifactDir "bg96_ota_codesign_cert.pem")
+      )
+      foreach ($path in $requiredArtifacts) {
+        if (-not (Test-Path -LiteralPath $path)) {
+          throw "RX65N BG96 OTA candidate artifact missing: $path"
+        }
+      }
 
       Write-Host "Using locally generated RX65N BG96 OTA code signer certificate and customCodeSigning signature."
   after_script:

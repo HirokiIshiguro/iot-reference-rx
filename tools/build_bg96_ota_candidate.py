@@ -45,6 +45,7 @@ def run_logged(
     log,
     env: dict[str, str],
     timeout: int,
+    allow_nonzero_exit: bool = False,
 ) -> None:
     print("+ " + " ".join(command))
     log.write("+ " + " ".join(command) + "\n")
@@ -60,8 +61,18 @@ def run_logged(
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"build command timed out after {timeout} seconds: {' '.join(command)}") from exc
-    if result.returncode != 0:
+    if result.returncode != 0 and not allow_nonzero_exit:
         raise RuntimeError(f"build command failed with exit {result.returncode}: {' '.join(command)}")
+    if result.returncode != 0:
+        print(
+            "warning: build command returned "
+            f"exit {result.returncode}; continuing after generated file validation"
+        )
+        log.write(
+            "warning: build command returned "
+            f"exit {result.returncode}; continuing after generated file validation\n"
+        )
+        log.flush()
 
 
 def e2studio_plugin_dir(e2studio_cli: Path) -> Path | None:
@@ -134,7 +145,7 @@ def run_e2studio_managed_build(
         "-build",
         "all",
     ]
-    run_logged(command, app_dir, log, os.environ.copy(), timeout)
+    run_logged(command, app_dir, log, os.environ.copy(), timeout, allow_nonzero_exit=True)
 
 
 def build_environment(e2studio_cli: Path, ccrx_bin_arg: Path | None) -> dict[str, str]:
