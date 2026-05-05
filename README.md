@@ -200,9 +200,21 @@ Focused examples:
 # RX72N TSIP OTA only
 PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=ota RX65N_BG96_TEST_SCOPE=build RX72N_TLS_BACKEND=tsip
 
-# RX65N/BG96 TLS 1.3 MQTT only
-PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=build RX65N_BG96_TEST_SCOPE=mqtt RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3
+# Software TLS 1.3 MQTT on both boards
+PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=mqtt RX65N_BG96_TEST_SCOPE=mqtt AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com RX72N_REQUIRE_TLS_VERSION=TLSv1.3 RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3
 ```
+
+### Scheduled Hardware Regressions
+
+The project-level GitLab pipeline schedules are part of the reference pipeline design. Keep the merge request pipeline short, and move matrix coverage that is useful but not review-blocking into schedules.
+
+| Schedule | Scope | Purpose |
+|----------|-------|---------|
+| Nightly full software TLS | `PIPELINE_PROFILE=nightly`, `RX72N_TEST_SCOPE=full`, `RX65N_BG96_TEST_SCOPE=full`, `RX72N_TLS_BACKEND=software`, `RX65N_BG96_TLS_BACKEND=software` | Full RX72N/Ether + RX65N/BG96 regression, including MQTT, OTA, and Fleet Provisioning. |
+| Focused RX72N TSIP OTA | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=build`, `RX72N_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning and the RX72N TSIP OTA path without consuming the cellular board. |
+| Focused software TLS 1.3 MQTT | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=mqtt`, `AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`, `RX72N_REQUIRE_TLS_VERSION=TLSv1.3`, `RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3` | Confirms that both transports still negotiate TLS 1.3 with the AWS IoT Core domain configured for `IoTSecurityPolicy_TLS13_1_2_2022_10`. |
+
+RX65N/BG96 TSIP hardware regression additionally requires the RX65N TSIP wrapped blob variables documented in `docs/tsip-integration-plan.md`. Add that schedule only after those variables are provisioned and a focused manual/API pipeline has passed.
 
 ## Limitations
 
