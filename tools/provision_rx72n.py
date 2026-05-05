@@ -78,12 +78,16 @@ def send_pem_command(ser, key_name, pem_path, char_delay, line_delay):
     with open(pem_path, "r", encoding="utf-8") as f:
         pem_content = f.read()
 
+    return send_pem_content_command(ser, key_name, pem_content, pem_path, char_delay, line_delay)
+
+
+def send_pem_content_command(ser, key_name, pem_content, source_label, char_delay, line_delay):
     pem_content = pem_content.replace("\r\n", "\n").replace("\r", "\n").strip()
     total_len = len(f"conf set {key_name} ") + len(pem_content)
     if total_len > 4090:
         print(f"  WARNING: Command length ({total_len}) near buffer limit (4096)")
 
-    print(f"  Sending: conf set {key_name} <{pem_path}> ({len(pem_content)} bytes)")
+    print(f"  Sending: conf set {key_name} <{source_label}> ({len(pem_content)} bytes)")
     send_chars(ser, f"conf set {key_name} ", char_delay)
     send_chars(ser, pem_content, char_delay)
     ser.write(b"\r\n")
@@ -99,6 +103,49 @@ def send_pem_command(ser, key_name, pem_path, char_delay, line_delay):
 
     print(f"  ERROR: unexpected response: {mask_sensitive_output(response.strip()) or 'No response'}")
     return False
+
+
+def derive_public_key_from_certificate(cert_path):
+    with open(cert_path, "rb") as f:
+        cert_pem = f.read()
+
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+    except ImportError:
+        return derive_public_key_from_certificate_with_openssl(cert_path)
+
+    try:
+        cert = x509.load_pem_x509_certificate(cert_pem)
+        public_key_pem = cert.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    except ValueError as exc:
+        print(f"  WARNING: failed to parse code signing certificate for bootloader public key: {exc}")
+        return None
+
+    return public_key_pem.decode("ascii")
+
+
+def derive_public_key_from_certificate_with_openssl(cert_path):
+    try:
+        result = subprocess.run(
+            ["openssl", "x509", "-pubkey", "-noout", "-in", cert_path],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        print(f"  WARNING: failed to derive bootloader public key with openssl: {exc}")
+        return None
+
+    public_key_pem = result.stdout.strip()
+    if "-----BEGIN PUBLIC KEY-----" not in public_key_pem:
+        print("  WARNING: openssl did not return a public key PEM")
+        return None
+
+    return public_key_pem
 
 
 def wait_for_response_tokens(ser, timeout, success_tokens, error_tokens=("Error",)):
@@ -244,6 +291,12 @@ def resolve_device_args(args, parser):
             if os.path.isfile(candidate):
                 args.codesigner_cert = candidate
                 print(f"Code signer cert from device_config: {candidate}")
+        if not args.codesigner_public_key and device.get("codesigner_public_key"):
+            repo_root = os.path.dirname(os.path.dirname(__file__))
+            candidate = os.path.join(repo_root, device["codesigner_public_key"])
+            if os.path.isfile(candidate):
+                args.codesigner_public_key = candidate
+                print(f"Code signer public key from device_config: {candidate}")
 
     if not args.endpoint:
         parser.error("--endpoint is required (or use --device-id)")
@@ -275,6 +328,8 @@ def resolve_device_args(args, parser):
                 parser.error(f"{desc} file not found: {path}")
     if args.codesigner_cert and not os.path.isfile(args.codesigner_cert):
         parser.error(f"Code signer certificate file not found: {args.codesigner_cert}")
+    if args.codesigner_public_key and not os.path.isfile(args.codesigner_public_key):
+        parser.error(f"Code signer public key file not found: {args.codesigner_public_key}")
 
 
 def provision(args):
@@ -297,6 +352,8 @@ def provision(args):
         print(f"Shadow Port:{args.shadow_port} @ {args.shadow_baud}")
     if args.codesigner_cert:
         print(f"Code Sign:  {args.codesigner_cert}")
+    if args.codesigner_public_key:
+        print(f"Code PubKey:{args.codesigner_public_key}")
     if args.reset_cmd:
         print(f"Reset cmd:  {args.reset_cmd}")
     if args.reset_after_open:
@@ -422,6 +479,35 @@ def provision(args):
             else:
                 print("\nWARNING: No code signing certificate provided; OTA signature verification will fail")
 
+        if args.codesigner_public_key:
+            print("\n--- Set bootloader code signing public key ---")
+            with open(args.codesigner_public_key, "r", encoding="utf-8") as f:
+                public_key_pem = f.read()
+            if not send_pem_content_command(
+                ser,
+                "codesignpubkey",
+                public_key_pem,
+                args.codesigner_public_key,
+                args.char_delay,
+                args.line_delay,
+            ):
+                return 1
+        elif args.codesigner_cert:
+            print("\n--- Set bootloader code signing public key (derived from certificate) ---")
+            public_key_pem = derive_public_key_from_certificate(args.codesigner_cert)
+            if public_key_pem:
+                if not send_pem_content_command(
+                    ser,
+                    "codesignpubkey",
+                    public_key_pem,
+                    f"{args.codesigner_cert}:public-key",
+                    args.char_delay,
+                    args.line_delay,
+                ):
+                    return 1
+            else:
+                print("  WARNING: bootloader public key was not provisioned")
+
         print("\n--- Commit to data flash ---")
         ser.reset_input_buffer()
         send_chars(ser, "conf commit", args.char_delay)
@@ -475,6 +561,7 @@ def main():
     parser.add_argument("--claim-cert", help="Path to fleet provisioning claim certificate PEM file")
     parser.add_argument("--claim-key", help="Path to fleet provisioning claim private key PEM file")
     parser.add_argument("--codesigner-cert", help="Path to OTA code signing certificate PEM file")
+    parser.add_argument("--codesigner-public-key", help="Path to OTA code signing public key PEM file for bootloader verification")
     parser.add_argument("--char-delay", type=float, default=DEFAULT_CHAR_DELAY,
                         help=f"Delay between characters in seconds (default: {DEFAULT_CHAR_DELAY})")
     parser.add_argument("--line-delay", type=float, default=DEFAULT_LINE_DELAY,

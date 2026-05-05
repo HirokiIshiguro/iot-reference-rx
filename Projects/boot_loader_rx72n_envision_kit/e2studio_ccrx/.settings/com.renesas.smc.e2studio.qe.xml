@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<QE>
+    <Segment id="Project">
+        <Setting id="SrcGeneratedPath" value="src/smc_gen"/>
+    </Segment>
+    <Segment id="Pin">
+        <Setting id="PB2" value="LCD_TCON2"/>
+        <Setting id="PB5" value="LCD_CLK"/>
+        <Setting id="PB4" value="LCD_TCON0"/>
+        <Setting id="PE2" value="LCD_DATA14"/>
+        <Setting id="PE1" value="LCD_DATA15"/>
+        <Setting id="PA0" value="LCD_DATA8"/>
+        <Setting id="PE4" value="LCD_DATA12"/>
+        <Setting id="PE3" value="LCD_DATA13"/>
+        <Setting id="PA2" value="LCD_DATA6"/>
+        <Setting id="PE6" value="LCD_DATA10"/>
+        <Setting id="PA1" value="LCD_DATA7"/>
+        <Setting id="PE5" value="LCD_DATA11"/>
+        <Setting id="PA4" value="LCD_DATA4"/>
+        <Setting id="PA3" value="LCD_DATA5"/>
+        <Setting id="PE7" value="LCD_DATA9"/>
+        <Setting id="PA6" value="LCD_DATA2"/>
+        <Setting id="PA5" value="LCD_DATA3"/>
+        <Setting id="P90" value="TXD7"/>
+        <Setting id="PA7" value="LCD_DATA1"/>
+        <Setting id="P92" value="RXD7"/>
+        <Setting id="P56" value="CLKOUT25M"/>
+        <Setting id="P12" value="RXD2"/>
+        <Setting id="P36" value="EXTAL"/>
+        <Setting id="P13" value="TXD2"/>
+        <Setting id="P37" value="XTAL"/>
+        <Setting id="PB1" value="LCD_TCON3"/>
+        <Setting id="PB0" value="LCD_DATA0"/>
+    </Segment>
+    <Segment id="Device">
+        <Setting id="Series" value="RX700"/>
+        <Setting id="Group" value="RX72N"/>
+        <Setting id="Board" value="カスタムユーザボード"/>
+        <Setting id="PartNo" value="R5F572NNHxFB"/>
+        <Setting id="PinCount" value="144"/>
+    </Segment>
+    <Segment id="Clock">
+        <Setting id="CacMCLK" value="16000.0"/>
+        <Setting id="PLLCLK" value="240000.0"/>
+        <Setting id="BusCLK" value="80000.0"/>
+        <Setting id="PCLKA" value="120000.0"/>
+        <Setting id="ExtCLK" value="16000.0"/>
+        <Setting id="UsbCLK" value="48000.0"/>
+        <Setting id="PCLKD" value="60000.0"/>
+        <Setting id="PCLKB" value="60000.0"/>
+        <Setting id="VCC" value="3.3"/>
+        <Setting id="PCLKC" value="60000.0"/>
+        <Setting id="ICLK" value="240000.0"/>
+        <Setting id="FCLK" value="60000.0"/>
+        <Setting id="SysCLKSrc" value="4.0"/>
+    </Segment>
+    <Segment id="Component">
+        <Setting id="r_bsp" value="FIT"/>
+        <Setting id="rm_littlefs_rx" value="FIT"/>
+        <Setting id="rm_rtos_abstraction_rx" value="FIT"/>
+        <Setting id="r_cmt_rx" value="FIT"/>
+        <Setting id="r_simple_glcdc_config_rx" value="FIT"/>
+        <Setting id="r_glcdc_rx" value="FIT"/>
+        <Setting id="r_simple_graphic_rx" value="FIT"/>
+        <Setting id="r_byteq" value="FIT"/>
+        <Setting id="r_sci_rx" value="FIT"/>
+        <Setting id="r_flash_rx" value="FIT"/>
+        <Segment component="r_bsp5.52" id="r_bsp" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="BSP_CFG_SWINT_UNIT1_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_SWINT_UNIT2_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_CODE_FLASH_BANK_MODE" value="0"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA0_ENABLE" value="0"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA1_IF_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_USER_WARM_START_POST_C_FUNCTION" value="my_sw_warmstart_postc_function"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA1_ENABLE" value="0"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA0_DM_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_USER_WARM_START_PRE_C_FUNCTION" value="my_sw_warmstart_prec_function"/>
+            <Setting id="BSP_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_USER_WARM_START_CALLBACK_PRE_INITC_ENABLED" value="0"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA0_OA_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_USTACK_BYTES" value="0x1000"/>
+            <Setting id="BSP_CFG_IO_LIB_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA1_ADDR" value="0xFFE00000"/>
+            <Setting id="BSP_CFG_ID_CODE_LONG_4" value="0xFFFFFFFF"/>
+            <Setting id="BSP_CFG_ID_CODE_LONG_2" value="0xFFFFFFFF"/>
+            <Setting id="BSP_CFG_EBMAPCR_2ND_PRIORITY" value="3"/>
+            <Setting id="BSP_CFG_ID_CODE_LONG_3" value="0xFFFFFFFF"/>
+            <Setting id="BSP_CFG_USER_CHARPUT_FUNCTION" value="my_sw_charput_function"/>
+            <Setting id="BSP_CFG_TRUSTED_MODE_FUNCTION" value="0xFFFFFFFF"/>
+            <Setting id="BSP_CFG_SWINT_TASK_BUFFER_NUMBER" value="8"/>
+            <Setting id="BSP_CFG_USER_LOCKING_HW_UNLOCK_FUNCTION" value="my_hw_unlocking_function"/>
+            <Setting id="BSP_CFG_ID_CODE_LONG_1" value="0xFFFFFFFF"/>
+            <Setting id="BSP_CFG_USER_STACK_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_STARTUP_DISABLE" value="0"/>
+            <Setting id="BSP_CFG_USER_LOCKING_SW_UNLOCK_FUNCTION" value="my_sw_unlocking_function"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA1_SIZE" value="0x0"/>
+            <Setting id="BSP_CFG_USER_CHARPUT_ENABLED" value="1"/>
+            <Setting id="BSP_CFG_SWINT_IPR_INITIAL_VALUE" value="0x1"/>
+            <Setting id="BSP_CFG_RUN_IN_USER_MODE" value="0"/>
+            <Setting id="BSP_CFG_USER_LOCKING_HW_LOCK_FUNCTION" value="my_hw_locking_function"/>
+            <Setting id="BSP_CFG_EBMAPCR_3RD_PRIORITY" value="1"/>
+            <Setting id="BSP_CFG_ROMCODE_REG_VALUE" value="0xFFFFFFFF"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA0_SIZE" value="0x0"/>
+            <Setting id="BSP_CFG_ROM_CACHE_ENABLE" value="0"/>
+            <Setting id="BSP_CFG_USER_LOCKING_TYPE" value="bsp_lock_t"/>
+            <Setting id="BSP_CFG_HEAP_BYTES" value="0x400"/>
+            <Setting id="BSP_CFG_FIT_IPL_MAX" value="0xF"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA0_ADDR" value="0xFFE00000"/>
+            <Setting id="BSP_CFG_EBMAPCR_4TH_PRIORITY" value="2"/>
+            <Setting id="BSP_CFG_USER_LOCKING_SW_LOCK_FUNCTION" value="my_sw_locking_function"/>
+            <Setting id="BSP_CFG_ISTACK_BYTES" value="0x400"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA1_DM_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_CLKOUT_OUTPUT" value="0"/>
+            <Setting id="BSP_CFG_USER_LOCKING_ENABLED" value="0"/>
+            <Setting id="BSP_CFG_USER_CHARGET_ENABLED" value="1"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA0_IF_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_USER_CHARGET_FUNCTION" value="my_sw_charget_function"/>
+            <Setting id="BSP_CFG_CODE_FLASH_START_BANK" value="0"/>
+            <Setting id="BSP_CFG_FAW_REG_VALUE" value="0xFFFFFFFF"/>
+            <Setting id="BSP_CFG_EBMAPCR_5TH_PRIORITY" value="4"/>
+            <Setting id="BSP_CFG_NONCACHEABLE_AREA1_OA_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED" value="0"/>
+            <Setting id="BSP_CFG_EBMAPCR_1ST_PRIORITY" value="0"/>
+        </Segment>
+        <Segment component="rm_littlefs_rx1.00.saffti-original" id="rm_littlefs_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="RM_LITTLEFS_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+            <Setting id="RM_LITTLEFS_CFG_BLOCK_CYCLES" value="500"/>
+            <Setting id="RM_LITTLEFS_CFG_READ_SIZE" value="4"/>
+            <Setting id="RM_LITTLEFS_CFG_FORMAT_IF_MOUNT_FAILED" value="0"/>
+            <Setting id="RM_LITTLEFS_CFG_PROVIDE_ABORT" value="1"/>
+            <Setting id="RM_LITTLEFS_CFG_BLOCK_SIZE" value="128"/>
+            <Setting id="RM_LITTLEFS_CFG_CACHE_SIZE" value="64"/>
+            <Setting id="RM_LITTLEFS_CFG_LOOKAHEAD_SIZE" value="16"/>
+            <Setting id="RM_LITTLEFS_CFG_FLASH_WAIT_TASK_ID" value="0"/>
+            <Setting id="RM_LITTLEFS_CFG_PROG_SIZE" value="4"/>
+        </Segment>
+        <Segment component="rm_rtos_abstraction_rx1.00.saffti-original" id="rm_rtos_abstraction_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="RM_RTOS_ABSTRACTION_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+        </Segment>
+        <Segment component="r_cmt_rx4.31" id="r_cmt_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="CMT_RX_CFG_IPR" value="5"/>
+        </Segment>
+        <Segment component="r_simple_glcdc_config_rx0.81" id="r_simple_glcdc_config_rx" source="com.renesas.smc.tools.swcomponent.fit.source"/>
+        <Segment component="r_glcdc_rx1.30" id="r_glcdc_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="GLCDC_CFG_INTERRUPT_PRIORITY_LEVEL" value="5"/>
+            <Setting id="GLCDC_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+        </Segment>
+        <Segment component="r_simple_graphic_rx0.80" id="r_simple_graphic_rx" source="com.renesas.smc.tools.swcomponent.fit.source"/>
+        <Segment component="r_byteq1.80" id="r_byteq" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="BYTEQ_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+            <Setting id="BYTEQ_CFG_MAX_CTRL_BLKS" value="32"/>
+            <Setting id="BYTEQ_CFG_USE_HEAP_FOR_CTRL_BLKS" value="0"/>
+        </Segment>
+        <Segment component="r_sci_rx3.40" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="SCI_CFG_CH9_FIFO_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH6_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH4_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH12_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_ASYNC_INCLUDED" value="1"/>
+            <Setting id="SCI_CFG_CH4_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_TEI_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH4_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH7_INCLUDED" value="1"/>
+            <Setting id="SCI_CFG_CH0_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH7_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH0_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH11_RX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH10_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH12_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH1_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH7_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH11_FIFO_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH0_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH11_TX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH5_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH5_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH10_FIFO_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH10_TX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH8_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH4_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH0_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH10_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH1_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+            <Setting id="SCI_CFG_CH10_RX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH1_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH9_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH8_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH5_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH6_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH7_RX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH2_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH7_FIFO_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH7_TX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH3_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH9_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH10_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH3_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH8_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH9_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH6_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH11_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH10_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH5_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH2_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH2_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_SYNC_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH12_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH8_FIFO_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH8_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_DUMMY_TX_BYTE" value="0xFF"/>
+            <Setting id="SCI_CFG_CH7_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH9_TX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH3_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH11_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_ERI_TEI_PRIORITY" value="3"/>
+            <Setting id="SCI_CFG_CH9_RX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH9_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH11_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_SSPI_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH3_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH1_DATA_MATCH_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_CH2_INCLUDED" value="1"/>
+            <Setting id="SCI_CFG_CH8_TX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH6_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH8_RX_FIFO_THRESH" value="8"/>
+            <Setting id="SCI_CFG_CH11_TX_BUFSIZ" value="80"/>
+        </Segment>
+        <Segment component="r_flash_rx4.50" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+            <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
+            <Setting id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" value="1"/>
+            <Setting id="FLASH_CFG_CODE_FLASH_ENABLE" value="1"/>
+            <Setting id="FLASH_CFG_CODE_FLASH_BGO" value="1"/>
+        </Segment>
+    </Segment>
+</QE>

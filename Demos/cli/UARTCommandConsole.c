@@ -88,7 +88,7 @@ static const char *const pcWelcomeMessage1 = "FreeRTOS command server.\r\n"
 #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
 #if (ENABLE_OTA_UPDATE_DEMO == 1)
 static const char *const pcWelcomeMessage2 =
-    "\t\t1. Set value for rootca(optional)/endpoint/claimcert/claimkey/template/codesigncert.\r\n";
+    "\t\t1. Set value for rootca(optional)/endpoint/claimcert/claimkey/template/codesigncert/codesignpubkey.\r\n";
 ;
 
 #else
@@ -99,7 +99,7 @@ static const char *const pcWelcomeMessage2 =
 #else
 #if (ENABLE_OTA_UPDATE_DEMO == 1)
 static const char *const pcWelcomeMessage2 =
-    "\t\t1. Set value for endpoint/thingname/certificate/key/codesigncert.\r\n";
+    "\t\t1. Set value for endpoint/thingname/certificate/key/codesigncert/codesignpubkey.\r\n";
 #else
 static const char *const pcWelcomeMessage2 =
     "\t\t1. Set value for endpoint/thingname/certificate/key.\r\n";

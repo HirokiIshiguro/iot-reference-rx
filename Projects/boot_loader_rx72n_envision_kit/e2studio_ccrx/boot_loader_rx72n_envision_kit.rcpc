@@ -9,8 +9,28 @@
     <Files>
       <Category Name="src">
         <Path>src\rx72n_boot_loader.c</Path>
+        <Path>src\rx_bootloader_config.h</Path>
         <Category Name="key">
           <Path>src\key\code_signer_public_key.h</Path>
+        </Category>
+        <Category Name="rx_bootloader">
+          <Path>src\rx_bootloader\base64_decode.c</Path>
+          <Path>src\rx_bootloader\base64_decode.h</Path>
+          <Path>src\rx_bootloader\rx_bootloader.c</Path>
+          <Path>src\rx_bootloader\rx_bootloader.h</Path>
+          <Path>src\rx_bootloader\rx_bootloader_private.h</Path>
+          <Category Name="config">
+            <Path>src\rx_bootloader\config\rx65n.h</Path>
+            <Path>src\rx_bootloader\config\rx72n.h</Path>
+            <Path>src\rx_bootloader\config\rx_bootloader_config.h</Path>
+          </Category>
+          <Category Name="ref">
+            <Path>src\rx_bootloader\ref\code_signer_public_key.h</Path>
+          </Category>
+          <Category Name="sfd">
+            <Path>src\rx_bootloader\sfd\r_simple_filesystem_on_dataflash.c</Path>
+            <Path>src\rx_bootloader\sfd\r_simple_filesystem_on_dataflash_if.h</Path>
+          </Category>
         </Category>
         <Category Name="smc_gen">
           <Category Name="general">
@@ -146,6 +166,8 @@
             <Path>src\smc_gen\r_config\r_sci_rx_config.h</Path>
             <Path>src\smc_gen\r_config\r_simple_glcdc_config_rx_config.h</Path>
             <Path>src\smc_gen\r_config\r_simple_graphic_rx_config.h</Path>
+            <Path>src\smc_gen\r_config\rm_littlefs_rx_config.h</Path>
+            <Path>src\smc_gen\r_config\rm_rtos_abstraction_rx_config.h</Path>
           </Category>
           <Category Name="r_flash_rx">
             <Path>src\smc_gen\r_flash_rx\r_flash_rx_if.h</Path>
@@ -277,12 +299,41 @@
               <Path>src\smc_gen\r_simple_graphic_rx\src\r_simple_graphic.c</Path>
             </Category>
           </Category>
+          <Category Name="rm_littlefs_rx">
+            <Path>src\smc_gen\rm_littlefs_rx\readme.txt</Path>
+            <Path>src\smc_gen\rm_littlefs_rx\rm_littlefs_rx_if.h</Path>
+            <Category Name="sample">
+              <Path>src\smc_gen\rm_littlefs_rx\sample\rm_littlefs_rx_sample.c</Path>
+            </Category>
+            <Category Name="src">
+              <Path>src\smc_gen\rm_littlefs_rx\src\rm_littlefs_rx.c</Path>
+              <Path>src\smc_gen\rm_littlefs_rx\src\rm_littlefs_rx_abort.c</Path>
+            </Category>
+            <Category Name="third_party">
+              <Category Name="littlefs">
+                <Path>src\smc_gen\rm_littlefs_rx\third_party\littlefs\lfs.c</Path>
+                <Path>src\smc_gen\rm_littlefs_rx\third_party\littlefs\lfs.h</Path>
+                <Path>src\smc_gen\rm_littlefs_rx\third_party\littlefs\lfs_util.c</Path>
+                <Path>src\smc_gen\rm_littlefs_rx\third_party\littlefs\lfs_util.h</Path>
+              </Category>
+            </Category>
+          </Category>
+          <Category Name="rm_rtos_abstraction_rx">
+            <Path>src\smc_gen\rm_rtos_abstraction_rx\readme.txt</Path>
+            <Path>src\smc_gen\rm_rtos_abstraction_rx\rm_rtos_abstraction_rx_if.h</Path>
+            <Category Name="sample">
+              <Path>src\smc_gen\rm_rtos_abstraction_rx\sample\rm_rtos_abstraction_rx_sample.c</Path>
+            </Category>
+            <Category Name="src">
+              <Path>src\smc_gen\rm_rtos_abstraction_rx\src\rm_rtos_abstraction_rx.c</Path>
+            </Category>
+          </Category>
         </Category>
         <Category Name="src">
-          <Path>src\src\base64_decode.c</Path>
-          <Path>src\src\base64_decode.h</Path>
-          <Path>src\src\r_simple_filesystem_on_dataflash.c</Path>
-          <Path>src\src\r_simple_filesystem_on_dataflash_if.h</Path>
+          <Path>src\src\ecc.c</Path>
+          <Path>src\src\ecc_dsa.c</Path>
+          <Path>src\src\sha256.c</Path>
+          <Path>src\src\utils.c</Path>
           <Category Name="tinycrypt"/>
         </Category>
       </Category>
@@ -295,6 +346,10 @@
           <Option>-isa=rxv3</Option>
           <Option>-fpu</Option>
           <Option>-dpfpu</Option>
+          <Option>-include="${ProjDirPath}\src"</Option>
+          <Option>-include="${ProjDirPath}\src\rx_bootloader"</Option>
+          <Option>-include="${ProjDirPath}\src\rx_bootloader\config"</Option>
+          <Option>-include="${ProjDirPath}\src\rx_bootloader\sfd"</Option>
           <Option>-include="${ProjDirPath}\src\src"</Option>
           <Option>-include="${ProjDirPath}\src\src\sha1\include"</Option>
           <Option>-include="${ProjDirPath}\src\src\tinycrypt\lib\include"</Option>
@@ -319,6 +374,12 @@
           <Option>-include="${ProjDirPath}\src\smc_gen\r_cmt_rx\src"</Option>
           <Option>-include="${ProjDirPath}\src\smc_gen\general"</Option>
           <Option>-include="${ProjDirPath}\src\smc_gen\r_pincfg"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_littlefs_rx\third_party\littlefs"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_littlefs_rx\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_littlefs_rx"</Option>
           <Option>-asmopt=-bank</Option>
           <Option>-utf8</Option>
           <Option>-nomessage</Option>
@@ -337,6 +398,29 @@
           <Option>-dpfpu</Option>
           <Option>-include="${ProjDirPath}\src\smc_gen\general"</Option>
           <Option>-include="${ProjDirPath}\src\smc_gen\r_pincfg"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_glcdc_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_config"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_littlefs_rx\third_party\littlefs"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_cmt_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_bsp"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_flash_rx\src\flash_type_3"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_cmt_rx\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_flash_rx\src\targets"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_simple_graphic_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_byteq\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_littlefs_rx\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_simple_glcdc_config_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_flash_rx\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_flash_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_byteq"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_flash_rx\src\flash_type_4"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_sci_rx\src"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_flash_rx\src\flash_type_1"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_sci_rx"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\rm_littlefs_rx"</Option>
           <Option>-utf8</Option>
           <Option>-bank</Option>
           <Option>-debug</Option>
@@ -377,6 +461,9 @@
         </LibraryGenerateOptions>
         <LinkOrder>
           <Path>HardwareDebug\rx72n_boot_loader.obj</Path>
+          <Path>HardwareDebug\base64_decode.obj</Path>
+          <Path>HardwareDebug\rx_bootloader.obj</Path>
+          <Path>HardwareDebug\r_simple_filesystem_on_dataflash.obj</Path>
           <Path>HardwareDebug\r_cg_hardware_setup.obj</Path>
           <Path>HardwareDebug\r_smc_cgc.obj</Path>
           <Path>HardwareDebug\r_smc_cgc_user.obj</Path>
@@ -424,11 +511,24 @@
           <Path>HardwareDebug\r_simple_glcdc_config_rx.obj</Path>
           <Path>HardwareDebug\r_ascii.obj</Path>
           <Path>HardwareDebug\r_simple_graphic.obj</Path>
-          <Path>HardwareDebug\base64_decode.obj</Path>
-          <Path>HardwareDebug\r_simple_filesystem_on_dataflash.obj</Path>
+          <Path>HardwareDebug\rm_littlefs_rx_sample.obj</Path>
+          <Path>HardwareDebug\rm_littlefs_rx.obj</Path>
+          <Path>HardwareDebug\rm_littlefs_rx_abort.obj</Path>
+          <Path>HardwareDebug\lfs.obj</Path>
+          <Path>HardwareDebug\lfs_util.obj</Path>
+          <Path>HardwareDebug\rm_rtos_abstraction_rx_sample.obj</Path>
+          <Path>HardwareDebug\rm_rtos_abstraction_rx.obj</Path>
+          <Path>HardwareDebug\ecc.obj</Path>
+          <Path>HardwareDebug\ecc_dsa.obj</Path>
+          <Path>HardwareDebug\sha256.obj</Path>
+          <Path>HardwareDebug\utils.obj</Path>
           <Path>HardwareDebug\boot_loader_rx72n_envision_kit.lib</Path>
         </LinkOrder>
         <CommonOptions>
+          <IncludePathForC>"${ProjDirPath}\src"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\rx_bootloader"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\rx_bootloader\config"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\rx_bootloader\sfd"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\src\src"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\src\src\sha1\include"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\src\src\tinycrypt\lib\include"</IncludePathForC>
@@ -453,8 +553,37 @@
           <IncludePathForC>"${ProjDirPath}\src\smc_gen\r_cmt_rx\src"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\src\smc_gen\general"</IncludePathForC>
           <IncludePathForC>"${ProjDirPath}\src\smc_gen\r_pincfg"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\rm_littlefs_rx\third_party\littlefs"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\rm_littlefs_rx\src"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx\src"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\rm_littlefs_rx"</IncludePathForC>
           <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\general"</IncludePathForAsm>
           <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_pincfg"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_glcdc_rx"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_config"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\rm_littlefs_rx\third_party\littlefs"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_cmt_rx"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_bsp"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_flash_rx\src\flash_type_3"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_cmt_rx\src"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_flash_rx\src\targets"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_simple_graphic_rx"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_byteq\src"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\rm_littlefs_rx\src"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_simple_glcdc_config_rx"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_flash_rx\src"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_flash_rx"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_byteq"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_flash_rx\src\flash_type_4"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\rm_rtos_abstraction_rx\src"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_sci_rx\src"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_flash_rx\src\flash_type_1"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_sci_rx"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\rm_littlefs_rx"</IncludePathForAsm>
         </CommonOptions>
       </BuildMode>
     </BuildOptions>
