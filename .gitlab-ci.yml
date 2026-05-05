@@ -60,15 +60,21 @@ variables:
   #   full  - ota + Fleet Provisioning path.
   RX65N_BG96_TEST_SCOPE: "build"
   RX65N_BG96_SKIP_HW_TESTS: "false"
-  RX65N_BG96_DEVICE_RESOURCE_GROUP: "ck-rx65n-rpi2-hardware"
+  RX65N_BG96_DEVICE_RESOURCE_GROUP: "ck-rx65n-rpi3-hardware"
+  # Route CK-RX65N/BG96 hardware jobs to Raspberry Pi #3. The runner currently
+  # exposes the RPi#3 host through the existing TB-RX671 OSS tag; override this
+  # variable to a dedicated CK-RX65N/BG96 tag after that tag is registered.
+  RX65N_BG96_RUNNER_TAG: "dev-tb-rx671"
   RX65N_BG96_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
   RX65N_BG96_RFP_DEVICE: "RX65x"
   RX65N_BG96_RFP_INTERFACE: "fine"
   RX65N_BG96_RFP_SPEED: "1500K"
   RX65N_BG96_RFP_AUTH_ID: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
   RX65N_BG96_RFP_TOOL: "e2l:OBE110020"
+  # Keep empty by default so the bootloader download job auto-probes UART ports
+  # on the selected runner and passes the chosen path to downstream jobs.
   RX65N_BG96_UART_PORT: ""
-  RX65N_BG96_RUNNER_HOSTNAME: "ef-saffti-001-rpi-002"
+  RX65N_BG96_RUNNER_HOSTNAME: "ef-saffti-001-rpi-003"
   RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS: "180"
   RX65N_BG96_APP_STARTUP_TIMEOUT_SECONDS: "420"
   RX65N_BG96_APP_RESET_RETRIES: "2"
@@ -492,8 +498,7 @@ build_rx72n_fleet_candidate:
     - exec-shell
     - os-linux
     - hw-raspi
-    - dev-ek-rx72n
-    - dev-ek-rx72n-set2
+    - $RX65N_BG96_RUNNER_TAG
   resource_group: $RX65N_BG96_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail
