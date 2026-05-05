@@ -61,10 +61,8 @@ variables:
   RX65N_BG96_TEST_SCOPE: "build"
   RX65N_BG96_SKIP_HW_TESTS: "false"
   RX65N_BG96_DEVICE_RESOURCE_GROUP: "ck-rx65n-rpi3-hardware"
-  # Route CK-RX65N/BG96 hardware jobs to Raspberry Pi #3. The runner currently
-  # exposes the RPi#3 host through the existing TB-RX671 OSS tag; override this
-  # variable to a dedicated CK-RX65N/BG96 tag after that tag is registered.
-  RX65N_BG96_RUNNER_TAG: "dev-tb-rx671"
+  # Route CK-RX65N/BG96 hardware jobs to Raspberry Pi #3.
+  RX65N_BG96_RUNNER_TAG: "dev-ck-rx65n-bg96"
   RX65N_BG96_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
   RX65N_BG96_RFP_DEVICE: "RX65x"
   RX65N_BG96_RFP_INTERFACE: "fine"
