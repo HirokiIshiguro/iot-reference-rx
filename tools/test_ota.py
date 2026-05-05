@@ -523,7 +523,8 @@ def analyze_log_file(path, expected_version=None):
 
 
 def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
-                 skip_reset=False, reset_after_open=False, raw_log_path=None):
+                 skip_reset=False, reset_after_open=False, raw_log_path=None,
+                 self_test_silence_reset_timeout=0.0):
     analyzer = OtaLogAnalyzer(expected_version=expected_version)
     total_bytes = 0
     raw_log_file = ensure_parent(raw_log_path)
@@ -568,8 +569,10 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
     print(f"Monitoring OTA UART ({port} @ {baud}bps, timeout={timeout}s)")
     print("=" * 60)
     start = time.time()
+    last_data_at = start
     last_progress_print = start
     failure_detected_at = None
+    self_test_recovery_reset_issued = False
     partial_line = ""
 
     try:
@@ -583,6 +586,7 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
 
                 total_bytes += len(data)
                 elapsed = time.time() - start
+                last_data_at = time.time()
                 full_text = partial_line + data
                 lines = full_text.splitlines(True)
                 if lines and not lines[-1].endswith(("\n", "\r")):
@@ -613,6 +617,30 @@ def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
                     break
             else:
                 now = time.time()
+                if (
+                    reset_cmd
+                    and self_test_silence_reset_timeout > 0
+                    and not self_test_recovery_reset_issued
+                    and analyzer.has_marker("activate_image")
+                    and analyzer.has_marker("selfcheck_mode")
+                    and not analyzer.has_marker("image_accepted")
+                    and (now - last_data_at) >= self_test_silence_reset_timeout
+                ):
+                    print(
+                        "\n[RECOVERY] self-test stage is silent after bootloader jump; "
+                        "issuing one external reset and continuing observation..."
+                    )
+                    try:
+                        ser.reset_input_buffer()
+                    except serial.SerialException:
+                        print("WARNING: Serial input buffer reset failed before recovery reset")
+                    if not reset_device_via_command(reset_cmd):
+                        print("WARNING: Recovery reset command failed, continuing to monitor anyway...")
+                    self_test_recovery_reset_issued = True
+                    now = time.time()
+                    last_data_at = now
+                    last_progress_print = now
+
                 if now - last_progress_print >= 15:
                     elapsed = now - start
                     print(
@@ -701,6 +729,15 @@ def main():
     )
     parser.add_argument("--raw-log", default=None, help="Write timestamped UART log to this path")
     parser.add_argument("--summary-json", default=None, help="Write JSON summary to this path")
+    parser.add_argument(
+        "--self-test-silence-reset-timeout",
+        type=float,
+        default=float(os.environ.get("OTA_SELF_TEST_SILENCE_RESET_TIMEOUT", "90")),
+        help=(
+            "Issue one external reset if OTA self-test is silent for this many seconds "
+            "after activation; set 0 to disable (default: 90)"
+        ),
+    )
     args = parser.parse_args()
 
     print("=" * 60)
@@ -726,6 +763,10 @@ def main():
             print("Reset:       disabled (--no-reset)")
         else:
             print("Reset:       UART 'reset' command")
+        if args.self_test_silence_reset_timeout > 0:
+            print(f"Recovery:    self-test silence reset after {args.self_test_silence_reset_timeout:g}s")
+        else:
+            print("Recovery:    self-test silence reset disabled")
 
         rl78_ports = list_renesas_ports()
         if rl78_ports:
@@ -758,6 +799,7 @@ def main():
             skip_reset=args.no_reset,
             reset_after_open=args.reset_after_open,
             raw_log_path=args.raw_log,
+            self_test_silence_reset_timeout=args.self_test_silence_reset_timeout,
         )
 
     write_summary(args.summary_json, summary)
