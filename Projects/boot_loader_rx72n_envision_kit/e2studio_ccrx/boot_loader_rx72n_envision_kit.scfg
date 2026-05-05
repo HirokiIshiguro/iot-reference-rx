@@ -26,7 +26,7 @@
             <item enabled="true" id="srcEOI"/>
         </option>
         <option enabled="true" id="mainfrequency" selection="textinputitem">
-            <item enabled="true" id="textinputitem" input="16" value="24"/>
+            <item enabled="true" id="textinputitem" input="16" value="16"/>
         </option>
         <option enabled="true" id="mainwaittime" selection="textinputitem">
             <item enabled="true" id="textinputitem" input="9980" value="9980"/>
@@ -73,7 +73,7 @@
             <item enabled="true" id="textinputitem" input="" value="120"/>
         </option>
         <option enabled="true" id="pllswitcher" selection="pllmain">
-            <item enabled="true" id="pllmain" input="" value="24"/>
+            <item enabled="true" id="pllmain" input="" value="16"/>
             <item enabled="false" id="pllhoco" input="" value="16"/>
         </option>
         <option enabled="true" id="plldivider" selection="div1-1">
@@ -173,27 +173,27 @@
             <item enabled="false" id="mul30-1"/>
         </option>
         <option enabled="true" id="sckswitcher" selection="pll">
-            <item enabled="true" id="pll" input="" value="360.0"/>
-            <item enabled="true" id="main" input="" value="24"/>
+            <item enabled="true" id="pll" input="" value="240.0"/>
+            <item enabled="true" id="main" input="" value="16"/>
             <item enabled="false" id="sub" input="" value="0.032768"/>
             <item enabled="false" id="hoco" input="" value="16"/>
             <item enabled="false" id="loco" input="" value="0.24"/>
         </option>
         <option enabled="true" id="ckoswitcher" selection="ckomain">
-            <item enabled="true" id="ckoppll" input="" value="300.0"/>
-            <item enabled="true" id="ckopll" input="" value="360.0"/>
-            <item enabled="true" id="ckomain" input="" value="24"/>
+            <item enabled="true" id="ckoppll" input="" value="200.0"/>
+            <item enabled="true" id="ckopll" input="" value="240.0"/>
+            <item enabled="true" id="ckomain" input="" value="16"/>
             <item enabled="false" id="ckosub" input="" value="0.032768"/>
             <item enabled="false" id="ckohoco" input="" value="16"/>
             <item enabled="false" id="ckoloco" input="" value="0.24"/>
         </option>
         <option enabled="true" id="usbswitcher" selection="usbuclk">
-            <item enabled="true" id="usbuclk" input="" value="72.0"/>
-            <item enabled="true" id="usbppll" input="" value="150.0"/>
+            <item enabled="true" id="usbuclk" input="" value="48.0"/>
+            <item enabled="true" id="usbppll" input="" value="100.0"/>
         </option>
         <option enabled="true" id="physwitcher" selection="phyppll">
-            <item enabled="true" id="phypll" input="" value="360.0"/>
-            <item enabled="true" id="phyppll" input="" value="300.0"/>
+            <item enabled="true" id="phypll" input="" value="240.0"/>
+            <item enabled="true" id="phyppll" input="" value="200.0"/>
         </option>
         <option enabled="true" id="fclkdivider" selection="comboBox1-4">
             <item enabled="false" id="comboBox1-1"/>
@@ -294,25 +294,25 @@
             <item enabled="true" id="comboBox1-16"/>
         </option>
         <option enabled="true" id="fclk" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="90.0"/>
+            <item enabled="true" id="textoutputitem" input="" value="60.0"/>
         </option>
         <option enabled="true" id="iclk" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="360.0"/>
+            <item enabled="true" id="textoutputitem" input="" value="240.0"/>
         </option>
         <option enabled="true" id="pclka" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="180.0"/>
+            <item enabled="true" id="textoutputitem" input="" value="120.0"/>
         </option>
         <option enabled="true" id="pclkb" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="90.0"/>
+            <item enabled="true" id="textoutputitem" input="" value="60.0"/>
         </option>
         <option enabled="true" id="pclkc" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="90.0"/>
+            <item enabled="true" id="textoutputitem" input="" value="60.0"/>
         </option>
         <option enabled="true" id="pclkd" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="90.0"/>
+            <item enabled="true" id="textoutputitem" input="" value="60.0"/>
         </option>
         <option enabled="true" id="bck" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="120.0"/>
+            <item enabled="true" id="textoutputitem" input="" value="80.0"/>
         </option>
         <option enabled="false" id="bckpin" selection="textoutputitem">
             <item enabled="true" id="textoutputitem" input="" value="60.0"/>
@@ -325,17 +325,17 @@
             <item enabled="true" id="textoutputitem" input="" value="120.0"/>
         </option>
         <option enabled="true" id="uclk" selection="textoutputitem">
-            <item enabled="false" id="textoutputitem" input="" value="72.0"/>
+            <item enabled="false" id="textoutputitem" input="" value="48.0"/>
         </option>
         <option enabled="true" id="clkout25m" selection="textoutputitem">
-            <item enabled="false" id="textoutputitem" input="" value="37.5"/>
+            <item enabled="false" id="textoutputitem" input="" value="25.0"/>
         </option>
         <option enabled="true" id="clkoutenable" selection="uncheck">
             <item enabled="true" id="check"/>
             <item enabled="true" id="uncheck"/>
         </option>
         <option enabled="false" id="clkout" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="24"/>
+            <item enabled="true" id="textoutputitem" input="" value="16"/>
         </option>
         <option enabled="false" id="cacilclk" selection="textoutputitem">
             <item enabled="true" id="textoutputitem" input="" value="120"/>
@@ -357,7 +357,7 @@
             <item enabled="true" id="textoutputitem" input="" value="32.768"/>
         </option>
         <option enabled="true" id="cacmclk" selection="textoutputitem">
-            <item enabled="true" id="textoutputitem" input="" value="24"/>
+            <item enabled="true" id="textoutputitem" input="" value="16"/>
         </option>
     </tool>
     <tool id="Interrupt">
