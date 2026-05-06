@@ -1270,7 +1270,18 @@ create_rx65n_bg96_ota:
       }
 
       $credentialDir = Join-Path $env:CI_PROJECT_DIR "artifacts\prepare_rx65n_bg96_mqtt_credentials"
-      $thingName = Get-FirstEnv @("AWS_OTA_THING_NAME_CK_RX65N_01", "BG96_OTA_THING_NAME", "AWS_IOT_THING_NAME_CK_RX65N_01", "RX65N_BG96_AWS_IOT_THING_NAME", "BG96_AWS_IOT_THING_NAME", "BG96_MQTT_THING_NAME", "AWS_IOT_THING_NAME")
+      $usingDynamicThing = $false
+      $thingName = ""
+      $thingPath = Join-Path $credentialDir "thing_name.txt"
+      $dynamicMeta = Join-Path $credentialDir "iot_credentials_meta.json"
+      if ($env:RX65N_BG96_TLS_BACKEND -ne "tsip" -and (Test-Path -LiteralPath $dynamicMeta) -and (Test-Path -LiteralPath $thingPath)) {
+        $thingName = (Get-Content -LiteralPath $thingPath -Raw).Trim()
+        $usingDynamicThing = $true
+        Write-Host "Using temporary BG96 AWS IoT thing for OTA target: $thingName"
+      }
+      if ([string]::IsNullOrWhiteSpace($thingName)) {
+        $thingName = Get-FirstEnv @("AWS_OTA_THING_NAME_CK_RX65N_01", "BG96_OTA_THING_NAME", "AWS_IOT_THING_NAME_CK_RX65N_01", "RX65N_BG96_AWS_IOT_THING_NAME", "BG96_AWS_IOT_THING_NAME", "BG96_MQTT_THING_NAME", "AWS_IOT_THING_NAME")
+      }
       if ([string]::IsNullOrWhiteSpace($thingName)) {
         $thingPath = Join-Path $credentialDir "thing_name.txt"
         if (Test-Path -LiteralPath $thingPath) {
@@ -1291,7 +1302,7 @@ create_rx65n_bg96_ota:
 
       $region = Resolve-AwsRegion
       $thingName = Require-Value "AWS IoT thing name" $thingName
-      $targetArn = Get-FirstEnv @("AWS_OTA_TARGET_ARN_CK_RX65N_01", "BG96_OTA_TARGET_ARN", "OTA_TARGET_ARN")
+      $targetArn = if ($usingDynamicThing) { "" } else { Get-FirstEnv @("AWS_OTA_TARGET_ARN_CK_RX65N_01", "BG96_OTA_TARGET_ARN", "OTA_TARGET_ARN") }
       $bucket = Require-Value "AWS OTA S3 bucket" (Get-FirstEnv @("AWS_OTA_S3_BUCKET_CK_RX65N_01", "RX65N_BG96_OTA_S3_BUCKET", "BG96_AWS_OTA_S3_BUCKET", "BG96_OTA_S3_BUCKET", "OTA_S3_BUCKET"))
       $roleArn = Require-Value "AWS OTA service role ARN" (Get-FirstEnv @("AWS_OTA_SERVICE_ROLE_ARN_CK_RX65N_01", "RX65N_BG96_OTA_SERVICE_ROLE_ARN", "BG96_AWS_OTA_SERVICE_ROLE_ARN", "BG96_OTA_SERVICE_ROLE_ARN", "BG96_OTA_ROLE_ARN", "OTA_SERVICE_ROLE_ARN", "OTA_ROLE_ARN"))
       $roleArn = Resolve-IamRoleArn $roleArn
