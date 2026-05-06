@@ -83,6 +83,9 @@ PRIVATE_KEY_VARS = (
     "CLIENT_PRIVATE_KEY_PEM",
     "AWS_IOT_PRIVKEY",
 )
+DYNAMIC_THING_NAME_VARS = ("RX65N_BG96_AWS_IOT_THING_NAME",)
+DYNAMIC_CLIENT_CERT_VARS = ("AWS_IOT_CERT",)
+DYNAMIC_PRIVATE_KEY_VARS = ("AWS_IOT_PRIVKEY",)
 ROOT_CA_VARS = (
     "AWS_IOT_ROOT_CA_PEM_CK_RX65N_01",
     "BG96_AWS_IOT_ROOT_CA_PEM",
@@ -309,9 +312,22 @@ def main() -> int:
     args = parse_args()
 
     endpoint, endpoint_var = env_value(ENDPOINT_VARS)
-    thing_name, thing_name_var = env_value(THING_NAME_VARS)
-    client_cert, client_cert_var = env_value(CLIENT_CERT_VARS)
-    private_key, private_key_var = env_value(PRIVATE_KEY_VARS)
+    if args.tls_backend == "tsip":
+        thing_name, thing_name_var = env_value(THING_NAME_VARS)
+        client_cert, client_cert_var = env_value(CLIENT_CERT_VARS)
+        private_key, private_key_var = None, None
+    else:
+        dynamic_thing_name, dynamic_thing_name_var = env_value(DYNAMIC_THING_NAME_VARS)
+        dynamic_client_cert, dynamic_client_cert_var = env_value(DYNAMIC_CLIENT_CERT_VARS)
+        dynamic_private_key, dynamic_private_key_var = env_value(DYNAMIC_PRIVATE_KEY_VARS)
+        if any((dynamic_thing_name, dynamic_client_cert, dynamic_private_key)):
+            thing_name, thing_name_var = dynamic_thing_name, dynamic_thing_name_var
+            client_cert, client_cert_var = dynamic_client_cert, dynamic_client_cert_var
+            private_key, private_key_var = dynamic_private_key, dynamic_private_key_var
+        else:
+            thing_name, thing_name_var = env_value(THING_NAME_VARS)
+            client_cert, client_cert_var = env_value(CLIENT_CERT_VARS)
+            private_key, private_key_var = env_value(PRIVATE_KEY_VARS)
     root_ca, root_ca_var = env_value(ROOT_CA_VARS)
 
     normalized_client_cert = normalize_certificate_pem(client_cert)
