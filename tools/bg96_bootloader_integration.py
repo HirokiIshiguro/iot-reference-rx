@@ -106,6 +106,9 @@ PRIVATE_KEY_VARS = (
     "AWS_IOT_PRIVKEY",
     "AWS_IOT_PRIVATE_KEY",
 )
+DYNAMIC_THING_NAME_VARS = ("RX65N_BG96_AWS_IOT_THING_NAME",)
+DYNAMIC_CLIENT_CERT_VARS = ("AWS_IOT_CERT",)
+DYNAMIC_PRIVATE_KEY_VARS = ("AWS_IOT_PRIVKEY",)
 CELLULAR_APN_VARS = (
     "AWS_IOT_CELLULAR_APN_CK_RX65N_01",
     "BG96_CELLULAR_APN",
@@ -399,9 +402,22 @@ def provision_cellular_apn(args: argparse.Namespace, port: serial.Serial) -> Non
 
 def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) -> None:
     endpoint, endpoint_var = env_text(ENDPOINT_VARS)
-    thing_name, thing_name_var = env_text(THING_NAME_VARS)
-    client_cert, cert_var = env_text(CLIENT_CERT_VARS)
-    private_key, key_var = env_text(PRIVATE_KEY_VARS)
+    if args.skip_private_key:
+        thing_name, thing_name_var = env_text(THING_NAME_VARS)
+        client_cert, cert_var = env_text(CLIENT_CERT_VARS)
+        private_key, key_var = None, None
+    else:
+        dynamic_thing_name, dynamic_thing_name_var = env_text(DYNAMIC_THING_NAME_VARS)
+        dynamic_client_cert, dynamic_cert_var = env_text(DYNAMIC_CLIENT_CERT_VARS)
+        dynamic_private_key, dynamic_key_var = env_text(DYNAMIC_PRIVATE_KEY_VARS)
+        if any((dynamic_thing_name, dynamic_client_cert, dynamic_private_key)):
+            thing_name, thing_name_var = dynamic_thing_name, dynamic_thing_name_var
+            client_cert, cert_var = dynamic_client_cert, dynamic_cert_var
+            private_key, key_var = dynamic_private_key, dynamic_key_var
+        else:
+            thing_name, thing_name_var = env_text(THING_NAME_VARS)
+            client_cert, cert_var = env_text(CLIENT_CERT_VARS)
+            private_key, key_var = env_text(PRIVATE_KEY_VARS)
     missing = [
         name
         for name, value in (
