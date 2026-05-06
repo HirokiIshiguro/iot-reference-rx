@@ -206,7 +206,7 @@ workflow:
     - if: $CI_COMMIT_BRANCH
       when: always
 
-build_rx72n:
+build_rx72n_ether:
   stage: build
   tags:
     - exec-shell
@@ -298,7 +298,7 @@ build_rx65n_bg96:
       -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS `
       -TlsBackend "$env:RX65N_BG96_TLS_BACKEND"
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx65n_bg96"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
       $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
@@ -330,7 +330,7 @@ build_rx65n_bg96:
     when: always
     paths:
       - rx65n_bg96_e2studio_build.log
-      - artifacts/rx65n_bg96/
+      - artifacts/build_rx65n_bg96/
       - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
@@ -338,7 +338,7 @@ build_rx65n_bg96:
       - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
 
-build_rx65n_bg96_fleet_candidate:
+build_rx65n_bg96_fleet:
   stage: build
   tags:
     - exec-shell
@@ -364,7 +364,7 @@ build_rx65n_bg96_fleet_candidate:
       -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS `
       -TlsBackend "$env:RX65N_BG96_TLS_BACKEND"
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx65n_bg96_fleet_candidate"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx65n_bg96_fleet"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
       $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
@@ -399,7 +399,7 @@ build_rx65n_bg96_fleet_candidate:
     when: always
     paths:
       - rx65n_bg96_e2studio_build_fleet.log
-      - artifacts/rx65n_bg96_fleet_candidate/
+      - artifacts/build_rx65n_bg96_fleet/
       - Projects/boot_loader_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
@@ -407,7 +407,7 @@ build_rx65n_bg96_fleet_candidate:
       - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
 
-build_rx72n_fleet_candidate:
+build_rx72n_ether_fleet:
   stage: build
   tags:
     - exec-shell
@@ -558,13 +558,13 @@ build_rx72n_fleet_candidate:
       when: always
     - when: never
 
-flash_rx72n_linux:
+flash_rx72n_ether:
   stage: flash
   extends: .rx72n_linux_hw_job
   needs:
-    - job: build_rx72n
+    - job: build_rx72n_ether
       artifacts: true
-    - job: cleanup_rx72n_ota_jobs
+    - job: cleanup_rx72n_ether_ota_jobs
       artifacts: false
       optional: true
   rules:
@@ -586,7 +586,7 @@ flash_rx72n_linux:
   script:
     - echo "=== Flash RX72N boot_loader and download app RSU on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx72n_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx72n_ether"
       mkdir -p "$artifact_dir"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
 
@@ -617,10 +617,10 @@ flash_rx72n_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/flash_rx72n_linux/
+      - artifacts/flash_rx72n_ether/
     expire_in: 7 days
 
-flash_rx65n_bg96_bootloader:
+flash_rx65n_bg96:
   stage: flash
   extends:
     - .rx65n_bg96_linux_hw_job
@@ -631,7 +631,7 @@ flash_rx65n_bg96_bootloader:
   script:
     - echo "=== Flash CK-RX65N BG96 boot loader on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx65n_bg96_bootloader"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx65n_bg96"
       mkdir -p "$artifact_dir"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
@@ -643,7 +643,7 @@ flash_rx65n_bg96_bootloader:
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
       python3 tools/bg96_bootloader_integration.py \
         --action flash-bootloader \
-        --bootloader-mot artifacts/rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --bootloader-mot artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot \
         --uart-port "${uart_port}" \
         --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
         --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
@@ -657,10 +657,10 @@ flash_rx65n_bg96_bootloader:
   artifacts:
     when: always
     paths:
-      - artifacts/flash_rx65n_bg96_bootloader/
+      - artifacts/flash_rx65n_bg96/
     expire_in: 7 days
 
-download_rx65n_bg96_rsu_via_bootloader:
+download_rx65n_bg96_app:
   stage: bootloader_download
   extends:
     - .rx65n_bg96_linux_hw_job
@@ -668,12 +668,12 @@ download_rx65n_bg96_rsu_via_bootloader:
   needs:
     - job: build_rx65n_bg96
       artifacts: true
-    - job: flash_rx65n_bg96_bootloader
+    - job: flash_rx65n_bg96
       artifacts: true
   script:
     - echo "=== Download CK-RX65N BG96 app RSU via boot loader ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/download_rx65n_bg96_rsu"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/download_rx65n_bg96_app"
       mkdir -p "$artifact_dir"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
@@ -685,8 +685,8 @@ download_rx65n_bg96_rsu_via_bootloader:
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
       python3 tools/bg96_bootloader_integration.py \
         --action download-rsu \
-        --bootloader-mot artifacts/rx65n_bg96/boot_loader_ck_rx65n.mot \
-        --userprog-rsu artifacts/rx65n_bg96/aws_bg96_ck_rx65n.rsu \
+        --bootloader-mot artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --userprog-rsu artifacts/build_rx65n_bg96/aws_bg96_ck_rx65n.rsu \
         --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
         --uart-port "${uart_port}" \
         --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
@@ -702,7 +702,7 @@ download_rx65n_bg96_rsu_via_bootloader:
   artifacts:
     when: always
     paths:
-      - artifacts/download_rx65n_bg96_rsu/
+      - artifacts/download_rx65n_bg96_app/
     expire_in: 7 days
 
 run_rx65n_bg96_app:
@@ -711,7 +711,7 @@ run_rx65n_bg96_app:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_app_rules
   needs:
-    - job: download_rx65n_bg96_rsu_via_bootloader
+    - job: download_rx65n_bg96_app
       artifacts: true
   script:
     - echo "=== Verify CK-RX65N BG96 app startup ==="
@@ -725,8 +725,8 @@ run_rx65n_bg96_app:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
@@ -763,12 +763,12 @@ prepare_rx65n_bg96_mqtt_credentials:
   extends:
     - .rx65n_bg96_credential_prepare_rules
   needs:
-    - job: download_rx65n_bg96_rsu_via_bootloader
+    - job: download_rx65n_bg96_app
       artifacts: false
   script:
     - $ErrorActionPreference = "Stop"
     - |
-      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_mqtt_credentials"
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\prepare_rx65n_bg96_mqtt_credentials"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
       function Get-FirstEnv {
@@ -820,10 +820,10 @@ prepare_rx65n_bg96_mqtt_credentials:
   artifacts:
     when: always
     paths:
-      - artifacts/rx65n_bg96_mqtt_credentials/
+      - artifacts/prepare_rx65n_bg96_mqtt_credentials/
     expire_in: 7 days
 
-provision_rx65n_bg96_mqtt_credentials:
+provision_rx65n_bg96_mqtt:
   stage: provision
   extends:
     - .rx65n_bg96_linux_hw_job
@@ -831,7 +831,7 @@ provision_rx65n_bg96_mqtt_credentials:
   needs:
     - job: prepare_rx65n_bg96_mqtt_credentials
       artifacts: true
-    - job: download_rx65n_bg96_rsu_via_bootloader
+    - job: download_rx65n_bg96_app
       artifacts: true
     - job: run_rx65n_bg96_app
       artifacts: true
@@ -839,7 +839,7 @@ provision_rx65n_bg96_mqtt_credentials:
   script:
     - echo "=== Provision CK-RX65N BG96 MQTT/APN credentials ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_mqtt_credentials"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_mqtt"
       mkdir -p "$artifact_dir"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
@@ -848,15 +848,15 @@ provision_rx65n_bg96_mqtt_credentials:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
         exit 1
       fi
 
-      credential_dir="$CI_PROJECT_DIR/artifacts/rx65n_bg96_mqtt_credentials"
+      credential_dir="$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials"
       if [ -f "$credential_dir/iot_credentials_meta.json" ]; then
         export RX65N_BG96_AWS_IOT_THING_NAME="$(tr -d '\r\n' < "$credential_dir/thing_name.txt")"
         export AWS_IOT_CERT="$credential_dir/certificate.pem"
@@ -925,7 +925,7 @@ provision_rx65n_bg96_mqtt_credentials:
   artifacts:
     when: always
     paths:
-      - artifacts/provision_rx65n_bg96_mqtt_credentials/
+      - artifacts/provision_rx65n_bg96_mqtt/
     expire_in: 7 days
 
 reset_rx65n_bg96_app:
@@ -934,9 +934,9 @@ reset_rx65n_bg96_app:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_mqtt_rules
   needs:
-    - job: download_rx65n_bg96_rsu_via_bootloader
+    - job: download_rx65n_bg96_app
       artifacts: true
-    - job: provision_rx65n_bg96_mqtt_credentials
+    - job: provision_rx65n_bg96_mqtt
       artifacts: true
   script:
     - echo "=== Reset CK-RX65N BG96 app after provisioning ==="
@@ -950,8 +950,8 @@ reset_rx65n_bg96_app:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
       fi
       if [ -z "$uart_port" ]; then
         uart_port="unused"
@@ -976,20 +976,20 @@ reset_rx65n_bg96_app:
       - artifacts/reset_rx65n_bg96_app/
     expire_in: 7 days
 
-verify_rx65n_bg96_mqtt:
+test_rx65n_bg96_mqtt:
   stage: test
   extends:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_mqtt_rules
   needs:
-    - job: download_rx65n_bg96_rsu_via_bootloader
+    - job: download_rx65n_bg96_app
       artifacts: true
     - job: reset_rx65n_bg96_app
       artifacts: true
   script:
     - echo "=== Verify CK-RX65N BG96 MQTT Pub/Sub ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/verify_rx65n_bg96_mqtt"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_mqtt"
       mkdir -p "$artifact_dir"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
@@ -998,8 +998,8 @@ verify_rx65n_bg96_mqtt:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
@@ -1031,10 +1031,10 @@ verify_rx65n_bg96_mqtt:
   artifacts:
     when: always
     paths:
-      - artifacts/verify_rx65n_bg96_mqtt/
+      - artifacts/test_rx65n_bg96_mqtt/
     expire_in: 7 days
 
-build_rx65n_bg96_ota_candidate:
+build_rx65n_bg96_ota:
   stage: ota_build
   tags:
     - exec-shell
@@ -1046,16 +1046,16 @@ build_rx65n_bg96_ota_candidate:
   needs:
     - job: prepare_rx65n_bg96_mqtt_credentials
       artifacts: true
-    - job: verify_rx65n_bg96_mqtt
+    - job: test_rx65n_bg96_mqtt
       artifacts: true
   script:
     - $ErrorActionPreference = "Stop"
     - python -m pip install --user cryptography
     - |
-      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate"
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\build_rx65n_bg96_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
-      $credentialDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_mqtt_credentials"
+      $credentialDir = Join-Path $env:CI_PROJECT_DIR "artifacts\prepare_rx65n_bg96_mqtt_credentials"
       $dynamicMeta = Join-Path $credentialDir "iot_credentials_meta.json"
       if (Test-Path -LiteralPath $dynamicMeta) {
         $env:RX65N_BG96_AWS_IOT_THING_NAME = (Get-Content -LiteralPath (Join-Path $credentialDir "thing_name.txt") -Raw).Trim()
@@ -1129,36 +1129,36 @@ build_rx65n_bg96_ota_candidate:
 
       Write-Host "Using locally generated RX65N BG96 OTA code signer certificate and customCodeSigning signature."
   after_script:
-    - $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate"
+    - $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\build_rx65n_bg96_ota"
     - $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
     - $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\$rx65nBg96AppProject\e2studio_ccrx"
     - python tools/patch_bg96_aws_iot_mcu.py restore --aws-root "$appRoot" --backup "$artifactDir\aws_dev_mode_key_provisioning.c.orig"
   artifacts:
     when: always
     paths:
-      - artifacts/rx65n_bg96_ota_candidate/
+      - artifacts/build_rx65n_bg96_ota/
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
 
-provision_rx65n_bg96_ota_signer_certificate:
+provision_rx65n_bg96_ota_signer:
   stage: ota_prepare
   extends:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_ota_rules
   needs:
-    - job: build_rx65n_bg96_ota_candidate
+    - job: build_rx65n_bg96_ota
       artifacts: true
-    - job: download_rx65n_bg96_rsu_via_bootloader
+    - job: download_rx65n_bg96_app
       artifacts: true
-    - job: verify_rx65n_bg96_mqtt
+    - job: test_rx65n_bg96_mqtt
       artifacts: true
   script:
     - echo "=== Provision CK-RX65N BG96 OTA signer certificate ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_ota_signer_certificate"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_ota_signer"
       mkdir -p "$artifact_dir"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
@@ -1167,8 +1167,8 @@ provision_rx65n_bg96_ota_signer_certificate:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
@@ -1183,7 +1183,7 @@ provision_rx65n_bg96_ota_signer_certificate:
       elif [ -n "${BG96_OTA_CODE_SIGNING_CERT:-}" ]; then
         code_signer_cert="${BG96_OTA_CODE_SIGNING_CERT}"
       else
-        code_signer_cert="artifacts/rx65n_bg96_ota_candidate/bg96_ota_codesign_cert.pem"
+        code_signer_cert="artifacts/build_rx65n_bg96_ota/bg96_ota_codesign_cert.pem"
       fi
       echo "Using RX65N BG96 OTA code signer certificate: ${code_signer_cert}"
       python3 tools/bg96_ota_prepare.py \
@@ -1207,10 +1207,10 @@ provision_rx65n_bg96_ota_signer_certificate:
   artifacts:
     when: always
     paths:
-      - artifacts/provision_rx65n_bg96_ota_signer_certificate/
+      - artifacts/provision_rx65n_bg96_ota_signer/
     expire_in: 7 days
 
-create_rx65n_bg96_ota_update:
+create_rx65n_bg96_ota:
   stage: ota_create
   tags:
     - exec-shell
@@ -1221,14 +1221,14 @@ create_rx65n_bg96_ota_update:
   needs:
     - job: prepare_rx65n_bg96_mqtt_credentials
       artifacts: true
-    - job: build_rx65n_bg96_ota_candidate
+    - job: build_rx65n_bg96_ota
       artifacts: true
-    - job: provision_rx65n_bg96_ota_signer_certificate
+    - job: provision_rx65n_bg96_ota_signer
       artifacts: true
   script:
     - $ErrorActionPreference = "Stop"
     - |
-      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota"
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx65n_bg96_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       function Get-FirstEnv {
         param([string[]]$Names)
@@ -1269,7 +1269,7 @@ create_rx65n_bg96_ota_update:
         throw "AWS OTA service role must be a full IAM role ARN or ACCOUNT_ID:role/NAME shorthand."
       }
 
-      $credentialDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_mqtt_credentials"
+      $credentialDir = Join-Path $env:CI_PROJECT_DIR "artifacts\prepare_rx65n_bg96_mqtt_credentials"
       $thingName = Get-FirstEnv @("AWS_OTA_THING_NAME_CK_RX65N_01", "BG96_OTA_THING_NAME", "AWS_IOT_THING_NAME_CK_RX65N_01", "RX65N_BG96_AWS_IOT_THING_NAME", "BG96_AWS_IOT_THING_NAME", "BG96_MQTT_THING_NAME", "AWS_IOT_THING_NAME")
       if ([string]::IsNullOrWhiteSpace($thingName)) {
         $thingPath = Join-Path $credentialDir "thing_name.txt"
@@ -1278,15 +1278,15 @@ create_rx65n_bg96_ota_update:
         }
       }
 
-      $version = (Get-Content (Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\version.txt") -Raw).Trim()
+      $version = (Get-Content (Join-Path $env:CI_PROJECT_DIR "artifacts\build_rx65n_bg96_ota\version.txt") -Raw).Trim()
       $versionToken = $version -replace '\.', '_'
-      $payload = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\bg96_${versionToken}_ota_payload.bin"
-      $payloadSignature = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\bg96_${versionToken}_ota_payload.sig.der"
-      $codeSignerCert = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota_candidate\bg96_ota_codesign_cert.pem"
+      $payload = Join-Path $env:CI_PROJECT_DIR "artifacts\build_rx65n_bg96_ota\bg96_${versionToken}_ota_payload.bin"
+      $payloadSignature = Join-Path $env:CI_PROJECT_DIR "artifacts\build_rx65n_bg96_ota\bg96_${versionToken}_ota_payload.sig.der"
+      $codeSignerCert = Join-Path $env:CI_PROJECT_DIR "artifacts\build_rx65n_bg96_ota\bg96_ota_codesign_cert.pem"
       if (-not (Test-Path -LiteralPath $payload)) { throw "RX65N BG96 OTA payload missing: $payload" }
       if (-not (Test-Path -LiteralPath $payloadSignature)) { throw "RX65N BG96 OTA payload signature missing: $payloadSignature" }
       if (-not (Test-Path -LiteralPath $codeSignerCert)) { throw "RX65N BG96 OTA code signer certificate missing: $codeSignerCert" }
-      $parkMarker = Join-Path $env:CI_PROJECT_DIR "artifacts\provision_rx65n_bg96_ota_signer_certificate\parked.ok"
+      $parkMarker = Join-Path $env:CI_PROJECT_DIR "artifacts\provision_rx65n_bg96_ota_signer\parked.ok"
       if (-not (Test-Path -LiteralPath $parkMarker)) { throw "RX65N BG96 OTA signer provisioning marker missing: $parkMarker" }
 
       $region = Resolve-AwsRegion
@@ -1316,7 +1316,7 @@ create_rx65n_bg96_ota_update:
   artifacts:
     when: always
     paths:
-      - artifacts/rx65n_bg96_ota/
+      - artifacts/create_rx65n_bg96_ota/
     expire_in: 7 days
 
 test_rx65n_bg96_ota:
@@ -1325,18 +1325,18 @@ test_rx65n_bg96_ota:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_ota_rules
   needs:
-    - job: build_rx65n_bg96_ota_candidate
+    - job: build_rx65n_bg96_ota
       artifacts: true
-    - job: download_rx65n_bg96_rsu_via_bootloader
+    - job: download_rx65n_bg96_app
       artifacts: true
-    - job: create_rx65n_bg96_ota_update
+    - job: create_rx65n_bg96_ota
       artifacts: true
   script:
     - echo "=== Verify CK-RX65N BG96 OTA ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_ota"
       mkdir -p "$artifact_dir"
-      version="$(tr -d '\r\n' < artifacts/rx65n_bg96_ota_candidate/version.txt)"
+      version="$(tr -d '\r\n' < artifacts/build_rx65n_bg96_ota/version.txt)"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
         echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
@@ -1344,8 +1344,8 @@ test_rx65n_bg96_ota:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_rsu/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
@@ -1376,7 +1376,7 @@ test_rx65n_bg96_ota:
       - artifacts/test_rx65n_bg96_ota/
     expire_in: 7 days
 
-cleanup_rx65n_bg96_ota_update:
+cleanup_rx65n_bg96_ota:
   stage: ota_cleanup
   tags:
     - exec-shell
@@ -1388,11 +1388,11 @@ cleanup_rx65n_bg96_ota_update:
       when: always
     - when: never
   dependencies:
-    - create_rx65n_bg96_ota_update
+    - create_rx65n_bg96_ota
   script:
     - $ErrorActionPreference = "Continue"
     - |
-      $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_ota\ota_job_meta.json"
+      $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx65n_bg96_ota\ota_job_meta.json"
       if (-not (Test-Path -LiteralPath $metaPath)) {
         Write-Host "RX65N BG96 OTA metadata missing; cleanup skipped."
         exit 0
@@ -1411,7 +1411,7 @@ cleanup_rx65n_bg96_ota_update:
   artifacts:
     when: always
     paths:
-      - artifacts/rx65n_bg96_ota/
+      - artifacts/create_rx65n_bg96_ota/
     expire_in: 7 days
 
 cleanup_rx65n_bg96_mqtt_credentials:
@@ -1431,7 +1431,7 @@ cleanup_rx65n_bg96_mqtt_credentials:
   script:
     - $ErrorActionPreference = "Continue"
     - |
-      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\rx65n_bg96_mqtt_credentials"
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\prepare_rx65n_bg96_mqtt_credentials"
       $metaPath = Join-Path $artifactDir "iot_credentials_meta.json"
       $outPath = Join-Path $artifactDir "cleanup_summary.json"
       if (-not (Test-Path -LiteralPath $metaPath)) {
@@ -1444,16 +1444,16 @@ cleanup_rx65n_bg96_mqtt_credentials:
   artifacts:
     when: always
     paths:
-      - artifacts/rx65n_bg96_mqtt_credentials/
+      - artifacts/prepare_rx65n_bg96_mqtt_credentials/
     expire_in: 7 days
 
-flash_rx72n_fleet_linux:
+flash_rx72n_ether_fleet:
   stage: fleet_flash
   extends: .rx72n_linux_hw_job
   needs:
-    - job: build_rx72n_fleet_candidate
+    - job: build_rx72n_ether_fleet
       artifacts: true
-    - job: test_ota_rx72n_linux
+    - job: test_rx72n_ether_ota
       artifacts: true
       optional: true
   rules:
@@ -1463,7 +1463,7 @@ flash_rx72n_fleet_linux:
   script:
     - echo "=== Flash RX72N Fleet Provisioning image on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx72n_fleet_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx72n_ether_fleet"
       mkdir -p "$artifact_dir"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
 
@@ -1494,15 +1494,15 @@ flash_rx72n_fleet_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/flash_rx72n_fleet_linux/
+      - artifacts/flash_rx72n_ether_fleet/
     expire_in: 7 days
 
-provision_rx72n_linux:
+provision_rx72n_ether_mqtt:
   stage: provision
   extends: .rx72n_linux_hw_job
   needs:
-    - build_rx72n
-    - flash_rx72n_linux
+    - build_rx72n_ether
+    - flash_rx72n_ether
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -1522,7 +1522,7 @@ provision_rx72n_linux:
   script:
     - echo "=== Provision RX72N AWS IoT credentials on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_ether_mqtt"
       mkdir -p "$artifact_dir"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
 
@@ -1574,15 +1574,15 @@ provision_rx72n_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/provision_rx72n_linux/
+      - artifacts/provision_rx72n_ether_mqtt/
     expire_in: 7 days
 
-provision_rx72n_fleet_linux:
+provision_rx72n_ether_fleet:
   stage: fleet_provision
   extends: .rx72n_linux_hw_job
   needs:
-    - build_rx72n_fleet_candidate
-    - flash_rx72n_fleet_linux
+    - build_rx72n_ether_fleet
+    - flash_rx72n_ether_fleet
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -1590,7 +1590,7 @@ provision_rx72n_fleet_linux:
   script:
     - echo "=== Provision RX72N fleet claim credentials on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_fleet_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_ether_fleet"
       mkdir -p "$artifact_dir"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
 
@@ -1619,17 +1619,17 @@ provision_rx72n_fleet_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/provision_rx72n_fleet_linux/
+      - artifacts/provision_rx72n_ether_fleet/
     expire_in: 7 days
 
-cleanup_rx72n_ota_jobs:
+cleanup_rx72n_ether_ota_jobs:
   stage: pre_test_cleanup
   tags:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
   needs:
-    - job: build_rx72n
+    - job: build_rx72n_ether
       artifacts: false
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
@@ -1650,29 +1650,29 @@ cleanup_rx72n_ota_jobs:
   script:
     - Write-Host "=== Cleanup stale RX72N OTA IoT Jobs ==="
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ota_jobs"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       python tools\cleanup_iot_jobs.py `
         --thing-name "$env:RX72N_DEVICE_ID" `
         --region "$env:AWS_DEFAULT_REGION" `
         --job-id-prefix "AFR_OTA-" `
         --output-json "$artifactDir\cleanup_summary.json" `
-        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ota_jobs.log"
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_ota_jobs.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
     paths:
-      - artifacts/cleanup_rx72n_ota_jobs/
+      - artifacts/cleanup_rx72n_ether_ota_jobs/
     expire_in: 7 days
 
-test_mqtt_rx72n_linux:
+test_rx72n_ether_mqtt:
   stage: test
   extends: .rx72n_linux_hw_job
   needs:
-    - build_rx72n
-    - flash_rx72n_linux
-    - provision_rx72n_linux
-    - cleanup_rx72n_ota_jobs
+    - build_rx72n_ether
+    - flash_rx72n_ether
+    - provision_rx72n_ether_mqtt
+    - cleanup_rx72n_ether_ota_jobs
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -1692,7 +1692,7 @@ test_mqtt_rx72n_linux:
   script:
     - echo "=== Verify RX72N MQTT baseline on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/test_mqtt_rx72n_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_mqtt"
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
@@ -1711,16 +1711,16 @@ test_mqtt_rx72n_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/test_mqtt_rx72n_linux/
+      - artifacts/test_rx72n_ether_mqtt/
     expire_in: 7 days
 
-test_fleet_rx72n_linux:
+test_rx72n_ether_fleet:
   stage: fleet_test
   extends: .rx72n_linux_hw_job
   needs:
-    - build_rx72n_fleet_candidate
-    - flash_rx72n_fleet_linux
-    - provision_rx72n_fleet_linux
+    - build_rx72n_ether_fleet
+    - flash_rx72n_ether_fleet
+    - provision_rx72n_ether_fleet
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -1728,7 +1728,7 @@ test_fleet_rx72n_linux:
   script:
     - echo "=== Verify RX72N fleet provisioning on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/test_fleet_rx72n_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_fleet"
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
@@ -1743,10 +1743,10 @@ test_fleet_rx72n_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/test_fleet_rx72n_linux/
+      - artifacts/test_rx72n_ether_fleet/
     expire_in: 7 days
 
-cleanup_rx72n_fleet_resources:
+cleanup_rx72n_ether_fleet:
   stage: fleet_cleanup
   allow_failure: true
   tags:
@@ -1754,7 +1754,7 @@ cleanup_rx72n_fleet_resources:
     - os-windows
     - hw-ishiguro-pc
   dependencies:
-    - test_fleet_rx72n_linux
+    - test_rx72n_ether_fleet
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: always
@@ -1762,9 +1762,9 @@ cleanup_rx72n_fleet_resources:
   script:
     - Write-Host "=== Cleanup RX72N Fleet Provisioning AWS resources ==="
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_fleet_resources"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_fleet"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-      $summary = "$env:CI_PROJECT_DIR\artifacts\test_fleet_rx72n_linux\fleet_summary.json"
+      $summary = "$env:CI_PROJECT_DIR\artifacts\test_rx72n_ether_fleet\fleet_summary.json"
       if (-not (Test-Path $summary)) {
         Write-Host "RX72N fleet summary not found; cleanup skipped: $summary"
         Set-Content -Path "$artifactDir\cleanup_summary.json" -Value '{"skipped":true,"reason":"fleet_summary_missing"}' -Encoding ascii
@@ -1776,29 +1776,29 @@ cleanup_rx72n_fleet_resources:
         --region "$env:AWS_DEFAULT_REGION" `
         --policy-name "$env:RX72N_FLEET_POLICY_NAME" `
         --output-json "$artifactDir\cleanup_summary.json" `
-        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_fleet_resources.log"
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_fleet.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
     paths:
-      - artifacts/cleanup_rx72n_fleet_resources/
+      - artifacts/cleanup_rx72n_ether_fleet/
     expire_in: 7 days
 
-flash_rx65n_bg96_fleet_bootloader:
+flash_rx65n_bg96_fleet:
   stage: fleet_flash
   extends:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_fleet_rules
   needs:
-    - job: build_rx65n_bg96_fleet_candidate
+    - job: build_rx65n_bg96_fleet
       artifacts: true
-    - job: cleanup_rx65n_bg96_ota_update
+    - job: cleanup_rx65n_bg96_ota
       artifacts: false
       optional: true
   script:
     - echo "=== Flash CK-RX65N BG96 bootloader for Fleet Provisioning ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx65n_bg96_fleet_bootloader"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx65n_bg96_fleet"
       mkdir -p "$artifact_dir"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
@@ -1809,7 +1809,7 @@ flash_rx65n_bg96_fleet_bootloader:
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
       python3 tools/bg96_bootloader_integration.py \
         --action flash-bootloader \
-        --bootloader-mot "$CI_PROJECT_DIR/artifacts/rx65n_bg96_fleet_candidate/boot_loader_ck_rx65n.mot" \
+        --bootloader-mot "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96_fleet/boot_loader_ck_rx65n.mot" \
         --uart-port "unused" \
         --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
         --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
@@ -1823,23 +1823,23 @@ flash_rx65n_bg96_fleet_bootloader:
   artifacts:
     when: always
     paths:
-      - artifacts/flash_rx65n_bg96_fleet_bootloader/
+      - artifacts/flash_rx65n_bg96_fleet/
     expire_in: 7 days
 
-provision_rx65n_bg96_fleet_credentials:
+provision_rx65n_bg96_fleet:
   stage: fleet_provision
   extends:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_fleet_rules
   needs:
-    - job: build_rx65n_bg96_fleet_candidate
+    - job: build_rx65n_bg96_fleet
       artifacts: true
-    - job: flash_rx65n_bg96_fleet_bootloader
+    - job: flash_rx65n_bg96_fleet
       artifacts: true
   script:
     - echo "=== Download and provision CK-RX65N BG96 Fleet Provisioning image ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_fleet_credentials"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_fleet"
       mkdir -p "$artifact_dir"
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
@@ -1851,8 +1851,8 @@ provision_rx65n_bg96_fleet_credentials:
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
       python3 tools/bg96_bootloader_integration.py \
         --action download-rsu \
-        --bootloader-mot "$CI_PROJECT_DIR/artifacts/rx65n_bg96_fleet_candidate/boot_loader_ck_rx65n.mot" \
-        --userprog-rsu "$CI_PROJECT_DIR/artifacts/rx65n_bg96_fleet_candidate/aws_bg96_ck_rx65n_fleet.rsu" \
+        --bootloader-mot "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96_fleet/boot_loader_ck_rx65n.mot" \
+        --userprog-rsu "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96_fleet/aws_bg96_ck_rx65n_fleet.rsu" \
         --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
         --uart-port "${uart_port}" \
         --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
@@ -1910,7 +1910,7 @@ provision_rx65n_bg96_fleet_credentials:
   artifacts:
     when: always
     paths:
-      - artifacts/provision_rx65n_bg96_fleet_credentials/
+      - artifacts/provision_rx65n_bg96_fleet/
     expire_in: 7 days
 
 test_rx65n_bg96_fleet:
@@ -1919,7 +1919,7 @@ test_rx65n_bg96_fleet:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_fleet_rules
   needs:
-    - job: provision_rx65n_bg96_fleet_credentials
+    - job: provision_rx65n_bg96_fleet
       artifacts: true
   script:
     - echo "=== Verify CK-RX65N BG96 Fleet Provisioning ==="
@@ -1933,8 +1933,8 @@ test_rx65n_bg96_fleet:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/provision_rx65n_bg96_fleet_credentials/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/provision_rx65n_bg96_fleet_credentials/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f artifacts/provision_rx65n_bg96_fleet/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/provision_rx65n_bg96_fleet/selected_uart_port.txt)"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
@@ -1960,7 +1960,7 @@ test_rx65n_bg96_fleet:
       - artifacts/test_rx65n_bg96_fleet/
     expire_in: 7 days
 
-cleanup_rx65n_bg96_fleet_resources:
+cleanup_rx65n_bg96_fleet:
   stage: fleet_cleanup
   allow_failure: true
   tags:
@@ -1974,7 +1974,7 @@ cleanup_rx65n_bg96_fleet_resources:
   script:
     - Write-Host "=== Cleanup CK-RX65N BG96 Fleet Provisioning AWS resources ==="
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx65n_bg96_fleet_resources"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx65n_bg96_fleet"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       $summary = "$env:CI_PROJECT_DIR\artifacts\test_rx65n_bg96_fleet\fleet_summary.json"
       if (-not (Test-Path $summary)) {
@@ -1987,15 +1987,15 @@ cleanup_rx65n_bg96_fleet_resources:
         --region "$env:AWS_DEFAULT_REGION" `
         --policy-name "$env:RX65N_BG96_FLEET_POLICY_NAME" `
         --output-json "$artifactDir\cleanup_summary.json" `
-        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx65n_bg96_fleet_resources.log"
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx65n_bg96_fleet.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
     paths:
-      - artifacts/cleanup_rx65n_bg96_fleet_resources/
+      - artifacts/cleanup_rx65n_bg96_fleet/
     expire_in: 7 days
 
-flash_rx72n:
+flash_rx72n_ether_windows:
   stage: flash
   tags:
     - exec-shell
@@ -2003,7 +2003,7 @@ flash_rx72n:
     - hw-ishiguro-pc
   resource_group: rx72n-envision-kit-local
   needs:
-    - build_rx72n
+    - build_rx72n_ether
   rules:
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -2013,7 +2013,7 @@ flash_rx72n:
     - pip install pyserial --quiet
     - if (-not $env:RFP_TOOL) { Write-Error "RFP_TOOL not set"; exit 1 }
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\flash_rx72n"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\flash_rx72n_ether_windows"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       $resetCmd = '"{0}" -device RX72x -tool {1} -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
         $env:RFP_CLI, $env:RFP_TOOL, $env:RFP_SPEED, $env:RFP_AUTH
@@ -2043,10 +2043,10 @@ flash_rx72n:
   artifacts:
     when: always
     paths:
-      - artifacts/flash_rx72n/
+      - artifacts/flash_rx72n_ether_windows/
     expire_in: 7 days
 
-provision_rx72n:
+provision_rx72n_ether_mqtt_windows:
   stage: provision
   tags:
     - exec-shell
@@ -2054,8 +2054,8 @@ provision_rx72n:
     - hw-ishiguro-pc
   resource_group: rx72n-envision-kit-local
   needs:
-    - build_rx72n
-    - flash_rx72n
+    - build_rx72n_ether
+    - flash_rx72n_ether_windows
   rules:
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -2068,7 +2068,7 @@ provision_rx72n:
     - if (-not $env:AWS_CLIENT_CERT_RX72N_02) { Write-Error "AWS_CLIENT_CERT_RX72N_02 not set"; exit 1 }
     - if (-not $env:AWS_PRIVATE_KEY_RX72N_02) { Write-Error "AWS_PRIVATE_KEY_RX72N_02 not set"; exit 1 }
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\provision_rx72n"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\provision_rx72n_ether_mqtt_windows"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       $resetCmd = '"{0}" -device RX72x -tool {1} -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
         $env:RFP_CLI, $env:RFP_TOOL, $env:RFP_SPEED, $env:RFP_AUTH
@@ -2091,10 +2091,10 @@ provision_rx72n:
   artifacts:
     when: always
     paths:
-      - artifacts/provision_rx72n/
+      - artifacts/provision_rx72n_ether_mqtt_windows/
     expire_in: 7 days
 
-test_mqtt_rx72n:
+test_rx72n_ether_mqtt_windows:
   stage: test
   tags:
     - exec-shell
@@ -2102,9 +2102,9 @@ test_mqtt_rx72n:
     - hw-ishiguro-pc
   resource_group: rx72n-envision-kit-local
   needs:
-    - build_rx72n
-    - flash_rx72n
-    - provision_rx72n
+    - build_rx72n_ether
+    - flash_rx72n_ether_windows
+    - provision_rx72n_ether_mqtt_windows
   rules:
     - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -2113,7 +2113,7 @@ test_mqtt_rx72n:
     - Write-Host "=== Verify RX72N MQTT baseline ==="
     - pip install pyserial --quiet
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\test_mqtt_rx72n"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\test_rx72n_ether_mqtt_windows"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       python -m serial.tools.list_ports -v 2>&1 | Tee-Object -FilePath "$artifactDir\serial_ports.txt"
       $resetCmd = '"{0}" -device RX72x -tool {1} -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
@@ -2129,10 +2129,10 @@ test_mqtt_rx72n:
   artifacts:
     when: always
     paths:
-      - artifacts/test_mqtt_rx72n/
+      - artifacts/test_rx72n_ether_mqtt_windows/
     expire_in: 7 days
 
-build_rx72n_mqtt_candidate:
+build_rx72n_ether_mqtt_candidate:
   stage: build
   tags:
     - exec-shell
@@ -2184,14 +2184,14 @@ build_rx72n_mqtt_candidate:
       - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
-package_rx72n_mqtt_candidate_rsu:
+package_rx72n_ether_mqtt_candidate_rsu:
   stage: package
   tags:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
   needs:
-    - job: build_rx72n_mqtt_candidate
+    - job: build_rx72n_ether_mqtt_candidate
       artifacts: true
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
@@ -2205,13 +2205,13 @@ package_rx72n_mqtt_candidate_rsu:
     - |
       & "$env:CI_PROJECT_DIR\tools\generate_rx72n_rsu.ps1" `
         -ProjectRoot "$env:CI_PROJECT_DIR" `
-        -Output "$env:CI_PROJECT_DIR\artifacts\rx72n_mqtt_candidate.rsu" `
+        -Output "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_mqtt_candidate.rsu" `
         -TlsBackend "$env:RX72N_TLS_BACKEND"
-    - if (-not (Test-Path "$env:CI_PROJECT_DIR\artifacts\rx72n_mqtt_candidate.rsu")) { Write-Error "RSU missing"; exit 1 }
+    - if (-not (Test-Path "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_mqtt_candidate.rsu")) { Write-Error "RSU missing"; exit 1 }
     - Write-Host "PACKAGE MQTT CANDIDATE SUCCESS"
   artifacts:
     paths:
-      - artifacts/rx72n_mqtt_candidate.rsu
+      - artifacts/build_rx72n_ether_mqtt_candidate.rsu
       - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
@@ -2221,7 +2221,7 @@ package_rx72n_mqtt_candidate_rsu:
       - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
-build_rx72n_ota_candidate:
+build_rx72n_ether_ota:
   stage: ota_build
   tags:
     - exec-shell
@@ -2229,7 +2229,7 @@ build_rx72n_ota_candidate:
     - hw-ishiguro-pc
   resource_group: rx72n-e2studio-build
   needs:
-    - test_mqtt_rx72n_linux
+    - test_rx72n_ether_mqtt
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -2248,7 +2248,7 @@ build_rx72n_ota_candidate:
     - Write-Host "=== Build RX72N OTA candidate ==="
     - pip install cryptography --quiet
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota_candidate"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
       if (-not $env:RX72N_OTA_CANDIDATE_VERSION) { Write-Error "RX72N_OTA_CANDIDATE_VERSION not set"; exit 1 }
@@ -2282,7 +2282,7 @@ build_rx72n_ota_candidate:
   artifacts:
     when: always
     paths:
-      - artifacts/rx72n_ota_candidate/
+      - artifacts/build_rx72n_ether_ota/
       - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.abs
@@ -2292,13 +2292,13 @@ build_rx72n_ota_candidate:
       - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 1 day
 
-park_rx72n_ota_cli_linux:
+park_rx72n_ether_ota_cli:
   stage: ota_prepare
   extends: .rx72n_linux_hw_job
   needs:
-    - job: build_rx72n
+    - job: build_rx72n_ether
       artifacts: true
-    - test_mqtt_rx72n_linux
+    - test_rx72n_ether_mqtt
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: on_success
@@ -2316,7 +2316,7 @@ park_rx72n_ota_cli_linux:
   script:
     - echo "=== Park RX72N in CLI before Windows OTA job creation ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/park_rx72n_ota_cli_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/park_rx72n_ether_ota_cli"
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
@@ -2355,19 +2355,19 @@ park_rx72n_ota_cli_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/park_rx72n_ota_cli_linux/
+      - artifacts/park_rx72n_ether_ota_cli/
     expire_in: 7 days
 
-create_rx72n_ota_update:
+create_rx72n_ether_ota:
   stage: ota_create
   tags:
     - exec-shell
     - os-windows
     - hw-ishiguro-pc
   needs:
-    - job: build_rx72n_ota_candidate
+    - job: build_rx72n_ether_ota
       artifacts: true
-    - job: park_rx72n_ota_cli_linux
+    - job: park_rx72n_ether_ota_cli
       artifacts: true
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
@@ -2386,7 +2386,7 @@ create_rx72n_ota_update:
   script:
     - Write-Host "=== Create RX72N AWS IoT OTA update ==="
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\create_rx72n_ether_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
       foreach ($name in @("RX72N_DEVICE_ID", "RX72N_OTA_CANDIDATE_VERSION", "AWS_OTA_S3_BUCKET_RX72N_02", "AWS_OTA_SIGNING_PROFILE_RX72N_02", "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02", "AWS_DEFAULT_REGION")) {
@@ -2401,9 +2401,9 @@ create_rx72n_ota_update:
       }
 
       $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
-      $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\rx72n_ota_candidate\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
+      $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_ota\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
       if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
-      $parkMarker = "$env:CI_PROJECT_DIR\artifacts\park_rx72n_ota_cli_linux\parked.ok"
+      $parkMarker = "$env:CI_PROJECT_DIR\artifacts\park_rx72n_ether_ota_cli\parked.ok"
       if (-not (Test-Path $parkMarker)) { Write-Error "RX72N CLI park marker missing: $parkMarker"; exit 1 }
 
       python tools/create_ota_update.py `
@@ -2421,14 +2421,14 @@ create_rx72n_ota_update:
   artifacts:
     when: always
     paths:
-      - artifacts/rx72n_ota/
+      - artifacts/create_rx72n_ether_ota/
     expire_in: 7 days
 
-test_ota_rx72n_linux:
+test_rx72n_ether_ota:
   stage: ota_test
   extends: .rx72n_linux_hw_job
   needs:
-    - job: create_rx72n_ota_update
+    - job: create_rx72n_ether_ota
       artifacts: true
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
@@ -2447,7 +2447,7 @@ test_ota_rx72n_linux:
   script:
     - echo "=== Verify RX72N OTA over MQTT on Linux runner ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/test_ota_rx72n_linux"
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_ota"
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
 
@@ -2472,5 +2472,5 @@ test_ota_rx72n_linux:
   artifacts:
     when: always
     paths:
-      - artifacts/test_ota_rx72n_linux/
+      - artifacts/test_rx72n_ether_ota/
     expire_in: 7 days

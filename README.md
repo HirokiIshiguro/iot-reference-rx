@@ -47,8 +47,10 @@ The following e2 studio projects are maintained under `Projects/`:
 |---------|------|-------------|
 | Boot Loader | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | RX72N dual-bank boot loader for OTA firmware update |
 | AWS Ether Demo | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | FreeRTOS + AWS IoT demo (MQTT PubSub, OTA) over Ethernet |
+| AWS Ether Demo with TSIP | `Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/` | RX72N Ethernet demo using the TSIP-enabled TLS backend |
 | CK-RX65N BG96 Boot Loader | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | RX65N dual-bank boot loader for BG96 OTA |
 | CK-RX65N BG96 AWS Demo | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | FreeRTOS + AWS IoT demo (MQTT PubSub, OTA) over BG96 cellular |
+| CK-RX65N BG96 AWS Demo with TSIP | `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` | BG96 cellular demo using the TSIP-enabled TLS backend; hardware validation requires RX65N-specific TSIP wrapped blobs |
 
 ### Boot Loader Architecture / ブートローダ構成
 
@@ -170,17 +172,44 @@ Demo selection is controlled by macros in `src/frtos_config/demo_config.h`:
 
 ## CI/CD Pipeline
 
-The GitLab CI pipeline provides:
+The GitLab CI pipeline is organized by MCU environment. Job names use
+`<action>_<mcu_env>_<feature>` where possible.
 
-| Stage | Description |
-|-------|-------------|
-| `build_rx72n` | Build boot loader and application (no credentials) |
-| `build_rx65n_bg96` | Build CK-RX65N BG96 boot loader and application, then package the app as `.rsu` |
-| `flash_rx72n` | Write firmware to RX72N Envision Kit via rfp-cli |
-| `provision_rx72n` | Provision AWS IoT credentials over UART CLI |
-| `test_mqtt_rx72n` | Verify MQTT PubSub connectivity on hardware |
-| `build_rx72n_mqtt_candidate` | Legacy focused path: build with injected AWS credentials when `RUN_RX72N_MQTT_CANDIDATE_BUILD=true` |
-| `package_rx72n_mqtt_candidate_rsu` | Legacy focused path: package signed `.rsu` image when `RUN_RX72N_MQTT_CANDIDATE_BUILD=true` |
+| MCU environment | Hardware | Connectivity | Standard runner |
+|-----------------|----------|--------------|-----------------|
+| `rx72n_ether` | RX72N Envision Kit | Ethernet | RPi #2 / `dev-ek-rx72n-set2` |
+| `rx65n_bg96` | CK-RX65N V1 + Quectel BG96 | Cellular Cat-M1/NB-IoT | RPi #3 / `dev-ck-rx65n-bg96` |
+
+Core hardware jobs:
+
+| Function | RX72N Ethernet job | RX65N/BG96 job |
+|----------|--------------------|----------------|
+| Build boot loader and app | `build_rx72n_ether` | `build_rx65n_bg96` |
+| Flash boot loader / initial app | `flash_rx72n_ether` | `flash_rx65n_bg96` |
+| Download app via boot loader | included in `flash_rx72n_ether` | `download_rx65n_bg96_app` |
+| Verify app startup | included in MQTT/OTA observation | `run_rx65n_bg96_app` |
+| Provision MQTT credentials | `provision_rx72n_ether_mqtt` | `provision_rx65n_bg96_mqtt` |
+| Test MQTT | `test_rx72n_ether_mqtt` | `test_rx65n_bg96_mqtt` |
+| Build OTA candidate | `build_rx72n_ether_ota` | `build_rx65n_bg96_ota` |
+| Create AWS IoT OTA job | `create_rx72n_ether_ota` | `create_rx65n_bg96_ota` |
+| Test OTA | `test_rx72n_ether_ota` | `test_rx65n_bg96_ota` |
+| Build Fleet Provisioning image | `build_rx72n_ether_fleet` | `build_rx65n_bg96_fleet` |
+| Test Fleet Provisioning | `test_rx72n_ether_fleet` | `test_rx65n_bg96_fleet` |
+
+Current hardware validation matrix:
+
+| Feature | `rx72n_ether` software TLS | `rx72n_ether` TSIP TLS | `rx65n_bg96` software TLS | `rx65n_bg96` TSIP TLS |
+|---------|----------------------------|------------------------|---------------------------|-----------------------|
+| Build | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
+| Flash / app boot | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
+| MQTT over TLS 1.2 | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
+| MQTT over TLS 1.3 | OK, [pipeline #4667](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4667) | Not implemented | OK, [pipeline #4667](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4667) | Not implemented |
+| OTA over MQTT | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
+| Fleet Provisioning | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Disabled by default | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Disabled by default |
+
+RX65N/BG96 TSIP jobs are defined in the pipeline, but the hardware path is not
+marked as verified until RX65N-specific UFPK-derived wrapped blobs and the
+matching static AWS IoT certificate are provisioned.
 
 ### Pipeline Profiles
 
