@@ -112,8 +112,8 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/coreMQTT/source/interface}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/coreMQTT-Agent/source/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/backoffAlgorithm/source/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/network_transport/using_mbedtls_pkcs11}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/network_transport/using_mbedtls_pkcs11_with_tsip}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/network_transport/using_mbedtls_pkcs11}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/corePKCS11/source/dependency/3rdparty/pkcs11/published/2-40-errata-1}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/corePKCS11/source/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/corePKCS11/source/dependency/3rdparty/mbedtls_utils}&quot;"/>
