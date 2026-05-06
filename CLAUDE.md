@@ -404,9 +404,9 @@ happy path 判定メモ:
 > Historical note:
 > The detailed Step 8 notes below describe the earlier CK-RX65N pipeline track.
 > In the current RX72N-only branch, `.gitlab-ci.yml` now covers the RX72N baseline path
-> `build_rx72n -> flash_rx72n -> provision_rx72n -> test_mqtt_rx72n`,
+> `build_rx72n_ether -> flash_rx72n_ether -> provision_rx72n_ether_mqtt -> test_rx72n_ether_mqtt`,
 > while the rendered-credential candidate path remains
-> `build_rx72n_mqtt_candidate -> package_rx72n_mqtt_candidate_rsu`.
+> `build_rx72n_ether_mqtt_candidate -> package_rx72n_ether_mqtt_candidate_rsu`.
 
 2026-03-08 時点の実装状態:
 
