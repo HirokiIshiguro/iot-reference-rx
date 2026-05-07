@@ -211,7 +211,7 @@ build_rx72n_ether:
   tags:
     - exec-shell
     - os-windows
-    - ccrx
+    - hw-meistier-pc
   resource_group: rx72n-e2studio-build
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
