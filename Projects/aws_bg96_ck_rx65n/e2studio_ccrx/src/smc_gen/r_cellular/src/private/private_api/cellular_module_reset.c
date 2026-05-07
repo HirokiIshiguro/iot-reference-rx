@@ -42,6 +42,8 @@
 #define BG96_BOOT_URC_QUIET_MS      (3000U)
 #define BG96_PWRKEY_PULSE_MS        (700U)
 #define BG96_RESET_PULSE_MS         (300U)
+#define BG96_PWRKEY_SHUTDOWN_WAIT_MS  (8000U)
+#define BG96_PWRKEY_RESTART_GUARD_MS  (1000U)
 
 /**********************************************************************************************************************
  * Typedef definitions
@@ -63,6 +65,7 @@ static e_cellular_err_t cellular_bg96_pwrkey_recovery (st_cellular_ctrl_t * cons
 static e_cellular_err_t cellular_bg96_quick_ate0 (st_cellular_ctrl_t * const p_ctrl, uint32_t timeout_ms);
 static e_cellular_err_t cellular_bg96_wait_ready_ate0 (st_cellular_ctrl_t * const p_ctrl, uint32_t wait_ms);
 static uint8_t          cellular_bg96_status_is_running (void);
+static uint8_t          cellular_bg96_wait_status_stopped (uint32_t wait_ms);
 static uint8_t          cellular_bg96_wait_status_running (uint32_t wait_ms);
 static e_cellular_err_t cellular_bg96_reset_n_recovery (st_cellular_ctrl_t * const p_ctrl);
 static e_cellular_err_t cellular_baud_upgrade (st_cellular_ctrl_t * const p_ctrl, uint32_t new_baud);
@@ -444,11 +447,38 @@ static e_cellular_err_t cellular_bg96_ensure_running(st_cellular_ctrl_t * const 
 static e_cellular_err_t cellular_bg96_pwrkey_recovery(st_cellular_ctrl_t * const p_ctrl)
 {
     e_cellular_err_t ret = CELLULAR_SUCCESS;
+    uint8_t          was_running = cellular_bg96_status_is_running();
 
     p_ctrl->recv_data = NULL;
     cellular_serial_close(p_ctrl);
 
+    CELLULAR_LOG_INFO(("BG96 PWRKEY fallback starts with STATUS=%u.", (unsigned int) was_running));
+
     cellular_bg96_pulse_pwrkey();
+
+    if (0U != was_running)
+    {
+        if (0U != cellular_bg96_wait_status_stopped(BG96_PWRKEY_SHUTDOWN_WAIT_MS))
+        {
+            CELLULAR_LOG_INFO(("BG96 PWRKEY fallback observed STATUS stopped - issuing start pulse."));
+            cellular_delay_task(BG96_PWRKEY_RESTART_GUARD_MS);
+            cellular_bg96_pulse_pwrkey();
+        }
+        else
+        {
+            CELLULAR_LOG_INFO(("BG96 PWRKEY fallback did not observe STATUS stopped."));
+        }
+    }
+
+    if (0U == cellular_bg96_wait_status_running(BG96_STATUS_READY_WAIT_MS))
+    {
+        CELLULAR_LOG_ERROR(("BG96 PWRKEY fallback failed: STATUS did not become running."));
+        p_ctrl->sci_ctrl.baud_rate = CELLULAR_BAUDRATE;
+        (void) cellular_serial_open(p_ctrl);
+        return CELLULAR_ERR_RECV_TASK;
+    }
+
+    CELLULAR_LOG_INFO(("BG96 PWRKEY fallback observed STATUS running."));
     cellular_delay_task(BG96_BOOT_URC_QUIET_MS);
 
     p_ctrl->module_status    = CELLULAR_MODULE_OPERATING_RESET;
@@ -461,6 +491,27 @@ static e_cellular_err_t cellular_bg96_pwrkey_recovery(st_cellular_ctrl_t * const
     }
 
     return ret;
+}
+
+/************************************************************************
+ * Function Name  @fn            cellular_bg96_wait_status_stopped
+ ***********************************************************************/
+static uint8_t cellular_bg96_wait_status_stopped(uint32_t wait_ms)
+{
+    uint32_t elapsed_ms = 0U;
+
+    while (elapsed_ms < wait_ms)
+    {
+        if (0U == cellular_bg96_status_is_running())
+        {
+            return 1U;
+        }
+
+        cellular_delay_task(BG96_READY_POLL_INTERVAL_MS);
+        elapsed_ms += BG96_READY_POLL_INTERVAL_MS;
+    }
+
+    return 0U;
 }
 
 /************************************************************************
