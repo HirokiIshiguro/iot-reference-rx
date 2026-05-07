@@ -211,7 +211,7 @@ build_rx72n_ether:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx72n-e2studio-build
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
@@ -280,7 +280,7 @@ build_rx65n_bg96:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx65n-bg96-e2studio-build
   rules:
     - if: '$RUN_RX65N_BG96_BUILD == "true"'
@@ -343,7 +343,7 @@ build_rx65n_bg96_fleet:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx65n-bg96-e2studio-build
   extends:
     - .rx65n_bg96_fleet_rules
@@ -412,7 +412,7 @@ build_rx72n_ether_fleet:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx72n-e2studio-build
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
@@ -758,7 +758,7 @@ prepare_rx65n_bg96_mqtt_credentials:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx65n-bg96-aws-iot-credentials
   extends:
     - .rx65n_bg96_credential_prepare_rules
@@ -1039,7 +1039,7 @@ build_rx65n_bg96_ota:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx65n-bg96-e2studio-build
   extends:
     - .rx65n_bg96_ota_rules
@@ -1215,7 +1215,7 @@ create_rx65n_bg96_ota:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   extends:
     - .rx65n_bg96_ota_rules
   needs:
@@ -1381,7 +1381,7 @@ cleanup_rx65n_bg96_ota:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   allow_failure: true
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(ota|full)$/'
@@ -1419,7 +1419,7 @@ cleanup_rx65n_bg96_mqtt_credentials:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx65n-bg96-aws-iot-credentials
   dependencies:
     - prepare_rx65n_bg96_mqtt_credentials
@@ -1627,7 +1627,7 @@ cleanup_rx72n_ether_ota_jobs:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   needs:
     - job: build_rx72n_ether
       artifacts: false
@@ -1752,7 +1752,7 @@ cleanup_rx72n_ether_fleet:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   dependencies:
     - test_rx72n_ether_fleet
   rules:
@@ -1966,7 +1966,7 @@ cleanup_rx65n_bg96_fleet:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   dependencies:
     - test_rx65n_bg96_fleet
   extends:
@@ -2000,7 +2000,7 @@ flash_rx72n_ether_windows:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n_ether
@@ -2051,7 +2051,7 @@ provision_rx72n_ether_mqtt_windows:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n_ether
@@ -2099,7 +2099,7 @@ test_rx72n_ether_mqtt_windows:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx72n-envision-kit-local
   needs:
     - build_rx72n_ether
@@ -2137,7 +2137,7 @@ build_rx72n_ether_mqtt_candidate:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx72n-e2studio-build
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
@@ -2189,7 +2189,7 @@ package_rx72n_ether_mqtt_candidate_rsu:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   needs:
     - job: build_rx72n_ether_mqtt_candidate
       artifacts: true
@@ -2226,7 +2226,7 @@ build_rx72n_ether_ota:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   resource_group: rx72n-e2studio-build
   needs:
     - test_rx72n_ether_mqtt
@@ -2363,7 +2363,7 @@ create_rx72n_ether_ota:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - ccrx
   needs:
     - job: build_rx72n_ether_ota
       artifacts: true
