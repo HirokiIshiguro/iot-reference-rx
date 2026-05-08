@@ -86,7 +86,7 @@ variables:
   RX65N_BG96_UART_BAUD_RATE: "921600"
   # Public Root CA data is fixed by the submodule. Tier 2 TSIP blobs are read
   # from masked CI/CD variables by tools/provision_tsip_over_uart.py.
-  RX65N_BG96_TSIP_PROVISIONING_DATA_DIR: "external/tsip_provisioning_data/rx72n_ek2"
+  RX65N_BG96_TSIP_PROVISIONING_DATA_DIR: "external/tsip_provisioning_data/rx65n_bg96"
   RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE: "128"
   RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS: "30"
   RX65N_BG96_TSIP_FLEET_ENABLE: "false"
