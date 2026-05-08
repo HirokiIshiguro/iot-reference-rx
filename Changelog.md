@@ -13,6 +13,8 @@
   TSIP用アプリケーションプロジェクト、UART経由の`tsipprov` provisioning、
   masked CI/CD Variablesまたは初期セットアップ時のローカル入力からの
   runtime provisioning payload投入に対応しました。
+  RX72N TSIP OTAはpipeline #4739、RX65N/BG96 TSIP OTAはpipeline #4744で
+  実機完走を確認しています。
 
 - RX72N Envision Kit Ethernetで、AWS IoT CoreへのTLS 1.3 MQTT接続に対応しました。
   実機スコープパイプラインでは、RX72N実機ログに
