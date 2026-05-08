@@ -173,11 +173,12 @@ TSIP経路は通常のMR pipelineへ全直積で載せず、focused pipelineとs
    `RX72N_REQUIRE_TLS_VERSION=TLSv1.3` を指定する。
 4. RX65N/BG96 TSIPは、focused pipeline
    [#4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744)
-   でOTA完走確認済みのため、毎日06:20 JSTのfocused scheduleへ昇格する。
+   でOTA完走確認済みのため、毎日06:20 JSTのfocused scheduleへ昇格済み。
+   GitLab schedule #7として登録している。
    推奨変数は `RX65N_BG96_TLS_BACKEND=tsip`、
    `RX65N_BG96_TEST_SCOPE=ota`、`RUN_RX72N_BUILD=false`、
    `RX72N_SKIP_HW_TESTS=true`、`RX72N_TEST_SCOPE=build`。
-   このscheduleはprojectのMaintainer/Owner権限で登録する。
+   このscheduleの変更にはprojectのMaintainer/Owner権限が必要。
 
 TSIPとTLS 1.3を同時に有効にする経路は別作業とし、ここではTSIP TLS 1.2系と
 software TLS 1.3系を別々に監視する。
