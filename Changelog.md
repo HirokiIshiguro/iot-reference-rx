@@ -11,8 +11,8 @@
 - RX72N Envision Kit EthernetとCK-RX65N + BG96 Cellularに、TSIP連携TLS backendを
   選択して実機CIへ流すための基盤を追加しています。
   TSIP用アプリケーションプロジェクト、UART経由の`tsipprov` provisioning、
-  公開可能なRoot CA素材を固定する`tsip_provisioning_data` submodule、
-  masked CI/CD Variablesからのwrapped key blob投入に対応しました。
+  masked CI/CD Variablesまたは初期セットアップ時のローカル入力からの
+  runtime provisioning payload投入に対応しました。
 
 - RX72N Envision Kit Ethernetで、AWS IoT CoreへのTLS 1.3 MQTT接続に対応しました。
   実機スコープパイプラインでは、RX72N実機ログに

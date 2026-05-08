@@ -84,9 +84,8 @@ variables:
   # RX65N_BG96_TLS_BACKEND: software or tsip.
   RX65N_BG96_TLS_BACKEND: "software"
   RX65N_BG96_UART_BAUD_RATE: "921600"
-  # Public Root CA data is fixed by the submodule. Tier 2 TSIP blobs are read
-  # from masked CI/CD variables by tools/provision_tsip_over_uart.py.
-  RX65N_BG96_TSIP_PROVISIONING_DATA_DIR: "external/tsip_provisioning_data/rx65n_bg96"
+  # TSIP runtime provisioning payloads are read from masked CI/CD variables by
+  # tools/provision_tsip_over_uart.py and sent to the board over UART.
   RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE: "128"
   RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS: "30"
   RX65N_BG96_TSIP_FLEET_ENABLE: "false"
@@ -143,9 +142,8 @@ variables:
   RX72N_FLEET_TEST_TIMEOUT: "600"
   # RX72N_TLS_BACKEND: software or tsip.
   RX72N_TLS_BACKEND: "software"
-  # Public Root CA data is fixed by the submodule. Tier 2 TSIP blobs are read
-  # from masked CI/CD variables by tools/provision_tsip_over_uart.py.
-  RX72N_TSIP_PROVISIONING_DATA_DIR: "external/tsip_provisioning_data/rx72n_ek2"
+  # TSIP runtime provisioning payloads are read from masked CI/CD variables by
+  # tools/provision_tsip_over_uart.py and sent to the board over UART.
   RX72N_TSIP_PROVISION_CHUNK_SIZE: "128"
   RX72N_TSIP_PROVISION_TIMEOUT_SECONDS: "30"
   RX72N_TSIP_FLEET_ENABLE: "false"
@@ -898,7 +896,6 @@ provision_rx65n_bg96_mqtt:
           --target rx65n \
           --port "${uart_port}" \
           --baud "${RX65N_BG96_UART_BAUD_RATE}" \
-          --data-dir "$CI_PROJECT_DIR/${RX65N_BG96_TSIP_PROVISIONING_DATA_DIR}" \
           --chunk-size "${RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE}" \
           --timeout "${RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS}" \
           --no-enter-cli \
@@ -1573,7 +1570,6 @@ provision_rx72n_ether_mqtt:
           --target rx72n \
           --port "$RX72N_LINUX_UART_PORT" \
           --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-          --data-dir "$CI_PROJECT_DIR/${RX72N_TSIP_PROVISIONING_DATA_DIR}" \
           --chunk-size "${RX72N_TSIP_PROVISION_CHUNK_SIZE}" \
           --timeout "${RX72N_TSIP_PROVISION_TIMEOUT_SECONDS}" \
           --no-enter-cli \

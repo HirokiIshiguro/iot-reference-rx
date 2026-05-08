@@ -94,7 +94,7 @@ CIではsoftware TLSをデフォルトとし、TSIPは明示的なpipeline varia
 import/buildする。後段ジョブが使うRSU/artifact名は従来名へ正規化し、通常版と
 TSIP版の切り替えをbuild profileの差分に閉じ込める。
 
-TSIP jobではwrapped provisioning blob用のmasked CI/CD Variablesを追加で要求する。
+TSIP jobではruntime provisioning payload用のmasked CI/CD Variablesを追加で要求する。
 software TLS jobでは既存のAWS IoT証明書・秘密鍵変数を継続利用する。
 
 TSIP実機provisioningは次の2段に分ける。
@@ -104,19 +104,21 @@ TSIP実機provisioningは次の2段に分ける。
 2. `tools/provision_tsip_over_uart.py` で `tsipprov` CLIへTSIP素材を投入し、
    `tsipprov prepare` でデバイス上のKeyIndexを生成する。
 
-Root CA DERとRoot CA signatureは公開可能なTier 0素材として
-`external/tsip_provisioning_data` submoduleから読む。Root signer public key、
-client public key、client private keyのwrapped blobはTier 2素材なのでGitには置かず、
-masked CI/CD Variablesから読む。
+Root CA signature、Root signer public key、client public key、client private keyの
+runtime provisioning payloadはGitには置かず、masked CI/CD Variablesまたは
+初期セットアップ時に指定するローカルファイルから読む。CIではこれらを
+`tools/provision_tsip_over_uart.py` でUART経由投入し、デバイス上でKeyIndexを生成する。
 
 RX72Nで既定参照するmasked variables:
 
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX`
 - `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX`
 - `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PUBLIC_HEX`
 - `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PRIVATE_HEX`
 
 RX65N/BG96で既定参照するmasked variables:
 
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX`
 - `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX`
 - `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PUBLIC_HEX`
 - `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PRIVATE_HEX`
