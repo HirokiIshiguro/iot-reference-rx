@@ -232,20 +232,22 @@ PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=ota RX65N_BG96_TEST_SCOPE=build RX72N_
 # RX65N/BG96 TSIP OTA only
 PIPELINE_PROFILE=focused RX65N_BG96_TEST_SCOPE=ota RUN_RX72N_BUILD=false RX72N_SKIP_HW_TESTS=true RX65N_BG96_TLS_BACKEND=tsip
 
-# Software TLS 1.3 MQTT on both boards
+# Manual/API software TLS 1.3 MQTT on both boards
 PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=mqtt RX65N_BG96_TEST_SCOPE=mqtt AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com RX72N_REQUIRE_TLS_VERSION=TLSv1.3 RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3
 ```
 
 ### Scheduled Hardware Regressions
 
-The project-level GitLab pipeline schedules are part of the reference pipeline design. Keep the merge request pipeline short, and move matrix coverage that is useful but not review-blocking into schedules.
+The project-level GitLab pipeline schedules are part of the reference pipeline design. Keep the merge request pipeline short, and move matrix coverage that is useful but not review-blocking into schedules. Heavy schedules are staggered by about one hour so the Windows CCRX runner and the two hardware runners do not all contend at the same time.
 
-| Schedule | Scope | Purpose |
-|----------|-------|---------|
-| Nightly full software TLS | `PIPELINE_PROFILE=nightly`, `RX72N_TEST_SCOPE=full`, `RX65N_BG96_TEST_SCOPE=full`, `RX72N_TLS_BACKEND=software`, `RX65N_BG96_TLS_BACKEND=software` | Full RX72N/Ether + RX65N/BG96 regression, including MQTT, OTA, and Fleet Provisioning. |
-| Focused RX72N TSIP OTA | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=build`, `RX72N_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning and the RX72N TSIP OTA path without consuming the cellular board. |
-| Focused RX65N/BG96 TSIP OTA | `PIPELINE_PROFILE=focused`, `RX65N_BG96_TEST_SCOPE=ota`, `RUN_RX72N_BUILD=false`, `RX72N_SKIP_HW_TESTS=true`, `RX65N_BG96_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning and the RX65N/BG96 TSIP OTA path without consuming the Ethernet board. |
-| Focused software TLS 1.3 MQTT | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=mqtt`, `AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`, `RX72N_REQUIRE_TLS_VERSION=TLSv1.3`, `RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3` | Confirms that both transports still negotiate TLS 1.3 with the AWS IoT Core domain configured for `IoTSecurityPolicy_TLS13_1_2_2022_10`. |
+| Schedule | Status | Time (JST) | Scope | Purpose |
+|----------|--------|------------|-------|---------|
+| Nightly full software TLS | Active | 03:20 daily | `PIPELINE_PROFILE=nightly`, `RX72N_TEST_SCOPE=full`, `RX65N_BG96_TEST_SCOPE=full`, `RX72N_TLS_BACKEND=software`, `RX65N_BG96_TLS_BACKEND=software` | Full RX72N/Ether + RX65N/BG96 regression, including MQTT, OTA, and Fleet Provisioning. |
+| Focused RX72N TSIP OTA | Active | 04:20 daily | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=build`, `RX65N_BG96_SKIP_HW_TESTS=true`, `RUN_RX65N_BG96_BUILD=false`, `RX72N_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning and the RX72N TSIP OTA path without consuming the cellular board. |
+| Focused RX72N software TLS 1.3 MQTT | Active | 05:20 daily | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=build`, `RX65N_BG96_SKIP_HW_TESTS=true`, `RUN_RX65N_BG96_BUILD=false`, `AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`, `RX72N_REQUIRE_TLS_VERSION=TLSv1.3`, `RX72N_TLS_BACKEND=software` | Confirms RX72N/Ether still negotiates TLS 1.3 with the AWS IoT Core domain configured for `IoTSecurityPolicy_TLS13_1_2_2022_10`. |
+| Focused RX65N/BG96 TSIP OTA | Active (schedule #7) | 06:20 daily | `PIPELINE_PROFILE=focused`, `RX65N_BG96_TEST_SCOPE=ota`, `RX65N_BG96_TLS_BACKEND=tsip`, `RUN_RX65N_BG96_BUILD=true`, `RX65N_BG96_SKIP_HW_TESTS=false`, `RUN_RX72N_BUILD=false`, `RX72N_SKIP_HW_TESTS=true`, `RX72N_TEST_SCOPE=build` | Confirms TSIP runtime provisioning and the RX65N/BG96 TSIP OTA path without consuming the Ethernet board. Validated manually by focused pipeline [#4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744). |
+
+Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
 ## Limitations
 
