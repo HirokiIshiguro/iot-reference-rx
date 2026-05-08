@@ -17,19 +17,18 @@ except ImportError:
     sys.exit(1)
 
 
-ROOT_CA_FILES = {
-    "aws": {
-        "rootca-sig": "root_ca/TSIP_TLS_ROOT_CA_BUNDLE_SIGNATURE_RSA_PSS_SHA256_C_ARRAY_FILE.txt",
-        "rootca-der": "root_ca/TSIP_TLS_ROOT_CA_BUNDLE_DER_C_ARRAY_FILE.txt",
-    },
-    "lanbenchd": {
-        "rootca-sig": "root_ca/TSIP_TLS_ROOT_CA_LANBENCHD_SIGNATURE_RSA_PSS_SHA256_C_ARRAY_FILE.txt",
-        "rootca-der": "root_ca/TSIP_TLS_ROOT_CA_LANBENCHD_DER_C_ARRAY_FILE.txt",
-    },
-}
-
 TARGET_ENV_NAMES = {
     "rx72n": {
+        "rootca-sig": (
+            "RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX",
+            "RX72N_TSIP_ROOT_CA_SIGNATURE_HEX",
+            "RX72N_TSIP_AWS_ROOT_CA_SIGNATURE_HEX",
+        ),
+        "rootca-der": (
+            "RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_DER_HEX",
+            "RX72N_TSIP_ROOT_CA_DER_HEX",
+            "RX72N_TSIP_AWS_ROOT_CA_DER_HEX",
+        ),
         "root-signer": (
             "RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX",
             "RX72N_TSIP_ROOT_SIGNER_RSA2048_PUBLIC_HEX",
@@ -44,6 +43,18 @@ TARGET_ENV_NAMES = {
         ),
     },
     "rx65n": {
+        "rootca-sig": (
+            "RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX",
+            "RX65N_BG96_TSIP_ROOT_CA_SIGNATURE_HEX",
+            "RX65N_TSIP_ROOT_CA_SIGNATURE_HEX",
+            "RX65N_BG96_TSIP_AWS_ROOT_CA_SIGNATURE_HEX",
+        ),
+        "rootca-der": (
+            "RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_DER_HEX",
+            "RX65N_BG96_TSIP_ROOT_CA_DER_HEX",
+            "RX65N_TSIP_ROOT_CA_DER_HEX",
+            "RX65N_BG96_TSIP_AWS_ROOT_CA_DER_HEX",
+        ),
         "root-signer": (
             "RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX",
             "RX65N_BG96_TSIP_ROOT_SIGNER_RSA2048_PUBLIC_HEX",
@@ -155,8 +166,9 @@ def send_command(
 
 def load_payloads(args: argparse.Namespace) -> list[tuple[str, bytes, str]]:
     selected = set(args.only or DEFAULT_SLOTS)
-    root_ca_files = ROOT_CA_FILES[args.root_ca]
     custom_env_names = {
+        "rootca-sig": tuple(filter(None, (args.rootca_sig_hex_env,))),
+        "rootca-der": tuple(filter(None, (args.rootca_der_hex_env,))),
         "root-signer": tuple(filter(None, (args.root_signer_hex_env,))),
         "client-pub": tuple(filter(None, (args.client_pub_hex_env,))),
         "client-pri": tuple(filter(None, (args.client_pri_hex_env,))),
@@ -165,10 +177,6 @@ def load_payloads(args: argparse.Namespace) -> list[tuple[str, bytes, str]]:
 
     for slot in ALL_SLOTS:
         if slot not in selected:
-            continue
-        if slot in root_ca_files:
-            path = args.data_dir / root_ca_files[slot]
-            payloads.append((slot, read_file_bytes(path), str(path)))
             continue
 
         env_names = custom_env_names[slot] or TARGET_ENV_NAMES[args.target][slot]
@@ -215,8 +223,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", required=True)
     parser.add_argument("--baud", type=int, default=921600)
     parser.add_argument("--target", choices=sorted(TARGET_ENV_NAMES), default="rx72n")
-    parser.add_argument("--data-dir", type=Path, default=Path("external/tsip_provisioning_data/rx72n_ek2"))
-    parser.add_argument("--root-ca", choices=sorted(ROOT_CA_FILES), default="aws")
+    parser.add_argument("--root-ca", choices=("aws", "lanbenchd"), default="aws",
+                        help="Root CA profile label for logs/compatibility; payloads are read from environment variables.")
+    parser.add_argument("--rootca-sig-hex-env")
+    parser.add_argument("--rootca-der-hex-env")
     parser.add_argument("--root-signer-hex-env")
     parser.add_argument("--client-pub-hex-env")
     parser.add_argument("--client-pri-hex-env")

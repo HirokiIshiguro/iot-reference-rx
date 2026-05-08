@@ -200,16 +200,16 @@ Current hardware validation matrix:
 
 | Feature | `rx72n_ether` software TLS | `rx72n_ether` TSIP TLS | `rx65n_bg96` software TLS | `rx65n_bg96` TSIP TLS |
 |---------|----------------------------|------------------------|---------------------------|-----------------------|
-| Build | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
-| Flash / app boot | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
-| MQTT over TLS 1.2 | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
+| Build | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
+| Flash / app boot | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
+| MQTT over TLS 1.2 | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
 | MQTT over TLS 1.3 | OK, [pipeline #4667](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4667) | Not implemented | OK, [pipeline #4667](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4667) | Not implemented |
-| OTA over MQTT | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | OK, [pipeline #4666](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4666) | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Not validated |
-| Fleet Provisioning | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Disabled by default | OK, [pipeline #4671](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4671) | Disabled by default |
+| OTA over MQTT | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
+| Fleet Provisioning | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | Disabled by default | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | Disabled by default |
 
-RX65N/BG96 TSIP jobs are defined in the pipeline, but the hardware path is not
-marked as verified until RX65N-specific UFPK-derived wrapped blobs and the
-matching static AWS IoT certificate are provisioned.
+RX65N/BG96 TSIP hardware validation uses RX65N-specific UFPK-derived runtime
+provisioning payloads and the matching static AWS IoT certificate documented in
+`docs/tsip-integration-plan.md`.
 
 ### Pipeline Profiles
 
@@ -229,6 +229,9 @@ Focused examples:
 # RX72N TSIP OTA only
 PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=ota RX65N_BG96_TEST_SCOPE=build RX72N_TLS_BACKEND=tsip
 
+# RX65N/BG96 TSIP OTA only
+PIPELINE_PROFILE=focused RX65N_BG96_TEST_SCOPE=ota RUN_RX72N_BUILD=false RX72N_SKIP_HW_TESTS=true RX65N_BG96_TLS_BACKEND=tsip
+
 # Software TLS 1.3 MQTT on both boards
 PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=mqtt RX65N_BG96_TEST_SCOPE=mqtt AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com RX72N_REQUIRE_TLS_VERSION=TLSv1.3 RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3
 ```
@@ -241,9 +244,8 @@ The project-level GitLab pipeline schedules are part of the reference pipeline d
 |----------|-------|---------|
 | Nightly full software TLS | `PIPELINE_PROFILE=nightly`, `RX72N_TEST_SCOPE=full`, `RX65N_BG96_TEST_SCOPE=full`, `RX72N_TLS_BACKEND=software`, `RX65N_BG96_TLS_BACKEND=software` | Full RX72N/Ether + RX65N/BG96 regression, including MQTT, OTA, and Fleet Provisioning. |
 | Focused RX72N TSIP OTA | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=build`, `RX72N_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning and the RX72N TSIP OTA path without consuming the cellular board. |
+| Focused RX65N/BG96 TSIP OTA | `PIPELINE_PROFILE=focused`, `RX65N_BG96_TEST_SCOPE=ota`, `RUN_RX72N_BUILD=false`, `RX72N_SKIP_HW_TESTS=true`, `RX65N_BG96_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning and the RX65N/BG96 TSIP OTA path without consuming the Ethernet board. |
 | Focused software TLS 1.3 MQTT | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=mqtt`, `AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`, `RX72N_REQUIRE_TLS_VERSION=TLSv1.3`, `RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3` | Confirms that both transports still negotiate TLS 1.3 with the AWS IoT Core domain configured for `IoTSecurityPolicy_TLS13_1_2_2022_10`. |
-
-RX65N/BG96 TSIP hardware regression additionally requires the RX65N TSIP wrapped blob variables documented in `docs/tsip-integration-plan.md`. Add that schedule only after those variables are provisioned and a focused manual/API pipeline has passed.
 
 ## Limitations
 
