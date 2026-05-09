@@ -822,7 +822,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c|trash/|src/smc_gen/r_bsp/board/generic_rx65n|src/smc_gen/r_bsp/mcu/rx65n|src/smc_gen/r_ether_rx/src/targets/rx65n|src/smc_gen/r_s12ad_rx/src/targets/rx65n|src/smc_gen/r_sci_rx/src/targets/rx65n|Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU/port.c|Middleware/FreeRTOS/coreMQTT-Agent/source/core_mqtt_agent.c|Middleware/FreeRTOS/coreMQTT-Agent/source/core_mqtt_agent_command_functions.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c|trash/|src/smc_gen/r_bsp/board/generic_rx65n|src/smc_gen/r_bsp/mcu/rx65n|src/smc_gen/r_ether_rx/src/targets/rx65n|src/smc_gen/r_s12ad_rx/src/targets/rx65n|src/smc_gen/r_sci_rx/src/targets/rx65n|Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU/port.c|Middleware/FreeRTOS/coreMQTT-Agent/source/core_mqtt_agent.c|Middleware/FreeRTOS/coreMQTT-Agent/source/core_mqtt_agent_command_functions.c|Middleware/3rdparty/mbedtls_with_TSIP/programs|Middleware/3rdparty/mbedtls_with_TSIP/tests" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

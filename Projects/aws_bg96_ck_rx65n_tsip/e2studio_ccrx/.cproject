@@ -272,7 +272,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c|trash/|Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk/source/jobs.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c|trash/|Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk/source/jobs.c|Middleware/3rdparty/mbedtls_with_TSIP/programs|Middleware/3rdparty/mbedtls_with_TSIP/tests" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
