@@ -340,7 +340,19 @@ int rm_littlefs_flash_lock(const struct lfs_config * c)
 #if LFS_THREAD_SAFE
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
 
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: lock enter semaphore=0x%08lx.",
+                 (unsigned long)p_instance_ctrl->xSemaphore));
+    }
+
     BaseType_t err = xSemaphoreTake(p_instance_ctrl->xSemaphore, RM_LITTLEFS_FLASH_SEMAPHORE_TIMEOUT);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: lock exit ret=%ld.",
+                 (long)err));
+    }
 
     FSP_ERROR_RETURN(true == err, LFS_ERR_IO);
 
@@ -367,7 +379,19 @@ int rm_littlefs_flash_unlock(const struct lfs_config * c)
 #if LFS_THREAD_SAFE
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
 
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: unlock enter semaphore=0x%08lx.",
+                 (unsigned long)p_instance_ctrl->xSemaphore));
+    }
+
     BaseType_t err = xSemaphoreGive(p_instance_ctrl->xSemaphore);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: unlock exit ret=%ld.",
+                 (long)err));
+    }
 
     FSP_ERROR_RETURN(true == err, LFS_ERR_IO);
 
