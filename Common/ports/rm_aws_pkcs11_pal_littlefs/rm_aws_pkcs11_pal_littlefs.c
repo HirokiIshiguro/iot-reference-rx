@@ -65,6 +65,7 @@
 
 extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
 extern volatile uint32_t g_littlefs_flash_trace_enabled;
+extern void vOutputString(const char * pcMessage);
 volatile uint32_t pvwrite = 0;
 enum eObjectHandles
 {
@@ -198,13 +199,26 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
     {
         g_littlefs_flash_trace_enabled = 1U;
         LogInfo(("PKCS11 PAL trace: SaveObject close trace enabled for device private key."));
+        vOutputString("PAL:DKEY before sync\r\n");
         LogInfo(("PKCS11 PAL trace: SaveObject sync enter for device private key."));
         lfs_err = lfs_file_sync(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+        vOutputString("PAL:DKEY after sync\r\n");
         LogInfo(("PKCS11 PAL trace: SaveObject sync ret=%ld.",
                  (long)lfs_err));
     }
 
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY before close\r\n");
+    }
+
     lfs_err = lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY after close\r\n");
+    }
+
     g_littlefs_flash_trace_enabled = 0U;
     LogInfo(("PKCS11 PAL trace: SaveObject close ret=%ld handle=%lu.",
              (long)lfs_err, (unsigned long)xHandle));
