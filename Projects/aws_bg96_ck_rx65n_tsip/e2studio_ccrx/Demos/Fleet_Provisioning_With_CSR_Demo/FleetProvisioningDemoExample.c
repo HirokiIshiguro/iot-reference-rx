@@ -64,6 +64,10 @@
 /* Demo Config */
 #include "demo_config.h"
 
+#ifndef democonfigFLEET_PROVISIONING_DEMO_STACKSIZE
+    #define democonfigFLEET_PROVISIONING_DEMO_STACKSIZE    democonfigDEMO_STACKSIZE
+#endif
+
 /* mbedTLS include for configuring threading functions */
 #include "mbedtls/threading.h"
 #include "threading_alt.h"
@@ -563,7 +567,7 @@ void vStartFleetProvisioningDemo()
      * and create new IoT Things using the AWS IoT Fleet Provisioning API */
     xTaskCreate( prvFleetProvisioningTask, /* Function that implements the task. */
                  "DemoTask",               /* Text name for the task - only used for debugging. */
-                 democonfigDEMO_STACKSIZE, /* Size of stack (in words, not bytes) to allocate for the task. */
+                 democonfigFLEET_PROVISIONING_DEMO_STACKSIZE, /* Size of stack (in words, not bytes) to allocate. */
                  NULL,                     /* Task parameter - not used in this case. */
                  tskIDLE_PRIORITY,         /* Task priority, must be between 0 and configMAX_PRIORITIES - 1. */
                  NULL );                   /* Used to pass out a handle to the created task - not used in this case. */
