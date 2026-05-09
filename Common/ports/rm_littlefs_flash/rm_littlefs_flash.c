@@ -160,15 +160,32 @@ int rm_littlefs_flash_read(const struct lfs_config * c,
                             lfs_size_t                size)
 {
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
+    uint32_t src_addr = (rm_littlefs_flash_data_start +
+            (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: read enter block=%lu off=%lu size=%lu addr=0x%08lx.",
+                 (unsigned long)block,
+                 (unsigned long)off,
+                 (unsigned long)size,
+                 (unsigned long)src_addr));
+    }
 
     /* No flash access while reading */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
 
     /* Read directly from the flash. */
-    memcpy( buffer,
-            (uint8_t *) (rm_littlefs_flash_data_start + (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off),
-            size);
+    memcpy( buffer, (uint8_t *) src_addr, size);
     xSemaphoreGive(xSemaphoreFlashAccess);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: read exit block=%lu off=%lu size=%lu.",
+                 (unsigned long)block,
+                 (unsigned long)off,
+                 (unsigned long)size));
+    }
 
     return LFS_ERR_OK;
 }
