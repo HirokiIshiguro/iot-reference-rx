@@ -112,9 +112,9 @@ void mbedtls_platform_mutex_init( mbedtls_threading_mutex_t * pMutex )
 {
     configASSERT( pMutex != NULL );
 
-    /* Create a statically-allocated FreeRTOS mutex. This should never fail as
-     * storage is provided. */
-    pMutex->mutexHandle = xSemaphoreCreateMutexStatic( &( pMutex->mutexStorage ) );
+    /* Create a statically-allocated recursive FreeRTOS mutex. Some TSIP-backed
+     * mbedTLS paths can re-enter the shared TSIP mutex from the same task. */
+    pMutex->mutexHandle = xSemaphoreCreateRecursiveMutexStatic( &( pMutex->mutexStorage ) );
     configASSERT( pMutex->mutexHandle != NULL );
 }
 
@@ -153,7 +153,7 @@ int mbedtls_platform_mutex_lock( mbedtls_threading_mutex_t * pMutex )
     ( void ) mutexStatus;
 
     /* This function should never fail if the mutex is initialized. */
-    mutexStatus = xSemaphoreTake( pMutex->mutexHandle, portMAX_DELAY );
+    mutexStatus = xSemaphoreTakeRecursive( pMutex->mutexHandle, portMAX_DELAY );
     configASSERT( mutexStatus == pdTRUE );
 
     return 0;
@@ -177,7 +177,7 @@ int mbedtls_platform_mutex_unlock( mbedtls_threading_mutex_t * pMutex )
     ( void ) mutexStatus;
 
     /* This function should never fail if the mutex is initialized. */
-    mutexStatus = xSemaphoreGive( pMutex->mutexHandle );
+    mutexStatus = xSemaphoreGiveRecursive( pMutex->mutexHandle );
     configASSERT( mutexStatus == pdTRUE );
 
     return 0;
