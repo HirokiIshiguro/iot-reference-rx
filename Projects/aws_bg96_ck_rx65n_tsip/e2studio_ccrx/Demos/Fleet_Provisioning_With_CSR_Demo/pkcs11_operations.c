@@ -57,6 +57,9 @@
 #include "mbedtls/x509_csr.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+#include "mbedtls/ssl.h"
+#endif
 
 /* strnlen includes for CC-RX compiler. */
 #if defined(__CCRX__)
@@ -279,11 +282,26 @@ bool xGenerateKeyAndCsr( CK_SESSION_HANDLE xP11Session,
     mbedtls_x509write_csr xReq;
     int32_t ulMbedtlsRet = -1;
     const mbedtls_pk_info_t * pxHeader = mbedtls_pk_info_from_type( MBEDTLS_PK_ECKEY );
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+    unsigned char ucSavedTsipEndpointFlag = g_tsip_endpointflg;
+#endif
 
     configASSERT( pcPrivKeyLabel != NULL );
     configASSERT( pcPubKeyLabel != NULL );
     configASSERT( pcCsrBuffer != NULL );
     configASSERT( pxOutCsrLength != NULL );
+
+    pcCsrBuffer[ 0 ] = '\0';
+    *pxOutCsrLength = 0U;
+
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+    /*
+     * Fleet-created device keys are PKCS #11 software keys. Keep key
+     * generation, CSR hashing, and CSR signing on the software mbedTLS path
+     * even when this image is built with TSIP-enabled TLS.
+     */
+    g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
+#endif
 
     xPkcs11Ret = prvGenerateKeyPairEC( xP11Session,
                                        pcPrivKeyLabel,
@@ -327,7 +345,14 @@ bool xGenerateKeyAndCsr( CK_SESSION_HANDLE xP11Session,
         mbedtls_pk_free( &xPrivKey );
     }
 
-    *pxOutCsrLength = strlen( pcCsrBuffer );
+    if( ulMbedtlsRet == 0 )
+    {
+        *pxOutCsrLength = strlen( pcCsrBuffer );
+    }
+
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+    g_tsip_endpointflg = ucSavedTsipEndpointFlag;
+#endif
 
     return( ulMbedtlsRet == 0 );
 }
