@@ -935,25 +935,37 @@ CK_RV xDestroyCertificateAndKey( CK_SESSION_HANDLE xP11Session)
     CK_OBJECT_CLASS certificateClass = CKO_CERTIFICATE;
     CK_OBJECT_CLASS privatekeyClass = CKO_PRIVATE_KEY;
     CK_OBJECT_CLASS publickeyClass = CKO_PUBLIC_KEY;
+    CK_BYTE_PTR pxPrivateKeyLabels[] =
+    {
+        ( CK_BYTE_PTR ) pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS
+    };
+    CK_BYTE_PTR pxPublicKeyLabels[] =
+    {
+        ( CK_BYTE_PTR ) pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS
+    };
+    CK_BYTE_PTR pxCertificateLabels[] =
+    {
+        ( CK_BYTE_PTR ) pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS
+    };
 
     xResult = C_GetFunctionList( &pxFunctionList );
 
     /* Destroy for a private key. */
     if( CKR_OK == xResult )
     {
-        prvDestroyProvidedObjects( xP11Session, ( CK_BYTE_PTR * ) pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS, &privatekeyClass, 1 );
+        xResult = prvDestroyProvidedObjects( xP11Session, pxPrivateKeyLabels, &privatekeyClass, 1 );
     }
 
     /* Destroy for a public key. */
     if( CKR_OK == xResult )
     {
-        prvDestroyProvidedObjects( xP11Session, ( CK_BYTE_PTR * ) pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS, &publickeyClass, 1 );
+        xResult = prvDestroyProvidedObjects( xP11Session, pxPublicKeyLabels, &publickeyClass, 1 );
     }
 
     /* Destroy for the client certificate. */
     if( CKR_OK == xResult )
     {
-        prvDestroyProvidedObjects( xP11Session, ( CK_BYTE_PTR * ) pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS, &certificateClass, 1 );
+        xResult = prvDestroyProvidedObjects( xP11Session, pxCertificateLabels, &certificateClass, 1 );
     }
 
     return xResult;
