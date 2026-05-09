@@ -265,7 +265,10 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     privateKeyTemplate[2].pValue = &xTrueObject;
     privateKeyTemplate[3].pValue = &xTrueObject;
 
+    LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList enter."));
     xResult = C_GetFunctionList(&xFunctionList);
+    LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList exit CK_RV=0x%08lx.",
+             (unsigned long)xResult));
 
     if (CKR_OK != xResult)
     {
@@ -273,6 +276,7 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     }
     else
     {
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
         xResult = xFunctionList->C_GenerateKeyPair(xSession,
                                                    &xMechanism,
                                                    pxPublicKeyTemplate,
@@ -280,6 +284,8 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
                                                    privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
                                                    xPublicKeyHandlePtr,
                                                    xPrivateKeyHandlePtr);
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
+                 (unsigned long)xResult));
     }
 
     return xResult;
