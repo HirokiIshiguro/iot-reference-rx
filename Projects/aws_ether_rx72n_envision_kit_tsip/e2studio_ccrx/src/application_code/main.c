@@ -289,17 +289,17 @@ void main_task(void *pvParameters)
                 vStartFleetProvisioningDemo();
             #else
                 xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
-            #endif
 
-            vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
-            prvDisplayWrite("MQTT task start\r\n");
+                vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
+                prvDisplayWrite("MQTT task start\r\n");
 
-            vStartSimplePubSubDemo ();
-            prvDisplayWrite("PubSub task start\r\n");
+                vStartSimplePubSubDemo ();
+                prvDisplayWrite("PubSub task start\r\n");
 
-            #if (ENABLE_OTA_UPDATE_DEMO == 1)
-                        vStartOtaDemo();
-                        prvDisplayWrite("OTA task start\r\n");
+                #if (ENABLE_OTA_UPDATE_DEMO == 1)
+                    vStartOtaDemo();
+                    prvDisplayWrite("OTA task start\r\n");
+                #endif
             #endif
     }
     else
