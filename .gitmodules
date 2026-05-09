@@ -69,7 +69,7 @@
 	url = ../../../../experiment/embedded/mcu/renesas/rx/bootloader/submodule.git
 [submodule "Middleware/3rdparty/mbedtls_with_TSIP"]
 	path = Middleware/3rdparty/mbedtls_with_TSIP
-	url = ../mbed-tls/mbedtls.git
+	url = ../../mbed-tls/mbedtls.git
 [submodule "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/Middleware/3rdparty/mbedtls_with_TSIP"]
 	path = Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/Middleware/3rdparty/mbedtls_with_TSIP
-	url = ../mbed-tls/mbedtls.git
+	url = ../../mbed-tls/mbedtls.git
