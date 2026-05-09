@@ -198,6 +198,10 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
     {
         g_littlefs_flash_trace_enabled = 1U;
         LogInfo(("PKCS11 PAL trace: SaveObject close trace enabled for device private key."));
+        LogInfo(("PKCS11 PAL trace: SaveObject sync enter for device private key."));
+        lfs_err = lfs_file_sync(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+        LogInfo(("PKCS11 PAL trace: SaveObject sync ret=%ld.",
+                 (long)lfs_err));
     }
 
     lfs_err = lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
