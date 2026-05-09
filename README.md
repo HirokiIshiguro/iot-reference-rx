@@ -1,5 +1,16 @@
 # FreeRTOS LTS IoT Reference for Renesas RX
 
+## Latest Full Test Results / 最新のフルテスト結果
+
+Last updated: 2026-05-09 JST. The latest scheduled hardware regression set is all green: **4/4 scheduled pipelines passed, 61/61 jobs succeeded**.
+
+| Scope | Pipeline | Tested commit | Result | Jobs |
+|-------|----------|---------------|--------|------|
+| Full software TLS regression (RX72N/Ether + RX65N/BG96) | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | `91f2d6b5` | success | 33/33 |
+| Focused RX72N TSIP OTA | [#4718](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4718) | `91f2d6b5` | success | 9/9 |
+| Focused RX72N software TLS 1.3 MQTT | [#4717](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4717) | `91f2d6b5` | success | 5/5 |
+| Focused RX65N/BG96 TSIP OTA | [#4791](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4791) | `f06e977f` | success | 14/14 |
+
 ## About This Fork / このフォークについて
 
 This repository is a fork of [renesas/iot-reference-rx](https://github.com/renesas/iot-reference-rx), modified and maintained for Renesas RX IoT reference work.
