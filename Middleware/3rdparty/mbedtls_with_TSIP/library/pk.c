@@ -650,8 +650,7 @@ int mbedtls_pk_sign_restartable( mbedtls_pk_context *ctx,
         return( MBEDTLS_ERR_PK_TYPE_MISMATCH );
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
-    if( ( MBEDTLS_SSL_IS_SERVER == g_tsip_endpointflg ) ||
-        ( pk_info_uses_pkcs11_signer( ctx->pk_info ) != 0 ) )
+    if( MBEDTLS_SSL_IS_SERVER == g_tsip_endpointflg )
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(MBEDTLS_FUNC_ENABLE)
     {
@@ -662,6 +661,20 @@ int mbedtls_pk_sign_restartable( mbedtls_pk_context *ctx,
     }
 #endif /* MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+    else if( pk_info_uses_pkcs11_signer( ctx->pk_info ) != 0 )
+    {
+        int ret;
+        unsigned char saved_tsip_endpoint = g_tsip_endpointflg;
+
+        g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
+        ret = ctx->pk_info->sign_func( ctx->pk_ctx, md_alg,
+                                       hash, hash_len,
+                                       sig, sig_size, sig_len,
+                                       f_rng, p_rng );
+        g_tsip_endpointflg = saved_tsip_endpoint;
+
+        return( ret );
+    }
     else
 #endif /* TSIP_TLS_API_ENABLE && MBEDTLS_FUNC_ENABLE */
 #if defined(TSIP_TLS_API_ENABLE)
