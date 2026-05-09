@@ -59,9 +59,7 @@
 #endif
 
 #define LFS_THREAD_SAFE (1)
-#ifdef LFS_THREADSAFE
-#error "LFS thread-safe operation is not implemented yet."
-#endif
+/* Define LFS_THREADSAFE project-wide when enabling LittleFS public API locking. */
 
 /* Defines the LittleFS instance control block to be the stdio wrapper. */
 #define RM_STDIO_LITTLEFS_CFG_LFS (g_rm_littlefs0_lfs)

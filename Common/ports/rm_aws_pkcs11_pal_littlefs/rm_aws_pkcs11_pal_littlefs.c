@@ -162,7 +162,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
         return eInvalidHandle;
     }
 
-    lfs_file_t file;
+    lfs_file_t file = { 0 };
 
     volatile int lfs_err = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, pxLabel->pValue);
     LogInfo(("PKCS11 PAL trace: SaveObject remove ret=%ld.",
@@ -273,7 +273,7 @@ CK_RV PKCS11_PAL_GetObjectValue(CK_OBJECT_HANDLE xHandle,
 
     if (eInvalidHandle != xHandle)
     {
-        lfs_file_t file;
+        lfs_file_t file = { 0 };
 
         int lfs_ret =
             lfs_file_open(  &RM_STDIO_LITTLEFS_CFG_LFS,
