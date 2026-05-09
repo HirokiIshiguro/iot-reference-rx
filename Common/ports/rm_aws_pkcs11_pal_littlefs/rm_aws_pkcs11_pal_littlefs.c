@@ -64,6 +64,7 @@
 #include "transport_mbedtls_pkcs11.h"
 
 extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
+extern volatile uint32_t g_littlefs_flash_trace_enabled;
 volatile uint32_t pvwrite = 0;
 enum eObjectHandles
 {
@@ -193,7 +194,14 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
         xHandle = eInvalidHandle;
     }
 
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        g_littlefs_flash_trace_enabled = 1U;
+        LogInfo(("PKCS11 PAL trace: SaveObject close trace enabled for device private key."));
+    }
+
     lfs_err = lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+    g_littlefs_flash_trace_enabled = 0U;
     LogInfo(("PKCS11 PAL trace: SaveObject close ret=%ld handle=%lu.",
              (long)lfs_err, (unsigned long)xHandle));
 
