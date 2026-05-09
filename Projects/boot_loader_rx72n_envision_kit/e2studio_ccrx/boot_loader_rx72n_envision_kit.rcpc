@@ -339,7 +339,7 @@
       </Category>
     </Files>
     <Device Category="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cpu.rx600" Series="RX">R5F572NNHxFB_DUAL</Device>
-    <BuildOptions Name="CC-RX" Version="v3.04.00">
+    <BuildOptions Name="CC-RX" Version="v3.07.00">
       <BuildMode Active="True" Name="HardwareDebug">
         <GeneralOptions/>
         <CompileOptions>
