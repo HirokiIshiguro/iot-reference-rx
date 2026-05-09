@@ -161,6 +161,7 @@
 									<listOptionValue builtIn="false" value="MBEDTLS_CONFIG_FILE=&lt;&quot;aws_mbedtls_config_with_tsip.h&quot;&gt;"/>
 									<listOptionValue builtIn="false" value="TSIP_RUNTIME_PROVISIONING_ENABLE"/>
 									<listOptionValue builtIn="false" value="CONFIG_FREERTOS_ASSERT_FAIL_ABORT"/>
+									<listOptionValue builtIn="false" value="LFS_YES_TRACE"/>
 									<listOptionValue builtIn="false" value="CONFIG_MEDTLS_USE_AFR_MEMORY"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_ERROR_C"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_ALLOW_PRIVATE_ACCESS"/>
