@@ -320,15 +320,28 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     configASSERT(pcCsrBuffer != NULL);
     configASSERT(pxOutCsrLength != NULL);
 
+    pcCsrBuffer[0] = '\0';
+    *pxOutCsrLength = 0U;
+
     xPkcs11Ret = prvGenerateKeyPairEC(xP11Session,
                                       pcPrivKeyLabel,
                                       pcPubKeyLabel,
                                       &xPrivKeyHandle,
                                       &xPubKeyHandle);
+    if (CKR_OK != xPkcs11Ret)
+    {
+        LogError(("C_GenerateKeyPair failed while preparing Fleet CSR: CK_RV=0x%08lx.",
+                  (unsigned long)xPkcs11Ret));
+    }
 
     if (CKR_OK == xPkcs11Ret)
     {
         xPkcs11Ret = xPKCS11_initMbedtlsPkContext(&xPrivKey, xP11Session, xPrivKeyHandle);
+        if (CKR_OK != xPkcs11Ret)
+        {
+            LogError(("xPKCS11_initMbedtlsPkContext failed while preparing Fleet CSR: CK_RV=0x%08lx.",
+                      (unsigned long)xPkcs11Ret));
+        }
     }
 
     if (CKR_OK == xPkcs11Ret)
@@ -355,6 +368,11 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
             ulMbedtlsRet = mbedtls_x509write_csr_pem(&xReq, (unsigned char *)pcCsrBuffer,
                                                      xCsrBufferLength, &lPKCS11RandomCallback,
                                                      &xP11Session);
+            if (0 != ulMbedtlsRet)
+            {
+                LogError(("mbedtls_x509write_csr_pem failed while preparing Fleet CSR: ret=%ld.",
+                          (long)ulMbedtlsRet));
+            }
         }
 
         mbedtls_x509write_csr_free(&xReq);
@@ -362,7 +380,10 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         mbedtls_pk_free(&xPrivKey);
     }
 
-    *pxOutCsrLength = strlen(pcCsrBuffer);
+    if (0 == ulMbedtlsRet)
+    {
+        *pxOutCsrLength = strlen(pcCsrBuffer);
+    }
 
     return (0 == ulMbedtlsRet);
 }
