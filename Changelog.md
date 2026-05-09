@@ -6,6 +6,18 @@
 
 ## Coming Soon
 
+### 予定
+
+- TSIP連携のFleet Provisioningはジョブ経路を用意済みですが、
+  `RX72N_TSIP_FLEET_ENABLE=false`、`RX65N_BG96_TSIP_FLEET_ENABLE=false` を
+  既定としているため、まだ標準の定期検証には含めていません。
+  RX72NとRX65N/BG96を別々のfocused pipelineで確認してから、scheduleへ昇格する予定です。
+
+- TSIP + TLS 1.3の同時有効化は、TSIP TLS 1.2経路とsoftware TLS 1.3経路を
+  別々に安定化した後に扱います。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.1.0
+
 ### 追加
 
 - RX72N Envision Kit EthernetとCK-RX65N + BG96 Cellularに、TSIP連携TLS backendを
@@ -13,7 +25,10 @@
   TSIP用アプリケーションプロジェクト、UART経由の`tsipprov` provisioning、
   masked CI/CD Variablesまたは初期セットアップ時のローカル入力からの
   runtime provisioning payload投入に対応しました。
-  RX72N TSIP OTAはpipeline #4739、RX65N/BG96 TSIP OTAはpipeline #4744で
+  RX72N TSIP OTA/MQTTはpipeline
+  [#4718](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4718)、
+  RX65N/BG96 TSIP OTA/MQTTはpipeline
+  [#4791](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4791)で
   実機完走を確認しています。
 
 - RX72N Envision Kit Ethernetで、AWS IoT CoreへのTLS 1.3 MQTT接続に対応しました。
@@ -36,10 +51,27 @@
   ロジアナ波形観測で見えたセルラー特有の待ち時間をもとに、MQTT受信待ち時間と
   OTAブロックサイズを調整し、実機CIで安定して再現できる保守的な設定に寄せました。
 
-### 予定
+### 実機フルテスト結果
 
-- 次のsafftiタグでは、202604ベース以降のBG96 OTA性能チューニング、RX72N TLS 1.3対応、
-  RX65N BG96 TLS 1.3対応、TSIP連携TLS backend、実機CI運用の改善をまとめる予定です。
+このタグ候補では、重い直積テストを通常MR pipelineへ載せず、schedule / focused pipelineの
+組み合わせで確認しています。2026-05-09時点の直近結果は **4/4 pipelines success、
+61/61 jobs success** です。
+
+| Scope | Pipeline | Tested commit | Result | Jobs |
+|-------|----------|---------------|--------|------|
+| Full software TLS regression (RX72N/Ether + RX65N/BG96 MQTT/OTA/Fleet) | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | `91f2d6b5` | success | 33/33 |
+| Focused RX72N TSIP OTA/MQTT | [#4718](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4718) | `91f2d6b5` | success | 9/9 |
+| Focused RX72N software TLS 1.3 MQTT | [#4717](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4717) | `91f2d6b5` | success | 5/5 |
+| Focused RX65N/BG96 TSIP OTA/MQTT | [#4791](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4791) | `f06e977f` | success | 14/14 |
+
+### 注記
+
+- TSIP OTA/MQTTのscopeは、OTA実行前にMQTT接続確認とcredential provisioningを通過するため
+  OTA/MQTTとして記載しています。
+- RX72N software TLS 1.3は、現在の定期結果ではMQTT接続確認までです。
+  既存OTAジョブをTLS 1.3必須条件で実行できるよう、Issue #43でOTAログ側のTLS version判定を
+  追加しています。
+- TSIP Fleet Provisioningはこのタグ候補の標準検証範囲外です。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.0.0
 

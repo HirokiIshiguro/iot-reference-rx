@@ -163,15 +163,19 @@ TSIP経路は通常のMR pipelineへ全直積で載せず、focused pipelineとs
 1. software TLSの全体回帰は、毎日03:20 JSTのnightly scheduleで実行する。
    `RX72N_TEST_SCOPE=full`、`RX65N_BG96_TEST_SCOPE=full` とし、MQTT / OTA /
    Fleet Provisioningまで確認する。
-2. RX72N TSIPは、毎日04:20 JSTのfocused scheduleで実行する。
+2. RX72N TSIP OTA/MQTTは、毎日04:20 JSTのfocused scheduleで実行する。
    `RX72N_TLS_BACKEND=tsip`、`RX72N_TEST_SCOPE=ota` とし、RX65N/BG96側は
-   build / hardwareともskipして、Ethernet側のTSIP runtime provisioningとOTAを確認する。
+   build / hardwareともskipして、Ethernet側のTSIP runtime provisioning、MQTT接続、
+   OTAを確認する。
 3. software TLS 1.3はTSIPとは分け、毎日05:20 JSTのfocused scheduleで
    RX72N/Ether MQTTを確認する。`AWS_IOT_ENDPOINT` を
    `IoTSecurityPolicy_TLS13_1_2_2022_10` のAWS IoT Core domain
    (`d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`) に切り替え、
    `RX72N_REQUIRE_TLS_VERSION=TLSv1.3` を指定する。
-4. RX65N/BG96 TSIPは、focused pipeline
+   既存ジョブグラフは `RX72N_TEST_SCOPE=ota` でも動かせるため、Issue #43で
+   OTAログ側のTLS 1.3必須判定を追加したうえで、scheduleをTLS 1.3 OTA/MQTTへ
+   昇格する。
+4. RX65N/BG96 TSIP OTA/MQTTは、focused pipeline
    [#4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744)
    でOTA完走確認済みのため、毎日06:20 JSTのfocused scheduleへ昇格済み。
    GitLab schedule #7として登録している。
@@ -182,6 +186,11 @@ TSIP経路は通常のMR pipelineへ全直積で載せず、focused pipelineとs
 
 TSIPとTLS 1.3を同時に有効にする経路は別作業とし、ここではTSIP TLS 1.2系と
 software TLS 1.3系を別々に監視する。
+
+TSIP Fleet Provisioningはジョブ経路としては存在するが、現時点では
+`RX72N_TSIP_FLEET_ENABLE=false`、`RX65N_BG96_TSIP_FLEET_ENABLE=false` を既定にして
+schedule対象外としている。TSIP Fleetをrelease validationへ含める場合は、RX72Nと
+RX65N/BG96を別々のfocused pipelineで確認してからscheduleへ昇格する。
 
 ## スコープ外
 

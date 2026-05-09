@@ -2459,12 +2459,17 @@ test_rx72n_ether_ota:
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+      tls_version_args=()
+      if [ -n "${RX72N_REQUIRE_TLS_VERSION:-}" ]; then
+        tls_version_args+=(--require-tls-version "$RX72N_REQUIRE_TLS_VERSION")
+      fi
 
       python tools/test_ota.py \
         --port "$RX72N_LINUX_UART_PORT" \
         --baud "$RX72N_LINUX_UART_BAUD_RATE" \
         --timeout "$RX72N_OTA_OBSERVE_TIMEOUT" \
         --expected-version "$RX72N_OTA_CANDIDATE_VERSION" \
+        "${tls_version_args[@]}" \
         --reset-cmd "$reset_cmd" \
         --reset-after-open \
         --no-reset \

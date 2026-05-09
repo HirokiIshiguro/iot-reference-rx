@@ -4,15 +4,48 @@
 > This fork maintains the RX72N Envision Kit Ethernet reference and the CK-RX65N V1 + BG96 cellular reference under `Projects/`.
 > Historical CK-RX65N / DA16600 / RYZ014A notes below are preserved as reference and may not match the current maintained project set.
 
+## Public Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [README.md](README.md) | Public entry point and latest scheduled regression summary |
+| [Changelog.md](Changelog.md) | SAFFTI release notes, tag-to-tag changes, and release validation links |
+| [docs/tsip-integration-plan.md](docs/tsip-integration-plan.md) | TSIP integration plan and scheduled regression split |
+
+## Latest Scheduled Regression Results
+
+Last updated: 2026-05-09 JST. The current scheduled regression set is all green:
+**4/4 scheduled pipelines passed, 61/61 jobs succeeded**.
+
+| Scope | Pipeline | Tested commit | Result | Jobs |
+|-------|----------|---------------|--------|------|
+| Full software TLS regression (RX72N/Ether + RX65N/BG96 MQTT/OTA/Fleet) | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | `91f2d6b5` | success | 33/33 |
+| Focused RX72N TSIP OTA/MQTT | [#4718](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4718) | `91f2d6b5` | success | 9/9 |
+| Focused RX72N software TLS 1.3 MQTT | [#4717](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4717) | `91f2d6b5` | success | 5/5 |
+| Focused RX65N/BG96 TSIP OTA/MQTT | [#4791](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4791) | `f06e977f` | success | 14/14 |
+
+Scope notes:
+
+- `RX72N_TEST_SCOPE=ota` and `RX65N_BG96_TEST_SCOPE=ota` include provisioning and MQTT connectivity before OTA, so the TSIP OTA schedules are documented as OTA/MQTT coverage.
+- RX72N software TLS 1.3 currently has a scheduled MQTT result. The same OTA job graph can run with `RX72N_TEST_SCOPE=ota` and `RX72N_REQUIRE_TLS_VERSION=TLSv1.3`; Issue #43 adds OTA-log TLS version enforcement before promoting that schedule to OTA/MQTT.
+- TSIP Fleet Provisioning job paths exist but are intentionally gated by `RX72N_TSIP_FLEET_ENABLE=false` and `RX65N_BG96_TSIP_FLEET_ENABLE=false` by default. They are not part of the current release validation set until separately enabled and proven.
+
 ## Maintained Projects
 
-| Board | Connectivity | Application | Boot loader | Status |
-|-------|--------------|-------------|-------------|--------|
-| RX72N Envision Kit | Ethernet | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | Maintained |
-| CK-RX65N V1 | BG96 cellular | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | Maintained |
+| Board | Connectivity | Application | TSIP application | Boot loader | Status |
+|-------|--------------|-------------|------------------|-------------|--------|
+| RX72N Envision Kit | Ethernet | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/` | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | Maintained |
+| CK-RX65N V1 | BG96 cellular | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | Maintained |
 
 CK-RX65N + BG96 was ported from the stable OSS OTA reference group:
 `https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-ota`.
+
+## Supported Board Specs
+
+| Board | MCU | Core | Code Flash | RAM | Connectivity |
+|-------|-----|------|------------|-----|--------------|
+| RX72N Envision Kit | RX72N (R5F572NN) | RXv3 | 4 MB (dual-bank) | 1 MB + 512 KB | Ethernet |
+| CK-RX65N V1 + BG96 | RX65N dual-bank | RXv2 | 2 MB (dual-bank) | 640 KB | Cellular Cat-M1/NB-IoT |
 
 ## Background / 背景
 
@@ -52,7 +85,7 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 
 | Role | URL |
 |------|-----|
-| GitLab (primary) | https://shelty2.servegame.com/oss/import/github/renesas/iot-reference-rx |
+| GitLab (primary) | https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx |
 | GitHub (mirror) | https://github.com/HirokiIshiguro/iot-reference-rx |
 | GitHub (upstream) | https://github.com/renesas/iot-reference-rx |
 
@@ -78,6 +111,19 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 | r_fwup | 2.04 | -- |
 
 **注意:** 202604.00-LTS では coreMQTT が v5、Jobs が v2 へ更新されるため、RX72N プロジェクトでは `Common/patches/coreMQTT-Agent/` と `Common/patches/Jobs-for-AWS-IoT-embedded-sdk/` に互換差分を保持する。
+
+### FIT Modules (RX Driver Package)
+
+| FIT module | Revision | RX Driver Package |
+|------------|----------|-------------------|
+| r_bsp | 7.52 | 1.46 |
+| r_ether_rx | 1.23 | 1.36 - 1.46 |
+| r_flash_rx | 5.21 | 1.46 |
+| r_sci_rx | 5.40 | 1.46 |
+| r_s12ad_rx | 5.40 | 1.45 - 1.46 |
+| r_byteq | 2.10 | 1.37 - 1.46 |
+| r_irq_rx | 4.60 | 1.46 |
+| r_fwup | 2.04 | 1.45 - 1.46 |
 
 ## Build Environment / ビルド環境
 
@@ -265,6 +311,53 @@ manual OTA job 用の追加入力 / 既定値:
 - `E2STUDIO_WORKSPACE_OTA` (Variable, 任意) — OTA candidate 再build用の一時 workspace
 
 ## CI/CD Pipeline
+
+The current GitLab CI pipeline is organized by MCU environment. Job names use
+`<action>_<mcu_env>_<feature>` where possible.
+
+| MCU environment | Hardware | Connectivity | Standard runner |
+|-----------------|----------|--------------|-----------------|
+| `rx72n_ether` | RX72N Envision Kit | Ethernet | RPi #2 / `dev-ek-rx72n-set2` |
+| `rx65n_bg96` | CK-RX65N V1 + Quectel BG96 | Cellular Cat-M1/NB-IoT | RPi #3 / `dev-ck-rx65n-bg96` |
+
+Core hardware jobs:
+
+| Function | RX72N Ethernet job | RX65N/BG96 job |
+|----------|--------------------|----------------|
+| Build boot loader and app | `build_rx72n_ether` | `build_rx65n_bg96` |
+| Flash boot loader / initial app | `flash_rx72n_ether` | `flash_rx65n_bg96` |
+| Download app via boot loader | included in `flash_rx72n_ether` | `download_rx65n_bg96_app` |
+| Provision MQTT credentials | `provision_rx72n_ether_mqtt` | `provision_rx65n_bg96_mqtt` |
+| Test MQTT | `test_rx72n_ether_mqtt` | `test_rx65n_bg96_mqtt` |
+| Build OTA candidate | `build_rx72n_ether_ota` | `build_rx65n_bg96_ota` |
+| Create AWS IoT OTA job | `create_rx72n_ether_ota` | `create_rx65n_bg96_ota` |
+| Test OTA | `test_rx72n_ether_ota` | `test_rx65n_bg96_ota` |
+| Build Fleet Provisioning image | `build_rx72n_ether_fleet` | `build_rx65n_bg96_fleet` |
+| Test Fleet Provisioning | `test_rx72n_ether_fleet` | `test_rx65n_bg96_fleet` |
+
+Pipeline profiles:
+
+| Profile | Pipeline source | Default scope |
+|---------|-----------------|---------------|
+| `branch` | Feature branch push | Build only. Hardware jobs stay out of branch push pipelines. |
+| `mr` | Merge request | `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=mqtt`. |
+| `focused` | Manual/API | Build only unless board scopes and TLS variables are set explicitly. |
+| `release` | `main`/tag | Full software-TLS regression for RX72N and RX65N/BG96. |
+| `nightly` | GitLab pipeline schedule | Full regression or scheduled focused paths. |
+
+Scheduled hardware regressions are staggered so the Windows CCRX runner and two
+hardware runners do not contend unnecessarily.
+
+| Schedule | Status | Time (JST) | Scope | Purpose |
+|----------|--------|------------|-------|---------|
+| Nightly full software TLS | Active | 03:20 daily | `PIPELINE_PROFILE=nightly`, `RX72N_TEST_SCOPE=full`, `RX65N_BG96_TEST_SCOPE=full`, `RX72N_TLS_BACKEND=software`, `RX65N_BG96_TLS_BACKEND=software` | Full RX72N/Ether + RX65N/BG96 regression including MQTT, OTA, and Fleet Provisioning. |
+| Focused RX72N TSIP OTA/MQTT | Active | 04:20 daily | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=build`, `RX65N_BG96_SKIP_HW_TESTS=true`, `RUN_RX65N_BG96_BUILD=false`, `RX72N_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning, MQTT, and OTA on the Ethernet board. |
+| Focused RX72N software TLS 1.3 MQTT | Active | 05:20 daily | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=build`, `RX65N_BG96_SKIP_HW_TESTS=true`, `RUN_RX65N_BG96_BUILD=false`, `AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`, `RX72N_REQUIRE_TLS_VERSION=TLSv1.3`, `RX72N_TLS_BACKEND=software` | Confirms RX72N/Ether negotiates TLS 1.3 with the AWS IoT Core TLS 1.3 policy domain. |
+| Focused RX65N/BG96 TSIP OTA/MQTT | Active (schedule #7) | 06:20 daily | `PIPELINE_PROFILE=focused`, `RX65N_BG96_TEST_SCOPE=ota`, `RX65N_BG96_TLS_BACKEND=tsip`, `RUN_RX65N_BG96_BUILD=true`, `RX65N_BG96_SKIP_HW_TESTS=false`, `RUN_RX72N_BUILD=false`, `RX72N_SKIP_HW_TESTS=true`, `RX72N_TEST_SCOPE=build` | Confirms TSIP runtime provisioning, MQTT, and OTA on the cellular board. |
+
+Creating or updating project pipeline schedules requires Maintainer/Owner
+permissions on this GitLab project. Keep active GitLab schedules and this table
+in sync.
 
 ### Phase 8a: CK-RX65N (V1) パイプライン構築
 
@@ -576,10 +669,29 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 
 | Project | Relation |
 |---------|----------|
-| [rx72n-envision-kit](https://shelty2.servegame.com/oss/import/github/renesas/rx72n-envision-kit) | Phase 8 の親プロジェクト。移植先 |
-| [OTA ナレッジベース](https://shelty2.servegame.com/oss/experiment/embedded/mcu/elemental/ota) | MCU OTA 技術全般のナレッジ |
-| [AWS IoT Core ナレッジ](https://shelty2.servegame.com/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
-| [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
+| [rx72n-envision-kit](https://gitlab.saffti.jp/oss/import/github/renesas/rx72n-envision-kit) | Phase 8 の親プロジェクト。移植先 |
+| [OTA ナレッジベース](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/elemental/ota) | MCU OTA 技術全般のナレッジ |
+| [AWS IoT Core ナレッジ](https://gitlab.saffti.jp/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
+| [hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
+
+## Current Limitations
+
+- CLI task cannot run after starting the demo because it shares SCI resources.
+- `mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST` must be set to `1` for OTA.
+- LittleFS is not thread-safe; do not call its API from multiple tasks.
+- Custom `printf` is not thread-safe; use `configPRINTF` instead.
+- After Smart Configurator code generation, verify linker section addresses for dual-bank configuration.
+- For RX72N, LittleFS is shifted to `0x00100800` to avoid overlap with boot loader signer-key storage.
+
+## FreeRTOS-Kernel Patch
+
+This fork uses the upstream FreeRTOS-Kernel submodule and applies the RX72N CCRX
+context-restore workaround from
+`Common/patches/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU/port.c` in the
+e2 studio project.
+
+- Issue: https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/13
+- Patch: https://gitlab.saffti.jp/oss/import/github/freertos/FreeRTOS-Kernel/-/merge_requests/1
 
 ## Known Pitfalls / 既知の注意事項
 
