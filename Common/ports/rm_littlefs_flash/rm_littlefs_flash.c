@@ -19,6 +19,17 @@
 #include "rm_littlefs_flash_config.h"
 #include "r_bsp/mcu/all/r_fsp_error.h"
 #include "r_common_api_flash.h"
+#include "logging_levels.h"
+
+#ifndef LIBRARY_LOG_NAME
+    #define LIBRARY_LOG_NAME    "LittleFS"
+#endif
+
+#ifndef LIBRARY_LOG_LEVEL
+    #define LIBRARY_LOG_LEVEL    LOG_INFO
+#endif
+
+#include "logging_stack.h"
 
 /**********************************************************************************************************************
  * Macro definitions
@@ -183,6 +194,15 @@ int rm_littlefs_flash_write(const struct lfs_config * c,
     /* if semaphore cannot be obtained then return error */
     flash_err_t flash_error_code = FLASH_ERR_BUSY;
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
+    uint32_t dest_addr = (rm_littlefs_flash_data_start +
+            (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off);
+
+    LogInfo(("LittleFS flash trace: write enter block=%lu off=%lu size=%lu addr=0x%08lx state=%lu.",
+             (unsigned long)block,
+             (unsigned long)off,
+             (unsigned long)size,
+             (unsigned long)dest_addr,
+             (unsigned long)update_data_flash_control_block.status));
 
     /* Flash access protect */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
@@ -190,8 +210,14 @@ int rm_littlefs_flash_write(const struct lfs_config * c,
     update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_WRITE_WAIT_COMPLETE;
 
     flash_error_code = R_FLASH_Write( (uint32_t)buffer,
-            (rm_littlefs_flash_data_start +
-            (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off), size );
+            dest_addr, size );
+
+    LogInfo(("LittleFS flash trace: write issued ret=%d block=%lu off=%lu size=%lu state=%lu.",
+             flash_error_code,
+             (unsigned long)block,
+             (unsigned long)off,
+             (unsigned long)size,
+             (unsigned long)update_data_flash_control_block.status));
 
     if ((FLASH_SUCCESS != flash_error_code))
     {
@@ -201,6 +227,11 @@ int rm_littlefs_flash_write(const struct lfs_config * c,
 
     /* wait for the semaphore to be released by callback */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+    LogInfo(("LittleFS flash trace: write wait done block=%lu off=%lu size=%lu state=%lu.",
+             (unsigned long)block,
+             (unsigned long)off,
+             (unsigned long)size,
+             (unsigned long)update_data_flash_control_block.status));
     xSemaphoreGive(xSemaphoreFlashAccess);
     return LFS_ERR_OK;
 }
@@ -221,14 +252,26 @@ int rm_littlefs_flash_erase(const struct lfs_config * c, lfs_block_t block)
     /* if semaphore cannot be obtained then return error */
     flash_err_t flash_error_code = FLASH_ERR_BUSY;
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
+    uint32_t erase_addr = rm_littlefs_flash_data_start + (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block);
+    uint32_t erase_blocks = p_instance_ctrl->p_cfg->p_lfs_cfg->block_size / RM_LITTLEFS_FLASH_DATA_BLOCK_SIZE;
+
+    LogInfo(("LittleFS flash trace: erase enter block=%lu addr=0x%08lx blocks=%lu state=%lu.",
+             (unsigned long)block,
+             (unsigned long)erase_addr,
+             (unsigned long)erase_blocks,
+             (unsigned long)update_data_flash_control_block.status));
 
     /* Flash access protect */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
 
     update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_ERASE_WAIT_COMPLETE;
 
-    flash_error_code = R_FLASH_Erase((flash_block_address_t)(rm_littlefs_flash_data_start + (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block)),
-                                    p_instance_ctrl->p_cfg->p_lfs_cfg->block_size / RM_LITTLEFS_FLASH_DATA_BLOCK_SIZE);
+    flash_error_code = R_FLASH_Erase((flash_block_address_t)erase_addr, erase_blocks);
+
+    LogInfo(("LittleFS flash trace: erase issued ret=%d block=%lu state=%lu.",
+             flash_error_code,
+             (unsigned long)block,
+             (unsigned long)update_data_flash_control_block.status));
 
     if ((FLASH_SUCCESS != flash_error_code))
     {
@@ -238,6 +281,9 @@ int rm_littlefs_flash_erase(const struct lfs_config * c, lfs_block_t block)
 
     /* wait for the semaphore to be released by callback */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+    LogInfo(("LittleFS flash trace: erase wait done block=%lu state=%lu.",
+             (unsigned long)block,
+             (unsigned long)update_data_flash_control_block.status));
     xSemaphoreGive(xSemaphoreFlashAccess);
     return LFS_ERR_OK;
 }
