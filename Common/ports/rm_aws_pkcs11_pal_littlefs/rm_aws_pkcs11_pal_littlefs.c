@@ -143,6 +143,9 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
 {
     CK_OBJECT_HANDLE xHandle = eInvalidHandle;
 
+    LogInfo(("PKCS11 PAL trace: SaveObject enter label=%s size=%lu.",
+             (char *)pxLabel->pValue, (unsigned long)ulDataSize));
+
     /* search specified label value from g_object_handle_dictionary */
     for (uint32_t i = 1; i < pkcs11configMAX_NUM_OBJECTS; i++)
     {
@@ -154,26 +157,35 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
 
     if (eInvalidHandle == xHandle)
     {
+        LogInfo(("PKCS11 PAL trace: SaveObject label not found."));
         return eInvalidHandle;
     }
 
     lfs_file_t file;
 
     volatile int lfs_err = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, pxLabel->pValue);
+    LogInfo(("PKCS11 PAL trace: SaveObject remove ret=%ld.",
+             (long)lfs_err));
 
     if ((LFS_ERR_NOENT != lfs_err) && (LFS_ERR_OK != lfs_err))
     {
+        LogInfo(("PKCS11 PAL trace: SaveObject remove failed."));
         return eInvalidHandle;
     }
 
     lfs_err = lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pxLabel->pValue, LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
+    LogInfo(("PKCS11 PAL trace: SaveObject open ret=%ld.",
+             (long)lfs_err));
 
     if (LFS_ERR_OK != lfs_err)
     {
+        LogInfo(("PKCS11 PAL trace: SaveObject open failed."));
         return eInvalidHandle;
     }
 
     lfs_err = lfs_file_write(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pucData, ulDataSize);
+    LogInfo(("PKCS11 PAL trace: SaveObject write ret=%ld.",
+             (long)lfs_err));
 
     pvwrite += ulDataSize;
     if (lfs_err < 0)
@@ -181,7 +193,9 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
         xHandle = eInvalidHandle;
     }
 
-    lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+    lfs_err = lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+    LogInfo(("PKCS11 PAL trace: SaveObject close ret=%ld handle=%lu.",
+             (long)lfs_err, (unsigned long)xHandle));
 
     return xHandle;
 }
