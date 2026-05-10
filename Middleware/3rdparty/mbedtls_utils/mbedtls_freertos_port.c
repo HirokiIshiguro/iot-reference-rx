@@ -31,9 +31,11 @@
  */
 
 /* Standard includes. */
+#include <stdio.h>
 #include <string.h>
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
+#include "task.h"
 /* mbed TLS includes. */
 #if !defined( MBEDTLS_CONFIG_FILE )
     #include "config.h"
@@ -153,7 +155,25 @@ int mbedtls_platform_mutex_lock( mbedtls_threading_mutex_t * pMutex )
     ( void ) mutexStatus;
 
     /* This function should never fail if the mutex is initialized. */
-    mutexStatus = xSemaphoreTakeRecursive( pMutex->mutexHandle, portMAX_DELAY );
+    mutexStatus = xSemaphoreTakeRecursive( pMutex->mutexHandle, pdMS_TO_TICKS( 5000 ) );
+    if( pdTRUE != mutexStatus )
+    {
+        char message[160];
+        TaskHandle_t holder = xSemaphoreGetMutexHolder( pMutex->mutexHandle );
+        const char * holderName = ( NULL != holder ) ? pcTaskGetName( holder ) : "none";
+        const char * currentName = ( taskSCHEDULER_NOT_STARTED != xTaskGetSchedulerState() ) ? pcTaskGetName( NULL ) : "none";
+
+        ( void ) snprintf( message,
+                           sizeof( message ),
+                           "MBEDTLS:MUTEX timeout mutex=0x%08lx handle=0x%08lx holder=%s current=%s\r\n",
+                           ( unsigned long ) pMutex,
+                           ( unsigned long ) pMutex->mutexHandle,
+                           holderName,
+                           currentName );
+        vOutputString( message );
+
+        mutexStatus = xSemaphoreTakeRecursive( pMutex->mutexHandle, portMAX_DELAY );
+    }
     configASSERT( mutexStatus == pdTRUE );
 
     return 0;
