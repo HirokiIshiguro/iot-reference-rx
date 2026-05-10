@@ -220,8 +220,18 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
     }
 
     g_littlefs_flash_trace_enabled = 0U;
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY before final log\r\n");
+    }
+
     LogInfo(("PKCS11 PAL trace: SaveObject close ret=%ld handle=%lu.",
              (long)lfs_err, (unsigned long)xHandle));
+
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY before return\r\n");
+    }
 
     return xHandle;
 }
