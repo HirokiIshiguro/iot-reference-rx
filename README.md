@@ -1,15 +1,40 @@
 # FreeRTOS LTS IoT Reference for Renesas RX
 
-## Latest Full Test Results / 最新のフルテスト結果
+## Latest Focused Test Matrix / 最新のFocusedテスト行列
 
-Last updated: 2026-05-09 JST. The latest scheduled hardware regression set is all green: **4/4 scheduled pipelines passed, 61/61 jobs succeeded**.
+Last updated: 2026-05-10 JST. The scheduled regression unit is a single
+nightly parent pipeline (`PIPELINE_PROFILE=nightly_matrix`) that fans out the
+focused rows below as child pipelines. This replaces the older "Full" schedule:
+the matrix table is the source of truth, and each row maps to one focused
+configuration. Rows marked `<coming soon>` are intentionally listed but not
+enabled until that configuration has hardware evidence.
 
-| Scope | Pipeline | Tested commit | Result | Jobs |
-|-------|----------|---------------|--------|------|
-| Full software TLS regression (RX72N/Ether + RX65N/BG96) | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | `91f2d6b5` | success | 33/33 |
-| Focused RX72N TSIP OTA | [#4718](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4718) | `91f2d6b5` | success | 9/9 |
-| Focused RX72N software TLS 1.3 MQTT | [#4717](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4717) | `91f2d6b5` | success | 5/5 |
-| Focused RX65N/BG96 TSIP OTA | [#4791](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4791) | `f06e977f` | success | 14/14 |
+| Focused row | Nightly matrix job | Latest evidence | Status |
+|-------------|--------------------|-----------------|--------|
+| RX72N TSIP MQTT | `matrix_rx72n_ether_tsip_mqtt` | [#4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK |
+| RX72N TSIP OTA | `matrix_rx72n_ether_tsip_ota` | [#4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK |
+| RX72N TSIP Fleet Provisioning | `matrix_rx72n_ether_tsip_fleet` | [#4905](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4905) | Stabilizing, gated by `NIGHTLY_MATRIX_INCLUDE_STABILIZING` |
+| RX72N TSIP TLS 1.3 MQTT | `<coming soon>` | `<coming soon>` | `<coming soon>` |
+| RX72N TSIP TLS 1.3 OTA | `<coming soon>` | `<coming soon>` | `<coming soon>` |
+| RX72N TSIP TLS 1.3 Fleet Provisioning | `<coming soon>` | `<coming soon>` | `<coming soon>` |
+| RX65N/BG96 TSIP MQTT | `matrix_rx65n_bg96_tsip_mqtt` | [#4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) | OK |
+| RX65N/BG96 TSIP OTA | `matrix_rx65n_bg96_tsip_ota` | [#4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) | OK |
+| RX65N/BG96 TSIP Fleet Provisioning | `matrix_rx65n_bg96_tsip_fleet` | [#4906](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4906) | Stabilizing, gated by `NIGHTLY_MATRIX_INCLUDE_STABILIZING` |
+| RX65N/BG96 TSIP TLS 1.3 MQTT | `<coming soon>` | `<coming soon>` | `<coming soon>` |
+| RX65N/BG96 TSIP TLS 1.3 OTA | `<coming soon>` | `<coming soon>` | `<coming soon>` |
+| RX65N/BG96 TSIP TLS 1.3 Fleet Provisioning | `<coming soon>` | `<coming soon>` | `<coming soon>` |
+| RX72N software MQTT | `matrix_rx72n_ether_software_mqtt` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
+| RX72N software OTA | `matrix_rx72n_ether_software_ota` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
+| RX72N software Fleet Provisioning | `matrix_rx72n_ether_software_fleet` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
+| RX72N software TLS 1.3 MQTT | `matrix_rx72n_ether_software_tls13_mqtt` | [#4717](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4717) | OK |
+| RX72N software TLS 1.3 OTA | `matrix_rx72n_ether_software_tls13_ota` | scheduled | Evidence pending |
+| RX72N software TLS 1.3 Fleet Provisioning | `matrix_rx72n_ether_software_tls13_fleet` | scheduled | Evidence pending |
+| RX65N/BG96 software MQTT | `matrix_rx65n_bg96_software_mqtt` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
+| RX65N/BG96 software OTA | `matrix_rx65n_bg96_software_ota` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
+| RX65N/BG96 software Fleet Provisioning | `matrix_rx65n_bg96_software_fleet` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
+| RX65N/BG96 software TLS 1.3 MQTT | `matrix_rx65n_bg96_software_tls13_mqtt` | [#4667](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4667) | OK |
+| RX65N/BG96 software TLS 1.3 OTA | `matrix_rx65n_bg96_software_tls13_ota` | scheduled | Evidence pending |
+| RX65N/BG96 software TLS 1.3 Fleet Provisioning | `matrix_rx65n_bg96_software_tls13_fleet` | scheduled | Evidence pending |
 
 ## About This Fork / このフォークについて
 

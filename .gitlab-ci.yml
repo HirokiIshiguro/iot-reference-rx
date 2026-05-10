@@ -1,4 +1,5 @@
 stages:
+  - nightly_matrix
   - build
   - pre_test_cleanup
   - flash
@@ -45,8 +46,9 @@ variables:
   #   mr      - representative MR standard pipeline.
   #   focused - manual/API pipeline; set board scopes explicitly.
   #   release - default branch/tag release-confidence pipeline.
-  #   nightly - scheduled full regression pipeline.
+  #   nightly_matrix - scheduled parent pipeline that fans out focused rows.
   PIPELINE_PROFILE: "branch"
+  NIGHTLY_MATRIX_INCLUDE_STABILIZING: "false"
   RUN_RX65N_BG96_BUILD: "true"
   # RX65N_BG96_TEST_SCOPE:
   #   build - build/package only, no hardware test.
@@ -117,6 +119,7 @@ variables:
   #   build - build/package only, no hardware test.
   #   mqtt  - flash/provision/MQTT only, no OTA.
   #   ota   - flash/provision/MQTT + OTA.
+  #   fleet - build and verify the Fleet Provisioning image.
   #   full  - flash/provision/MQTT + OTA + Fleet Provisioning cleanup path.
   RX72N_TEST_SCOPE: "build"
   RUN_RX72N_HW_TESTS: "false"
@@ -156,6 +159,8 @@ variables:
 
 workflow:
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
+      when: always
     - if: $CI_COMMIT_TAG
       variables:
         PIPELINE_PROFILE: "release"
@@ -170,6 +175,8 @@ workflow:
         RX65N_BG96_TEST_SCOPE: "mqtt"
         RX72N_TEST_SCOPE: "ota"
       when: always
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: always
     - if: '$CI_PIPELINE_SOURCE == "web"'
       variables:
         PIPELINE_PROFILE: "focused"
@@ -180,9 +187,11 @@ workflow:
       when: always
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       variables:
-        PIPELINE_PROFILE: "nightly"
-        RX65N_BG96_TEST_SCOPE: "full"
-        RX72N_TEST_SCOPE: "full"
+        PIPELINE_PROFILE: "nightly_matrix"
+        RUN_RX65N_BG96_BUILD: "false"
+        RUN_RX72N_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX72N_TEST_SCOPE: "build"
       when: always
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
       when: never
@@ -203,6 +212,196 @@ workflow:
       when: always
     - if: $CI_COMMIT_BRANCH
       when: always
+
+.nightly_matrix_trigger:
+  stage: nightly_matrix
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: on_success
+    - when: never
+  trigger:
+    include:
+      - local: .gitlab-ci.yml
+    strategy: depend
+    forward:
+      yaml_variables: true
+      pipeline_variables: true
+
+.nightly_matrix_rx72n:
+  extends: .nightly_matrix_trigger
+  variables:
+    PIPELINE_PROFILE: "focused"
+    RUN_RX72N_BUILD: "true"
+    RX72N_SKIP_HW_TESTS: "false"
+    RX65N_BG96_TEST_SCOPE: "build"
+    RUN_RX65N_BG96_BUILD: "false"
+    RX65N_BG96_SKIP_HW_TESTS: "true"
+
+.nightly_matrix_rx65n_bg96:
+  extends: .nightly_matrix_trigger
+  variables:
+    PIPELINE_PROFILE: "focused"
+    RX72N_TEST_SCOPE: "build"
+    RUN_RX72N_BUILD: "false"
+    RX72N_SKIP_HW_TESTS: "true"
+    RUN_RX65N_BG96_BUILD: "true"
+    RX65N_BG96_SKIP_HW_TESTS: "false"
+
+.nightly_matrix_stabilizing_trigger:
+  stage: nightly_matrix
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true"'
+      when: on_success
+    - when: never
+  trigger:
+    include:
+      - local: .gitlab-ci.yml
+    strategy: depend
+    forward:
+      yaml_variables: true
+      pipeline_variables: true
+
+.nightly_matrix_rx72n_stabilizing:
+  extends: .nightly_matrix_stabilizing_trigger
+  variables:
+    PIPELINE_PROFILE: "focused"
+    RUN_RX72N_BUILD: "true"
+    RX72N_SKIP_HW_TESTS: "false"
+    RX65N_BG96_TEST_SCOPE: "build"
+    RUN_RX65N_BG96_BUILD: "false"
+    RX65N_BG96_SKIP_HW_TESTS: "true"
+
+.nightly_matrix_rx65n_bg96_stabilizing:
+  extends: .nightly_matrix_stabilizing_trigger
+  variables:
+    PIPELINE_PROFILE: "focused"
+    RX72N_TEST_SCOPE: "build"
+    RUN_RX72N_BUILD: "false"
+    RX72N_SKIP_HW_TESTS: "true"
+    RUN_RX65N_BG96_BUILD: "true"
+    RX65N_BG96_SKIP_HW_TESTS: "false"
+
+matrix_rx72n_ether_software_mqtt:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "mqtt"
+    RX72N_TLS_BACKEND: "software"
+
+matrix_rx72n_ether_software_ota:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "ota"
+    RX72N_TLS_BACKEND: "software"
+
+matrix_rx72n_ether_software_fleet:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "fleet"
+    RX72N_TLS_BACKEND: "software"
+
+matrix_rx72n_ether_software_tls13_mqtt:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "mqtt"
+    RX72N_TLS_BACKEND: "software"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx72n_ether_software_tls13_ota:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "ota"
+    RX72N_TLS_BACKEND: "software"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx72n_ether_software_tls13_fleet:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "fleet"
+    RX72N_TLS_BACKEND: "software"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx72n_ether_tsip_mqtt:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "mqtt"
+    RX72N_TLS_BACKEND: "tsip"
+
+matrix_rx72n_ether_tsip_ota:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "ota"
+    RX72N_TLS_BACKEND: "tsip"
+
+matrix_rx72n_ether_tsip_fleet:
+  extends: .nightly_matrix_rx72n_stabilizing
+  variables:
+    RX72N_TEST_SCOPE: "fleet"
+    RX72N_TLS_BACKEND: "tsip"
+    RX72N_TSIP_FLEET_ENABLE: "true"
+
+matrix_rx65n_bg96_software_mqtt:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "mqtt"
+    RX65N_BG96_TLS_BACKEND: "software"
+
+matrix_rx65n_bg96_software_ota:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "ota"
+    RX65N_BG96_TLS_BACKEND: "software"
+
+matrix_rx65n_bg96_software_fleet:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "fleet"
+    RX65N_BG96_TLS_BACKEND: "software"
+
+matrix_rx65n_bg96_software_tls13_mqtt:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "mqtt"
+    RX65N_BG96_TLS_BACKEND: "software"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx65n_bg96_software_tls13_ota:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "ota"
+    RX65N_BG96_TLS_BACKEND: "software"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx65n_bg96_software_tls13_fleet:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "fleet"
+    RX65N_BG96_TLS_BACKEND: "software"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx65n_bg96_tsip_mqtt:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "mqtt"
+    RX65N_BG96_TLS_BACKEND: "tsip"
+
+matrix_rx65n_bg96_tsip_ota:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "ota"
+    RX65N_BG96_TLS_BACKEND: "tsip"
+
+matrix_rx65n_bg96_tsip_fleet:
+  extends: .nightly_matrix_rx65n_bg96_stabilizing
+  variables:
+    RX65N_BG96_TEST_SCOPE: "fleet"
+    RX65N_BG96_TLS_BACKEND: "tsip"
+    RX65N_BG96_TSIP_FLEET_ENABLE: "true"
 
 build_rx72n_ether:
   stage: build
@@ -413,7 +612,7 @@ build_rx72n_ether_fleet:
     - ccrx
   resource_group: rx72n-e2studio-build
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -1465,7 +1664,7 @@ flash_rx72n_ether_fleet:
       artifacts: true
       optional: true
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -1591,7 +1790,7 @@ provision_rx72n_ether_fleet:
     - build_rx72n_ether_fleet
     - flash_rx72n_ether_fleet
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -1729,7 +1928,7 @@ test_rx72n_ether_fleet:
     - flash_rx72n_ether_fleet
     - provision_rx72n_ether_fleet
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
@@ -1808,7 +2007,7 @@ cleanup_rx72n_ether_fleet:
   dependencies:
     - test_rx72n_ether_fleet
   rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE == "full") && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_CLEANUP_FLEET_RESOURCES != "false" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_DEFAULT_REGION && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: always
     - when: never
   script:
