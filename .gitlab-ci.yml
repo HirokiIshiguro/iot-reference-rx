@@ -84,6 +84,9 @@ variables:
   RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS: "0.002"
   RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS: "0.5"
   RX65N_BG96_REQUIRE_TLS_VERSION: ""
+  # Highest-precedence endpoint for focused RX65N/BG96 rows that intentionally
+  # override board-default CI/CD variables, such as TLS 1.3 validation.
+  RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: ""
   # RX65N_BG96_TLS_BACKEND: software or tsip.
   RX65N_BG96_TLS_BACKEND: "software"
   RX65N_BG96_UART_BAUD_RATE: "921600"
@@ -374,6 +377,7 @@ matrix_rx65n_bg96_software_tls13_mqtt:
     RX65N_BG96_TEST_SCOPE: "mqtt"
     RX65N_BG96_TLS_BACKEND: "software"
     RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
     AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
 
 matrix_rx65n_bg96_software_tls13_ota:
@@ -382,6 +386,7 @@ matrix_rx65n_bg96_software_tls13_ota:
     RX65N_BG96_TEST_SCOPE: "ota"
     RX65N_BG96_TLS_BACKEND: "software"
     RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
     AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
 
 matrix_rx65n_bg96_software_tls13_fleet:
@@ -390,6 +395,7 @@ matrix_rx65n_bg96_software_tls13_fleet:
     RX65N_BG96_TEST_SCOPE: "fleet"
     RX65N_BG96_TLS_BACKEND: "software"
     RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
     AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
 
 matrix_rx65n_bg96_tsip_mqtt:
@@ -1008,7 +1014,7 @@ prepare_rx65n_bg96_mqtt_credentials:
         throw "BG96 MQTT credentials are not available and RX65N_BG96_DYNAMIC_IOT_CREDENTIALS is not true."
       }
 
-      $endpoint = Get-FirstEnv @("AWS_IOT_MQTT_BROKER_ENDPOINT_CK_RX65N_01", "BG96_AWS_IOT_ENDPOINT", "BG96_AWS_IOT_MQTT_BROKER_ENDPOINT", "BG96_MQTT_ENDPOINT", "BG96_MQTT_BROKER_ENDPOINT", "AWS_IOT_ENDPOINT", "AWS_IOT_MQTT_BROKER_ENDPOINT")
+      $endpoint = Get-FirstEnv @("RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE", "AWS_IOT_MQTT_BROKER_ENDPOINT_CK_RX65N_01", "BG96_AWS_IOT_ENDPOINT", "BG96_AWS_IOT_MQTT_BROKER_ENDPOINT", "BG96_MQTT_ENDPOINT", "BG96_MQTT_BROKER_ENDPOINT", "AWS_IOT_ENDPOINT", "AWS_IOT_MQTT_BROKER_ENDPOINT")
       $thingName = "$env:RX65N_BG96_THING_NAME_PREFIX-$env:CI_PIPELINE_ID"
       $args = @(
         "tools/create_bg96_iot_credentials.py",
@@ -1456,7 +1462,7 @@ create_rx65n_bg96_ota:
         if (-not [string]::IsNullOrWhiteSpace($configuredRegion)) {
           return $configuredRegion
         }
-        $endpoint = Get-FirstEnv @("AWS_IOT_MQTT_BROKER_ENDPOINT_CK_RX65N_01", "BG96_AWS_IOT_ENDPOINT", "BG96_AWS_IOT_MQTT_BROKER_ENDPOINT", "BG96_MQTT_ENDPOINT", "BG96_MQTT_BROKER_ENDPOINT", "AWS_IOT_ENDPOINT", "AWS_IOT_MQTT_BROKER_ENDPOINT")
+        $endpoint = Get-FirstEnv @("RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE", "AWS_IOT_MQTT_BROKER_ENDPOINT_CK_RX65N_01", "BG96_AWS_IOT_ENDPOINT", "BG96_AWS_IOT_MQTT_BROKER_ENDPOINT", "BG96_MQTT_ENDPOINT", "BG96_MQTT_BROKER_ENDPOINT", "AWS_IOT_ENDPOINT", "AWS_IOT_MQTT_BROKER_ENDPOINT")
         if ($endpoint -match '\.iot\.([a-z0-9-]+)\.amazonaws\.com') {
           return $Matches[1]
         }
