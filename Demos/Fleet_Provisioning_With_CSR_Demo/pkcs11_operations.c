@@ -278,17 +278,15 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     }
     else
     {
-        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair direct enter."));
-        xResult = C_GenerateKeyPair(xSession,
-                                    &xMechanism,
-                                    pxPublicKeyTemplate,
-                                    (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                    privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                    xPublicKeyHandlePtr,
-                                    xPrivateKeyHandlePtr);
-        vOutputString("PKCS11_OPS: after direct C_GenerateKeyPair\r\n");
-        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
-                 (unsigned long)xResult));
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
+        xResult = xFunctionList->C_GenerateKeyPair(xSession,
+                                                   &xMechanism,
+                                                   pxPublicKeyTemplate,
+                                                   (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                                   privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                                   xPublicKeyHandlePtr,
+                                                   xPrivateKeyHandlePtr);
+        vOutputString("PKCS11_OPS: after indirect C_GenerateKeyPair\r\n");
     }
 
     return xResult;
@@ -352,6 +350,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
                                       pcPubKeyLabel,
                                       &xPrivKeyHandle,
                                       &xPubKeyHandle);
+    vOutputString("PKCS11_OPS: xGenerateKeyAndCsr after keypair\r\n");
     if (CKR_OK != xPkcs11Ret)
     {
         LogError(("C_GenerateKeyPair failed while preparing Fleet CSR: CK_RV=0x%08lx.",
