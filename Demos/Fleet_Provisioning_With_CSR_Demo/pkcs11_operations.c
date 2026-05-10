@@ -63,6 +63,8 @@
 #include "mbedtls/ssl.h"
 #endif
 
+extern void vOutputString( const char * pcMessage );
+
 /* strnlen includes for CC-RX compiler. */
 #if defined(__CCRX__)
 #include "strnlen.h"
@@ -276,14 +278,15 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     }
     else
     {
-        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
-        xResult = xFunctionList->C_GenerateKeyPair(xSession,
-                                                   &xMechanism,
-                                                   pxPublicKeyTemplate,
-                                                   (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                                   privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                                   xPublicKeyHandlePtr,
-                                                   xPrivateKeyHandlePtr);
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair direct enter."));
+        xResult = C_GenerateKeyPair(xSession,
+                                    &xMechanism,
+                                    pxPublicKeyTemplate,
+                                    (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                    privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                    xPublicKeyHandlePtr,
+                                    xPrivateKeyHandlePtr);
+        vOutputString("PKCS11_OPS: after direct C_GenerateKeyPair\r\n");
         LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
                  (unsigned long)xResult));
     }
