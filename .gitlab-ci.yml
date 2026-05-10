@@ -225,7 +225,7 @@ workflow:
     strategy: depend
     forward:
       yaml_variables: true
-      pipeline_variables: true
+      pipeline_variables: false
 
 .nightly_matrix_rx72n:
   extends: .nightly_matrix_trigger
@@ -259,7 +259,7 @@ workflow:
     strategy: depend
     forward:
       yaml_variables: true
-      pipeline_variables: true
+      pipeline_variables: false
 
 .nightly_matrix_rx72n_stabilizing:
   extends: .nightly_matrix_stabilizing_trigger
