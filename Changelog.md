@@ -30,6 +30,11 @@
   TLS 1.3のRSA-PSS CertificateVerifyに必要なRSA秘密鍵処理は、BG96プロジェクト内蔵の
   mbedTLS/PKCS #11連携にも反映しました。
 
+- 実機スケジューラを、Full regressionという大きな単位ではなく、
+  READMEのFocused Test Matrixに対応する1本のnightly parent pipelineから
+  focused child pipelineへ展開する形へ整理しています。
+  TSIP TLS 1.3系はまだ実機実績がないため、README上では`<coming soon>`として扱います。
+
 ### 改善
 
 - CK-RX65N + BG96のOTA性能チューニングを進めています。
