@@ -1753,6 +1753,51 @@ test_rx72n_ether_fleet:
       - artifacts/test_rx72n_ether_fleet/
     expire_in: 7 days
 
+debug_rx72n_ether_fleet_current_app:
+  stage: fleet_test
+  extends: .rx72n_linux_hw_job
+  rules:
+    - if: '$RX72N_DEBUG_CURRENT_APP_FLEET == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Debug RX72N fleet provisioning using currently flashed app ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/debug_rx72n_ether_fleet_current_app"
+      mkdir -p "$artifact_dir"
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      python tools/provision_rx72n.py \
+        --fleet-provisioning \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --endpoint "$AWS_IOT_ENDPOINT" \
+        --template-name "$AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02" \
+        --claim-cert "$AWS_FLEET_CLAIM_CERT_RX72N_02" \
+        --claim-key "$AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02" \
+        --format \
+        --no-reset \
+        --reset-cmd "$reset_cmd" \
+        --reset-after-open \
+        --boot-wait 12 \
+        --cli-timeout 25 \
+        --attempts 3 \
+        2>&1 | tee "$artifact_dir/provision_rx72n_fleet.log"
+
+      python tools/test_fleet_rx72n.py \
+        --log-port "$RX72N_LINUX_UART_PORT" \
+        --log-baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout "$RX72N_FLEET_TEST_TIMEOUT" \
+        --reset-cmd "$reset_cmd" \
+        --summary-json "$artifact_dir/fleet_summary.json" \
+        2>&1 | tee "$artifact_dir/test_fleet_rx72n.log"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/debug_rx72n_ether_fleet_current_app/
+    expire_in: 7 days
+
 cleanup_rx72n_ether_fleet:
   stage: fleet_cleanup
   allow_failure: true
