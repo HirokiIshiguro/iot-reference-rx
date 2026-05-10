@@ -1766,9 +1766,10 @@ provision_rx72n_ether_mqtt:
         --boot-wait 12
         --cli-timeout 25
         --attempts 3
+        --no-reset
       )
       if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
-        provision_args+=(--skip-private-key --no-reset)
+        provision_args+=(--skip-private-key)
       fi
 
       python tools/provision_rx72n.py "${provision_args[@]}" "${shadow_args[@]}" \
