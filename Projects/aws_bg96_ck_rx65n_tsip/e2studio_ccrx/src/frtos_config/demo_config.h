@@ -237,6 +237,7 @@
  * stack is created by an operating system thread.
  */
 #define democonfigDEMO_STACKSIZE        configMINIMAL_STACK_SIZE * 3
+#define democonfigFLEET_PROVISIONING_DEMO_STACKSIZE    ( configMINIMAL_STACK_SIZE * 12 )
 
 /**
  * @brief Set the stack size of the main demo task.

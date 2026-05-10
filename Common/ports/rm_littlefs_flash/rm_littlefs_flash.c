@@ -19,6 +19,17 @@
 #include "rm_littlefs_flash_config.h"
 #include "r_bsp/mcu/all/r_fsp_error.h"
 #include "r_common_api_flash.h"
+#include "logging_levels.h"
+
+#ifndef LIBRARY_LOG_NAME
+    #define LIBRARY_LOG_NAME    "LittleFS"
+#endif
+
+#ifndef LIBRARY_LOG_LEVEL
+    #define LIBRARY_LOG_LEVEL    LOG_INFO
+#endif
+
+#include "logging_stack.h"
 
 /**********************************************************************************************************************
  * Macro definitions
@@ -62,6 +73,8 @@ static void update_dataflash_data (const struct lfs_config * c,
         const void              * buffer,
         lfs_size_t                size,
         uint32_t                  update_state);
+
+volatile uint32_t g_littlefs_flash_trace_enabled = 0U;
 
 /**********************************************************************************************************************
  * Function Name: RM_LITTLEFS_FLASH_Open
@@ -147,15 +160,32 @@ int rm_littlefs_flash_read(const struct lfs_config * c,
                             lfs_size_t                size)
 {
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
+    uint32_t src_addr = (rm_littlefs_flash_data_start +
+            (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: read enter block=%lu off=%lu size=%lu addr=0x%08lx.",
+                 (unsigned long)block,
+                 (unsigned long)off,
+                 (unsigned long)size,
+                 (unsigned long)src_addr));
+    }
 
     /* No flash access while reading */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
 
     /* Read directly from the flash. */
-    memcpy( buffer,
-            (uint8_t *) (rm_littlefs_flash_data_start + (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off),
-            size);
+    memcpy( buffer, (uint8_t *) src_addr, size);
     xSemaphoreGive(xSemaphoreFlashAccess);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: read exit block=%lu off=%lu size=%lu.",
+                 (unsigned long)block,
+                 (unsigned long)off,
+                 (unsigned long)size));
+    }
 
     return LFS_ERR_OK;
 }
@@ -183,6 +213,18 @@ int rm_littlefs_flash_write(const struct lfs_config * c,
     /* if semaphore cannot be obtained then return error */
     flash_err_t flash_error_code = FLASH_ERR_BUSY;
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
+    uint32_t dest_addr = (rm_littlefs_flash_data_start +
+            (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: write enter block=%lu off=%lu size=%lu addr=0x%08lx state=%lu.",
+                 (unsigned long)block,
+                 (unsigned long)off,
+                 (unsigned long)size,
+                 (unsigned long)dest_addr,
+                 (unsigned long)update_data_flash_control_block.status));
+    }
 
     /* Flash access protect */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
@@ -190,8 +232,17 @@ int rm_littlefs_flash_write(const struct lfs_config * c,
     update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_WRITE_WAIT_COMPLETE;
 
     flash_error_code = R_FLASH_Write( (uint32_t)buffer,
-            (rm_littlefs_flash_data_start +
-            (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block) + off), size );
+            dest_addr, size );
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: write issued ret=%d block=%lu off=%lu size=%lu state=%lu.",
+                 flash_error_code,
+                 (unsigned long)block,
+                 (unsigned long)off,
+                 (unsigned long)size,
+                 (unsigned long)update_data_flash_control_block.status));
+    }
 
     if ((FLASH_SUCCESS != flash_error_code))
     {
@@ -201,6 +252,14 @@ int rm_littlefs_flash_write(const struct lfs_config * c,
 
     /* wait for the semaphore to be released by callback */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: write wait done block=%lu off=%lu size=%lu state=%lu.",
+                 (unsigned long)block,
+                 (unsigned long)off,
+                 (unsigned long)size,
+                 (unsigned long)update_data_flash_control_block.status));
+    }
     xSemaphoreGive(xSemaphoreFlashAccess);
     return LFS_ERR_OK;
 }
@@ -221,14 +280,32 @@ int rm_littlefs_flash_erase(const struct lfs_config * c, lfs_block_t block)
     /* if semaphore cannot be obtained then return error */
     flash_err_t flash_error_code = FLASH_ERR_BUSY;
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
+    uint32_t erase_addr = rm_littlefs_flash_data_start + (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block);
+    uint32_t erase_blocks = p_instance_ctrl->p_cfg->p_lfs_cfg->block_size / RM_LITTLEFS_FLASH_DATA_BLOCK_SIZE;
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: erase enter block=%lu addr=0x%08lx blocks=%lu state=%lu.",
+                 (unsigned long)block,
+                 (unsigned long)erase_addr,
+                 (unsigned long)erase_blocks,
+                 (unsigned long)update_data_flash_control_block.status));
+    }
 
     /* Flash access protect */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
 
     update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_ERASE_WAIT_COMPLETE;
 
-    flash_error_code = R_FLASH_Erase((flash_block_address_t)(rm_littlefs_flash_data_start + (p_instance_ctrl->p_cfg->p_lfs_cfg->block_size * block)),
-                                    p_instance_ctrl->p_cfg->p_lfs_cfg->block_size / RM_LITTLEFS_FLASH_DATA_BLOCK_SIZE);
+    flash_error_code = R_FLASH_Erase((flash_block_address_t)erase_addr, erase_blocks);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: erase issued ret=%d block=%lu state=%lu.",
+                 flash_error_code,
+                 (unsigned long)block,
+                 (unsigned long)update_data_flash_control_block.status));
+    }
 
     if ((FLASH_SUCCESS != flash_error_code))
     {
@@ -238,6 +315,12 @@ int rm_littlefs_flash_erase(const struct lfs_config * c, lfs_block_t block)
 
     /* wait for the semaphore to be released by callback */
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: erase wait done block=%lu state=%lu.",
+                 (unsigned long)block,
+                 (unsigned long)update_data_flash_control_block.status));
+    }
     xSemaphoreGive(xSemaphoreFlashAccess);
     return LFS_ERR_OK;
 }
@@ -257,7 +340,19 @@ int rm_littlefs_flash_lock(const struct lfs_config * c)
 #if LFS_THREAD_SAFE
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
 
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: lock enter semaphore=0x%08lx.",
+                 (unsigned long)p_instance_ctrl->xSemaphore));
+    }
+
     BaseType_t err = xSemaphoreTake(p_instance_ctrl->xSemaphore, RM_LITTLEFS_FLASH_SEMAPHORE_TIMEOUT);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: lock exit ret=%ld.",
+                 (long)err));
+    }
 
     FSP_ERROR_RETURN(true == err, LFS_ERR_IO);
 
@@ -284,7 +379,19 @@ int rm_littlefs_flash_unlock(const struct lfs_config * c)
 #if LFS_THREAD_SAFE
     rm_littlefs_flash_instance_ctrl_t * p_instance_ctrl = (rm_littlefs_flash_instance_ctrl_t *) c->context;
 
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: unlock enter semaphore=0x%08lx.",
+                 (unsigned long)p_instance_ctrl->xSemaphore));
+    }
+
     BaseType_t err = xSemaphoreGive(p_instance_ctrl->xSemaphore);
+
+    if (0U != g_littlefs_flash_trace_enabled)
+    {
+        LogInfo(("LittleFS flash trace: unlock exit ret=%ld.",
+                 (long)err));
+    }
 
     FSP_ERROR_RETURN(true == err, LFS_ERR_IO);
 

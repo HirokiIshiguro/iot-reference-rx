@@ -66,6 +66,10 @@
 /* Demo Config */
 #include "demo_config.h"
 
+#ifndef democonfigFLEET_PROVISIONING_DEMO_STACKSIZE
+    #define democonfigFLEET_PROVISIONING_DEMO_STACKSIZE    democonfigDEMO_STACKSIZE
+#endif
+
 /* mbedTLS include for configuring threading functions */
 #include "mbedtls/threading.h"
 #include "threading_alt.h"
@@ -629,7 +633,7 @@ void vStartFleetProvisioningDemo()
      * and create new IoT Things using the AWS IoT Fleet Provisioning API */
     xTaskCreate(prvFleetProvisioningTask, /* Function that implements the task. */
                 "DemoTask",               /* Text name for the task - only used for debugging. */
-                democonfigDEMO_STACKSIZE, /* Size of stack (in words, not bytes) to allocate for the task. */
+                democonfigFLEET_PROVISIONING_DEMO_STACKSIZE, /* Size of stack (in words, not bytes) to allocate. */
                 NULL,                     /* Task parameter - not used in this case. */
                 tskIDLE_PRIORITY + 3,     /* Task priority, must be between 0 and configMAX_PRIORITIES - 1. */
                 NULL);                    /* Used to pass out a handle to the created task - not used in this case. */
@@ -709,6 +713,8 @@ int prvFpDemo_start(void *pvParameters)
     LogInfo(("---------Start Fleet Provisioning Task---------\r\n"));
 
     templateLength = prvGetCacheEntryLength(KVS_TEMPLATE_NAME);
+    LogInfo(("Fleet provisioning template length: %lu.",
+             (unsigned long)templateLength));
 
 #if defined(__TEST__)
     pcPublishTopic = FP_CBOR_REGISTER_PUBLISH_TOPIC(democonfigPROVISIONING_TEMPLATE_NAME);
@@ -726,6 +732,7 @@ int prvFpDemo_start(void *pvParameters)
         xReadEntry(KVS_TEMPLATE_NAME, template_buff, templateLength);
         template_buff[templateLength] = '\0';
         templateData = template_buff;
+        LogInfo(("Fleet provisioning template: %s.", templateData));
 
         xPublishTopicLength = FP_CBOR_REGISTER_PUBLISH_LENGTH(templateLength);
         pcPublishTopic = pvPortMalloc(xPublishTopicLength + 1);
@@ -764,6 +771,7 @@ int prvFpDemo_start(void *pvParameters)
         xOwnershipTokenLength = fpdemoOWNERSHIP_TOKEN_BUFFER_LENGTH;
 
         /* Initialize the PKCS #11 module */
+        LogInfo(("Initializing PKCS #11 for Fleet provisioning."));
         xPkcs11Ret = xInitializePkcs11Session(&xP11Session);
 
         if (CKR_OK != xPkcs11Ret)
@@ -784,9 +792,14 @@ int prvFpDemo_start(void *pvParameters)
         }
 
         thingnameLength = prvGetCacheEntryLength(KVS_CORE_THING_NAME);
+        LogInfo(("Fleet PKCS #11 state: cert=0x%08lx key=0x%08lx thingnameLength=%lu.",
+                 (unsigned long)xClientCertificate,
+                 (unsigned long)xPrivateKey,
+                 (unsigned long)thingnameLength));
 
         if ((CKR_OK == xPkcs11Ret) && ((CK_INVALID_HANDLE == xClientCertificate) || (CK_INVALID_HANDLE == xPrivateKey) || (0 == thingnameLength)))
         {
+            LogInfo(("Destroying existing Fleet device certificate/private key objects."));
             xPkcs11Ret = xDestroyCertificateAndKey(xP11Session);
             if (CKR_OK != xPkcs11Ret)
             {
@@ -795,6 +808,7 @@ int prvFpDemo_start(void *pvParameters)
             }
             else
             {
+                LogInfo(("Generating Fleet key pair and CSR."));
                 xStatus = xGenerateKeyAndCsr(xP11Session,
                                              pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
                                              pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS,
@@ -806,6 +820,11 @@ int prvFpDemo_start(void *pvParameters)
                 if (false == xStatus)
                 {
                     LogError(("Failed to generate Key and Certificate Signing Request."));
+                }
+                else
+                {
+                    LogInfo(("Generated Fleet CSR: %lu bytes.",
+                             (unsigned long)xCsrLength));
                 }
             }
         }

@@ -59,6 +59,11 @@
 #include "mbedtls/x509_csr.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+#include "mbedtls/ssl.h"
+#endif
+
+extern void vOutputString( const char * pcMessage );
 
 /* strnlen includes for CC-RX compiler. */
 #if defined(__CCRX__)
@@ -262,7 +267,10 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     privateKeyTemplate[2].pValue = &xTrueObject;
     privateKeyTemplate[3].pValue = &xTrueObject;
 
+    LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList enter."));
     xResult = C_GetFunctionList(&xFunctionList);
+    LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList exit CK_RV=0x%08lx.",
+             (unsigned long)xResult));
 
     if (CKR_OK != xResult)
     {
@@ -270,6 +278,7 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     }
     else
     {
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
         xResult = xFunctionList->C_GenerateKeyPair(xSession,
                                                    &xMechanism,
                                                    pxPublicKeyTemplate,
@@ -277,6 +286,7 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
                                                    privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
                                                    xPublicKeyHandlePtr,
                                                    xPrivateKeyHandlePtr);
+        vOutputString("PKCS11_OPS: after indirect C_GenerateKeyPair\r\n");
     }
 
     return xResult;
@@ -314,21 +324,47 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     mbedtls_x509write_csr xReq;
     int32_t ulMbedtlsRet = -1;
     const mbedtls_pk_info_t *pxHeader = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+    unsigned char ucSavedTsipEndpointFlag = g_tsip_endpointflg;
+#endif
 
     configASSERT(pcPrivKeyLabel != NULL);
     configASSERT(pcPubKeyLabel != NULL);
     configASSERT(pcCsrBuffer != NULL);
     configASSERT(pxOutCsrLength != NULL);
 
+    pcCsrBuffer[0] = '\0';
+    *pxOutCsrLength = 0U;
+
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+    /*
+     * Fleet-created device keys are PKCS #11 software keys. Keep key
+     * generation, CSR hashing, and CSR signing on the software mbedTLS path
+     * even when this image is built with TSIP-enabled TLS.
+     */
+    g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
+#endif
+
     xPkcs11Ret = prvGenerateKeyPairEC(xP11Session,
                                       pcPrivKeyLabel,
                                       pcPubKeyLabel,
                                       &xPrivKeyHandle,
                                       &xPubKeyHandle);
+    vOutputString("PKCS11_OPS: xGenerateKeyAndCsr after keypair\r\n");
+    if (CKR_OK != xPkcs11Ret)
+    {
+        LogError(("C_GenerateKeyPair failed while preparing Fleet CSR: CK_RV=0x%08lx.",
+                  (unsigned long)xPkcs11Ret));
+    }
 
     if (CKR_OK == xPkcs11Ret)
     {
         xPkcs11Ret = xPKCS11_initMbedtlsPkContext(&xPrivKey, xP11Session, xPrivKeyHandle);
+        if (CKR_OK != xPkcs11Ret)
+        {
+            LogError(("xPKCS11_initMbedtlsPkContext failed while preparing Fleet CSR: CK_RV=0x%08lx.",
+                      (unsigned long)xPkcs11Ret));
+        }
     }
 
     if (CKR_OK == xPkcs11Ret)
@@ -355,6 +391,11 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
             ulMbedtlsRet = mbedtls_x509write_csr_pem(&xReq, (unsigned char *)pcCsrBuffer,
                                                      xCsrBufferLength, &lPKCS11RandomCallback,
                                                      &xP11Session);
+            if (0 != ulMbedtlsRet)
+            {
+                LogError(("mbedtls_x509write_csr_pem failed while preparing Fleet CSR: ret=%ld.",
+                          (long)ulMbedtlsRet));
+            }
         }
 
         mbedtls_x509write_csr_free(&xReq);
@@ -362,7 +403,14 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         mbedtls_pk_free(&xPrivKey);
     }
 
-    *pxOutCsrLength = strlen(pcCsrBuffer);
+    if (0 == ulMbedtlsRet)
+    {
+        *pxOutCsrLength = strlen(pcCsrBuffer);
+    }
+
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
+    g_tsip_endpointflg = ucSavedTsipEndpointFlag;
+#endif
 
     return (0 == ulMbedtlsRet);
 }
@@ -1042,25 +1090,37 @@ CK_RV xDestroyCertificateAndKey(CK_SESSION_HANDLE xP11Session)
     CK_OBJECT_CLASS certificateClass = CKO_CERTIFICATE;
     CK_OBJECT_CLASS privatekeyClass = CKO_PRIVATE_KEY;
     CK_OBJECT_CLASS publickeyClass = CKO_PUBLIC_KEY;
+    CK_BYTE_PTR pxPrivateKeyLabels[] =
+    {
+        (CK_BYTE_PTR)pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS
+    };
+    CK_BYTE_PTR pxPublicKeyLabels[] =
+    {
+        (CK_BYTE_PTR)pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS
+    };
+    CK_BYTE_PTR pxCertificateLabels[] =
+    {
+        (CK_BYTE_PTR)pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS
+    };
 
     xResult = C_GetFunctionList(&pxFunctionList);
 
     /* Destroy for a private key. */
     if (CKR_OK == xResult)
     {
-        prvDestroyProvidedObjects(xP11Session, (CK_BYTE_PTR *)pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS, &privatekeyClass, 1);
+        xResult = prvDestroyProvidedObjects(xP11Session, pxPrivateKeyLabels, &privatekeyClass, 1);
     }
 
     /* Destroy for a public key. */
     if (CKR_OK == xResult)
     {
-        prvDestroyProvidedObjects(xP11Session, (CK_BYTE_PTR *)pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS, &publickeyClass, 1);
+        xResult = prvDestroyProvidedObjects(xP11Session, pxPublicKeyLabels, &publickeyClass, 1);
     }
 
     /* Destroy for the client certificate. */
     if (CKR_OK == xResult)
     {
-        prvDestroyProvidedObjects(xP11Session, (CK_BYTE_PTR *)pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS, &certificateClass, 1);
+        xResult = prvDestroyProvidedObjects(xP11Session, pxCertificateLabels, &certificateClass, 1);
     }
 
     return xResult;

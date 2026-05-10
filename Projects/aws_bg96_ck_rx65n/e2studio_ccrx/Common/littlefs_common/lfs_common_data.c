@@ -35,6 +35,10 @@ const struct lfs_config g_rm_littlefs0_lfs_cfg =
     .prog = &rm_littlefs_flash_write,
     .erase = &rm_littlefs_flash_erase,
     .sync = &rm_littlefs_flash_sync,
+#ifdef LFS_THREADSAFE
+    .lock = &rm_littlefs_flash_lock,
+    .unlock = &rm_littlefs_flash_unlock,
+#endif
     .read_size = LFS_FLASH_READ_SIZE,
     .prog_size = LFS_FLASH_PROGRAM_SIZE,
     .block_size = LFS_FLASH_BLOCK_SIZE,

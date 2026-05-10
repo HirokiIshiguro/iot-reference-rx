@@ -236,6 +236,15 @@
 			</matcher>
 		</filter>
 		<filter>
+			<id>1778400000002</id>
+			<name>Middleware/3rdparty/mbedtls_with_TSIP</name>
+			<type>9</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-include|library</arguments>
+			</matcher>
+		</filter>
+		<filter>
 			<id>1776782598420</id>
 			<name>Middleware/3rdparty/mbedtls_config</name>
 			<type>6</type>

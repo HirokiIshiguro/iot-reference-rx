@@ -64,6 +64,8 @@
 #include "transport_mbedtls_pkcs11.h"
 
 extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
+extern volatile uint32_t g_littlefs_flash_trace_enabled;
+extern void vOutputString(const char * pcMessage);
 volatile uint32_t pvwrite = 0;
 enum eObjectHandles
 {
@@ -143,6 +145,9 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
 {
     CK_OBJECT_HANDLE xHandle = eInvalidHandle;
 
+    LogInfo(("PKCS11 PAL trace: SaveObject enter label=%s size=%lu.",
+             (char *)pxLabel->pValue, (unsigned long)ulDataSize));
+
     /* search specified label value from g_object_handle_dictionary */
     for (uint32_t i = 1; i < pkcs11configMAX_NUM_OBJECTS; i++)
     {
@@ -154,26 +159,35 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
 
     if (eInvalidHandle == xHandle)
     {
+        LogInfo(("PKCS11 PAL trace: SaveObject label not found."));
         return eInvalidHandle;
     }
 
-    lfs_file_t file;
+    lfs_file_t file = { 0 };
 
     volatile int lfs_err = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, pxLabel->pValue);
+    LogInfo(("PKCS11 PAL trace: SaveObject remove ret=%ld.",
+             (long)lfs_err));
 
     if ((LFS_ERR_NOENT != lfs_err) && (LFS_ERR_OK != lfs_err))
     {
+        LogInfo(("PKCS11 PAL trace: SaveObject remove failed."));
         return eInvalidHandle;
     }
 
     lfs_err = lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pxLabel->pValue, LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
+    LogInfo(("PKCS11 PAL trace: SaveObject open ret=%ld.",
+             (long)lfs_err));
 
     if (LFS_ERR_OK != lfs_err)
     {
+        LogInfo(("PKCS11 PAL trace: SaveObject open failed."));
         return eInvalidHandle;
     }
 
     lfs_err = lfs_file_write(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pucData, ulDataSize);
+    LogInfo(("PKCS11 PAL trace: SaveObject write ret=%ld.",
+             (long)lfs_err));
 
     pvwrite += ulDataSize;
     if (lfs_err < 0)
@@ -181,7 +195,43 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
         xHandle = eInvalidHandle;
     }
 
-    lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        g_littlefs_flash_trace_enabled = 1U;
+        LogInfo(("PKCS11 PAL trace: SaveObject close trace enabled for device private key."));
+        vOutputString("PAL:DKEY before sync\r\n");
+        LogInfo(("PKCS11 PAL trace: SaveObject sync enter for device private key."));
+        lfs_err = lfs_file_sync(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+        vOutputString("PAL:DKEY after sync\r\n");
+        LogInfo(("PKCS11 PAL trace: SaveObject sync ret=%ld.",
+                 (long)lfs_err));
+    }
+
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY before close\r\n");
+    }
+
+    lfs_err = lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY after close\r\n");
+    }
+
+    g_littlefs_flash_trace_enabled = 0U;
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY before final log\r\n");
+    }
+
+    LogInfo(("PKCS11 PAL trace: SaveObject close ret=%ld handle=%lu.",
+             (long)lfs_err, (unsigned long)xHandle));
+
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        vOutputString("PAL:DKEY before return\r\n");
+    }
 
     return xHandle;
 }
@@ -251,7 +301,7 @@ CK_RV PKCS11_PAL_GetObjectValue(CK_OBJECT_HANDLE xHandle,
 
     if (eInvalidHandle != xHandle)
     {
-        lfs_file_t file;
+        lfs_file_t file = { 0 };
 
         int lfs_ret =
             lfs_file_open(  &RM_STDIO_LITTLEFS_CFG_LFS,

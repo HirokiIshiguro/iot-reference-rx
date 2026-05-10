@@ -359,6 +359,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     int32_t mbedtlsError = 0;
     CK_RV xResult = CKR_OK;
 
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    BaseType_t xUseTsipRuntimeKey = pdFALSE;
+    BaseType_t xDisableTsipTlsAccelForConnection = pdFALSE;
+    BaseType_t xPrivateKeyLabelIsDevice = pdFALSE;
+#endif
+
 #if defined(TSIP_TLS_API_ENABLE)
     extern mbedtls_threading_mutex_t 						mutexUseTsip;
     extern tsip_tls_ca_certification_public_key_index_t		system_user_rsa2048_ne_key_index;
@@ -479,14 +485,116 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
     }
 
-    /* RootCA certificate verification */
+    /* Configure the client certificate private key. TSIP runtime credentials
+     * take precedence for the normal device key. Fleet provisioning claim and
+     * generated keys remain PKCS #11 software keys in the TSIP-capable build. */
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
-        if( ( pdTRUE != xTsipProvisioningPrepareTlsRootCaTrustAnchor() ) ||
-            ( pdTRUE != xTsipProvisioningLoadClientRsa2048KeyPair() ) )
+        mbedtls_pk_init( &( pTlsTransportParams->sslContext.privKey ) );
+
+        xPrivateKeyLabelIsDevice =
+            ( 0 == strncmp( pNetworkCredentials->pPrivateKeyLabel,
+                            pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
+                            sizeof( pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS ) ) ) ? pdTRUE : pdFALSE;
+
+        if( ( xPrivateKeyLabelIsDevice == pdTRUE ) &&
+            ( pdTRUE == xTsipProvisioningLoadClientRsa2048KeyPair() ) )
         {
-            LogError( ( "Failed to load TSIP runtime provisioning data." ) );
+            xUseTsipRuntimeKey = pdTRUE;
+            mbedtlsError = mbedtls_pk_setup( &( pTlsTransportParams->sslContext.privKey ),
+                                             mbedtls_pk_info_from_type( MBEDTLS_PK_RSA ) );
+
+            if( mbedtlsError != 0 )
+            {
+                LogError( ( "Failed to setup TSIP runtime private key." ) );
+                returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+            }
+        }
+
+        if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+            ( xUseTsipRuntimeKey == pdFALSE ) )
+        {
+            xResult = initializeClientKeys( &( pTlsTransportParams->sslContext ),
+                                            pNetworkCredentials->pPrivateKeyLabel );
+
+            if( xResult != CKR_OK )
+            {
+                LogError( ( "Failed to setup PKCS #11 private key for label \"%s\": CK_RV=0x%08lx.",
+                            pNetworkCredentials->pPrivateKeyLabel,
+                            ( unsigned long ) xResult ) );
+                returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+            }
+            else
+            {
+                xDisableTsipTlsAccelForConnection = pdTRUE;
+            }
+        }
+
+        if( returnStatus == TLS_TRANSPORT_SUCCESS )
+        {
+            xResult = readCertificateIntoContext( &( pTlsTransportParams->sslContext ),
+                                                  pNetworkCredentials->pClientCertLabel,
+                                                  CKO_CERTIFICATE,
+                                                  &( pTlsTransportParams->sslContext.clientCert ) );
+
+            if( xResult != CKR_OK )
+            {
+                LogError( ( "Failed to get certificate from PKCS #11 module." ) );
+                returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+            }
+            else
+            {
+                ( void ) mbedtls_ssl_conf_own_cert( &( pTlsTransportParams->sslContext.config ),
+                                                    &( pTlsTransportParams->sslContext.clientCert ),
+                                                    &( pTlsTransportParams->sslContext.privKey ) );
+            }
+        }
+    }
+#else
+    if (TLS_TRANSPORT_SUCCESS == returnStatus)
+    {
+        /* Configuring client certificate private key (RSA) */
+        mbedtls_pk_init(&(pTlsTransportParams->sslContext.privKey));
+        mbedtlsError = mbedtls_pk_setup(&(pTlsTransportParams->sslContext.privKey),
+                                        mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+        if (0 != mbedtlsError)
+        {
+            LogError(("Failed to setup Private key"));
+            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        }
+        else
+        {
+            /* Setup the client certificate. */
+            xResult = readCertificateIntoContext( &( pTlsTransportParams->sslContext ),
+                                                  pNetworkCredentials->pClientCertLabel,
+                                                  CKO_CERTIFICATE,
+                                                  &( pTlsTransportParams->sslContext.clientCert ) );
+
+            if( xResult != CKR_OK )
+            {
+                LogError( ( "Failed to get certificate from PKCS #11 module." ) );
+
+                returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+            }
+            else
+            {
+                ( void ) mbedtls_ssl_conf_own_cert( &( pTlsTransportParams->sslContext.config ),
+                                                    &( pTlsTransportParams->sslContext.clientCert ),
+                                                    &( pTlsTransportParams->sslContext.privKey ) );
+            }
+        }
+    }
+#endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
+
+    /* RootCA certificate verification */
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+        ( xUseTsipRuntimeKey == pdTRUE ) )
+    {
+        if( pdTRUE != xTsipProvisioningPrepareTlsRootCaTrustAnchor() )
+        {
+            LogError( ( "Failed to load TSIP runtime Root CA trust anchor." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         }
         else if( NULL == ( pTsipRootCaSignature = prvGetRootCaSignatureForTsip( trust_ca_root_rsa_certificate_signature,
@@ -499,6 +607,9 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
 
     if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+        ( xUseTsipRuntimeKey == pdTRUE ) &&
+#endif
         ( glTlsServerCertAuthModeOverride != MBEDTLS_SSL_VERIFY_NONE ) )
     {
     tsip_rootca_rsa_pubkey_scnt = 0U;
@@ -538,43 +649,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         tsip_rootca_rsa_pubkey_scnt = 1U;
     }
     }
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    else if( ( xUseTsipRuntimeKey == pdFALSE ) ||
+             ( glTlsServerCertAuthModeOverride == MBEDTLS_SSL_VERIFY_NONE ) )
+#else
     else if( glTlsServerCertAuthModeOverride == MBEDTLS_SSL_VERIFY_NONE )
+#endif
     {
         tsip_rootca_rsa_pubkey_scnt = 0U;
-    }
-
-    if (TLS_TRANSPORT_SUCCESS == returnStatus)
-    {
-        /* Configuring client certificate private key (RSA) */
-        mbedtls_pk_init(&(pTlsTransportParams->sslContext.privKey));
-        mbedtlsError = mbedtls_pk_setup(&(pTlsTransportParams->sslContext.privKey),
-                                        mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
-        if (0 != mbedtlsError)
-        {
-            LogError(("Failed to setup Private key"));
-            returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
-        }
-        else
-        {
-            /* Setup the client certificate. */
-            xResult = readCertificateIntoContext( &( pTlsTransportParams->sslContext ),
-                                                  pNetworkCredentials->pClientCertLabel,
-                                                  CKO_CERTIFICATE,
-                                                  &( pTlsTransportParams->sslContext.clientCert ) );
-
-            if( xResult != CKR_OK )
-            {
-                LogError( ( "Failed to get certificate from PKCS #11 module." ) );
-
-                returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
-            }
-            else
-            {
-                ( void ) mbedtls_ssl_conf_own_cert( &( pTlsTransportParams->sslContext.config ),
-                                                    &( pTlsTransportParams->sslContext.clientCert ),
-                                                    &( pTlsTransportParams->sslContext.privKey ) );
-            }
-        }
     }
 
     if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) && ( pNetworkCredentials->pAlpnProtos != NULL ) )
@@ -612,7 +694,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         {
 #if defined(TSIP_TLS_API_ENABLE)
             pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
-                ( glTlsDisableTsipTlsAccelOverride != 0 ) ? 1U : 0U;
+                ( ( glTlsDisableTsipTlsAccelOverride != 0 )
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+                  || ( xDisableTsipTlsAccelForConnection != pdFALSE )
+#endif
+                  ) ? 1U : 0U;
             if( pNetworkCredentials->tlsDebugLevel > 0U )
             {
                 LogInfo( ( "TSIP TLS accel override=%ld",
