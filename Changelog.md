@@ -33,6 +33,8 @@
 - 実機スケジューラを、Full regressionという大きな単位ではなく、
   READMEのFocused Test Matrixに対応する1本のnightly parent pipelineから
   focused child pipelineへ展開する形へ整理しています。
+  各child pipelineはボード別に直列化し、RX72NとRX65N/BG96の並列性は保ちつつ、
+  同一ボード上のflash/provision/testシーケンスが割り込まれないようにします。
   TSIP TLS 1.3系はまだ実機実績がないため、README上では`<coming soon>`として扱います。
 
 ### 改善
