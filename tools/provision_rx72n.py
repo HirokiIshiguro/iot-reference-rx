@@ -14,6 +14,11 @@ import subprocess
 import sys
 import time
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True, errors="backslashreplace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(line_buffering=True, errors="backslashreplace")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "provisioning"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "test_scripts"))
 
@@ -43,9 +48,15 @@ CLI_INVITE_MARKERS = (
     "Press CLI and enter to switch to CLI mode",
     "FreeRTOS command server.",
 )
+APP_START_MARKERS = CLI_READY_MARKERS + CLI_INVITE_MARKERS + (
+    "IP Address:",
+    "Creating a TLS connection",
+    "A clean MQTT connection is established.",
+)
 BOOTLOADER_MARKERS = (
     "send image(*.rsu) via UART.",
     "send \"userprog.rsu\" via UART.",
+    "jump to user program",
     "error occurred. please reset your board.",
 )
 
@@ -257,6 +268,11 @@ def enter_cli_mode(ser, char_delay, line_delay, timeout, retry_interval, shadow_
         time.sleep(0.1)
 
     print("\nERROR: CLI prompt not detected")
+    if "jump to user program" in collected and not any(marker in collected for marker in APP_START_MARKERS):
+        print(
+            "DIAG: bootloader jumped to the user program, but no application "
+            "startup marker was captured before the CLI wake-up timeout."
+        )
     return False
 
 
