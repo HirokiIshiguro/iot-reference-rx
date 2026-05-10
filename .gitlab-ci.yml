@@ -44,6 +44,7 @@ variables:
   # pipelines can focus a single board/config without duplicating the job graph.
   #   branch  - feature push build-only pipeline.
   #   mr      - representative MR standard pipeline.
+  #   main    - post-merge representative pipeline.
   #   focused - manual/API pipeline; set board scopes explicitly.
   #   release - default branch/tag release-confidence pipeline.
   #   nightly_matrix - scheduled parent pipeline that fans out focused rows.
@@ -206,9 +207,12 @@ workflow:
       when: always
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       variables:
-        PIPELINE_PROFILE: "release"
-        RX65N_BG96_TEST_SCOPE: "full"
-        RX72N_TEST_SCOPE: "full"
+        PIPELINE_PROFILE: "main"
+        # Full coverage is provided by the nightly focused matrix schedule.
+        # Keep post-merge feedback aligned with MR standard instead of running
+        # a second full hardware regression immediately after every merge.
+        RX65N_BG96_TEST_SCOPE: "mqtt"
+        RX72N_TEST_SCOPE: "ota"
       when: always
     - if: $CI_COMMIT_BRANCH
       when: always
@@ -229,6 +233,7 @@ workflow:
 
 .nightly_matrix_rx72n:
   extends: .nightly_matrix_trigger
+  resource_group: nightly-matrix-rx72n-ether
   variables:
     PIPELINE_PROFILE: "focused"
     RUN_RX72N_BUILD: "true"
@@ -239,6 +244,7 @@ workflow:
 
 .nightly_matrix_rx65n_bg96:
   extends: .nightly_matrix_trigger
+  resource_group: nightly-matrix-rx65n-bg96
   variables:
     PIPELINE_PROFILE: "focused"
     RX72N_TEST_SCOPE: "build"
@@ -263,6 +269,7 @@ workflow:
 
 .nightly_matrix_rx72n_stabilizing:
   extends: .nightly_matrix_stabilizing_trigger
+  resource_group: nightly-matrix-rx72n-ether
   variables:
     PIPELINE_PROFILE: "focused"
     RUN_RX72N_BUILD: "true"
@@ -273,6 +280,7 @@ workflow:
 
 .nightly_matrix_rx65n_bg96_stabilizing:
   extends: .nightly_matrix_stabilizing_trigger
+  resource_group: nightly-matrix-rx65n-bg96
   variables:
     PIPELINE_PROFILE: "focused"
     RX72N_TEST_SCOPE: "build"

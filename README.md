@@ -6,8 +6,11 @@ Last updated: 2026-05-10 JST. The scheduled regression unit is a single
 nightly parent pipeline (`PIPELINE_PROFILE=nightly_matrix`) that fans out the
 focused rows below as child pipelines. This replaces the older "Full" schedule:
 the matrix table is the source of truth, and each row maps to one focused
-configuration. Rows marked `<coming soon>` are intentionally listed but not
-enabled until that configuration has hardware evidence.
+configuration. Child pipelines are serialized per board so one RX72N row and
+one RX65N/BG96 row can run in parallel without interleaving flash/provision/test
+sequences on the same physical board. Rows marked `<coming soon>` are
+intentionally listed but not enabled until that configuration has hardware
+evidence.
 
 | Focused row | Nightly matrix job | Latest evidence | Status |
 |-------------|--------------------|-----------------|--------|
