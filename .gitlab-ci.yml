@@ -66,7 +66,7 @@ variables:
   RX65N_BG96_DEVICE_RESOURCE_GROUP: "ck-rx65n-rpi3-hardware"
   # Route CK-RX65N/BG96 hardware jobs to Raspberry Pi #3.
   RX65N_BG96_RUNNER_TAG: "dev-ck-rx65n-bg96"
-  RX65N_BG96_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
+  RX65N_BG96_LINUX_RFP_CLI: "./tools/rfp_cli_locked.sh"
   RX65N_BG96_RFP_DEVICE: "RX65x"
   RX65N_BG96_RFP_INTERFACE: "fine"
   RX65N_BG96_RFP_SPEED: "1500K"
@@ -133,7 +133,7 @@ variables:
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_REQUIRE_TLS_VERSION: ""
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
-  RX72N_LINUX_RFP_CLI: "$CI_PROJECT_DIR/tools/rfp_cli_locked.sh"
+  RX72N_LINUX_RFP_CLI: "./tools/rfp_cli_locked.sh"
   # The restore pipeline is pinned to the RX72N set2 runner on RPi#2.
   # RPi#1 and RPi#2 both expose an RX72N E2 Lite as OBE110008, but the runner
   # tag scopes the host, so the pinned serial remains unambiguous.
