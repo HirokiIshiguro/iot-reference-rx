@@ -146,6 +146,7 @@ variables:
   RX72N_LINUX_UART_BAUD_RATE: "921600"
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
   RX72N_MQTT_TEST_TIMEOUT: "600"
+  RX72N_MQTT_TEST_REPEAT_COUNT: "1"
   RX72N_FLEET_TEST_TIMEOUT: "600"
   # RX72N_TLS_BACKEND: software or tsip.
   RX72N_TLS_BACKEND: "software"
@@ -1923,13 +1924,50 @@ test_rx72n_ether_mqtt:
         tls_version_args+=(--require-tls-version "$RX72N_REQUIRE_TLS_VERSION")
       fi
 
-      python tools/test_mqtt_rx72n.py \
-        --log-port "$RX72N_LINUX_UART_PORT" \
-        --log-baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --timeout "$RX72N_MQTT_TEST_TIMEOUT" \
-        --reset-cmd "$reset_cmd" \
-        "${tls_version_args[@]}" \
-        2>&1 | tee "$artifact_dir/test_mqtt_rx72n.log"
+      repeat_count="${RX72N_MQTT_TEST_REPEAT_COUNT:-1}"
+      if ! [[ "$repeat_count" =~ ^[0-9]+$ ]] || [ "$repeat_count" -lt 1 ]; then
+        echo "ERROR: RX72N_MQTT_TEST_REPEAT_COUNT must be a positive integer: $repeat_count" | tee "$artifact_dir/repeat_summary.log"
+        exit 2
+      fi
+
+      printf 'iteration,status,log\n' > "$artifact_dir/repeat_summary.csv"
+      failures=0
+      for iteration in $(seq 1 "$repeat_count"); do
+        if [ "$repeat_count" -eq 1 ]; then
+          log_path="$artifact_dir/test_mqtt_rx72n.log"
+        else
+          log_path="$artifact_dir/test_mqtt_rx72n_${iteration}.log"
+        fi
+
+        echo "=== RX72N MQTT iteration ${iteration}/${repeat_count} ===" | tee "$log_path"
+        set +e
+        python tools/test_mqtt_rx72n.py \
+          --log-port "$RX72N_LINUX_UART_PORT" \
+          --log-baud "$RX72N_LINUX_UART_BAUD_RATE" \
+          --timeout "$RX72N_MQTT_TEST_TIMEOUT" \
+          --reset-cmd "$reset_cmd" \
+          "${tls_version_args[@]}" \
+          2>&1 | tee -a "$log_path"
+        status=${PIPESTATUS[0]}
+        set -e
+
+        if [ "$status" -eq 0 ]; then
+          printf '%s,success,%s\n' "$iteration" "$(basename "$log_path")" >> "$artifact_dir/repeat_summary.csv"
+        else
+          failures=$((failures + 1))
+          printf '%s,failed,%s\n' "$iteration" "$(basename "$log_path")" >> "$artifact_dir/repeat_summary.csv"
+        fi
+      done
+
+      {
+        echo "repeat_count=$repeat_count"
+        echo "success_count=$((repeat_count - failures))"
+        echo "failure_count=$failures"
+      } | tee "$artifact_dir/repeat_summary.log"
+
+      if [ "$failures" -ne 0 ]; then
+        exit 1
+      fi
   artifacts:
     when: always
     paths:
