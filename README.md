@@ -15,7 +15,7 @@
 | <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5010)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5013)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5016)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5017)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5018)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5019)</small> |
 | <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5007)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5020)</small> |  |  |  |  |
 
-<small>`✓` は安定系スケジュールでテストOKを確認済みの行です。空欄は未有効化、証跡待ち、または `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でのみ流す stabilizing 行です。stabilizing は機能実績はあるが、通信断復帰などの安定性確認が残っているため、通常の All Green 判定母集団にはまだ入れません。現在の stabilizing 対象は RX72N/Ether software OTA、RX72N/Ether software TLS1.3 OTA、RX72N/Ether TSIP Fleet、RX65N/BG96 TSIP Fleet です。</small>
+<small>`✓` は安定系スケジュールでテストOKを確認済みの行です。空欄は未有効化、証跡待ち、または `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でのみ流す stabilizing 行です。stabilizing は機能実績はあるが、通信断復帰などの安定性確認が残っているため、通常の All Green 判定母集団にはまだ入れません。現在の stabilizing 対象は RX72N/Ether software OTA、RX72N/Ether software TLS1.3 OTA、RX72N/Ether TSIP Fleet、RX65N/BG96 TSIP Fleet です。stabilizing 行は同一条件で 5 回連続成功したら安定系へ昇格し、昇格後に対象行起因の失敗が 1 回でも出たら stabilizing へ戻します。停電、配線作業、Runner 障害など対象行の実装品質と無関係な外乱は連続成功/失敗判定から除外します。</small>
 
 ## About This Fork / このフォークについて
 
