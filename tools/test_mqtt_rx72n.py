@@ -18,9 +18,9 @@ import sys
 import time
 
 if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(errors="backslashreplace")
+    sys.stdout.reconfigure(line_buffering=True, errors="backslashreplace")
 if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(errors="backslashreplace")
+    sys.stderr.reconfigure(line_buffering=True, errors="backslashreplace")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "test_scripts"))
 
@@ -69,9 +69,18 @@ BOOT_MARKERS = [
     "BootLoader",
     "execute image",
     "send image",
+    "jump to user program",
     "error occurred",
     "software reset",
     "activating image",
+]
+
+APP_START_MARKERS = [
+    "FreeRTOS command server.",
+    "Press CLI and enter to switch to CLI mode",
+    "IP Address:",
+    "Creating a TLS connection",
+    "A clean MQTT connection is established.",
 ]
 
 ERROR_PATTERNS = [
@@ -141,7 +150,7 @@ def reset_device_via_command(reset_cmd):
     return True
 
 
-def monitor_uart(port, baud, timeout, reset_cmd=None):
+def monitor_uart(port, baud, timeout, reset_cmd=None, app_startup_timeout=45.0):
     results = {marker["name"]: False for marker in MARKERS}
     infos = []
     errors = []
@@ -150,10 +159,12 @@ def monitor_uart(port, baud, timeout, reset_cmd=None):
     total_lines = 0
     boot_lines = []
     buffer = ""
+    jump_to_app_time = None
+    app_output_seen = False
 
     ser = open_serial_port(port, baud)
     if ser is None:
-        return results, infos, errors, total_bytes, total_lines, boot_lines
+        return results, infos, errors, [], total_bytes, total_lines, boot_lines, app_output_seen
 
     try:
         ser.reset_input_buffer()
@@ -185,7 +196,12 @@ def monitor_uart(port, baud, timeout, reset_cmd=None):
                     for boot_marker in BOOT_MARKERS:
                         if boot_marker in line:
                             boot_lines.append(line)
+                            if boot_marker == "jump to user program":
+                                jump_to_app_time = time.time()
                             break
+
+                    if any(marker in line for marker in APP_START_MARKERS):
+                        app_output_seen = True
 
                     for marker in MARKERS:
                         if not results[marker["name"]] and marker["pattern"] in line:
@@ -213,6 +229,20 @@ def monitor_uart(port, baud, timeout, reset_cmd=None):
             else:
                 time.sleep(0.05)
 
+            if (
+                app_startup_timeout > 0
+                and jump_to_app_time is not None
+                and not app_output_seen
+                and time.time() - jump_to_app_time >= app_startup_timeout
+            ):
+                diag = (
+                    "Application output did not appear after bootloader "
+                    f"'jump to user program' within {app_startup_timeout:.0f}s"
+                )
+                errors.append(diag)
+                print(f"[ERROR] {diag}")
+                break
+
             elapsed = time.time() - start
             if int(elapsed) // 30 > last_status:
                 last_status = int(elapsed) // 30
@@ -222,7 +252,7 @@ def monitor_uart(port, baud, timeout, reset_cmd=None):
         ser.close()
         print(f"Closed {port}")
 
-    return results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines
+    return results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines, app_output_seen
 
 
 def main():
@@ -236,6 +266,8 @@ def main():
                         help=f"Log baud rate (default: {DEFAULT_LOG_BAUD})")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT,
                         help=f"Overall timeout in seconds (default: {DEFAULT_TIMEOUT})")
+    parser.add_argument("--app-startup-timeout", type=float, default=45.0,
+                        help="Seconds to wait for application UART output after bootloader jump (0 disables)")
     parser.add_argument("--reset-cmd",
                         help="External reset command to execute while the log port is open")
     parser.add_argument("--no-reset", action="store_true",
@@ -261,14 +293,16 @@ def main():
     print(f"Log Port:    {args.log_port}")
     print(f"Log Baud:    {args.log_baud}")
     print(f"Timeout:     {args.timeout}s")
+    print(f"App Startup: {args.app_startup_timeout}s after bootloader jump")
     print(f"Reset Mode:  {'external reset command' if args.reset_cmd else 'monitor only'}")
     print("=" * 60)
 
-    results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines = monitor_uart(
+    results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines, app_output_seen = monitor_uart(
         args.log_port,
         args.log_baud,
         args.timeout,
         reset_cmd=None if args.no_reset else args.reset_cmd,
+        app_startup_timeout=args.app_startup_timeout,
     )
 
     print()
@@ -308,6 +342,8 @@ def main():
     print("[FAIL] phase8b MQTT baseline incomplete")
     if total_bytes == 0:
         print("[DIAG] No UART bytes were captured on the dedicated log port.")
+    if (not app_output_seen) and any("jump to user program" in line for line in boot_lines):
+        print("[DIAG] Bootloader jumped to the user program, but no application startup marker was captured.")
     return 1
 
 
