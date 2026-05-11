@@ -174,10 +174,11 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       variables:
         PIPELINE_PROFILE: "mr"
-        # MR standard keeps daily feedback short while covering both transports:
-        # RX72N/Ether exercises OTA, RX65N/BG96 exercises the cellular MQTT path.
+        # MR standard keeps daily feedback short while covering both transports.
+        # OTA rows are delegated to the nightly matrix; unstable rows stay under
+        # the stabilizing gate until repeated schedule evidence is available.
         RX65N_BG96_TEST_SCOPE: "mqtt"
-        RX72N_TEST_SCOPE: "ota"
+        RX72N_TEST_SCOPE: "mqtt"
       when: always
     - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $PIPELINE_PROFILE == "nightly_matrix"'
       when: always
@@ -215,7 +216,7 @@ workflow:
         # Keep post-merge feedback aligned with MR standard instead of running
         # a second full hardware regression immediately after every merge.
         RX65N_BG96_TEST_SCOPE: "mqtt"
-        RX72N_TEST_SCOPE: "ota"
+        RX72N_TEST_SCOPE: "mqtt"
       when: always
     - if: $CI_COMMIT_BRANCH
       when: always
@@ -299,7 +300,7 @@ matrix_rx72n_ether_software_mqtt:
     RX72N_TLS_BACKEND: "software"
 
 matrix_rx72n_ether_software_ota:
-  extends: .nightly_matrix_rx72n
+  extends: .nightly_matrix_rx72n_stabilizing
   variables:
     RX72N_TEST_SCOPE: "ota"
     RX72N_TLS_BACKEND: "software"
