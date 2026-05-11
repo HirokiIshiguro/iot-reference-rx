@@ -27,7 +27,7 @@ evidence.
 | RX65N/BG96 TSIP TLS 1.3 OTA | `<coming soon>` | `<coming soon>` | `<coming soon>` |
 | RX65N/BG96 TSIP TLS 1.3 Fleet Provisioning | `<coming soon>` | `<coming soon>` | `<coming soon>` |
 | RX72N software MQTT | `matrix_rx72n_ether_software_mqtt` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
-| RX72N software OTA | `matrix_rx72n_ether_software_ota` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
+| RX72N software OTA | `matrix_rx72n_ether_software_ota` | [#5002](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5002) | Stabilizing, gated by `NIGHTLY_MATRIX_INCLUDE_STABILIZING` |
 | RX72N software Fleet Provisioning | `matrix_rx72n_ether_software_fleet` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
 | RX72N software TLS 1.3 MQTT | `matrix_rx72n_ether_software_tls13_mqtt` | [#4717](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4717) | OK |
 | RX72N software TLS 1.3 OTA | `matrix_rx72n_ether_software_tls13_ota` | [#4989](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4989) | Stabilizing, gated by `NIGHTLY_MATRIX_INCLUDE_STABILIZING` |
@@ -257,7 +257,7 @@ This project is treated as an advanced hardware CI pipeline: the full matrix spa
 | Profile | Pipeline source | Default scope |
 |---------|-----------------|---------------|
 | `branch` | Feature branch push | Build only. Hardware jobs are kept out of push pipelines to avoid interleaving board state with MR pipelines. |
-| `mr` | Merge request | `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=mqtt`. This covers Ethernet OTA and Cellular MQTT while keeping review feedback short. |
+| `mr` | Merge request | `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=mqtt`. This covers both transports while keeping review feedback short; OTA coverage is delegated to the focused matrix. |
 | `focused` | Manual/API | Build only unless the caller sets `RX72N_TEST_SCOPE`, `RX65N_BG96_TEST_SCOPE`, `RX72N_TLS_BACKEND`, `RX65N_BG96_TLS_BACKEND`, or TLS version variables explicitly. |
 | `main` | Default branch push | Same representative scope as `mr`; full matrix coverage is delegated to the schedule. |
 | `release` | Tag | Full software-TLS regression for RX72N and RX65N/BG96. |
@@ -282,7 +282,7 @@ The project-level GitLab pipeline schedule is part of the reference pipeline des
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=false` | Runs the stable focused rows listed in the matrix above. TSIP Fleet and RX72N software TLS 1.3 OTA are gated as stabilizing rows until repeated schedule evidence is available. |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=false` | Runs the stable focused rows listed in the matrix above. TSIP Fleet and RX72N software OTA/TLS 1.3 OTA are gated as stabilizing rows until repeated schedule evidence is available. |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
