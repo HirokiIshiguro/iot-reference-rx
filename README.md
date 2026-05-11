@@ -2,7 +2,7 @@
 
 ## Latest Focused Test Matrix / 最新のFocusedテスト行列
 
-Last updated: 2026-05-10 JST. The scheduled regression unit is a single
+Last updated: 2026-05-11 JST. The scheduled regression unit is a single
 nightly parent pipeline (`PIPELINE_PROFILE=nightly_matrix`) that fans out the
 focused rows below as child pipelines. This replaces the older "Full" schedule:
 the matrix table is the source of truth, and each row maps to one focused
@@ -30,7 +30,7 @@ evidence.
 | RX72N software OTA | `matrix_rx72n_ether_software_ota` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
 | RX72N software Fleet Provisioning | `matrix_rx72n_ether_software_fleet` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
 | RX72N software TLS 1.3 MQTT | `matrix_rx72n_ether_software_tls13_mqtt` | [#4717](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4717) | OK |
-| RX72N software TLS 1.3 OTA | `matrix_rx72n_ether_software_tls13_ota` | scheduled | Evidence pending |
+| RX72N software TLS 1.3 OTA | `matrix_rx72n_ether_software_tls13_ota` | [#4989](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4989) | Stabilizing, gated by `NIGHTLY_MATRIX_INCLUDE_STABILIZING` |
 | RX72N software TLS 1.3 Fleet Provisioning | `matrix_rx72n_ether_software_tls13_fleet` | scheduled | Evidence pending |
 | RX65N/BG96 software MQTT | `matrix_rx65n_bg96_software_mqtt` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
 | RX65N/BG96 software OTA | `matrix_rx65n_bg96_software_ota` | [#4709](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4709) | OK |
@@ -259,8 +259,9 @@ This project is treated as an advanced hardware CI pipeline: the full matrix spa
 | `branch` | Feature branch push | Build only. Hardware jobs are kept out of push pipelines to avoid interleaving board state with MR pipelines. |
 | `mr` | Merge request | `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=mqtt`. This covers Ethernet OTA and Cellular MQTT while keeping review feedback short. |
 | `focused` | Manual/API | Build only unless the caller sets `RX72N_TEST_SCOPE`, `RX65N_BG96_TEST_SCOPE`, `RX72N_TLS_BACKEND`, `RX65N_BG96_TLS_BACKEND`, or TLS version variables explicitly. |
-| `release` | `main`/tag | Full software-TLS regression for RX72N and RX65N/BG96. |
-| `nightly` | GitLab pipeline schedule | Full regression. The default schedule uses the same full scope as release, and additional focused schedules can cover TLS 1.3 or TSIP-specific paths. |
+| `main` | Default branch push | Same representative scope as `mr`; full matrix coverage is delegated to the schedule. |
+| `release` | Tag | Full software-TLS regression for RX72N and RX65N/BG96. |
+| `nightly_matrix` | GitLab pipeline schedule | Parent pipeline that fans out the focused matrix rows. Stabilizing rows run only when `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true`. |
 
 Focused examples:
 
@@ -277,14 +278,11 @@ PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=mqtt RX65N_BG96_TEST_SCOPE=mqtt AWS_IO
 
 ### Scheduled Hardware Regressions
 
-The project-level GitLab pipeline schedules are part of the reference pipeline design. Keep the merge request pipeline short, and move matrix coverage that is useful but not review-blocking into schedules. Heavy schedules are staggered by about one hour so the Windows CCRX runner and the two hardware runners do not all contend at the same time.
+The project-level GitLab pipeline schedule is part of the reference pipeline design. Keep the merge request pipeline short, and move matrix coverage that is useful but not review-blocking into the nightly matrix schedule. The active schedule is a single parent pipeline; child pipelines are serialized per board by matrix resource groups, so RX72N and RX65N/BG96 rows can run in parallel without interleaving state on the same physical board.
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly full software TLS | Active | 03:20 daily | `PIPELINE_PROFILE=nightly`, `RX72N_TEST_SCOPE=full`, `RX65N_BG96_TEST_SCOPE=full`, `RX72N_TLS_BACKEND=software`, `RX65N_BG96_TLS_BACKEND=software` | Full RX72N/Ether + RX65N/BG96 regression, including MQTT, OTA, and Fleet Provisioning. |
-| Focused RX72N TSIP OTA | Active | 04:20 daily | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=ota`, `RX65N_BG96_TEST_SCOPE=build`, `RX65N_BG96_SKIP_HW_TESTS=true`, `RUN_RX65N_BG96_BUILD=false`, `RX72N_TLS_BACKEND=tsip` | Confirms TSIP runtime provisioning and the RX72N TSIP OTA path without consuming the cellular board. |
-| Focused RX72N software TLS 1.3 MQTT | Active | 05:20 daily | `PIPELINE_PROFILE=focused`, `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=build`, `RX65N_BG96_SKIP_HW_TESTS=true`, `RUN_RX65N_BG96_BUILD=false`, `AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`, `RX72N_REQUIRE_TLS_VERSION=TLSv1.3`, `RX72N_TLS_BACKEND=software` | Confirms RX72N/Ether still negotiates TLS 1.3 with the AWS IoT Core domain configured for `IoTSecurityPolicy_TLS13_1_2_2022_10`. |
-| Focused RX65N/BG96 TSIP OTA | Active (schedule #7) | 06:20 daily | `PIPELINE_PROFILE=focused`, `RX65N_BG96_TEST_SCOPE=ota`, `RX65N_BG96_TLS_BACKEND=tsip`, `RUN_RX65N_BG96_BUILD=true`, `RX65N_BG96_SKIP_HW_TESTS=false`, `RUN_RX72N_BUILD=false`, `RX72N_SKIP_HW_TESTS=true`, `RX72N_TEST_SCOPE=build` | Confirms TSIP runtime provisioning and the RX65N/BG96 TSIP OTA path without consuming the Ethernet board. Validated manually by focused pipeline [#4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744). |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=false` | Runs the stable focused rows listed in the matrix above. TSIP Fleet and RX72N software TLS 1.3 OTA are gated as stabilizing rows until repeated schedule evidence is available. |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
