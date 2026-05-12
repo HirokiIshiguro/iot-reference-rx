@@ -77,6 +77,18 @@ The current boot loader uses the RX dual-bank flash mechanism with r_fwup (Firmw
 - Performs bank swap on successful verification
 - Supports rollback on signature verification failure
 
+#### Boot Loader / Application Clock Handoff
+
+RX72N / RX65N のブートローダはアプリケーションのリセットハンドラへ直接ジャンプします。アプリケーションは
+電源リセット直後に近いクロック状態を前提に BSP の `mcu_clock_setup()` を実行するため、
+ブートローダとアプリケーションのクロック設定は同一にしてください。クロック設定を変更する場合は、
+対象 MCU のブートローダ、software app、TSIP app の e2 studio/Smart Configurator 設定を同時に更新します。
+
+ブートローダはジャンプ直前に使用中の PLL 系クロックを停止し、アプリケーション側 BSP が安全に
+再初期化できる状態へ戻します。現時点では RX72N は PLL/PPLL、RX65N は PLL を MCU 別分岐で扱います。
+この処理はブートローダ側のハンドオフ処理に閉じ込め、
+生成された BSP 内部ファイルは原則として純正のまま維持します。
+
 **Roadmap:** The current r_fwup-based boot loader will be replaced with [MCUboot](https://www.mcuboot.com/) to provide a production-grade secure boot chain with swap/revert, encrypted images, and hardware root of trust.
 
 ## Development Environment / 開発環境
