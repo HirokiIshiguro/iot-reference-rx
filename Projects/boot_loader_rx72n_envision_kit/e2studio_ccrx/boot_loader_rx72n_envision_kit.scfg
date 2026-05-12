@@ -76,12 +76,12 @@
             <item enabled="true" id="pllmain" input="" value="16"/>
             <item enabled="false" id="pllhoco" input="" value="16"/>
         </option>
-        <option enabled="true" id="plldivider" selection="div1-1">
+        <option enabled="true" id="plldivider" selection="div1-2">
             <item enabled="true" id="div1-1"/>
             <item enabled="true" id="div1-2"/>
             <item enabled="true" id="div1-3"/>
         </option>
-        <option enabled="true" id="pllmul" selection="mul15-1">
+        <option enabled="true" id="pllmul" selection="mul30-1">
             <item enabled="true" id="mul10-1"/>
             <item enabled="false" id="mul10_5-1"/>
             <item enabled="false" id="mul11-1"/>
@@ -277,7 +277,7 @@
             <item enabled="false" id="comboBox1-4"/>
             <item enabled="false" id="comboBox1-5"/>
         </option>
-        <option enabled="true" id="pplldiv" selection="comboBox1-2">
+        <option enabled="true" id="pplldiv" selection="comboBox1-4">
             <item enabled="true" id="comboBox1-2"/>
             <item enabled="true" id="comboBox1-3"/>
             <item enabled="true" id="comboBox1-4"/>
@@ -678,6 +678,7 @@
                 <gridItem id="BSP_CFG_EBMAPCR_3RD_PRIORITY" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_EBMAPCR_4TH_PRIORITY" selectedIndex="2"/>
                 <gridItem id="BSP_CFG_EBMAPCR_5TH_PRIORITY" selectedIndex="4"/>
+                <gridItem id="BSP_CFG_BOOTLOADER_PROJECT" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_NONCACHEABLE_AREA0_ENABLE" selectedIndex="0"/>
                 <gridItem id="BSP_CFG_NONCACHEABLE_AREA0_ADDR" selectedIndex="0xFFE00000"/>
                 <gridItem id="BSP_CFG_NONCACHEABLE_AREA0_SIZE" selectedIndex="0"/>
