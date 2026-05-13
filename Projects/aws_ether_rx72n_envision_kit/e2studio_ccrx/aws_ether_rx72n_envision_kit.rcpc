@@ -1619,7 +1619,7 @@
           <Option>-include="${ProjDirPath}\src\smc_gen\r_glcdc_rx"</Option>
           <Option>-include="${ProjDirPath}\src\smc_gen\r_simple_graphic_rx\src"</Option>
           <Option>-include="${ProjDirPath}\src\smc_gen\r_cmt_rx"</Option>
-          <Option>-define=MBEDTLS_CONFIG_FILE=&lt;"aws_mbedtls_config.h"&gt;,CONFIG_FREERTOS_ASSERT_FAIL_ABORT,CONFIG_MEDTLS_USE_AFR_MEMORY,MBEDTLS_ERROR_C,MBEDTLS_ALLOW_PRIVATE_ACCESS,__LITTLE_ENDIAN__</Option>
+          <Option>-define=MBEDTLS_CONFIG_FILE=&lt;"aws_mbedtls_config.h"&gt;,CONFIG_FREERTOS_ASSERT_FAIL_ABORT,CONFIG_MEDTLS_USE_AFR_MEMORY,MBEDTLS_ERROR_C,MBEDTLS_ALLOW_PRIVATE_ACCESS,IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE,__LITTLE_ENDIAN__</Option>
           <Option>-asmopt=-bank</Option>
           <Option>-utf8</Option>
           <Option>-nomessage=11174,21644,20010,23034,23035,20177,23033</Option>
@@ -2403,6 +2403,7 @@
           <MacroForC>CONFIG_MEDTLS_USE_AFR_MEMORY</MacroForC>
           <MacroForC>MBEDTLS_ERROR_C</MacroForC>
           <MacroForC>MBEDTLS_ALLOW_PRIVATE_ACCESS</MacroForC>
+          <MacroForC>IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE</MacroForC>
           <MacroForC>__LITTLE_ENDIAN__</MacroForC>
         </CommonOptions>
       </BuildMode>
