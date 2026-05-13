@@ -2,20 +2,24 @@
 
 ## 最新テスト結果
 
-最終更新: 2026-05-11 JST。最新の安定系フルテストは
-[schedule pipeline #5006](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5006)
-で、14/14 行が成功しています。通常スケジュールは `PIPELINE_PROFILE=nightly_matrix` と
+最終更新: 2026-05-13 JST。ブートローダからアプリへのクロックハンドオフ修正後、
+[schedule pipeline #5071](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5071) /
+[#5086](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5086) /
+[#5101](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5101) /
+[#5116](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5116) /
+[#5131](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5131)
+で5回確認を行い、13/14 行が5回連続成功しています。通常スケジュールは `PIPELINE_PROFILE=nightly_matrix` と
 `NIGHTLY_MATRIX_INCLUDE_STABILIZING=false` で実行し、安定運用対象の focused 行だけを
 子パイプラインとして展開します。
 
 | <small>MCU環境</small> | <small>MQTT</small> | <small>OTA</small> | <small>Fleet</small> | <small>TLS1.3 MQTT</small> | <small>TLS1.3 OTA</small> | <small>TLS1.3 Fleet</small> |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| <small>RX72N/Ether<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5008)</small> |  | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5015)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5009)</small> |  | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5011)</small> |
-| <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5012)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5014)</small> |  |  |  |  |
-| <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5010)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5013)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5016)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5017)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5018)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5019)</small> |
-| <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5007)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5020)</small> |  |  |  |  |
+| <small>RX72N/Ether<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5132)</small> |  | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5136)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5134)</small> |  | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5137)</small> |
+| <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5138)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5140)</small> |  |  |  |  |
+| <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5133)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5135)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5139)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5141)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5142)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5143)</small> |
+| <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5144)</small> |  |  |  |  |  |
 
-<small>`✓` は安定系スケジュールでテストOKを確認済みの行です。空欄は未有効化、証跡待ち、または `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でのみ流す stabilizing 行です。stabilizing は機能実績はあるが、通信断復帰などの安定性確認が残っているため、通常の All Green 判定母集団にはまだ入れません。現在の stabilizing 対象は RX72N/Ether software OTA、RX72N/Ether software TLS1.3 OTA、RX72N/Ether TSIP Fleet、RX65N/BG96 TSIP Fleet です。stabilizing 行は同一条件で 5 回連続成功したら安定系へ昇格し、昇格後に対象行起因の失敗が 1 回でも出たら stabilizing へ戻します。停電、配線作業、Runner 障害など対象行の実装品質と無関係な外乱は連続成功/失敗判定から除外します。</small>
+<small>`✓` は同一コミット上の安定系スケジュールで5回連続テストOKを確認済みの行です。表中のリンクは5回目確認時の子パイプラインを示します。空欄は未有効化、証跡待ち、または `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でのみ流す stabilizing 行です。stabilizing は機能実績はあるが、通信断復帰などの安定性確認が残っているため、通常の All Green 判定母集団にはまだ入れません。現在の stabilizing 対象は RX72N/Ether software OTA、RX72N/Ether software TLS1.3 OTA、RX72N/Ether TSIP Fleet、RX65N/BG96 TSIP OTA、RX65N/BG96 TSIP Fleet です。RX65N/BG96 TSIP OTA は4回連続成功後、5回目の [schedule pipeline #5131](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5131) でブロック20/110後に継続確認できなかったため、stabilizing 扱いへ戻しています。stabilizing 行は同一条件で 5 回連続成功したら安定系へ昇格し、昇格後に対象行起因の失敗が 1 回でも出たら stabilizing へ戻します。停電、配線作業、Runner 障害など対象行の実装品質と無関係な外乱は連続成功/失敗判定から除外します。</small>
 
 ## About This Fork / このフォークについて
 
