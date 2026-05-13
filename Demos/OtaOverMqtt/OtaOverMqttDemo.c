@@ -1419,6 +1419,11 @@ static void processOTAEvents(void)
             {
                 currentBlockOffset++;
             }
+
+            if (nextBlockOffsetToRequest < currentBlockOffset)
+            {
+                nextBlockOffsetToRequest = currentBlockOffset;
+            }
         }
 
         /* File block cannot be written */
