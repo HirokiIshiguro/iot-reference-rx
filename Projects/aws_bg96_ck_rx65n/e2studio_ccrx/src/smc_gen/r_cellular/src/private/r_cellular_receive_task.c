@@ -207,6 +207,7 @@ static bool cellular_bg96_qird_fast_drain (st_cellular_ctrl_t * p_ctrl,
                                            const int32_t length);
 static bool cellular_bg96_read_exact (st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst, uint16_t length);
 static bool cellular_bg96_read_one (st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst);
+static bool cellular_bg96_qird_trailer_has_ok (const uint8_t * p_trailer, uint16_t count, bool allow_partial);
 static bool cellular_bg96_read_qird_trailer (st_cellular_ctrl_t * p_ctrl, const int32_t length);
 #endif /* CELLULAR_TARGET_BG96 */
 static void         cellular_system_state_change (st_cellular_ctrl_t * p_ctrl, int32_t stat);
@@ -1145,6 +1146,65 @@ static bool cellular_bg96_read_one(st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst)
  *********************************************************************************************************************/
 
 /***********************************************************************************************
+ * Function Name  @fn            cellular_bg96_qird_trailer_has_ok
+ * Description    @details       Check a QIRD trailer prefix followed by OK with optional trailing CR.
+ **********************************************************************************************/
+static bool cellular_bg96_qird_trailer_has_ok(const uint8_t * p_trailer, uint16_t count, bool allow_partial)
+{
+    uint16_t ok_pos = 0;
+    uint16_t i      = 0;
+    bool     ret    = false;
+
+    if ((count >= 4U) &&
+        ('O' == p_trailer[count - 4U]) &&
+        ('K' == p_trailer[count - 3U]) &&
+        (CHAR_CHECK_7 == p_trailer[count - 2U]) &&
+        (CHAR_CHECK_4 == p_trailer[count - 1U]))
+    {
+        ok_pos = (uint16_t)(count - 4U);
+        ret    = true;
+    }
+    else if ((true == allow_partial) &&
+             (count >= 3U) &&
+             ('O' == p_trailer[count - 3U]) &&
+             ('K' == p_trailer[count - 2U]) &&
+             (CHAR_CHECK_7 == p_trailer[count - 1U]))
+    {
+        ok_pos = (uint16_t)(count - 3U);
+        ret    = true;
+    }
+    else if ((true == allow_partial) &&
+             (count >= 2U) &&
+             ('O' == p_trailer[count - 2U]) &&
+             ('K' == p_trailer[count - 1U]))
+    {
+        ok_pos = (uint16_t)(count - 2U);
+        ret    = true;
+    }
+    else
+    {
+        /* No OK suffix was found. */
+    }
+
+    if (true == ret)
+    {
+        for (i = 0; i < ok_pos; i++)
+        {
+            if ((CHAR_CHECK_7 != p_trailer[i]) && (CHAR_CHECK_4 != p_trailer[i]))
+            {
+                ret = false;
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
+/**********************************************************************************************************************
+ * End of function cellular_bg96_qird_trailer_has_ok
+ *********************************************************************************************************************/
+
+/***********************************************************************************************
  * Function Name  @fn            cellular_bg96_read_qird_trailer
  * Description    @details       Consume BG96 QIRD terminal CR/LF framing and OK.
  **********************************************************************************************/
@@ -1152,52 +1212,19 @@ static bool cellular_bg96_read_qird_trailer(st_cellular_ctrl_t * p_ctrl, const i
 {
     uint8_t  trailer[BG96_QIRD_TRAILER_MAX] = {0};
     uint16_t count                          = 0;
-    uint16_t i                              = 0;
     bool     ret                            = false;
 
     while (count < BG96_QIRD_TRAILER_MAX)
     {
         if (false == cellular_bg96_read_one(p_ctrl, &trailer[count]))
         {
-            CELLULAR_LOG_ERROR(("BG96 QIRD trailer timeout: length=%ld count=%u sci_err=%d got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
-                                (long)length,
-                                (unsigned int)count,
-                                (int)p_ctrl->sci_ctrl.sci_err_flg,
-                                (unsigned int)trailer[0],
-                                (unsigned int)trailer[1],
-                                (unsigned int)trailer[2],
-                                (unsigned int)trailer[3],
-                                (unsigned int)trailer[4],
-                                (unsigned int)trailer[5],
-                                (unsigned int)trailer[6],
-                                (unsigned int)trailer[7]));
-            break;
-        }
-
-        count++;
-
-        if ((count >= 4U) &&
-            ('O' == trailer[count - 4U]) &&
-            ('K' == trailer[count - 3U]) &&
-            (CHAR_CHECK_7 == trailer[count - 2U]) &&
-            (CHAR_CHECK_4 == trailer[count - 1U]))
-        {
-            ret = true;
-
-            for (i = 0; i < (uint16_t)(count - 4U); i++)
-            {
-                if ((CHAR_CHECK_7 != trailer[i]) && (CHAR_CHECK_4 != trailer[i]))
-                {
-                    ret = false;
-                    break;
-                }
-            }
-
+            ret = cellular_bg96_qird_trailer_has_ok(trailer, count, true);
             if (false == ret)
             {
-                CELLULAR_LOG_ERROR(("BG96 QIRD trailer prefix mismatch: length=%ld count=%u got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
+                CELLULAR_LOG_ERROR(("BG96 QIRD trailer timeout: length=%ld count=%u sci_err=%d got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
                                     (long)length,
                                     (unsigned int)count,
+                                    (int)p_ctrl->sci_ctrl.sci_err_flg,
                                     (unsigned int)trailer[0],
                                     (unsigned int)trailer[1],
                                     (unsigned int)trailer[2],
@@ -1207,7 +1234,14 @@ static bool cellular_bg96_read_qird_trailer(st_cellular_ctrl_t * p_ctrl, const i
                                     (unsigned int)trailer[6],
                                     (unsigned int)trailer[7]));
             }
+            break;
+        }
 
+        count++;
+
+        if (true == cellular_bg96_qird_trailer_has_ok(trailer, count, false))
+        {
+            ret = true;
             break;
         }
     }
