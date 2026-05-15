@@ -142,18 +142,18 @@ e_cellular_err_t cellular_execute_at_command(st_cellular_ctrl_t * const p_ctrl, 
  ***************************************************************************/
 static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
 {
-#if CELLULAR_CFG_CTS_SW_CTRL == 1
     uint16_t                   length      = 0;
+#if CELLULAR_CFG_CTS_SW_CTRL == 1
     uint16_t                   send_size   = 0;
 #endif
     sci_err_t                  sci_ret     = SCI_SUCCESS;
     e_cellular_err_atc_t       ret         = CELLULAR_ATC_OK;
     e_cellular_timeout_check_t timeout_ret = CELLULAR_NOT_TIMEOUT;
+    length = (uint16_t)strlen((const char *)p_ctrl->sci_ctrl.atc_buff);
 #if CELLULAR_CFG_CTS_SW_CTRL == 0
     p_ctrl->sci_ctrl.tx_end_flg = CELLULAR_TX_END_FLAG_OFF;
 
-    sci_ret = R_SCI_Send(p_ctrl->sci_ctrl.sci_hdl, p_ctrl->sci_ctrl.atc_buff,
-                            (uint16_t)strlen((const char *)p_ctrl->sci_ctrl.atc_buff)); // (uint8_t[])->(char*)
+    sci_ret = R_SCI_Send(p_ctrl->sci_ctrl.sci_hdl, p_ctrl->sci_ctrl.atc_buff, length);
 
     if (SCI_SUCCESS == sci_ret)
     {
@@ -168,18 +168,30 @@ static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
             timeout_ret = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
             if (CELLULAR_TIMEOUT == timeout_ret)
             {
+                CELLULAR_LOG_ERROR(("AT command TX timeout: cmd=%d len=%u tx_end=%d sci_err=%d.\n",
+                                    (int)p_ctrl->sci_ctrl.at_command,
+                                    (unsigned int)length,
+                                    (int)p_ctrl->sci_ctrl.tx_end_flg,
+                                    (int)p_ctrl->sci_ctrl.sci_err_flg));
                 ret = CELLULAR_ATC_ERR_TIMEOUT;
                 break;
             }
         }
+        if ((CELLULAR_ATC_OK == ret) && (ATC_RECV_SOCKET == p_ctrl->sci_ctrl.at_command))
+        {
+            CELLULAR_LOG_DEBUG(("BG96 QIRD AT TX done: len=%u.\n", (unsigned int)length));
+        }
     }
     else
     {
+        CELLULAR_LOG_ERROR(("AT command TX start failed: cmd=%d len=%u sci_ret=%d sci_err=%d.\n",
+                            (int)p_ctrl->sci_ctrl.at_command,
+                            (unsigned int)length,
+                            (int)sci_ret,
+                            (int)p_ctrl->sci_ctrl.sci_err_flg));
         ret = CELLULAR_ATC_ERR_MODULE_COM;
     }
 #else
-    length = strlen((const char *)p_ctrl->sci_ctrl.atc_buff);   // (&uint8_t[])->(char*)
-
     /* WAIT_LOOP */
     while (send_size < length)
     {
@@ -193,6 +205,12 @@ static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
                 timeout_ret = cellular_tx_flag_check(p_ctrl);
                 if (CELLULAR_TIMEOUT == timeout_ret)
                 {
+                    CELLULAR_LOG_ERROR(("AT command TX timeout: cmd=%d len=%u sent=%u tx_end=%d sci_err=%d.\n",
+                                        (int)p_ctrl->sci_ctrl.at_command,
+                                        (unsigned int)length,
+                                        (unsigned int)send_size,
+                                        (int)p_ctrl->sci_ctrl.tx_end_flg,
+                                        (int)p_ctrl->sci_ctrl.sci_err_flg));
                     ret = CELLULAR_ATC_ERR_TIMEOUT;
                     break;
                 }
@@ -200,11 +218,21 @@ static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
             }
             else
             {
+                CELLULAR_LOG_ERROR(("AT command TX byte failed: cmd=%d len=%u sent=%u sci_ret=%d sci_err=%d.\n",
+                                    (int)p_ctrl->sci_ctrl.at_command,
+                                    (unsigned int)length,
+                                    (unsigned int)send_size,
+                                    (int)sci_ret,
+                                    (int)p_ctrl->sci_ctrl.sci_err_flg));
                 ret = CELLULAR_ATC_ERR_MODULE_COM;
                 break;
             }
         }
     };
+    if ((CELLULAR_ATC_OK == ret) && (ATC_RECV_SOCKET == p_ctrl->sci_ctrl.at_command))
+    {
+        CELLULAR_LOG_DEBUG(("BG96 QIRD AT TX done: len=%u.\n", (unsigned int)length));
+    }
 #endif  /* CELLULAR_CFG_CTS_SW_CTRL == 0 */
 
     return ret;
@@ -243,6 +271,11 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
         timeout_ret = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
         if (CELLULAR_TIMEOUT == timeout_ret)
         {
+            CELLULAR_LOG_ERROR(("AT command response timeout: cmd=%d expect=%d res=%d sci_err=%d.\n",
+                                (int)p_ctrl->sci_ctrl.at_command,
+                                (int)expect_code,
+                                (int)res,
+                                (int)p_ctrl->sci_ctrl.sci_err_flg));
             ret = CELLULAR_ATC_ERR_TIMEOUT;
             break;
         }
@@ -255,6 +288,14 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
 #if BSP_CFG_RTOS_USED == (1)
     cellular_clear_atc_wait(p_ctrl);
 #endif
+
+    if (ATC_RECV_SOCKET == p_ctrl->sci_ctrl.at_command)
+    {
+        CELLULAR_LOG_DEBUG(("BG96 QIRD AT response done: ret=%d res=%d expect=%d.\n",
+                            (int)ret,
+                            (int)res,
+                            (int)expect_code));
+    }
 
     return ret;
 }

@@ -236,6 +236,11 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
         timeout = cellular_receive_flag_check(p_ctrl, p_cellular_timeout_ctrl, socket_no, timeout_ms);
         if (CELLULAR_TIMEOUT == timeout)
         {
+            CELLULAR_LOG_ERROR(("BG96 receive flag timeout: socket=%u total=%ld pending=%d timeout_ms=%lu.\n",
+                                (unsigned int)socket_no,
+                                (long)total_receive_length,
+                                (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
+                                (unsigned long)timeout_ms));
             break; /* Break of the data receive loop */
         }
 
@@ -256,17 +261,34 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
                 timeout              = cellular_check_timeout(p_cellular_timeout_ctrl);
                 if (CELLULAR_TIMEOUT == timeout)
                 {
+                    CELLULAR_LOG_ERROR(("BG96 receive data timeout after QIRD: socket=%u receive_size=%ld total=%ld pending=%d timeout_ms=%lu.\n",
+                                        (unsigned int)socket_no,
+                                        (long)receive_size,
+                                        (long)total_receive_length,
+                                        (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
+                                        (unsigned long)timeout_ms));
                     break; /* Break of the data receive loop */
                 }
 
             }
             else
             {
+                CELLULAR_LOG_ERROR(("BG96 QIRD command failed: socket=%u receive_size=%ld ret=%d total=%ld pending=%d timeout_ms=%lu.\n",
+                                    (unsigned int)socket_no,
+                                    (long)receive_size,
+                                    (int)ret,
+                                    (long)total_receive_length,
+                                    (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
+                                    (unsigned long)timeout_ms));
                 break; /* Break of the data receive loop */
             }
         }
         else
         {
+            CELLULAR_LOG_ERROR(("BG96 receive AT semaphore take failed: socket=%u total=%ld pending=%d.\n",
+                                (unsigned int)socket_no,
+                                (long)total_receive_length,
+                                (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size));
             break; /* Break of the data receive loop */
         }
     } /* End of data receive loop */
