@@ -211,10 +211,15 @@ void handleReceivedPublish(void *              pvIncomingPublishCallbackContext,
     message       = (uint8_t *) pxPublishInfo->pPayload;
     messageLength = pxPublishInfo->payloadLength;
 
+    configPRINTF(("[INFO] BG96 diag: mqtt wrapper callback enter topicLen=%u payload=%lu\n",
+                 (unsigned int) topicLength,
+                 (unsigned long) messageLength));
     configPRINTF(("[INFO] Incoming PUBLISH received on topic %.*s\n",
                  (unsigned int) topicLength, topic));
 
     messageHandled = otaDemo_handleIncomingMQTTMessage(topic, topicLength, message, messageLength);
+    configPRINTF(("[INFO] BG96 diag: mqtt wrapper callback exit handled=%u\n",
+                 (unsigned int) messageHandled));
 
     if (!messageHandled)
     {

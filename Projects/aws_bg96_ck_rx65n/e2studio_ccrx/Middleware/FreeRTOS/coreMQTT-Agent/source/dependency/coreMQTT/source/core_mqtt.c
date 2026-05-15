@@ -1423,6 +1423,10 @@ static MQTTStatus_t handleIncomingPublish( MQTTContext_t * pContext,
 
     if( status == MQTTSuccess )
     {
+        LogInfo( ( "BG96 diag: publish state update enter packetId=%hu qos=%u dup=%u.",
+                   ( unsigned short ) packetIdentifier,
+                   ( unsigned int ) publishInfo.qos,
+                   ( unsigned int ) publishInfo.dup ) );
         MQTT_PRE_STATE_UPDATE_HOOK( pContext );
 
         status = MQTT_UpdateStatePublish( pContext,
@@ -1432,6 +1436,10 @@ static MQTTStatus_t handleIncomingPublish( MQTTContext_t * pContext,
                                           &publishRecordState );
 
         MQTT_POST_STATE_UPDATE_HOOK( pContext );
+
+        LogInfo( ( "BG96 diag: publish state update exit status=%s state=%s.",
+                   MQTT_Status_strerror( status ),
+                   MQTT_State_strerror( publishRecordState ) ) );
 
         if( status == MQTTSuccess )
         {
@@ -1505,15 +1513,26 @@ static MQTTStatus_t handleIncomingPublish( MQTTContext_t * pContext,
          * duplicate incoming publishes. */
         if( duplicatePublish == false )
         {
+            LogInfo( ( "BG96 diag: publish app callback enter packetId=%hu payload=%lu.",
+                       ( unsigned short ) packetIdentifier,
+                       ( unsigned long ) publishInfo.payloadLength ) );
             pContext->appCallback( pContext,
-                                   pIncomingPacket,
-                                   &deserializedInfo );
+                                    pIncomingPacket,
+                                    &deserializedInfo );
+            LogInfo( ( "BG96 diag: publish app callback exit packetId=%hu.",
+                       ( unsigned short ) packetIdentifier ) );
         }
 
         /* Send PUBACK or PUBREC if necessary. */
+        LogInfo( ( "BG96 diag: publish ack send enter packetId=%hu state=%s.",
+                   ( unsigned short ) packetIdentifier,
+                   MQTT_State_strerror( publishRecordState ) ) );
         status = sendPublishAcks( pContext,
                                   packetIdentifier,
                                   publishRecordState );
+        LogInfo( ( "BG96 diag: publish ack send exit packetId=%hu status=%s.",
+                   ( unsigned short ) packetIdentifier,
+                   MQTT_Status_strerror( status ) ) );
     }
 
     return status;

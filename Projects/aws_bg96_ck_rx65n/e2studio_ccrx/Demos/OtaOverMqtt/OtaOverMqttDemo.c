@@ -846,11 +846,16 @@ bool otaDemo_handleIncomingMQTTMessage(char * topic,
     if (MQTTFileDownloaderSuccess == ret)
     {
         LogInfo(("Data block is receiving from topic: %.*s\n", topicLength, topic));
+        LogInfo(("BG96 diag: OTA data block callback enter payload=%lu.\n",
+                 (unsigned long) messageLength));
         OtaDataEvent_t * dataBuf = getOtaDataEventBuffer();
 
         if (NULL != dataBuf)
         {
+            LogInfo(("BG96 diag: OTA data buffer acquired.\n"));
             memcpy(dataBuf->data, message, messageLength);
+            LogInfo(("BG96 diag: OTA data copied payload=%lu.\n",
+                     (unsigned long) messageLength));
         }
         else
         {
@@ -861,7 +866,9 @@ bool otaDemo_handleIncomingMQTTMessage(char * topic,
         nextEvent.dataEvent = dataBuf;
         dataBuf->dataLength = messageLength;
         nextEvent.eventId   = OtaAgentEventReceivedFileBlock;
+        LogInfo(("BG96 diag: OTA send file block event enter.\n"));
         OtaSendEvent_FreeRTOS(&nextEvent);
+        LogInfo(("BG96 diag: OTA send file block event exit.\n"));
     }
     else /* not the callback from MQTT File Stream */
     {

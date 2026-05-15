@@ -154,6 +154,10 @@ int32_t R_CELLULAR_ReceiveSocket(st_cellular_ctrl_t * const p_ctrl, const uint8_
         }
         else
         {
+            CELLULAR_LOG_ERROR(("BG96 diag: ReceiveSocket rx_semaphore take failed socket=%u length=%ld ret=%d.\n",
+                                (unsigned int)socket_no,
+                                (long)length,
+                                (int)semaphore_ret));
             ret = CELLULAR_ERR_OTHER_ATCOMMAND_RUNNING;
         }
         p_ctrl->running_api_count -= 2;
@@ -236,6 +240,14 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
         timeout = cellular_receive_flag_check(p_ctrl, p_cellular_timeout_ctrl, socket_no, timeout_ms);
         if (CELLULAR_TIMEOUT == timeout)
         {
+            CELLULAR_LOG_ERROR(("BG96 diag: receive flag timeout socket=%u total=%ld length=%ld pending=%d flag=%u status=%u system=%u.\n",
+                                (unsigned int)socket_no,
+                                (long)total_receive_length,
+                                (long)length,
+                                (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
+                                (unsigned int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_flg,
+                                (unsigned int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].socket_status,
+                                (unsigned int)p_ctrl->system_state));
             break; /* Break of the data receive loop */
         }
 
@@ -262,11 +274,24 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
             }
             else
             {
+                CELLULAR_LOG_ERROR(("BG96 diag: atc_sqnsrecv failed socket=%u request=%ld ret=%d total=%ld length=%ld pending=%d sci_err=%d.\n",
+                                    (unsigned int)socket_no,
+                                    (long)receive_size,
+                                    (int)ret,
+                                    (long)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].total_recv_count,
+                                    (long)length,
+                                    (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
+                                    (int)p_ctrl->sci_ctrl.sci_err_flg));
                 break; /* Break of the data receive loop */
             }
         }
         else
         {
+            CELLULAR_LOG_ERROR(("BG96 diag: receive at_semaphore take failed socket=%u total=%ld length=%ld ret=%d.\n",
+                                (unsigned int)socket_no,
+                                (long)total_receive_length,
+                                (long)length,
+                                (int)semaphore_ret));
             break; /* Break of the data receive loop */
         }
     } /* End of data receive loop */
@@ -281,6 +306,19 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
     }
     p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].total_recv_count = 0;
     p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].p_recv           = NULL;
+
+    if (length > total_receive_length)
+    {
+        CELLULAR_LOG_ERROR(("BG96 diag: receive_data short return socket=%u total=%ld length=%ld timeout=%d ret=%d pending=%d flag=%u sci_err=%d.\n",
+                            (unsigned int)socket_no,
+                            (long)total_receive_length,
+                            (long)length,
+                            (int)timeout,
+                            (int)ret,
+                            (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
+                            (unsigned int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_flg,
+                            (int)p_ctrl->sci_ctrl.sci_err_flg));
+    }
 
     return total_receive_length;
 }
