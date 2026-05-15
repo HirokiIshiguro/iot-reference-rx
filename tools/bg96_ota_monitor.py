@@ -27,14 +27,20 @@ MARKERS = {
     "activate_image": "Activate Image event Received",
     "selfcheck_mode": "OTA image is in selfcheck mode.",
     "image_accepted": "New image has higher version than current image, accepted!",
+    "image_committed": "Accepted and committed final image.",
+    "ota_completed": "---OTA Completed successfully!---",
 }
-REQUIRED = (
+REQUIRED_PROGRESS = (
     "job_received",
     "download_started",
     "block_downloaded",
     "close_file",
     "activate_image",
+)
+ACCEPTANCE_MARKERS = (
     "image_accepted",
+    "image_committed",
+    "ota_completed",
 )
 ERROR_PATTERNS = (
     "Cellular init failed",
@@ -85,6 +91,17 @@ def log_raw(path: Path | None, elapsed: float, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"[{datetime.now(timezone.utc).isoformat()}][+{elapsed:07.3f}s] {text}")
+
+
+def has_accepted_image(detected: dict[str, dict]) -> bool:
+    return any(marker in detected for marker in ACCEPTANCE_MARKERS)
+
+
+def missing_required_markers(detected: dict[str, dict]) -> list[str]:
+    missing = [marker for marker in REQUIRED_PROGRESS if marker not in detected]
+    if not has_accepted_image(detected):
+        missing.append("image_accepted_or_ota_completed")
+    return missing
 
 
 def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) -> dict:
@@ -155,22 +172,28 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
                     errors.append(stripped)
 
         if (
-            all(marker in detected for marker in REQUIRED)
-            or "image_accepted" in detected
-        ) and args.expected_version in versions:
+            all(marker in detected for marker in REQUIRED_PROGRESS)
+            and has_accepted_image(detected)
+            and args.expected_version in versions
+        ):
             break
         if errors:
             break
 
     elapsed = time.time() - start
-    success = all(marker in detected for marker in REQUIRED) and args.expected_version in versions and not errors
+    success = (
+        all(marker in detected for marker in REQUIRED_PROGRESS)
+        and has_accepted_image(detected)
+        and args.expected_version in versions
+        and not errors
+    )
     return {
         "success": success,
         "attempt": attempt,
         "expected_version": args.expected_version,
         "versions_seen": versions,
         "detected_markers": detected,
-        "missing_required": [marker for marker in REQUIRED if marker not in detected],
+        "missing_required": missing_required_markers(detected),
         "errors": errors,
         "total_bytes": total_bytes,
         "duration_seconds": round(elapsed, 3),
@@ -202,7 +225,8 @@ def aggregate_summaries(summaries: list[dict], expected_version: str) -> dict:
 
     blocking_errors = [error for error in errors if not is_retryable_error(error)]
     success = (
-        all(marker in detected for marker in REQUIRED)
+        all(marker in detected for marker in REQUIRED_PROGRESS)
+        and has_accepted_image(detected)
         and expected_version in versions
         and not blocking_errors
     )
@@ -212,7 +236,7 @@ def aggregate_summaries(summaries: list[dict], expected_version: str) -> dict:
         "expected_version": expected_version,
         "versions_seen": versions,
         "detected_markers": detected,
-        "missing_required": [marker for marker in REQUIRED if marker not in detected],
+        "missing_required": missing_required_markers(detected),
         "errors": errors,
         "blocking_errors": blocking_errors,
         "retryable_errors": [error for error in errors if is_retryable_error(error)],
