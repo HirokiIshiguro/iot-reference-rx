@@ -765,6 +765,7 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
     bool xPublishHandled = false;
     char cOriginalChar, * pcLocation;
 
+    ( void ) packetId;
     ( void ) pMqttAgentContext;
 
 #if (ENABLE_OTA_UPDATE_DEMO == 1) || (OTA_E2E_TEST_ENABLED == 1)
@@ -774,14 +775,7 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 
     /* Fan out the incoming publishes to the callbacks registered using
      * subscription manager. */
-    LogInfo( ( "BG96 diag: agent incoming publish callback enter packetId=%hu topicLen=%hu payload=%lu.",
-               ( unsigned short ) packetId,
-               ( unsigned short ) pxPublishInfo->topicNameLength,
-               ( unsigned long ) pxPublishInfo->payloadLength ) );
     xPublishHandled = prvMatchTopicFilterSubscriptions( pxPublishInfo );
-    LogInfo( ( "BG96 diag: agent incoming publish callback exit packetId=%hu handled=%u.",
-               ( unsigned short ) packetId,
-               ( unsigned int ) xPublishHandled ) );
 
     /* If there are no callbacks to handle the incoming publishes,
      * handle it as an unsolicited publish. */
@@ -1049,11 +1043,7 @@ static bool prvMatchTopicFilterSubscriptions( MQTTPublishInfo_t * pxPublishInfo 
     uint32_t ulIndex = 0;
     bool isMatched = false, publishHandled = false;
 
-    LogInfo( ( "BG96 diag: subscription mutex take enter topicLen=%hu.",
-               ( unsigned short ) pxPublishInfo->topicNameLength ) );
     xSemaphoreTake( xSubscriptionsMutex, portMAX_DELAY );
-    LogInfo( ( "BG96 diag: subscription mutex take exit topicLen=%hu.",
-               ( unsigned short ) pxPublishInfo->topicNameLength ) );
     {
         for( ulIndex = 0U; ulIndex < MQTT_AGENT_MAX_SUBSCRIPTIONS; ulIndex++ )
         {
@@ -1067,22 +1057,14 @@ static bool prvMatchTopicFilterSubscriptions( MQTTPublishInfo_t * pxPublishInfo 
 
                 if( isMatched == true )
                 {
-                    LogInfo( ( "BG96 diag: subscription callback enter index=%lu topicLen=%hu.",
-                               ( unsigned long ) ulIndex,
-                               ( unsigned short ) pxPublishInfo->topicNameLength ) );
                     xTopicFilterSubscriptions[ ulIndex ].pxIncomingPublishCallback( xTopicFilterSubscriptions[ ulIndex ].pvIncomingPublishCallbackContext,
                                                                                     pxPublishInfo );
-                    LogInfo( ( "BG96 diag: subscription callback exit index=%lu.",
-                               ( unsigned long ) ulIndex ) );
                     publishHandled = true;
                 }
             }
         }
     }
     xSemaphoreGive( xSubscriptionsMutex );
-    LogInfo( ( "BG96 diag: subscription mutex give topicLen=%hu handled=%u.",
-               ( unsigned short ) pxPublishInfo->topicNameLength,
-               ( unsigned int ) publishHandled ) );
     return publishHandled;
 }
 

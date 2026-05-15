@@ -103,14 +103,6 @@ e_cellular_err_t cellular_execute_at_command(st_cellular_ctrl_t * const p_ctrl, 
         {
             atc_ret = cellular_res_check(p_ctrl, expect_code);
         }
-        else
-        {
-            CELLULAR_LOG_ERROR(("BG96 diag: AT send failed command=%d atc_ret=%d sci_err=%d atc=%s\n",
-                                (int)command,
-                                (int)atc_ret,
-                                (int)p_ctrl->sci_ctrl.sci_err_flg,
-                                p_ctrl->sci_ctrl.atc_buff));
-        }
 
         if ((CELLULAR_PSM_ACTIVE == p_ctrl->ring_ctrl.psm) && (CELLULAR_SEMAPHORE_SUCCESS == semaphore_ret))
         {
@@ -127,23 +119,10 @@ e_cellular_err_t cellular_execute_at_command(st_cellular_ctrl_t * const p_ctrl, 
         }
         else if (CELLULAR_ATC_ERR_TIMEOUT == atc_ret)
         {
-            CELLULAR_LOG_ERROR(("BG96 diag: AT command timeout command=%d expect=%d sci_err=%d atc=%s recv=%s\n",
-                                (int)command,
-                                (int)expect_code,
-                                (int)p_ctrl->sci_ctrl.sci_err_flg,
-                                p_ctrl->sci_ctrl.atc_buff,
-                                p_ctrl->sci_ctrl.receive_buff));
             ret = CELLULAR_ERR_MODULE_TIMEOUT;
         }
         else
         {
-            CELLULAR_LOG_ERROR(("BG96 diag: AT command compare/com failed command=%d expect=%d atc_ret=%d sci_err=%d atc=%s recv=%s\n",
-                                (int)command,
-                                (int)expect_code,
-                                (int)atc_ret,
-                                (int)p_ctrl->sci_ctrl.sci_err_flg,
-                                p_ctrl->sci_ctrl.atc_buff,
-                                p_ctrl->sci_ctrl.receive_buff));
             ret = CELLULAR_ERR_MODULE_COM;
         }
     }
@@ -264,12 +243,6 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
         timeout_ret = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
         if (CELLULAR_TIMEOUT == timeout_ret)
         {
-            CELLULAR_LOG_ERROR(("BG96 diag: AT response wait timeout expect=%d current_res=%d atc=%s recv=%s sci_err=%d\n",
-                                (int)expect_code,
-                                (int)res,
-                                p_ctrl->sci_ctrl.atc_buff,
-                                p_ctrl->sci_ctrl.receive_buff,
-                                (int)p_ctrl->sci_ctrl.sci_err_flg));
             ret = CELLULAR_ATC_ERR_TIMEOUT;
             break;
         }

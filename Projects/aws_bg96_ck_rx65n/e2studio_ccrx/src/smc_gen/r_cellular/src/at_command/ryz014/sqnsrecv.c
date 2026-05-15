@@ -26,7 +26,6 @@
  *********************************************************************************************************************/
 #include "at_command.h"
 #include "cellular_private_api.h"
-#include "cellular_freertos.h"
 
 /**********************************************************************************************************************
  * Macro definitions
@@ -70,20 +69,7 @@ e_cellular_err_t atc_sqnsrecv(st_cellular_ctrl_t * const p_ctrl, const uint8_t s
         (uint8_t)(socket_no - CELLULAR_START_SOCKET_NUMBER);
     p_ctrl->sci_ctrl.active_recv_request_size = (uint16_t)length;
 
-    CELLULAR_LOG_DEBUG(("BG96 diag: QIRD command enter socket=%u length=%ld sidx=%u pending=%d total=%lu.\n",
-                        (unsigned int)socket_no,
-                        (long)length,
-                        (unsigned int)p_ctrl->sci_ctrl.active_recv_socket,
-                        (int)p_ctrl->p_socket_ctrl[p_ctrl->sci_ctrl.active_recv_socket].receive_unprocessed_size,
-                        (unsigned long)p_ctrl->p_socket_ctrl[p_ctrl->sci_ctrl.active_recv_socket].total_recv_count));
     ret = cellular_execute_at_command(p_ctrl, p_ctrl->sci_ctrl.atc_timeout, ATC_RETURN_OK, ATC_RECV_SOCKET);
-    CELLULAR_LOG_DEBUG(("BG96 diag: QIRD command exit socket=%u length=%ld ret=%d pending=%d total=%lu sci_err=%d.\n",
-                        (unsigned int)socket_no,
-                        (long)length,
-                        (int)ret,
-                        (int)p_ctrl->p_socket_ctrl[p_ctrl->sci_ctrl.active_recv_socket].receive_unprocessed_size,
-                        (unsigned long)p_ctrl->p_socket_ctrl[p_ctrl->sci_ctrl.active_recv_socket].total_recv_count,
-                        (int)p_ctrl->sci_ctrl.sci_err_flg));
 
     return ret;
 }
