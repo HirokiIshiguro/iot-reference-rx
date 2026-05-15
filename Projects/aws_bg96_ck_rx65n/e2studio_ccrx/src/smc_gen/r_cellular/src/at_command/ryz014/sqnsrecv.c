@@ -26,7 +26,6 @@
  *********************************************************************************************************************/
 #include "at_command.h"
 #include "cellular_private_api.h"
-#include "cellular_freertos.h"
 
 /**********************************************************************************************************************
  * Macro definitions
@@ -70,14 +69,7 @@ e_cellular_err_t atc_sqnsrecv(st_cellular_ctrl_t * const p_ctrl, const uint8_t s
         (uint8_t)(socket_no - CELLULAR_START_SOCKET_NUMBER);
     p_ctrl->sci_ctrl.active_recv_request_size = (uint16_t)length;
 
-    CELLULAR_LOG_DEBUG(("BG96 QIRD exec start: socket=%u length=%ld.\n",
-                        (unsigned int)socket_no,
-                        (long)length));
     ret = cellular_execute_at_command(p_ctrl, p_ctrl->sci_ctrl.atc_timeout, ATC_RETURN_OK, ATC_RECV_SOCKET);
-    CELLULAR_LOG_DEBUG(("BG96 QIRD exec end: socket=%u length=%ld ret=%d.\n",
-                        (unsigned int)socket_no,
-                        (long)length,
-                        (int)ret));
 
     return ret;
 }
