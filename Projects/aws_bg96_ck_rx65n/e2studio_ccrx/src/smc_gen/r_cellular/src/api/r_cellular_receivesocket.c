@@ -256,12 +256,6 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
                 timeout              = cellular_check_timeout(p_cellular_timeout_ctrl);
                 if (CELLULAR_TIMEOUT == timeout)
                 {
-                    CELLULAR_LOG_ERROR(("BG96 receive data timeout after QIRD: socket=%u receive_size=%ld total=%ld pending=%d timeout_ms=%lu.\n",
-                                        (unsigned int)socket_no,
-                                        (long)receive_size,
-                                        (long)total_receive_length,
-                                        (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
-                                        (unsigned long)timeout_ms));
                     break; /* Break of the data receive loop */
                 }
 
