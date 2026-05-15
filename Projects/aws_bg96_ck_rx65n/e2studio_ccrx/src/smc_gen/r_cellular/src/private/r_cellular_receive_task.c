@@ -48,6 +48,7 @@
 #define CHAR_END        ('\0')
 #if defined(CELLULAR_TARGET_BG96)
 #define BG96_QIRD_READ_CHUNK_MAX   (256U)
+#define BG96_QIRD_TRAILER_MAX      (16U)
 #define BG96_QIRD_UNREAD_LIMIT     (32767)
 #define BG96_RECV_URC_COALESCE_DELAY_MS  (0U)
 #endif /* CELLULAR_TARGET_BG96 */
@@ -205,6 +206,7 @@ static bool cellular_bg96_qird_fast_drain (st_cellular_ctrl_t * p_ctrl,
                                            st_cellular_receive_t * cellular_receive,
                                            const int32_t length);
 static bool cellular_bg96_read_exact (st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst, uint16_t length);
+static bool cellular_bg96_read_one (st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst);
 static bool cellular_bg96_read_qird_trailer (st_cellular_ctrl_t * p_ctrl, const int32_t length);
 #endif /* CELLULAR_TARGET_BG96 */
 static void         cellular_system_state_change (st_cellular_ctrl_t * p_ctrl, int32_t stat);
@@ -1075,9 +1077,10 @@ static bool cellular_bg96_read_exact(st_cellular_ctrl_t * p_ctrl, uint8_t * p_ds
             timeout = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
             if (CELLULAR_TIMEOUT == timeout)
             {
-                CELLULAR_LOG_ERROR(("BG96 QIRD read_exact timeout: length=%u copied=%u.\n",
+                CELLULAR_LOG_ERROR(("BG96 QIRD read_exact timeout: length=%u copied=%u sci_err=%d.\n",
                                     (unsigned int)length,
-                                    (unsigned int)copied));
+                                    (unsigned int)copied,
+                                    (int)p_ctrl->sci_ctrl.sci_err_flg));
                 ret = false;
                 break;
             }
@@ -1100,10 +1103,11 @@ static bool cellular_bg96_read_exact(st_cellular_ctrl_t * p_ctrl, uint8_t * p_ds
         }
         else
         {
-            CELLULAR_LOG_ERROR(("BG96 QIRD read_exact receive failed: length=%u copied=%u avail=%u.\n",
+            CELLULAR_LOG_ERROR(("BG96 QIRD read_exact receive failed: length=%u copied=%u avail=%u sci_err=%d.\n",
                                 (unsigned int)length,
                                 (unsigned int)copied,
-                                (unsigned int)avail));
+                                (unsigned int)avail,
+                                (int)p_ctrl->sci_ctrl.sci_err_flg));
             ret = false;
             break;
         }
@@ -1116,38 +1120,49 @@ static bool cellular_bg96_read_exact(st_cellular_ctrl_t * p_ctrl, uint8_t * p_ds
  *********************************************************************************************************************/
 
 /***********************************************************************************************
+ * Function Name  @fn            cellular_bg96_read_one
+ * Description    @details       Read one queued SCI byte while sharing the active AT command timeout.
+ **********************************************************************************************/
+static bool cellular_bg96_read_one(st_cellular_ctrl_t * p_ctrl, uint8_t * p_dst)
+{
+    bool                       ret     = true;
+    e_cellular_timeout_check_t timeout = CELLULAR_NOT_TIMEOUT;
+
+    while (SCI_SUCCESS != R_SCI_Receive(p_ctrl->sci_ctrl.sci_hdl, p_dst, 1U))
+    {
+        timeout = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
+        if (CELLULAR_TIMEOUT == timeout)
+        {
+            ret = false;
+            break;
+        }
+    }
+
+    return ret;
+}
+/**********************************************************************************************************************
+ * End of function cellular_bg96_read_one
+ *********************************************************************************************************************/
+
+/***********************************************************************************************
  * Function Name  @fn            cellular_bg96_read_qird_trailer
  * Description    @details       Consume BG96 QIRD terminal CR/LF framing and OK.
  **********************************************************************************************/
 static bool cellular_bg96_read_qird_trailer(st_cellular_ctrl_t * p_ctrl, const int32_t length)
 {
-    static const uint8_t qird_trailer_with_payload[] =
-    {
-        CHAR_CHECK_7, CHAR_CHECK_4, CHAR_CHECK_7, CHAR_CHECK_4, 'O', 'K', CHAR_CHECK_7, CHAR_CHECK_4
-    };
-    static const uint8_t qird_trailer_without_payload[] =
-    {
-        CHAR_CHECK_7, CHAR_CHECK_4, 'O', 'K', CHAR_CHECK_7, CHAR_CHECK_4
-    };
-    const uint8_t * p_expected   = qird_trailer_without_payload;
-    uint16_t        expected_len = (uint16_t)sizeof(qird_trailer_without_payload);
-    uint8_t         trailer[sizeof(qird_trailer_with_payload)] = {0};
-    bool            ret          = false;
+    uint8_t  trailer[BG96_QIRD_TRAILER_MAX] = {0};
+    uint16_t count                          = 0;
+    uint16_t i                              = 0;
+    bool     ret                            = false;
 
-    if (length > 0)
+    while (count < BG96_QIRD_TRAILER_MAX)
     {
-        p_expected   = qird_trailer_with_payload;
-        expected_len = (uint16_t)sizeof(qird_trailer_with_payload);
-    }
-
-    if (true == cellular_bg96_read_exact(p_ctrl, trailer, expected_len))
-    {
-        ret = (0 == memcmp(trailer, p_expected, expected_len));
-        if (false == ret)
+        if (false == cellular_bg96_read_one(p_ctrl, &trailer[count]))
         {
-            CELLULAR_LOG_ERROR(("BG96 QIRD trailer mismatch: length=%ld expected_len=%u got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
+            CELLULAR_LOG_ERROR(("BG96 QIRD trailer timeout: length=%ld count=%u sci_err=%d got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
                                 (long)length,
-                                (unsigned int)expected_len,
+                                (unsigned int)count,
+                                (int)p_ctrl->sci_ctrl.sci_err_flg,
                                 (unsigned int)trailer[0],
                                 (unsigned int)trailer[1],
                                 (unsigned int)trailer[2],
@@ -1156,13 +1171,60 @@ static bool cellular_bg96_read_qird_trailer(st_cellular_ctrl_t * p_ctrl, const i
                                 (unsigned int)trailer[5],
                                 (unsigned int)trailer[6],
                                 (unsigned int)trailer[7]));
+            break;
+        }
+
+        count++;
+
+        if ((count >= 4U) &&
+            ('O' == trailer[count - 4U]) &&
+            ('K' == trailer[count - 3U]) &&
+            (CHAR_CHECK_7 == trailer[count - 2U]) &&
+            (CHAR_CHECK_4 == trailer[count - 1U]))
+        {
+            ret = true;
+
+            for (i = 0; i < (uint16_t)(count - 4U); i++)
+            {
+                if ((CHAR_CHECK_7 != trailer[i]) && (CHAR_CHECK_4 != trailer[i]))
+                {
+                    ret = false;
+                    break;
+                }
+            }
+
+            if (false == ret)
+            {
+                CELLULAR_LOG_ERROR(("BG96 QIRD trailer prefix mismatch: length=%ld count=%u got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
+                                    (long)length,
+                                    (unsigned int)count,
+                                    (unsigned int)trailer[0],
+                                    (unsigned int)trailer[1],
+                                    (unsigned int)trailer[2],
+                                    (unsigned int)trailer[3],
+                                    (unsigned int)trailer[4],
+                                    (unsigned int)trailer[5],
+                                    (unsigned int)trailer[6],
+                                    (unsigned int)trailer[7]));
+            }
+
+            break;
         }
     }
-    else
+
+    if ((false == ret) && (count >= BG96_QIRD_TRAILER_MAX))
     {
-        CELLULAR_LOG_ERROR(("BG96 QIRD trailer read_exact failed: length=%ld expected_len=%u.\n",
+        CELLULAR_LOG_ERROR(("BG96 QIRD trailer too long: length=%ld count=%u got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
                             (long)length,
-                            (unsigned int)expected_len));
+                            (unsigned int)count,
+                            (unsigned int)trailer[0],
+                            (unsigned int)trailer[1],
+                            (unsigned int)trailer[2],
+                            (unsigned int)trailer[3],
+                            (unsigned int)trailer[4],
+                            (unsigned int)trailer[5],
+                            (unsigned int)trailer[6],
+                            (unsigned int)trailer[7]));
     }
 
     return ret;

@@ -37,7 +37,7 @@
  *********************************************************************************************************************/
 #define CELLULAR_RECONNECT_TIMEOUT    (120000)
 #if defined(CELLULAR_TARGET_BG96)
-#define CELLULAR_BG96_QIRD_MAX_READ_SIZE   (1024)
+#define CELLULAR_BG96_QIRD_MAX_READ_SIZE   (1500)
 #define CELLULAR_BG96_QIRD_FRAME_MARGIN    (128U)
 #endif /* CELLULAR_TARGET_BG96 */
 
