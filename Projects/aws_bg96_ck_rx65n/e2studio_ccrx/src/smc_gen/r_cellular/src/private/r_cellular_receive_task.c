@@ -943,6 +943,25 @@ static bool cellular_bg96_qird_fast_drain(st_cellular_ctrl_t * p_ctrl,
         ((length > 0) && (NULL == p_ctrl->p_socket_ctrl[sidx].p_recv)) ||
         (length > (int32_t)requested_size))
     {
+        uint8_t p_recv_null_log = 1;
+        uint32_t total_log = 0;
+        int16_t pending_log = 0;
+
+        if (sidx < p_ctrl->creatable_socket)
+        {
+            p_recv_null_log = (NULL == p_ctrl->p_socket_ctrl[sidx].p_recv) ? 1U : 0U;
+            total_log = p_ctrl->p_socket_ctrl[sidx].total_recv_count;
+            pending_log = p_ctrl->p_socket_ctrl[sidx].receive_unprocessed_size;
+        }
+
+        CELLULAR_LOG_ERROR(("BG96 QIRD fast drain parameter error: sidx=%u creatable=%u length=%ld requested=%u p_recv_null=%u total=%lu pending=%d.\n",
+                            (unsigned int)sidx,
+                            (unsigned int)p_ctrl->creatable_socket,
+                            (long)length,
+                            (unsigned int)requested_size,
+                            (unsigned int)p_recv_null_log,
+                            (unsigned long)total_log,
+                            (int)pending_log));
         ret = false;
     }
 
@@ -961,11 +980,29 @@ static bool cellular_bg96_qird_fast_drain(st_cellular_ctrl_t * p_ctrl,
         {
             p_ctrl->p_socket_ctrl[sidx].total_recv_count += (uint32_t)length;
         }
+        else
+        {
+            CELLULAR_LOG_ERROR(("BG96 QIRD payload read failed: sidx=%u length=%ld requested=%u total=%lu pending=%ld.\n",
+                                (unsigned int)sidx,
+                                (long)length,
+                                (unsigned int)requested_size,
+                                (unsigned long)p_ctrl->p_socket_ctrl[sidx].total_recv_count,
+                                (long)pending_size));
+        }
     }
 
     if (true == ret)
     {
         ret = cellular_bg96_read_qird_trailer(p_ctrl, length);
+        if (false == ret)
+        {
+            CELLULAR_LOG_ERROR(("BG96 QIRD trailer read failed: sidx=%u length=%ld requested=%u total=%lu pending=%ld.\n",
+                                (unsigned int)sidx,
+                                (long)length,
+                                (unsigned int)requested_size,
+                                (unsigned long)p_ctrl->p_socket_ctrl[sidx].total_recv_count,
+                                (long)pending_size));
+        }
     }
 
     if (true == ret)
@@ -1026,6 +1063,9 @@ static bool cellular_bg96_read_exact(st_cellular_ctrl_t * p_ctrl, uint8_t * p_ds
                                          SCI_CMD_RX_Q_BYTES_AVAIL_TO_READ,
                                          &avail))
         {
+            CELLULAR_LOG_ERROR(("BG96 QIRD read_exact queue check failed: length=%u copied=%u.\n",
+                                (unsigned int)length,
+                                (unsigned int)copied));
             ret = false;
             break;
         }
@@ -1035,6 +1075,9 @@ static bool cellular_bg96_read_exact(st_cellular_ctrl_t * p_ctrl, uint8_t * p_ds
             timeout = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
             if (CELLULAR_TIMEOUT == timeout)
             {
+                CELLULAR_LOG_ERROR(("BG96 QIRD read_exact timeout: length=%u copied=%u.\n",
+                                    (unsigned int)length,
+                                    (unsigned int)copied));
                 ret = false;
                 break;
             }
@@ -1054,6 +1097,15 @@ static bool cellular_bg96_read_exact(st_cellular_ctrl_t * p_ctrl, uint8_t * p_ds
         if (SCI_SUCCESS == R_SCI_Receive(p_ctrl->sci_ctrl.sci_hdl, &p_dst[copied], avail))
         {
             copied = (uint16_t)(copied + avail);
+        }
+        else
+        {
+            CELLULAR_LOG_ERROR(("BG96 QIRD read_exact receive failed: length=%u copied=%u avail=%u.\n",
+                                (unsigned int)length,
+                                (unsigned int)copied,
+                                (unsigned int)avail));
+            ret = false;
+            break;
         }
     }
 
@@ -1091,6 +1143,26 @@ static bool cellular_bg96_read_qird_trailer(st_cellular_ctrl_t * p_ctrl, const i
     if (true == cellular_bg96_read_exact(p_ctrl, trailer, expected_len))
     {
         ret = (0 == memcmp(trailer, p_expected, expected_len));
+        if (false == ret)
+        {
+            CELLULAR_LOG_ERROR(("BG96 QIRD trailer mismatch: length=%ld expected_len=%u got=%02x %02x %02x %02x %02x %02x %02x %02x.\n",
+                                (long)length,
+                                (unsigned int)expected_len,
+                                (unsigned int)trailer[0],
+                                (unsigned int)trailer[1],
+                                (unsigned int)trailer[2],
+                                (unsigned int)trailer[3],
+                                (unsigned int)trailer[4],
+                                (unsigned int)trailer[5],
+                                (unsigned int)trailer[6],
+                                (unsigned int)trailer[7]));
+        }
+    }
+    else
+    {
+        CELLULAR_LOG_ERROR(("BG96 QIRD trailer read_exact failed: length=%ld expected_len=%u.\n",
+                            (long)length,
+                            (unsigned int)expected_len));
     }
 
     return ret;
