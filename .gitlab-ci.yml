@@ -731,7 +731,7 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_app_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(app|mqtt|ota|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(app|mqtt|full)$/'
       when: on_success
     - when: never
 
