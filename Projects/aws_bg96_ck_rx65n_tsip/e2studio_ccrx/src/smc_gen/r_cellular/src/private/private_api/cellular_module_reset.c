@@ -650,13 +650,6 @@ static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * c
     {
         CELLULAR_LOG_INFO(("BG96 UART flow control enabled (AT+IFC=2,2, host CTS=%u).",
                            CELLULAR_CFG_BG96_USE_HW_CTS));
-#if CELLULAR_CFG_BG96_USE_HW_CTS == 1
-        ret = cellular_serial_enable_cts(p_ctrl);
-        if (CELLULAR_SUCCESS == ret)
-        {
-            CELLULAR_LOG_INFO(("BG96 host hardware CTS enabled."));
-        }
-#endif
     }
     else
     {

@@ -84,7 +84,10 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     else
     {
         R_SCI_CFG_PINSET_CELLULAR_SERIAL();
-#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && !defined(CELLULAR_TARGET_BG96)
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
+        /* Enable SCI hardware CTS only when the target board wires BG96 CTS to
+         * the SCI CTS input. The default BG96 flow-control path keeps this
+         * disabled and uses host RTS to protect MCU receive. */
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
 #endif
 #if defined(__CCRX__) || defined(__ICCRX__) || defined(__RX__)
@@ -100,29 +103,6 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
 }
 /**********************************************************************************************************************
  * End of function cellular_serial_open
- *********************************************************************************************************************/
-
-/**********************************************************************************************
- * Function Name  @fn            cellular_serial_enable_cts
- *********************************************************************************************/
-e_cellular_err_t cellular_serial_enable_cts(st_cellular_ctrl_t * const p_ctrl)
-{
-#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96) && (CELLULAR_CFG_BG96_USE_HW_CTS == 1)
-    if ((NULL == p_ctrl) || (FIT_NO_PTR == p_ctrl) ||
-        (NULL == p_ctrl->sci_ctrl.sci_hdl) || (FIT_NO_PTR == p_ctrl->sci_ctrl.sci_hdl))
-    {
-        return CELLULAR_ERR_PARAMETER;
-    }
-
-    R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
-#else
-    (void)p_ctrl;
-#endif
-
-    return CELLULAR_SUCCESS;
-}
-/**********************************************************************************************************************
- * End of function cellular_serial_enable_cts
  *********************************************************************************************************************/
 
 /**********************************************************************************************
