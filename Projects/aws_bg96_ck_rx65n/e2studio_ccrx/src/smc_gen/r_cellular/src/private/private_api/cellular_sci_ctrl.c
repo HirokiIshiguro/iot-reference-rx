@@ -160,8 +160,10 @@ e_cellular_err_t cellular_serial_enable_cts(st_cellular_ctrl_t * const p_ctrl)
         return CELLULAR_ERR_MODULE_COM;
     }
 
-    cellular_bg96_cts_peripheral_input();
     R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
+    cellular_bg96_cts_peripheral_input();
+    CELLULAR_LOG_INFO(("BG96 CTS after SCI CTSE pin mode: %u.",
+                       CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN)));
 #else
     (void)p_ctrl;
 #endif
