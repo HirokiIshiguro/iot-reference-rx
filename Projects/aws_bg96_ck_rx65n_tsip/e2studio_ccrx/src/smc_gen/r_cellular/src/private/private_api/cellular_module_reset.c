@@ -632,9 +632,10 @@ static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * c
     uint32_t saved_atc_timeout = p_ctrl->sci_ctrl.atc_timeout;
 
     memset(p_ctrl->sci_ctrl.atc_buff, 0x00, CELLULAR_ATC_BUFF_SIZE);
-    /* BG96 rejects AT+IFC=2,0 on this path. Keep DCE->DTE enabled in the
-     * modem command so DCE_by_DTE=2 takes effect; CK-RX65N still ignores CTS
-     * when CELLULAR_CFG_BG96_USE_HW_CTS is 0. */
+    /* Enable both BG96 UART flow-control directions. The host-side SCI CTS
+     * input is enabled only after this command succeeds; before that the
+     * shared CTS6#/RTS6# pin is kept as GPIO input so the SCI default RTS
+     * output does not drive the BG96 CTS net. */
     (void) snprintf((char *)p_ctrl->sci_ctrl.atc_buff,
                     CELLULAR_ATC_BUFF_SIZE,
                     "AT+IFC=2,2\r");
@@ -650,6 +651,13 @@ static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * c
     {
         CELLULAR_LOG_INFO(("BG96 UART flow control enabled (AT+IFC=2,2, host CTS=%u).",
                            CELLULAR_CFG_BG96_USE_HW_CTS));
+#if CELLULAR_CFG_BG96_USE_HW_CTS == 1
+        ret = cellular_serial_enable_cts(p_ctrl);
+        if (CELLULAR_SUCCESS == ret)
+        {
+            CELLULAR_LOG_INFO(("BG96 host hardware CTS enabled."));
+        }
+#endif
     }
     else
     {

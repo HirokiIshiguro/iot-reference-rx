@@ -48,6 +48,28 @@
 static void cellular_uart_callback (void * const p_Args);
 
 /**********************************************************************************************
+ * Function Name  @fn            cellular_bg96_cts_gpio_input
+ *********************************************************************************************/
+static void cellular_bg96_cts_gpio_input(void)
+{
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96)
+    CELLULAR_SET_PMR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = 0;
+    CELLULAR_SET_PDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
+#endif
+}
+
+/**********************************************************************************************
+ * Function Name  @fn            cellular_bg96_cts_peripheral_input
+ *********************************************************************************************/
+static void cellular_bg96_cts_peripheral_input(void)
+{
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96)
+    CELLULAR_SET_PDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
+    CELLULAR_SET_PMR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = 1;
+#endif
+}
+
+/**********************************************************************************************
  * Function Name  @fn            cellular_serial_open
  *********************************************************************************************/
 e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
@@ -84,10 +106,13 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     else
     {
         R_SCI_CFG_PINSET_CELLULAR_SERIAL();
-#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
-        /* Enable SCI hardware CTS only when the target board wires BG96 CTS to
-         * the SCI CTS input. The default BG96 flow-control path keeps this
-         * disabled and uses host RTS to protect MCU receive. */
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96)
+        /* R_SCI_PinSet_SCI6 selects the shared CTS6#/RTS6# peripheral pin.
+         * Until CTSE is enabled the SCI driver treats that pin as RTS output,
+         * which can drive the BG96 CTS net. Keep it as a GPIO input until the
+         * modem has accepted AT+IFC and hardware CTS is explicitly enabled. */
+        cellular_bg96_cts_gpio_input();
+#elif (CELLULAR_CFG_CTS_SW_CTRL == 0)
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
 #endif
 #if defined(__CCRX__) || defined(__ICCRX__) || defined(__RX__)
@@ -103,6 +128,30 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
 }
 /**********************************************************************************************************************
  * End of function cellular_serial_open
+ *********************************************************************************************************************/
+
+/**********************************************************************************************
+ * Function Name  @fn            cellular_serial_enable_cts
+ *********************************************************************************************/
+e_cellular_err_t cellular_serial_enable_cts(st_cellular_ctrl_t * const p_ctrl)
+{
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96) && (CELLULAR_CFG_BG96_USE_HW_CTS == 1)
+    if ((NULL == p_ctrl) || (FIT_NO_PTR == p_ctrl) ||
+        (NULL == p_ctrl->sci_ctrl.sci_hdl) || (FIT_NO_PTR == p_ctrl->sci_ctrl.sci_hdl))
+    {
+        return CELLULAR_ERR_PARAMETER;
+    }
+
+    cellular_bg96_cts_peripheral_input();
+    R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
+#else
+    (void)p_ctrl;
+#endif
+
+    return CELLULAR_SUCCESS;
+}
+/**********************************************************************************************************************
+ * End of function cellular_serial_enable_cts
  *********************************************************************************************************************/
 
 /**********************************************************************************************
