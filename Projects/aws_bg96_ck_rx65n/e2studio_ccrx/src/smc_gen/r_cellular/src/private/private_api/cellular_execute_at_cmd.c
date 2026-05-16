@@ -35,16 +35,6 @@
 /**********************************************************************************************************************
  * Macro definitions
  *********************************************************************************************************************/
-#if defined(CELLULAR_TARGET_BG96) && !defined(CELLULAR_CFG_BG96_USE_HW_CTS)
-#define CELLULAR_CFG_BG96_USE_HW_CTS (0)
-#endif
-
-#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96) && (CELLULAR_CFG_BG96_USE_HW_CTS == 1)
-#define CELLULAR_BG96_HW_CTS_DIAG (1)
-#define CELLULAR_BG96_CTS_LEVEL() (CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN))
-#else
-#define CELLULAR_BG96_HW_CTS_DIAG (0)
-#endif
 
 /**********************************************************************************************************************
  * Typedef definitions
@@ -108,18 +98,10 @@ e_cellular_err_t cellular_execute_at_command(st_cellular_ctrl_t * const p_ctrl, 
         cellular_timeout_init(&p_ctrl->sci_ctrl.timeout_ctrl, timeout_ms);
         cellular_set_atc_number(p_ctrl, command);
         atc_ret = cellular_send_atc(p_ctrl);
-#if CELLULAR_BG96_HW_CTS_DIAG == 1
-        CELLULAR_LOG_INFO(("BG96 AT command %d send result=%d CTS=%u.",
-                           command, atc_ret, CELLULAR_BG96_CTS_LEVEL()));
-#endif
 
         if (CELLULAR_ATC_OK == atc_ret)
         {
             atc_ret = cellular_res_check(p_ctrl, expect_code);
-#if CELLULAR_BG96_HW_CTS_DIAG == 1
-            CELLULAR_LOG_INFO(("BG96 AT command %d response result=%d CTS=%u.",
-                               command, atc_ret, CELLULAR_BG96_CTS_LEVEL()));
-#endif
         }
 
         if ((CELLULAR_PSM_ACTIVE == p_ctrl->ring_ctrl.psm) && (CELLULAR_SEMAPHORE_SUCCESS == semaphore_ret))
@@ -168,16 +150,10 @@ static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
     e_cellular_err_atc_t       ret         = CELLULAR_ATC_OK;
     e_cellular_timeout_check_t timeout_ret = CELLULAR_NOT_TIMEOUT;
 #if CELLULAR_CFG_CTS_SW_CTRL == 0
-    uint16_t                   length      = 0;
-
     p_ctrl->sci_ctrl.tx_end_flg = CELLULAR_TX_END_FLAG_OFF;
-    length = (uint16_t)strlen((const char *)p_ctrl->sci_ctrl.atc_buff); // (uint8_t[])->(char*)
 
-#if CELLULAR_BG96_HW_CTS_DIAG == 1
-    CELLULAR_LOG_INFO(("BG96 AT send start len=%u CTS=%u.", length, CELLULAR_BG96_CTS_LEVEL()));
-#endif
-
-    sci_ret = R_SCI_Send(p_ctrl->sci_ctrl.sci_hdl, p_ctrl->sci_ctrl.atc_buff, length);
+    sci_ret = R_SCI_Send(p_ctrl->sci_ctrl.sci_hdl, p_ctrl->sci_ctrl.atc_buff,
+                            (uint16_t)strlen((const char *)p_ctrl->sci_ctrl.atc_buff)); // (uint8_t[])->(char*)
 
     if (SCI_SUCCESS == sci_ret)
     {
@@ -193,25 +169,13 @@ static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
             if (CELLULAR_TIMEOUT == timeout_ret)
             {
                 ret = CELLULAR_ATC_ERR_TIMEOUT;
-#if CELLULAR_BG96_HW_CTS_DIAG == 1
-                CELLULAR_LOG_ERROR(("BG96 AT send timeout CTS=%u.", CELLULAR_BG96_CTS_LEVEL()));
-#endif
                 break;
             }
         }
-#if CELLULAR_BG96_HW_CTS_DIAG == 1
-        if (CELLULAR_ATC_OK == ret)
-        {
-            CELLULAR_LOG_INFO(("BG96 AT send done CTS=%u.", CELLULAR_BG96_CTS_LEVEL()));
-        }
-#endif
     }
     else
     {
         ret = CELLULAR_ATC_ERR_MODULE_COM;
-#if CELLULAR_BG96_HW_CTS_DIAG == 1
-        CELLULAR_LOG_ERROR(("BG96 R_SCI_Send failed ret=%d CTS=%u.", sci_ret, CELLULAR_BG96_CTS_LEVEL()));
-#endif
     }
 #else
     length = strlen((const char *)p_ctrl->sci_ctrl.atc_buff);   // (&uint8_t[])->(char*)
