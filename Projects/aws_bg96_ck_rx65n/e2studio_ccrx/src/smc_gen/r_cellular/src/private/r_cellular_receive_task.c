@@ -51,7 +51,6 @@
 #define BG96_QIRD_TRAILER_MAX      (16U)
 #define BG96_QIRD_UNREAD_LIMIT     (32767)
 #define BG96_RECV_URC_COALESCE_DELAY_MS  (0U)
-#define BG96_RECV_TASK_BYTE_BUDGET        (256U)
 #endif /* CELLULAR_TARGET_BG96 */
 
 /**********************************************************************************************************************
@@ -288,9 +287,6 @@ void cellular_recv_task(ULONG p_pvParameters)
 
     sci_err_t             sci_ret          = SCI_SUCCESS;
     st_cellular_receive_t cellular_receive = {0,0,CELLULAR_RES_NONE,JOB_STATUS_NONE,0,0,0};
-#if defined(CELLULAR_TARGET_BG96) && (BSP_CFG_RTOS_USED == (1))
-    uint16_t              continuous_rx_count = 0U;
-#endif
 
     memset(p_ctrl->sci_ctrl.receive_buff, 0, sizeof(p_ctrl->sci_ctrl.receive_buff));
 
@@ -303,9 +299,6 @@ void cellular_recv_task(ULONG p_pvParameters)
         sci_ret = R_SCI_Receive(p_ctrl->sci_ctrl.sci_hdl, &cellular_receive.data, 1);
         if (SCI_SUCCESS != sci_ret)
         {
-#if defined(CELLULAR_TARGET_BG96) && (BSP_CFG_RTOS_USED == (1))
-            continuous_rx_count = 0U;
-#endif
 #if BSP_CFG_RTOS_USED == (1)
             if ((0U != cellular_receive.recv_count) ||
                 (JOB_STATUS_NONE != cellular_receive.job_status) ||
@@ -335,14 +328,6 @@ void cellular_recv_task(ULONG p_pvParameters)
                 cellular_receive.recv_count++;
             }
             (* p_cellular_recvtask_api[cellular_receive.job_no])(p_ctrl, &cellular_receive);
-#if defined(CELLULAR_TARGET_BG96) && (BSP_CFG_RTOS_USED == (1))
-            continuous_rx_count++;
-            if (continuous_rx_count >= BG96_RECV_TASK_BYTE_BUDGET)
-            {
-                continuous_rx_count = 0U;
-                vTaskDelay(1);
-            }
-#endif
         }
         if (CELLULAR_MODULE_OPERATING_RESET == p_ctrl->module_status)
         {
