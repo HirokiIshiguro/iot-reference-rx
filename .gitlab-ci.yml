@@ -737,7 +737,7 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_provision_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|full)$/'
       when: on_success
     - when: never
 
@@ -1365,7 +1365,7 @@ provision_rx65n_bg96_ota_signer:
       artifacts: true
     - job: download_rx65n_bg96_app
       artifacts: true
-    - job: provision_rx65n_bg96_mqtt
+    - job: prepare_rx65n_bg96_mqtt_credentials
       artifacts: true
   script:
     - echo "=== Provision CK-RX65N BG96 OTA signer certificate ==="
@@ -1387,7 +1387,59 @@ provision_rx65n_bg96_ota_signer:
         exit 1
       fi
 
+      credential_dir="$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials"
+      if [ -f "$credential_dir/iot_credentials_meta.json" ]; then
+        export RX65N_BG96_AWS_IOT_THING_NAME="$(tr -d '\r\n' < "$credential_dir/thing_name.txt")"
+        export AWS_IOT_CERT="$credential_dir/certificate.pem"
+        export AWS_IOT_PRIVKEY="$credential_dir/private_key.pem"
+        if [ -z "${AWS_IOT_ENDPOINT:-}" ] && [ -f "$credential_dir/endpoint.txt" ]; then
+          export AWS_IOT_ENDPOINT="$(tr -d '\r\n' < "$credential_dir/endpoint.txt")"
+        fi
+        echo "Using temporary BG96 AWS IoT credentials from $credential_dir"
+      fi
+
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      bg96_provision_args=(
+        --action provision-mqtt
+        --uart-port "${uart_port}"
+        --baud "${RX65N_BG96_UART_BAUD_RATE}"
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}"
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}"
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}"
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}"
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}"
+        --rfp-tool "${rfp_tool}"
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}"
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}"
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}"
+        --no-reset-after-provision
+      )
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        bg96_provision_args+=(--skip-private-key)
+      fi
+
+      python3 tools/bg96_bootloader_integration.py "${bg96_provision_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_mqtt_for_ota.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        python3 tools/provision_tsip_over_uart.py \
+          --target rx65n \
+          --port "${uart_port}" \
+          --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+          --chunk-size "${RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          2>&1 | tee "$artifact_dir/provision_tsip_for_ota.log"
+        status="${PIPESTATUS[0]}"
+        if [ "$status" -ne 0 ]; then
+          exit "$status"
+        fi
+      fi
+
       if [ -n "${RX65N_BG96_OTA_CODE_SIGNING_CERT:-}" ]; then
         code_signer_cert="${RX65N_BG96_OTA_CODE_SIGNING_CERT}"
       elif [ -n "${AWS_IOT_CODE_SIGNING_CERT_PEM_FILE_CK_RX65N_01:-}" ]; then
