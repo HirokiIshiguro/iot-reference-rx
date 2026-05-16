@@ -136,10 +136,28 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
 e_cellular_err_t cellular_serial_enable_cts(st_cellular_ctrl_t * const p_ctrl)
 {
 #if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96) && (CELLULAR_CFG_BG96_USE_HW_CTS == 1)
+    uint32_t wait_ms = 0;
+
     if ((NULL == p_ctrl) || (FIT_NO_PTR == p_ctrl) ||
         (NULL == p_ctrl->sci_ctrl.sci_hdl) || (FIT_NO_PTR == p_ctrl->sci_ctrl.sci_hdl))
     {
         return CELLULAR_ERR_PARAMETER;
+    }
+
+    while ((0 != CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN)) && (wait_ms < 1000U))
+    {
+        cellular_delay_task(10U);
+        wait_ms += 10U;
+    }
+
+    CELLULAR_LOG_INFO(("BG96 CTS GPIO before SCI CTSE: %u after %lu ms.",
+                       CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN),
+                       (unsigned long)wait_ms));
+
+    if (0 != CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN))
+    {
+        CELLULAR_LOG_ERROR(("BG96 CTS did not assert low; SCI CTSE is not enabled."));
+        return CELLULAR_ERR_MODULE_COM;
     }
 
     cellular_bg96_cts_peripheral_input();
