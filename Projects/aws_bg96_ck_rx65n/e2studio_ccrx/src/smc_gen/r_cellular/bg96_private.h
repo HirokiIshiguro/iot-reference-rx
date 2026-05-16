@@ -52,10 +52,11 @@
 #define CELLULAR_TX_TIMEOUT             (10)        /* Transmit timeout (0.1sec,0~255,0=no_limit) */
 /* CBT's BG96 AT path is stable when the module is first opened at the factory
  * default 115200 bps. After ATE0 confirms communication, the driver upgrades
- * the module and host SCI to 921600 bps for runtime traffic. */
+ * the module and host SCI to 460800 bps for runtime traffic. This stays above
+ * the expected Cat-M1 throughput while reducing SCI overrun risk on RX65N SCI6. */
 #define CELLULAR_BAUDRATE_FACTORY       (115200)    /* BG96 factory default */
 #define CELLULAR_BAUDRATE               (115200)    /* Initial host SCI baud */
-#define CELLULAR_BAUDRATE_TARGET        (921600)    /* Runtime BG96 AT UART baud */
+#define CELLULAR_BAUDRATE_TARGET        (460800)    /* Runtime BG96 AT UART baud */
 #define CELLULAR_BAUDRATE_PERSIST_NV    (0)         /* 1: save target baud with AT&W */
 #define CELLULAR_CREATABLE_SOCKETS      (6)         /* Number of sockets to create (1~6) */
 #define CELLULAR_MAX_TX_SIZE            (1460)      /* BG96 AT+QISEND max payload per transmission */
