@@ -106,34 +106,43 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
     open_phase |= PHASE_1;
 #endif
 
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: config init start."));
     ret = cellular_config_init(p_ctrl, p_cfg);
     if (CELLULAR_SUCCESS != ret)
     {
         goto R_CELLULAR_Open_fail;
     }
     open_phase |= PHASE_2;
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: config init complete."));
 
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: serial open start."));
     ret = cellular_serial_open(p_ctrl);
     if (CELLULAR_SUCCESS != ret)
     {
         goto R_CELLULAR_Open_fail;
     }
     open_phase |= PHASE_3;
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: serial open complete."));
 
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: semaphore init start."));
     ret = cellular_semaphore_init(p_ctrl);
     if (CELLULAR_SUCCESS != ret)
     {
         goto R_CELLULAR_Open_fail;
     }
     open_phase |= PHASE_4;
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: semaphore init complete."));
 
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task start."));
     ret = cellular_start_recv_task(p_ctrl);
     if (CELLULAR_SUCCESS != ret)
     {
         goto R_CELLULAR_Open_fail;
     }
     open_phase |= PHASE_5;
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task created."));
 
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task sync start."));
     if ((CELLULAR_MAIN_TASK_BIT | CELLULAR_RECV_TASK_BIT) !=
             cellular_synchro_event_group(p_ctrl->eventgroup, CELLULAR_MAIN_TASK_BIT,
                 (CELLULAR_MAIN_TASK_BIT | CELLULAR_RECV_TASK_BIT), CELLULAR_TIME_WAIT_TASK_START))
@@ -141,13 +150,17 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
         ret = CELLULAR_ERR_CREATE_TASK;
         goto R_CELLULAR_Open_fail;
     }
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task sync complete."));
 
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: module reset start."));
     ret = cellular_module_reset(p_ctrl);
     if (CELLULAR_SUCCESS != ret)
     {
         goto R_CELLULAR_Open_fail;
     }
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: module reset complete."));
 
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: module init start."));
     ret = cellular_init(p_ctrl, p_cfg);
     if (CELLULAR_SUCCESS != ret)
     {
