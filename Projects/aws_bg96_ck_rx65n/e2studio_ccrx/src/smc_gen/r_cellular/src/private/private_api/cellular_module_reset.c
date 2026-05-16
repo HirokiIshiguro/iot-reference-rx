@@ -630,13 +630,14 @@ static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * c
 #if CELLULAR_CFG_BG96_FLOW_CONTROL == 1
     e_cellular_err_t ret = CELLULAR_SUCCESS;
     uint32_t saved_atc_timeout = p_ctrl->sci_ctrl.atc_timeout;
-    uint8_t dte_by_dce_flow = (CELLULAR_CFG_BG96_USE_HW_CTS == 1) ? 2U : 0U;
 
     memset(p_ctrl->sci_ctrl.atc_buff, 0x00, CELLULAR_ATC_BUFF_SIZE);
+    /* BG96 rejects AT+IFC=2,0 on this path. Keep DCE->DTE enabled in the
+     * modem command so DCE_by_DTE=2 takes effect; CK-RX65N still ignores CTS
+     * when CELLULAR_CFG_BG96_USE_HW_CTS is 0. */
     (void) snprintf((char *)p_ctrl->sci_ctrl.atc_buff,
                     CELLULAR_ATC_BUFF_SIZE,
-                    "AT+IFC=2,%u\r",
-                    dte_by_dce_flow);
+                    "AT+IFC=2,2\r");
 
     p_ctrl->sci_ctrl.atc_timeout = 3000U;
     ret = cellular_execute_at_command(p_ctrl,
@@ -647,11 +648,12 @@ static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * c
 
     if (CELLULAR_SUCCESS == ret)
     {
-        CELLULAR_LOG_INFO(("BG96 UART flow control enabled (AT+IFC=2,%u).", dte_by_dce_flow));
+        CELLULAR_LOG_INFO(("BG96 UART flow control enabled (AT+IFC=2,2, host CTS=%u).",
+                           CELLULAR_CFG_BG96_USE_HW_CTS));
     }
     else
     {
-        CELLULAR_LOG_ERROR(("BG96 AT+IFC=2,%u failed (ret=%d).", dte_by_dce_flow, ret));
+        CELLULAR_LOG_ERROR(("BG96 AT+IFC=2,2 failed (ret=%d).", ret));
     }
 
     return ret;
