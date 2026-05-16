@@ -49,6 +49,10 @@
 #define CELLULAR_CFG_BG96_FLOW_CONTROL (1)
 #endif
 
+#if defined(CELLULAR_TARGET_BG96) && !defined(CELLULAR_CFG_BG96_USE_HW_CTS)
+#define CELLULAR_CFG_BG96_USE_HW_CTS (0)
+#endif
+
 /**********************************************************************************************************************
  * Typedef definitions
  *********************************************************************************************************************/
@@ -626,11 +630,13 @@ static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * c
 #if CELLULAR_CFG_BG96_FLOW_CONTROL == 1
     e_cellular_err_t ret = CELLULAR_SUCCESS;
     uint32_t saved_atc_timeout = p_ctrl->sci_ctrl.atc_timeout;
+    uint8_t dte_by_dce_flow = (CELLULAR_CFG_BG96_USE_HW_CTS == 1) ? 2U : 0U;
 
     memset(p_ctrl->sci_ctrl.atc_buff, 0x00, CELLULAR_ATC_BUFF_SIZE);
     (void) snprintf((char *)p_ctrl->sci_ctrl.atc_buff,
                     CELLULAR_ATC_BUFF_SIZE,
-                    "AT+IFC=2,2\r");
+                    "AT+IFC=2,%u\r",
+                    dte_by_dce_flow);
 
     p_ctrl->sci_ctrl.atc_timeout = 3000U;
     ret = cellular_execute_at_command(p_ctrl,
@@ -641,11 +647,11 @@ static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * c
 
     if (CELLULAR_SUCCESS == ret)
     {
-        CELLULAR_LOG_INFO(("BG96 UART hardware flow control enabled."));
+        CELLULAR_LOG_INFO(("BG96 UART flow control enabled (AT+IFC=2,%u).", dte_by_dce_flow));
     }
     else
     {
-        CELLULAR_LOG_ERROR(("BG96 AT+IFC=2,2 failed (ret=%d).", ret));
+        CELLULAR_LOG_ERROR(("BG96 AT+IFC=2,%u failed (ret=%d).", dte_by_dce_flow, ret));
     }
 
     return ret;

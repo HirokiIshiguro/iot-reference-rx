@@ -59,6 +59,11 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     uint8_t          priority = CELLULAR_CFG_SCI_PRIORITY - 1;
 #endif
 
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
+    CELLULAR_SET_PMR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = 0;
+    CELLULAR_SET_PDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
+#endif
+
     p_ctrl->sci_ctrl.tx_buff_size   = R_SCI_CFG_TX_BUFSIZE;
     p_ctrl->sci_ctrl.rx_buff_size   = R_SCI_CFG_RX_BUFSIZE;
     sci_cfg.async.baud_rate         = p_ctrl->sci_ctrl.baud_rate;
@@ -78,6 +83,7 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     }
     else
     {
+        R_SCI_CFG_PINSET_CELLULAR_SERIAL();
 #if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
         /* Enable SCI hardware CTS only when the target board wires BG96 CTS to
          * the SCI CTS input. The default BG96 flow-control path keeps this
@@ -87,7 +93,6 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
 #if defined(__CCRX__) || defined(__ICCRX__) || defined(__RX__)
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_SET_TXI_PRIORITY, &priority);
 #endif
-        R_SCI_CFG_PINSET_CELLULAR_SERIAL();
 #if CELLULAR_CFG_CTS_SW_CTRL == 0
         CELLULAR_SET_PODR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = 0;
         CELLULAR_SET_PDR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN)  = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
