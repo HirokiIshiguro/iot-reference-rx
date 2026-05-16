@@ -1357,7 +1357,7 @@
                 <gridItem id="CELLULAR_CFG_CTS_PORT" selectedIndex="18"/>
                 <gridItem id="CELLULAR_CFG_CTS_PIN" selectedIndex="3"/>
                 <gridItem id="CELLULAR_CFG_PFS_SET_VALUE" selectedIndex="0x0BU"/>
-                <gridItem id="CELLULAR_CFG_BG96_USE_HW_CTS" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_BG96_USE_HW_CTS" selectedIndex="1"/>
                 <gridItem id="CELLULAR_CFG_BG96_FLOW_CONTROL" selectedIndex="1"/>
                 <gridItem id="CELLULAR_CFG_RTS_PORT" selectedIndex="0"/>
                 <gridItem id="CELLULAR_CFG_RTS_PIN" selectedIndex="2"/>
