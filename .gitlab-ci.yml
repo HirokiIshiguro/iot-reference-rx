@@ -743,7 +743,7 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_mqtt_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(mqtt|ota|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(mqtt|full)$/'
       when: on_success
     - when: never
 
@@ -1097,6 +1097,8 @@ provision_rx65n_bg96_mqtt:
       )
       if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
         bg96_provision_args+=(--skip-private-key --no-reset-after-provision)
+      elif [ "${RX65N_BG96_TEST_SCOPE}" = "ota" ]; then
+        bg96_provision_args+=(--no-reset-after-provision)
       fi
 
       python3 tools/bg96_bootloader_integration.py "${bg96_provision_args[@]}" \
@@ -1258,8 +1260,6 @@ build_rx65n_bg96_ota:
   needs:
     - job: prepare_rx65n_bg96_mqtt_credentials
       artifacts: true
-    - job: test_rx65n_bg96_mqtt
-      artifacts: true
   script:
     - $ErrorActionPreference = "Stop"
     - python -m pip install --user cryptography
@@ -1365,7 +1365,7 @@ provision_rx65n_bg96_ota_signer:
       artifacts: true
     - job: download_rx65n_bg96_app
       artifacts: true
-    - job: test_rx65n_bg96_mqtt
+    - job: provision_rx65n_bg96_mqtt
       artifacts: true
   script:
     - echo "=== Provision CK-RX65N BG96 OTA signer certificate ==="
