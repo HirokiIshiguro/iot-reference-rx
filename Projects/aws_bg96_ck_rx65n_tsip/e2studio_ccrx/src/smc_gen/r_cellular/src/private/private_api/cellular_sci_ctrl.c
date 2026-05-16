@@ -79,9 +79,9 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     else
     {
 #if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
-        /* Enable SCI hardware CTS unless the target board lacks a real CTS pin
-         * (CBT SCI5 case). The CK-RX65N experiment board uses SCI6/PJ3 and
-         * can consume BG96 CTS directly in hardware. */
+        /* Enable SCI hardware CTS only when the target board wires BG96 CTS to
+         * the SCI CTS input. The default BG96 flow-control path keeps this
+         * disabled and uses host RTS to protect MCU receive. */
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
 #endif
 #if defined(__CCRX__) || defined(__ICCRX__) || defined(__RX__)
