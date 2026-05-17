@@ -92,6 +92,11 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
     e_cellular_err_semaphore_t         semaphore_ret = CELLULAR_SEMAPHORE_ERR_TAKE;
     volatile e_cellular_auto_connect_t type          = CELLULAR_DISABLE_AUTO_CONNECT;
 
+    CELLULAR_LOG_INFO(("cellular_module_reset: entry sockets=%u state=%u status=%u.",
+                       (unsigned int)p_ctrl->creatable_socket,
+                       (unsigned int)p_ctrl->system_state,
+                       (unsigned int)p_ctrl->module_status));
+
     /* WAIT_LOOP */
     for (cnt = CELLULAR_START_SOCKET_NUMBER; cnt <= p_ctrl->creatable_socket; cnt++)
     {
@@ -101,12 +106,14 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
             cnt = p_ctrl->creatable_socket;
         }
     }
+    CELLULAR_LOG_INFO(("cellular_module_reset: socket shutdown cleanup complete ret=%d.", ret));
 
     /* WAIT_LOOP */
     for (cnt = CELLULAR_START_SOCKET_NUMBER; cnt <= p_ctrl->creatable_socket; cnt++)
     {
         ret = cellular_closesocket(p_ctrl, (uint8_t)cnt);       //cast
     }
+    CELLULAR_LOG_INFO(("cellular_module_reset: socket close cleanup complete ret=%d.", ret));
 
     if (CELLULAR_PSM_ACTIVE == p_ctrl->ring_ctrl.psm)
     {
@@ -145,7 +152,10 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 #if defined(CELLULAR_TARGET_BG96)
     (void) type;
     p_ctrl->recv_data = NULL;
+    CELLULAR_LOG_INFO(("cellular_module_reset: BG96 pin prepare start."));
     cellular_bg96_prepare_pins();
+    CELLULAR_LOG_INFO(("cellular_module_reset: BG96 pin prepare complete status=%u.",
+                       (unsigned int)cellular_bg96_status_is_running()));
     p_ctrl->module_status    = CELLULAR_MODULE_OPERATING_RESET;
     p_ctrl->sci_ctrl.atc_flg = CELLULAR_ATC_RESPONSE_CONFIRMED;
 
@@ -159,14 +169,21 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
         }
     }
 
+    CELLULAR_LOG_INFO(("cellular_module_reset: AT semaphore take start."));
     semaphore_ret = cellular_take_semaphore(p_ctrl->at_semaphore);
+    CELLULAR_LOG_INFO(("cellular_module_reset: AT semaphore take result=%d.", semaphore_ret));
     if (CELLULAR_SEMAPHORE_SUCCESS != semaphore_ret)
     {
         p_ctrl->recv_data = NULL;
         return CELLULAR_ERR_OTHER_ATCOMMAND_RUNNING;
     }
 
+    CELLULAR_LOG_INFO(("cellular_module_reset: quick ATE0 start baud=%lu.",
+                       (unsigned long)p_ctrl->sci_ctrl.baud_rate));
     ret = cellular_bg96_quick_ate0(p_ctrl, 3000u);
+    CELLULAR_LOG_INFO(("cellular_module_reset: quick ATE0 result=%d baud=%lu.",
+                       ret,
+                       (unsigned long)p_ctrl->sci_ctrl.baud_rate));
 
     if (CELLULAR_SUCCESS != ret)
     {

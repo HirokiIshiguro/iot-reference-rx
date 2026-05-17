@@ -152,8 +152,11 @@ static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
 #if CELLULAR_CFG_CTS_SW_CTRL == 0
     p_ctrl->sci_ctrl.tx_end_flg = CELLULAR_TX_END_FLAG_OFF;
 
+    CELLULAR_LOG_INFO(("cellular_send_atc: R_SCI_Send start len=%u.",
+                       (unsigned int)strlen((const char *)p_ctrl->sci_ctrl.atc_buff)));
     sci_ret = R_SCI_Send(p_ctrl->sci_ctrl.sci_hdl, p_ctrl->sci_ctrl.atc_buff,
                             (uint16_t)strlen((const char *)p_ctrl->sci_ctrl.atc_buff)); // (uint8_t[])->(char*)
+    CELLULAR_LOG_INFO(("cellular_send_atc: R_SCI_Send returned %d.", (int)sci_ret));
 
     if (SCI_SUCCESS == sci_ret)
     {
@@ -168,13 +171,19 @@ static e_cellular_err_atc_t cellular_send_atc(st_cellular_ctrl_t * const p_ctrl)
             timeout_ret = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
             if (CELLULAR_TIMEOUT == timeout_ret)
             {
+                CELLULAR_LOG_ERROR(("cellular_send_atc: TX completion timed out."));
                 ret = CELLULAR_ATC_ERR_TIMEOUT;
                 break;
             }
         }
+        if (CELLULAR_TX_END_FLAG_ON == p_ctrl->sci_ctrl.tx_end_flg)
+        {
+            CELLULAR_LOG_INFO(("cellular_send_atc: TX completion observed."));
+        }
     }
     else
     {
+        CELLULAR_LOG_ERROR(("cellular_send_atc: R_SCI_Send failed."));
         ret = CELLULAR_ATC_ERR_MODULE_COM;
     }
 #else
@@ -226,6 +235,7 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
 #if BSP_CFG_RTOS_USED == (1)
     cellular_prepare_atc_wait(p_ctrl);
 #endif
+    CELLULAR_LOG_INFO(("cellular_res_check: wait start expect=%d.", (int)expect_code));
 
     /* WAIT_LOOP */
     while (1)
@@ -233,6 +243,7 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
         res = cellular_get_atc_response(p_ctrl);
         if (ATC_RETURN_NONE != res)
         {
+            CELLULAR_LOG_INFO(("cellular_res_check: response=%d.", (int)res));
             if (res != expect_code)
             {
                 ret = CELLULAR_ATC_ERR_COMPARE;
@@ -243,6 +254,7 @@ static e_cellular_err_atc_t cellular_res_check(st_cellular_ctrl_t * const p_ctrl
         timeout_ret = cellular_check_timeout(&p_ctrl->sci_ctrl.timeout_ctrl);
         if (CELLULAR_TIMEOUT == timeout_ret)
         {
+            CELLULAR_LOG_ERROR(("cellular_res_check: response timed out."));
             ret = CELLULAR_ATC_ERR_TIMEOUT;
             break;
         }
