@@ -42,7 +42,7 @@
 #define BG96_BOOT_URC_QUIET_MS      (3000U)
 #define BG96_PWRKEY_PULSE_MS        (700U)
 #define BG96_RESET_PULSE_MS         (300U)
-#define BG96_PWRKEY_SHUTDOWN_WAIT_MS  (8000U)
+#define BG96_PWRKEY_SHUTDOWN_WAIT_MS  (65000U)
 #define BG96_PWRKEY_RESTART_GUARD_MS  (1000U)
 
 #if defined(CELLULAR_TARGET_BG96) && !defined(CELLULAR_CFG_BG96_FLOW_CONTROL)
@@ -202,8 +202,8 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 
     if (CELLULAR_SUCCESS != ret)
     {
-        CELLULAR_LOG_INFO(("ATE0 probes failed - issuing BG96 control pulse."));
-        ret = cellular_bg96_ensure_running(p_ctrl);
+        CELLULAR_LOG_INFO(("ATE0 probes failed - issuing BG96 PWRKEY recovery."));
+        ret = cellular_bg96_pwrkey_recovery(p_ctrl);
         if (CELLULAR_SUCCESS == ret)
         {
             ret = cellular_bg96_wait_ready_ate0(p_ctrl, BG96_READY_WAIT_MS);
@@ -227,8 +227,8 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 
     if (CELLULAR_SUCCESS != ret)
     {
-        CELLULAR_LOG_INFO(("BG96 still silent after status-based recovery - issuing PWRKEY fallback pulse."));
-        ret = cellular_bg96_pwrkey_recovery(p_ctrl);
+        CELLULAR_LOG_INFO(("BG96 still silent after PWRKEY recovery - issuing RESET_N fallback pulse."));
+        ret = cellular_bg96_reset_n_recovery(p_ctrl);
         if (CELLULAR_SUCCESS == ret)
         {
             ret = cellular_bg96_wait_ready_ate0(p_ctrl, BG96_READY_WAIT_MS);
@@ -237,7 +237,7 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 #if CELLULAR_BAUDRATE_TARGET != CELLULAR_BAUDRATE
         if (CELLULAR_SUCCESS != ret)
         {
-            CELLULAR_LOG_INFO(("ATE0 after PWRKEY fallback at %lu bps timed out - probing %lu bps.",
+            CELLULAR_LOG_INFO(("ATE0 after RESET_N fallback at %lu bps timed out - probing %lu bps.",
                                (unsigned long)p_ctrl->sci_ctrl.baud_rate,
                                (unsigned long)CELLULAR_BAUDRATE_TARGET));
             ret = cellular_serial_reopen(p_ctrl, CELLULAR_BAUDRATE_TARGET);
@@ -497,7 +497,10 @@ static e_cellular_err_t cellular_bg96_pwrkey_recovery(st_cellular_ctrl_t * const
         }
         else
         {
-            CELLULAR_LOG_INFO(("BG96 PWRKEY fallback did not observe STATUS stopped."));
+            CELLULAR_LOG_ERROR(("BG96 PWRKEY fallback did not observe STATUS stopped."));
+            p_ctrl->sci_ctrl.baud_rate = CELLULAR_BAUDRATE;
+            (void) cellular_serial_open(p_ctrl);
+            return CELLULAR_ERR_RECV_TASK;
         }
     }
 
