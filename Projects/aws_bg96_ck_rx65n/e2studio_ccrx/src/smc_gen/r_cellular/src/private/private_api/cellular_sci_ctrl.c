@@ -81,6 +81,9 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     uint8_t          priority = CELLULAR_CFG_SCI_PRIORITY - 1;
 #endif
 
+    CELLULAR_LOG_INFO(("cellular_serial_open: start baud=%lu.",
+                       (unsigned long)p_ctrl->sci_ctrl.baud_rate));
+
 #if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
     CELLULAR_SET_PMR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = 0;
     CELLULAR_SET_PDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
@@ -98,6 +101,7 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
 
     sci_ret = R_SCI_Open((uint8_t)R_SCI_CFG_CELLULAR_SERIAL_CH, SCI_MODE_ASYNC, &sci_cfg,   //cast
                             cellular_uart_callback, &p_ctrl->sci_ctrl.sci_hdl);
+    CELLULAR_LOG_INFO(("cellular_serial_open: R_SCI_Open returned %d.", sci_ret));
 
     if (SCI_SUCCESS != sci_ret)
     {
@@ -105,25 +109,32 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     }
     else
     {
+        CELLULAR_LOG_INFO(("cellular_serial_open: pinset start."));
         R_SCI_CFG_PINSET_CELLULAR_SERIAL();
+        CELLULAR_LOG_INFO(("cellular_serial_open: pinset complete."));
 #if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96)
         /* R_SCI_PinSet_SCI6 selects the shared CTS6#/RTS6# peripheral pin.
          * Until CTSE is enabled the SCI driver treats that pin as RTS output,
          * which can drive the BG96 CTS net. Keep it as a GPIO input until the
          * modem has accepted AT+IFC and hardware CTS is explicitly enabled. */
         cellular_bg96_cts_gpio_input();
+        CELLULAR_LOG_INFO(("cellular_serial_open: BG96 CTS GPIO input restored."));
 #elif (CELLULAR_CFG_CTS_SW_CTRL == 0)
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
 #endif
 #if defined(__CCRX__) || defined(__ICCRX__) || defined(__RX__)
+        CELLULAR_LOG_INFO(("cellular_serial_open: TXI priority set start."));
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_SET_TXI_PRIORITY, &priority);
+        CELLULAR_LOG_INFO(("cellular_serial_open: TXI priority set complete."));
 #endif
 #if CELLULAR_CFG_CTS_SW_CTRL == 0
         CELLULAR_SET_PODR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = 0;
         CELLULAR_SET_PDR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN)  = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
+        CELLULAR_LOG_INFO(("cellular_serial_open: RTS GPIO output prepared."));
 #endif
     }
 
+    CELLULAR_LOG_INFO(("cellular_serial_open: return %d.", ret));
     return ret;
 }
 /**********************************************************************************************************************
@@ -180,7 +191,9 @@ e_cellular_err_t cellular_serial_enable_cts(st_cellular_ctrl_t * const p_ctrl)
  *********************************************************************************************/
 void cellular_serial_close(st_cellular_ctrl_t * const p_ctrl)
 {
+    CELLULAR_LOG_INFO(("cellular_serial_close: start."));
     R_SCI_Close(p_ctrl->sci_ctrl.sci_hdl);
+    CELLULAR_LOG_INFO(("cellular_serial_close: complete."));
     return;
 }
 /**********************************************************************************************************************
@@ -196,9 +209,18 @@ void cellular_serial_close(st_cellular_ctrl_t * const p_ctrl)
  *********************************************************************************************/
 e_cellular_err_t cellular_serial_reopen(st_cellular_ctrl_t * const p_ctrl, uint32_t new_baud)
 {
+    e_cellular_err_t ret = CELLULAR_SUCCESS;
+
+    CELLULAR_LOG_INFO(("cellular_serial_reopen: start current=%lu new=%lu.",
+                       (unsigned long)p_ctrl->sci_ctrl.baud_rate,
+                       (unsigned long)new_baud));
     cellular_serial_close(p_ctrl);
+    CELLULAR_LOG_INFO(("cellular_serial_reopen: close returned."));
     p_ctrl->sci_ctrl.baud_rate = new_baud;
-    return cellular_serial_open(p_ctrl);
+    ret = cellular_serial_open(p_ctrl);
+    CELLULAR_LOG_INFO(("cellular_serial_reopen: open returned %d.", ret));
+
+    return ret;
 }
 /**********************************************************************************************************************
  * End of function cellular_serial_reopen
