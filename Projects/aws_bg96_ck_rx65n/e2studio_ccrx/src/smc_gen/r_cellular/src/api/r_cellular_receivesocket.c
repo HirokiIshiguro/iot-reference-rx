@@ -37,7 +37,7 @@
  *********************************************************************************************************************/
 #define CELLULAR_RECONNECT_TIMEOUT    (120000)
 #if defined(CELLULAR_TARGET_BG96)
-#define CELLULAR_BG96_QIRD_MAX_READ_SIZE   (1500)
+#define CELLULAR_BG96_QIRD_MAX_READ_SIZE   (1024)
 #define CELLULAR_BG96_QIRD_FRAME_MARGIN    (128U)
 #endif /* CELLULAR_TARGET_BG96 */
 
@@ -262,11 +262,22 @@ static int32_t cellular_receive_data(st_cellular_ctrl_t * const p_ctrl, const ui
             }
             else
             {
+                CELLULAR_LOG_ERROR(("BG96 QIRD command failed: socket=%u receive_size=%ld ret=%d total=%ld pending=%d timeout_ms=%lu.\n",
+                                    (unsigned int)socket_no,
+                                    (long)receive_size,
+                                    (int)ret,
+                                    (long)total_receive_length,
+                                    (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size,
+                                    (unsigned long)timeout_ms));
                 break; /* Break of the data receive loop */
             }
         }
         else
         {
+            CELLULAR_LOG_ERROR(("BG96 receive AT semaphore take failed: socket=%u total=%ld pending=%d.\n",
+                                (unsigned int)socket_no,
+                                (long)total_receive_length,
+                                (int)p_ctrl->p_socket_ctrl[socket_no - CELLULAR_START_SOCKET_NUMBER].receive_unprocessed_size));
             break; /* Break of the data receive loop */
         }
     } /* End of data receive loop */

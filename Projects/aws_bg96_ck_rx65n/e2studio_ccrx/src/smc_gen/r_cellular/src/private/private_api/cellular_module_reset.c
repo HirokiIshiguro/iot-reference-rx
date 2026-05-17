@@ -45,6 +45,14 @@
 #define BG96_PWRKEY_SHUTDOWN_WAIT_MS  (8000U)
 #define BG96_PWRKEY_RESTART_GUARD_MS  (1000U)
 
+#if defined(CELLULAR_TARGET_BG96) && !defined(CELLULAR_CFG_BG96_FLOW_CONTROL)
+#define CELLULAR_CFG_BG96_FLOW_CONTROL (1)
+#endif
+
+#if defined(CELLULAR_TARGET_BG96) && !defined(CELLULAR_CFG_BG96_USE_HW_CTS)
+#define CELLULAR_CFG_BG96_USE_HW_CTS (0)
+#endif
+
 /**********************************************************************************************************************
  * Typedef definitions
  *********************************************************************************************************************/
@@ -69,6 +77,7 @@ static uint8_t          cellular_bg96_wait_status_stopped (uint32_t wait_ms);
 static uint8_t          cellular_bg96_wait_status_running (uint32_t wait_ms);
 static e_cellular_err_t cellular_bg96_reset_n_recovery (st_cellular_ctrl_t * const p_ctrl);
 static e_cellular_err_t cellular_baud_upgrade (st_cellular_ctrl_t * const p_ctrl, uint32_t new_baud);
+static e_cellular_err_t cellular_bg96_flow_control_enable (st_cellular_ctrl_t * const p_ctrl);
 #else
 static e_cellular_err_t cellular_pin_reset (st_cellular_ctrl_t * const p_ctrl);
 #endif
@@ -230,6 +239,11 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
         ret = cellular_baud_upgrade(p_ctrl, CELLULAR_BAUDRATE_TARGET);
     }
 #endif
+
+    if (CELLULAR_SUCCESS == ret)
+    {
+        ret = cellular_bg96_flow_control_enable(p_ctrl);
+    }
 
     if (CELLULAR_SUCCESS == ret)
     {
@@ -606,6 +620,55 @@ static e_cellular_err_t cellular_baud_upgrade(st_cellular_ctrl_t * const p_ctrl,
     p_ctrl->sci_ctrl.atc_timeout = saved_atc_timeout;
 
     return ret;
+}
+
+/************************************************************************
+ * Function Name  @fn            cellular_bg96_flow_control_enable
+ ***********************************************************************/
+static e_cellular_err_t cellular_bg96_flow_control_enable(st_cellular_ctrl_t * const p_ctrl)
+{
+#if CELLULAR_CFG_BG96_FLOW_CONTROL == 1
+    e_cellular_err_t ret = CELLULAR_SUCCESS;
+    uint32_t saved_atc_timeout = p_ctrl->sci_ctrl.atc_timeout;
+
+    memset(p_ctrl->sci_ctrl.atc_buff, 0x00, CELLULAR_ATC_BUFF_SIZE);
+    /* Enable both BG96 UART flow-control directions. The host-side SCI CTS
+     * input is enabled only after this command succeeds; before that the
+     * shared CTS6#/RTS6# pin is kept as GPIO input so the SCI default RTS
+     * output does not drive the BG96 CTS net. */
+    (void) snprintf((char *)p_ctrl->sci_ctrl.atc_buff,
+                    CELLULAR_ATC_BUFF_SIZE,
+                    "AT+IFC=2,2\r");
+
+    p_ctrl->sci_ctrl.atc_timeout = 3000U;
+    ret = cellular_execute_at_command(p_ctrl,
+                                      p_ctrl->sci_ctrl.atc_timeout,
+                                      ATC_RETURN_OK,
+                                      ATC_ECHO_OFF);
+    p_ctrl->sci_ctrl.atc_timeout = saved_atc_timeout;
+
+    if (CELLULAR_SUCCESS == ret)
+    {
+        CELLULAR_LOG_INFO(("BG96 UART flow control enabled (AT+IFC=2,2, host CTS=%u).",
+                           CELLULAR_CFG_BG96_USE_HW_CTS));
+#if CELLULAR_CFG_BG96_USE_HW_CTS == 1
+        ret = cellular_serial_enable_cts(p_ctrl);
+        if (CELLULAR_SUCCESS == ret)
+        {
+            CELLULAR_LOG_INFO(("BG96 host hardware CTS enabled."));
+        }
+#endif
+    }
+    else
+    {
+        CELLULAR_LOG_ERROR(("BG96 AT+IFC=2,2 failed (ret=%d).", ret));
+    }
+
+    return ret;
+#else
+    (void)p_ctrl;
+    return CELLULAR_SUCCESS;
+#endif
 }
 #else
 /************************************************************************

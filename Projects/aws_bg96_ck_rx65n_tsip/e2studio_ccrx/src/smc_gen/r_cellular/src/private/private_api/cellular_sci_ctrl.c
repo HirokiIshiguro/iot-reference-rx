@@ -30,6 +30,9 @@
 /**********************************************************************************************************************
  * Macro definitions
  *********************************************************************************************************************/
+#if defined(CELLULAR_TARGET_BG96) && !defined(CELLULAR_CFG_BG96_USE_HW_CTS)
+#define CELLULAR_CFG_BG96_USE_HW_CTS (0)
+#endif
 
 /**********************************************************************************************************************
  * Typedef definitions
@@ -45,6 +48,28 @@
 static void cellular_uart_callback (void * const p_Args);
 
 /**********************************************************************************************
+ * Function Name  @fn            cellular_bg96_cts_gpio_input
+ *********************************************************************************************/
+static void cellular_bg96_cts_gpio_input(void)
+{
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96)
+    CELLULAR_SET_PMR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = 0;
+    CELLULAR_SET_PDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
+#endif
+}
+
+/**********************************************************************************************
+ * Function Name  @fn            cellular_bg96_cts_peripheral_input
+ *********************************************************************************************/
+static void cellular_bg96_cts_peripheral_input(void)
+{
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96)
+    CELLULAR_SET_PDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
+    CELLULAR_SET_PMR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = 1;
+#endif
+}
+
+/**********************************************************************************************
  * Function Name  @fn            cellular_serial_open
  *********************************************************************************************/
 e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
@@ -54,6 +79,11 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     e_cellular_err_t ret      = CELLULAR_SUCCESS;
 #if defined(__CCRX__) || defined(__ICCRX__) || defined(__RX__)
     uint8_t          priority = CELLULAR_CFG_SCI_PRIORITY - 1;
+#endif
+
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
+    CELLULAR_SET_PMR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = 0;
+    CELLULAR_SET_PDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN) = CELLULAR_PIN_DIRECTION_MODE_INPUT;
 #endif
 
     p_ctrl->sci_ctrl.tx_buff_size   = R_SCI_CFG_TX_BUFSIZE;
@@ -75,16 +105,19 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
     }
     else
     {
-#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && (!defined(CELLULAR_TARGET_BG96) || (CELLULAR_CFG_BG96_USE_HW_CTS == 1))
-        /* Enable SCI hardware CTS unless the target board lacks a real CTS pin
-         * (CBT SCI5 case). The CK-RX65N experiment board uses SCI6/PJ3 and
-         * can consume BG96 CTS directly in hardware. */
+        R_SCI_CFG_PINSET_CELLULAR_SERIAL();
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96)
+        /* R_SCI_PinSet_SCI6 selects the shared CTS6#/RTS6# peripheral pin.
+         * Until CTSE is enabled the SCI driver treats that pin as RTS output,
+         * which can drive the BG96 CTS net. Keep it as a GPIO input until the
+         * modem has accepted AT+IFC and hardware CTS is explicitly enabled. */
+        cellular_bg96_cts_gpio_input();
+#elif (CELLULAR_CFG_CTS_SW_CTRL == 0)
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
 #endif
 #if defined(__CCRX__) || defined(__ICCRX__) || defined(__RX__)
         R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_SET_TXI_PRIORITY, &priority);
 #endif
-        R_SCI_CFG_PINSET_CELLULAR_SERIAL();
 #if CELLULAR_CFG_CTS_SW_CTRL == 0
         CELLULAR_SET_PODR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN) = 0;
         CELLULAR_SET_PDR(CELLULAR_CFG_RTS_PORT, CELLULAR_CFG_RTS_PIN)  = CELLULAR_PIN_DIRECTION_MODE_OUTPUT;
@@ -95,6 +128,48 @@ e_cellular_err_t cellular_serial_open(st_cellular_ctrl_t * const p_ctrl)
 }
 /**********************************************************************************************************************
  * End of function cellular_serial_open
+ *********************************************************************************************************************/
+
+/**********************************************************************************************
+ * Function Name  @fn            cellular_serial_enable_cts
+ *********************************************************************************************/
+e_cellular_err_t cellular_serial_enable_cts(st_cellular_ctrl_t * const p_ctrl)
+{
+#if (CELLULAR_CFG_CTS_SW_CTRL == 0) && defined(CELLULAR_TARGET_BG96) && (CELLULAR_CFG_BG96_USE_HW_CTS == 1)
+    uint32_t wait_ms = 0;
+
+    if ((NULL == p_ctrl) || (FIT_NO_PTR == p_ctrl) ||
+        (NULL == p_ctrl->sci_ctrl.sci_hdl) || (FIT_NO_PTR == p_ctrl->sci_ctrl.sci_hdl))
+    {
+        return CELLULAR_ERR_PARAMETER;
+    }
+
+    while ((0 != CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN)) && (wait_ms < 1000U))
+    {
+        cellular_delay_task(10U);
+        wait_ms += 10U;
+    }
+
+    CELLULAR_LOG_INFO(("BG96 CTS GPIO before SCI CTSE: %u after %lu ms.",
+                       CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN),
+                       (unsigned long)wait_ms));
+
+    if (0 != CELLULAR_GET_PIDR(CELLULAR_CFG_CTS_PORT, CELLULAR_CFG_CTS_PIN))
+    {
+        CELLULAR_LOG_ERROR(("BG96 CTS did not assert low; SCI CTSE is not enabled."));
+        return CELLULAR_ERR_MODULE_COM;
+    }
+
+    R_SCI_Control(p_ctrl->sci_ctrl.sci_hdl, SCI_CMD_EN_CTS_IN, NULL);
+    cellular_bg96_cts_peripheral_input();
+#else
+    (void)p_ctrl;
+#endif
+
+    return CELLULAR_SUCCESS;
+}
+/**********************************************************************************************************************
+ * End of function cellular_serial_enable_cts
  *********************************************************************************************************************/
 
 /**********************************************************************************************

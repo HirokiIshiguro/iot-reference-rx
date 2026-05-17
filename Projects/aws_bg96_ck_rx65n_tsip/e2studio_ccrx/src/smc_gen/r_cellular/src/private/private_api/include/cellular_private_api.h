@@ -209,6 +209,16 @@ void cellular_serial_close (st_cellular_ctrl_t * const p_ctrl);
  *********************************************************************************************/
 e_cellular_err_t cellular_serial_reopen (st_cellular_ctrl_t * const p_ctrl, uint32_t new_baud);
 
+/**********************************************************************************************
+ * Function Name  @fn            cellular_serial_enable_cts
+ * Description    @details       Enable SCI hardware CTS input after modem flow control setup.
+ * Arguments      @param[in/out] p_ctrl -
+ *                                  Pointer to managed structure.
+ * Return Value   @retval        CELLULAR_SUCCESS -
+ *                                  Successfully enabled the CTS input.
+ *********************************************************************************************/
+e_cellular_err_t cellular_serial_enable_cts (st_cellular_ctrl_t * const p_ctrl);
+
 /****************************************************************************
  * Function Name  @fn            cellular_semaphore_init
  * Description    @details       Initialize the semaphore function.
