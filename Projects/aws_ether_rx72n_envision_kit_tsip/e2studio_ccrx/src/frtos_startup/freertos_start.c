@@ -22,6 +22,7 @@ Includes   <System Includes> , "Project Includes"
 #include "task.h"
 #include "freertos_start.h"
 #include "serial.h"
+#include "trcRecorder.h"
 
 #if defined(FREERTOS_ENABLE_UNIT_TESTS)
 #include "unity_internals.h"
@@ -343,6 +344,7 @@ void Processing_Before_Start_Kernel(void)
 #endif
 
     Kernel_Object_init();
+    (void) xTraceInitialize();
 
     /************** task creation ****************************/
     /* Main task. */

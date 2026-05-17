@@ -213,19 +213,25 @@ void R_Pins_Create(void)
     MPC.PB1PFS.BYTE = 0x25U;
     PORTB.PMR.BYTE |= 0x02U;
 
-    /* Set RXD2 pin */
-    MPC.P12PFS.BYTE = 0x0AU;
-    PORT1.PMR.BYTE |= 0x04U;
-
     /* Set RXD7 pin */
     MPC.P92PFS.BYTE = 0x0AU;
     PORT9.PMR.BYTE |= 0x04U;
 
-    /* Set TXD2 pin */
-    PORT1.PODR.BYTE |= 0x08U;
-    MPC.P13PFS.BYTE = 0x0AU;
-    PORT1.PDR.BYTE |= 0x08U;
-    // PORT1.PMR.BIT.B3 = 1U; // Please set the PMR bit after TE bit is set to 1.
+    /* Set SCK2 pin */
+    MPC.P51PFS.BYTE = 0x0AU;
+    PORT5.PMR.BYTE |= 0x02U;
+
+    /* Set SMISO2 pin */
+    MPC.P52PFS.BYTE = 0x0AU;
+    PORT5.PMR.BYTE |= 0x04U;
+
+    /* Set SMOSI2 pin */
+    MPC.P50PFS.BYTE = 0x0AU;
+    PORT5.PMR.BYTE |= 0x01U;
+
+    /* Set SS2# pin */
+    MPC.P54PFS.BYTE = 0x0BU;
+    PORT5.PMR.BYTE |= 0x10U;
 
     /* Set TXD7 pin */
     PORT9.PODR.BYTE |= 0x01U;

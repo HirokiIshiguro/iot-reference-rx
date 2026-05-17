@@ -1,21 +1,8 @@
 /* Generated configuration header file - do not edit */
 /***********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No 
-* other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all 
-* applicable laws, including copyright laws. 
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
-* THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, 
-* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM 
-* EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES 
-* SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS 
-* SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of 
-* this software. By using this software, you agree to the additional terms and conditions found by accessing the 
-* following link:
-* http://www.renesas.com/disclaimer 
+* Copyright (c) 2013 - 2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2013-2024 Renesas Electronics Corporation. All rights reserved.
+* SPDX-License-Identifier: BSD-3-Clause
 ***********************************************************************************************************************/
 /***********************************************************************************************************************
 * File Name     : r_sci_rx_config.h
@@ -52,6 +39,8 @@
 *           29.05.2023 4.90    Added support for RX23E-B.
 *           31.01.2024 5.10    Modified comments in Data Match parameters.
 *           28.06.2024 5.30    Added support for RX260, RX261.
+*           15.03.2025 5.41    Updated disclaimer
+*           30.10.2025 5.60    Added support for RX14T.
 ***********************************************************************************************************************/
 #ifndef SCI_CONFIG_H
 #define SCI_CONFIG_H
@@ -71,7 +60,7 @@ Configuration Options
 /* Setting an equate to 1 includes code specific to that mode. */
 #define SCI_CFG_ASYNC_INCLUDED  (1)
 #define SCI_CFG_SYNC_INCLUDED   (0)
-#define SCI_CFG_SSPI_INCLUDED   (0)
+#define SCI_CFG_SSPI_INCLUDED   (1)
 #define SCI_CFG_IRDA_INCLUDED   (0)
 
 /* Use circular buffer in mode asynchronous */
@@ -94,21 +83,21 @@ Configuration Options
  * i = this channel is available in IrDA interface.
  * RX MCU supported channels
  *
- * CH#  110 111 113 130 140 230  231  23T 24T 24U 64M 71M 65N 66T 72T 23W 72M 13T 72N 66N 23E-A 671 660 26T 23E-B 260 261
- * ---  --- --- --- --- --- --- ----- --- --- --- --- --- --- --- --- --- --- --- --- --- ----- --- --- --- ----- --- ---
- * CH0           X   Xa      X    X                X   X   Xn              X       X   X          X   X       X          
- * CH1   X   X*  X*  Xu   X  X    X    Xu  Xu  Xu  X   X   Xs  X   X   X   X   X   X   X    Xu    X   X  X    X    X   X 
- * CH2           X                                 X   X   Xu              X       X   X          X   X                  
- * CH3                                             X   X   Xs              X       X   X          X   X                  
- * CH4                                             X   X   Xn              X       X   X          X   X                  
- * CH5   X   X   Xi  X    X  Xi   Xu,i X   X   X   X   X   X   X   X   Xi  X   X   X   X    X     X   X  X    X    X   X 
- * CH6           X   X    X  X    X        X   X   X   X   Xn  X   X       Xu      X   X    X     X   X  X    X    X   X 
- * CH7                                             Xu  Xu  Xn              X       X   X          X   X                  
- * CH8           X   Xa   X  X    X            X           X   X   X   Xu  X       X   X          X   X       X          
- * CH9           X   Xa   X  X    X            X           Xs  X   X       X       X   X          X   X       X          
- * CH10                                                    X               X       X   X          X   X                  
- * CH11                                        X           Xs  X   X       X       X   X          X   X                  
- * CH12  X   X   X   X    X  X    X                X   X   Xs  X   X   X   X   X   X   X    X     X   X  X    X    X   X 
+ * CH#  110 111 113 130 140 230  231  23T 24T 24U 64M 71M 65N 66T 72T 23W 72M 13T 72N 66N 23E-A 671 660 26T 23E-B 260 261 14T
+ * ---  --- --- --- --- --- --- ----- --- --- --- --- --- --- --- --- --- --- --- --- --- ----- --- --- --- ----- --- --- ---
+ * CH0           X   Xa      X    X                X   X   Xn              X       X   X          X   X       X              
+ * CH1   X   X*  X*  Xu   X  X    X    Xu  Xu  Xu  X   X   Xs  X   X   X   X   X   X   X    Xu    X   X  X    X    X   X   X 
+ * CH2           X                                 X   X   Xu              X       X   X          X   X                      
+ * CH3                                             X   X   Xs              X       X   X          X   X                      
+ * CH4                                             X   X   Xn              X       X   X          X   X                      
+ * CH5   X   X   Xi  X    X  Xi   Xu,i X   X   X   X   X   X   X   X   Xi  X   X   X   X    X     X   X  X    X    X   X   X 
+ * CH6           X   X    X  X    X        X   X   X   X   Xn  X   X       Xu      X   X    X     X   X  X    X    X   X   X 
+ * CH7                                             Xu  Xu  Xn              X       X   X          X   X                      
+ * CH8           X   Xa   X  X    X            X           X   X   X   Xu  X       X   X          X   X       X              
+ * CH9           X   Xa   X  X    X            X           Xs  X   X       X       X   X          X   X       X              
+ * CH10                                                    X               X       X   X          X   X                      
+ * CH11                                        X           Xs  X   X       X       X   X          X   X                      
+ * CH12  X   X   X   X    X  X    X                X   X   Xs  X   X   X   X   X   X   X    X     X   X  X    X    X   X   X 
 */
 
 #define SCI_CFG_CH0_INCLUDED    (0)
@@ -192,7 +181,7 @@ Configuration Options
 /* SPECIFY ASYNC MODE TX QUEUE BUFFER SIZES (will not allocate if chan not enabled */
 #define SCI_CFG_CH0_TX_BUFSIZ   (80)
 #define SCI_CFG_CH1_TX_BUFSIZ   (80)
-#define SCI_CFG_CH2_TX_BUFSIZ   (80)
+#define SCI_CFG_CH2_TX_BUFSIZ   (8192)
 #define SCI_CFG_CH3_TX_BUFSIZ   (80)
 #define SCI_CFG_CH4_TX_BUFSIZ   (80)
 #define SCI_CFG_CH5_TX_BUFSIZ   (80)
@@ -207,7 +196,7 @@ Configuration Options
 /* SPECIFY ASYNC MODE RX QUEUE BUFFER SIZES (will not allocate if chan not enabled */
 #define SCI_CFG_CH0_RX_BUFSIZ   (80)
 #define SCI_CFG_CH1_RX_BUFSIZ   (80)
-#define SCI_CFG_CH2_RX_BUFSIZ   (80)
+#define SCI_CFG_CH2_RX_BUFSIZ   (8192)
 #define SCI_CFG_CH3_RX_BUFSIZ   (80)
 #define SCI_CFG_CH4_RX_BUFSIZ   (80)
 #define SCI_CFG_CH5_RX_BUFSIZ   (80)

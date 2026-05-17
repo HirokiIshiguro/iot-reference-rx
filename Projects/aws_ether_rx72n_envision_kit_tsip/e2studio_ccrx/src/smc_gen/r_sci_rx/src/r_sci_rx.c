@@ -1,20 +1,7 @@
 /***********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No 
-* other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all 
-* applicable laws, including copyright laws. 
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
-* THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, 
-* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM 
-* EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES 
-* SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS 
-* SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of 
-* this software. By using this software, you agree to the additional terms and conditions found by accessing the 
-* following link:
-* http://www.renesas.com/disclaimer 
+* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2016-2024 Renesas Electronics Corporation. All rights reserved.
+* SPDX-License-Identifier: BSD-3-Clause
 ***********************************************************************************************************************/
 /**********************************************************************************************************************
 * File Name    : r_sci_rx.c
@@ -50,8 +37,8 @@
 *                              Modified comment of API function to Doxygen style.
 *                              Added support for atomic control.
 *                              Fixed to comply with GSCE Coding Standards Rev.6.00.
-*                              Fixed a bug that error when a reception interrupt occurs before incrementing "u_tx_data.buf"
-*                               in "sci_send_sync_data" and "sci_receive" functions
+*                              Fixed a bug that error when a reception interrupt occurs before incrementing
+*                              "u_tx_data.buf" in "sci_send_sync_data" and "sci_receive" functions
 *          30.12.2019  3.40    Added support RX66N, RX72N.
 *          25.08.2020  3.60    Added feature using DTC/DMAC in SCI transfer.
 *                              Merged IrDA functionality to SCI FIT.
@@ -79,6 +66,8 @@
 *           31.01.2024 5.10    Added WAIT_LOOP comments.
 *           01.11.2024 5.40    Fixed the issue that the DMAC channel will not be closed or keep busy
 *                              if a communication error after executing the R_SCI_Send() or R_SCI_Receive() function.
+*           15.03.2025 5.41    Updated disclaimer
+*           30.10.2025 5.60    Fixed to comply with GSCE Coding Standards Rev.6.6.0.
 ***********************************************************************************************************************/
 
 /*****************************************************************************
@@ -1563,7 +1552,8 @@ void txi_handler(sci_hdl_t const hdl)
 #if(TX_DTC_DMACA_ENABLE & 0x02)
             if (SCI_DMACA_ENABLE == hdl->rom->dtc_dmaca_tx_enable)
             {
-                if((4 == hdl->rom->dmaca_tx_channel) || (5 == hdl->rom->dmaca_tx_channel) || (6 == hdl->rom->dmaca_tx_channel) || (7 == hdl->rom->dmaca_tx_channel))
+                if((4 == hdl->rom->dmaca_tx_channel) || (5 == hdl->rom->dmaca_tx_channel)
+                    || (6 == hdl->rom->dmaca_tx_channel) || (7 == hdl->rom->dmaca_tx_channel))
                 {
                     dmaca_stat_t   stat_dmaca;
                     R_DMACA_Control(hdl->rom->dmaca_tx_channel, DMACA_CMD_DTIF_STATUS_CLR, &stat_dmaca);
@@ -1617,7 +1607,8 @@ void txi_handler(sci_hdl_t const hdl)
 #if(TX_DTC_DMACA_ENABLE & 0x02)
             if(SCI_DMACA_ENABLE == hdl->rom->dtc_dmaca_tx_enable)
             {
-                if((4 == hdl->rom->dmaca_tx_channel) || (5 == hdl->rom->dmaca_tx_channel) || (6 == hdl->rom->dmaca_tx_channel) || (7 == hdl->rom->dmaca_tx_channel))
+                if((4 == hdl->rom->dmaca_tx_channel) || (5 == hdl->rom->dmaca_tx_channel)
+                    || (6 == hdl->rom->dmaca_tx_channel) || (7 == hdl->rom->dmaca_tx_channel))
                 {
                     dmaca_stat_t   stat_dmaca;
                     R_DMACA_Control(hdl->rom->dmaca_tx_channel, DMACA_CMD_DTIF_STATUS_CLR, &stat_dmaca);
@@ -1708,8 +1699,8 @@ void tei_handler(sci_hdl_t const hdl)
 * Note that the toggling of Slave Select lines when in SSPI mode is not handled by this driver. The Slave
 * Select line for the target device must be enabled prior to calling this function.
 * @note See section 2.11 Callback Function in application note for values passed to arguments of the callback function.
-* In Asynchronous mode, when data match detected, received data stored in a queue and notify to user by callback function
-* with event SCI_EVT_RX_CHAR_MATCH.
+* In Asynchronous mode, when data match detected, received data stored in a queue and notify to user by
+* callback function with event SCI_EVT_RX_CHAR_MATCH.
 */
 sci_err_t R_SCI_Receive(sci_hdl_t const hdl,
                         uint8_t         *p_dst,
@@ -2636,7 +2627,8 @@ static void sci_receive_data_match(sci_hdl_t const hdl)
         {
             hdl->rom->regs->DCCR.BIT.DCMF = 0; /* Clear Data Match Flag */
 
-            if ((0 == hdl->rom->regs->DCCR.BIT.DFER )  &&  (0 == hdl->rom->regs->DCCR.BIT.DPER )) /* Check framing error and parity error */
+            /* Check framing error and parity error */
+            if ((0 == hdl->rom->regs->DCCR.BIT.DFER )  &&  (0 == hdl->rom->regs->DCCR.BIT.DPER ))
             {
                 /* Casting unsigned char type to unin8_t type is valid */
                 byte = (uint8_t)(hdl->rom->regs->CDR.BYTE.L); /* Read data from comparison data register */
@@ -3004,7 +2996,8 @@ void eri_handler(sci_hdl_t const hdl)
 *                    The cmd value or an element of p_args contains an invalid value.
 * @details This function is used for configuring special hardware features such as changing driver configuration and
 * obtaining driver status.
-* The CTS/ RTS pin functions as RTS by default hardware control. By issuing an SCI_CMD_EN_CTS_IN, the pin functions as CTS.
+* The CTS/ RTS pin functions as RTS by default hardware control. By issuing an SCI_CMD_EN_CTS_IN,
+* the pin functions as CTS.
 * @note When SCI_CMD_CHANGE_BAUD is used, the optimum values for BRR, SEMR.ABCS, and SMR.CKS is calculated based on
 * the bit rate specified. This however does not guarantee a low bit error rate for all peripheral clock/baud rate
 * combinations.\n
@@ -3186,7 +3179,11 @@ sci_err_t R_SCI_Control(sci_hdl_t const     hdl,
 
         case (SCI_CMD_SET_TXI_PRIORITY):
         {
-#if defined(BSP_MCU_RX64M) || defined(BSP_MCU_RX71M) || defined(BSP_MCU_RX65N) || defined(BSP_MCU_RX66T) || defined(BSP_MCU_RX72T) || defined(BSP_MCU_RX72M) || defined(BSP_MCU_RX72N) || defined(BSP_MCU_RX66N)|| defined(BSP_MCU_RX671)|| defined(BSP_MCU_RX660) || defined(BSP_MCU_RX26T)
+#if defined(BSP_MCU_RX64M) || defined(BSP_MCU_RX71M) || defined(BSP_MCU_RX65N) \
+            || defined(BSP_MCU_RX66T) || defined(BSP_MCU_RX72T) \
+            || defined(BSP_MCU_RX72M) || defined(BSP_MCU_RX72N) \
+            || defined(BSP_MCU_RX66N) || defined(BSP_MCU_RX671) \
+            || defined(BSP_MCU_RX660) || defined(BSP_MCU_RX26T)
             /* Casting void type to uint8_t type is valid */
             *hdl->rom->ipr_txi = *((uint8_t *)p_args);
             break;
@@ -3198,7 +3195,11 @@ sci_err_t R_SCI_Control(sci_hdl_t const     hdl,
         }
         case (SCI_CMD_SET_RXI_PRIORITY):
         {
-#if defined(BSP_MCU_RX64M) || defined(BSP_MCU_RX71M) || defined(BSP_MCU_RX65N) || defined(BSP_MCU_RX66T) || defined(BSP_MCU_RX72T) || defined(BSP_MCU_RX72M) || defined(BSP_MCU_RX72N) || defined(BSP_MCU_RX66N)|| defined(BSP_MCU_RX671)|| defined(BSP_MCU_RX660) || defined(BSP_MCU_RX26T)
+#if defined(BSP_MCU_RX64M) || defined(BSP_MCU_RX71M) || defined(BSP_MCU_RX65N) \
+            || defined(BSP_MCU_RX66T) || defined(BSP_MCU_RX72T) \
+            || defined(BSP_MCU_RX72M) || defined(BSP_MCU_RX72N) \
+            || defined(BSP_MCU_RX66N) || defined(BSP_MCU_RX671) \
+            || defined(BSP_MCU_RX660) || defined(BSP_MCU_RX26T)
             /* Casting void type to uint8_t type is valid */
             *hdl->rom->ipr_rxi = *((uint8_t *)p_args);
             break;
@@ -3210,7 +3211,11 @@ sci_err_t R_SCI_Control(sci_hdl_t const     hdl,
         }
         case (SCI_CMD_SET_TXI_RXI_PRIORITY):
         {
-#if defined(BSP_MCU_RX64M) || defined(BSP_MCU_RX71M) || defined(BSP_MCU_RX65N) || defined(BSP_MCU_RX66T) || defined(BSP_MCU_RX72T) || defined(BSP_MCU_RX72M) || defined(BSP_MCU_RX72N) || defined(BSP_MCU_RX66N)|| defined(BSP_MCU_RX671)|| defined(BSP_MCU_RX660) || defined(BSP_MCU_RX26T)
+#if defined(BSP_MCU_RX64M) || defined(BSP_MCU_RX71M) || defined(BSP_MCU_RX65N) \
+            || defined(BSP_MCU_RX66T) || defined(BSP_MCU_RX72T) \
+            || defined(BSP_MCU_RX72M) || defined(BSP_MCU_RX72N) \
+            || defined(BSP_MCU_RX66N) || defined(BSP_MCU_RX671) \
+            || defined(BSP_MCU_RX660) || defined(BSP_MCU_RX26T)
             /* Casting void type to uint8_t type is valid */
             *hdl->rom->ipr_txi = *((uint8_t *)p_args);
             *hdl->rom->ipr_rxi = *((uint8_t *)p_args);

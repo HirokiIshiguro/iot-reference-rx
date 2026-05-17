@@ -48,10 +48,12 @@
         <Setting id="PA7" value="LCD_DATA1"/>
         <Setting id="P92" value="RXD7"/>
         <Setting id="P91" value="AN115"/>
+        <Setting id="P50" value="SMOSI2"/>
         <Setting id="P93" value="AN117"/>
+        <Setting id="P52" value="SMISO2"/>
+        <Setting id="P51" value="SCK2"/>
+        <Setting id="P54" value="SS2#"/>
         <Setting id="P56" value="CLKOUT25M"/>
-        <Setting id="P12" value="RXD2"/>
-        <Setting id="P13" value="TXD2"/>
         <Setting id="PB1" value="LCD_TCON3"/>
         <Setting id="PB0" value="LCD_DATA0"/>
     </Segment>
@@ -217,7 +219,7 @@
             <Setting id="FWUP_CFG_USER_FLASH_ERASE_FUNCTION" value="ota_flash_erase_function"/>
         </Segment>
         <Segment component="LittleFS202406.01-LTS-rx-1.1.1" id="LittleFS" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
-        <Segment component="r_sci_rx5.40" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_sci_rx5.60" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="SCI_CFG_CH9_FIFO_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH4_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH8_EN_TXI_NESTED_INT" value="0"/>
@@ -263,7 +265,7 @@
             <Setting id="SCI_CFG_CH4_EN_TEI_NESTED_INT" value="0"/>
             <Setting id="SCI_CFG_CH5_EN_RXI_NESTED_INT" value="0"/>
             <Setting id="SCI_CFG_CH6_TX_DTC_DMACA_ENABLE" value="0"/>
-            <Setting id="SCI_CFG_CH2_RX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH2_RX_BUFSIZ" value="8192"/>
             <Setting id="SCI_CFG_CH8_FIFO_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH7_DATA_MATCH_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH3_TX_BUFSIZ" value="80"/>
@@ -364,7 +366,7 @@
             <Setting id="SCI_CFG_CH10_TX_DMACA_CH_NUM" value="0"/>
             <Setting id="SCI_CFG_CH9_TX_BUFSIZ" value="80"/>
             <Setting id="SCI_CFG_CH7_TX_DTC_DMACA_ENABLE" value="0"/>
-            <Setting id="SCI_CFG_SSPI_INCLUDED" value="0"/>
+            <Setting id="SCI_CFG_SSPI_INCLUDED" value="1"/>
             <Setting id="SCI_CFG_CH6_TX_BUFSIZ" value="80"/>
             <Setting id="SCI_CFG_CH4_EN_ERI_NESTED_INT" value="0"/>
             <Setting id="SCI_CFG_CH11_TX_BUFSIZ" value="80"/>
@@ -403,7 +405,7 @@
             <Setting id="SCI_CFG_CH3_EN_ERI_NESTED_INT" value="0"/>
             <Setting id="SCI_CFG_CH6_RX_BUFSIZ" value="80"/>
             <Setting id="SCI_CFG_CH7_RX_FIFO_THRESH" value="8"/>
-            <Setting id="SCI_CFG_CH2_TX_BUFSIZ" value="80"/>
+            <Setting id="SCI_CFG_CH2_TX_BUFSIZ" value="8192"/>
             <Setting id="SCI_CFG_CH9_RX_DTC_DMACA_ENABLE" value="0"/>
             <Setting id="SCI_CFG_CH12_RX_DTC_DMACA_ENABLE" value="0"/>
             <Setting id="SCI_CFG_CH5_EN_TEI_NESTED_INT" value="0"/>
