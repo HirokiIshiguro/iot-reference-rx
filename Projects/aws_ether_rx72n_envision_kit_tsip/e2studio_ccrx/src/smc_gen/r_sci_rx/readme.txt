@@ -26,6 +26,7 @@ Features
 * (RX130) Simultaneous operation of up to 4 channels.
 * (RX13T) Simultaneous operation of up to 3 channels.
 * (RX140) Simultaneous operation of up to 6 channels.
+* (RX14T) Simultaneous operation of up to 4 channels.
 * (RX24T) Simultaneous operation of up to 3 channels.
 * (RX24U) Simultaneous operation of up to 6 channels.
 * (RX260/261) Simultaneous operation of up to 4 channels.

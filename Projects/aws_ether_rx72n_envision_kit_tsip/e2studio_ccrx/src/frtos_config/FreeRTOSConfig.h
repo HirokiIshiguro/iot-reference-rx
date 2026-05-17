@@ -58,7 +58,7 @@
 #define configMAX_PRIORITIES                       (7)
 #define configTICK_RATE_HZ                         (( TickType_t ) 1000)
 #define configMINIMAL_STACK_SIZE                   (768)
-#define configTOTAL_HEAP_SIZE_N						(320)
+#define configTOTAL_HEAP_SIZE_N						(256)
 #define configTOTAL_HEAP_SIZE                      (( size_t ) ( configTOTAL_HEAP_SIZE_N * 1024 ))
 #define configAPPLICATION_ALLOCATED_HEAP           1
 #define configMAX_TASK_NAME_LEN                    (12)
@@ -295,8 +295,10 @@ uint32_t ulRand(void);
 /* The platform FreeRTOS is running on. */
 #define configPLATFORM_NAME    "RenesasRX65N"
 
-/* Header required for the tracealyzer recorder library. */
-//#include "trcRecorder.h"
+/*
+ * TraceRecorder is included from FreeRTOS.h after FreeRTOS core types and
+ * port macros are available, but before the default trace macros are defined.
+ */
 
 /* When the FIT configurator or the Smart Configurator is used, platform.h has to be used. */
 #define configINCLUDE_PLATFORM_H_INSTEAD_OF_IODEFINE_H  1

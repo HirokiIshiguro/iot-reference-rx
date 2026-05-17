@@ -32,6 +32,14 @@ small steps.
 5. Port board features from [rx72n-envision-kit] in separate MRs: GUI/touch,
    SD card, serial flash, audio, and firmware update UI.
 
+## Tracealyzer SPI Output Experiment
+
+Tracealyzer over RTT/FINE is not the preferred transport for this workload.
+The SPI output experiment is tracked in
+`tracealyzer_spi_output_experiment.md`. The first implementation path is to
+use one RX72N Envision Kit PMOD as SCI simple SPI master and forward recorder
+bytes to a GR-ROSE SPI/Ethernet bridge.
+
 ## Non-Goals For The First Bring-Up
 
 - No Fleet Provisioning rollout.

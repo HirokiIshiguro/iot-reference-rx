@@ -52,6 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "mqtt_agent_task.h"
 #include "r_simple_glcdc_config_rx_if.h"
 #include "r_simple_graphic_if.h"
+#include "trcRecorder.h"
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 #include "tsip_provisioning_cli.h"
 #endif
@@ -212,6 +213,7 @@ void main_task(void *pvParameters)
 
     prvMiscInitialization();
     UserInitialization();
+    (void) xTraceEnable(TRC_START_FROM_HOST);
     prvDisplayInitialize();
     prvDisplayWrite("FreeRTOS init\r\n");
 

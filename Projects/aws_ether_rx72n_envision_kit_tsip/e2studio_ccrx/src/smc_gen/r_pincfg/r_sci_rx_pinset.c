@@ -32,13 +32,21 @@ void R_SCI_PinSet_SCI2()
 {
     R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
 
+    /* Set SCK2 pin */
+    MPC.P51PFS.BYTE = 0x0AU;
+    PORT5.PMR.BIT.B1 = 1U;
+
     /* Set RXD2/SMISO2/SSCL2 pin */
-    MPC.P12PFS.BYTE = 0x0AU;
-    PORT1.PMR.BIT.B2 = 1U;
+    MPC.P52PFS.BYTE = 0x0AU;
+    PORT5.PMR.BIT.B2 = 1U;
 
     /* Set TXD2/SMOSI2/SSDA2 pin */
-    MPC.P13PFS.BYTE = 0x0AU;
-    PORT1.PMR.BIT.B3 = 1U;
+    MPC.P50PFS.BYTE = 0x0AU;
+    PORT5.PMR.BIT.B0 = 1U;
+
+    /* Set CTS2#/RTS2#/SS2# pin */
+    MPC.P54PFS.BYTE = 0x0BU;
+    PORT5.PMR.BIT.B4 = 1U;
 
     R_BSP_RegisterProtectEnable(BSP_REG_PROTECT_MPC);
 }

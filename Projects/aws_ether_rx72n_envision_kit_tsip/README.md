@@ -18,6 +18,22 @@ pwsh -File tools/build_headless_rx72n.ps1 `
   -TlsBackend tsip
 ```
 
+## Tracealyzer SPI Output
+
+This profile includes the validated Tracealyzer Recorder SPI output experiment for the GR-ROSE SPI/Ether bridge.
+
+- RX72N Envision Kit role: SCI2 simple SPI master on PMOD1/CN1
+- Bridge role: GR-ROSE RSPI1 slave to Ethernet TCP server
+- SPI bit rate: 2 Mbps
+- SPI frame size: 256 bytes
+- Trace payload per frame: 252 bytes
+- Recorder stream port: `src/TraceRecorder/streamports/Renesas_RX_SCI_SPI`
+- Transport binding: `src/application_code/trace_spi_transport.c`
+
+Tracealyzer starts from host control via `xTraceEnable(TRC_START_FROM_HOST)`. The 2026-05-17 hardware run streamed for more than 4 minutes with no missed events:
+
+- [Tracealyzer live stream evidence](docs/evidence/tracealyzer-spi-ether-2026-05-17-4min-no-missed.png)
+
 ## Rationale
 
 The previous migration direction updated [rx72n-envision-kit] in place by
