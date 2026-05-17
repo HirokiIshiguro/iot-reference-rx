@@ -40,7 +40,7 @@
 #define BG96_READY_WAIT_MS          (8000U)
 #define BG96_STATUS_READY_WAIT_MS   (15000U)
 #define BG96_BOOT_URC_QUIET_MS      (3000U)
-#define BG96_PWRKEY_PULSE_MS        (700U)
+#define BG96_PWRKEY_PULSE_MS        (1200U)
 #define BG96_RESET_PULSE_MS         (300U)
 #define BG96_PWRKEY_SHUTDOWN_WAIT_MS  (65000U)
 #define BG96_PWRKEY_RESTART_GUARD_MS  (1000U)
@@ -212,7 +212,7 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 #if CELLULAR_BAUDRATE_TARGET != CELLULAR_BAUDRATE
         if (CELLULAR_SUCCESS != ret)
         {
-            CELLULAR_LOG_INFO(("ATE0 after control pulse at %lu bps timed out - probing %lu bps.",
+            CELLULAR_LOG_INFO(("ATE0 after PWRKEY recovery at %lu bps timed out - probing %lu bps.",
                                (unsigned long)p_ctrl->sci_ctrl.baud_rate,
                                (unsigned long)CELLULAR_BAUDRATE_TARGET));
             ret = cellular_serial_reopen(p_ctrl, CELLULAR_BAUDRATE_TARGET);
