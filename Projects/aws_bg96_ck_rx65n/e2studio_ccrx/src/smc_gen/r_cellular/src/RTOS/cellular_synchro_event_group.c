@@ -57,6 +57,7 @@ uint32_t cellular_synchro_event_group(void * const xEventGroup,
 #if BSP_CFG_RTOS_USED == (1)
         EventBits_t current_bits = 0;
         TickType_t wait_ticks    = 0;
+        const char * task_name   = pcTaskGetName(NULL);
 
         if (CELLULAR_TIME_OUT_MAX_DELAY == xTicksToWait)
         {
@@ -67,19 +68,23 @@ uint32_t cellular_synchro_event_group(void * const xEventGroup,
             wait_ticks = (TickType_t)xTicksToWait;
         }
 
-        current_bits = xEventGroupGetBits((EventGroupHandle_t)xEventGroup);
-        CELLULAR_LOG_INFO(("cellular_synchro_event_group: enter task=%s handle=0x%08lx tick=%lu sched=%ld "
-                           "set=0x%08lx wait=0x%08lx timeout=%lu bits=0x%08lx heap=%lu stack_hwm=%lu.",
-                           pcTaskGetName(NULL),
+        CELLULAR_LOG_INFO(("cellular_synchro_event_group: pre-bits task=%s handle=0x%08lx tick=%lu sched=%ld "
+                           "set=0x%08lx wait=0x%08lx timeout=%lu heap=%lu stack_hwm=%lu.",
+                           task_name,
                            (unsigned long)xEventGroup,
                            (unsigned long)xTaskGetTickCount(),
                            (long)xTaskGetSchedulerState(),
                            (unsigned long)uxBitsToSet,
                            (unsigned long)uxBitsToWaitFor,
                            (unsigned long)wait_ticks,
-                           (unsigned long)current_bits,
                            (unsigned long)xPortGetFreeHeapSize(),
                            (unsigned long)uxTaskGetStackHighWaterMark(NULL)));
+        current_bits = xEventGroupGetBitsFromISR((EventGroupHandle_t)xEventGroup);
+        CELLULAR_LOG_INFO(("cellular_synchro_event_group: pre-sync task=%s handle=0x%08lx tick=%lu bits=0x%08lx.",
+                           task_name,
+                           (unsigned long)xEventGroup,
+                           (unsigned long)xTaskGetTickCount(),
+                           (unsigned long)current_bits));
 
         if (CELLULAR_TIME_OUT_MAX_DELAY == xTicksToWait)
         {
@@ -96,10 +101,10 @@ uint32_t cellular_synchro_event_group(void * const xEventGroup,
                                     (TickType_t)xTicksToWait);
         }
 
-        current_bits = xEventGroupGetBits((EventGroupHandle_t)xEventGroup);
+        current_bits = xEventGroupGetBitsFromISR((EventGroupHandle_t)xEventGroup);
         CELLULAR_LOG_INFO(("cellular_synchro_event_group: leave task=%s handle=0x%08lx tick=%lu sched=%ld "
                            "ret=0x%08lx bits=0x%08lx heap=%lu stack_hwm=%lu.",
-                           pcTaskGetName(NULL),
+                           task_name,
                            (unsigned long)xEventGroup,
                            (unsigned long)xTaskGetTickCount(),
                            (long)xTaskGetSchedulerState(),
