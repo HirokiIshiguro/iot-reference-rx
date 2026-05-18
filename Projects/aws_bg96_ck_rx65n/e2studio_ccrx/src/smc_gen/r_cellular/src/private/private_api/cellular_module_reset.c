@@ -200,10 +200,10 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 #endif
     }
 
-    if (CELLULAR_SUCCESS != ret)
+    if ((CELLULAR_SUCCESS != ret) && (0U != cellular_bg96_status_is_running()))
     {
-        CELLULAR_LOG_INFO(("ATE0 probes failed - issuing BG96 PWRKEY recovery."));
-        ret = cellular_bg96_pwrkey_recovery(p_ctrl);
+        CELLULAR_LOG_INFO(("BG96 STATUS is running but AT is silent - issuing RESET_N fallback pulse."));
+        ret = cellular_bg96_reset_n_recovery(p_ctrl);
         if (CELLULAR_SUCCESS == ret)
         {
             ret = cellular_bg96_wait_ready_ate0(p_ctrl, BG96_READY_WAIT_MS);
@@ -212,7 +212,7 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 #if CELLULAR_BAUDRATE_TARGET != CELLULAR_BAUDRATE
         if (CELLULAR_SUCCESS != ret)
         {
-            CELLULAR_LOG_INFO(("ATE0 after PWRKEY recovery at %lu bps timed out - probing %lu bps.",
+            CELLULAR_LOG_INFO(("ATE0 after RESET_N fallback at %lu bps timed out - probing %lu bps.",
                                (unsigned long)p_ctrl->sci_ctrl.baud_rate,
                                (unsigned long)CELLULAR_BAUDRATE_TARGET));
             ret = cellular_serial_reopen(p_ctrl, CELLULAR_BAUDRATE_TARGET);
@@ -227,8 +227,8 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 
     if (CELLULAR_SUCCESS != ret)
     {
-        CELLULAR_LOG_INFO(("BG96 still silent after PWRKEY recovery - issuing RESET_N fallback pulse."));
-        ret = cellular_bg96_reset_n_recovery(p_ctrl);
+        CELLULAR_LOG_INFO(("BG96 still silent after RESET_N recovery - issuing PWRKEY recovery."));
+        ret = cellular_bg96_pwrkey_recovery(p_ctrl);
         if (CELLULAR_SUCCESS == ret)
         {
             ret = cellular_bg96_wait_ready_ate0(p_ctrl, BG96_READY_WAIT_MS);
@@ -237,7 +237,7 @@ e_cellular_err_t cellular_module_reset(st_cellular_ctrl_t * const p_ctrl)
 #if CELLULAR_BAUDRATE_TARGET != CELLULAR_BAUDRATE
         if (CELLULAR_SUCCESS != ret)
         {
-            CELLULAR_LOG_INFO(("ATE0 after RESET_N fallback at %lu bps timed out - probing %lu bps.",
+            CELLULAR_LOG_INFO(("ATE0 after PWRKEY recovery at %lu bps timed out - probing %lu bps.",
                                (unsigned long)p_ctrl->sci_ctrl.baud_rate,
                                (unsigned long)CELLULAR_BAUDRATE_TARGET));
             ret = cellular_serial_reopen(p_ctrl, CELLULAR_BAUDRATE_TARGET);
