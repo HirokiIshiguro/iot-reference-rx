@@ -55,6 +55,32 @@ uint32_t cellular_synchro_event_group(void * const xEventGroup,
     if (NULL != xEventGroup)
     {
 #if BSP_CFG_RTOS_USED == (1)
+        EventBits_t current_bits = 0;
+        TickType_t wait_ticks    = 0;
+
+        if (CELLULAR_TIME_OUT_MAX_DELAY == xTicksToWait)
+        {
+            wait_ticks = (TickType_t)portMAX_DELAY;
+        }
+        else
+        {
+            wait_ticks = (TickType_t)xTicksToWait;
+        }
+
+        current_bits = xEventGroupGetBits((EventGroupHandle_t)xEventGroup);
+        CELLULAR_LOG_INFO(("cellular_synchro_event_group: enter task=%s handle=0x%08lx tick=%lu sched=%ld "
+                           "set=0x%08lx wait=0x%08lx timeout=%lu bits=0x%08lx heap=%lu stack_hwm=%lu.",
+                           pcTaskGetName(NULL),
+                           (unsigned long)xEventGroup,
+                           (unsigned long)xTaskGetTickCount(),
+                           (long)xTaskGetSchedulerState(),
+                           (unsigned long)uxBitsToSet,
+                           (unsigned long)uxBitsToWaitFor,
+                           (unsigned long)wait_ticks,
+                           (unsigned long)current_bits,
+                           (unsigned long)xPortGetFreeHeapSize(),
+                           (unsigned long)uxTaskGetStackHighWaterMark(NULL)));
+
         if (CELLULAR_TIME_OUT_MAX_DELAY == xTicksToWait)
         {
             ret = xEventGroupSync((EventGroupHandle_t)xEventGroup,
@@ -69,6 +95,18 @@ uint32_t cellular_synchro_event_group(void * const xEventGroup,
                                     (EventBits_t)uxBitsToWaitFor,
                                     (TickType_t)xTicksToWait);
         }
+
+        current_bits = xEventGroupGetBits((EventGroupHandle_t)xEventGroup);
+        CELLULAR_LOG_INFO(("cellular_synchro_event_group: leave task=%s handle=0x%08lx tick=%lu sched=%ld "
+                           "ret=0x%08lx bits=0x%08lx heap=%lu stack_hwm=%lu.",
+                           pcTaskGetName(NULL),
+                           (unsigned long)xEventGroup,
+                           (unsigned long)xTaskGetTickCount(),
+                           (long)xTaskGetSchedulerState(),
+                           (unsigned long)ret,
+                           (unsigned long)current_bits,
+                           (unsigned long)xPortGetFreeHeapSize(),
+                           (unsigned long)uxTaskGetStackHighWaterMark(NULL)));
 #elif BSP_CFG_RTOS_USED == (5)
         UINT rtos_ret;
 
