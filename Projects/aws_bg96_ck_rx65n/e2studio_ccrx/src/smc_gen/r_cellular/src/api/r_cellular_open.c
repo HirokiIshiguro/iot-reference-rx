@@ -159,6 +159,7 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
 #if BSP_CFG_RTOS_USED == (1)
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task ready wait start."));
     recv_ready = ulTaskNotifyTakeIndexed(CELLULAR_OPEN_NOTIFY_INDEX, pdTRUE, CELLULAR_TIME_WAIT_TASK_START);
+    p_ctrl->recv_ready_taskhandle = NULL;
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task ready wait returned %lu.", (unsigned long)recv_ready));
     if (0U == recv_ready)
     {

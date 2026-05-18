@@ -291,19 +291,12 @@ void cellular_recv_task(ULONG p_pvParameters)
     uint32_t              sync_bits        = 0;
 #endif
 
-    CELLULAR_LOG_INFO(("cellular_recv_task: entry."));
     memset(p_ctrl->sci_ctrl.receive_buff, 0, sizeof(p_ctrl->sci_ctrl.receive_buff));
-    CELLULAR_LOG_INFO(("cellular_recv_task: receive buffer cleared."));
 
 #if BSP_CFG_RTOS_USED == (1)
     if (NULL != p_ctrl->recv_ready_taskhandle)
     {
         (void)xTaskNotifyGiveIndexed((TaskHandle_t)p_ctrl->recv_ready_taskhandle, CELLULAR_OPEN_NOTIFY_INDEX);
-        CELLULAR_LOG_INFO(("cellular_recv_task: ready notified."));
-    }
-    else
-    {
-        CELLULAR_LOG_ERROR(("cellular_recv_task: ready notify target is NULL."));
     }
 #else
     CELLULAR_LOG_INFO(("cellular_recv_task: sync start."));
