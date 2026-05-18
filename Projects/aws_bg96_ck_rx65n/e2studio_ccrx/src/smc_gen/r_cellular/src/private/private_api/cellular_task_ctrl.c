@@ -56,6 +56,15 @@ e_cellular_err_t cellular_start_recv_task(st_cellular_ctrl_t * const p_ctrl)
     thread_size /= (uint16_t)sizeof(configSTACK_DEPTH_TYPE);    //cast
 #endif
 
+#if BSP_CFG_RTOS_USED == (1)
+    p_ctrl->eventgroup = NULL;
+    ret = cellular_create_task(cellular_recv_task,
+                                CELLULAR_RECV_TASK_NAME,
+                                thread_size,
+                                (void *)p_ctrl, //(st_cellular_ctrl_t *)->(void *)
+                                CELLULAR_RECV_TASK_PRIORITY,
+                                &p_ctrl->recv_taskhandle);
+#else
     p_ctrl->eventgroup = cellular_create_event_group("task_event");
     if (NULL == p_ctrl->eventgroup)
     {
@@ -70,6 +79,7 @@ e_cellular_err_t cellular_start_recv_task(st_cellular_ctrl_t * const p_ctrl)
                                     CELLULAR_RECV_TASK_PRIORITY,
                                     &p_ctrl->recv_taskhandle);
     }
+#endif
 
     return ret;
 }

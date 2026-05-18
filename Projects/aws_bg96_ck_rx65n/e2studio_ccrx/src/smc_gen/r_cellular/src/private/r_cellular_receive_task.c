@@ -287,16 +287,30 @@ void cellular_recv_task(ULONG p_pvParameters)
 
     sci_err_t             sci_ret          = SCI_SUCCESS;
     st_cellular_receive_t cellular_receive = {0,0,CELLULAR_RES_NONE,JOB_STATUS_NONE,0,0,0};
+#if BSP_CFG_RTOS_USED == (5)
     uint32_t              sync_bits        = 0;
+#endif
 
     CELLULAR_LOG_INFO(("cellular_recv_task: entry."));
     memset(p_ctrl->sci_ctrl.receive_buff, 0, sizeof(p_ctrl->sci_ctrl.receive_buff));
     CELLULAR_LOG_INFO(("cellular_recv_task: receive buffer cleared."));
 
+#if BSP_CFG_RTOS_USED == (1)
+    if (NULL != p_ctrl->recv_ready_taskhandle)
+    {
+        (void)xTaskNotifyGiveIndexed((TaskHandle_t)p_ctrl->recv_ready_taskhandle, CELLULAR_OPEN_NOTIFY_INDEX);
+        CELLULAR_LOG_INFO(("cellular_recv_task: ready notified."));
+    }
+    else
+    {
+        CELLULAR_LOG_ERROR(("cellular_recv_task: ready notify target is NULL."));
+    }
+#else
     CELLULAR_LOG_INFO(("cellular_recv_task: sync start."));
     sync_bits = cellular_synchro_event_group(p_ctrl->eventgroup, CELLULAR_RECV_TASK_BIT,
                                 (CELLULAR_MAIN_TASK_BIT | CELLULAR_RECV_TASK_BIT), CELLULAR_TIME_WAIT_TASK_START);
     CELLULAR_LOG_INFO(("cellular_recv_task: sync returned 0x%08lx.", (unsigned long)sync_bits));
+#endif
 
     /* WAIT_LOOP */
     while (1)

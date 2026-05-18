@@ -52,6 +52,7 @@
 #define CELLULAR_MAIN_TASK_BIT              (0x01u << 1)
 #define CELLULAR_RECV_TASK_BIT              (0x01u << 2)
 #define CELLULAR_TASK_NOTIFY_INDEX          (1U)
+#define CELLULAR_OPEN_NOTIFY_INDEX          (2U)
 
 #define CELLULAR_TIME_WAIT_TASK_START       (10000u)
 #define CELLULAR_TIME_OUT_MAX_DELAY         (0xffffffffu)

@@ -62,6 +62,7 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
 {
     uint8_t          open_phase = 0;
     uint32_t         preemption = 0;
+    uint32_t         recv_ready = 0;
     e_cellular_err_t ret        = CELLULAR_SUCCESS;
 
     CELLULAR_LOG_INFO(("Called: R_CELLULAR_Open()"));
@@ -135,6 +136,17 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
     open_phase |= PHASE_4;
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: semaphore init complete."));
 
+#if BSP_CFG_RTOS_USED == (1)
+#if configTASK_NOTIFICATION_ARRAY_ENTRIES <= CELLULAR_OPEN_NOTIFY_INDEX
+#error "configTASK_NOTIFICATION_ARRAY_ENTRIES must reserve CELLULAR_OPEN_NOTIFY_INDEX."
+#endif
+    p_ctrl->recv_ready_taskhandle = xTaskGetCurrentTaskHandle();
+    while (0U != ulTaskNotifyTakeIndexed(CELLULAR_OPEN_NOTIFY_INDEX, pdTRUE, 0))
+    {
+        /* Drain stale startup notifications before creating the receive task. */
+    }
+#endif
+
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task start."));
     ret = cellular_start_recv_task(p_ctrl);
     if (CELLULAR_SUCCESS != ret)
@@ -144,6 +156,16 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
     open_phase |= PHASE_5;
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task created."));
 
+#if BSP_CFG_RTOS_USED == (1)
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task ready wait start."));
+    recv_ready = ulTaskNotifyTakeIndexed(CELLULAR_OPEN_NOTIFY_INDEX, pdTRUE, CELLULAR_TIME_WAIT_TASK_START);
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task ready wait returned %lu.", (unsigned long)recv_ready));
+    if (0U == recv_ready)
+    {
+        ret = CELLULAR_ERR_CREATE_TASK;
+        goto R_CELLULAR_Open_fail;
+    }
+#else
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task sync start."));
     if ((CELLULAR_MAIN_TASK_BIT | CELLULAR_RECV_TASK_BIT) !=
             cellular_synchro_event_group(p_ctrl->eventgroup, CELLULAR_MAIN_TASK_BIT,
@@ -153,6 +175,7 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
         goto R_CELLULAR_Open_fail;
     }
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task sync complete."));
+#endif
 
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: module reset start."));
     ret = cellular_module_reset(p_ctrl);

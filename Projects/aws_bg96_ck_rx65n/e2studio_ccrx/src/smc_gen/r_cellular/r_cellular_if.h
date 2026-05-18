@@ -564,6 +564,7 @@ typedef struct cellular_ctrl
     st_cellular_ipaddr_t        pdp_addr;           // PDP Address
     void *                      at_semaphore;       // Semaphore handle (for at command)
     void *                      recv_taskhandle;    // Task handle
+    void *                      recv_ready_taskhandle; // Task handle to notify receive task startup
     void *                      eventgroup;         // Event Group Handles
     void *                      recv_data;          // Pointer to the storage location of the retrieved information.
     st_cellular_sci_ctrl_t      sci_ctrl;           // Module communication management structure
