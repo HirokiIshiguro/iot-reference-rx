@@ -287,11 +287,16 @@ void cellular_recv_task(ULONG p_pvParameters)
 
     sci_err_t             sci_ret          = SCI_SUCCESS;
     st_cellular_receive_t cellular_receive = {0,0,CELLULAR_RES_NONE,JOB_STATUS_NONE,0,0,0};
+    uint32_t              sync_bits        = 0;
 
+    CELLULAR_LOG_INFO(("cellular_recv_task: entry."));
     memset(p_ctrl->sci_ctrl.receive_buff, 0, sizeof(p_ctrl->sci_ctrl.receive_buff));
+    CELLULAR_LOG_INFO(("cellular_recv_task: receive buffer cleared."));
 
-    cellular_synchro_event_group(p_ctrl->eventgroup, CELLULAR_RECV_TASK_BIT,
+    CELLULAR_LOG_INFO(("cellular_recv_task: sync start."));
+    sync_bits = cellular_synchro_event_group(p_ctrl->eventgroup, CELLULAR_RECV_TASK_BIT,
                                 (CELLULAR_MAIN_TASK_BIT | CELLULAR_RECV_TASK_BIT), CELLULAR_TIME_WAIT_TASK_START);
+    CELLULAR_LOG_INFO(("cellular_recv_task: sync returned 0x%08lx.", (unsigned long)sync_bits));
 
     /* WAIT_LOOP */
     while (1)

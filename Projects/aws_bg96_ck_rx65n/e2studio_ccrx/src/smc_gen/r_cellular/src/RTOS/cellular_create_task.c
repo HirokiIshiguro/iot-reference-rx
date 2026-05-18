@@ -61,12 +61,20 @@ e_cellular_err_t cellular_create_task(void (*pxTaskCode)(ULONG),
 #if BSP_CFG_RTOS_USED == (1)
     int32_t rtos_ret;
 
+    CELLULAR_LOG_INFO(("cellular_create_task: %s stack=%u priority=%lu.",
+                       pcName,
+                       (unsigned int)usStackDepth,
+                       (unsigned long)uxPriority));
+
     rtos_ret = xTaskCreate((TaskFunction_t)pxTaskCode,
                             pcName,
                             (configSTACK_DEPTH_TYPE)usStackDepth,
                             pvParameters,
                             tskIDLE_PRIORITY + (UBaseType_t)uxPriority,
                             (TaskHandle_t *)pxCreatedTask);
+    CELLULAR_LOG_INFO(("cellular_create_task: %s xTaskCreate returned %ld.",
+                       pcName,
+                       (long)rtos_ret));
 
     if (pdPASS != rtos_ret)
     {
