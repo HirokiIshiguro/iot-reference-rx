@@ -28,6 +28,7 @@
 
 #include "cellular_private_api.h"
 #include "cellular_freertos.h"
+#include "cellular_receive_task.h"
 #include "at_command.h"
 
 /**********************************************************************************************************************
@@ -153,6 +154,12 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
     {
         goto R_CELLULAR_Open_fail;
     }
+
+#if BSP_CFG_RTOS_USED == (1)
+    /* Restore the receive task priority after startup AT command sequencing is complete. */
+    vTaskPrioritySet((TaskHandle_t)p_ctrl->recv_taskhandle,
+                        tskIDLE_PRIORITY + (UBaseType_t)CELLULAR_RECV_TASK_PRIORITY);
+#endif
 
     CELLULAR_LOG_INFO(("Return from: R_CELLULAR_Open() with return code = %d.", ret));
 
