@@ -40,9 +40,9 @@
 #define BG96_READY_WAIT_MS          (8000U)
 #define BG96_STATUS_READY_WAIT_MS   (15000U)
 #define BG96_BOOT_URC_QUIET_MS      (3000U)
-#define BG96_PWRKEY_PULSE_MS        (1200U)
+#define BG96_PWRKEY_PULSE_MS        (700U)
 #define BG96_RESET_PULSE_MS         (300U)
-#define BG96_PWRKEY_SHUTDOWN_WAIT_MS  (65000U)
+#define BG96_PWRKEY_SHUTDOWN_WAIT_MS  (8000U)
 #define BG96_PWRKEY_RESTART_GUARD_MS  (1000U)
 
 #if defined(CELLULAR_TARGET_BG96) && !defined(CELLULAR_CFG_BG96_FLOW_CONTROL)
@@ -497,10 +497,7 @@ static e_cellular_err_t cellular_bg96_pwrkey_recovery(st_cellular_ctrl_t * const
         }
         else
         {
-            CELLULAR_LOG_ERROR(("BG96 PWRKEY fallback did not observe STATUS stopped."));
-            p_ctrl->sci_ctrl.baud_rate = CELLULAR_BAUDRATE;
-            (void) cellular_serial_open(p_ctrl);
-            return CELLULAR_ERR_RECV_TASK;
+            CELLULAR_LOG_INFO(("BG96 PWRKEY fallback did not observe STATUS stopped."));
         }
     }
 
