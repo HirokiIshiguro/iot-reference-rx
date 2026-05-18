@@ -28,6 +28,7 @@
 
 #include "cellular_private_api.h"
 #include "cellular_freertos.h"
+#include "cellular_receive_task.h"
 #include "at_command.h"
 
 /**********************************************************************************************************************
@@ -166,6 +167,9 @@ e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t * const p_ctrl, const st_cel
         ret = CELLULAR_ERR_CREATE_TASK;
         goto R_CELLULAR_Open_fail;
     }
+    vTaskPrioritySet((TaskHandle_t)p_ctrl->recv_taskhandle,
+                        tskIDLE_PRIORITY + (UBaseType_t)CELLULAR_RECV_TASK_PRIORITY);
+    CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task priority raised."));
 #else
     CELLULAR_LOG_INFO(("R_CELLULAR_Open: receive task sync start."));
     if ((CELLULAR_MAIN_TASK_BIT | CELLULAR_RECV_TASK_BIT) !=

@@ -62,7 +62,7 @@ e_cellular_err_t cellular_start_recv_task(st_cellular_ctrl_t * const p_ctrl)
                                 CELLULAR_RECV_TASK_NAME,
                                 thread_size,
                                 (void *)p_ctrl, //(st_cellular_ctrl_t *)->(void *)
-                                CELLULAR_RECV_TASK_PRIORITY,
+                                CELLULAR_RECV_TASK_START_PRIORITY,
                                 &p_ctrl->recv_taskhandle);
 #else
     p_ctrl->eventgroup = cellular_create_event_group("task_event");
