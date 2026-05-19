@@ -138,6 +138,8 @@ OtaPalJobDocProcessingResult_t otaPal_CreateFileForRx(AfrOtaJobDocumentFields_t 
 {
     static uint8_t hdl = 0U;
 
+    LogInfo(("otaPal_CreateFileForRx: enter"));
+
     if (NULL == pFileContext)
     {
         return OtaPalJobDocFileCreateFailed;
@@ -149,18 +151,23 @@ OtaPalJobDocProcessingResult_t otaPal_CreateFileForRx(AfrOtaJobDocumentFields_t 
         return OtaPalJobDocFileCreateFailed;
     }
 
+    LogInfo(("otaPal_CreateFileForRx: ensure flash resources"));
     if (pdTRUE != prvEnsureFlashResources())
     {
         LogError(("otaPal_CreateFileForRx: flash resource init failed"));
         return OtaPalJobDocFileCreateFailed;
     }
 
+    LogInfo(("otaPal_CreateFileForRx: wait for flash queue drained"));
     (void)prvWaitForFlashQueueDrained();
+    LogInfo(("otaPal_CreateFileForRx: reset download state"));
     prvResetDownloadState();
     pFileContext->fileId = hdl++;
     OtaImageState = OtaImageStateUnknown;
+    LogInfo(("otaPal_CreateFileForRx: persist image state"));
     (void) prvPersistImageState(OtaImageState);
 
+    LogInfo(("otaPal_CreateFileForRx: erase buffer area"));
     if (pdTRUE != prvEraseBufferArea())
     {
         LogError(("otaPal_CreateFileForRx: buffer erase failed"));
@@ -420,13 +427,18 @@ OtaPalStatus_t otaPal_EraseArea(uint8_t area)
 
 static BaseType_t prvEnsureFlashResources(void)
 {
-    if (COMMONAPI_SUCCESS != R_Demo_Common_API_Flash_Open())
+    e_commonapi_err_t commonApiError = R_Demo_Common_API_Flash_Open();
+
+    LogInfo(("prvEnsureFlashResources: R_Demo_Common_API_Flash_Open returned %d", (int)commonApiError));
+
+    if (COMMONAPI_SUCCESS != commonApiError)
     {
         return pdFALSE;
     }
 
     if (NULL == xOtaFlashQueue)
     {
+        LogInfo(("prvEnsureFlashResources: creating flash queue"));
         xOtaFlashQueue = xQueueCreate(OTA_FLASH_QUEUE_LENGTH, sizeof(OtaFlashBlock_t));
         if (NULL == xOtaFlashQueue)
         {
@@ -436,6 +448,7 @@ static BaseType_t prvEnsureFlashResources(void)
 
     if (NULL == xOtaFlashTask)
     {
+        LogInfo(("prvEnsureFlashResources: creating flash task"));
         if (pdPASS != xTaskCreate(prvOtaFlashTask,
                                   "OTA_FLASH",
                                   configMINIMAL_STACK_SIZE * 2U,
@@ -536,18 +549,27 @@ static BaseType_t prvEraseBufferArea(void)
     uint32_t eraseAddr = FWUP_CFG_BUF_AREA_ADDR_L + (FWUP_CFG_CF_BLK_SIZE * (numBlocks - 1U));
     flash_err_t flashError;
 
+    LogInfo(("prvEraseBufferArea: enter addr=%08x blocks=%u",
+             (unsigned int)eraseAddr,
+             (unsigned int)numBlocks));
+
     if (pdTRUE != prvWaitForFlashQueueDrained())
     {
         return pdFALSE;
     }
 
+    LogInfo(("prvEraseBufferArea: taking flash semaphore"));
     xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
     update_data_flash_control_block.status = DATA_FLASH_UPDATE_STATE_ERASE_WAIT_COMPLETE;
+    LogInfo(("prvEraseBufferArea: calling R_FLASH_Erase"));
     flashError = R_FLASH_Erase((flash_block_address_t)eraseAddr, numBlocks);
+    LogInfo(("prvEraseBufferArea: R_FLASH_Erase returned %d", (int)flashError));
 
     if (FLASH_SUCCESS == flashError)
     {
+        LogInfo(("prvEraseBufferArea: waiting for erase completion callback"));
         xSemaphoreTake(xSemaphoreFlashAccess, portMAX_DELAY);
+        LogInfo(("prvEraseBufferArea: erase completion callback observed"));
         xSemaphoreGive(xSemaphoreFlashAccess);
         return pdTRUE;
     }
