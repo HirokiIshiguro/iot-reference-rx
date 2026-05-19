@@ -190,8 +190,8 @@ void cellular_serial_close(st_cellular_ctrl_t * const p_ctrl)
 /**********************************************************************************************
  * Function Name  @fn            cellular_serial_reopen
  * Description    @details       Close and reopen the SCI at a new baud rate.
- *                               The receive task busy-polls R_SCI_Receive and yields when it
- *                               fails, so the brief window between close and open is absorbed
+ *                               The receive task delays when R_SCI_Receive fails, so the
+ *                               brief window between close and open is absorbed
  *                               without losing task state.
  *********************************************************************************************/
 e_cellular_err_t cellular_serial_reopen(st_cellular_ctrl_t * const p_ctrl, uint32_t new_baud)

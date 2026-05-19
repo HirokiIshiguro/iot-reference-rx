@@ -28,6 +28,7 @@
 
 #include "cellular_private_api.h"
 #include "cellular_freertos.h"
+#include "cellular_receive_task.h"
 #include "at_command.h"
 
 /**********************************************************************************************************************

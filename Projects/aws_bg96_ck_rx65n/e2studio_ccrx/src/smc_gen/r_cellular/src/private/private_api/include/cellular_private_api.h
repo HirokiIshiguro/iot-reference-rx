@@ -197,7 +197,7 @@ void cellular_serial_close (st_cellular_ctrl_t * const p_ctrl);
  * Description    @details       Close and reopen the serial port at a new baud rate.
  *                               Used by the BG96 boot-time baud upgrade (115200 -> 921600).
  *                               The receive task tolerates the brief SCI handle transition
- *                               because its main loop yields on R_SCI_Receive failure.
+ *                               because its main loop delays on R_SCI_Receive failure.
  * Arguments      @param[in/out] p_ctrl -
  *                                  Pointer to managed structure (baud_rate field is updated).
  *                @param[in]     new_baud -
