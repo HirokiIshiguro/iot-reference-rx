@@ -725,7 +725,23 @@ build_rx72n_ether_fleet:
     - $AWS_CLI_RUNNER_TAG
   before_script:
     - $ErrorActionPreference = "Stop"
-    - aws --version
+    - |
+      python -c "import awscli" 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        $ciBin = "$env:CI_PROJECT_DIR\.ci-bin"
+        New-Item -ItemType Directory -Force -Path $ciBin | Out-Null
+        Set-Content -Path "$ciBin\aws.cmd" -Encoding ASCII -Value @(
+          "@echo off",
+          "python -m awscli %*"
+        )
+        $env:PATH = "$ciBin;$env:PATH"
+        $env:AWS_CLI_USE_PYTHON_MODULE = "1"
+      }
+      if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
+        Write-Error "AWS CLI is unavailable on the AWS CLI runner."
+        exit 1
+      }
+      aws --version
 
 .rx65n_bg96_flash_rules:
   rules:
@@ -1928,7 +1944,6 @@ cleanup_rx72n_ether_ota_jobs:
         exit 1
       }
 
-      aws --version
       python tools\cleanup_iot_jobs.py `
         --thing-name "$env:RX72N_DEVICE_ID" `
         --region "$env:AWS_DEFAULT_REGION" `
