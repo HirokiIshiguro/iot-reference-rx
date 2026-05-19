@@ -33,8 +33,7 @@
 /**********************************************************************************************************************
  * Macro definitions
  *********************************************************************************************************************/
-#define CELLULAR_RECV_TASK_PRIORITY       (5)
-#define CELLULAR_RECV_TASK_START_PRIORITY (1)
+#define CELLULAR_RECV_TASK_PRIORITY (5)
 #define CELLULAR_RING_TASK_PRIORITY (4)
 #define CELLULAR_IDLE_PRIORITY      CELLULAR_RECV_TASK_PRIORITY
 

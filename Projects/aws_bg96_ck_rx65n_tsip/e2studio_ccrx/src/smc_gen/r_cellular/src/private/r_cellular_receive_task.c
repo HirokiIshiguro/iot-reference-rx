@@ -296,20 +296,7 @@ void cellular_recv_task(ULONG p_pvParameters)
         sci_ret = R_SCI_Receive(p_ctrl->sci_ctrl.sci_hdl, &cellular_receive.data, 1);
         if (SCI_SUCCESS != sci_ret)
         {
-#if BSP_CFG_RTOS_USED == (1)
-            if ((0U != cellular_receive.recv_count) ||
-                (JOB_STATUS_NONE != cellular_receive.job_status) ||
-                (CELLULAR_RES_NONE != cellular_receive.job_no))
-            {
-                taskYIELD();
-            }
-            else
-            {
-                vTaskDelay(1);
-            }
-#else
             cellular_delay_task(1);
-#endif
         }
         else
         {

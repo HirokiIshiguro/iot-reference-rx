@@ -55,8 +55,6 @@ e_cellular_err_t cellular_start_recv_task(st_cellular_ctrl_t * const p_ctrl)
 
 #if BSP_CFG_RTOS_USED == (1)
     thread_size /= (uint16_t)sizeof(configSTACK_DEPTH_TYPE);    //cast
-    /* Keep R_CELLULAR_Open() runnable until the modem reset/init sequence has completed. */
-    priority = CELLULAR_RECV_TASK_START_PRIORITY;
 #endif
 
     p_ctrl->eventgroup = cellular_create_event_group("task_event");
