@@ -1899,7 +1899,10 @@ provision_rx72n_ether_fleet:
 
 cleanup_rx72n_ether_ota_jobs:
   stage: pre_test_cleanup
-  extends: .rx72n_linux_hw_job
+  tags:
+    - exec-shell
+    - os-windows
+    - ccrx
   needs:
     - job: build_rx72n_ether
       artifacts: false
@@ -1920,22 +1923,28 @@ cleanup_rx72n_ether_ota_jobs:
       when: on_success
     - when: never
   script:
-    - echo "=== Cleanup stale RX72N OTA IoT Jobs ==="
+    - Write-Host "=== Cleanup stale RX72N OTA IoT Jobs ==="
     - |
-      if ! command -v aws >/dev/null 2>&1; then
-        python -m pip install --quiet awscli
-      fi
+      if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
+        Write-Host "AWS CLI not found on this Windows runner; installing awscli for this user."
+        python -m pip install --user --quiet awscli
+        $userScripts = python -c "import os, site; print(os.path.join(site.USER_BASE, 'Scripts'))"
+        $env:PATH = "$userScripts;$env:PATH"
+      }
+      if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
+        Write-Error "AWS CLI is still unavailable after setup."
+        exit 1
+      }
 
-      artifact_dir="$CI_PROJECT_DIR/artifacts/cleanup_rx72n_ether_ota_jobs"
-      mkdir -p "$artifact_dir"
-      python tools/cleanup_iot_jobs.py \
-        --thing-name "$RX72N_DEVICE_ID" \
-        --region "$AWS_DEFAULT_REGION" \
-        --job-id-prefix "AFR_OTA-" \
-        --output-json "$artifact_dir/cleanup_summary.json" \
-        2>&1 | tee "$artifact_dir/cleanup_rx72n_ether_ota_jobs.log"
-      status="${PIPESTATUS[0]}"
-      exit "$status"
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      python tools\cleanup_iot_jobs.py `
+        --thing-name "$env:RX72N_DEVICE_ID" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --job-id-prefix "AFR_OTA-" `
+        --output-json "$artifactDir\cleanup_summary.json" `
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_ota_jobs.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
     paths:
