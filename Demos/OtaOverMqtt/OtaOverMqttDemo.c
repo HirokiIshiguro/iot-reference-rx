@@ -491,11 +491,19 @@ static bool convertSignatureToDER(AfrOtaJobDocumentFields_t *jobFields)
     bool returnVal = true;
     size_t decodedSignatureLength = 0;
 
+    LogInfo(("Decoding OTA image signature: encodedLen=%u, bufferSize=%u",
+             (unsigned int)jobFields->signatureLen,
+             (unsigned int)sizeof(OtaImageSingatureDecoded)));
+
     Base64Status_t xResult = base64_Decode(OtaImageSingatureDecoded,
                                            sizeof(OtaImageSingatureDecoded),
                                            &decodedSignatureLength,
                                            (const uint8_t *)jobFields->signature, // cast the signature
                                            jobFields->signatureLen);
+
+    LogInfo(("Decoded OTA image signature: status=%d, decodedLen=%u",
+             (int)xResult,
+             (unsigned int)decodedSignatureLength));
 
     if (Base64Success == xResult)
     {
@@ -763,7 +771,12 @@ static OtaPalJobDocProcessingResult_t receivedJobDocumentHandler(OtaJobEventData
 
             if (handled)
             {
+                LogInfo(("Creating OTA receive file: fileSize=%u, signatureLen=%u, blockSize=%u",
+                         (unsigned int)jobFields.fileSize,
+                         (unsigned int)jobFields.signatureLen,
+                         (unsigned int)mqttFileDownloader_CONFIG_BLOCK_SIZE));
                 xResult = otaPal_CreateFileForRx(&jobFields);
+                LogInfo(("otaPal_CreateFileForRx returned %d", (int)xResult));
             }
             else
             {
