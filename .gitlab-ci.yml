@@ -1899,10 +1899,7 @@ provision_rx72n_ether_fleet:
 
 cleanup_rx72n_ether_ota_jobs:
   stage: pre_test_cleanup
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
+  extends: .rx72n_linux_hw_job
   needs:
     - job: build_rx72n_ether
       artifacts: false
@@ -1923,17 +1920,18 @@ cleanup_rx72n_ether_ota_jobs:
       when: on_success
     - when: never
   script:
-    - Write-Host "=== Cleanup stale RX72N OTA IoT Jobs ==="
+    - echo "=== Cleanup stale RX72N OTA IoT Jobs ==="
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-      python tools\cleanup_iot_jobs.py `
-        --thing-name "$env:RX72N_DEVICE_ID" `
-        --region "$env:AWS_DEFAULT_REGION" `
-        --job-id-prefix "AFR_OTA-" `
-        --output-json "$artifactDir\cleanup_summary.json" `
-        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_ota_jobs.log"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      artifact_dir="$CI_PROJECT_DIR/artifacts/cleanup_rx72n_ether_ota_jobs"
+      mkdir -p "$artifact_dir"
+      python tools/cleanup_iot_jobs.py \
+        --thing-name "$RX72N_DEVICE_ID" \
+        --region "$AWS_DEFAULT_REGION" \
+        --job-id-prefix "AFR_OTA-" \
+        --output-json "$artifact_dir/cleanup_summary.json" \
+        2>&1 | tee "$artifact_dir/cleanup_rx72n_ether_ota_jobs.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
   artifacts:
     when: always
     paths:
