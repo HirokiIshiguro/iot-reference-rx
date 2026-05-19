@@ -1938,6 +1938,7 @@ cleanup_rx72n_ether_ota_jobs:
           "@echo off",
           "python -c ""import sys; from awscli.clidriver import main; sys.exit(main())"" %*"
         )
+        $env:AWS_CLI_USE_PYTHON_MODULE = "1"
         $env:PATH = "$ciBin;$userScripts;$env:PATH"
       }
       if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {

@@ -3,6 +3,8 @@
 
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import sys
 import time
@@ -22,8 +24,28 @@ def run_command(cmd, *, allow_failure=False):
     return result
 
 
+def aws_command_prefix():
+    if os.environ.get("AWS_CLI_USE_PYTHON_MODULE") == "1":
+        return [
+            sys.executable,
+            "-c",
+            "import sys; from awscli.clidriver import main; sys.exit(main())",
+        ]
+
+    configured = os.environ.get("AWS_CLI_EXE")
+    if configured:
+        return [configured]
+
+    for candidate in ("aws", "aws.cmd", "aws.exe"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            return [resolved]
+
+    return ["aws"]
+
+
 def run_aws(args, region, *, allow_failure=False):
-    return run_command(["aws", *args, "--region", region, "--output", "json"], allow_failure=allow_failure)
+    return run_command([*aws_command_prefix(), *args, "--region", region, "--output", "json"], allow_failure=allow_failure)
 
 
 def load_json(result):
