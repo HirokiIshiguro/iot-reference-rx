@@ -1922,6 +1922,10 @@ cleanup_rx72n_ether_ota_jobs:
   script:
     - echo "=== Cleanup stale RX72N OTA IoT Jobs ==="
     - |
+      if ! command -v aws >/dev/null 2>&1; then
+        python -m pip install --quiet awscli
+      fi
+
       artifact_dir="$CI_PROJECT_DIR/artifacts/cleanup_rx72n_ether_ota_jobs"
       mkdir -p "$artifact_dir"
       python tools/cleanup_iot_jobs.py \
