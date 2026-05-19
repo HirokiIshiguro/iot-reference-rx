@@ -457,7 +457,7 @@ build_rx72n_ether:
         --output "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot" `
         --range-start 0xFFE00000 `
         --range-end 0xFFFFFFFF `
-        --shift -0x200000 `
+        --shift=-0x200000 `
         --drop-out-of-range
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
     - |
@@ -659,7 +659,7 @@ build_rx72n_ether_fleet:
         --output "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot" `
         --range-start 0xFFE00000 `
         --range-end 0xFFFFFFFF `
-        --shift -0x200000 `
+        --shift=-0x200000 `
         --drop-out-of-range
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
     - |
