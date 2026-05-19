@@ -1925,19 +1925,27 @@ cleanup_rx72n_ether_ota_jobs:
   script:
     - Write-Host "=== Cleanup stale RX72N OTA IoT Jobs ==="
     - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
       if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
         Write-Host "AWS CLI not found on this Windows runner; installing awscli for this user."
         python -m pip install --user --quiet awscli
-        $userScripts = python -c "import os, site; print(os.path.join(site.USER_BASE, 'Scripts'))"
-        $env:PATH = "$userScripts;$env:PATH"
+        $userScripts = (& python -c "import os, site; print(os.path.join(site.USER_BASE, 'Scripts'))").Trim()
+        $ciBin = "$env:CI_PROJECT_DIR\.ci-bin"
+        New-Item -ItemType Directory -Force -Path $ciBin | Out-Null
+        Set-Content -Path "$ciBin\aws.cmd" -Encoding ASCII -Value @(
+          "@echo off",
+          "python -c ""import sys; from awscli.clidriver import main; sys.exit(main())"" %*"
+        )
+        $env:PATH = "$ciBin;$userScripts;$env:PATH"
       }
       if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
         Write-Error "AWS CLI is still unavailable after setup."
         exit 1
       }
 
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      aws --version
       python tools\cleanup_iot_jobs.py `
         --thing-name "$env:RX72N_DEVICE_ID" `
         --region "$env:AWS_DEFAULT_REGION" `
