@@ -225,6 +225,7 @@ workflow:
 
 .nightly_matrix_trigger:
   stage: nightly_matrix
+  timeout: 4h
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
       when: on_success
@@ -261,6 +262,7 @@ workflow:
 
 .nightly_matrix_stabilizing_trigger:
   stage: nightly_matrix
+  timeout: 4h
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true"'
       when: on_success
