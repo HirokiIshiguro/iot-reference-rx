@@ -541,17 +541,30 @@ static CK_RV p11_ecdsa_ctx_init( mbedtls_pk_context * pk,
             if( pxAttrs[ 0 ].ulValueLen > 0 )
             {
                 pxAttrs[ 0 ].pValue = pvPortMalloc( pxAttrs[ 0 ].ulValueLen );
+                if( pxAttrs[ 0 ].pValue == NULL )
+                {
+                    xResult = CKR_HOST_MEMORY;
+                    LogError( ( "Failed to allocate EC parameter buffer" ) );
+                }
             }
 
-            if( pxAttrs[ 1 ].ulValueLen > 0 )
+            if( ( xResult == CKR_OK ) && ( pxAttrs[ 1 ].ulValueLen > 0 ) )
             {
                 pxAttrs[ 1 ].pValue = pvPortMalloc( pxAttrs[ 1 ].ulValueLen );
+                if( pxAttrs[ 1 ].pValue == NULL )
+                {
+                    xResult = CKR_HOST_MEMORY;
+                    LogError( ( "Failed to allocate EC point buffer" ) );
+                }
             }
 
-            xResult = pxFunctionList->C_GetAttributeValue( xSessionHandle,
-                                                           xPkHandle,
-                                                           pxAttrs,
-                                                           2 );
+            if( xResult == CKR_OK )
+            {
+                xResult = pxFunctionList->C_GetAttributeValue( xSessionHandle,
+                                                               xPkHandle,
+                                                               pxAttrs,
+                                                               2 );
+            }
         }
 
         /* Parse EC Group */
@@ -573,13 +586,21 @@ static CK_RV p11_ecdsa_ctx_init( mbedtls_pk_context * pk,
             size_t uxLen = pxAttrs[ 1 ].ulValueLen;
             int lResult = 0;
 
-            lResult = mbedtls_asn1_get_tag( &pucIterator, &( pucIterator[ uxLen ] ), &uxLen, MBEDTLS_ASN1_OCTET_STRING );
+            if( ( pucIterator == NULL ) || ( uxLen == 0U ) )
+            {
+                xResult = CKR_GENERAL_ERROR;
+                LogError( ( "Invalid EC point attribute" ) );
+            }
+            else
+            {
+                lResult = mbedtls_asn1_get_tag( &pucIterator, &( pucIterator[ uxLen ] ), &uxLen, MBEDTLS_ASN1_OCTET_STRING );
+            }
 
-            if( lResult != 0 )
+            if( ( xResult == CKR_OK ) && ( lResult != 0 ) )
             {
                 xResult = CKR_GENERAL_ERROR;
             }
-            else
+            else if( xResult == CKR_OK )
             {
                 lResult = mbedtls_ecp_point_read_binary( &( pxMbedEcDsaCtx->grp ),
                                                          &( pxMbedEcDsaCtx->Q ),

@@ -405,10 +405,12 @@ void vApplicationLcdLogString( const char * pcMessage, unsigned short usStringLe
 
     if( ( pdFALSE != xDisplayInitialized ) && ( NULL != pcMessage ) )
     {
+        taskENTER_CRITICAL();
         for( usIndex = 0; usIndex < usStringLength; usIndex++ )
         {
             R_SIMPLE_GRAPHIC_PutCharacter(pcMessage[usIndex]);
         }
+        taskEXIT_CRITICAL();
     }
 }
 /*-----------------------------------------------------------*/

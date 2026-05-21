@@ -63,8 +63,6 @@
 #include "mbedtls/ssl.h"
 #endif
 
-extern void vOutputString( const char * pcMessage );
-
 /* strnlen includes for CC-RX compiler. */
 #if defined(__CCRX__)
 #include "strnlen.h"
@@ -286,7 +284,8 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
                                                    privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
                                                    xPublicKeyHandlePtr,
                                                    xPrivateKeyHandlePtr);
-        vOutputString("PKCS11_OPS: after indirect C_GenerateKeyPair\r\n");
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
+                 (unsigned long)xResult));
     }
 
     return xResult;
@@ -323,7 +322,6 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     mbedtls_pk_context xPrivKey;
     mbedtls_x509write_csr xReq;
     int32_t ulMbedtlsRet = -1;
-    const mbedtls_pk_info_t *pxHeader = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
     unsigned char ucSavedTsipEndpointFlag = g_tsip_endpointflg;
 #endif
@@ -335,6 +333,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
 
     pcCsrBuffer[0] = '\0';
     *pxOutCsrLength = 0U;
+    mbedtls_pk_init(&xPrivKey);
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
     /*
@@ -350,7 +349,8 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
                                       pcPubKeyLabel,
                                       &xPrivKeyHandle,
                                       &xPubKeyHandle);
-    vOutputString("PKCS11_OPS: xGenerateKeyAndCsr after keypair\r\n");
+    LogInfo(("Fleet CSR trace: keypair CK_RV=0x%08lx.",
+             (unsigned long)xPkcs11Ret));
     if (CKR_OK != xPkcs11Ret)
     {
         LogError(("C_GenerateKeyPair failed while preparing Fleet CSR: CK_RV=0x%08lx.",
@@ -359,6 +359,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
 
     if (CKR_OK == xPkcs11Ret)
     {
+        LogInfo(("Fleet CSR trace: initializing mbedTLS PK context."));
         xPkcs11Ret = xPKCS11_initMbedtlsPkContext(&xPrivKey, xP11Session, xPrivKeyHandle);
         if (CKR_OK != xPkcs11Ret)
         {
@@ -388,6 +389,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         {
             mbedtls_x509write_csr_set_key(&xReq, &xPrivKey);
 
+            LogInfo(("Fleet CSR trace: writing CSR PEM."));
             ulMbedtlsRet = mbedtls_x509write_csr_pem(&xReq, (unsigned char *)pcCsrBuffer,
                                                      xCsrBufferLength, &lPKCS11RandomCallback,
                                                      &xP11Session);
@@ -399,7 +401,6 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         }
 
         mbedtls_x509write_csr_free(&xReq);
-
         mbedtls_pk_free(&xPrivKey);
     }
 
