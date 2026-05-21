@@ -53,6 +53,7 @@
 /* PKCS #11 include. */
 #include "core_pkcs11_config_defaults.h"
 #include "core_pkcs11_config.h"
+#include "core_pkcs11_pal.h"
 #include "core_pki_utils.h"
 #include "mbedtls_utils.h"
 #include "mbedtls_pk_pkcs11.h"
@@ -88,6 +89,7 @@
 
 #define EC_PARAMS_LENGTH      (10)
 #define EC_D_LENGTH           (32)
+#define EC_PRIVATE_KEY_DER_MAX_LENGTH    (200U)
 
 /**
  * @brief Struct for holding parsed RSA-2048 private keys.
@@ -132,7 +134,11 @@ static CK_RV prvGenerateKeyPairEC (CK_SESSION_HANDLE xSession,
                                    const char *pcPrivateKeyLabel,
                                    const char *pcPublicKeyLabel,
                                    CK_OBJECT_HANDLE_PTR xPrivateKeyHandlePtr,
-                                   CK_OBJECT_HANDLE_PTR xPublicKeyHandlePtr);
+                                   CK_OBJECT_HANDLE_PTR xPublicKeyHandlePtr,
+                                   mbedtls_pk_context *pxGeneratedKey);
+
+static CK_RV prvSaveGeneratedPrivateKeyDer(const char *pcPrivateKeyLabel,
+                                           mbedtls_pk_context *pxGeneratedKey);
 
 /**
  * @brief Import the specified ECDSA private key into storage.
@@ -256,20 +262,19 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
                                   const char *pcPrivateKeyLabel,
                                   const char *pcPublicKeyLabel,
                                   CK_OBJECT_HANDLE_PTR xPrivateKeyHandlePtr,
-                                  CK_OBJECT_HANDLE_PTR xPublicKeyHandlePtr)
+                                  CK_OBJECT_HANDLE_PTR xPublicKeyHandlePtr,
+                                  mbedtls_pk_context *pxGeneratedKey)
 {
     CK_RV xResult;
     int32_t lMbedtlsRet;
-    mbedtls_pk_context xGeneratedKey;
 
     (void) pcPublicKeyLabel;
 
     *xPrivateKeyHandlePtr = CK_INVALID_HANDLE;
     *xPublicKeyHandlePtr = CK_INVALID_HANDLE;
-    mbedtls_pk_init(&xGeneratedKey);
 
     LogInfo(("Fleet CSR trace: software ECP key setup enter."));
-    lMbedtlsRet = mbedtls_pk_setup(&xGeneratedKey,
+    lMbedtlsRet = mbedtls_pk_setup(pxGeneratedKey,
                                    mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
     LogInfo(("Fleet CSR trace: software ECP key setup exit ret=%ld.",
              (long)lMbedtlsRet));
@@ -278,7 +283,7 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     {
         LogInfo(("Fleet CSR trace: software ECP keygen enter."));
         lMbedtlsRet = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1,
-                                          mbedtls_pk_ec(xGeneratedKey),
+                                          mbedtls_pk_ec(*pxGeneratedKey),
                                           &lPKCS11RandomCallback,
                                           &xSession);
         LogInfo(("Fleet CSR trace: software ECP keygen exit ret=%ld.",
@@ -288,10 +293,8 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     if (0 == lMbedtlsRet)
     {
         LogInfo(("Fleet CSR trace: storing generated private key enter."));
-        xResult = provisionPrivateECKey(xSession,
-                                        pcPrivateKeyLabel,
-                                        &xGeneratedKey,
-                                        xPrivateKeyHandlePtr);
+        xResult = prvSaveGeneratedPrivateKeyDer(pcPrivateKeyLabel,
+                                                pxGeneratedKey);
         LogInfo(("Fleet CSR trace: storing generated private key exit CK_RV=0x%08lx handle=0x%08lx.",
                  (unsigned long)xResult,
                  (unsigned long)*xPrivateKeyHandlePtr));
@@ -300,8 +303,6 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     {
         xResult = CKR_FUNCTION_FAILED;
     }
-
-    mbedtls_pk_free(&xGeneratedKey);
 
     return xResult;
 }
@@ -363,23 +364,13 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
                                       pcPrivKeyLabel,
                                       pcPubKeyLabel,
                                       &xPrivKeyHandle,
-                                      &xPubKeyHandle);
+                                      &xPubKeyHandle,
+                                      &xPrivKey);
 
     if (CKR_OK != xPkcs11Ret)
     {
         LogError(("C_GenerateKeyPair failed while preparing Fleet CSR: CK_RV=0x%08lx.",
                   (unsigned long)xPkcs11Ret));
-    }
-
-    if (CKR_OK == xPkcs11Ret)
-    {
-        LogInfo(("Fleet CSR trace: initializing mbedTLS PK context."));
-        xPkcs11Ret = xPKCS11_initMbedtlsPkContext(&xPrivKey, xP11Session, xPrivKeyHandle);
-        if (CKR_OK != xPkcs11Ret)
-        {
-            LogError(("xPKCS11_initMbedtlsPkContext failed while preparing Fleet CSR: CK_RV=0x%08lx.",
-                      (unsigned long)xPkcs11Ret));
-        }
     }
 
     if (CKR_OK == xPkcs11Ret)
@@ -415,7 +406,6 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         }
 
         mbedtls_x509write_csr_free(&xReq);
-        mbedtls_pk_free(&xPrivKey);
     }
 
     if (0 == ulMbedtlsRet)
@@ -427,10 +417,69 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     g_tsip_endpointflg = ucSavedTsipEndpointFlag;
 #endif
 
+    mbedtls_pk_free(&xPrivKey);
+
     return (0 == ulMbedtlsRet);
 }
 /**********************************************************************************************************************
  End of function xGenerateKeyAndCsr
+ *********************************************************************************************************************/
+
+/*-----------------------------------------------------------*/
+
+/**********************************************************************************************************************
+ * Function Name: prvSaveGeneratedPrivateKeyDer
+ * Description  : Saves a Fleet-generated EC private key directly into the PAL.
+ * Arguments    : pcPrivateKeyLabel
+ *              : pxGeneratedKey
+ * Return Value : . 
+ *********************************************************************************************************************/
+static CK_RV prvSaveGeneratedPrivateKeyDer(const char *pcPrivateKeyLabel,
+                                           mbedtls_pk_context *pxGeneratedKey)
+{
+    CK_BYTE ucDerKey[EC_PRIVATE_KEY_DER_MAX_LENGTH] = {0};
+    CK_ATTRIBUTE xLabel =
+    {
+        CKA_LABEL,
+        (CK_VOID_PTR)pcPrivateKeyLabel,
+        (CK_ULONG)strnlen(pcPrivateKeyLabel, pkcs11configMAX_LABEL_LENGTH)
+    };
+    CK_OBJECT_HANDLE xPalHandle = CK_INVALID_HANDLE;
+    CK_RV xResult = CKR_OK;
+    int32_t lDerKeyLength;
+
+    LogInfo(("Fleet CSR trace: direct PAL private key DER write enter."));
+    lDerKeyLength = mbedtls_pk_write_key_der(pxGeneratedKey, ucDerKey, sizeof(ucDerKey));
+    LogInfo(("Fleet CSR trace: direct PAL private key DER encode ret=%ld.",
+             (long)lDerKeyLength));
+
+    if ((lDerKeyLength <= 0) || ((uint32_t)lDerKeyLength > sizeof(ucDerKey)))
+    {
+        xResult = CKR_FUNCTION_FAILED;
+    }
+
+    if (CKR_OK == xResult)
+    {
+        xPalHandle = PKCS11_PAL_SaveObject(&xLabel,
+                                           ucDerKey + sizeof(ucDerKey) - (uint32_t)lDerKeyLength,
+                                           (CK_ULONG)lDerKeyLength);
+        LogInfo(("Fleet CSR trace: direct PAL private key save handle=0x%08lx.",
+                 (unsigned long)xPalHandle));
+
+        if (CK_INVALID_HANDLE == xPalHandle)
+        {
+            xResult = CKR_DEVICE_MEMORY;
+        }
+    }
+
+    (void)memset(ucDerKey, 0, sizeof(ucDerKey));
+    LogInfo(("Fleet CSR trace: direct PAL private key DER write exit CK_RV=0x%08lx.",
+             (unsigned long)xResult));
+
+    return xResult;
+}
+/**********************************************************************************************************************
+ End of function prvSaveGeneratedPrivateKeyDer
  *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
