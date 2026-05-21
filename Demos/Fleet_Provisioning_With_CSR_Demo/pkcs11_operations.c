@@ -36,6 +36,7 @@
 /* Standard includes. */
 #include <errno.h>
 #include <assert.h>
+#include <string.h>
 
 /* Config include. */
 #include "demo_config.h"
@@ -322,6 +323,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     mbedtls_pk_context xPrivKey;
     mbedtls_x509write_csr xReq;
     int32_t ulMbedtlsRet = -1;
+    int32_t lRngProbeRet = 0;
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
     unsigned char ucSavedTsipEndpointFlag = g_tsip_endpointflg;
 #endif
@@ -342,15 +344,34 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
      * even when this image is built with TSIP-enabled TLS.
      */
     g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
+
+    {
+        unsigned char ucRngProbe[16] = { 0 };
+
+        LogInfo(("Fleet CSR trace: RNG probe enter."));
+        lRngProbeRet = lPKCS11RandomCallback(&xP11Session,
+                                             ucRngProbe,
+                                             sizeof(ucRngProbe));
+        LogInfo(("Fleet CSR trace: RNG probe exit ret=%ld.",
+                 (long)lRngProbeRet));
+        (void) memset(ucRngProbe, 0, sizeof(ucRngProbe));
+    }
 #endif
 
-    xPkcs11Ret = prvGenerateKeyPairEC(xP11Session,
-                                      pcPrivKeyLabel,
-                                      pcPubKeyLabel,
-                                      &xPrivKeyHandle,
-                                      &xPubKeyHandle);
-    LogInfo(("Fleet CSR trace: keypair CK_RV=0x%08lx.",
-             (unsigned long)xPkcs11Ret));
+    if (0 == lRngProbeRet)
+    {
+        xPkcs11Ret = prvGenerateKeyPairEC(xP11Session,
+                                          pcPrivKeyLabel,
+                                          pcPubKeyLabel,
+                                          &xPrivKeyHandle,
+                                          &xPubKeyHandle);
+        LogInfo(("Fleet CSR trace: keypair CK_RV=0x%08lx.",
+                 (unsigned long)xPkcs11Ret));
+    }
+    else
+    {
+        xPkcs11Ret = CKR_FUNCTION_FAILED;
+    }
     if (CKR_OK != xPkcs11Ret)
     {
         LogError(("C_GenerateKeyPair failed while preparing Fleet CSR: CK_RV=0x%08lx.",
