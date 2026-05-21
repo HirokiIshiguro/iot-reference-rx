@@ -572,7 +572,8 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
                                    CK_OBJECT_HANDLE_PTR pxObjectHandle)
 {
     CK_RV result = CKR_OK;
-    CK_BYTE *DPtr = NULL;        /* Private value D. */
+    CK_BYTE ucD[EC_D_LENGTH] = {0}; /* Private value D. */
+    CK_BYTE *DPtr = ucD;
     CK_BYTE *ecParamsPtr = NULL; /* DER-encoding of an ANSI X9.62 Parameters value */
     int mbedResult = 0;
     CK_BBOOL trueObject = CK_TRUE;
@@ -586,16 +587,9 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         *pxObjectHandle = CK_INVALID_HANDLE;
     }
 
-    LogInfo(("Fleet CSR trace: private EC alloc enter."));
-    DPtr = (CK_BYTE *)pvPortMalloc(EC_D_LENGTH);
-    LogInfo(("Fleet CSR trace: private EC alloc exit ptr=0x%08lx.",
+    LogInfo(("Fleet CSR trace: private EC D buffer ptr=0x%08lx.",
              (unsigned long)DPtr));
     vTaskDelay(pdMS_TO_TICKS(1U));
-
-    if (NULL == DPtr)
-    {
-        result = CKR_HOST_MEMORY;
-    }
 
     if (CKR_OK == result)
     {
@@ -670,11 +664,7 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         }
     }
 
-    if (NULL != DPtr)
-    {
-        vPortFree(DPtr);
-        DPtr = NULL;
-    }
+    (void) memset(ucD, 0, sizeof(ucD));
 
     return result;
 }
