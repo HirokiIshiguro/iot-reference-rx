@@ -590,6 +590,7 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
     DPtr = (CK_BYTE *)pvPortMalloc(EC_D_LENGTH);
     LogInfo(("Fleet CSR trace: private EC alloc exit ptr=0x%08lx.",
              (unsigned long)DPtr));
+    vTaskDelay(pdMS_TO_TICKS(1U));
 
     if (NULL == DPtr)
     {
@@ -598,10 +599,17 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
 
     if (CKR_OK == result)
     {
+        LogInfo(("Fleet CSR trace: private EC keypair=0x%08lx d.p=0x%08lx d.n=%lu.",
+                 (unsigned long)keyPair,
+                 (unsigned long)keyPair->d.p,
+                 (unsigned long)keyPair->d.n));
+        vTaskDelay(pdMS_TO_TICKS(1U));
         LogInfo(("Fleet CSR trace: private EC D export enter."));
+        vTaskDelay(pdMS_TO_TICKS(1U));
         mbedResult = mbedtls_mpi_write_binary(&(keyPair->d), DPtr, EC_D_LENGTH);
         LogInfo(("Fleet CSR trace: private EC D export exit ret=%ld.",
                  (long)mbedResult));
+        vTaskDelay(pdMS_TO_TICKS(1U));
 
         if (0 != mbedResult)
         {
@@ -614,6 +622,7 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
     {
         LogInfo(("Fleet CSR trace: private EC curve check enter id=%ld.",
                  (long)keyPair->grp.id));
+        vTaskDelay(pdMS_TO_TICKS(1U));
         if (MBEDTLS_ECP_DP_SECP256R1 == keyPair->grp.id)
         {
             ecParamsPtr = (const CK_BYTE *)("\x06\x08" MBEDTLS_OID_EC_GRP_SECP256R1);
@@ -645,6 +654,7 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         privateKeyTemplate[6].pValue = DPtr;
 
         LogInfo(("Fleet CSR trace: C_CreateObject private EC enter."));
+        vTaskDelay(pdMS_TO_TICKS(1U));
         result = C_CreateObject(session,
                                 (CK_ATTRIBUTE_PTR)&privateKeyTemplate,
                                 (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
@@ -652,6 +662,7 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         LogInfo(("Fleet CSR trace: C_CreateObject private EC exit CK_RV=0x%08lx handle=0x%08lx.",
                  (unsigned long)result,
                  (unsigned long)objectHandle));
+        vTaskDelay(pdMS_TO_TICKS(1U));
 
         if ((CKR_OK == result) && (NULL != pxObjectHandle))
         {
