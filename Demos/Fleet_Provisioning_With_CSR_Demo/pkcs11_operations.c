@@ -43,6 +43,10 @@
 #include "task.h"
 #include "portable.h"
 
+#if defined(__CCRX__) || defined(__GNUC__)
+#include "platform.h"
+#endif
+
 /* Interface include. */
 #include "pkcs11_operations.h"
 
@@ -142,6 +146,8 @@ static CK_RV provisionPrivateECKey (CK_SESSION_HANDLE session,
                                     mbedtls_pk_context *mbedPkContext,
                                     CK_OBJECT_HANDLE_PTR pxObjectHandle);
 
+static void prvLogFleetCpuState(const char *pcTag);
+
 /**
  * @brief Import the specified RSA private key into storage.
  *
@@ -152,6 +158,21 @@ static CK_RV provisionPrivateECKey (CK_SESSION_HANDLE session,
 static CK_RV provisionPrivateRSAKey (CK_SESSION_HANDLE session,
                                      const char *label,
                                      mbedtls_pk_context *mbedPkContext);
+
+/*-----------------------------------------------------------*/
+
+static void prvLogFleetCpuState(const char *pcTag)
+{
+#if defined(__CCRX__) || defined(__GNUC__)
+    LogInfo(("Fleet CSR trace: %s psw=0x%08lx ipl=%lu.",
+             pcTag,
+             (unsigned long)R_BSP_GET_PSW(),
+             (unsigned long)R_BSP_GET_IPL()));
+#else
+    LogInfo(("Fleet CSR trace: %s cpu-state unavailable.",
+             pcTag));
+#endif
+}
 
 /*-----------------------------------------------------------*/
 
@@ -656,15 +677,22 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         LogInfo(("Fleet CSR trace: C_CreateObject private EC exit CK_RV=0x%08lx handle=0x%08lx.",
                  (unsigned long)result,
                  (unsigned long)objectHandle));
-        vTaskDelay(pdMS_TO_TICKS(1U));
+        prvLogFleetCpuState("after C_CreateObject");
 
         if ((CKR_OK == result) && (NULL != pxObjectHandle))
         {
+            LogInfo(("Fleet CSR trace: private EC handle store enter ptr=0x%08lx.",
+                     (unsigned long)pxObjectHandle));
             *pxObjectHandle = objectHandle;
+            LogInfo(("Fleet CSR trace: private EC handle store exit handle=0x%08lx.",
+                     (unsigned long)*pxObjectHandle));
         }
     }
 
+    LogInfo(("Fleet CSR trace: private EC D clear enter."));
     (void) memset(ucD, 0, sizeof(ucD));
+    LogInfo(("Fleet CSR trace: private EC return CK_RV=0x%08lx.",
+             (unsigned long)result));
 
     return result;
 }
