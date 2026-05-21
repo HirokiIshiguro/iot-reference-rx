@@ -111,6 +111,10 @@ const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
 
 static size_t txIndex = 0;
 
+#define serialTX_EMPTY_RETRY_DELAY_TICKS    ( pdMS_TO_TICKS( 1U ) )
+#define serialTX_MAX_DRAIN_WAIT_TICKS       ( pdMS_TO_TICKS( 200U ) )
+#define serialTX_MAX_POLL_RETRIES           ( 2000U )
+
 /* Used to guard access to the UART in case messages are sent to the UART from
 more than one task. */
 static SemaphoreHandle_t xTransmitMutex = NULL;
@@ -278,12 +282,25 @@ void vSerialPutString(const signed char * pcString, unsigned short usStringLengt
         uint32_t str_length = usStringLength;
         uint16_t transmit_length = 0;
         sci_err_t sci_err = SCI_SUCCESS;
-        uint32_t retry = 0xFFFF;
+        uint32_t retry = serialTX_MAX_POLL_RETRIES;
+        TickType_t start_tick = 0;
+
+        if (taskSCHEDULER_RUNNING == xTaskGetSchedulerState())
+        {
+            start_tick = xTaskGetTickCount();
+        }
 
         if ( xSemaphoreTake( xTransmitMutex, xMaxBlockTime ) == pdPASS )
         {
             while ((retry > 0) && (str_length > 0))
             {
+                if ((taskSCHEDULER_RUNNING == xTaskGetSchedulerState()) &&
+                    ((xTaskGetTickCount() - start_tick) > serialTX_MAX_DRAIN_WAIT_TICKS))
+                {
+                    sci_err = SCI_ERR_INSUFFICIENT_SPACE;
+                    break;
+                }
+
                 R_SCI_Control(xSerialSciHandle, SCI_CMD_TX_Q_BYTES_FREE, &transmit_length);
 
                 if (0 == transmit_length)
@@ -293,7 +310,7 @@ void vSerialPutString(const signed char * pcString, unsigned short usStringLengt
 
                     if (taskSCHEDULER_RUNNING == xTaskGetSchedulerState())
                     {
-                        vTaskDelay(1);
+                        vTaskDelay(serialTX_EMPTY_RETRY_DELAY_TICKS);
                     }
                     else
                     {
@@ -314,6 +331,10 @@ void vSerialPutString(const signed char * pcString, unsigned short usStringLengt
                 if ((SCI_ERR_XCVR_BUSY == sci_err) || (SCI_ERR_INSUFFICIENT_SPACE == sci_err))
                 {
                     retry--; // retry if previous transmission still in progress or tx buffer is insufficient.
+                    if (taskSCHEDULER_RUNNING == xTaskGetSchedulerState())
+                    {
+                        vTaskDelay(serialTX_EMPTY_RETRY_DELAY_TICKS);
+                    }
                     continue;
                 }
 
