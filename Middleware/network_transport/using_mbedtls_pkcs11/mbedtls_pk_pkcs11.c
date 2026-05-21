@@ -1036,6 +1036,8 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     P11RsaCtx_t * pxP11RsaCtx = NULL;
     int ( * lRngCallback )( void *, unsigned char *, size_t ) = plRng;
     void * pvRngCtx = pvRng;
+    const unsigned char pucDigestInfoPrefix[] = pkcs11STUFF_APPENDED_TO_RSA_SIG;
+    unsigned char pucDigestInfo[ pkcs11RSA_SIGNATURE_INPUT_LENGTH ];
 
     configASSERT( pucSig != NULL );
     configASSERT( xSigBufferSize > 0 );
@@ -1075,6 +1077,9 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
         }
         else
         {
+            ( void ) memcpy( pucDigestInfo, pucDigestInfoPrefix, sizeof( pucDigestInfoPrefix ) );
+            ( void ) memcpy( &( pucDigestInfo[ sizeof( pucDigestInfoPrefix ) ] ), pucHash, xHashLen );
+
             if( lRngCallback == NULL )
             {
                 lRngCallback = lPKCS11RandomCallback;
@@ -1085,9 +1090,9 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
             lMbedResult = mbedtls_rsa_pkcs1_sign( &( pxP11RsaCtx->xMbedRsaCtx ),
                                                   lRngCallback,
                                                   pvRngCtx,
-                                                  MBEDTLS_MD_SHA256,
-                                                  ( unsigned int ) xHashLen,
-                                                  pucHash,
+                                                  MBEDTLS_MD_NONE,
+                                                  ( unsigned int ) sizeof( pucDigestInfo ),
+                                                  pucDigestInfo,
                                                   pucSig );
             vOutputString( "P11:RSA:SWSignSHA256<\r\n" );
 
