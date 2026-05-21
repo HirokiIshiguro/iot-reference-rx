@@ -139,7 +139,8 @@ static CK_RV prvGenerateKeyPairEC (CK_SESSION_HANDLE xSession,
  */
 static CK_RV provisionPrivateECKey (CK_SESSION_HANDLE session,
                                     const char *label,
-                                    mbedtls_pk_context *mbedPkContext);
+                                    mbedtls_pk_context *mbedPkContext,
+                                    CK_OBJECT_HANDLE_PTR pxObjectHandle);
 
 /**
  * @brief Import the specified RSA private key into storage.
@@ -237,47 +238,49 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
                                   CK_OBJECT_HANDLE_PTR xPublicKeyHandlePtr)
 {
     CK_RV xResult;
-    CK_MECHANISM xMechanism = {CKM_EC_KEY_PAIR_GEN, NULL_PTR, 0};
-    CK_BYTE pxEcParams[] = pkcs11DER_ENCODED_OID_P256; /* prime256v1 */
-    CK_KEY_TYPE xKeyType = CKK_EC;
+    int32_t lMbedtlsRet;
+    mbedtls_pk_context xGeneratedKey;
 
-    CK_BBOOL xTrueObject = CK_TRUE;
-    CK_ATTRIBUTE pxPublicKeyTemplate[] =
-        {
-            {CKA_KEY_TYPE, NULL /* &keyType */, sizeof(xKeyType)},
-            {CKA_VERIFY, NULL /* &trueObject */, sizeof(xTrueObject)},
-            {CKA_EC_PARAMS, NULL /* ecParams */, sizeof(pxEcParams)},
-            {CKA_LABEL, (void *)pcPublicKeyLabel, strnlen(pcPublicKeyLabel, pkcs11configMAX_LABEL_LENGTH)}};
+    (void) pcPublicKeyLabel;
 
-    /* Aggregate initializers must not use the address of an automatic variable. */
-    pxPublicKeyTemplate[0].pValue = &xKeyType;
-    pxPublicKeyTemplate[1].pValue = &xTrueObject;
-    pxPublicKeyTemplate[2].pValue = &pxEcParams;
+    *xPrivateKeyHandlePtr = CK_INVALID_HANDLE;
+    *xPublicKeyHandlePtr = CK_INVALID_HANDLE;
+    mbedtls_pk_init(&xGeneratedKey);
 
-    CK_ATTRIBUTE privateKeyTemplate[] =
-        {
-            {CKA_KEY_TYPE, NULL /* &keyType */, sizeof(xKeyType)},
-            {CKA_TOKEN, NULL /* &trueObject */, sizeof(xTrueObject)},
-            {CKA_PRIVATE, NULL /* &trueObject */, sizeof(xTrueObject)},
-            {CKA_SIGN, NULL /* &trueObject */, sizeof(xTrueObject)},
-            {CKA_LABEL, (void *)pcPrivateKeyLabel, strnlen(pcPrivateKeyLabel, pkcs11configMAX_LABEL_LENGTH)}};
+    LogInfo(("Fleet CSR trace: software ECP key setup enter."));
+    lMbedtlsRet = mbedtls_pk_setup(&xGeneratedKey,
+                                   mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+    LogInfo(("Fleet CSR trace: software ECP key setup exit ret=%ld.",
+             (long)lMbedtlsRet));
 
-    /* Aggregate initializers must not use the address of an automatic variable. */
-    privateKeyTemplate[0].pValue = &xKeyType;
-    privateKeyTemplate[1].pValue = &xTrueObject;
-    privateKeyTemplate[2].pValue = &xTrueObject;
-    privateKeyTemplate[3].pValue = &xTrueObject;
+    if (0 == lMbedtlsRet)
+    {
+        LogInfo(("Fleet CSR trace: software ECP keygen enter."));
+        lMbedtlsRet = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1,
+                                          mbedtls_pk_ec(xGeneratedKey),
+                                          &lPKCS11RandomCallback,
+                                          &xSession);
+        LogInfo(("Fleet CSR trace: software ECP keygen exit ret=%ld.",
+                 (long)lMbedtlsRet));
+    }
 
-    LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
-    xResult = C_GenerateKeyPair(xSession,
-                                &xMechanism,
-                                pxPublicKeyTemplate,
-                                (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                xPublicKeyHandlePtr,
-                                xPrivateKeyHandlePtr);
-    LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
-             (unsigned long)xResult));
+    if (0 == lMbedtlsRet)
+    {
+        LogInfo(("Fleet CSR trace: storing generated private key enter."));
+        xResult = provisionPrivateECKey(xSession,
+                                        pcPrivateKeyLabel,
+                                        &xGeneratedKey,
+                                        xPrivateKeyHandlePtr);
+        LogInfo(("Fleet CSR trace: storing generated private key exit CK_RV=0x%08lx handle=0x%08lx.",
+                 (unsigned long)xResult,
+                 (unsigned long)*xPrivateKeyHandlePtr));
+    }
+    else
+    {
+        xResult = CKR_FUNCTION_FAILED;
+    }
+
+    mbedtls_pk_free(&xGeneratedKey);
 
     return xResult;
 }
@@ -565,7 +568,8 @@ bool xPkcs11CloseSession(CK_SESSION_HANDLE xP11Session)
  *********************************************************************************************************************/
 static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
                                    const char *label,
-                                   mbedtls_pk_context *mbedPkContext)
+                                   mbedtls_pk_context *mbedPkContext,
+                                   CK_OBJECT_HANDLE_PTR pxObjectHandle)
 {
     CK_RV result = CKR_OK;
     CK_FUNCTION_LIST_PTR functionList = NULL;
@@ -577,6 +581,11 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
     CK_OBJECT_CLASS privateKeyClass = CKO_PRIVATE_KEY;
     CK_OBJECT_HANDLE objectHandle = CK_INVALID_HANDLE;
     mbedtls_ecp_keypair *keyPair = (mbedtls_ecp_keypair *)mbedPkContext->pk_ctx;
+
+    if (NULL != pxObjectHandle)
+    {
+        *pxObjectHandle = CK_INVALID_HANDLE;
+    }
 
     result = C_GetFunctionList(&functionList);
 
@@ -641,6 +650,11 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
                                               (CK_ATTRIBUTE_PTR)&privateKeyTemplate,
                                               (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
                                               &objectHandle);
+
+        if ((CKR_OK == result) && (NULL != pxObjectHandle))
+        {
+            *pxObjectHandle = objectHandle;
+        }
     }
 
     if (NULL != DPtr)
@@ -832,7 +846,7 @@ CK_RV provisionPrivateKey(CK_SESSION_HANDLE session,
                  (MBEDTLS_PK_ECKEY == mbedKeyType) ||
                  (MBEDTLS_PK_ECKEY_DH == mbedKeyType))
         {
-            result = provisionPrivateECKey(session, label, &mbedPkContext);
+            result = provisionPrivateECKey(session, label, &mbedPkContext, NULL);
         }
         else
         {
