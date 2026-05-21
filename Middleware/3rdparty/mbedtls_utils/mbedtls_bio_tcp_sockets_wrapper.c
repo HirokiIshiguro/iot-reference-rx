@@ -32,7 +32,7 @@
 #include "logging_levels.h"
 
 #define LIBRARY_LOG_NAME     "MbedTLSBio"
-#define LIBRARY_LOG_LEVEL    LOG_INFO
+#define LIBRARY_LOG_LEVEL    LOG_ERROR
 
 #include "logging_stack.h"
 
@@ -70,11 +70,7 @@ int xMbedTLSBioTCPSocketsWrapperSend( void * ctx,
     configASSERT( ctx != NULL );
     configASSERT( buf != NULL );
 
-    LogInfo( ( "BIO trace: send enter len=%lu.",
-               ( unsigned long ) len ) );
     xReturnStatus = TCP_Sockets_Send( ( Socket_t ) ctx, buf, len );
-    LogInfo( ( "BIO trace: send raw ret=%ld.",
-               ( long ) xReturnStatus ) );
 
     switch( xReturnStatus )
     {
@@ -98,9 +94,6 @@ int xMbedTLSBioTCPSocketsWrapperSend( void * ctx,
             break;
     }
 
-    LogInfo( ( "BIO trace: send exit ret=%ld.",
-               ( long ) xReturnStatus ) );
-
     return ( int ) xReturnStatus;
 }
 
@@ -122,11 +115,7 @@ int xMbedTLSBioTCPSocketsWrapperRecv( void * ctx,
     configASSERT( ctx != NULL );
     configASSERT( buf != NULL );
 
-    LogInfo( ( "BIO trace: recv enter len=%lu.",
-               ( unsigned long ) len ) );
     xReturnStatus = TCP_Sockets_Recv( ( Socket_t ) ctx, buf, len );
-    LogInfo( ( "BIO trace: recv raw ret=%ld.",
-               ( long ) xReturnStatus ) );
 
     switch( xReturnStatus )
     {
@@ -147,9 +136,6 @@ int xMbedTLSBioTCPSocketsWrapperRecv( void * ctx,
         default:
             break;
     }
-
-    LogInfo( ( "BIO trace: recv exit ret=%ld.",
-               ( long ) xReturnStatus ) );
 
     return ( int ) xReturnStatus;
 }

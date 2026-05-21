@@ -49,6 +49,7 @@
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
+#include "task.h"
 
 /* MbedTLS Bio TCP sockets wrapper include. */
 #include "mbedtls_bio_tcp_sockets_wrapper.h"
@@ -100,6 +101,17 @@ static const char * pNoHighLevelMbedTlsCodeStr = "<No-High-Level-Code>";
  * does not contain a low-level code.
  */
 static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
+
+static void prvLogCurrentTaskStackHighWaterMark( const char * pcLabel )
+{
+    #if ( INCLUDE_uxTaskGetStackHighWaterMark == 1 )
+        LogInfo( ( "TLS stack trace: %s highwater=%lu.",
+                   pcLabel,
+                   ( unsigned long ) uxTaskGetStackHighWaterMark( NULL ) ) );
+    #else
+        ( void ) pcLabel;
+    #endif
+}
 
 /**
  * @brief Utility for converting the high-level code in an mbedTLS error to string,
@@ -810,6 +822,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
         LogInfo( ( "TLS trace: handshake enter state=%ld.",
                    ( long ) pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
+        prvLogCurrentTaskStackHighWaterMark( "before_handshake" );
 
         /* Perform the TLS handshake. */
         do
@@ -836,6 +849,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                    ( unsigned long ) ulHandshakeAttempt,
                    ( long ) pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ),
                    ( long ) mbedtlsError ) );
+        prvLogCurrentTaskStackHighWaterMark( "after_handshake" );
 
         if( mbedtlsError != 0 )
         {

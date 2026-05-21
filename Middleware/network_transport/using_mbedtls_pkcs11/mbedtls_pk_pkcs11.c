@@ -77,6 +77,10 @@
 
 /*-----------------------------------------------------------*/
 
+extern void vOutputString( const char * pcMessage );
+
+/*-----------------------------------------------------------*/
+
 typedef struct P11PkCtx
 {
     CK_FUNCTION_LIST_PTR pxFunctionList;
@@ -802,12 +806,14 @@ static int p11_ecdsa_sign( mbedtls_pk_context * pk,
     if( CKR_OK == xResult )
     {
         /* Use the PKCS#11 module to sign. */
+        vOutputString( "P11:ECDSA:SignInit>\r\n" );
         LogInfo( ( "PKCS11 sign trace: ECDSA SignInit enter handle=%lu hashLen=%lu.",
                    ( unsigned long ) pxP11Ctx->xPkHandle,
                    ( unsigned long ) xHashLen ) );
         xResult = pxP11Ctx->pxFunctionList->C_SignInit( pxP11Ctx->xSessionHandle,
                                                         &xMech,
                                                         pxP11Ctx->xPkHandle );
+        vOutputString( "P11:ECDSA:SignInit<\r\n" );
         LogInfo( ( "PKCS11 sign trace: ECDSA SignInit exit ret=0x%08lx.",
                    ( unsigned long ) xResult ) );
     }
@@ -818,11 +824,13 @@ static int p11_ecdsa_sign( mbedtls_pk_context * pk,
 
         ( void ) memcpy( pucHashCopy, pucHash, xHashLen );
 
+        vOutputString( "P11:ECDSA:Sign>\r\n" );
         LogInfo( ( "PKCS11 sign trace: ECDSA Sign enter sigBuf=%lu.",
                    ( unsigned long ) xSigBufferSize ) );
         xResult = pxP11Ctx->pxFunctionList->C_Sign( pxP11Ctx->xSessionHandle,
                                                     pucHashCopy, xHashLen,
                                                     pucSig, &ulSigLen );
+        vOutputString( "P11:ECDSA:Sign<\r\n" );
         LogInfo( ( "PKCS11 sign trace: ECDSA Sign exit ret=0x%08lx sigLen=%lu.",
                    ( unsigned long ) xResult,
                    ( unsigned long ) ulSigLen ) );
@@ -1066,12 +1074,14 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     if( CKR_OK == xResult )
     {
         /* Use the PKCS#11 module to sign. */
+        vOutputString( "P11:RSA:SignInit>\r\n" );
         LogInfo( ( "PKCS11 sign trace: RSA SignInit enter handle=%lu hashLen=%lu.",
                    ( unsigned long ) pxP11Ctx->xPkHandle,
                    ( unsigned long ) xHashLen ) );
         xResult = pxP11Ctx->pxFunctionList->C_SignInit( pxP11Ctx->xSessionHandle,
                                                         &xMech,
                                                         pxP11Ctx->xPkHandle );
+        vOutputString( "P11:RSA:SignInit<\r\n" );
         LogInfo( ( "PKCS11 sign trace: RSA SignInit exit ret=0x%08lx.",
                    ( unsigned long ) xResult ) );
     }
@@ -1080,6 +1090,7 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     {
         CK_ULONG ulSigLen = sizeof( pxToBeSigned );
 
+        vOutputString( "P11:RSA:Sign>\r\n" );
         LogInfo( ( "PKCS11 sign trace: RSA Sign enter sigBuf=%lu.",
                    ( unsigned long ) xSigBufferSize ) );
         xResult = pxP11Ctx->pxFunctionList->C_Sign( pxP11Ctx->xSessionHandle,
@@ -1087,6 +1098,7 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
                                                     pkcs11RSA_SIGNATURE_INPUT_LENGTH,
                                                     pucSig,
                                                     &ulSigLen );
+        vOutputString( "P11:RSA:Sign<\r\n" );
         LogInfo( ( "PKCS11 sign trace: RSA Sign exit ret=0x%08lx sigLen=%lu.",
                    ( unsigned long ) xResult,
                    ( unsigned long ) ulSigLen ) );
