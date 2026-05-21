@@ -30,7 +30,7 @@
 #include "logging_levels.h"
 
 #define LIBRARY_LOG_NAME     "MbedTLSPkP11"
-#define LIBRARY_LOG_LEVEL    LOG_ERROR
+#define LIBRARY_LOG_LEVEL    LOG_INFO
 
 #include "logging_stack.h"
 
@@ -802,9 +802,14 @@ static int p11_ecdsa_sign( mbedtls_pk_context * pk,
     if( CKR_OK == xResult )
     {
         /* Use the PKCS#11 module to sign. */
+        LogInfo( ( "PKCS11 sign trace: ECDSA SignInit enter handle=%lu hashLen=%lu.",
+                   ( unsigned long ) pxP11Ctx->xPkHandle,
+                   ( unsigned long ) xHashLen ) );
         xResult = pxP11Ctx->pxFunctionList->C_SignInit( pxP11Ctx->xSessionHandle,
                                                         &xMech,
                                                         pxP11Ctx->xPkHandle );
+        LogInfo( ( "PKCS11 sign trace: ECDSA SignInit exit ret=0x%08lx.",
+                   ( unsigned long ) xResult ) );
     }
 
     if( CKR_OK == xResult )
@@ -813,9 +818,14 @@ static int p11_ecdsa_sign( mbedtls_pk_context * pk,
 
         ( void ) memcpy( pucHashCopy, pucHash, xHashLen );
 
+        LogInfo( ( "PKCS11 sign trace: ECDSA Sign enter sigBuf=%lu.",
+                   ( unsigned long ) xSigBufferSize ) );
         xResult = pxP11Ctx->pxFunctionList->C_Sign( pxP11Ctx->xSessionHandle,
                                                     pucHashCopy, xHashLen,
                                                     pucSig, &ulSigLen );
+        LogInfo( ( "PKCS11 sign trace: ECDSA Sign exit ret=0x%08lx sigLen=%lu.",
+                   ( unsigned long ) xResult,
+                   ( unsigned long ) ulSigLen ) );
 
         if( xResult == CKR_OK )
         {
@@ -1056,20 +1066,30 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     if( CKR_OK == xResult )
     {
         /* Use the PKCS#11 module to sign. */
+        LogInfo( ( "PKCS11 sign trace: RSA SignInit enter handle=%lu hashLen=%lu.",
+                   ( unsigned long ) pxP11Ctx->xPkHandle,
+                   ( unsigned long ) xHashLen ) );
         xResult = pxP11Ctx->pxFunctionList->C_SignInit( pxP11Ctx->xSessionHandle,
                                                         &xMech,
                                                         pxP11Ctx->xPkHandle );
+        LogInfo( ( "PKCS11 sign trace: RSA SignInit exit ret=0x%08lx.",
+                   ( unsigned long ) xResult ) );
     }
 
     if( CKR_OK == xResult )
     {
         CK_ULONG ulSigLen = sizeof( pxToBeSigned );
 
+        LogInfo( ( "PKCS11 sign trace: RSA Sign enter sigBuf=%lu.",
+                   ( unsigned long ) xSigBufferSize ) );
         xResult = pxP11Ctx->pxFunctionList->C_Sign( pxP11Ctx->xSessionHandle,
                                                     pxToBeSigned,
                                                     pkcs11RSA_SIGNATURE_INPUT_LENGTH,
                                                     pucSig,
                                                     &ulSigLen );
+        LogInfo( ( "PKCS11 sign trace: RSA Sign exit ret=0x%08lx sigLen=%lu.",
+                   ( unsigned long ) xResult,
+                   ( unsigned long ) ulSigLen ) );
 
         *pxSigLen = ( size_t ) ulSigLen;
     }

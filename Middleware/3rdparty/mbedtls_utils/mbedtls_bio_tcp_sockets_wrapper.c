@@ -29,6 +29,13 @@
  * @brief Implements mbed TLS platform send/receive functions for the TCP sockets wrapper.
  */
 
+#include "logging_levels.h"
+
+#define LIBRARY_LOG_NAME     "MbedTLSBio"
+#define LIBRARY_LOG_LEVEL    LOG_INFO
+
+#include "logging_stack.h"
+
 /* MbedTLS includes. */
 #if !defined( MBEDTLS_CONFIG_FILE )
     #include "mbedtls/mbedtls_config.h"
@@ -63,7 +70,11 @@ int xMbedTLSBioTCPSocketsWrapperSend( void * ctx,
     configASSERT( ctx != NULL );
     configASSERT( buf != NULL );
 
+    LogInfo( ( "BIO trace: send enter len=%lu.",
+               ( unsigned long ) len ) );
     xReturnStatus = TCP_Sockets_Send( ( Socket_t ) ctx, buf, len );
+    LogInfo( ( "BIO trace: send raw ret=%ld.",
+               ( long ) xReturnStatus ) );
 
     switch( xReturnStatus )
     {
@@ -87,6 +98,9 @@ int xMbedTLSBioTCPSocketsWrapperSend( void * ctx,
             break;
     }
 
+    LogInfo( ( "BIO trace: send exit ret=%ld.",
+               ( long ) xReturnStatus ) );
+
     return ( int ) xReturnStatus;
 }
 
@@ -108,7 +122,11 @@ int xMbedTLSBioTCPSocketsWrapperRecv( void * ctx,
     configASSERT( ctx != NULL );
     configASSERT( buf != NULL );
 
+    LogInfo( ( "BIO trace: recv enter len=%lu.",
+               ( unsigned long ) len ) );
     xReturnStatus = TCP_Sockets_Recv( ( Socket_t ) ctx, buf, len );
+    LogInfo( ( "BIO trace: recv raw ret=%ld.",
+               ( long ) xReturnStatus ) );
 
     switch( xReturnStatus )
     {
@@ -129,6 +147,9 @@ int xMbedTLSBioTCPSocketsWrapperRecv( void * ctx,
         default:
             break;
     }
+
+    LogInfo( ( "BIO trace: recv exit ret=%ld.",
+               ( long ) xReturnStatus ) );
 
     return ( int ) xReturnStatus;
 }
