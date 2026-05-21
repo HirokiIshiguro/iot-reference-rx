@@ -88,7 +88,7 @@ void R_SIMPLE_GRAPHIC_PutCharacter(char character)
 	if(current_y == (SCREEN_HEIGHT/FONT_HEIGHT))
 	{
 		current_y--;
-		memcpy(current_buffer[0], current_buffer[1], sizeof(current_buffer[0]) * ((SCREEN_HEIGHT/FONT_HEIGHT) - 1));
+		memmove(current_buffer[0], current_buffer[1], sizeof(current_buffer[0]) * ((SCREEN_HEIGHT/FONT_HEIGHT) - 1));
 		memset(current_buffer[(SCREEN_HEIGHT/FONT_HEIGHT) - 1], 0, sizeof(current_buffer[0]));
 	}
 }
