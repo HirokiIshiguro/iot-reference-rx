@@ -318,7 +318,7 @@ void flashing_callback(void *event)
     uint32_t event_code;
     event_code = *((uint32_t*)event);
 
-    static portBASE_TYPE xHigherPriorityTaskWoken;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     switch (event_code)
     {

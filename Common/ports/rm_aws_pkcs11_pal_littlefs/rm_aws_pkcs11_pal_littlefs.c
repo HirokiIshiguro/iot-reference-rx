@@ -64,7 +64,7 @@
 #include "transport_mbedtls_pkcs11.h"
 
 #ifndef PKCS11_PAL_LITTLEFS_TRACE
-    #define PKCS11_PAL_LITTLEFS_TRACE    (0)
+    #define PKCS11_PAL_LITTLEFS_TRACE    (1)
 #endif
 
 extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
@@ -154,6 +154,11 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
 #if PKCS11_PAL_LITTLEFS_TRACE
     LogInfo(("PKCS11 PAL trace: SaveObject enter label=%s size=%lu.",
              (char *)pxLabel->pValue, (unsigned long)ulDataSize));
+    if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
+    {
+        g_littlefs_flash_trace_enabled = 1U;
+        vOutputString("PAL:DKEY trace enabled\r\n");
+    }
 #endif
 
     /* search specified label value from g_object_handle_dictionary */
@@ -218,7 +223,6 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
     if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
     {
 #if PKCS11_PAL_LITTLEFS_TRACE
-        g_littlefs_flash_trace_enabled = 1U;
         LogInfo(("PKCS11 PAL trace: SaveObject close trace enabled for device private key."));
         vOutputString("PAL:DKEY before sync\r\n");
         LogInfo(("PKCS11 PAL trace: SaveObject sync enter for device private key."));
