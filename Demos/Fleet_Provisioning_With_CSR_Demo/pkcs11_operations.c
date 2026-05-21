@@ -40,6 +40,8 @@
 
 /* Config include. */
 #include "demo_config.h"
+#include "task.h"
+#include "portable.h"
 
 /* Interface include. */
 #include "pkcs11_operations.h"
@@ -78,6 +80,21 @@
 #define PRIME_2_LENGTH        (128)
 #define EXPONENT_1_LENGTH     (128)
 #define EXPONENT_2_LENGTH     (128)
+
+static void prvLogFleetMemoryState(const char *pcTag)
+{
+#if (INCLUDE_uxTaskGetStackHighWaterMark == 1)
+    UBaseType_t uxStackHighWater = uxTaskGetStackHighWaterMark(NULL);
+#else
+    UBaseType_t uxStackHighWater = 0U;
+#endif
+
+    LogInfo(("Fleet memory trace: %s stackHwm=%lu heapFree=%lu heapMin=%lu.",
+             pcTag,
+             (unsigned long)uxStackHighWater,
+             (unsigned long)xPortGetFreeHeapSize(),
+             (unsigned long)xPortGetMinimumEverFreeHeapSize()));
+}
 #define COEFFICIENT_LENGTH    (128)
 
 #define EC_PARAMS_LENGTH      (10)
@@ -267,10 +284,12 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     privateKeyTemplate[2].pValue = &xTrueObject;
     privateKeyTemplate[3].pValue = &xTrueObject;
 
+    prvLogFleetMemoryState("before C_GetFunctionList");
     LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList enter."));
     xResult = C_GetFunctionList(&xFunctionList);
     LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList exit CK_RV=0x%08lx.",
              (unsigned long)xResult));
+    prvLogFleetMemoryState("after C_GetFunctionList");
 
     if (CKR_OK != xResult)
     {
@@ -278,6 +297,7 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     }
     else
     {
+        prvLogFleetMemoryState("before C_GenerateKeyPair");
         LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
         xResult = xFunctionList->C_GenerateKeyPair(xSession,
                                                    &xMechanism,
@@ -288,6 +308,7 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
                                                    xPrivateKeyHandlePtr);
         LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
                  (unsigned long)xResult));
+        prvLogFleetMemoryState("after C_GenerateKeyPair");
     }
 
     return xResult;
@@ -337,6 +358,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     pcCsrBuffer[0] = '\0';
     *pxOutCsrLength = 0U;
     mbedtls_pk_init(&xPrivKey);
+    prvLogFleetMemoryState("xGenerateKeyAndCsr entry");
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
     /*
@@ -348,7 +370,6 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
 
     {
         unsigned char ucRngProbe[16] = { 0 };
-        mbedtls_pk_context xEcpProbe;
 
         LogInfo(("Fleet CSR trace: RNG probe enter."));
         lRngProbeRet = lPKCS11RandomCallback(&xP11Session,
@@ -357,35 +378,12 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         LogInfo(("Fleet CSR trace: RNG probe exit ret=%ld.",
                  (long)lRngProbeRet));
         (void) memset(ucRngProbe, 0, sizeof(ucRngProbe));
-
-        if (0 == lRngProbeRet)
-        {
-            mbedtls_pk_init(&xEcpProbe);
-
-            LogInfo(("Fleet CSR trace: local ECP keygen setup enter."));
-            lRngProbeRet = mbedtls_pk_setup(&xEcpProbe,
-                                            mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-            LogInfo(("Fleet CSR trace: local ECP keygen setup exit ret=%ld.",
-                     (long)lRngProbeRet));
-
-            if (0 == lRngProbeRet)
-            {
-                LogInfo(("Fleet CSR trace: local ECP keygen enter."));
-                lRngProbeRet = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1,
-                                                   mbedtls_pk_ec(xEcpProbe),
-                                                   &lPKCS11RandomCallback,
-                                                   &xP11Session);
-                LogInfo(("Fleet CSR trace: local ECP keygen exit ret=%ld.",
-                         (long)lRngProbeRet));
-            }
-
-            mbedtls_pk_free(&xEcpProbe);
-        }
     }
 #endif
 
     if (0 == lRngProbeRet)
     {
+        prvLogFleetMemoryState("before prvGenerateKeyPairEC");
         xPkcs11Ret = prvGenerateKeyPairEC(xP11Session,
                                           pcPrivKeyLabel,
                                           pcPubKeyLabel,
@@ -393,6 +391,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
                                           &xPubKeyHandle);
         LogInfo(("Fleet CSR trace: keypair CK_RV=0x%08lx.",
                  (unsigned long)xPkcs11Ret));
+        prvLogFleetMemoryState("after prvGenerateKeyPairEC");
     }
     else
     {
