@@ -572,7 +572,6 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
                                    CK_OBJECT_HANDLE_PTR pxObjectHandle)
 {
     CK_RV result = CKR_OK;
-    CK_FUNCTION_LIST_PTR functionList = NULL;
     CK_BYTE *DPtr = NULL;        /* Private value D. */
     CK_BYTE *ecParamsPtr = NULL; /* DER-encoding of an ANSI X9.62 Parameters value */
     int mbedResult = 0;
@@ -587,25 +586,22 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         *pxObjectHandle = CK_INVALID_HANDLE;
     }
 
-    result = C_GetFunctionList(&functionList);
+    LogInfo(("Fleet CSR trace: private EC alloc enter."));
+    DPtr = (CK_BYTE *)pvPortMalloc(EC_D_LENGTH);
+    LogInfo(("Fleet CSR trace: private EC alloc exit ptr=0x%08lx.",
+             (unsigned long)DPtr));
 
-    if (CKR_OK != result)
+    if (NULL == DPtr)
     {
-        LogError(("Could not get a PKCS #11 function pointer."));
-    }
-    else
-    {
-        DPtr = (CK_BYTE *)pvPortMalloc(EC_D_LENGTH);
-
-        if (NULL == DPtr)
-        {
-            result = CKR_HOST_MEMORY;
-        }
+        result = CKR_HOST_MEMORY;
     }
 
     if (CKR_OK == result)
     {
+        LogInfo(("Fleet CSR trace: private EC D export enter."));
         mbedResult = mbedtls_mpi_write_binary(&(keyPair->d), DPtr, EC_D_LENGTH);
+        LogInfo(("Fleet CSR trace: private EC D export exit ret=%ld.",
+                 (long)mbedResult));
 
         if (0 != mbedResult)
         {
@@ -616,6 +612,8 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
 
     if (CKR_OK == result)
     {
+        LogInfo(("Fleet CSR trace: private EC curve check enter id=%ld.",
+                 (long)keyPair->grp.id));
         if (MBEDTLS_ECP_DP_SECP256R1 == keyPair->grp.id)
         {
             ecParamsPtr = (const CK_BYTE *)("\x06\x08" MBEDTLS_OID_EC_GRP_SECP256R1);
@@ -646,10 +644,14 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         privateKeyTemplate[5].pValue = ecParamsPtr;
         privateKeyTemplate[6].pValue = DPtr;
 
-        result = functionList->C_CreateObject(session,
-                                              (CK_ATTRIBUTE_PTR)&privateKeyTemplate,
-                                              (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                              &objectHandle);
+        LogInfo(("Fleet CSR trace: C_CreateObject private EC enter."));
+        result = C_CreateObject(session,
+                                (CK_ATTRIBUTE_PTR)&privateKeyTemplate,
+                                (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                &objectHandle);
+        LogInfo(("Fleet CSR trace: C_CreateObject private EC exit CK_RV=0x%08lx handle=0x%08lx.",
+                 (unsigned long)result,
+                 (unsigned long)objectHandle));
 
         if ((CKR_OK == result) && (NULL != pxObjectHandle))
         {
