@@ -64,7 +64,7 @@
 #include "transport_mbedtls_pkcs11.h"
 
 #ifndef PKCS11_PAL_LITTLEFS_TRACE
-    #define PKCS11_PAL_LITTLEFS_TRACE    (1)
+    #define PKCS11_PAL_LITTLEFS_TRACE    (0)
 #endif
 
 extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;

@@ -358,6 +358,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     TlsTransportStatus_t returnStatus = TLS_TRANSPORT_SUCCESS;
     int32_t mbedtlsError = 0;
     CK_RV xResult = CKR_OK;
+    long lTraceUseTsipKey = 0L;
+    long lTraceDisableTsipAccel = 0L;
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     BaseType_t xUseTsipRuntimeKey = pdFALSE;
@@ -390,6 +392,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     configASSERT( pNetworkCredentials->pPrivateKeyLabel != NULL );
 
     pTlsTransportParams = pNetworkContext->pParams;
+
+    LogInfo( ( "TLS trace: setup enter host=%s cert=%s key=%s.",
+               pHostName,
+               pNetworkCredentials->pClientCertLabel,
+               pNetworkCredentials->pPrivateKeyLabel ) );
 
     /* Initialize the mbed TLS context structures. */
     sslContextInit( &( pTlsTransportParams->sslContext ) );
@@ -482,6 +489,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             mbedtls_ssl_conf_ca_chain( &( pTlsTransportParams->sslContext.config ),
                                        &( pTlsTransportParams->sslContext.rootCa ),
                                        NULL );
+            LogInfo( ( "TLS trace: root CA parsed." ) );
         }
     }
 
@@ -502,6 +510,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             ( pdTRUE == xTsipProvisioningLoadClientRsa2048KeyPair() ) )
         {
             xUseTsipRuntimeKey = pdTRUE;
+            LogInfo( ( "TLS trace: TSIP runtime device key selected." ) );
             mbedtlsError = mbedtls_pk_setup( &( pTlsTransportParams->sslContext.privKey ),
                                              mbedtls_pk_info_from_type( MBEDTLS_PK_RSA ) );
 
@@ -515,8 +524,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
             ( xUseTsipRuntimeKey == pdFALSE ) )
         {
+            LogInfo( ( "TLS trace: PKCS #11 key setup enter label=%s.",
+                       pNetworkCredentials->pPrivateKeyLabel ) );
             xResult = initializeClientKeys( &( pTlsTransportParams->sslContext ),
                                             pNetworkCredentials->pPrivateKeyLabel );
+            LogInfo( ( "TLS trace: PKCS #11 key setup exit ret=0x%08lx.",
+                       ( unsigned long ) xResult ) );
 
             if( xResult != CKR_OK )
             {
@@ -533,10 +546,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
         if( returnStatus == TLS_TRANSPORT_SUCCESS )
         {
+            LogInfo( ( "TLS trace: client certificate load enter label=%s.",
+                       pNetworkCredentials->pClientCertLabel ) );
             xResult = readCertificateIntoContext( &( pTlsTransportParams->sslContext ),
                                                   pNetworkCredentials->pClientCertLabel,
                                                   CKO_CERTIFICATE,
                                                   &( pTlsTransportParams->sslContext.clientCert ) );
+            LogInfo( ( "TLS trace: client certificate load exit ret=0x%08lx.",
+                       ( unsigned long ) xResult ) );
 
             if( xResult != CKR_OK )
             {
@@ -602,6 +619,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         {
             LogError( ( "Failed to load Root CA signature for TSIP runtime provisioning." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
+        }
+        else
+        {
+            LogInfo( ( "TLS trace: TSIP Root CA trust anchor prepared." ) );
         }
     }
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
@@ -674,13 +695,26 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
             returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
         }
+        else
+        {
+            LogInfo( ( "TLS trace: ALPN configured." ) );
+        }
     }
 
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
         /* Initialize the mbed TLS secured connection context. */
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+        lTraceUseTsipKey = ( long ) xUseTsipRuntimeKey;
+        lTraceDisableTsipAccel = ( long ) xDisableTsipTlsAccelForConnection;
+#endif
+        LogInfo( ( "TLS trace: ssl_setup enter use_tsip_key=%ld disable_tsip_accel=%ld.",
+                   lTraceUseTsipKey,
+                   lTraceDisableTsipAccel ) );
         mbedtlsError = mbedtls_ssl_setup( &( pTlsTransportParams->sslContext.context ),
                                           &( pTlsTransportParams->sslContext.config ) );
+        LogInfo( ( "TLS trace: ssl_setup exit ret=%ld.",
+                   ( long ) mbedtlsError ) );
 
         if( mbedtlsError != 0 )
         {
@@ -743,6 +777,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
             returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
         }
+        else
+        {
+            LogInfo( ( "TLS trace: hostname configured." ) );
+        }
     }
 
     /* Set Maximum Fragment Length if enabled. */
@@ -770,6 +808,9 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
         uint32_t ulHandshakeAttempt = 0U;
 
+        LogInfo( ( "TLS trace: handshake enter state=%ld.",
+                   ( long ) pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
+
         /* Perform the TLS handshake. */
         do
         {
@@ -790,6 +831,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             ulHandshakeAttempt++;
         } while( ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_READ ) ||
                  ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_WRITE ) );
+
+        LogInfo( ( "TLS trace: handshake exit attempts=%lu state=%ld ret=%ld.",
+                   ( unsigned long ) ulHandshakeAttempt,
+                   ( long ) pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ),
+                   ( long ) mbedtlsError ) );
 
         if( mbedtlsError != 0 )
         {
