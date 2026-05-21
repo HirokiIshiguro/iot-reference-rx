@@ -53,6 +53,7 @@
 
 /* MbedTLS include. */
 #include "mbedtls/error.h"
+#include "mbedtls/ecp.h"
 #include "mbedtls/oid.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/sha256.h"
@@ -347,6 +348,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
 
     {
         unsigned char ucRngProbe[16] = { 0 };
+        mbedtls_pk_context xEcpProbe;
 
         LogInfo(("Fleet CSR trace: RNG probe enter."));
         lRngProbeRet = lPKCS11RandomCallback(&xP11Session,
@@ -355,6 +357,30 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         LogInfo(("Fleet CSR trace: RNG probe exit ret=%ld.",
                  (long)lRngProbeRet));
         (void) memset(ucRngProbe, 0, sizeof(ucRngProbe));
+
+        if (0 == lRngProbeRet)
+        {
+            mbedtls_pk_init(&xEcpProbe);
+
+            LogInfo(("Fleet CSR trace: local ECP keygen setup enter."));
+            lRngProbeRet = mbedtls_pk_setup(&xEcpProbe,
+                                            mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+            LogInfo(("Fleet CSR trace: local ECP keygen setup exit ret=%ld.",
+                     (long)lRngProbeRet));
+
+            if (0 == lRngProbeRet)
+            {
+                LogInfo(("Fleet CSR trace: local ECP keygen enter."));
+                lRngProbeRet = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1,
+                                                   mbedtls_pk_ec(xEcpProbe),
+                                                   &lPKCS11RandomCallback,
+                                                   &xP11Session);
+                LogInfo(("Fleet CSR trace: local ECP keygen exit ret=%ld.",
+                         (long)lRngProbeRet));
+            }
+
+            mbedtls_pk_free(&xEcpProbe);
+        }
     }
 #endif
 
