@@ -202,6 +202,16 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
     if (0 == socketStatus)
     {
+        /* FreeRTOS_connect() uses the socket receive block time as its connect
+         * timeout. Set it before connecting so transient SYN failures do not
+         * block forever with the default portMAX_DELAY. */
+        transportTimeout = pdMS_TO_TICKS(receiveTimeoutMs);
+        (void)FreeRTOS_setsockopt(tcpSocket,
+                                  0,
+                                  FREERTOS_SO_RCVTIMEO,
+                                  &transportTimeout,
+                                  sizeof(TickType_t));
+
         /* Establish connection. */
         LogDebug(("Creating TCP Connection to %s.", pHostName));
         socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
