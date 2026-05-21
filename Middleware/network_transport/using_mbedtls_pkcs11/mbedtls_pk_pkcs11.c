@@ -1026,7 +1026,7 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     CK_RV xResult = CKR_OK;
     int32_t lFinalResult = 0;
 
-    const P11RsaCtx_t * pxP11RsaCtx = NULL;
+    P11RsaCtx_t * pxP11RsaCtx = NULL;
 
     configASSERT( pucSig != NULL );
     configASSERT( xSigBufferSize > 0 );
@@ -1035,10 +1035,9 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     configASSERT( xHashLen > 0 );
 
     configASSERT( xMdAlg == MBEDTLS_MD_SHA256 );
-    configASSERT( xHashLen <= sizeof( pxToBeSigned ) );
+    configASSERT( xHashLen == pkcs11SHA256_DIGEST_LENGTH );
 
-    /* Sanity check buffer length. */
-    if( xHashLen > sizeof( pxToBeSigned ) )
+    if( ( xMdAlg != MBEDTLS_MD_SHA256 ) || ( xHashLen != pkcs11SHA256_DIGEST_LENGTH ) )
     {
         xResult = CKR_ARGUMENTS_BAD;
     }
