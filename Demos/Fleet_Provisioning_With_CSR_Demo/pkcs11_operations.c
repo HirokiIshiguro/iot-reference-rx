@@ -297,6 +297,21 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     }
     else
     {
+        CK_BYTE ucRandomProbe[16] = { 0 };
+
+        prvLogFleetMemoryState("before C_GenerateRandom");
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom enter."));
+        xResult = xFunctionList->C_GenerateRandom(xSession,
+                                                   ucRandomProbe,
+                                                   sizeof(ucRandomProbe));
+        LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom exit CK_RV=0x%08lx.",
+                 (unsigned long)xResult));
+        prvLogFleetMemoryState("after C_GenerateRandom");
+        (void) memset(ucRandomProbe, 0, sizeof(ucRandomProbe));
+    }
+
+    if (CKR_OK == xResult)
+    {
         prvLogFleetMemoryState("before C_GenerateKeyPair");
         LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
         xResult = xFunctionList->C_GenerateKeyPair(xSession,
