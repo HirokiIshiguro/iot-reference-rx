@@ -1027,20 +1027,8 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     int32_t lFinalResult = 0;
 
     const P11RsaCtx_t * pxP11RsaCtx = NULL;
-    const P11PkCtx_t * pxP11Ctx = NULL;
 
     CK_BYTE pxToBeSigned[ 256 ];
-
-    CK_MECHANISM xMech =
-    {
-        .mechanism      = CKM_RSA_PKCS,
-        .pParameter     = NULL,
-        .ulParameterLen = 0
-    };
-
-    /* Unused parameters. */
-    ( void ) ( plRng );
-    ( void ) ( pvRng );
 
     configASSERT( pucSig != NULL );
     configASSERT( xSigBufferSize > 0 );
@@ -1059,7 +1047,6 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     else if( pk != NULL )
     {
         pxP11RsaCtx = ( P11RsaCtx_t * ) pk->pk_ctx;
-        pxP11Ctx = &( pxP11RsaCtx->xP11PkCtx );
     }
     else
     {
@@ -1073,37 +1060,36 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
 
     if( CKR_OK == xResult )
     {
-        /* Use the PKCS#11 module to sign. */
-        vOutputString( "P11:RSA:SignInit>\r\n" );
-        LogInfo( ( "PKCS11 sign trace: RSA SignInit enter handle=%lu hashLen=%lu.",
-                   ( unsigned long ) pxP11Ctx->xPkHandle,
-                   ( unsigned long ) xHashLen ) );
-        xResult = pxP11Ctx->pxFunctionList->C_SignInit( pxP11Ctx->xSessionHandle,
-                                                        &xMech,
-                                                        pxP11Ctx->xPkHandle );
-        vOutputString( "P11:RSA:SignInit<\r\n" );
-        LogInfo( ( "PKCS11 sign trace: RSA SignInit exit ret=0x%08lx.",
-                   ( unsigned long ) xResult ) );
-    }
+        const size_t uxRsaLength = mbedtls_rsa_get_len( &( pxP11RsaCtx->xMbedRsaCtx ) );
+        int32_t lMbedResult;
 
-    if( CKR_OK == xResult )
-    {
-        CK_ULONG ulSigLen = sizeof( pxToBeSigned );
+        if( xSigBufferSize < uxRsaLength )
+        {
+            xResult = CKR_BUFFER_TOO_SMALL;
+        }
+        else
+        {
+            vOutputString( "P11:RSA:SWSign>\r\n" );
+            lMbedResult = mbedtls_rsa_pkcs1_sign( &( pxP11RsaCtx->xMbedRsaCtx ),
+                                                  plRng,
+                                                  pvRng,
+                                                  MBEDTLS_MD_NONE,
+                                                  pkcs11RSA_SIGNATURE_INPUT_LENGTH,
+                                                  pxToBeSigned,
+                                                  pucSig );
+            vOutputString( "P11:RSA:SWSign<\r\n" );
 
-        vOutputString( "P11:RSA:Sign>\r\n" );
-        LogInfo( ( "PKCS11 sign trace: RSA Sign enter sigBuf=%lu.",
-                   ( unsigned long ) xSigBufferSize ) );
-        xResult = pxP11Ctx->pxFunctionList->C_Sign( pxP11Ctx->xSessionHandle,
-                                                    pxToBeSigned,
-                                                    pkcs11RSA_SIGNATURE_INPUT_LENGTH,
-                                                    pucSig,
-                                                    &ulSigLen );
-        vOutputString( "P11:RSA:Sign<\r\n" );
-        LogInfo( ( "PKCS11 sign trace: RSA Sign exit ret=0x%08lx sigLen=%lu.",
-                   ( unsigned long ) xResult,
-                   ( unsigned long ) ulSigLen ) );
-
-        *pxSigLen = ( size_t ) ulSigLen;
+            if( lMbedResult == 0 )
+            {
+                *pxSigLen = uxRsaLength;
+            }
+            else
+            {
+                LogError( ( "Failed to sign message using imported RSA key with mbed TLS error code %d.",
+                            ( int ) lMbedResult ) );
+                xResult = CKR_FUNCTION_FAILED;
+            }
+        }
     }
 
     if( xResult != CKR_OK )
