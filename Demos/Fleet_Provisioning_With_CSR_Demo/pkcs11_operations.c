@@ -253,7 +253,7 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
 {
     CK_RV xResult;
     CK_MECHANISM xMechanism = {CKM_EC_KEY_PAIR_GEN, NULL_PTR, 0};
-    CK_FUNCTION_LIST_PTR xFunctionList;
+    CK_BYTE ucRandomProbe[16] = { 0 };
     CK_BYTE pxEcParams[] = pkcs11DER_ENCODED_OID_P256; /* prime256v1 */
     CK_KEY_TYPE xKeyType = CKK_EC;
 
@@ -284,43 +284,27 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     privateKeyTemplate[2].pValue = &xTrueObject;
     privateKeyTemplate[3].pValue = &xTrueObject;
 
-    prvLogFleetMemoryState("before C_GetFunctionList");
-    LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList enter."));
-    xResult = C_GetFunctionList(&xFunctionList);
-    LogInfo(("Fleet PKCS #11 trace: C_GetFunctionList exit CK_RV=0x%08lx.",
+    prvLogFleetMemoryState("before C_GenerateRandom");
+    LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom enter."));
+    xResult = C_GenerateRandom(xSession,
+                               ucRandomProbe,
+                               sizeof(ucRandomProbe));
+    LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom exit CK_RV=0x%08lx.",
              (unsigned long)xResult));
-    prvLogFleetMemoryState("after C_GetFunctionList");
-
-    if (CKR_OK != xResult)
-    {
-        LogError(("Could not get a PKCS #11 function pointer."));
-    }
-    else
-    {
-        CK_BYTE ucRandomProbe[16] = { 0 };
-
-        prvLogFleetMemoryState("before C_GenerateRandom");
-        LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom enter."));
-        xResult = xFunctionList->C_GenerateRandom(xSession,
-                                                   ucRandomProbe,
-                                                   sizeof(ucRandomProbe));
-        LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom exit CK_RV=0x%08lx.",
-                 (unsigned long)xResult));
-        prvLogFleetMemoryState("after C_GenerateRandom");
-        (void) memset(ucRandomProbe, 0, sizeof(ucRandomProbe));
-    }
+    prvLogFleetMemoryState("after C_GenerateRandom");
+    (void) memset(ucRandomProbe, 0, sizeof(ucRandomProbe));
 
     if (CKR_OK == xResult)
     {
         prvLogFleetMemoryState("before C_GenerateKeyPair");
         LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
-        xResult = xFunctionList->C_GenerateKeyPair(xSession,
-                                                   &xMechanism,
-                                                   pxPublicKeyTemplate,
-                                                   (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                                   privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                                   xPublicKeyHandlePtr,
-                                                   xPrivateKeyHandlePtr);
+        xResult = C_GenerateKeyPair(xSession,
+                                    &xMechanism,
+                                    pxPublicKeyTemplate,
+                                    (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                    privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                    xPublicKeyHandlePtr,
+                                    xPrivateKeyHandlePtr);
         LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
                  (unsigned long)xResult));
         prvLogFleetMemoryState("after C_GenerateKeyPair");
