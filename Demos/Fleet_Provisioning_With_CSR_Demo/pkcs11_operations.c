@@ -80,21 +80,6 @@
 #define PRIME_2_LENGTH        (128)
 #define EXPONENT_1_LENGTH     (128)
 #define EXPONENT_2_LENGTH     (128)
-
-static void prvLogFleetMemoryState(const char *pcTag)
-{
-#if (INCLUDE_uxTaskGetStackHighWaterMark == 1)
-    UBaseType_t uxStackHighWater = uxTaskGetStackHighWaterMark(NULL);
-#else
-    UBaseType_t uxStackHighWater = 0U;
-#endif
-
-    LogInfo(("Fleet memory trace: %s stackHwm=%lu heapFree=%lu heapMin=%lu.",
-             pcTag,
-             (unsigned long)uxStackHighWater,
-             (unsigned long)xPortGetFreeHeapSize(),
-             (unsigned long)xPortGetMinimumEverFreeHeapSize()));
-}
 #define COEFFICIENT_LENGTH    (128)
 
 #define EC_PARAMS_LENGTH      (10)
@@ -253,7 +238,6 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
 {
     CK_RV xResult;
     CK_MECHANISM xMechanism = {CKM_EC_KEY_PAIR_GEN, NULL_PTR, 0};
-    CK_BYTE ucRandomProbe[16] = { 0 };
     CK_BYTE pxEcParams[] = pkcs11DER_ENCODED_OID_P256; /* prime256v1 */
     CK_KEY_TYPE xKeyType = CKK_EC;
 
@@ -284,31 +268,16 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     privateKeyTemplate[2].pValue = &xTrueObject;
     privateKeyTemplate[3].pValue = &xTrueObject;
 
-    prvLogFleetMemoryState("before C_GenerateRandom");
-    LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom enter."));
-    xResult = C_GenerateRandom(xSession,
-                               ucRandomProbe,
-                               sizeof(ucRandomProbe));
-    LogInfo(("Fleet PKCS #11 trace: C_GenerateRandom exit CK_RV=0x%08lx.",
+    LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
+    xResult = C_GenerateKeyPair(xSession,
+                                &xMechanism,
+                                pxPublicKeyTemplate,
+                                (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
+                                xPublicKeyHandlePtr,
+                                xPrivateKeyHandlePtr);
+    LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
              (unsigned long)xResult));
-    prvLogFleetMemoryState("after C_GenerateRandom");
-    (void) memset(ucRandomProbe, 0, sizeof(ucRandomProbe));
-
-    if (CKR_OK == xResult)
-    {
-        prvLogFleetMemoryState("before C_GenerateKeyPair");
-        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair enter."));
-        xResult = C_GenerateKeyPair(xSession,
-                                    &xMechanism,
-                                    pxPublicKeyTemplate,
-                                    (sizeof(pxPublicKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                    privateKeyTemplate, (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
-                                    xPublicKeyHandlePtr,
-                                    xPrivateKeyHandlePtr);
-        LogInfo(("Fleet PKCS #11 trace: C_GenerateKeyPair exit CK_RV=0x%08lx.",
-                 (unsigned long)xResult));
-        prvLogFleetMemoryState("after C_GenerateKeyPair");
-    }
 
     return xResult;
 }
@@ -344,7 +313,6 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     mbedtls_pk_context xPrivKey;
     mbedtls_x509write_csr xReq;
     int32_t ulMbedtlsRet = -1;
-    int32_t lRngProbeRet = 0;
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
     unsigned char ucSavedTsipEndpointFlag = g_tsip_endpointflg;
 #endif
@@ -357,7 +325,6 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
     pcCsrBuffer[0] = '\0';
     *pxOutCsrLength = 0U;
     mbedtls_pk_init(&xPrivKey);
-    prvLogFleetMemoryState("xGenerateKeyAndCsr entry");
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_FUNC_ENABLE)
     /*
@@ -366,36 +333,14 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
      * even when this image is built with TSIP-enabled TLS.
      */
     g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
-
-    {
-        unsigned char ucRngProbe[16] = { 0 };
-
-        LogInfo(("Fleet CSR trace: RNG probe enter."));
-        lRngProbeRet = lPKCS11RandomCallback(&xP11Session,
-                                             ucRngProbe,
-                                             sizeof(ucRngProbe));
-        LogInfo(("Fleet CSR trace: RNG probe exit ret=%ld.",
-                 (long)lRngProbeRet));
-        (void) memset(ucRngProbe, 0, sizeof(ucRngProbe));
-    }
 #endif
 
-    if (0 == lRngProbeRet)
-    {
-        prvLogFleetMemoryState("before prvGenerateKeyPairEC");
-        xPkcs11Ret = prvGenerateKeyPairEC(xP11Session,
-                                          pcPrivKeyLabel,
-                                          pcPubKeyLabel,
-                                          &xPrivKeyHandle,
-                                          &xPubKeyHandle);
-        LogInfo(("Fleet CSR trace: keypair CK_RV=0x%08lx.",
-                 (unsigned long)xPkcs11Ret));
-        prvLogFleetMemoryState("after prvGenerateKeyPairEC");
-    }
-    else
-    {
-        xPkcs11Ret = CKR_FUNCTION_FAILED;
-    }
+    xPkcs11Ret = prvGenerateKeyPairEC(xP11Session,
+                                      pcPrivKeyLabel,
+                                      pcPubKeyLabel,
+                                      &xPrivKeyHandle,
+                                      &xPubKeyHandle);
+
     if (CKR_OK != xPkcs11Ret)
     {
         LogError(("C_GenerateKeyPair failed while preparing Fleet CSR: CK_RV=0x%08lx.",
