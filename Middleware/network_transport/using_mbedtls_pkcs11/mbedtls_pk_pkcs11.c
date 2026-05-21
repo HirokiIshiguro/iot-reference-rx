@@ -1033,8 +1033,16 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
 {
     CK_RV xResult = CKR_OK;
     int32_t lFinalResult = 0;
-
     P11RsaCtx_t * pxP11RsaCtx = NULL;
+    const P11PkCtx_t * pxP11Ctx = NULL;
+    CK_MECHANISM xMech =
+    {
+        .mechanism      = CKM_RSA_PKCS,
+        .pParameter     = NULL,
+        .ulParameterLen = 0
+    };
+    const unsigned char pucDigestInfoPrefix[] = pkcs11STUFF_APPENDED_TO_RSA_SIG;
+    unsigned char pucDigestInfo[ pkcs11RSA_SIGNATURE_INPUT_LENGTH ];
 
     configASSERT( pucSig != NULL );
     configASSERT( xSigBufferSize > 0 );
@@ -1045,6 +1053,9 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     configASSERT( xMdAlg == MBEDTLS_MD_SHA256 );
     configASSERT( xHashLen == pkcs11SHA256_DIGEST_LENGTH );
 
+    ( void ) ( plRng );
+    ( void ) ( pvRng );
+
     if( ( xMdAlg != MBEDTLS_MD_SHA256 ) || ( xHashLen != pkcs11SHA256_DIGEST_LENGTH ) )
     {
         xResult = CKR_ARGUMENTS_BAD;
@@ -1052,6 +1063,15 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     else if( pk != NULL )
     {
         pxP11RsaCtx = ( P11RsaCtx_t * ) pk->pk_ctx;
+
+        if( pxP11RsaCtx != NULL )
+        {
+            pxP11Ctx = &( pxP11RsaCtx->xP11PkCtx );
+        }
+        else
+        {
+            xResult = CKR_FUNCTION_FAILED;
+        }
     }
     else
     {
@@ -1060,34 +1080,35 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
 
     if( CKR_OK == xResult )
     {
-        const size_t uxRsaLength = mbedtls_rsa_get_len( &( pxP11RsaCtx->xMbedRsaCtx ) );
-        int32_t lMbedResult;
+        CK_ULONG ulSigLen = xSigBufferSize;
 
-        if( xSigBufferSize < uxRsaLength )
+        if( xSigBufferSize < pkcs11RSA_2048_SIGNATURE_LENGTH )
         {
             xResult = CKR_BUFFER_TOO_SMALL;
         }
         else
         {
-            vOutputString( "P11:RSA:SWSignSHA256>\r\n" );
-            lMbedResult = mbedtls_rsa_pkcs1_sign( &( pxP11RsaCtx->xMbedRsaCtx ),
-                                                  plRng,
-                                                  pvRng,
-                                                  MBEDTLS_MD_SHA256,
-                                                  ( unsigned int ) xHashLen,
-                                                  pucHash,
-                                                  pucSig );
-            vOutputString( "P11:RSA:SWSignSHA256<\r\n" );
+            ( void ) memcpy( pucDigestInfo, pucDigestInfoPrefix, sizeof( pucDigestInfoPrefix ) );
+            ( void ) memcpy( &( pucDigestInfo[ sizeof( pucDigestInfoPrefix ) ] ), pucHash, xHashLen );
 
-            if( lMbedResult == 0 )
+            vOutputString( "P11:RSA:SignInit>\r\n" );
+            xResult = pxP11Ctx->pxFunctionList->C_SignInit( pxP11Ctx->xSessionHandle,
+                                                            &xMech,
+                                                            pxP11Ctx->xPkHandle );
+            vOutputString( "P11:RSA:SignInit<\r\n" );
+        }
+
+        if( xResult == CKR_OK )
+        {
+            vOutputString( "P11:RSA:Sign>\r\n" );
+            xResult = pxP11Ctx->pxFunctionList->C_Sign( pxP11Ctx->xSessionHandle,
+                                                        pucDigestInfo, sizeof( pucDigestInfo ),
+                                                        pucSig, &ulSigLen );
+            vOutputString( "P11:RSA:Sign<\r\n" );
+
+            if( xResult == CKR_OK )
             {
-                *pxSigLen = uxRsaLength;
-            }
-            else
-            {
-                LogError( ( "Failed to sign message using imported RSA key with mbed TLS error code %d.",
-                            ( int ) lMbedResult ) );
-                xResult = CKR_FUNCTION_FAILED;
+                *pxSigLen = ulSigLen;
             }
         }
     }
