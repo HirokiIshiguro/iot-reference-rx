@@ -64,6 +64,10 @@
 
 #include "mbedtls/debug.h"
 
+#if defined( IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE )
+    #include "mbedtls/platform_util.h"
+#endif /* IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE */
+
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 
@@ -160,6 +164,35 @@ static void sslContextFree( SSLContext_t * pSslContext );
 static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                       const char * pHostName,
                                       const NetworkCredentials_t * pNetworkCredentials );
+
+#if defined( IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE )
+
+/**
+ * @brief Export TLS secrets for packet-capture analysis.
+ *
+ * @warning This must only be enabled in controlled debug builds. The emitted
+ *          values can decrypt the matching TLS session.
+ */
+static void tlsKeyLogExport( void * pExpKey,
+                             mbedtls_ssl_key_export_type secretType,
+                             const unsigned char * pSecret,
+                             size_t secretLen,
+                             const unsigned char clientRandom[ 32 ],
+                             const unsigned char serverRandom[ 32 ],
+                             mbedtls_tls_prf_types tlsPrfType );
+
+static void appendHex( char * pBuffer,
+                       size_t bufferLength,
+                       size_t * pOffset,
+                       const unsigned char * pData,
+                       size_t dataLength );
+
+static void bytesToHexString( char * pBuffer,
+                              size_t bufferLength,
+                              const unsigned char * pData,
+                              size_t dataLength );
+
+#endif /* IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE */
 
 /*-----------------------------------------------------------*/
 
@@ -465,6 +498,13 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                  xMbedTLSBioTCPSocketsWrapperSend,
                                  xMbedTLSBioTCPSocketsWrapperRecv,
                                  NULL );
+
+            #if defined( IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE )
+                mbedtls_ssl_set_export_keys_cb( &( pTlsTransportParams->sslContext.context ),
+                                                tlsKeyLogExport,
+                                                NULL );
+                LogWarn( ( "TLS key log export is enabled for packet analysis." ) );
+            #endif /* IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE */
         }
     }
 
@@ -568,6 +608,82 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     return returnStatus;
 }
+
+/*-----------------------------------------------------------*/
+
+#if defined( IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE )
+
+static void appendHex( char * pBuffer,
+                       size_t bufferLength,
+                       size_t * pOffset,
+                       const unsigned char * pData,
+                       size_t dataLength )
+{
+    static const char hexDigits[] = "0123456789abcdef";
+    size_t i;
+
+    for( i = 0U; ( i < dataLength ) && ( ( *pOffset + 2U ) < bufferLength ); i++ )
+    {
+        pBuffer[ *pOffset ] = hexDigits[ ( pData[ i ] >> 4 ) & 0x0FU ];
+        ( *pOffset )++;
+        pBuffer[ *pOffset ] = hexDigits[ pData[ i ] & 0x0FU ];
+        ( *pOffset )++;
+    }
+}
+
+static void bytesToHexString( char * pBuffer,
+                              size_t bufferLength,
+                              const unsigned char * pData,
+                              size_t dataLength )
+{
+    size_t offset = 0U;
+
+    appendHex( pBuffer, bufferLength, &offset, pData, dataLength );
+
+    if( offset < bufferLength )
+    {
+        pBuffer[ offset ] = '\0';
+    }
+    else if( bufferLength > 0U )
+    {
+        pBuffer[ bufferLength - 1U ] = '\0';
+    }
+}
+
+static void tlsKeyLogExport( void * pExpKey,
+                             mbedtls_ssl_key_export_type secretType,
+                             const unsigned char * pSecret,
+                             size_t secretLen,
+                             const unsigned char clientRandom[ 32 ],
+                             const unsigned char serverRandom[ 32 ],
+                             mbedtls_tls_prf_types tlsPrfType )
+{
+    char clientRandomHex[ 65 ];
+    char masterSecretHex[ 129 ];
+
+    ( void ) pExpKey;
+    ( void ) serverRandom;
+    ( void ) tlsPrfType;
+
+    if( ( secretType != MBEDTLS_SSL_KEY_EXPORT_TLS12_MASTER_SECRET ) ||
+        ( pSecret == NULL ) ||
+        ( secretLen == 0U ) ||
+        ( secretLen > 64U ) )
+    {
+        return;
+    }
+
+    bytesToHexString( clientRandomHex, sizeof( clientRandomHex ), clientRandom, 32U );
+    bytesToHexString( masterSecretHex, sizeof( masterSecretHex ), pSecret, secretLen );
+
+    LogInfo( ( "TLSKEYLOG_CLIENT_RANDOM:%s", clientRandomHex ) );
+    LogInfo( ( "TLSKEYLOG_MASTER_SECRET:%s", masterSecretHex ) );
+
+    mbedtls_platform_zeroize( clientRandomHex, sizeof( clientRandomHex ) );
+    mbedtls_platform_zeroize( masterSecretHex, sizeof( masterSecretHex ) );
+}
+
+#endif /* IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE */
 
 /*-----------------------------------------------------------*/
 

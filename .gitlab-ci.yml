@@ -2059,6 +2059,8 @@ test_rx72n_ether_fleet:
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_fleet"
       mkdir -p "$artifact_dir"
+      tls_keylog_file="/tmp/rx72n_ether_fleet_${CI_PIPELINE_ID}_${CI_JOB_ID}.keys"
+      echo "TLS key log file on runner: $tls_keylog_file"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
 
@@ -2068,6 +2070,7 @@ test_rx72n_ether_fleet:
         --timeout "$RX72N_FLEET_TEST_TIMEOUT" \
         --reset-cmd "$reset_cmd" \
         --summary-json "$artifact_dir/fleet_summary.json" \
+        --tls-keylog-file "$tls_keylog_file" \
         2>&1 | tee "$artifact_dir/test_fleet_rx72n.log"
   artifacts:
     when: always

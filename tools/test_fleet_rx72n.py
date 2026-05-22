@@ -45,6 +45,18 @@ ERROR_PATTERNS = [
 ]
 
 
+def append_tls_keylog_entry(path, client_random, master_secret):
+    if not path:
+        return
+
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+
+    with open(path, "a", encoding="ascii") as handle:
+        handle.write(f"CLIENT_RANDOM {client_random} {master_secret}\n")
+
+
 def reset_device_via_command(reset_cmd):
     print(f"Running reset command: {reset_cmd}")
     try:
@@ -80,7 +92,7 @@ def reset_device_via_command(reset_cmd):
     return True
 
 
-def monitor_uart(port, baud, timeout, reset_cmd):
+def monitor_uart(port, baud, timeout, reset_cmd, tls_keylog_file):
     results = {name: False for name, _ in MARKERS}
     errors = []
     certificate_id = None
@@ -89,6 +101,7 @@ def monitor_uart(port, baud, timeout, reset_cmd):
     total_lines = 0
     buffer = ""
     fatal_cellular_error = False
+    pending_client_random = None
 
     ser = serial.Serial(
         port=port,
@@ -122,6 +135,22 @@ def monitor_uart(port, baud, timeout, reset_cmd):
                         continue
 
                     total_lines += 1
+
+                    if "TLSKEYLOG_CLIENT_RANDOM:" in line:
+                        pending_client_random = line.split("TLSKEYLOG_CLIENT_RANDOM:", 1)[1].strip()
+                        print("[TLSKEYLOG] client random captured")
+                        continue
+
+                    if "TLSKEYLOG_MASTER_SECRET:" in line:
+                        master_secret = line.split("TLSKEYLOG_MASTER_SECRET:", 1)[1].strip()
+                        if pending_client_random:
+                            append_tls_keylog_entry(tls_keylog_file, pending_client_random, master_secret)
+                            print("[TLSKEYLOG] NSS key log entry captured")
+                            pending_client_random = None
+                        else:
+                            print("[TLSKEYLOG] master secret captured without matching client random")
+                        continue
+
                     print(line)
 
                     for name, pattern in MARKERS:
@@ -169,6 +198,8 @@ def main():
     parser.add_argument("--label", default=os.environ.get("FLEET_TEST_LABEL", "RX72N"))
     parser.add_argument("--summary-json", help="Optional path to write fleet provisioning summary JSON")
     parser.add_argument("--app-reset-retries", type=int, default=int(os.environ.get("FLEET_APP_RESET_RETRIES", "0")))
+    parser.add_argument("--tls-keylog-file", default=os.environ.get("RX72N_TLS_KEYLOG_FILE"),
+                        help="Optional NSS key log output path. TLSKEYLOG UART lines are suppressed from stdout.")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -177,6 +208,10 @@ def main():
     print(f"Log Port: {args.log_port}")
     print(f"Log Baud: {args.log_baud}")
     print(f"Timeout:  {args.timeout}s")
+    if args.tls_keylog_file:
+        if os.path.exists(args.tls_keylog_file):
+            os.remove(args.tls_keylog_file)
+        print(f"TLS key log file: {args.tls_keylog_file}")
     print("=" * 60)
 
     attempts = []
@@ -188,6 +223,7 @@ def main():
             args.log_baud,
             args.timeout,
             args.reset_cmd,
+            args.tls_keylog_file,
         )
         attempts.append(
             {
