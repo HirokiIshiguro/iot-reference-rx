@@ -49,7 +49,6 @@
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
-#include "task.h"
 
 /* MbedTLS Bio TCP sockets wrapper include. */
 #include "mbedtls_bio_tcp_sockets_wrapper.h"
@@ -101,17 +100,6 @@ static const char * pNoHighLevelMbedTlsCodeStr = "<No-High-Level-Code>";
  * does not contain a low-level code.
  */
 static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
-
-static void prvLogCurrentTaskStackHighWaterMark( const char * pcLabel )
-{
-    #if ( INCLUDE_uxTaskGetStackHighWaterMark == 1 )
-        LogInfo( ( "TLS stack trace: %s highwater=%lu.",
-                   pcLabel,
-                   ( unsigned long ) uxTaskGetStackHighWaterMark( NULL ) ) );
-    #else
-        ( void ) pcLabel;
-    #endif
-}
 
 /**
  * @brief Utility for converting the high-level code in an mbedTLS error to string,
@@ -373,8 +361,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     TlsTransportStatus_t returnStatus = TLS_TRANSPORT_SUCCESS;
     int32_t mbedtlsError = 0;
     CK_RV xResult = CKR_OK;
-    long lTraceUseTsipKey = 0L;
-    long lTraceDisableTsipAccel = 0L;
 
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     BaseType_t xUseTsipRuntimeKey = pdFALSE;
@@ -398,57 +384,23 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
 #endif
 
-    configPRINT_STRING( "TSET: entry direct\r\n" );
-    LogInfo( ( "TSET: entry ctx=%p host=%p credentials=%p.",
-               pNetworkContext,
-               pHostName,
-               pNetworkCredentials ) );
-
     configASSERT( pNetworkContext != NULL );
-    configPRINT_STRING( "TSET: ctx ok direct\r\n" );
-    LogInfo( ( "TSET: assert ctx ok." ) );
     configASSERT( pNetworkContext->pParams != NULL );
-    configPRINT_STRING( "TSET: params ok direct\r\n" );
-    LogInfo( ( "TSET: assert params ok." ) );
     configASSERT( pHostName != NULL );
-    configPRINT_STRING( "TSET: host ok direct\r\n" );
-    LogInfo( ( "TSET: assert host ok." ) );
     configASSERT( pNetworkCredentials != NULL );
-    configPRINT_STRING( "TSET: credentials ok direct\r\n" );
-    LogInfo( ( "TSET: assert credentials ok." ) );
     configASSERT( pNetworkCredentials->pRootCa != NULL );
-    configPRINT_STRING( "TSET: root ok direct\r\n" );
-    LogInfo( ( "TSET: assert root ok." ) );
     configASSERT( pNetworkCredentials->pClientCertLabel != NULL );
-    configPRINT_STRING( "TSET: cert label ok direct\r\n" );
-    LogInfo( ( "TSET: assert cert label ok." ) );
     configASSERT( pNetworkCredentials->pPrivateKeyLabel != NULL );
-    configPRINT_STRING( "TSET: key label ok direct\r\n" );
-    LogInfo( ( "TSET: assert key label ok." ) );
 
     pTlsTransportParams = pNetworkContext->pParams;
 
-    LogInfo( ( "TSET: params=%p root=%p certLabel=%p keyLabel=%p.",
-               pTlsTransportParams,
-               pNetworkCredentials->pRootCa,
-               pNetworkCredentials->pClientCertLabel,
-               pNetworkCredentials->pPrivateKeyLabel ) );
-
-    LogInfo( ( "TLS trace: setup enter host=%s cert=%s key=%s.",
-               pHostName,
-               pNetworkCredentials->pClientCertLabel,
-               pNetworkCredentials->pPrivateKeyLabel ) );
-
     /* Initialize the mbed TLS context structures. */
-    configPRINT_STRING( "TSET: ssl init direct\r\n" );
     sslContextInit( &( pTlsTransportParams->sslContext ) );
 
-    configPRINT_STRING( "TSET: config defaults call direct\r\n" );
     mbedtlsError = mbedtls_ssl_config_defaults( &( pTlsTransportParams->sslContext.config ),
                                                 MBEDTLS_SSL_IS_CLIENT,
                                                 MBEDTLS_SSL_TRANSPORT_STREAM,
                                                 MBEDTLS_SSL_PRESET_DEFAULT );
-    configPRINT_STRING( "TSET: config defaults returned direct\r\n" );
 
     if( mbedtlsError != 0 )
     {
@@ -462,8 +414,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
-        configPRINT_STRING( "TSET: base config begin direct\r\n" );
-
         /* Set up the certificate security profile, starting from the default value. */
         pTlsTransportParams->sslContext.certProfile = mbedtls_x509_crt_profile_default;
 
@@ -518,11 +468,9 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
 
         /* Parse the server root CA certificate into the SSL context. */
-        configPRINT_STRING( "TSET: root parse call direct\r\n" );
         mbedtlsError = mbedtls_x509_crt_parse( &( pTlsTransportParams->sslContext.rootCa ),
                                                pNetworkCredentials->pRootCa,
                                                pNetworkCredentials->rootCaSize );
-        configPRINT_STRING( "TSET: root parse returned direct\r\n" );
 
         if( mbedtlsError != 0 )
         {
@@ -537,7 +485,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             mbedtls_ssl_conf_ca_chain( &( pTlsTransportParams->sslContext.config ),
                                        &( pTlsTransportParams->sslContext.rootCa ),
                                        NULL );
-            LogInfo( ( "TLS trace: root CA parsed." ) );
         }
     }
 
@@ -547,7 +494,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
-        configPRINT_STRING( "TSET: key setup begin direct\r\n" );
         mbedtls_pk_init( &( pTlsTransportParams->sslContext.privKey ) );
 
         xPrivateKeyLabelIsDevice =
@@ -555,17 +501,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                             pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
                             sizeof( pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS ) ) ) ? pdTRUE : pdFALSE;
 
-        configPRINT_STRING( "TSET: tsip key load decision direct\r\n" );
         if( ( xPrivateKeyLabelIsDevice == pdTRUE ) &&
             ( pdTRUE == xTsipProvisioningLoadClientRsa2048KeyPair() ) )
         {
-            configPRINT_STRING( "TSET: tsip key load true direct\r\n" );
             xUseTsipRuntimeKey = pdTRUE;
-            LogInfo( ( "TLS trace: TSIP runtime device key selected." ) );
-            configPRINT_STRING( "TSET: tsip pk setup call direct\r\n" );
             mbedtlsError = mbedtls_pk_setup( &( pTlsTransportParams->sslContext.privKey ),
                                              mbedtls_pk_info_from_type( MBEDTLS_PK_RSA ) );
-            configPRINT_STRING( "TSET: tsip pk setup returned direct\r\n" );
 
             if( mbedtlsError != 0 )
             {
@@ -577,14 +518,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
             ( xUseTsipRuntimeKey == pdFALSE ) )
         {
-            configPRINT_STRING( "TSET: pkcs key setup call direct\r\n" );
-            LogInfo( ( "TLS trace: PKCS #11 key setup enter label=%s.",
-                       pNetworkCredentials->pPrivateKeyLabel ) );
             xResult = initializeClientKeys( &( pTlsTransportParams->sslContext ),
                                             pNetworkCredentials->pPrivateKeyLabel );
-            configPRINT_STRING( "TSET: pkcs key setup returned direct\r\n" );
-            LogInfo( ( "TLS trace: PKCS #11 key setup exit ret=0x%08lx.",
-                       ( unsigned long ) xResult ) );
 
             if( xResult != CKR_OK )
             {
@@ -601,16 +536,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
         if( returnStatus == TLS_TRANSPORT_SUCCESS )
         {
-            configPRINT_STRING( "TSET: cert load call direct\r\n" );
-            LogInfo( ( "TLS trace: client certificate load enter label=%s.",
-                       pNetworkCredentials->pClientCertLabel ) );
             xResult = readCertificateIntoContext( &( pTlsTransportParams->sslContext ),
                                                   pNetworkCredentials->pClientCertLabel,
                                                   CKO_CERTIFICATE,
                                                   &( pTlsTransportParams->sslContext.clientCert ) );
-            configPRINT_STRING( "TSET: cert load returned direct\r\n" );
-            LogInfo( ( "TLS trace: client certificate load exit ret=0x%08lx.",
-                       ( unsigned long ) xResult ) );
 
             if( xResult != CKR_OK )
             {
@@ -619,11 +548,9 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             }
             else
             {
-                configPRINT_STRING( "TSET: own cert call direct\r\n" );
                 ( void ) mbedtls_ssl_conf_own_cert( &( pTlsTransportParams->sslContext.config ),
                                                     &( pTlsTransportParams->sslContext.clientCert ),
                                                     &( pTlsTransportParams->sslContext.privKey ) );
-                configPRINT_STRING( "TSET: own cert returned direct\r\n" );
             }
         }
     }
@@ -668,24 +595,16 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
         ( xUseTsipRuntimeKey == pdTRUE ) )
     {
-        configPRINT_STRING( "TSET: tsip root prepare call direct\r\n" );
         if( pdTRUE != xTsipProvisioningPrepareTlsRootCaTrustAnchor() )
         {
-            configPRINT_STRING( "TSET: tsip root prepare false direct\r\n" );
             LogError( ( "Failed to load TSIP runtime Root CA trust anchor." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         }
         else if( NULL == ( pTsipRootCaSignature = prvGetRootCaSignatureForTsip( trust_ca_root_rsa_certificate_signature,
                                                                                 &ulRootCaSignatureSize ) ) )
         {
-            configPRINT_STRING( "TSET: tsip root signature missing direct\r\n" );
             LogError( ( "Failed to load Root CA signature for TSIP runtime provisioning." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
-        }
-        else
-        {
-            configPRINT_STRING( "TSET: tsip root prepare ok direct\r\n" );
-            LogInfo( ( "TLS trace: TSIP Root CA trust anchor prepared." ) );
         }
     }
 #endif /* TSIP_TLS_API_ENABLE && TSIP_RUNTIME_PROVISIONING_ENABLE */
@@ -698,7 +617,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
     tsip_rootca_rsa_pubkey_scnt = 0U;
     mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
-    configPRINT_STRING( "TSET: tsip root verify call direct\r\n" );
     mbedtlsError = R_TSIP_TlsRootCertificateVerification(
                     (uint32_t)R_TSIP_TLS_PUBLIC_KEY_TYPE_RSA2048, // 0 : RSA 2048bit
                     (uint8_t*)pTlsTransportParams->sslContext.rootCa.raw.p, //
@@ -720,7 +638,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                     trust_ca_root_rsa_certificate_signature,
 #endif
                     &tsip_rootca_rsa_pubkey[tsip_rootca_rsa_pubkey_scnt][0]);
-    configPRINT_STRING( "TSET: tsip root verify returned direct\r\n" );
     if (TSIP_SUCCESS != mbedtlsError)
     {
         #if ( TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED == 1 )
@@ -749,10 +666,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
         /* Include an application protocol list in the TLS ClientHello
          * message. */
-        configPRINT_STRING( "TSET: alpn call direct\r\n" );
         mbedtlsError = mbedtls_ssl_conf_alpn_protocols( &( pTlsTransportParams->sslContext.config ),
                                                         pNetworkCredentials->pAlpnProtos );
-        configPRINT_STRING( "TSET: alpn returned direct\r\n" );
 
         if( mbedtlsError != 0 )
         {
@@ -762,23 +677,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
             returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
         }
-        else
-        {
-            LogInfo( ( "TLS trace: ALPN configured." ) );
-        }
     }
 
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
         /* Initialize the mbed TLS secured connection context. */
-#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
-        lTraceUseTsipKey = ( long ) xUseTsipRuntimeKey;
-        lTraceDisableTsipAccel = ( long ) xDisableTsipTlsAccelForConnection;
-#endif
-        LogInfo( ( "TLS trace: ssl_setup enter use_tsip_key=%ld disable_tsip_accel=%ld.",
-                   lTraceUseTsipKey,
-                   lTraceDisableTsipAccel ) );
-        configPRINT_STRING( "TSET: ssl setup call direct\r\n" );
 #if defined(TSIP_TLS_API_ENABLE)
         pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
             ( ( glTlsDisableTsipTlsAccelOverride != 0 )
@@ -789,9 +692,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #endif
         mbedtlsError = mbedtls_ssl_setup( &( pTlsTransportParams->sslContext.context ),
                                           &( pTlsTransportParams->sslContext.config ) );
-        configPRINT_STRING( "TSET: ssl setup returned direct\r\n" );
-        LogInfo( ( "TLS trace: ssl_setup exit ret=%ld.",
-                   ( long ) mbedtlsError ) );
 
         if( mbedtlsError != 0 )
         {
@@ -821,13 +721,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
              * #mbedtls_ssl_set_bio requires the second parameter as void *.
              */
             /* coverity[misra_c_2012_rule_11_2_violation] */
-            configPRINT_STRING( "TSET: set bio call direct\r\n" );
             mbedtls_ssl_set_bio( &( pTlsTransportParams->sslContext.context ),
                                  ( void * ) pTlsTransportParams->tcpSocket,
                                  xMbedTLSBioTCPSocketsWrapperSend,
                                  xMbedTLSBioTCPSocketsWrapperRecv,
                                  NULL );
-            configPRINT_STRING( "TSET: set bio returned direct\r\n" );
         }
     }
 
@@ -836,18 +734,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         /* Enable SNI if requested. */
         if( pNetworkCredentials->disableSni == pdFALSE )
         {
-            configPRINT_STRING( "TSET: hostname call direct\r\n" );
             mbedtlsError = mbedtls_ssl_set_hostname( &( pTlsTransportParams->sslContext.context ),
                                                      pHostName );
-            configPRINT_STRING( "TSET: hostname returned direct\r\n" );
         }
         /* MbedTLS-3.6.3 requires calling the mbedtls_ssl_set_hostname() before calling mbedtls_ssl_handshake(). */
         else
         {
-            configPRINT_STRING( "TSET: hostname null call direct\r\n" );
             mbedtlsError = mbedtls_ssl_set_hostname( &( pTlsTransportParams->sslContext.context ),
                                                      NULL );
-            configPRINT_STRING( "TSET: hostname null returned direct\r\n" );
         }
 
         if( mbedtlsError != 0 )
@@ -857,10 +751,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                         mbedtlsLowLevelCodeOrDefault( mbedtlsError ) ) );
 
             returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
-        }
-        else
-        {
-            LogInfo( ( "TLS trace: hostname configured." ) );
         }
     }
 
@@ -889,15 +779,9 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
         uint32_t ulHandshakeAttempt = 0U;
 
-        LogInfo( ( "TLS trace: handshake enter state=%ld.",
-                   ( long ) pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
-        prvLogCurrentTaskStackHighWaterMark( "before_handshake" );
-        configPRINT_STRING( "TSET: handshake begin direct\r\n" );
-
         /* Perform the TLS handshake. */
         do
         {
-            configPRINT_STRING( "TSET: handshake call direct\r\n" );
             if( pNetworkCredentials->tlsDebugLevel > 0U )
             {
                 LogInfo( ( "TLS handshake call begin: attempt=%lu state=%ld",
@@ -905,7 +789,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                            (long)pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
             }
             mbedtlsError = mbedtls_ssl_handshake( &( pTlsTransportParams->sslContext.context ) );
-            configPRINT_STRING( "TSET: handshake returned direct\r\n" );
             if( pNetworkCredentials->tlsDebugLevel > 0U )
             {
                 LogInfo( ( "TLS handshake call end: attempt=%lu state=%ld ret=%ld",
@@ -916,12 +799,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             ulHandshakeAttempt++;
         } while( ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_READ ) ||
                  ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_WRITE ) );
-
-        LogInfo( ( "TLS trace: handshake exit attempts=%lu state=%ld ret=%ld.",
-                   ( unsigned long ) ulHandshakeAttempt,
-                   ( long ) pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ),
-                   ( long ) mbedtlsError ) );
-        prvLogCurrentTaskStackHighWaterMark( "after_handshake" );
 
         if( mbedtlsError != 0 )
         {
@@ -961,20 +838,14 @@ static int generateRandomBytes( void * pvCtx,
     extern unsigned char g_tsip_endpointflg;
 #endif
 
-    configPRINT_STRING( "TRNG: enter direct\r\n" );
-    LogInfo( ( "TLS trace: RNG enter len=%lu.",
-               ( unsigned long ) xRandomLength ) );
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     if( pxCtx->xUseSoftwarePkcs11Random != pdFALSE )
     {
-        configPRINT_STRING( "TRNG: software drbg direct\r\n" );
-        LogInfo( ( "TLS trace: forcing software DRBG for PKCS #11 RNG." ) );
         ucSavedTsipEndpoint = g_tsip_endpointflg;
         g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
         xRestoreTsipEndpoint = pdTRUE;
     }
 #endif
-    configPRINT_STRING( "TRNG: generate call direct\r\n" );
     xResult = pxCtx->pxP11FunctionList->C_GenerateRandom( pxCtx->xP11Session, pucRandom, xRandomLength );
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     if( xRestoreTsipEndpoint != pdFALSE )
@@ -982,9 +853,6 @@ static int generateRandomBytes( void * pvCtx,
         g_tsip_endpointflg = ucSavedTsipEndpoint;
     }
 #endif
-    configPRINT_STRING( "TRNG: generate returned direct\r\n" );
-    LogInfo( ( "TLS trace: RNG exit ret=0x%08lx.",
-               ( unsigned long ) xResult ) );
 
     if( xResult != CKR_OK )
     {
@@ -1214,13 +1082,11 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
         /* Initialize tcpSocket so failure cleanup never touches a stale handle. */
         pTlsTransportParams->tcpSocket = NULL;
 
-        configPRINT_STRING( "TLSC: tcp connect call\r\n" );
         socketStatus = TCP_Sockets_Connect( &( pTlsTransportParams->tcpSocket ),
                                             pHostName,
                                             port,
                                             receiveTimeoutMs,
                                             sendTimeoutMs );
-        configPRINT_STRING( "TLSC: tcp connect returned\r\n" );
 
         if( socketStatus != 0 )
         {
@@ -1236,9 +1102,7 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
     {
         isSocketConnected = pdTRUE;
 
-        configPRINT_STRING( "TLSC: setup call\r\n" );
         returnStatus = tlsSetup( pNetworkContext, pHostName, pNetworkCredentials );
-        configPRINT_STRING( "TLSC: setup returned\r\n" );
     }
 
     /* Clean up on failure. */
