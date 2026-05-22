@@ -53,6 +53,7 @@ extern void vLoggingPrintf (const char *pcFormatString,
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
+#include "task.h"
 
 /* FreeRTOS+TCP includes. */
 #include "FreeRTOS_IP.h"
@@ -103,6 +104,52 @@ extern void vLoggingPrintf (const char *pcFormatString,
  * @brief negative error code indicating a network failure.
  */
 #define FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR (-1)
+
+static volatile BaseType_t xConnectDiagActive = pdFALSE;
+static volatile Socket_t xConnectDiagSocket = FREERTOS_INVALID_SOCKET;
+static TaskHandle_t xConnectDiagTask = NULL;
+
+static void prvConnectDiagTask(void *pvParameters)
+{
+    (void)pvParameters;
+
+    for (;;)
+    {
+        if (pdFALSE != xConnectDiagActive)
+        {
+            uint32_t ulLoop = 0;
+
+            while ((pdFALSE != xConnectDiagActive) && (ulLoop < 30U))
+            {
+                Socket_t xSocket = (Socket_t)xConnectDiagSocket;
+                BaseType_t xConnected = pdFALSE;
+
+                if ((NULL != xSocket) && (FREERTOS_INVALID_SOCKET != xSocket))
+                {
+                    xConnected = FreeRTOS_issocketconnected(xSocket);
+                }
+
+                if (xConnected > 0)
+                {
+                    configPRINT_STRING("TCPD: connected\r\n");
+                }
+                else if (xConnected < 0)
+                {
+                    configPRINT_STRING("TCPD: error\r\n");
+                }
+                else
+                {
+                    configPRINT_STRING("TCPD: waiting\r\n");
+                }
+
+                ulLoop++;
+                vTaskDelay(pdMS_TO_TICKS(1000U));
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100U));
+    }
+}
 
 /**
  * @brief Establish a connection to server.
@@ -219,8 +266,47 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
                                   sizeof(TickType_t));
 
         /* Establish connection. */
+        LogInfo(("TCP trace: connect start host=%s port=%u recvTimeoutMs=%lu connectBlockTicks=%lu heap=%lu minHeap=%lu.",
+                 pHostName,
+                 port,
+                 (unsigned long)receiveTimeoutMs,
+                 (unsigned long)transportTimeout,
+                 (unsigned long)xPortGetFreeHeapSize(),
+                 (unsigned long)xPortGetMinimumEverFreeHeapSize()));
+
+        xConnectDiagSocket = tcpSocket;
+        xConnectDiagActive = pdTRUE;
+        configPRINT_STRING("TCPD: active\r\n");
+
+        if (NULL == xConnectDiagTask)
+        {
+            BaseType_t xCreateStatus;
+
+            xCreateStatus = xTaskCreate(prvConnectDiagTask,
+                                        "TcpConnDiag",
+                                        (uint16_t)(configMINIMAL_STACK_SIZE * 2U),
+                                        NULL,
+                                        configMAX_PRIORITIES - 2,
+                                        &xConnectDiagTask);
+            LogInfo(("TCP trace: diag create status=%d handle=%p.",
+                     xCreateStatus,
+                     (void *)xConnectDiagTask));
+        }
+        else
+        {
+            LogInfo(("TCP trace: diag reuse handle=%p.",
+                     (void *)xConnectDiagTask));
+        }
+
         LogDebug(("Creating TCP Connection to %s.", pHostName));
         socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
+        xConnectDiagActive = pdFALSE;
+        LogInfo(("TCP trace: connect done status=%d host=%s port=%u heap=%lu minHeap=%lu.",
+                 socketStatus,
+                 pHostName,
+                 port,
+                 (unsigned long)xPortGetFreeHeapSize(),
+                 (unsigned long)xPortGetMinimumEverFreeHeapSize()));
 
         if (0 != socketStatus)
         {
