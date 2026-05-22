@@ -70,10 +70,6 @@
     #define democonfigFLEET_PROVISIONING_DEMO_STACKSIZE    democonfigDEMO_STACKSIZE
 #endif
 
-#ifndef fpdemoRECONNECT_DELAY_MS
-    #define fpdemoRECONNECT_DELAY_MS    (1000U)
-#endif
-
 /* mbedTLS include for configuring threading functions */
 #include "mbedtls/threading.h"
 #include "threading_alt.h"
@@ -1051,9 +1047,6 @@ int prvFpDemo_start(void *pvParameters)
             {
                 xDisconnectMqttSession(&xMqttContext, &xNetworkContext);
                 xConnectionEstablished = false;
-                LogInfo(("Waiting %lu ms before reconnecting with provisioned credentials.",
-                         (unsigned long)fpdemoRECONNECT_DELAY_MS));
-                vTaskDelay(pdMS_TO_TICKS(fpdemoRECONNECT_DELAY_MS));
             }
         }
 
