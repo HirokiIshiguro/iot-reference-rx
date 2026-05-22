@@ -673,8 +673,6 @@ BaseType_t xEstablishMqttSession( MQTTContext_t * pxMqttContext,
     configASSERT( pxMqttContext != NULL );
     configASSERT( pxNetworkContext != NULL );
 
-    xMqttSessionEstablished = pdFALSE;
-
 #if defined(__TEST__)
     pcBrokerEndpoint = clientcredentialMQTT_BROKER_ENDPOINT;
     pcRootCA = (char *) democonfigROOT_CA_PEM;
@@ -816,8 +814,15 @@ BaseType_t xEstablishMqttSession( MQTTContext_t * pxMqttContext,
                 else
                 {
                     LogInfo( ( "MQTT connection successfully established with broker.\n\n" ) );
-                    xMqttSessionEstablished = pdTRUE;
                 }
+            }
+
+            if( xReturnStatus == pdFAIL )
+            {
+                /* Keep a flag for indicating if MQTT session is established. This
+                 * flag will mark that an MQTT DISCONNECT has to be sent at the end
+                 * of the demo even if there are intermediate failures. */
+                xMqttSessionEstablished = true;
             }
 
             if( xReturnStatus == pdFAIL )
@@ -887,7 +892,6 @@ BaseType_t xDisconnectMqttSession( MQTTContext_t * pxMqttContext,
 
     /* Close the network connection.  */
     TLS_FreeRTOS_Disconnect( pxNetworkContext );
-    xMqttSessionEstablished = pdFALSE;
 
     return xReturnStatus;
 }
