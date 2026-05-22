@@ -128,6 +128,8 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
                                     TickType_t connectTimeout)
 {
     BaseType_t socketStatus = 0;
+    BaseType_t tcpState = 0;
+    BaseType_t lastTcpState = -1;
     TimeOut_t timeoutState = {0};
     TickType_t remainingTime = connectTimeout;
     TickType_t pollDelay = prvMillisecondsToTicks(FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS);
@@ -141,7 +143,17 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
 
     for (;;)
     {
+        tcpState = FreeRTOS_connstatus(tcpSocket);
         socketStatus = FreeRTOS_issocketconnected(tcpSocket);
+
+        if (tcpState != lastTcpState)
+        {
+            LogInfo(("TCP connect poll: state=%d, connected=%d, remaining=%lu.",
+                     tcpState,
+                     socketStatus,
+                     (unsigned long)remainingTime));
+            lastTcpState = tcpState;
+        }
 
         if (socketStatus > 0)
         {
@@ -159,6 +171,7 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
             if (pdFALSE != xTaskCheckForTimeOut(&timeoutState, &remainingTime))
             {
                 socketStatus = -pdFREERTOS_ERRNO_ETIMEDOUT;
+                LogError(("TCP connect poll timed out: state=%d.", tcpState));
                 break;
             }
 
@@ -283,15 +296,21 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
          * This avoids depending on the eSOCKET_CONNECT event path, which can
          * leave FreeRTOS_connect() waiting even after the TCP handshake completes. */
         transportTimeout = 0;
-        (void)FreeRTOS_setsockopt(tcpSocket,
-                                  0,
-                                  FREERTOS_SO_RCVTIMEO,
-                                  &transportTimeout,
-                                  sizeof(TickType_t));
+        socketStatus = FreeRTOS_setsockopt(tcpSocket,
+                                           0,
+                                           FREERTOS_SO_RCVTIMEO,
+                                           &transportTimeout,
+                                           sizeof(TickType_t));
+        LogInfo(("TCP connect start: rcvtimeo_set=%d, state=%d.",
+                 socketStatus,
+                 FreeRTOS_connstatus(tcpSocket)));
 
         /* Establish connection. */
         LogDebug(("Creating TCP Connection to %s.", pHostName));
         socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
+        LogInfo(("FreeRTOS_connect returned: status=%d, state=%d.",
+                 socketStatus,
+                 FreeRTOS_connstatus(tcpSocket)));
 
         if (-pdFREERTOS_ERRNO_EWOULDBLOCK == socketStatus)
         {
