@@ -159,6 +159,7 @@ variables:
   RX72N_OTA_OBSERVE_TIMEOUT: "900"
   AWS_DEFAULT_REGION: "ap-northeast-1"
   AWS_CLI_RUNNER_TAG: "aws-cli-ishiguro"
+  RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
   E2STUDIO_WORKSPACE_FLEET: "C:/Temp/e2ws_iot_ref_rx72n_fleet"
   E2STUDIO_WORKSPACE_MQTT: "C:/Temp/e2ws_iot_ref_rx72n_mqtt"
@@ -426,7 +427,8 @@ build_rx72n_ether:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -627,7 +629,8 @@ build_rx72n_ether_fleet:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -2506,7 +2509,8 @@ build_rx72n_ether_mqtt_candidate:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -2595,7 +2599,8 @@ build_rx72n_ether_ota:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   needs:
     - test_rx72n_ether_mqtt
   rules:
