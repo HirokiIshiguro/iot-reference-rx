@@ -459,6 +459,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
+        configPRINT_STRING( "TSET: base config begin direct\r\n" );
+
         /* Set up the certificate security profile, starting from the default value. */
         pTlsTransportParams->sslContext.certProfile = mbedtls_x509_crt_profile_default;
 
@@ -513,9 +515,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
 
         /* Parse the server root CA certificate into the SSL context. */
+        configPRINT_STRING( "TSET: root parse call direct\r\n" );
         mbedtlsError = mbedtls_x509_crt_parse( &( pTlsTransportParams->sslContext.rootCa ),
                                                pNetworkCredentials->pRootCa,
                                                pNetworkCredentials->rootCaSize );
+        configPRINT_STRING( "TSET: root parse returned direct\r\n" );
 
         if( mbedtlsError != 0 )
         {
@@ -540,6 +544,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
+        configPRINT_STRING( "TSET: key setup begin direct\r\n" );
         mbedtls_pk_init( &( pTlsTransportParams->sslContext.privKey ) );
 
         xPrivateKeyLabelIsDevice =
@@ -547,13 +552,17 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                             pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
                             sizeof( pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS ) ) ) ? pdTRUE : pdFALSE;
 
+        configPRINT_STRING( "TSET: tsip key load decision direct\r\n" );
         if( ( xPrivateKeyLabelIsDevice == pdTRUE ) &&
             ( pdTRUE == xTsipProvisioningLoadClientRsa2048KeyPair() ) )
         {
+            configPRINT_STRING( "TSET: tsip key load true direct\r\n" );
             xUseTsipRuntimeKey = pdTRUE;
             LogInfo( ( "TLS trace: TSIP runtime device key selected." ) );
+            configPRINT_STRING( "TSET: tsip pk setup call direct\r\n" );
             mbedtlsError = mbedtls_pk_setup( &( pTlsTransportParams->sslContext.privKey ),
                                              mbedtls_pk_info_from_type( MBEDTLS_PK_RSA ) );
+            configPRINT_STRING( "TSET: tsip pk setup returned direct\r\n" );
 
             if( mbedtlsError != 0 )
             {
@@ -565,10 +574,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
             ( xUseTsipRuntimeKey == pdFALSE ) )
         {
+            configPRINT_STRING( "TSET: pkcs key setup call direct\r\n" );
             LogInfo( ( "TLS trace: PKCS #11 key setup enter label=%s.",
                        pNetworkCredentials->pPrivateKeyLabel ) );
             xResult = initializeClientKeys( &( pTlsTransportParams->sslContext ),
                                             pNetworkCredentials->pPrivateKeyLabel );
+            configPRINT_STRING( "TSET: pkcs key setup returned direct\r\n" );
             LogInfo( ( "TLS trace: PKCS #11 key setup exit ret=0x%08lx.",
                        ( unsigned long ) xResult ) );
 
@@ -587,12 +598,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
         if( returnStatus == TLS_TRANSPORT_SUCCESS )
         {
+            configPRINT_STRING( "TSET: cert load call direct\r\n" );
             LogInfo( ( "TLS trace: client certificate load enter label=%s.",
                        pNetworkCredentials->pClientCertLabel ) );
             xResult = readCertificateIntoContext( &( pTlsTransportParams->sslContext ),
                                                   pNetworkCredentials->pClientCertLabel,
                                                   CKO_CERTIFICATE,
                                                   &( pTlsTransportParams->sslContext.clientCert ) );
+            configPRINT_STRING( "TSET: cert load returned direct\r\n" );
             LogInfo( ( "TLS trace: client certificate load exit ret=0x%08lx.",
                        ( unsigned long ) xResult ) );
 
@@ -650,19 +663,23 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
         ( xUseTsipRuntimeKey == pdTRUE ) )
     {
+        configPRINT_STRING( "TSET: tsip root prepare call direct\r\n" );
         if( pdTRUE != xTsipProvisioningPrepareTlsRootCaTrustAnchor() )
         {
+            configPRINT_STRING( "TSET: tsip root prepare false direct\r\n" );
             LogError( ( "Failed to load TSIP runtime Root CA trust anchor." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         }
         else if( NULL == ( pTsipRootCaSignature = prvGetRootCaSignatureForTsip( trust_ca_root_rsa_certificate_signature,
                                                                                 &ulRootCaSignatureSize ) ) )
         {
+            configPRINT_STRING( "TSET: tsip root signature missing direct\r\n" );
             LogError( ( "Failed to load Root CA signature for TSIP runtime provisioning." ) );
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         }
         else
         {
+            configPRINT_STRING( "TSET: tsip root prepare ok direct\r\n" );
             LogInfo( ( "TLS trace: TSIP Root CA trust anchor prepared." ) );
         }
     }
@@ -676,6 +693,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
     tsip_rootca_rsa_pubkey_scnt = 0U;
     mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
+    configPRINT_STRING( "TSET: tsip root verify call direct\r\n" );
     mbedtlsError = R_TSIP_TlsRootCertificateVerification(
                     (uint32_t)R_TSIP_TLS_PUBLIC_KEY_TYPE_RSA2048, // 0 : RSA 2048bit
                     (uint8_t*)pTlsTransportParams->sslContext.rootCa.raw.p, //
@@ -697,6 +715,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                     trust_ca_root_rsa_certificate_signature,
 #endif
                     &tsip_rootca_rsa_pubkey[tsip_rootca_rsa_pubkey_scnt][0]);
+    configPRINT_STRING( "TSET: tsip root verify returned direct\r\n" );
     if (TSIP_SUCCESS != mbedtlsError)
     {
         #if ( TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED == 1 )
