@@ -616,9 +616,11 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             }
             else
             {
+                configPRINT_STRING( "TSET: own cert call direct\r\n" );
                 ( void ) mbedtls_ssl_conf_own_cert( &( pTlsTransportParams->sslContext.config ),
                                                     &( pTlsTransportParams->sslContext.clientCert ),
                                                     &( pTlsTransportParams->sslContext.privKey ) );
+                configPRINT_STRING( "TSET: own cert returned direct\r\n" );
             }
         }
     }
@@ -744,8 +746,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
         /* Include an application protocol list in the TLS ClientHello
          * message. */
+        configPRINT_STRING( "TSET: alpn call direct\r\n" );
         mbedtlsError = mbedtls_ssl_conf_alpn_protocols( &( pTlsTransportParams->sslContext.config ),
                                                         pNetworkCredentials->pAlpnProtos );
+        configPRINT_STRING( "TSET: alpn returned direct\r\n" );
 
         if( mbedtlsError != 0 )
         {
@@ -771,8 +775,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         LogInfo( ( "TLS trace: ssl_setup enter use_tsip_key=%ld disable_tsip_accel=%ld.",
                    lTraceUseTsipKey,
                    lTraceDisableTsipAccel ) );
+        configPRINT_STRING( "TSET: ssl setup call direct\r\n" );
         mbedtlsError = mbedtls_ssl_setup( &( pTlsTransportParams->sslContext.context ),
                                           &( pTlsTransportParams->sslContext.config ) );
+        configPRINT_STRING( "TSET: ssl setup returned direct\r\n" );
         LogInfo( ( "TLS trace: ssl_setup exit ret=%ld.",
                    ( long ) mbedtlsError ) );
 
@@ -806,11 +812,13 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
              * #mbedtls_ssl_set_bio requires the second parameter as void *.
              */
             /* coverity[misra_c_2012_rule_11_2_violation] */
+            configPRINT_STRING( "TSET: set bio call direct\r\n" );
             mbedtls_ssl_set_bio( &( pTlsTransportParams->sslContext.context ),
                                  ( void * ) pTlsTransportParams->tcpSocket,
                                  xMbedTLSBioTCPSocketsWrapperSend,
                                  xMbedTLSBioTCPSocketsWrapperRecv,
                                  NULL );
+            configPRINT_STRING( "TSET: set bio returned direct\r\n" );
         }
     }
 
@@ -819,14 +827,18 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         /* Enable SNI if requested. */
         if( pNetworkCredentials->disableSni == pdFALSE )
         {
+            configPRINT_STRING( "TSET: hostname call direct\r\n" );
             mbedtlsError = mbedtls_ssl_set_hostname( &( pTlsTransportParams->sslContext.context ),
                                                      pHostName );
+            configPRINT_STRING( "TSET: hostname returned direct\r\n" );
         }
         /* MbedTLS-3.6.3 requires calling the mbedtls_ssl_set_hostname() before calling mbedtls_ssl_handshake(). */
         else
         {
+            configPRINT_STRING( "TSET: hostname null call direct\r\n" );
             mbedtlsError = mbedtls_ssl_set_hostname( &( pTlsTransportParams->sslContext.context ),
                                                      NULL );
+            configPRINT_STRING( "TSET: hostname null returned direct\r\n" );
         }
 
         if( mbedtlsError != 0 )
@@ -871,10 +883,12 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         LogInfo( ( "TLS trace: handshake enter state=%ld.",
                    ( long ) pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
         prvLogCurrentTaskStackHighWaterMark( "before_handshake" );
+        configPRINT_STRING( "TSET: handshake begin direct\r\n" );
 
         /* Perform the TLS handshake. */
         do
         {
+            configPRINT_STRING( "TSET: handshake call direct\r\n" );
             if( pNetworkCredentials->tlsDebugLevel > 0U )
             {
                 LogInfo( ( "TLS handshake call begin: attempt=%lu state=%ld",
@@ -882,6 +896,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                            (long)pTlsTransportParams->sslContext.context.MBEDTLS_PRIVATE( state ) ) );
             }
             mbedtlsError = mbedtls_ssl_handshake( &( pTlsTransportParams->sslContext.context ) );
+            configPRINT_STRING( "TSET: handshake returned direct\r\n" );
             if( pNetworkCredentials->tlsDebugLevel > 0U )
             {
                 LogInfo( ( "TLS handshake call end: attempt=%lu state=%ld ret=%ld",
