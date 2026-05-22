@@ -77,6 +77,9 @@ typedef struct SSLContext
     CK_FUNCTION_LIST_PTR pxP11FunctionList;
     CK_SESSION_HANDLE xP11Session;
     CK_OBJECT_HANDLE xP11PrivateKey;
+#if defined( TSIP_TLS_API_ENABLE ) && defined( TSIP_RUNTIME_PROVISIONING_ENABLE )
+    BaseType_t xUseSoftwarePkcs11Random;
+#endif
 } SSLContext_t;
 
 /**

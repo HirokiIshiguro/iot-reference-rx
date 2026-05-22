@@ -340,6 +340,9 @@ static void sslContextInit( SSLContext_t * pSslContext )
     pSslContext->context.tsip_cipher_suite = 0U;
     pSslContext->context.disable_tsip_tls_accel = 0U;
 #endif
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    pSslContext->xUseSoftwarePkcs11Random = pdFALSE;
+#endif
 
     xInitializePkcs11Session( &( pSslContext->xP11Session ) );
     C_GetFunctionList( &( pSslContext->pxP11FunctionList ) );
@@ -799,6 +802,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                   || ( xDisableTsipTlsAccelForConnection != pdFALSE )
 #endif
                   ) ? 1U : 0U;
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+            pTlsTransportParams->sslContext.xUseSoftwarePkcs11Random =
+                ( xDisableTsipTlsAccelForConnection != pdFALSE ) ? pdTRUE : pdFALSE;
+#endif
             if( pNetworkCredentials->tlsDebugLevel > 0U )
             {
                 LogInfo( ( "TSIP TLS accel override=%ld",
@@ -946,12 +953,33 @@ static int generateRandomBytes( void * pvCtx,
     /* Must cast from void pointer to conform to mbed TLS API. */
     SSLContext_t * pxCtx = ( SSLContext_t * ) pvCtx;
     CK_RV xResult;
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    unsigned char ucSavedTsipEndpoint = 0U;
+    BaseType_t xRestoreTsipEndpoint = pdFALSE;
+    extern unsigned char g_tsip_endpointflg;
+#endif
 
     configPRINT_STRING( "TRNG: enter direct\r\n" );
     LogInfo( ( "TLS trace: RNG enter len=%lu.",
                ( unsigned long ) xRandomLength ) );
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    if( pxCtx->xUseSoftwarePkcs11Random != pdFALSE )
+    {
+        configPRINT_STRING( "TRNG: software drbg direct\r\n" );
+        LogInfo( ( "TLS trace: forcing software DRBG for PKCS #11 RNG." ) );
+        ucSavedTsipEndpoint = g_tsip_endpointflg;
+        g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
+        xRestoreTsipEndpoint = pdTRUE;
+    }
+#endif
     configPRINT_STRING( "TRNG: generate call direct\r\n" );
     xResult = pxCtx->pxP11FunctionList->C_GenerateRandom( pxCtx->xP11Session, pucRandom, xRandomLength );
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    if( xRestoreTsipEndpoint != pdFALSE )
+    {
+        g_tsip_endpointflg = ucSavedTsipEndpoint;
+    }
+#endif
     configPRINT_STRING( "TRNG: generate returned direct\r\n" );
     LogInfo( ( "TLS trace: RNG exit ret=0x%08lx.",
                ( unsigned long ) xResult ) );
