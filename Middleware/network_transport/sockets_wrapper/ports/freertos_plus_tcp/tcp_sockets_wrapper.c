@@ -202,6 +202,22 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
     if (0 == socketStatus)
     {
+        /* FreeRTOS_connect() uses the socket receive block time while waiting
+         * for eSOCKET_CONNECT/eSOCKET_CLOSED. Configure it before connecting
+         * so a lost wake event cannot leave the caller blocked forever. */
+        transportTimeout = (0U == receiveTimeoutMs) ? portMAX_DELAY : pdMS_TO_TICKS(receiveTimeoutMs);
+
+        if ((receiveTimeoutMs > 0U) && (0U == transportTimeout))
+        {
+            transportTimeout = 1U;
+        }
+
+        (void)FreeRTOS_setsockopt(tcpSocket,
+                                  0,
+                                  FREERTOS_SO_RCVTIMEO,
+                                  &transportTimeout,
+                                  sizeof(TickType_t));
+
         /* Establish connection. */
         LogDebug(("Creating TCP Connection to %s.", pHostName));
         socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
