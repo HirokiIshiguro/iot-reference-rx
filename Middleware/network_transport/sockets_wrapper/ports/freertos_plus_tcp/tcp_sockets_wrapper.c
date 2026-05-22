@@ -130,6 +130,7 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
     BaseType_t socketStatus = 0;
     BaseType_t tcpState = 0;
     BaseType_t lastTcpState = -1;
+    uint32_t pollCount = 0;
     TimeOut_t timeoutState = {0};
     TickType_t remainingTime = connectTimeout;
     TickType_t pollDelay = prvMillisecondsToTicks(FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS);
@@ -153,6 +154,16 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
                      socketStatus,
                      (unsigned long)remainingTime));
             lastTcpState = tcpState;
+        }
+        else if ((pollCount % 100U) == 0U)
+        {
+            LogInfo(("TCP connect poll heartbeat: count=%lu, tick=%lu, state=%d, connected=%d, remaining=%lu, delay=%lu.",
+                     (unsigned long)pollCount,
+                     (unsigned long)xTaskGetTickCount(),
+                     tcpState,
+                     socketStatus,
+                     (unsigned long)remainingTime,
+                     (unsigned long)pollDelay));
         }
 
         if (socketStatus > 0)
@@ -189,6 +200,8 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
         {
             vTaskDelay(pollDelay);
         }
+
+        pollCount++;
     }
 
     return socketStatus;
