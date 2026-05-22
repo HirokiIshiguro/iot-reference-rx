@@ -160,6 +160,7 @@ variables:
   AWS_DEFAULT_REGION: "ap-northeast-1"
   AWS_CLI_RUNNER_TAG: "aws-cli-ishiguro"
   RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
   E2STUDIO_WORKSPACE_FLEET: "C:/Temp/e2ws_iot_ref_rx72n_fleet"
   E2STUDIO_WORKSPACE_MQTT: "C:/Temp/e2ws_iot_ref_rx72n_mqtt"
@@ -497,6 +498,7 @@ build_rx65n_bg96:
     - exec-shell
     - os-windows
     - ccrx
+    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: rx65n-bg96-e2studio-build
   rules:
     - if: '$RUN_RX65N_BG96_BUILD == "true"'
@@ -560,6 +562,7 @@ build_rx65n_bg96_fleet:
     - exec-shell
     - os-windows
     - ccrx
+    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: rx65n-bg96-e2studio-build
   extends:
     - .rx65n_bg96_fleet_rules
@@ -1280,6 +1283,7 @@ build_rx65n_bg96_ota:
     - exec-shell
     - os-windows
     - ccrx
+    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: rx65n-bg96-e2studio-build
   extends:
     - .rx65n_bg96_ota_rules
