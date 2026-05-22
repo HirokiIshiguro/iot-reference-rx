@@ -102,6 +102,28 @@ typedef struct P11RsaCtx
 
 /*-----------------------------------------------------------*/
 
+/*
+ * mbed TLS 3.6 pk_info callbacks receive mbedtls_pk_context *.
+ * The TSIP fork is based on mbed TLS 3.2.1 and still passes the
+ * underlying pk_ctx directly.
+ */
+#if ( MBEDTLS_VERSION_NUMBER >= 0x03060000 )
+    typedef mbedtls_pk_context P11PkCallbackCtx_t;
+    typedef mbedtls_pk_context P11PkConstCallbackCtx_t;
+    #define p11CTX_FROM_CALLBACK( pxCallbackCtx )    ( ( ( pxCallbackCtx ) != NULL ) ? ( pxCallbackCtx )->pk_ctx : NULL )
+#else
+    typedef void P11PkCallbackCtx_t;
+    typedef const void P11PkConstCallbackCtx_t;
+    #define p11CTX_FROM_CALLBACK( pxCallbackCtx )    ( ( void * ) ( pxCallbackCtx ) )
+#endif
+
+#define p11ECDSA_FROM_CALLBACK( pxCallbackCtx )      ( ( P11EcDsaCtx_t * ) p11CTX_FROM_CALLBACK( pxCallbackCtx ) )
+#define p11RSA_FROM_CALLBACK( pxCallbackCtx )        ( ( P11RsaCtx_t * ) p11CTX_FROM_CALLBACK( pxCallbackCtx ) )
+#define p11ECP_FROM_CALLBACK( pxCallbackCtx )        ( ( mbedtls_ecp_keypair * ) p11CTX_FROM_CALLBACK( pxCallbackCtx ) )
+#define p11MBEDRSA_FROM_CALLBACK( pxCallbackCtx )    ( ( mbedtls_rsa_context * ) p11CTX_FROM_CALLBACK( pxCallbackCtx ) )
+
+/*-----------------------------------------------------------*/
+
 /**
  * @brief Allocates a P11EcDsaCtx_t
  *
@@ -145,7 +167,7 @@ static void p11_ecdsa_ctx_free( void * pvCtx );
  * @return 0 on success
  * @return A negative number on failure
  */
-static int p11_ecdsa_sign( mbedtls_pk_context * pk,
+static int p11_ecdsa_sign( P11PkCallbackCtx_t * pxCallbackCtx,
                            mbedtls_md_type_t xMdAlg,
                            const unsigned char * pucHash,
                            size_t xHashLen,
@@ -161,7 +183,7 @@ static int p11_ecdsa_sign( mbedtls_pk_context * pk,
  * @param pvCtx Void pointer to the relevant P11EcDsaCtx_t.
  * @return size_t Bit length of the key.
  */
-static size_t p11_ecdsa_get_bitlen( mbedtls_pk_context * pxMbedtlsPkCtx );
+static size_t p11_ecdsa_get_bitlen( P11PkConstCallbackCtx_t * pxCallbackCtx );
 
 /**
  * @brief Returns true if the pk context can perform the given pk operation.
@@ -186,19 +208,19 @@ static int p11_ecdsa_can_do( mbedtls_pk_type_t xType );
  * @param xSigLen Length of the signature given in pucSig
  * @return 0 on success
  */
-static int p11_ecdsa_verify( mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_ecdsa_verify( P11PkCallbackCtx_t * pxCallbackCtx,
                              mbedtls_md_type_t xMdAlg,
                              const unsigned char * pucHash,
                              size_t xHashLen,
                              const unsigned char * pucSig,
                              size_t xSigLen );
 
-static int p11_ecdsa_check_pair( mbedtls_pk_context * pxPub,
-                                 mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_ecdsa_check_pair( P11PkConstCallbackCtx_t * pxPub,
+                                 P11PkConstCallbackCtx_t * pxPrv,
                                  int ( * lFRng )( void *, unsigned char *, size_t ),
                                  void * pvPRng );
 
-static void p11_ecdsa_debug( mbedtls_pk_context * pxMbedtlsPkCtx,
+static void p11_ecdsa_debug( P11PkConstCallbackCtx_t * pxCallbackCtx,
                              mbedtls_pk_debug_item * pxItems );
 
 static int prvEcdsaSigToASN1( const unsigned char * pucRawSig,
@@ -241,18 +263,18 @@ mbedtls_pk_info_t mbedtls_pkcs11_pk_ecdsa =
 
 /*-----------------------------------------------------------*/
 
-static size_t p11_rsa_get_bitlen( mbedtls_pk_context * ctx );
+static size_t p11_rsa_get_bitlen( P11PkConstCallbackCtx_t * pxCallbackCtx );
 
 static int p11_rsa_can_do( mbedtls_pk_type_t xType );
 
-static int p11_rsa_verify( mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_rsa_verify( P11PkCallbackCtx_t * pxCallbackCtx,
                            mbedtls_md_type_t xMdAlg,
                            const unsigned char * pucHash,
                            size_t xHashLen,
                            const unsigned char * pucSig,
                            size_t xSigLen );
 
-static int p11_rsa_sign( mbedtls_pk_context * pk,
+static int p11_rsa_sign( P11PkCallbackCtx_t * pxCallbackCtx,
                          mbedtls_md_type_t md_alg,
                          const unsigned char * hash,
                          size_t hash_len,
@@ -262,8 +284,8 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
                          int ( * f_rng )( void *, unsigned char *, size_t ),
                          void * p_rng );
 
-static int p11_rsa_check_pair( mbedtls_pk_context * pvPub,
-                               mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_rsa_check_pair( P11PkConstCallbackCtx_t * pvPub,
+                               P11PkConstCallbackCtx_t * pxPrv,
                                int ( * lFRng )( void *, unsigned char *, size_t ),
                                void * pvPRng );
 
@@ -281,7 +303,7 @@ static CK_RV p11_rsa_import_private_key( mbedtls_rsa_context * pxMbedRsaCtx,
 
 static void p11_rsa_ctx_free( void * pvCtx );
 
-static void p11_rsa_debug( mbedtls_pk_context * pxMbedtlsPkCtx,
+static void p11_rsa_debug( P11PkConstCallbackCtx_t * pxCallbackCtx,
                            mbedtls_pk_debug_item * pxItems );
 
 /*-----------------------------------------------------------*/
@@ -766,7 +788,7 @@ static int prvEcdsaSigToASN1( const unsigned char * pucRawSig,
 
 /*-----------------------------------------------------------*/
 
-static int p11_ecdsa_sign( mbedtls_pk_context * pk,
+static int p11_ecdsa_sign( P11PkCallbackCtx_t * pxCallbackCtx,
                            mbedtls_md_type_t xMdAlg,
                            const unsigned char * pucHash,
                            size_t xHashLen,
@@ -778,7 +800,7 @@ static int p11_ecdsa_sign( mbedtls_pk_context * pk,
 {
     CK_RV xResult = CKR_OK;
     int32_t lFinalResult = 0;
-    const P11EcDsaCtx_t * pxEcDsaCtx = ( P11EcDsaCtx_t * ) pk->pk_ctx;
+    const P11EcDsaCtx_t * pxEcDsaCtx = p11ECDSA_FROM_CALLBACK( pxCallbackCtx );
     const P11PkCtx_t * pxP11Ctx = NULL;
     unsigned char pucHashCopy[ MBEDTLS_MD_MAX_SIZE ];
     unsigned char pucRawSig[ pkcs11ECDSA_P256_SIGNATURE_LENGTH ];
@@ -857,11 +879,11 @@ static int p11_ecdsa_sign( mbedtls_pk_context * pk,
 
 /*-----------------------------------------------------------*/
 
-static size_t p11_ecdsa_get_bitlen( mbedtls_pk_context * pxMbedtlsPkCtx )
+static size_t p11_ecdsa_get_bitlen( P11PkConstCallbackCtx_t * pxCallbackCtx )
 {
-    configASSERT( mbedtls_ecdsa_info.get_bitlen );
+    const P11EcDsaCtx_t * pxP11EcDsaCtx = p11ECDSA_FROM_CALLBACK( pxCallbackCtx );
 
-    return mbedtls_ecdsa_info.get_bitlen( pxMbedtlsPkCtx );
+    return ( pxP11EcDsaCtx != NULL ) ? pxP11EcDsaCtx->xMbedEcDsaCtx.grp.nbits : 0U;
 }
 
 /*-----------------------------------------------------------*/
@@ -873,25 +895,31 @@ static int p11_ecdsa_can_do( mbedtls_pk_type_t xType )
 
 /*-----------------------------------------------------------*/
 
-static int p11_ecdsa_verify( mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_ecdsa_verify( P11PkCallbackCtx_t * pxCallbackCtx,
                              mbedtls_md_type_t xMdAlg,
                              const unsigned char * pucHash,
                              size_t xHashLen,
                              const unsigned char * pucSig,
                              size_t xSigLen )
 {
-    configASSERT( mbedtls_ecdsa_info.verify_func );
+    P11EcDsaCtx_t * pxP11EcDsaCtx = p11ECDSA_FROM_CALLBACK( pxCallbackCtx );
 
-    return mbedtls_ecdsa_info.verify_func( pxMbedtlsPkCtx,
-                                           xMdAlg,
-                                           pucHash, xHashLen,
-                                           pucSig, xSigLen );
+    ( void ) xMdAlg;
+
+    if( pxP11EcDsaCtx == NULL )
+    {
+        return -1;
+    }
+
+    return mbedtls_ecdsa_read_signature( &( pxP11EcDsaCtx->xMbedEcDsaCtx ),
+                                         pucHash, xHashLen,
+                                         pucSig, xSigLen );
 }
 
 /*-----------------------------------------------------------*/
 
-static int p11_ecdsa_check_pair( mbedtls_pk_context * pxPub,
-                                 mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_ecdsa_check_pair( P11PkConstCallbackCtx_t * pxPub,
+                                 P11PkConstCallbackCtx_t * pxPrv,
                                  int ( * lFRng )( void *, unsigned char *, size_t ),
                                  void * pvPRng )
 {
@@ -903,14 +931,14 @@ static int p11_ecdsa_check_pair( mbedtls_pk_context * pxPub,
     ( void ) lFRng;
     ( void ) pvPRng;
 
-    if( ( pxPub == NULL ) || ( pxMbedtlsPkCtx == NULL ) )
+    if( ( pxPub == NULL ) || ( pxPrv == NULL ) )
     {
         lResult = -1;
     }
     else
     {
-        pxP11PrvKey = ( P11EcDsaCtx_t * ) pxMbedtlsPkCtx->pk_ctx;
-        pxPubKey = ( mbedtls_ecp_keypair * ) pxPub->pk_ctx;
+        pxP11PrvKey = p11ECDSA_FROM_CALLBACK( pxPrv );
+        pxPubKey = p11ECP_FROM_CALLBACK( pxPub );
 
         if( pxP11PrvKey != NULL )
         {
@@ -960,7 +988,7 @@ static int p11_ecdsa_check_pair( mbedtls_pk_context * pxPub,
         };
         unsigned char pucTestSignature[ MBEDTLS_ECDSA_MAX_SIG_LEN( 256 ) ] = { 0 };
         size_t uxSigLen = 0;
-        lResult = p11_ecdsa_sign( ( mbedtls_pk_context * ) pxMbedtlsPkCtx, MBEDTLS_MD_SHA256,
+        lResult = p11_ecdsa_sign( ( P11PkCallbackCtx_t * ) pxPrv, MBEDTLS_MD_SHA256,
                                   pucTestHash, sizeof( pucTestHash ),
                                   pucTestSignature, sizeof( pucTestSignature ), &uxSigLen,
                                   NULL, NULL );
@@ -978,21 +1006,26 @@ static int p11_ecdsa_check_pair( mbedtls_pk_context * pxPub,
 
 /*-----------------------------------------------------------*/
 
-static void p11_ecdsa_debug( mbedtls_pk_context * pxMbedtlsPkCtx,
+static void p11_ecdsa_debug( P11PkConstCallbackCtx_t * pxCallbackCtx,
                              mbedtls_pk_debug_item * pxItems )
 {
-    configASSERT( mbedtls_ecdsa_info.debug_func );
+    ( void ) pxCallbackCtx;
 
-    mbedtls_ecdsa_info.debug_func( ( mbedtls_pk_context * ) pxMbedtlsPkCtx, pxItems );
+    if( pxItems != NULL )
+    {
+        pxItems[ 0 ].type = MBEDTLS_PK_DEBUG_NONE;
+        pxItems[ 0 ].name = NULL;
+        pxItems[ 0 ].value = NULL;
+    }
 }
 
 /*-----------------------------------------------------------*/
 
-static size_t p11_rsa_get_bitlen( mbedtls_pk_context * pxMbedtlsPkCtx )
+static size_t p11_rsa_get_bitlen( P11PkConstCallbackCtx_t * pxCallbackCtx )
 {
-    configASSERT( mbedtls_rsa_info.get_bitlen );
+    const P11RsaCtx_t * pxP11RsaCtx = p11RSA_FROM_CALLBACK( pxCallbackCtx );
 
-    return mbedtls_rsa_info.get_bitlen( pxMbedtlsPkCtx );
+    return ( pxP11RsaCtx != NULL ) ? ( mbedtls_rsa_get_len( &( pxP11RsaCtx->xMbedRsaCtx ) ) * 8U ) : 0U;
 }
 
 /*-----------------------------------------------------------*/
@@ -1004,24 +1037,30 @@ static int p11_rsa_can_do( mbedtls_pk_type_t xType )
 
 /*-----------------------------------------------------------*/
 
-static int p11_rsa_verify( mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_rsa_verify( P11PkCallbackCtx_t * pxCallbackCtx,
                            mbedtls_md_type_t xMdAlg,
                            const unsigned char * pucHash,
                            size_t xHashLen,
                            const unsigned char * pucSig,
                            size_t xSigLen )
 {
-    configASSERT( mbedtls_rsa_info.verify_func );
+    P11RsaCtx_t * pxP11RsaCtx = p11RSA_FROM_CALLBACK( pxCallbackCtx );
 
-    return mbedtls_rsa_info.verify_func( pxMbedtlsPkCtx,
-                                         xMdAlg,
-                                         pucHash, xHashLen,
-                                         pucSig, xSigLen );
+    if( ( pxP11RsaCtx == NULL ) || ( xSigLen != mbedtls_rsa_get_len( &( pxP11RsaCtx->xMbedRsaCtx ) ) ) )
+    {
+        return -1;
+    }
+
+    return mbedtls_rsa_pkcs1_verify( &( pxP11RsaCtx->xMbedRsaCtx ),
+                                     xMdAlg,
+                                     ( unsigned int ) xHashLen,
+                                     pucHash,
+                                     pucSig );
 }
 
 /*-----------------------------------------------------------*/
 
-static int p11_rsa_sign( mbedtls_pk_context * pk,
+static int p11_rsa_sign( P11PkCallbackCtx_t * pxCallbackCtx,
                          mbedtls_md_type_t xMdAlg,
                          const unsigned char * pucHash,
                          size_t xHashLen,
@@ -1052,9 +1091,9 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
     {
         xResult = CKR_ARGUMENTS_BAD;
     }
-    else if( pk != NULL )
+    else if( pxCallbackCtx != NULL )
     {
-        pxP11RsaCtx = ( P11RsaCtx_t * ) pk->pk_ctx;
+        pxP11RsaCtx = p11RSA_FROM_CALLBACK( pxCallbackCtx );
 
         if( pxP11RsaCtx == NULL )
         {
@@ -1120,17 +1159,28 @@ static int p11_rsa_sign( mbedtls_pk_context * pk,
 
 /*-----------------------------------------------------------*/
 
-static int p11_rsa_check_pair( mbedtls_pk_context * pxPub,
-                               mbedtls_pk_context * pxMbedtlsPkCtx,
+static int p11_rsa_check_pair( P11PkConstCallbackCtx_t * pxPub,
+                               P11PkConstCallbackCtx_t * pxPrv,
                                int ( * lFRng )( void *, unsigned char *, size_t ),
                                void * pvPRng )
 {
-    configASSERT( mbedtls_rsa_info.check_pair_func );
+    mbedtls_rsa_context * pxPubKey = p11MBEDRSA_FROM_CALLBACK( pxPub );
+    P11RsaCtx_t * pxP11PrvKey = p11RSA_FROM_CALLBACK( pxPrv );
+    int lResult;
 
-    return mbedtls_rsa_info.check_pair_func( pxPub,
-                                             pxMbedtlsPkCtx,
-                                             lFRng,
-                                             pvPRng );
+    ( void ) lFRng;
+    ( void ) pvPRng;
+
+    if( ( pxPubKey == NULL ) || ( pxP11PrvKey == NULL ) )
+    {
+        lResult = -1;
+    }
+    else
+    {
+        lResult = mbedtls_rsa_check_pub_priv( pxPubKey, &( pxP11PrvKey->xMbedRsaCtx ) );
+    }
+
+    return lResult;
 }
 
 /*-----------------------------------------------------------*/
@@ -1284,12 +1334,17 @@ static void p11_rsa_ctx_free( void * pvCtx )
 
 /*-----------------------------------------------------------*/
 
-static void p11_rsa_debug( mbedtls_pk_context * pxMbedtlsPkCtx,
+static void p11_rsa_debug( P11PkConstCallbackCtx_t * pxCallbackCtx,
                            mbedtls_pk_debug_item * pxItems )
 {
-    configASSERT( mbedtls_rsa_info.debug_func );
+    ( void ) pxCallbackCtx;
 
-    mbedtls_rsa_info.debug_func( pxMbedtlsPkCtx, pxItems );
+    if( pxItems != NULL )
+    {
+        pxItems[ 0 ].type = MBEDTLS_PK_DEBUG_NONE;
+        pxItems[ 0 ].name = NULL;
+        pxItems[ 0 ].value = NULL;
+    }
 }
 
 /*-----------------------------------------------------------*/
