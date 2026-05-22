@@ -395,24 +395,32 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
 #endif
 
+    configPRINT_STRING( "TSET: entry direct\r\n" );
     LogInfo( ( "TSET: entry ctx=%p host=%p credentials=%p.",
                pNetworkContext,
                pHostName,
                pNetworkCredentials ) );
 
     configASSERT( pNetworkContext != NULL );
+    configPRINT_STRING( "TSET: ctx ok direct\r\n" );
     LogInfo( ( "TSET: assert ctx ok." ) );
     configASSERT( pNetworkContext->pParams != NULL );
+    configPRINT_STRING( "TSET: params ok direct\r\n" );
     LogInfo( ( "TSET: assert params ok." ) );
     configASSERT( pHostName != NULL );
+    configPRINT_STRING( "TSET: host ok direct\r\n" );
     LogInfo( ( "TSET: assert host ok." ) );
     configASSERT( pNetworkCredentials != NULL );
+    configPRINT_STRING( "TSET: credentials ok direct\r\n" );
     LogInfo( ( "TSET: assert credentials ok." ) );
     configASSERT( pNetworkCredentials->pRootCa != NULL );
+    configPRINT_STRING( "TSET: root ok direct\r\n" );
     LogInfo( ( "TSET: assert root ok." ) );
     configASSERT( pNetworkCredentials->pClientCertLabel != NULL );
+    configPRINT_STRING( "TSET: cert label ok direct\r\n" );
     LogInfo( ( "TSET: assert cert label ok." ) );
     configASSERT( pNetworkCredentials->pPrivateKeyLabel != NULL );
+    configPRINT_STRING( "TSET: key label ok direct\r\n" );
     LogInfo( ( "TSET: assert key label ok." ) );
 
     pTlsTransportParams = pNetworkContext->pParams;
@@ -429,12 +437,15 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                pNetworkCredentials->pPrivateKeyLabel ) );
 
     /* Initialize the mbed TLS context structures. */
+    configPRINT_STRING( "TSET: ssl init direct\r\n" );
     sslContextInit( &( pTlsTransportParams->sslContext ) );
 
+    configPRINT_STRING( "TSET: config defaults call direct\r\n" );
     mbedtlsError = mbedtls_ssl_config_defaults( &( pTlsTransportParams->sslContext.config ),
                                                 MBEDTLS_SSL_IS_CLIENT,
                                                 MBEDTLS_SSL_TRANSPORT_STREAM,
                                                 MBEDTLS_SSL_PRESET_DEFAULT );
+    configPRINT_STRING( "TSET: config defaults returned direct\r\n" );
 
     if( mbedtlsError != 0 )
     {
