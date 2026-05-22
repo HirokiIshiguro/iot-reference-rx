@@ -426,8 +426,7 @@ build_rx72n_ether:
     - exec-shell
     - os-windows
     - ccrx
-    - hw-ishiguro-pc
-  resource_group: rx72n-e2studio-build-ishiguro-debug
+  resource_group: rx72n-e2studio-build
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -628,8 +627,7 @@ build_rx72n_ether_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - hw-ishiguro-pc
-  resource_group: rx72n-e2studio-build-ishiguro-debug
+  resource_group: rx72n-e2studio-build
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -2061,8 +2059,6 @@ test_rx72n_ether_fleet:
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_fleet"
       mkdir -p "$artifact_dir"
-      tls_keylog_file="/tmp/rx72n_ether_fleet_${CI_PIPELINE_ID}_${CI_JOB_ID}.keys"
-      echo "TLS key log file on runner: $tls_keylog_file"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
 
@@ -2072,7 +2068,6 @@ test_rx72n_ether_fleet:
         --timeout "$RX72N_FLEET_TEST_TIMEOUT" \
         --reset-cmd "$reset_cmd" \
         --summary-json "$artifact_dir/fleet_summary.json" \
-        --tls-keylog-file "$tls_keylog_file" \
         2>&1 | tee "$artifact_dir/test_fleet_rx72n.log"
   artifacts:
     when: always

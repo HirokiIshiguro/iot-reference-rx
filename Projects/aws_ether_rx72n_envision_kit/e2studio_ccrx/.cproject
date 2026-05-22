@@ -161,7 +161,6 @@
 									<listOptionValue builtIn="false" value="CONFIG_MEDTLS_USE_AFR_MEMORY"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_ERROR_C"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_ALLOW_PRIVATE_ACCESS"/>
-									<listOptionValue builtIn="false" value="IOT_REFERENCE_RX_TLS_KEYLOG_ENABLE"/>
 									<listOptionValue builtIn="false" value="__LITTLE_ENDIAN__"/>
 								</option>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.gOptimize.2074715702" name="リンク時にモジュール間最適化の対象にする (-goptimize)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.gOptimize" useByScannerDiscovery="false" value="true" valueType="boolean"/>
