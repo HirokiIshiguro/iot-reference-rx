@@ -426,7 +426,8 @@ build_rx72n_ether:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - hw-ishiguro-pc
+  resource_group: rx72n-e2studio-build-ishiguro-debug
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -627,7 +628,8 @@ build_rx72n_ether_fleet:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - hw-ishiguro-pc
+  resource_group: rx72n-e2studio-build-ishiguro-debug
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
