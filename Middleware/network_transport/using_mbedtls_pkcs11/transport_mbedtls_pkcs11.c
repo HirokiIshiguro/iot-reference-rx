@@ -867,6 +867,7 @@ void TLS_FreeRTOS_Disconnect( NetworkContext_t * pNetworkContext )
 
         /* Call socket shutdown function to close connection. */
         TCP_Sockets_Disconnect( pTlsTransportParams->tcpSocket );
+        pTlsTransportParams->tcpSocket = NULL;
 
         /* Free mbed TLS contexts. */
         sslContextFree( &( pTlsTransportParams->sslContext ) );
