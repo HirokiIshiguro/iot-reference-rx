@@ -404,7 +404,7 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
  * Description  : Saves a Fleet-generated EC private key directly into the PAL.
  * Arguments    : pcPrivateKeyLabel
  *              : pxGeneratedKey
- * Return Value : . 
+ * Return Value : CK_RV status.
  *********************************************************************************************************************/
 static CK_RV prvSaveGeneratedPrivateKeyDer(const char *pcPrivateKeyLabel,
                                            mbedtls_pk_context *pxGeneratedKey)
