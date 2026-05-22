@@ -77,6 +77,13 @@ extern void vLoggingPrintf (const char *pcFormatString,
 #endif
 
 /**
+ * @brief Delay between non-blocking connect completion polls.
+ */
+#ifndef FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS
+#define FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS (10U)
+#endif
+
+/**
  * @brief TCP stream buffer and window sizing for MQTT/TLS traffic.
  *
  * RX72N OTA streams deliver each 16 KiB block as a roughly 22 KiB JSON/Base64
@@ -105,50 +112,84 @@ extern void vLoggingPrintf (const char *pcFormatString,
  */
 #define FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR (-1)
 
-static volatile BaseType_t xConnectDiagActive = pdFALSE;
-static volatile Socket_t xConnectDiagSocket = FREERTOS_INVALID_SOCKET;
-static TaskHandle_t xConnectDiagTask = NULL;
-
-static void prvConnectDiagTask(void *pvParameters)
+static TickType_t prvMillisecondsToTicks(uint32_t milliseconds)
 {
-    (void)pvParameters;
+    TickType_t ticks = pdMS_TO_TICKS(milliseconds);
+
+    if ((milliseconds > 0U) && (0U == ticks))
+    {
+        ticks = 1U;
+    }
+
+    return ticks;
+}
+
+static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
+                                    TickType_t connectTimeout)
+{
+    BaseType_t socketStatus = 0;
+    TimeOut_t timeoutState = {0};
+    TickType_t remainingTime = connectTimeout;
+    TickType_t pollDelay = prvMillisecondsToTicks(FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS);
+    uint32_t pollCount = 0;
+
+    if (0U == pollDelay)
+    {
+        pollDelay = 1U;
+    }
+
+    vTaskSetTimeOutState(&timeoutState);
 
     for (;;)
     {
-        if (pdFALSE != xConnectDiagActive)
+        socketStatus = FreeRTOS_issocketconnected(tcpSocket);
+
+        if (socketStatus > 0)
         {
-            uint32_t ulLoop = 0;
+            configPRINT_STRING("TCPC: connected\r\n");
+            socketStatus = 0;
+            break;
+        }
 
-            while ((pdFALSE != xConnectDiagActive) && (ulLoop < 30U))
+        if (socketStatus < 0)
+        {
+            configPRINT_STRING("TCPC: error\r\n");
+            break;
+        }
+
+        if ((pollCount % 100U) == 0U)
+        {
+            configPRINT_STRING("TCPC: waiting\r\n");
+        }
+
+        if (portMAX_DELAY != connectTimeout)
+        {
+            if (pdFALSE != xTaskCheckForTimeOut(&timeoutState, &remainingTime))
             {
-                Socket_t xSocket = (Socket_t)xConnectDiagSocket;
-                BaseType_t xConnected = pdFALSE;
+                configPRINT_STRING("TCPC: timeout\r\n");
+                socketStatus = -pdFREERTOS_ERRNO_ETIMEDOUT;
+                break;
+            }
 
-                if ((NULL != xSocket) && (FREERTOS_INVALID_SOCKET != xSocket))
-                {
-                    xConnected = FreeRTOS_issocketconnected(xSocket);
-                }
-
-                if (xConnected > 0)
-                {
-                    configPRINT_STRING("TCPD: connected\r\n");
-                }
-                else if (xConnected < 0)
-                {
-                    configPRINT_STRING("TCPD: error\r\n");
-                }
-                else
-                {
-                    configPRINT_STRING("TCPD: waiting\r\n");
-                }
-
-                ulLoop++;
-                vTaskDelay(pdMS_TO_TICKS(1000U));
+            if (remainingTime < pollDelay)
+            {
+                pollDelay = remainingTime;
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(100U));
+        if (0U == pollDelay)
+        {
+            taskYIELD();
+        }
+        else
+        {
+            vTaskDelay(pollDelay);
+        }
+
+        pollCount++;
     }
+
+    return socketStatus;
 }
 
 /**
@@ -249,16 +290,10 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
     if (0 == socketStatus)
     {
-        /* FreeRTOS_connect() uses the socket receive block time while waiting
-         * for eSOCKET_CONNECT/eSOCKET_CLOSED. Configure it before connecting
-         * so a lost wake event cannot leave the caller blocked forever. */
-        transportTimeout = (0U == receiveTimeoutMs) ? portMAX_DELAY : pdMS_TO_TICKS(receiveTimeoutMs);
-
-        if ((receiveTimeoutMs > 0U) && (0U == transportTimeout))
-        {
-            transportTimeout = 1U;
-        }
-
+        /* Start connect in non-blocking mode, then poll the public socket state
+         * in this task. This distinguishes a FreeRTOS_connect() event-wait stall
+         * from a lower-level TCP state-machine issue. */
+        transportTimeout = 0;
         (void)FreeRTOS_setsockopt(tcpSocket,
                                   0,
                                   FREERTOS_SO_RCVTIMEO,
@@ -270,37 +305,26 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
                  pHostName,
                  port,
                  (unsigned long)receiveTimeoutMs,
-                 (unsigned long)transportTimeout,
+                 (unsigned long)((0U == receiveTimeoutMs) ? portMAX_DELAY : prvMillisecondsToTicks(receiveTimeoutMs)),
                  (unsigned long)xPortGetFreeHeapSize(),
                  (unsigned long)xPortGetMinimumEverFreeHeapSize()));
 
-        xConnectDiagSocket = tcpSocket;
-        xConnectDiagActive = pdTRUE;
-        configPRINT_STRING("TCPD: active\r\n");
-
-        if (NULL == xConnectDiagTask)
-        {
-            BaseType_t xCreateStatus;
-
-            xCreateStatus = xTaskCreate(prvConnectDiagTask,
-                                        "TcpConnDiag",
-                                        (uint16_t)(configMINIMAL_STACK_SIZE * 2U),
-                                        NULL,
-                                        configMAX_PRIORITIES - 2,
-                                        &xConnectDiagTask);
-            LogInfo(("TCP trace: diag create status=%d handle=%p.",
-                     xCreateStatus,
-                     (void *)xConnectDiagTask));
-        }
-        else
-        {
-            LogInfo(("TCP trace: diag reuse handle=%p.",
-                     (void *)xConnectDiagTask));
-        }
-
         LogDebug(("Creating TCP Connection to %s.", pHostName));
+        configPRINT_STRING("TCPC: start\r\n");
         socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
-        xConnectDiagActive = pdFALSE;
+        LogInfo(("TCP trace: connect initial status=%d host=%s port=%u heap=%lu minHeap=%lu.",
+                 socketStatus,
+                 pHostName,
+                 port,
+                 (unsigned long)xPortGetFreeHeapSize(),
+                 (unsigned long)xPortGetMinimumEverFreeHeapSize()));
+
+        if (-pdFREERTOS_ERRNO_EWOULDBLOCK == socketStatus)
+        {
+            transportTimeout = (0U == receiveTimeoutMs) ? portMAX_DELAY : prvMillisecondsToTicks(receiveTimeoutMs);
+            socketStatus = prvWaitForConnect(tcpSocket, transportTimeout);
+        }
+
         LogInfo(("TCP trace: connect done status=%d host=%s port=%u heap=%lu minHeap=%lu.",
                  socketStatus,
                  pHostName,
