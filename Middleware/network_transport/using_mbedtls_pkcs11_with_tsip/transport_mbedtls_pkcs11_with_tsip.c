@@ -779,6 +779,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                    lTraceUseTsipKey,
                    lTraceDisableTsipAccel ) );
         configPRINT_STRING( "TSET: ssl setup call direct\r\n" );
+#if defined(TSIP_TLS_API_ENABLE)
+        pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
+            ( ( glTlsDisableTsipTlsAccelOverride != 0 )
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+              || ( xDisableTsipTlsAccelForConnection != pdFALSE )
+#endif
+              ) ? 1U : 0U;
+#endif
         mbedtlsError = mbedtls_ssl_setup( &( pTlsTransportParams->sslContext.context ),
                                           &( pTlsTransportParams->sslContext.config ) );
         configPRINT_STRING( "TSET: ssl setup returned direct\r\n" );
@@ -796,12 +804,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         else
         {
 #if defined(TSIP_TLS_API_ENABLE)
-            pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
-                ( ( glTlsDisableTsipTlsAccelOverride != 0 )
-#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
-                  || ( xDisableTsipTlsAccelForConnection != pdFALSE )
-#endif
-                  ) ? 1U : 0U;
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
             pTlsTransportParams->sslContext.xUseSoftwarePkcs11Random =
                 ( xDisableTsipTlsAccelForConnection != pdFALSE ) ? pdTRUE : pdFALSE;
