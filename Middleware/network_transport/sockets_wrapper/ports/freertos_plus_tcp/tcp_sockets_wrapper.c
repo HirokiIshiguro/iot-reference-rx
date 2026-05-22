@@ -189,6 +189,8 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
         pollCount++;
     }
 
+    configPRINT_STRING("TCPC: wait exit\r\n");
+
     return socketStatus;
 }
 
@@ -323,14 +325,17 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
         {
             transportTimeout = (0U == receiveTimeoutMs) ? portMAX_DELAY : prvMillisecondsToTicks(receiveTimeoutMs);
             socketStatus = prvWaitForConnect(tcpSocket, transportTimeout);
+            configPRINT_STRING("TCPC: wait returned\r\n");
         }
 
+        configPRINT_STRING("TCPC: before done log\r\n");
         LogInfo(("TCP trace: connect done status=%d host=%s port=%u heap=%lu minHeap=%lu.",
                  socketStatus,
                  pHostName,
                  port,
                  (unsigned long)xPortGetFreeHeapSize(),
                  (unsigned long)xPortGetMinimumEverFreeHeapSize()));
+        configPRINT_STRING("TCPC: after done log\r\n");
 
         if (0 != socketStatus)
         {

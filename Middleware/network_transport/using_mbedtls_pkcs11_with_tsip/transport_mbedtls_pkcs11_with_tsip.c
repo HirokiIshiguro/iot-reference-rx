@@ -1118,11 +1118,13 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
         /* Initialize tcpSocket so failure cleanup never touches a stale handle. */
         pTlsTransportParams->tcpSocket = NULL;
 
+        configPRINT_STRING( "TLSC: tcp connect call\r\n" );
         socketStatus = TCP_Sockets_Connect( &( pTlsTransportParams->tcpSocket ),
                                             pHostName,
                                             port,
                                             receiveTimeoutMs,
                                             sendTimeoutMs );
+        configPRINT_STRING( "TLSC: tcp connect returned\r\n" );
 
         if( socketStatus != 0 )
         {
@@ -1138,7 +1140,9 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
     {
         isSocketConnected = pdTRUE;
 
+        configPRINT_STRING( "TLSC: setup call\r\n" );
         returnStatus = tlsSetup( pNetworkContext, pHostName, pNetworkCredentials );
+        configPRINT_STRING( "TLSC: setup returned\r\n" );
     }
 
     /* Clean up on failure. */
