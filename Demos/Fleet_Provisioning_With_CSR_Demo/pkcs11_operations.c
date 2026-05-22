@@ -152,8 +152,6 @@ static CK_RV provisionPrivateECKey (CK_SESSION_HANDLE session,
                                     mbedtls_pk_context *mbedPkContext,
                                     CK_OBJECT_HANDLE_PTR pxObjectHandle);
 
-static void prvLogFleetCpuState(const char *pcTag);
-
 /**
  * @brief Import the specified RSA private key into storage.
  *
@@ -164,21 +162,6 @@ static void prvLogFleetCpuState(const char *pcTag);
 static CK_RV provisionPrivateRSAKey (CK_SESSION_HANDLE session,
                                      const char *label,
                                      mbedtls_pk_context *mbedPkContext);
-
-/*-----------------------------------------------------------*/
-
-static void prvLogFleetCpuState(const char *pcTag)
-{
-#if defined(__CCRX__) || defined(__GNUC__)
-    LogInfo(("Fleet CSR trace: %s psw=0x%08lx ipl=%lu.",
-             pcTag,
-             (unsigned long)R_BSP_GET_PSW(),
-             (unsigned long)R_BSP_GET_IPL()));
-#else
-    LogInfo(("Fleet CSR trace: %s cpu-state unavailable.",
-             pcTag));
-#endif
-}
 
 /*-----------------------------------------------------------*/
 
@@ -273,31 +256,21 @@ static CK_RV prvGenerateKeyPairEC(CK_SESSION_HANDLE xSession,
     *xPrivateKeyHandlePtr = CK_INVALID_HANDLE;
     *xPublicKeyHandlePtr = CK_INVALID_HANDLE;
 
-    LogInfo(("Fleet CSR trace: software ECP key setup enter."));
     lMbedtlsRet = mbedtls_pk_setup(pxGeneratedKey,
                                    mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-    LogInfo(("Fleet CSR trace: software ECP key setup exit ret=%ld.",
-             (long)lMbedtlsRet));
 
     if (0 == lMbedtlsRet)
     {
-        LogInfo(("Fleet CSR trace: software ECP keygen enter."));
         lMbedtlsRet = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1,
                                           mbedtls_pk_ec(*pxGeneratedKey),
                                           &lPKCS11RandomCallback,
                                           &xSession);
-        LogInfo(("Fleet CSR trace: software ECP keygen exit ret=%ld.",
-                 (long)lMbedtlsRet));
     }
 
     if (0 == lMbedtlsRet)
     {
-        LogInfo(("Fleet CSR trace: storing generated private key enter."));
         xResult = prvSaveGeneratedPrivateKeyDer(pcPrivateKeyLabel,
                                                 pxGeneratedKey);
-        LogInfo(("Fleet CSR trace: storing generated private key exit CK_RV=0x%08lx handle=0x%08lx.",
-                 (unsigned long)xResult,
-                 (unsigned long)*xPrivateKeyHandlePtr));
     }
     else
     {
@@ -394,7 +367,6 @@ bool xGenerateKeyAndCsr(CK_SESSION_HANDLE xP11Session,
         {
             mbedtls_x509write_csr_set_key(&xReq, &xPrivKey);
 
-            LogInfo(("Fleet CSR trace: writing CSR PEM."));
             ulMbedtlsRet = mbedtls_x509write_csr_pem(&xReq, (unsigned char *)pcCsrBuffer,
                                                      xCsrBufferLength, &lPKCS11RandomCallback,
                                                      &xP11Session);
@@ -448,10 +420,7 @@ static CK_RV prvSaveGeneratedPrivateKeyDer(const char *pcPrivateKeyLabel,
     CK_RV xResult = CKR_OK;
     int32_t lDerKeyLength;
 
-    LogInfo(("Fleet CSR trace: direct PAL private key DER write enter."));
     lDerKeyLength = mbedtls_pk_write_key_der(pxGeneratedKey, ucDerKey, sizeof(ucDerKey));
-    LogInfo(("Fleet CSR trace: direct PAL private key DER encode ret=%ld.",
-             (long)lDerKeyLength));
 
     if ((lDerKeyLength <= 0) || ((uint32_t)lDerKeyLength > sizeof(ucDerKey)))
     {
@@ -463,8 +432,6 @@ static CK_RV prvSaveGeneratedPrivateKeyDer(const char *pcPrivateKeyLabel,
         xPalHandle = PKCS11_PAL_SaveObject(&xLabel,
                                            ucDerKey + sizeof(ucDerKey) - (uint32_t)lDerKeyLength,
                                            (CK_ULONG)lDerKeyLength);
-        LogInfo(("Fleet CSR trace: direct PAL private key save handle=0x%08lx.",
-                 (unsigned long)xPalHandle));
 
         if (CK_INVALID_HANDLE == xPalHandle)
         {
@@ -473,8 +440,6 @@ static CK_RV prvSaveGeneratedPrivateKeyDer(const char *pcPrivateKeyLabel,
     }
 
     (void)memset(ucDerKey, 0, sizeof(ucDerKey));
-    LogInfo(("Fleet CSR trace: direct PAL private key DER write exit CK_RV=0x%08lx.",
-             (unsigned long)xResult));
 
     return xResult;
 }
@@ -657,23 +622,9 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         *pxObjectHandle = CK_INVALID_HANDLE;
     }
 
-    LogInfo(("Fleet CSR trace: private EC D buffer ptr=0x%08lx.",
-             (unsigned long)DPtr));
-    vTaskDelay(pdMS_TO_TICKS(1U));
-
     if (CKR_OK == result)
     {
-        LogInfo(("Fleet CSR trace: private EC keypair=0x%08lx d.p=0x%08lx d.n=%lu.",
-                 (unsigned long)keyPair,
-                 (unsigned long)keyPair->d.p,
-                 (unsigned long)keyPair->d.n));
-        vTaskDelay(pdMS_TO_TICKS(1U));
-        LogInfo(("Fleet CSR trace: private EC D export enter."));
-        vTaskDelay(pdMS_TO_TICKS(1U));
         mbedResult = mbedtls_mpi_write_binary(&(keyPair->d), DPtr, EC_D_LENGTH);
-        LogInfo(("Fleet CSR trace: private EC D export exit ret=%ld.",
-                 (long)mbedResult));
-        vTaskDelay(pdMS_TO_TICKS(1U));
 
         if (0 != mbedResult)
         {
@@ -684,9 +635,6 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
 
     if (CKR_OK == result)
     {
-        LogInfo(("Fleet CSR trace: private EC curve check enter id=%ld.",
-                 (long)keyPair->grp.id));
-        vTaskDelay(pdMS_TO_TICKS(1U));
         if (MBEDTLS_ECP_DP_SECP256R1 == keyPair->grp.id)
         {
             ecParamsPtr = (const CK_BYTE *)("\x06\x08" MBEDTLS_OID_EC_GRP_SECP256R1);
@@ -717,31 +665,18 @@ static CK_RV provisionPrivateECKey(CK_SESSION_HANDLE session,
         privateKeyTemplate[5].pValue = ecParamsPtr;
         privateKeyTemplate[6].pValue = DPtr;
 
-        LogInfo(("Fleet CSR trace: C_CreateObject private EC enter."));
-        vTaskDelay(pdMS_TO_TICKS(1U));
         result = C_CreateObject(session,
                                 (CK_ATTRIBUTE_PTR)&privateKeyTemplate,
                                 (sizeof(privateKeyTemplate)) / sizeof(CK_ATTRIBUTE),
                                 &objectHandle);
-        LogInfo(("Fleet CSR trace: C_CreateObject private EC exit CK_RV=0x%08lx handle=0x%08lx.",
-                 (unsigned long)result,
-                 (unsigned long)objectHandle));
-        prvLogFleetCpuState("after C_CreateObject");
 
         if ((CKR_OK == result) && (NULL != pxObjectHandle))
         {
-            LogInfo(("Fleet CSR trace: private EC handle store enter ptr=0x%08lx.",
-                     (unsigned long)pxObjectHandle));
             *pxObjectHandle = objectHandle;
-            LogInfo(("Fleet CSR trace: private EC handle store exit handle=0x%08lx.",
-                     (unsigned long)*pxObjectHandle));
         }
     }
 
-    LogInfo(("Fleet CSR trace: private EC D clear enter."));
     (void) memset(ucD, 0, sizeof(ucD));
-    LogInfo(("Fleet CSR trace: private EC return CK_RV=0x%08lx.",
-             (unsigned long)result));
 
     return result;
 }
