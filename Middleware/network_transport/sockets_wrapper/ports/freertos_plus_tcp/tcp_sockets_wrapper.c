@@ -53,6 +53,7 @@ extern void vLoggingPrintf (const char *pcFormatString,
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
+#include "task.h"
 
 /* FreeRTOS+TCP includes. */
 #include "FreeRTOS_IP.h"
@@ -73,6 +74,13 @@ extern void vLoggingPrintf (const char *pcFormatString,
  */
 #ifndef FREERTOS_SOCKETS_WRAPPER_SHUTDOWN_LOOPS
 #define FREERTOS_SOCKETS_WRAPPER_SHUTDOWN_LOOPS (3)
+#endif
+
+/**
+ * @brief Delay between non-blocking connect completion polls.
+ */
+#ifndef FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS
+#define FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS (10U)
 #endif
 
 /**
@@ -103,6 +111,75 @@ extern void vLoggingPrintf (const char *pcFormatString,
  * @brief negative error code indicating a network failure.
  */
 #define FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR (-1)
+
+static TickType_t prvMillisecondsToTicks(uint32_t milliseconds)
+{
+    TickType_t ticks = pdMS_TO_TICKS(milliseconds);
+
+    if ((milliseconds > 0U) && (0U == ticks))
+    {
+        ticks = 1U;
+    }
+
+    return ticks;
+}
+
+static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
+                                    TickType_t connectTimeout)
+{
+    BaseType_t socketStatus = 0;
+    TimeOut_t timeoutState = {0};
+    TickType_t remainingTime = connectTimeout;
+    TickType_t pollDelay = prvMillisecondsToTicks(FREERTOS_SOCKETS_WRAPPER_CONNECT_POLL_DELAY_MS);
+
+    if (0U == pollDelay)
+    {
+        pollDelay = 1U;
+    }
+
+    vTaskSetTimeOutState(&timeoutState);
+
+    for (;;)
+    {
+        socketStatus = FreeRTOS_issocketconnected(tcpSocket);
+
+        if (socketStatus > 0)
+        {
+            socketStatus = 0;
+            break;
+        }
+
+        if (socketStatus < 0)
+        {
+            break;
+        }
+
+        if (portMAX_DELAY != connectTimeout)
+        {
+            if (pdFALSE != xTaskCheckForTimeOut(&timeoutState, &remainingTime))
+            {
+                socketStatus = -pdFREERTOS_ERRNO_ETIMEDOUT;
+                break;
+            }
+
+            if (remainingTime < pollDelay)
+            {
+                pollDelay = remainingTime;
+            }
+        }
+
+        if (0U == pollDelay)
+        {
+            taskYIELD();
+        }
+        else
+        {
+            vTaskDelay(pollDelay);
+        }
+    }
+
+    return socketStatus;
+}
 
 /**
  * @brief Establish a connection to server.
@@ -202,10 +279,10 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
     if (0 == socketStatus)
     {
-        /* FreeRTOS_connect() uses the socket receive block time as its connect
-         * timeout. Set it before connecting so transient SYN failures do not
-         * block forever with the default portMAX_DELAY. */
-        transportTimeout = pdMS_TO_TICKS(receiveTimeoutMs);
+        /* Start connect in non-blocking mode, then poll the public socket state.
+         * This avoids depending on the eSOCKET_CONNECT event path, which can
+         * leave FreeRTOS_connect() waiting even after the TCP handshake completes. */
+        transportTimeout = 0;
         (void)FreeRTOS_setsockopt(tcpSocket,
                                   0,
                                   FREERTOS_SO_RCVTIMEO,
@@ -215,6 +292,12 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
         /* Establish connection. */
         LogDebug(("Creating TCP Connection to %s.", pHostName));
         socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
+
+        if (-pdFREERTOS_ERRNO_EWOULDBLOCK == socketStatus)
+        {
+            transportTimeout = (0U == receiveTimeoutMs) ? portMAX_DELAY : prvMillisecondsToTicks(receiveTimeoutMs);
+            socketStatus = prvWaitForConnect(tcpSocket, transportTimeout);
+        }
 
         if (0 != socketStatus)
         {
