@@ -947,9 +947,12 @@ static int generateRandomBytes( void * pvCtx,
     SSLContext_t * pxCtx = ( SSLContext_t * ) pvCtx;
     CK_RV xResult;
 
+    configPRINT_STRING( "TRNG: enter direct\r\n" );
     LogInfo( ( "TLS trace: RNG enter len=%lu.",
                ( unsigned long ) xRandomLength ) );
+    configPRINT_STRING( "TRNG: generate call direct\r\n" );
     xResult = pxCtx->pxP11FunctionList->C_GenerateRandom( pxCtx->xP11Session, pucRandom, xRandomLength );
+    configPRINT_STRING( "TRNG: generate returned direct\r\n" );
     LogInfo( ( "TLS trace: RNG exit ret=0x%08lx.",
                ( unsigned long ) xResult ) );
 
