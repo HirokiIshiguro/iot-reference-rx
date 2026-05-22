@@ -395,15 +395,33 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
 #endif
 
+    LogInfo( ( "TSET: entry ctx=%p host=%p credentials=%p.",
+               pNetworkContext,
+               pHostName,
+               pNetworkCredentials ) );
+
     configASSERT( pNetworkContext != NULL );
+    LogInfo( ( "TSET: assert ctx ok." ) );
     configASSERT( pNetworkContext->pParams != NULL );
+    LogInfo( ( "TSET: assert params ok." ) );
     configASSERT( pHostName != NULL );
+    LogInfo( ( "TSET: assert host ok." ) );
     configASSERT( pNetworkCredentials != NULL );
+    LogInfo( ( "TSET: assert credentials ok." ) );
     configASSERT( pNetworkCredentials->pRootCa != NULL );
+    LogInfo( ( "TSET: assert root ok." ) );
     configASSERT( pNetworkCredentials->pClientCertLabel != NULL );
+    LogInfo( ( "TSET: assert cert label ok." ) );
     configASSERT( pNetworkCredentials->pPrivateKeyLabel != NULL );
+    LogInfo( ( "TSET: assert key label ok." ) );
 
     pTlsTransportParams = pNetworkContext->pParams;
+
+    LogInfo( ( "TSET: params=%p root=%p certLabel=%p keyLabel=%p.",
+               pTlsTransportParams,
+               pNetworkCredentials->pRootCa,
+               pNetworkCredentials->pClientCertLabel,
+               pNetworkCredentials->pPrivateKeyLabel ) );
 
     LogInfo( ( "TLS trace: setup enter host=%s cert=%s key=%s.",
                pHostName,
