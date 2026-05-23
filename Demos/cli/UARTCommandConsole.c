@@ -292,8 +292,6 @@ void vOutputString(const char *pcMessage)
     {
         unsigned short usStringLength = (unsigned short)strlen(pcMessage);
 
-        configLCD_LOG_STRING(pcMessage, usStringLength);
-
         /* Cast to type "signed char *" and (unsigned short) to be compatible with parameter type */
         vSerialPutString((signed char *)pcMessage, usStringLength);
     }

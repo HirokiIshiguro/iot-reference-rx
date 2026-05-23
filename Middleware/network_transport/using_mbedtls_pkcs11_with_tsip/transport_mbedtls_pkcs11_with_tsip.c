@@ -328,6 +328,9 @@ static void sslContextInit( SSLContext_t * pSslContext )
     pSslContext->context.tsip_cipher_suite = 0U;
     pSslContext->context.disable_tsip_tls_accel = 0U;
 #endif
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    pSslContext->xUseSoftwarePkcs11Random = pdFALSE;
+#endif
 
     xInitializePkcs11Session( &( pSslContext->xP11Session ) );
     C_GetFunctionList( &( pSslContext->pxP11FunctionList ) );
@@ -679,6 +682,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
         /* Initialize the mbed TLS secured connection context. */
+#if defined(TSIP_TLS_API_ENABLE)
+        pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
+            ( ( glTlsDisableTsipTlsAccelOverride != 0 )
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+              || ( xDisableTsipTlsAccelForConnection != pdFALSE )
+#endif
+              ) ? 1U : 0U;
+#endif
         mbedtlsError = mbedtls_ssl_setup( &( pTlsTransportParams->sslContext.context ),
                                           &( pTlsTransportParams->sslContext.config ) );
 
@@ -693,12 +704,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         else
         {
 #if defined(TSIP_TLS_API_ENABLE)
-            pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
-                ( ( glTlsDisableTsipTlsAccelOverride != 0 )
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
-                  || ( xDisableTsipTlsAccelForConnection != pdFALSE )
+            pTlsTransportParams->sslContext.xUseSoftwarePkcs11Random =
+                ( xDisableTsipTlsAccelForConnection != pdFALSE ) ? pdTRUE : pdFALSE;
 #endif
-                  ) ? 1U : 0U;
             if( pNetworkCredentials->tlsDebugLevel > 0U )
             {
                 LogInfo( ( "TSIP TLS accel override=%ld",
@@ -823,8 +832,27 @@ static int generateRandomBytes( void * pvCtx,
     /* Must cast from void pointer to conform to mbed TLS API. */
     SSLContext_t * pxCtx = ( SSLContext_t * ) pvCtx;
     CK_RV xResult;
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    unsigned char ucSavedTsipEndpoint = 0U;
+    BaseType_t xRestoreTsipEndpoint = pdFALSE;
+    extern unsigned char g_tsip_endpointflg;
+#endif
 
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    if( pxCtx->xUseSoftwarePkcs11Random != pdFALSE )
+    {
+        ucSavedTsipEndpoint = g_tsip_endpointflg;
+        g_tsip_endpointflg = MBEDTLS_SSL_IS_SERVER;
+        xRestoreTsipEndpoint = pdTRUE;
+    }
+#endif
     xResult = pxCtx->pxP11FunctionList->C_GenerateRandom( pxCtx->xP11Session, pucRandom, xRandomLength );
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    if( xRestoreTsipEndpoint != pdFALSE )
+    {
+        g_tsip_endpointflg = ucSavedTsipEndpoint;
+    }
+#endif
 
     if( xResult != CKR_OK )
     {
@@ -1022,6 +1050,7 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
     TlsTransportParams_t * pTlsTransportParams = NULL;
     TlsTransportStatus_t returnStatus = TLS_TRANSPORT_SUCCESS;
     BaseType_t socketStatus = 0;
+    BaseType_t isSocketConnected = pdFALSE;
 
     if( ( pNetworkContext == NULL ) ||
         ( pNetworkContext->pParams == NULL ) ||
@@ -1049,6 +1078,10 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
         pTlsTransportParams = pNetworkContext->pParams;
+
+        /* Initialize tcpSocket so failure cleanup never touches a stale handle. */
+        pTlsTransportParams->tcpSocket = NULL;
+
         socketStatus = TCP_Sockets_Connect( &( pTlsTransportParams->tcpSocket ),
                                             pHostName,
                                             port,
@@ -1067,13 +1100,19 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
     /* Perform TLS handshake. */
     if( returnStatus == TLS_TRANSPORT_SUCCESS )
     {
+        isSocketConnected = pdTRUE;
+
         returnStatus = tlsSetup( pNetworkContext, pHostName, pNetworkCredentials );
     }
 
     /* Clean up on failure. */
     if( returnStatus != TLS_TRANSPORT_SUCCESS )
     {
-        TCP_Sockets_Disconnect( pTlsTransportParams->tcpSocket );
+        if( isSocketConnected == pdTRUE )
+        {
+            TCP_Sockets_Disconnect( pTlsTransportParams->tcpSocket );
+            pTlsTransportParams->tcpSocket = NULL;
+        }
     }
     else
     {
@@ -1118,6 +1157,7 @@ void TLS_FreeRTOS_Disconnect( NetworkContext_t * pNetworkContext )
 
         /* Call socket shutdown function to close connection. */
         TCP_Sockets_Disconnect( pTlsTransportParams->tcpSocket );
+        pTlsTransportParams->tcpSocket = NULL;
 
         /* Free mbed TLS contexts. */
         sslContextFree( &( pTlsTransportParams->sslContext ) );

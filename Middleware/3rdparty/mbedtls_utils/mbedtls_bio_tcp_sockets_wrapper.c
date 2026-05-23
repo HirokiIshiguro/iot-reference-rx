@@ -29,6 +29,13 @@
  * @brief Implements mbed TLS platform send/receive functions for the TCP sockets wrapper.
  */
 
+#include "logging_levels.h"
+
+#define LIBRARY_LOG_NAME     "MbedTLSBio"
+#define LIBRARY_LOG_LEVEL    LOG_ERROR
+
+#include "logging_stack.h"
+
 /* MbedTLS includes. */
 #if !defined( MBEDTLS_CONFIG_FILE )
     #include "mbedtls/mbedtls_config.h"

@@ -158,6 +158,9 @@ variables:
   RX72N_OTA_CANDIDATE_VERSION: "0.9.3"
   RX72N_OTA_OBSERVE_TIMEOUT: "900"
   AWS_DEFAULT_REGION: "ap-northeast-1"
+  AWS_CLI_RUNNER_TAG: "aws-cli-ishiguro"
+  RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
   E2STUDIO_WORKSPACE_FLEET: "C:/Temp/e2ws_iot_ref_rx72n_fleet"
   E2STUDIO_WORKSPACE_MQTT: "C:/Temp/e2ws_iot_ref_rx72n_mqtt"
@@ -425,7 +428,8 @@ build_rx72n_ether:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -457,7 +461,7 @@ build_rx72n_ether:
         --output "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot" `
         --range-start 0xFFE00000 `
         --range-end 0xFFFFFFFF `
-        --shift -0x200000 `
+        --shift=-0x200000 `
         --drop-out-of-range
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
     - |
@@ -494,6 +498,7 @@ build_rx65n_bg96:
     - exec-shell
     - os-windows
     - ccrx
+    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: rx65n-bg96-e2studio-build
   rules:
     - if: '$RUN_RX65N_BG96_BUILD == "true"'
@@ -557,6 +562,7 @@ build_rx65n_bg96_fleet:
     - exec-shell
     - os-windows
     - ccrx
+    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: rx65n-bg96-e2studio-build
   extends:
     - .rx65n_bg96_fleet_rules
@@ -626,7 +632,8 @@ build_rx72n_ether_fleet:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -659,7 +666,7 @@ build_rx72n_ether_fleet:
         --output "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot" `
         --range-start 0xFFE00000 `
         --range-end 0xFFFFFFFF `
-        --shift -0x200000 `
+        --shift=-0x200000 `
         --drop-out-of-range
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit_bank1.mot")) { Write-Error "bank1 boot_loader .mot missing"; exit 1 }
     - |
@@ -716,6 +723,31 @@ build_rx72n_ether_fleet:
     - python3 -m venv .venv-pi
     - source .venv-pi/bin/activate
     - python -m pip install --quiet pyserial cryptography
+
+.aws_cli_windows_job:
+  tags:
+    - exec-shell
+    - os-windows
+    - $AWS_CLI_RUNNER_TAG
+  before_script:
+    - $ErrorActionPreference = "Stop"
+    - |
+      python -c "import awscli" 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        $ciBin = "$env:CI_PROJECT_DIR\.ci-bin"
+        New-Item -ItemType Directory -Force -Path $ciBin | Out-Null
+        Set-Content -Path "$ciBin\aws.cmd" -Encoding ASCII -Value @(
+          "@echo off",
+          "python -m awscli %*"
+        )
+        $env:PATH = "$ciBin;$env:PATH"
+        $env:AWS_CLI_USE_PYTHON_MODULE = "1"
+      }
+      if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
+        Write-Error "AWS CLI is unavailable on the AWS CLI runner."
+        exit 1
+      }
+      aws --version
 
 .rx65n_bg96_flash_rules:
   rules:
@@ -968,13 +1000,10 @@ run_rx65n_bg96_app:
 
 prepare_rx65n_bg96_mqtt_credentials:
   stage: credential_prepare
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
-  resource_group: rx65n-bg96-aws-iot-credentials
   extends:
+    - .aws_cli_windows_job
     - .rx65n_bg96_credential_prepare_rules
+  resource_group: rx65n-bg96-aws-iot-credentials
   needs:
     - job: download_rx65n_bg96_app
       artifacts: false
@@ -1254,6 +1283,7 @@ build_rx65n_bg96_ota:
     - exec-shell
     - os-windows
     - ccrx
+    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: rx65n-bg96-e2studio-build
   extends:
     - .rx65n_bg96_ota_rules
@@ -1476,11 +1506,8 @@ provision_rx65n_bg96_ota_signer:
 
 create_rx65n_bg96_ota:
   stage: ota_create
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
   extends:
+    - .aws_cli_windows_job
     - .rx65n_bg96_ota_rules
   needs:
     - job: prepare_rx65n_bg96_mqtt_credentials
@@ -1653,10 +1680,7 @@ test_rx65n_bg96_ota:
 
 cleanup_rx65n_bg96_ota:
   stage: ota_cleanup
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
+  extends: .aws_cli_windows_job
   allow_failure: true
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(ota|full)$/'
@@ -1691,10 +1715,7 @@ cleanup_rx65n_bg96_ota:
 
 cleanup_rx65n_bg96_mqtt_credentials:
   stage: credential_cleanup
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
+  extends: .aws_cli_windows_job
   resource_group: rx65n-bg96-aws-iot-credentials
   dependencies:
     - prepare_rx65n_bg96_mqtt_credentials
@@ -1899,10 +1920,7 @@ provision_rx72n_ether_fleet:
 
 cleanup_rx72n_ether_ota_jobs:
   stage: pre_test_cleanup
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
+  extends: .aws_cli_windows_job
   needs:
     - job: build_rx72n_ether
       artifacts: false
@@ -1927,6 +1945,12 @@ cleanup_rx72n_ether_ota_jobs:
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
+        Write-Error "AWS CLI is unavailable on the AWS CLI runner."
+        exit 1
+      }
+
       python tools\cleanup_iot_jobs.py `
         --thing-name "$env:RX72N_DEVICE_ID" `
         --region "$env:AWS_DEFAULT_REGION" `
@@ -2106,10 +2130,7 @@ debug_rx72n_ether_fleet_current_app:
 cleanup_rx72n_ether_fleet:
   stage: fleet_cleanup
   allow_failure: true
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
+  extends: .aws_cli_windows_job
   dependencies:
     - test_rx72n_ether_fleet
   rules:
@@ -2320,13 +2341,10 @@ test_rx65n_bg96_fleet:
 cleanup_rx65n_bg96_fleet:
   stage: fleet_cleanup
   allow_failure: true
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
   dependencies:
     - test_rx65n_bg96_fleet
   extends:
+    - .aws_cli_windows_job
     - .rx65n_bg96_fleet_cleanup_rules
   script:
     - Write-Host "=== Cleanup CK-RX65N BG96 Fleet Provisioning AWS resources ==="
@@ -2495,7 +2513,8 @@ build_rx72n_ether_mqtt_candidate:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -2584,7 +2603,8 @@ build_rx72n_ether_ota:
     - exec-shell
     - os-windows
     - ccrx
-  resource_group: rx72n-e2studio-build
+    - $RX72N_BUILD_RUNNER_TAG
+  resource_group: rx72n-e2studio-build-ishiguro
   needs:
     - test_rx72n_ether_mqtt
   rules:
@@ -2717,10 +2737,7 @@ park_rx72n_ether_ota_cli:
 
 create_rx72n_ether_ota:
   stage: ota_create
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
+  extends: .aws_cli_windows_job
   needs:
     - job: build_rx72n_ether_ota
       artifacts: true

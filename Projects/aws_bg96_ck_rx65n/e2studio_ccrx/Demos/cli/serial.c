@@ -197,7 +197,7 @@ const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
         the task when the transmission has completed. */
         xSendingTask = xTaskGetCurrentTaskHandle();
         uint32_t str_length = usStringLength;
-        uint32_t transmit_length = 0;
+        uint16_t transmit_length = 0;
         sci_err_t sci_err = SCI_SUCCESS;
         uint32_t retry = 0xFFFF;
 
@@ -206,9 +206,26 @@ const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 5000 );
 
             R_SCI_Control(xSerialSciHandle, SCI_CMD_TX_Q_BYTES_FREE, &transmit_length);
 
+            if(0 == transmit_length)
+            {
+                sci_err = SCI_ERR_INSUFFICIENT_SPACE;
+                retry--;
+
+                if (taskSCHEDULER_RUNNING == xTaskGetSchedulerState())
+                {
+                    vTaskDelay(1);
+                }
+                else
+                {
+                    R_BSP_NOP();
+                }
+
+                continue;
+            }
+
             if(transmit_length > str_length)
             {
-                transmit_length = str_length;
+                transmit_length = (uint16_t)str_length;
             }
 
             sci_err = R_SCI_Send(xSerialSciHandle, (uint8_t *) pcString,
