@@ -1,5 +1,11 @@
 # FreeRTOS LTS IoT Reference for Renesas RX
 
+## 最新リリース
+
+最新のsafftiリリースタグは
+[v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0)
+です。変更点は [Changelog.md](Changelog.md) を参照してください。
+
 ## 最新テスト結果
 
 最終更新: 2026-05-24 JST。RX72N TSIP transport include order 修正後、
@@ -53,6 +59,9 @@ upstream は CK-RX65N v2 のみを公式サポートしており、**RX72N に�
 | This fork (GitHub mirror) | https://github.com/HirokiIshiguro/iot-reference-rx |
 
 Base version: **202604.00-LTS-rx** (FreeRTOS 202604.00 LTS)
+
+Latest saffti release:
+**[v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0)**
 
 ## Supported Board / 対応ボード
 
@@ -232,16 +241,12 @@ Core hardware jobs:
 | Build Fleet Provisioning image | `build_rx72n_ether_fleet` | `build_rx65n_bg96_fleet` |
 | Test Fleet Provisioning | `test_rx72n_ether_fleet` | `test_rx65n_bg96_fleet` |
 
-Current hardware validation matrix:
-
-| Feature | `rx72n_ether` software TLS | `rx72n_ether` TSIP TLS | `rx65n_bg96` software TLS | `rx65n_bg96` TSIP TLS |
-|---------|----------------------------|------------------------|---------------------------|-----------------------|
-| Build | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
-| Flash / app boot | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
-| MQTT over TLS 1.2 | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
-| MQTT over TLS 1.3 | OK, [pipeline #4667](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4667) | Not implemented | OK, [pipeline #4667](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4667) | Not implemented |
-| OTA over MQTT | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4739](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4739) | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | OK, [pipeline #4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744) |
-| Fleet Provisioning | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | Disabled by default | OK, [pipeline #4737](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4737) | Disabled by default |
+Current hardware validation status is summarized in the **最新テスト結果** matrix at
+the top of this README. As of
+[v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0),
+MQTT / OTA / Fleet Provisioning are validated on both RX72N/Ether and
+RX65N/BG96 for software TLS and TSIP TLS backends, except for the intentionally
+deferred TSIP + TLS 1.3 combinations.
 
 RX65N/BG96 TSIP hardware validation uses RX65N-specific UFPK-derived runtime
 provisioning payloads and the matching static AWS IoT certificate documented in
@@ -279,7 +284,7 @@ The project-level GitLab pipeline schedule is part of the reference pipeline des
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=false` | Runs the stable focused rows listed in the matrix above. TSIP Fleet and RX72N software OTA/TLS 1.3 OTA are gated as stabilizing rows until repeated schedule evidence is available. |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix` | Runs the focused rows represented in the latest matrix. TSIP + TLS 1.3 rows are intentionally left out until that backend combination is implemented and validated. |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
