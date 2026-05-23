@@ -6,6 +6,18 @@
 
 ## Coming Soon
 
+### 予定
+
+- TSIP backend と TLS 1.3 の組み合わせを、RX72N Envision Kit Ethernet と
+  CK-RX65N + BG96 Cellular の両方で実機検証できるようにします。
+
+- Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
+  性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
+
+- RX72N 経由でセカンダリ MCU を更新する OTA リファレンスを追加する予定です。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.1.0
+
 ### 追加
 
 - RX72N Envision Kit EthernetとCK-RX65N + BG96 Cellularに、TSIP連携TLS backendを
@@ -13,8 +25,8 @@
   TSIP用アプリケーションプロジェクト、UART経由の`tsipprov` provisioning、
   masked CI/CD Variablesまたは初期セットアップ時のローカル入力からの
   runtime provisioning payload投入に対応しました。
-  RX72N TSIP OTAはpipeline #4739、RX65N/BG96 TSIP OTAはpipeline #4744で
-  実機完走を確認しています。
+  RX72N TSIP MQTT / OTA / Fleet Provisioning と、RX65N/BG96 TSIP MQTT / OTA /
+  Fleet Provisioning は、READMEの最新テスト結果に示す通り5回確認済みです。
 
 - RX72N Envision Kit Ethernetで、AWS IoT CoreへのTLS 1.3 MQTT接続に対応しました。
   実機スコープパイプラインでは、RX72N実機ログに
@@ -35,7 +47,7 @@
   focused child pipelineへ展開する形へ整理しています。
   各child pipelineはボード別に直列化し、RX72NとRX65N/BG96の並列性は保ちつつ、
   同一ボード上のflash/provision/testシーケンスが割り込まれないようにします。
-  TSIP TLS 1.3系はまだ実機実績がないため、README上では`<coming soon>`として扱います。
+  TSIP TLS 1.3系は未実装/未検証のため、README上では空欄として扱います。
 
 ### 改善
 
@@ -43,10 +55,40 @@
   ロジアナ波形観測で見えたセルラー特有の待ち時間をもとに、MQTT受信待ち時間と
   OTAブロックサイズを調整し、実機CIで安定して再現できる保守的な設定に寄せました。
 
-### 予定
+- RX72N/RX65N共通のブートローダハンドオフ処理を整理し、ブートローダから
+  アプリケーションへジャンプする直前にPLL系クロックをリセット直後に近い状態へ
+  戻すことで、アプリ側BSPのクロック初期化を安定化しました。
 
-- 次のsafftiタグでは、202604ベース以降のBG96 OTA性能チューニング、RX72N TLS 1.3対応、
-  RX65N BG96 TLS 1.3対応、TSIP連携TLS backend、実機CI運用の改善をまとめる予定です。
+- CK-RX65N + BG96の初期化と受信経路を見直し、BG96のPWRKEY/RESET_N制御、
+  QIRD受信、OTA/Fleetをまたぐ実機CIの安定性を改善しました。
+
+- READMEの実機検証結果を、MCU環境、TLS backend、機能のマトリクスとして整理しました。
+  `✓` のセルは5回テストOKを確認した証跡へ直接リンクしています。
+
+### 修正
+
+- RX72N TSIPアプリで、TSIP transport実装をリンクしているにもかかわらず
+  非TSIP transportヘッダが先に選択され、`TlsTransportParams_t` のABIがずれる問題を
+  修正しました。この不一致により、TLS handshake成功後にMQTTの
+  `pNetworkContext` が壊れる可能性がありました。
+
+- OTAの欠落ブロック復旧後に次のブロック要求を再開できないケースを補正しました。
+
+- Fleet Provisioningで生成したEC秘密鍵をPKCS #11 PAL経由で保存する経路を整理し、
+  TSIP backendでもFleet Provisioningが動作するようにしました。
+
+- mbedTLS 3.6系のPKコールバックABIに合わせ、PKCS #11経由のRSA署名と
+  software fallbackの接続を修正しました。
+
+### 検証
+
+- RX72N/Ether software / TSIP、RX65N/BG96 software / TSIP の各環境で、
+  MQTT、OTA、Fleet Provisioningを実機CIで確認しました。
+
+- software TLS backendでは、RX72N/EtherとRX65N/BG96の両方で
+  TLS 1.3 MQTT、TLS 1.3 OTA、TLS 1.3 Fleet Provisioningを確認しました。
+
+- TSIP + TLS 1.3の6セルは意図的に未検証として残しています。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.0.0
 
