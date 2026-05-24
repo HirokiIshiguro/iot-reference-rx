@@ -10,6 +10,13 @@
 
 - TSIP backend と TLS 1.3 の組み合わせを、RX72N Envision Kit Ethernet と
   CK-RX65N + BG96 Cellular の両方で実機検証できるようにします。
+  まずは `tsip_tls13` 実験で TSIP ドライバの TLS 1.3 primitive API、
+  特に resumption、PSK、0-RTT 系の未使用 API を単体で確認します。
+  次に、現在の TSIP 連携ベースである Mbed TLS 3.2.1 系では
+  TLS 1.3 full handshake と MQTT/TLS 接続の安定動作を固めます。
+  その後、`iot-reference-rx` 本体で通常 TLS backend が参照している
+  Mbed TLS 3.6.4 以降へ TSIP 連携を移植し、TLS 1.3 session resumption と
+  0-RTT を LANBENCH や AWS IoT Core 接続で検証する計画です。
 
 - Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
   性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
