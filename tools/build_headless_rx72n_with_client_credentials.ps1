@@ -9,6 +9,7 @@ param(
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build_mqtt_candidate.log"),
     [int]$E2StudioTimeoutSeconds = 600,
     [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" }),
+    [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" }),
     [switch]$KeepRenderedHeaders
 )
 
@@ -114,7 +115,8 @@ try {
         -Workspace $Workspace `
         -LogFile $LogFile `
         -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
-        -TlsBackend $TlsBackend
+        -TlsBackend $TlsBackend `
+        -RequireTlsVersion $RequireTlsVersion
 }
 finally {
     if (-not $KeepRenderedHeaders) {
