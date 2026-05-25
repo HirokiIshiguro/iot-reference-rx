@@ -358,6 +358,31 @@ matrix_rx72n_ether_tsip_fleet:
     RX72N_TLS_BACKEND: "tsip"
     RX72N_TSIP_FLEET_ENABLE: "true"
 
+matrix_rx72n_ether_tsip_tls13_mqtt:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "mqtt"
+    RX72N_TLS_BACKEND: "tsip"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx72n_ether_tsip_tls13_ota:
+  extends: .nightly_matrix_rx72n_stabilizing
+  variables:
+    RX72N_TEST_SCOPE: "ota"
+    RX72N_TLS_BACKEND: "tsip"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx72n_ether_tsip_tls13_fleet:
+  extends: .nightly_matrix_rx72n_stabilizing
+  variables:
+    RX72N_TEST_SCOPE: "fleet"
+    RX72N_TLS_BACKEND: "tsip"
+    RX72N_TSIP_FLEET_ENABLE: "true"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
 matrix_rx65n_bg96_software_mqtt:
   extends: .nightly_matrix_rx65n_bg96
   variables:
@@ -422,6 +447,34 @@ matrix_rx65n_bg96_tsip_fleet:
     RX65N_BG96_TLS_BACKEND: "tsip"
     RX65N_BG96_TSIP_FLEET_ENABLE: "true"
 
+matrix_rx65n_bg96_tsip_tls13_mqtt:
+  extends: .nightly_matrix_rx65n_bg96
+  variables:
+    RX65N_BG96_TEST_SCOPE: "mqtt"
+    RX65N_BG96_TLS_BACKEND: "tsip"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx65n_bg96_tsip_tls13_ota:
+  extends: .nightly_matrix_rx65n_bg96_stabilizing
+  variables:
+    RX65N_BG96_TEST_SCOPE: "ota"
+    RX65N_BG96_TLS_BACKEND: "tsip"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx65n_bg96_tsip_tls13_fleet:
+  extends: .nightly_matrix_rx65n_bg96_stabilizing
+  variables:
+    RX65N_BG96_TEST_SCOPE: "fleet"
+    RX65N_BG96_TLS_BACKEND: "tsip"
+    RX65N_BG96_TSIP_FLEET_ENABLE: "true"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
 build_rx72n_ether:
   stage: build
   tags:
@@ -444,7 +497,8 @@ build_rx72n_ether:
         -Workspace "$env:E2STUDIO_WORKSPACE" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build.log" `
         -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS `
-        -TlsBackend "$env:RX72N_TLS_BACKEND"
+        -TlsBackend "$env:RX72N_TLS_BACKEND" `
+        -RequireTlsVersion "$env:RX72N_REQUIRE_TLS_VERSION"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - |
       $rx72nAppProject = if ($env:RX72N_TLS_BACKEND -eq "tsip") { "aws_ether_rx72n_envision_kit_tsip" } else { "aws_ether_rx72n_envision_kit" }
@@ -514,7 +568,8 @@ build_rx65n_bg96:
       -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96" `
       -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log" `
       -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS `
-      -TlsBackend "$env:RX65N_BG96_TLS_BACKEND"
+      -TlsBackend "$env:RX65N_BG96_TLS_BACKEND" `
+      -RequireTlsVersion "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx65n_bg96"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -581,7 +636,8 @@ build_rx65n_bg96_fleet:
       -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build_fleet.log" `
       -FleetDemoId "$demoId" `
       -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS `
-      -TlsBackend "$env:RX65N_BG96_TLS_BACKEND"
+      -TlsBackend "$env:RX65N_BG96_TLS_BACKEND" `
+      -RequireTlsVersion "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx65n_bg96_fleet"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -649,7 +705,8 @@ build_rx72n_ether_fleet:
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_fleet.log" `
         -FleetDemoId "$env:RX72N_DEVICE_ID-fp" `
         -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS `
-        -TlsBackend "$env:RX72N_TLS_BACKEND"
+        -TlsBackend "$env:RX72N_TLS_BACKEND" `
+        -RequireTlsVersion "$env:RX72N_REQUIRE_TLS_VERSION"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - |
       $rx72nAppProject = if ($env:RX72N_TLS_BACKEND -eq "tsip") { "aws_ether_rx72n_envision_kit_tsip" } else { "aws_ether_rx72n_envision_kit" }
@@ -2534,7 +2591,8 @@ build_rx72n_ether_mqtt_candidate:
         -Workspace "$env:E2STUDIO_WORKSPACE_MQTT" `
         -LogFile "$env:CI_PROJECT_DIR\rx72n_e2studio_build_mqtt_candidate.log" `
         -E2StudioTimeoutSeconds $env:RX72N_E2STUDIO_TIMEOUT_SECONDS `
-        -TlsBackend "$env:RX72N_TLS_BACKEND"
+        -TlsBackend "$env:RX72N_TLS_BACKEND" `
+        -RequireTlsVersion "$env:RX72N_REQUIRE_TLS_VERSION"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot")) { Write-Error "boot_loader .mot missing"; exit 1 }
     - |
       $rx72nAppProject = if ($env:RX72N_TLS_BACKEND -eq "tsip") { "aws_ether_rx72n_envision_kit_tsip" } else { "aws_ether_rx72n_envision_kit" }
@@ -2648,6 +2706,7 @@ build_rx72n_ether_ota:
         --e2studio-cli "$env:E2STUDIO_CLI" `
         --workspace "$env:E2STUDIO_WORKSPACE_OTA" `
         --tls-backend "$env:RX72N_TLS_BACKEND" `
+        --require-tls-version "$env:RX72N_REQUIRE_TLS_VERSION" `
         --code-sign-cert-out "$candidateCodeSignCert" `
         2>&1 | Tee-Object -FilePath "$artifactDir\build_ota_candidate.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

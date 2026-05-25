@@ -5,7 +5,8 @@ param(
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build_fleet.log"),
     [string]$FleetDemoId = "rx65n-bg96-fp",
     [int]$E2StudioTimeoutSeconds = 600,
-    [string]$TlsBackend = $(if ($env:RX65N_BG96_TLS_BACKEND) { $env:RX65N_BG96_TLS_BACKEND } else { "software" })
+    [string]$TlsBackend = $(if ($env:RX65N_BG96_TLS_BACKEND) { $env:RX65N_BG96_TLS_BACKEND } else { "software" }),
+    [string]$RequireTlsVersion = $(if ($env:RX65N_BG96_REQUIRE_TLS_VERSION) { $env:RX65N_BG96_REQUIRE_TLS_VERSION } else { "" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -95,6 +96,7 @@ if (-not (Test-Path $buildScript)) {
     -LogFile $LogFile `
     -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
     -TlsBackend $normalizedTlsBackend `
+    -RequireTlsVersion $RequireTlsVersion `
     -PrepareBuildFilesOnly
 
 foreach ($path in @($fleetSubdirMk, $linkerSubCommand, $linkerAppCommand)) {
@@ -132,7 +134,8 @@ try {
         -Workspace $Workspace `
         -LogFile $LogFile `
         -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
-        -TlsBackend $normalizedTlsBackend
+        -TlsBackend $normalizedTlsBackend `
+        -RequireTlsVersion $RequireTlsVersion
 }
 finally {
     [System.IO.File]::WriteAllText(

@@ -28,7 +28,7 @@ RX65N/BG96 TSIP Fleet 行だけキャンセルされたため、同一コミッ�
 | <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5952)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5954)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5957)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5960)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5962)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5965)</small> |
 | <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5966)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5967)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969)</small> |  |  |  |
 
-<small>`✓` は同一コミット上で5回テストOKを確認済みのセルです。表中のリンクは5回目確認時の子パイプライン、または補完確認パイプラインを示します。空欄は TSIP 対応 TLS 1.3 の未実装/未検証セルです。TSIP 対応 TLS 1.3 は別作業でまとめて対応予定です。昇格後に対象セル起因の失敗が 1 回でも出た場合は、該当セルを再度 stabilizing 扱いへ戻します。停電、配線作業、Runner 障害など対象セルの実装品質と無関係な外乱は連続成功/失敗判定から除外します。</small>
+<small>`✓` は同一コミット上で5回テストOKを確認済みのセルです。表中のリンクは5回目確認時の子パイプライン、または補完確認パイプラインを示します。空欄は5回成功の昇格条件をまだ満たしていないセルです。TSIP 対応 TLS 1.3 は `RX72N_REQUIRE_TLS_VERSION=TLSv1.3` / `RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3` と TSIP backend の組み合わせで段階的に検証します。昇格後に対象セル起因の失敗が 1 回でも出た場合は、該当セルを再度 stabilizing 扱いへ戻します。停電、配線作業、Runner 障害など対象セルの実装品質と無関係な外乱は連続成功/失敗判定から除外します。</small>
 
 ## About This Fork / このフォークについて
 

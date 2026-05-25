@@ -5,7 +5,8 @@ param(
     [string]$ProjectsPath = "Projects",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log"),
     [int]$E2StudioTimeoutSeconds = 600,
-    [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" })
+    [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" }),
+    [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,16 +21,18 @@ $workspace = $Workspace
 $projectsPath = $ProjectsPath -replace "/", "\"
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
 $normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
+$normalizedRequireTlsVersion = $RequireTlsVersion.ToLowerInvariant()
 switch ($normalizedTlsBackend) {
     "software" { $appProjectName = "aws_ether_rx72n_envision_kit" }
     "tsip" { $appProjectName = "aws_ether_rx72n_envision_kit_tsip" }
     default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
 }
+$useTsipTls13Config = ($normalizedTlsBackend -eq "tsip") -and ($normalizedRequireTlsVersion -in @("tlsv1.3", "tls1.3", "tls13"))
 $projectNames = @(
     "boot_loader_rx72n_envision_kit",
     $appProjectName
 )
-$rcpcSnapshots = @{}
+$metadataSnapshots = @{}
 
 if (-not (Test-Path (Join-Path $projectRoot "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h"))) {
     throw "Git submodules not initialized."
@@ -58,7 +61,12 @@ foreach ($projectName in $projectNames) {
         $rcpcPath = Get-ChildItem -Path $projectDir -Filter '*.rcpc' -File -ErrorAction SilentlyContinue | Select-Object -First 1
     }
     if ($rcpcPath) {
-        $rcpcSnapshots[$rcpcPath.FullName] = Get-Content $rcpcPath.FullName -Raw
+        $metadataSnapshots[$rcpcPath.FullName] = [System.IO.File]::ReadAllBytes($rcpcPath.FullName)
+    }
+
+    $cprojectPath = Join-Path $projectDir ".cproject"
+    if (Test-Path -LiteralPath $cprojectPath) {
+        $metadataSnapshots[$cprojectPath] = [System.IO.File]::ReadAllBytes($cprojectPath)
     }
 }
 
@@ -78,8 +86,35 @@ Write-Host "=== RX72N import + build all ==="
 Write-Host "Workspace: $workspace"
 Write-Host "Log file:  $logFile"
 Write-Host "TLS backend: $normalizedTlsBackend"
+Write-Host "Require TLS version: $(if ($RequireTlsVersion) { $RequireTlsVersion } else { '<none>' })"
+Write-Host "TSIP TLS 1.3 config: $useTsipTls13Config"
 foreach ($projectName in $projectNames) {
     Write-Host "Import:    $(Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx")"
+}
+
+function Use-MbedTlsConfigFile {
+    param(
+        [string]$ProjectDir,
+        [string]$ConfigFile
+    )
+
+    $cproject = Join-Path $ProjectDir ".cproject"
+    if (-not (Test-Path -LiteralPath $cproject)) {
+        throw ".cproject not found: $cproject"
+    }
+
+    $from = 'MBEDTLS_CONFIG_FILE=&lt;&quot;aws_mbedtls_config_with_tsip.h&quot;&gt;'
+    $to = "MBEDTLS_CONFIG_FILE=&lt;&quot;$ConfigFile&quot;&gt;"
+    $content = [System.IO.File]::ReadAllText($cproject)
+    if (-not $content.Contains($from)) {
+        throw "TSIP mbed TLS config macro not found in $cproject"
+    }
+    [System.IO.File]::WriteAllText(
+        $cproject,
+        $content.Replace($from, $to),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    Write-Host "Selected mbed TLS config for ${ProjectDir}: $ConfigFile"
 }
 
 function Find-Artifacts {
@@ -161,6 +196,12 @@ function Invoke-E2StudioCli {
 
 try {
     Remove-Item -Force -LiteralPath $logFile -ErrorAction SilentlyContinue
+    if ($useTsipTls13Config) {
+        Use-MbedTlsConfigFile `
+            -ProjectDir (Join-Path $projectRoot "$projectsPath\$appProjectName\e2studio_ccrx") `
+            -ConfigFile "aws_mbedtls_config_with_tsip13.h"
+    }
+
     $e2exit = Invoke-E2StudioCli (@() + $e2base + $imports + @("-build", "all"))
 
     Write-Host "e2studio exit code: $e2exit"
@@ -207,7 +248,7 @@ try {
     Write-Host "RX72N headless build succeeded."
 }
 finally {
-    foreach ($rcpcPath in $rcpcSnapshots.Keys) {
-        [System.IO.File]::WriteAllText($rcpcPath, $rcpcSnapshots[$rcpcPath], [System.Text.UTF8Encoding]::new($false))
+    foreach ($metadataPath in $metadataSnapshots.Keys) {
+        [System.IO.File]::WriteAllBytes($metadataPath, $metadataSnapshots[$metadataPath])
     }
 }

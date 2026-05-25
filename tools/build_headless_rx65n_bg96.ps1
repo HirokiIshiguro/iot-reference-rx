@@ -7,6 +7,7 @@ param(
     [string]$Make = $env:RX65N_BG96_MAKE,
     [string]$CcrxBin = $env:BIN_RX,
     [string]$TlsBackend = $(if ($env:RX65N_BG96_TLS_BACKEND) { $env:RX65N_BG96_TLS_BACKEND } else { "software" }),
+    [string]$RequireTlsVersion = $(if ($env:RX65N_BG96_REQUIRE_TLS_VERSION) { $env:RX65N_BG96_REQUIRE_TLS_VERSION } else { "" }),
     [switch]$PrepareBuildFilesOnly
 )
 
@@ -17,11 +18,13 @@ $projectRoot = (Resolve-Path $ProjectRoot).Path
 $workspace = $Workspace
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
 $normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
+$normalizedRequireTlsVersion = $RequireTlsVersion.ToLowerInvariant()
 switch ($normalizedTlsBackend) {
     "software" { $appProjectName = "aws_bg96_ck_rx65n" }
     "tsip" { $appProjectName = "aws_bg96_ck_rx65n_tsip" }
     default { throw "Unsupported RX65N BG96 TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
 }
+$useTsipTls13Config = ($normalizedTlsBackend -eq "tsip") -and ($normalizedRequireTlsVersion -in @("tlsv1.3", "tls1.3", "tls13"))
 $bootProject = Join-Path $projectRoot "Projects\boot_loader_ck_rx65n\e2studio_ccrx"
 $appProject = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx"
 $patchBackup = Join-Path $projectRoot "artifacts\rx65n_bg96_aws_dev_mode_key_provisioning.c.orig"
@@ -60,6 +63,31 @@ function Restore-ProjectMetadata {
     foreach ($path in $Snapshots.Keys) {
         [System.IO.File]::WriteAllBytes($path, $Snapshots[$path])
     }
+}
+
+function Use-MbedTlsConfigFile {
+    param(
+        [string]$ProjectDir,
+        [string]$ConfigFile
+    )
+
+    $cproject = Join-Path $ProjectDir ".cproject"
+    if (-not (Test-Path -LiteralPath $cproject)) {
+        throw ".cproject not found: $cproject"
+    }
+
+    $from = 'MBEDTLS_CONFIG_FILE=&lt;&quot;aws_mbedtls_config_with_tsip.h&quot;&gt;'
+    $to = "MBEDTLS_CONFIG_FILE=&lt;&quot;$ConfigFile&quot;&gt;"
+    $content = [System.IO.File]::ReadAllText($cproject)
+    if (-not $content.Contains($from)) {
+        throw "TSIP mbed TLS config macro not found in $cproject"
+    }
+    [System.IO.File]::WriteAllText(
+        $cproject,
+        $content.Replace($from, $to),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    Write-Host "Selected mbed TLS config for ${ProjectDir}: $ConfigFile"
 }
 
 function Convert-ToArgumentString {
@@ -279,6 +307,48 @@ function Get-MissingManagedBuildFiles {
     return ,$missing
 }
 
+function Clear-GeneratedBuildFiles {
+    foreach ($projectDir in @($bootProject, $appProject)) {
+        $hardwareDebug = Join-Path $projectDir "HardwareDebug"
+        if (Test-Path -LiteralPath $hardwareDebug) {
+            Remove-Item -Recurse -Force -LiteralPath $hardwareDebug
+            Write-Host "Cleared generated build files: $hardwareDebug"
+        }
+    }
+}
+
+function Reset-ManagedBuildFilesOnTsipConfigDrift {
+    if ($normalizedTlsBackend -ne "tsip") {
+        return
+    }
+
+    $expectedConfig = if ($useTsipTls13Config) {
+        "aws_mbedtls_config_with_tsip13.h"
+    } else {
+        "aws_mbedtls_config_with_tsip.h"
+    }
+    $hardwareDebug = Join-Path $appProject "HardwareDebug"
+    if (-not (Test-Path -LiteralPath $hardwareDebug)) {
+        return
+    }
+
+    $commandFiles = Get-ChildItem -Path $hardwareDebug -Recurse -Include "cSubCommand.tmp", "cDepSubCommand.tmp" -File -ErrorAction SilentlyContinue
+    if (-not $commandFiles) {
+        return
+    }
+
+    $configMatches = Select-String -Path $commandFiles.FullName -Pattern 'MBEDTLS_CONFIG_FILE=<"aws_mbedtls_config_with_tsip(13)?\.h">' -ErrorAction SilentlyContinue
+    if (-not $configMatches) {
+        return
+    }
+
+    $unexpected = $configMatches | Where-Object { $_.Line -notmatch [regex]::Escape($expectedConfig) } | Select-Object -First 1
+    if ($unexpected) {
+        Write-Host "Generated build files use a different TSIP mbed TLS config; regenerating. Expected: $expectedConfig"
+        Clear-GeneratedBuildFiles
+    }
+}
+
 function Invoke-E2StudioManagedBuild {
     $headless = Resolve-E2StudioHeadless
     if ($workspace -and (Test-Path -LiteralPath $workspace)) {
@@ -336,6 +406,8 @@ Add-PathEntry $busyBoxBin
 Write-Host "Using GNU make: $makeExe"
 Write-Host "Using CC-RX bin: $ccrxBinDir"
 Write-Host "TLS backend: $normalizedTlsBackend"
+Write-Host "Require TLS version: $(if ($RequireTlsVersion) { $RequireTlsVersion } else { '<none>' })"
+Write-Host "TSIP TLS 1.3 config: $useTsipTls13Config"
 if ($busyBoxBin) {
     Write-Host "Using e2 studio BusyBox tools: $busyBoxBin"
 }
@@ -347,6 +419,11 @@ $metadataSnapshots = Save-ProjectMetadata @($bootProject, $appProject)
 $patchApplied = $false
 
 try {
+    if ($useTsipTls13Config) {
+        Use-MbedTlsConfigFile -ProjectDir $appProject -ConfigFile "aws_mbedtls_config_with_tsip13.h"
+    }
+
+    Reset-ManagedBuildFilesOnTsipConfigDrift
     Ensure-ManagedBuildFiles
     if ($PrepareBuildFilesOnly) {
         Write-Host "CK-RX65N BG96 generated build files are ready."

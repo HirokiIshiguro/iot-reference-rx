@@ -816,8 +816,9 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     }
     else
     {
-        LogInfo( ( "(Network connection %p) TLS handshake successful.",
-                   pNetworkContext ) );
+        LogInfo( ( "(Network connection %p) TLS handshake successful: version %s",
+                   pNetworkContext,
+                   mbedtls_ssl_get_version( &( pTlsTransportParams->sslContext.context ) ) ) );
     }
 
     return returnStatus;

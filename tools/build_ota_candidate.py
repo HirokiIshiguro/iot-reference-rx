@@ -90,6 +90,11 @@ def main():
         default=None,
         help="TLS backend profile to build. Defaults to RX72N_TLS_BACKEND or software.",
     )
+    parser.add_argument(
+        "--require-tls-version",
+        default=None,
+        help="Optional TLS version requirement passed to build_headless_rx72n.ps1.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -137,6 +142,9 @@ def main():
         if args.workspace:
             build_cmd.extend(["-Workspace", args.workspace])
         build_cmd.extend(["-TlsBackend", tls_backend])
+        require_tls_version = args.require_tls_version or os.environ.get("RX72N_REQUIRE_TLS_VERSION")
+        if require_tls_version:
+            build_cmd.extend(["-RequireTlsVersion", require_tls_version])
         run(build_cmd, repo_root)
 
         run(
