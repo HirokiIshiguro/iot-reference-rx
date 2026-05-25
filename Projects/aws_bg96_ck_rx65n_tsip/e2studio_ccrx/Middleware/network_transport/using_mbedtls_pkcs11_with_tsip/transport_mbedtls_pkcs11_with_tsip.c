@@ -683,12 +683,16 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     {
         /* Initialize the mbed TLS secured connection context. */
 #if defined(TSIP_TLS_API_ENABLE)
+#if defined(TSIP_TLS13_CERTVERIFY_ONLY)
+        pTlsTransportParams->sslContext.context.disable_tsip_tls_accel = 1U;
+#else
         pTlsTransportParams->sslContext.context.disable_tsip_tls_accel =
             ( ( glTlsDisableTsipTlsAccelOverride != 0 )
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
               || ( xDisableTsipTlsAccelForConnection != pdFALSE )
 #endif
               ) ? 1U : 0U;
+#endif
 #endif
         mbedtlsError = mbedtls_ssl_setup( &( pTlsTransportParams->sslContext.context ),
                                           &( pTlsTransportParams->sslContext.config ) );
