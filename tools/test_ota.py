@@ -40,6 +40,7 @@ except ImportError:
 
 RL78_G1C_VID_PID = "045B:8111"
 VERSION_RE = re.compile(r"Application version (\d+)\.(\d+)\.(\d+)")
+TLS_VERSION_RE = re.compile(r"TLS handshake successful: version\s+(\S+)")
 LOG_PREFIX_RE = re.compile(r"^(?:\[[^\]]+\])?\[\+([0-9]+(?:\.[0-9]+)?)s\]\s?(.*)$")
 
 
@@ -301,8 +302,9 @@ def reset_device_via_command(reset_cmd):
 
 
 class OtaLogAnalyzer:
-    def __init__(self, expected_version=None):
+    def __init__(self, expected_version=None, require_tls_version=None):
         self.expected_version = expected_version
+        self.require_tls_version = require_tls_version
         self.marker_state = {
             marker.marker_id: {
                 "stage": marker.stage,
@@ -316,6 +318,8 @@ class OtaLogAnalyzer:
         self.error_state = {}
         self.versions_seen = []
         self.version_events = []
+        self.tls_versions_seen = []
+        self.tls_events = []
         self.total_lines = 0
         self.last_progress_stage = None
         self.last_observed_at = 0.0
@@ -349,6 +353,19 @@ class OtaLogAnalyzer:
                         self.versions_seen.append(version)
             if self.last_progress_stage is None or STAGE_ORDER[marker.stage] >= STAGE_ORDER.get(self.last_progress_stage, 0):
                 self.last_progress_stage = marker.stage
+
+        tls_match = TLS_VERSION_RE.search(stripped)
+        if tls_match:
+            tls_version = tls_match.group(1)
+            self.tls_events.append(
+                {
+                    "version": tls_version,
+                    "seen_at": round(elapsed, 3),
+                    "line": stripped,
+                }
+            )
+            if tls_version not in self.tls_versions_seen:
+                self.tls_versions_seen.append(tls_version)
 
         for pattern in ERROR_PATTERNS:
             if not re.search(pattern.pattern, stripped):
@@ -400,6 +417,13 @@ class OtaLogAnalyzer:
             return None
         return min(self.error_state.values(), key=lambda item: item["first_seen_at"])
 
+    def tls_requirement_ok(self):
+        if not self.require_tls_version:
+            return True
+        return bool(self.tls_versions_seen) and all(
+            version == self.require_tls_version for version in self.tls_versions_seen
+        )
+
     def is_success(self):
         required_markers = (
             "job_received",
@@ -417,6 +441,9 @@ class OtaLogAnalyzer:
             if self.expected_version not in self.versions_seen:
                 return False
         elif len(self.versions_seen) < 2:
+            return False
+
+        if not self.tls_requirement_ok():
             return False
 
         return self.observed_reboot_into_new_image()
@@ -440,6 +467,8 @@ class OtaLogAnalyzer:
             return "expected_version_not_observed"
         if not self.expected_version and len(self.versions_seen) < 2:
             return "new_version_not_observed"
+        if not self.tls_requirement_ok():
+            return "required_tls_version_not_observed"
         return "timeout_after_unknown_stage"
 
     def build_summary(self, total_bytes, elapsed, success):
@@ -465,6 +494,10 @@ class OtaLogAnalyzer:
             "expected_version": self.expected_version,
             "versions_seen": self.versions_seen,
             "version_events": self.version_events,
+            "require_tls_version": self.require_tls_version,
+            "tls_versions_seen": self.tls_versions_seen,
+            "tls_version_ok": self.tls_requirement_ok(),
+            "tls_events": self.tls_events,
             "total_lines": self.total_lines,
             "total_bytes": total_bytes,
             "duration_seconds": duration_seconds,
@@ -505,8 +538,8 @@ def parse_logged_line(line):
     return float(match.group(1)), match.group(2)
 
 
-def analyze_log_file(path, expected_version=None):
-    analyzer = OtaLogAnalyzer(expected_version=expected_version)
+def analyze_log_file(path, expected_version=None, require_tls_version=None):
+    analyzer = OtaLogAnalyzer(expected_version=expected_version, require_tls_version=require_tls_version)
     total_bytes = 0
     elapsed = 0.0
     with open(path, "r", encoding="utf-8", errors="replace") as handle:
@@ -523,8 +556,8 @@ def analyze_log_file(path, expected_version=None):
 
 
 def monitor_uart(port, baud, timeout, expected_version=None, reset_cmd=None,
-                 skip_reset=False, reset_after_open=False, raw_log_path=None):
-    analyzer = OtaLogAnalyzer(expected_version=expected_version)
+                 skip_reset=False, reset_after_open=False, raw_log_path=None, require_tls_version=None):
+    analyzer = OtaLogAnalyzer(expected_version=expected_version, require_tls_version=require_tls_version)
     total_bytes = 0
     raw_log_file = ensure_parent(raw_log_path)
 
@@ -655,6 +688,10 @@ def print_summary(summary):
     print(f"Classification: {summary['classification']}")
     print(f"Last stage:     {summary['last_progress_stage']}")
     print(f"Versions seen:  {', '.join(summary['versions_seen']) or '(none)'}")
+    print(f"TLS versions:   {', '.join(summary['tls_versions_seen']) or '(none)'}")
+    if summary["require_tls_version"]:
+        status = "PASS" if summary["tls_version_ok"] else "FAIL"
+        print(f"TLS required:   {summary['require_tls_version']} ({status})")
     print(f"Total bytes:    {summary['total_bytes']}")
     print(f"Duration:       {summary['duration_seconds']}s")
     if summary["required_markers_missing"]:
@@ -699,6 +736,7 @@ def main():
         default=None,
         help="Expected post-OTA version (e.g. 0.9.3). If omitted, two distinct versions are required.",
     )
+    parser.add_argument("--require-tls-version", default=None, help="Require all observed TLS handshakes to use this version")
     parser.add_argument("--raw-log", default=None, help="Write timestamped UART log to this path")
     parser.add_argument("--summary-json", default=None, help="Write JSON summary to this path")
     args = parser.parse_args()
@@ -738,6 +776,7 @@ def main():
             print("\nWARNING: No Renesas RL78/G1C ports detected!")
 
     print(f"Expected ver:{args.expected_version or '(auto detect)'}")
+    print(f"Required TLS:{args.require_tls_version or '(not enforced)'}")
     print(f"Raw log:     {args.raw_log or '(disabled)'}")
     print(f"Summary:     {args.summary_json or '(disabled)'}")
     print("=" * 60)
@@ -747,7 +786,11 @@ def main():
         return 1
 
     if args.input_log:
-        _, summary = analyze_log_file(args.input_log, expected_version=args.expected_version)
+        _, summary = analyze_log_file(
+            args.input_log,
+            expected_version=args.expected_version,
+            require_tls_version=args.require_tls_version,
+        )
     else:
         summary = monitor_uart(
             port=args.port,
@@ -758,6 +801,7 @@ def main():
             skip_reset=args.no_reset,
             reset_after_open=args.reset_after_open,
             raw_log_path=args.raw_log,
+            require_tls_version=args.require_tls_version,
         )
 
     write_summary(args.summary_json, summary)
