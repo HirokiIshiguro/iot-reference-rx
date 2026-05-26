@@ -8,6 +8,21 @@
 
 ### 予定
 
+- Mbed TLS 3.6.4 以降へ TSIP 連携を移植し、TLS 1.3 session resumption と
+  0-RTT を LANBENCH や AWS IoT Core 接続で検証する計画です。
+  現時点の `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
+  TSIP backend と組み合わせて実機CIで確認済みですが、resumption と 0-RTT は
+  まだリリース対象外です。
+
+- Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
+  性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
+
+- RX72N 経由でセカンダリ MCU を更新する OTA リファレンスを追加する予定です。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.2.0
+
+### 追加
+
 - TSIP backend と TLS 1.3 の組み合わせで、RX72N Envision Kit Ethernet と
   CK-RX65N + BG96 Cellular の MQTT 接続、OTA、Fleet Provisioning を実機CIで検証できるようにしました。
   `tsip_tls13` / `tsip_mbedtls13` 実験で確認した結果をもとに、
@@ -19,14 +34,43 @@
   TLSv1.3 が観測されることをCIで要求するようにしました。
   この段階では TLS 1.3 の CertificateVerify に TSIP ドライバ API を使い、
   鍵スケジュール、record path、resumption、0-RTT は software path として扱います。
-  次に、`iot-reference-rx` 本体で通常 TLS backend が参照している
-  Mbed TLS 3.6.4 以降へ TSIP 連携を移植し、TLS 1.3 session resumption と
-  0-RTT を LANBENCH や AWS IoT Core 接続で検証する計画です。
 
-- Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
-  性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
+### 改善
 
-- RX72N 経由でセカンダリ MCU を更新する OTA リファレンスを追加する予定です。
+- TSIP backend 用 Mbed TLS submodule を
+  `v3.2.1-renesas-tsip-custom-0.1.5` 相当へ進めました。
+  TSIPで安全に扱うべきデバイス秘密鍵はTSIP経路を維持しつつ、Fleet Provisioningで生成される
+  一時的なプロビジョニング鍵など、TSIP key indexではない鍵はsoftware DRBG / PKCS #11 fallbackで
+  扱えるようにしています。
+
+- READMEの最新テスト結果マトリクスを更新し、RX72N/Ether software、RX72N/Ether TSIP、
+  RX65N/BG96 software、RX65N/BG96 TSIP の4環境について、MQTT、OTA、Fleet Provisioning、
+  TLS 1.3 MQTT、TLS 1.3 OTA、TLS 1.3 Fleet Provisioning までの24セルすべてを
+  `✓` に昇格しました。TLS 1.3 session resumption と 0-RTT は次段階の検証列として
+  READMEに先行追加しています。
+
+### 検証
+
+- TSIP backend + TLS 1.3 MQTT は、main merge commit `7ed373c9` 上の
+  [focused pipeline #6045](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6045) から
+  [#6049](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049) まで
+  5回連続成功しています。
+
+- TSIP backend + TLS 1.3 OTA は、commit `2e687700` 上の
+  [focused pipeline #6059](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6059) から
+  [#6063](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6063) まで
+  5回連続成功しています。
+
+- TSIP backend + TLS 1.3 Fleet Provisioning は、commit `d91f2271` 上の
+  [focused pipeline #6072](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6072) から
+  [#6076](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6076) まで
+  5回連続成功しています。
+
+### 注記
+
+- このリリースでは、TSIP backend と TLS 1.3 の full handshake を使う実機経路を
+  RX72N/Ether と RX65N/BG96 の両方で揃えました。
+  TLS 1.3 session resumption と 0-RTT は次段階の検証対象です。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.1.0
 
