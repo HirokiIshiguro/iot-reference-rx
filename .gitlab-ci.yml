@@ -135,6 +135,7 @@ variables:
   RX72N_SKIP_OTA_TESTS: "false"
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_REQUIRE_TLS_VERSION: ""
+  RX72N_TLS13_RESUMPTION_TEST: "false"
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
   RX72N_LINUX_RFP_CLI: "./tools/rfp_cli_locked.sh"
   # The restore pipeline is pinned to the RX72N set2 runner on RPi#2.
@@ -321,6 +322,15 @@ matrix_rx72n_ether_software_tls13_mqtt:
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "software"
     RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+
+matrix_rx72n_ether_software_tls13_resumption_mqtt:
+  extends: .nightly_matrix_rx72n
+  variables:
+    RX72N_TEST_SCOPE: "mqtt"
+    RX72N_TLS_BACKEND: "software"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX72N_TLS13_RESUMPTION_TEST: "true"
     AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
 
 matrix_rx72n_ether_software_tls13_ota:
@@ -2063,6 +2073,10 @@ test_rx72n_ether_mqtt:
       if [ -n "${RX72N_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args+=(--require-tls-version "$RX72N_REQUIRE_TLS_VERSION")
       fi
+      resumption_args=()
+      if [ "${RX72N_TLS13_RESUMPTION_TEST:-false}" = "true" ]; then
+        resumption_args+=(--require-tls13-resumption)
+      fi
 
       repeat_count="${RX72N_MQTT_TEST_REPEAT_COUNT:-1}"
       if ! [[ "$repeat_count" =~ ^[0-9]+$ ]] || [ "$repeat_count" -lt 1 ]; then
@@ -2087,6 +2101,7 @@ test_rx72n_ether_mqtt:
           --timeout "$RX72N_MQTT_TEST_TIMEOUT" \
           --reset-cmd "$reset_cmd" \
           "${tls_version_args[@]}" \
+          "${resumption_args[@]}" \
           2>&1 | tee -a "$log_path"
         status=${PIPESTATUS[0]}
         set -e

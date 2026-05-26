@@ -88,6 +88,18 @@
 
 /*-----------------------------------------------------------*/
 
+#ifndef TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION
+#define TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION    ( 0 )
+#endif
+
+#if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+    #if !defined( MBEDTLS_SSL_PROTO_TLS1_3 ) || !defined( MBEDTLS_SSL_SESSION_TICKETS ) || !defined( MBEDTLS_SSL_CLI_C )
+        #error "TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION requires MBEDTLS_SSL_PROTO_TLS1_3, MBEDTLS_SSL_SESSION_TICKETS, and MBEDTLS_SSL_CLI_C."
+    #endif
+#endif
+
+/*-----------------------------------------------------------*/
+
 /**
  * @brief Each compilation unit that consumes the NetworkContext must define it.
  * It should contain a single pointer as seen below whenever the header file
@@ -114,6 +126,12 @@ static const char * pNoHighLevelMbedTlsCodeStr = "<No-High-Level-Code>";
  * does not contain a low-level code.
  */
 static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
+
+#if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+    static mbedtls_ssl_session xTls13SavedSession;
+    static BaseType_t xTls13SavedSessionInitialized = pdFALSE;
+    static BaseType_t xTls13SavedSessionValid = pdFALSE;
+#endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
 
 /**
  * @brief Utility for converting the high-level code in an mbedTLS error to string,
@@ -160,6 +178,13 @@ static void sslContextFree( SSLContext_t * pSslContext );
 static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                       const char * pHostName,
                                       const NetworkCredentials_t * pNetworkCredentials );
+
+#if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+    static void prvTls13ResumptionInitialize( void );
+    static BaseType_t prvTls13ResumptionApplySavedSession( SSLContext_t * pSslContext );
+    static void prvTls13ResumptionStoreSession( SSLContext_t * pSslContext,
+                                                const char * pSource );
+#endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
 
 /*-----------------------------------------------------------*/
 
@@ -290,6 +315,92 @@ static void sslContextFree( SSLContext_t * pSslContext )
     pSslContext->pxP11FunctionList->C_CloseSession( pSslContext->xP11Session );
 }
 
+#if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+static void prvTls13ResumptionInitialize( void )
+{
+    if( xTls13SavedSessionInitialized == pdFALSE )
+    {
+        mbedtls_ssl_session_init( &xTls13SavedSession );
+        xTls13SavedSessionInitialized = pdTRUE;
+    }
+}
+
+static BaseType_t prvTls13ResumptionApplySavedSession( SSLContext_t * pSslContext )
+{
+    BaseType_t xResumptionRequested = pdFALSE;
+    int32_t mbedtlsError = 0;
+
+    configASSERT( pSslContext != NULL );
+
+    prvTls13ResumptionInitialize();
+
+    if( ( xTls13SavedSessionValid == pdTRUE ) &&
+        ( xTls13SavedSession.MBEDTLS_PRIVATE( tls_version ) == MBEDTLS_SSL_VERSION_TLS1_3 ) &&
+        ( xTls13SavedSession.MBEDTLS_PRIVATE( ticket ) != NULL ) &&
+        ( xTls13SavedSession.MBEDTLS_PRIVATE( ticket_len ) > 0U ) )
+    {
+        mbedtlsError = mbedtls_ssl_set_session( &( pSslContext->context ),
+                                                &xTls13SavedSession );
+
+        if( mbedtlsError == 0 )
+        {
+            xResumptionRequested = pdTRUE;
+            LogInfo( ( "TLS 1.3 resumption requested with stored session ticket: ticketLen=%lu ciphersuite=0x%04x.",
+                       ( unsigned long ) xTls13SavedSession.MBEDTLS_PRIVATE( ticket_len ),
+                       ( unsigned int ) xTls13SavedSession.MBEDTLS_PRIVATE( ciphersuite ) ) );
+        }
+        else
+        {
+            LogWarn( ( "TLS 1.3 resumption set_session failed: mbedTLSError= %s : %s.",
+                       mbedtlsHighLevelCodeOrDefault( mbedtlsError ),
+                       mbedtlsLowLevelCodeOrDefault( mbedtlsError ) ) );
+        }
+    }
+    else
+    {
+        LogInfo( ( "TLS 1.3 resumption requested: no stored session ticket." ) );
+    }
+
+    return xResumptionRequested;
+}
+
+static void prvTls13ResumptionStoreSession( SSLContext_t * pSslContext,
+                                            const char * pSource )
+{
+    int32_t mbedtlsError = 0;
+
+    configASSERT( pSslContext != NULL );
+
+    prvTls13ResumptionInitialize();
+
+    if( xTls13SavedSessionValid == pdTRUE )
+    {
+        mbedtls_ssl_session_free( &xTls13SavedSession );
+        mbedtls_ssl_session_init( &xTls13SavedSession );
+        xTls13SavedSessionValid = pdFALSE;
+    }
+
+    mbedtlsError = mbedtls_ssl_get_session( &( pSslContext->context ),
+                                            &xTls13SavedSession );
+
+    if( mbedtlsError == 0 )
+    {
+        xTls13SavedSessionValid = pdTRUE;
+        LogInfo( ( "TLS 1.3 resumption ticket stored from %s: ticketLen=%lu ciphersuite=0x%04x.",
+                   pSource,
+                   ( unsigned long ) xTls13SavedSession.MBEDTLS_PRIVATE( ticket_len ),
+                   ( unsigned int ) xTls13SavedSession.MBEDTLS_PRIVATE( ciphersuite ) ) );
+    }
+    else
+    {
+        LogWarn( ( "TLS 1.3 resumption ticket store failed from %s: mbedTLSError= %s : %s.",
+                   pSource,
+                   mbedtlsHighLevelCodeOrDefault( mbedtlsError ),
+                   mbedtlsLowLevelCodeOrDefault( mbedtlsError ) ) );
+    }
+}
+#endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
+
 static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                       const char * pHostName,
                                       const NetworkCredentials_t * pNetworkCredentials )
@@ -363,6 +474,16 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                               &pTlsTransportParams->sslContext );
         mbedtls_ssl_conf_cert_profile( &( pTlsTransportParams->sslContext.config ),
                                        &( pTlsTransportParams->sslContext.certProfile ) );
+
+        #if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+            #if defined( MBEDTLS_SSL_SESSION_TICKETS ) && defined( MBEDTLS_SSL_PROTO_TLS1_3 )
+                mbedtls_ssl_conf_session_tickets( &( pTlsTransportParams->sslContext.config ),
+                                                  MBEDTLS_SSL_SESSION_TICKETS_ENABLED );
+                mbedtls_ssl_conf_tls13_enable_signal_new_session_tickets(
+                    &( pTlsTransportParams->sslContext.config ),
+                    MBEDTLS_SSL_TLS1_3_SIGNAL_NEW_SESSION_TICKETS_ENABLED );
+            #endif /* MBEDTLS_SSL_SESSION_TICKETS && MBEDTLS_SSL_PROTO_TLS1_3 */
+        #endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
 
         /* Parse the server root CA certificate into the SSL context. */
         mbedtlsError = mbedtls_x509_crt_parse( &( pTlsTransportParams->sslContext.rootCa ),
@@ -492,6 +613,13 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         }
     }
 
+    #if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+        if( returnStatus == TLS_TRANSPORT_SUCCESS )
+        {
+            ( void ) prvTls13ResumptionApplySavedSession( &( pTlsTransportParams->sslContext ) );
+        }
+    #endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
+
     /* Set Maximum Fragment Length if enabled. */
     #ifdef MBEDTLS_SSL_MAX_FRAGMENT_LENGTH
         if( returnStatus == TLS_TRANSPORT_SUCCESS )
@@ -519,6 +647,14 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         do
         {
             mbedtlsError = mbedtls_ssl_handshake( &( pTlsTransportParams->sslContext.context ) );
+
+            #if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+                if( mbedtlsError == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET )
+                {
+                    prvTls13ResumptionStoreSession( &( pTlsTransportParams->sslContext ),
+                                                    "handshake" );
+                }
+            #endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
         } while( ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_READ ) ||
                  ( mbedtlsError == MBEDTLS_ERR_SSL_WANT_WRITE ) ||
                  ( mbedtlsError == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET ) );
@@ -913,6 +1049,11 @@ int32_t TLS_FreeRTOS_recv( NetworkContext_t * pNetworkContext,
         {
             if( tlsStatus == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET )
             {
+                #if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+                    prvTls13ResumptionStoreSession( &( pTlsTransportParams->sslContext ),
+                                                    "read" );
+                #endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
+
                 LogDebug( ( "Received a MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET return code from mbedtls_ssl_read." ) );
             }
 
@@ -978,6 +1119,11 @@ int32_t TLS_FreeRTOS_send( NetworkContext_t * pNetworkContext,
         {
             if( tlsStatus == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET )
             {
+                #if ( TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION == 1 )
+                    prvTls13ResumptionStoreSession( &( pTlsTransportParams->sslContext ),
+                                                    "write" );
+                #endif /* TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION */
+
                 LogDebug( ( "Received a MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET return code from mbedtls_ssl_write." ) );
             }
             LogDebug( ( "Failed to send data. However, send can be retried on this error. "
