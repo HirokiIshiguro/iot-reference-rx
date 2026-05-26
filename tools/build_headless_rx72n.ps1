@@ -6,8 +6,7 @@ param(
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log"),
     [int]$E2StudioTimeoutSeconds = 600,
     [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" }),
-    [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" }),
-    [string]$Tls13ResumptionTest = $(if ($env:RX72N_TLS13_RESUMPTION_TEST) { $env:RX72N_TLS13_RESUMPTION_TEST } else { "" })
+    [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,17 +22,12 @@ $projectsPath = $ProjectsPath -replace "/", "\"
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
 $normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
 $normalizedRequireTlsVersion = $RequireTlsVersion.ToLowerInvariant()
-$enableTls13ResumptionTest = $Tls13ResumptionTest.ToLowerInvariant() -in @("1", "true", "yes", "on")
 switch ($normalizedTlsBackend) {
     "software" { $appProjectName = "aws_ether_rx72n_envision_kit" }
     "tsip" { $appProjectName = "aws_ether_rx72n_envision_kit_tsip" }
     default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
 }
-$isTls13Required = $normalizedRequireTlsVersion -in @("tlsv1.3", "tls1.3", "tls13")
-$useTsipTls13Config = ($normalizedTlsBackend -eq "tsip") -and $isTls13Required
-if ($enableTls13ResumptionTest -and (($normalizedTlsBackend -ne "software") -or (-not $isTls13Required))) {
-    throw "RX72N TLS 1.3 resumption test currently requires software TLS backend and RX72N_REQUIRE_TLS_VERSION=TLSv1.3."
-}
+$useTsipTls13Config = ($normalizedTlsBackend -eq "tsip") -and ($normalizedRequireTlsVersion -in @("tlsv1.3", "tls1.3", "tls13"))
 $projectNames = @(
     "boot_loader_rx72n_envision_kit",
     $appProjectName
@@ -94,7 +88,6 @@ Write-Host "Log file:  $logFile"
 Write-Host "TLS backend: $normalizedTlsBackend"
 Write-Host "Require TLS version: $(if ($RequireTlsVersion) { $RequireTlsVersion } else { '<none>' })"
 Write-Host "TSIP TLS 1.3 config: $useTsipTls13Config"
-Write-Host "TLS 1.3 resumption test: $enableTls13ResumptionTest"
 foreach ($projectName in $projectNames) {
     Write-Host "Import:    $(Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx")"
 }
@@ -122,38 +115,6 @@ function Use-MbedTlsConfigFile {
         [System.Text.UTF8Encoding]::new($false)
     )
     Write-Host "Selected mbed TLS config for ${ProjectDir}: $ConfigFile"
-}
-
-function Add-CompilerDefine {
-    param(
-        [string]$ProjectDir,
-        [string]$Define
-    )
-
-    $cproject = Join-Path $ProjectDir ".cproject"
-    if (-not (Test-Path -LiteralPath $cproject)) {
-        throw ".cproject not found: $cproject"
-    }
-
-    $escapedDefine = [System.Security.SecurityElement]::Escape($Define)
-    $content = [System.IO.File]::ReadAllText($cproject)
-    if ($content.Contains("value=`"$escapedDefine`"")) {
-        Write-Host "Compiler define already present in ${ProjectDir}: $Define"
-        return
-    }
-
-    $regexOptions = [System.Text.RegularExpressions.RegexOptions]::Singleline
-    $pattern = '(<option\b[^>]*superClass="com\.renesas\.cdt\.managedbuild\.renesas\.ccrx\.compiler\.option\.define"[^>]*>)(.*?)(\r?\n\s*</option>)'
-    $match = [System.Text.RegularExpressions.Regex]::Match($content, $pattern, $regexOptions)
-    if (-not $match.Success) {
-        throw "Compiler define option not found in $cproject"
-    }
-
-    $lineEnding = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
-    $insert = "$lineEnding`t`t`t`t`t`t`t`t`t<listOptionValue builtIn=`"false`" value=`"$escapedDefine`"/>"
-    $updated = $content.Substring(0, $match.Groups[3].Index) + $insert + $content.Substring($match.Groups[3].Index)
-    [System.IO.File]::WriteAllText($cproject, $updated, [System.Text.UTF8Encoding]::new($false))
-    Write-Host "Added compiler define to ${ProjectDir}: $Define"
 }
 
 function Find-Artifacts {
@@ -239,13 +200,6 @@ try {
         Use-MbedTlsConfigFile `
             -ProjectDir (Join-Path $projectRoot "$projectsPath\$appProjectName\e2studio_ccrx") `
             -ConfigFile "aws_mbedtls_config_with_tsip13.h"
-    }
-
-    if ($enableTls13ResumptionTest) {
-        $appProjectDir = Join-Path $projectRoot "$projectsPath\$appProjectName\e2studio_ccrx"
-        Add-CompilerDefine -ProjectDir $appProjectDir -Define "MBEDTLS_SSL_SESSION_TICKETS"
-        Add-CompilerDefine -ProjectDir $appProjectDir -Define "TLS_TRANSPORT_ENABLE_TLS13_SESSION_RESUMPTION=1"
-        Add-CompilerDefine -ProjectDir $appProjectDir -Define "democonfigTLS13_RESUMPTION_TEST=1"
     }
 
     $e2exit = Invoke-E2StudioCli (@() + $e2base + $imports + @("-build", "all"))

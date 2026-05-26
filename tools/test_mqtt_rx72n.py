@@ -65,18 +65,6 @@ INFO_MARKERS = [
     "A clean MQTT connection is established.",
 ]
 
-TLS13_RESUMPTION_NO_TICKET_MARKER = "TLS 1.3 resumption requested: no stored session ticket."
-TLS13_RESUMPTION_REQUEST_MARKER = "TLS 1.3 resumption requested with stored session ticket"
-TLS13_RESUMPTION_TICKET_MARKER = "TLS 1.3 resumption ticket stored"
-TLS13_RESUMPTION_RECONNECT_MARKER = "TLS 1.3 resumption test: reconnecting MQTT broker"
-
-PKCS11_SIGN_MARKERS = [
-    "P11:ECDSA:SignInit>",
-    "P11:ECDSA:Sign>",
-    "P11:RSA:SWSignSHA256>",
-    "PKCS11 sign trace:",
-]
-
 BOOT_MARKERS = [
     "BootLoader",
     "execute image",
@@ -162,20 +150,11 @@ def reset_device_via_command(reset_cmd):
     return True
 
 
-def monitor_uart(port, baud, timeout, reset_cmd=None, app_startup_timeout=45.0, require_tls13_resumption=False):
+def monitor_uart(port, baud, timeout, reset_cmd=None, app_startup_timeout=45.0):
     results = {marker["name"]: False for marker in MARKERS}
     infos = []
     errors = []
     tls_versions = []
-    resumption = {
-        "initial_no_ticket": False,
-        "ticket_stored": False,
-        "reconnect_requested": False,
-        "resumption_requested": False,
-        "second_handshake_seen": False,
-        "sign_after_request": 0,
-        "accepted_without_client_sign": False,
-    }
     total_bytes = 0
     total_lines = 0
     boot_lines = []
@@ -185,7 +164,7 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, app_startup_timeout=45.0, 
 
     ser = open_serial_port(port, baud)
     if ser is None:
-        return results, infos, errors, [], resumption, total_bytes, total_lines, boot_lines, app_output_seen
+        return results, infos, errors, [], total_bytes, total_lines, boot_lines, app_output_seen
 
     try:
         ser.reset_input_buffer()
@@ -234,52 +213,18 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, app_startup_timeout=45.0, 
                             infos.append(line)
                             print(f"[INFO] {line}")
 
-                    if TLS13_RESUMPTION_NO_TICKET_MARKER in line:
-                        resumption["initial_no_ticket"] = True
-                        print("[INFO] TLS 1.3 resumption: first full handshake has no stored ticket yet")
-
-                    if TLS13_RESUMPTION_TICKET_MARKER in line:
-                        resumption["ticket_stored"] = True
-                        print(f"[INFO] TLS 1.3 resumption ticket: {line}")
-
-                    if TLS13_RESUMPTION_RECONNECT_MARKER in line:
-                        resumption["reconnect_requested"] = True
-                        print("[INFO] TLS 1.3 resumption reconnect requested")
-
-                    if TLS13_RESUMPTION_REQUEST_MARKER in line:
-                        resumption["resumption_requested"] = True
-                        resumption["sign_after_request"] = 0
-                        resumption["second_handshake_seen"] = False
-                        print(f"[INFO] TLS 1.3 resumption requested: {line}")
-
-                    if resumption["resumption_requested"] and any(
-                        sign_marker in line for sign_marker in PKCS11_SIGN_MARKERS
-                    ):
-                        resumption["sign_after_request"] += 1
-
                     tls_match = re.search(r"TLS handshake successful: version\s+(\S+)", line)
                     if tls_match:
                         tls_version = tls_match.group(1)
                         tls_versions.append(tls_version)
                         print(f"[INFO] TLS version: {tls_version}")
 
-                        if resumption["resumption_requested"] and not resumption["second_handshake_seen"]:
-                            resumption["second_handshake_seen"] = True
-                            if "TLSv1.3" in tls_version and resumption["sign_after_request"] == 0:
-                                resumption["accepted_without_client_sign"] = True
-                                print(
-                                    "[MILESTONE] TLS 1.3 resumption accepted "
-                                    "without a second client certificate signature"
-                                )
-
                     for error_pattern in ERROR_PATTERNS:
                         if error_pattern in line:
                             errors.append(line)
                             print(f"[ERROR] {line}")
 
-                if all(results.values()) and (
-                    not require_tls13_resumption or resumption["accepted_without_client_sign"]
-                ):
+                if all(results.values()):
                     break
             else:
                 time.sleep(0.05)
@@ -307,7 +252,7 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, app_startup_timeout=45.0, 
         ser.close()
         print(f"Closed {port}")
 
-    return results, infos, errors, tls_versions, resumption, total_bytes, total_lines, boot_lines, app_output_seen
+    return results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines, app_output_seen
 
 
 def main():
@@ -329,8 +274,6 @@ def main():
                         help="Skip reset and only monitor the current UART stream")
     parser.add_argument("--require-tls-version",
                         help="Require the logged TLS handshake version to contain this string")
-    parser.add_argument("--require-tls13-resumption", action="store_true",
-                        help="Require TLS 1.3 session ticket resumption on a second MQTT connection")
     args = parser.parse_args()
 
     if args.device_id:
@@ -354,13 +297,12 @@ def main():
     print(f"Reset Mode:  {'external reset command' if args.reset_cmd else 'monitor only'}")
     print("=" * 60)
 
-    results, infos, errors, tls_versions, resumption, total_bytes, total_lines, boot_lines, app_output_seen = monitor_uart(
+    results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines, app_output_seen = monitor_uart(
         args.log_port,
         args.log_baud,
         args.timeout,
         reset_cmd=None if args.no_reset else args.reset_cmd,
         app_startup_timeout=args.app_startup_timeout,
-        require_tls13_resumption=args.require_tls13_resumption,
     )
 
     print()
@@ -377,15 +319,6 @@ def main():
         print("TLS versions:")
         for tls_version in tls_versions[:5]:
             print(f"  - {tls_version}")
-    if args.require_tls13_resumption:
-        print("TLS 1.3 resumption:")
-        print(f"  - initial_no_ticket={resumption['initial_no_ticket']}")
-        print(f"  - ticket_stored={resumption['ticket_stored']}")
-        print(f"  - reconnect_requested={resumption['reconnect_requested']}")
-        print(f"  - resumption_requested={resumption['resumption_requested']}")
-        print(f"  - second_handshake_seen={resumption['second_handshake_seen']}")
-        print(f"  - sign_after_request={resumption['sign_after_request']}")
-        print(f"  - accepted_without_client_sign={resumption['accepted_without_client_sign']}")
     if errors:
         print("Errors:")
         for line in errors[:5]:
@@ -402,13 +335,7 @@ def main():
         status = "PASS" if tls_ok else "FAIL"
         print(f"[{status}] Required TLS version: {args.require_tls_version}")
 
-    resumption_ok = True
-    if args.require_tls13_resumption:
-        resumption_ok = resumption["accepted_without_client_sign"]
-        status = "PASS" if resumption_ok else "FAIL"
-        print(f"[{status}] TLS 1.3 session ticket resumption")
-
-    if all(results.values()) and tls_ok and resumption_ok:
+    if all(results.values()) and tls_ok:
         print("[PASS] phase8b MQTT baseline verified")
         return 0
 

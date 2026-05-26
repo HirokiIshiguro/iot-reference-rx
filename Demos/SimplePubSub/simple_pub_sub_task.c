@@ -54,10 +54,6 @@
 /* Demo Specific configs. */
 #include "demo_config.h"
 
-#ifndef democonfigTLS13_RESUMPTION_TEST
-#define democonfigTLS13_RESUMPTION_TEST    ( 0 )
-#endif
-
 /* MQTT library includes. */
 #include "core_mqtt.h"
 
@@ -74,20 +70,12 @@
 /**
  * @brief Delay for the synchronous publisher task between publishes.
  */
-#if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-    #define mqttexampleDELAY_BETWEEN_PUBLISH_OPERATIONS_MS    ( 250U )
-#else
-    #define mqttexampleDELAY_BETWEEN_PUBLISH_OPERATIONS_MS    ( 2000U )
-#endif
+#define mqttexampleDELAY_BETWEEN_PUBLISH_OPERATIONS_MS (2000U)
 
 /**
  * @brief Number of publishes done by each task in this demo.
  */
-#if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-    #define mqttexamplePUBLISH_COUNT    ( 1 )
-#else
-    #define mqttexamplePUBLISH_COUNT    ( 10 )
-#endif
+#define mqttexamplePUBLISH_COUNT (10)
 
 /**
  * @brief Number of unsubscribe retries in this demo.
@@ -166,11 +154,7 @@
  * to a topic, publishing messages to a topic and reporting the incoming messages on subscribed topic.
  * Number of subscribe publish demo tasks to be spawned is configurable.
  */
-#if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-    #define appmainMQTT_NUM_PUBSUB_TASKS    ( 1 )
-#else
-    #define appmainMQTT_NUM_PUBSUB_TASKS    ( 2 )
-#endif
+#define appmainMQTT_NUM_PUBSUB_TASKS (2)
 #define appmainMQTT_PUBSUB_TASK_STACK_SIZE (2048)
 #define appmainMQTT_PUBSUB_TASK_PRIORITY (tskIDLE_PRIORITY + 1)
 /*-----------------------------------------------------------*/
@@ -295,10 +279,6 @@ static MQTTStatus_t prvPublishToTopic (MQTTQoS_t xQoS,
  */
 static char *prvGetThingNameFromKeyStore (void);
 
-#if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-static void prvRequestTls13ResumptionReconnect( void );
-#endif
-
 /**
  * @brief The function that implements the task demonstrated by this file.
  *
@@ -327,36 +307,6 @@ BaseType_t xStartSimplePubSubTasks (uint32_t ulNumPubsubTasks,
  * context used by this demo.
  */
 extern MQTTAgentContext_t xGlobalMqttAgentContext;
-
-#if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-static BaseType_t xTls13ResumptionReconnectRequested = pdFALSE;
-#endif
-
-/*-----------------------------------------------------------*/
-
-#if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-static void prvRequestTls13ResumptionReconnect( void )
-{
-    MQTTStatus_t xCommandStatus = MQTTBadParameter;
-    MQTTAgentCommandInfo_t xCommandParams = { 0 };
-
-    if( xTls13ResumptionReconnectRequested == pdFALSE )
-    {
-        xTls13ResumptionReconnectRequested = pdTRUE;
-        xCommandParams.blockTimeMs = mqttexampleMAX_COMMAND_SEND_BLOCK_TIME_MS;
-
-        LogInfo( ( "TLS 1.3 resumption test: requesting MQTT agent reconnect." ) );
-        xCommandStatus = MQTTAgent_Terminate( &xGlobalMqttAgentContext,
-                                              &xCommandParams );
-
-        if( xCommandStatus != MQTTSuccess )
-        {
-            LogError( ( "TLS 1.3 resumption test: failed to request MQTT agent reconnect: %s.",
-                        MQTT_Status_strerror( xCommandStatus ) ) );
-        }
-    }
-}
-#endif /* democonfigTLS13_RESUMPTION_TEST */
 
 /*-----------------------------------------------------------*/
 
@@ -920,10 +870,6 @@ void vSimpleSubscribePublishTask(void *pvParameters)
     if (MQTTSuccess == xMQTTStatus)
     {
         LogInfo(("Unsubscribe successfully from task %d.", ulTaskNumber));
-
-        #if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-            prvRequestTls13ResumptionReconnect();
-        #endif
     }
     else
     {

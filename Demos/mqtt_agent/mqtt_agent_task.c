@@ -69,10 +69,6 @@
 #include "core_pkcs11_config.h"
 #include "core_pkcs11_config_defaults.h"
 
-#ifndef democonfigTLS13_RESUMPTION_TEST
-#define democonfigTLS13_RESUMPTION_TEST    ( 0 )
-#endif
-
 /* MQTT library includes. */
 #include "core_mqtt.h"
 
@@ -923,10 +919,6 @@ void prvMQTTAgentTask(void *pvParameters)
     size_t endpointLength;
     size_t rootCALength;
 
-    #if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-        uint32_t ulTls13ResumptionReconnectCount = 0U;
-    #endif
-
     (void)xWaitForMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED, portMAX_DELAY);
     LogInfo(("---------Start MQTT Agent Task---------\r\n"));
 
@@ -1012,15 +1004,6 @@ void prvMQTTAgentTask(void *pvParameters)
                 LogInfo(("MQTT Agent loop terminated due to a graceful disconnect."));
                 (void)MQTTAgent_CancelAll(&xGlobalMqttAgentContext);
                 (void)prvDisconnectTLS(&xNetworkContext);
-
-                #if ( democonfigTLS13_RESUMPTION_TEST == 1 )
-                    if( ulTls13ResumptionReconnectCount == 0U )
-                    {
-                        ulTls13ResumptionReconnectCount++;
-                        LogInfo( ( "TLS 1.3 resumption test: reconnecting MQTT broker after graceful disconnect." ) );
-                        pMqttContext->connectStatus = prvConnectToMQTTBroker( true );
-                    }
-                #endif
             }
             else
             {
