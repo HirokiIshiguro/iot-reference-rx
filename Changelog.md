@@ -9,16 +9,17 @@
 ### 予定
 
 - TSIP backend と TLS 1.3 の組み合わせで、RX72N Envision Kit Ethernet と
-  CK-RX65N + BG96 Cellular の MQTT 接続と OTA を実機CIで検証できるようにしました。
+  CK-RX65N + BG96 Cellular の MQTT 接続、OTA、Fleet Provisioning を実機CIで検証できるようにしました。
   `tsip_tls13` / `tsip_mbedtls13` 実験で確認した結果をもとに、
   現在の TSIP 連携ベースである Mbed TLS 3.2.1 系では
-  TLS 1.3 full handshake と MQTT/TLS 接続、OTA の安定動作を固めています。
+  TLS 1.3 full handshake と MQTT/TLS 接続、OTA、Fleet Provisioning の安定動作を固めています。
   OTAでは、更新前のダウンロード経路だけでなく、更新後アプリの再接続でも
+  TLSv1.3 が観測されることをCIで要求するようにしました。
+  Fleet Provisioning では、claim certificate 接続と provisioned certificate 接続の両方で
   TLSv1.3 が観測されることをCIで要求するようにしました。
   この段階では TLS 1.3 の CertificateVerify に TSIP ドライバ API を使い、
   鍵スケジュール、record path、resumption、0-RTT は software path として扱います。
-  次に TSIP backend + TLS 1.3 の Fleet Provisioning を段階的に検証し、
-  その後、`iot-reference-rx` 本体で通常 TLS backend が参照している
+  次に、`iot-reference-rx` 本体で通常 TLS backend が参照している
   Mbed TLS 3.6.4 以降へ TSIP 連携を移植し、TLS 1.3 session resumption と
   0-RTT を LANBENCH や AWS IoT Core 接続で検証する計画です。
 
