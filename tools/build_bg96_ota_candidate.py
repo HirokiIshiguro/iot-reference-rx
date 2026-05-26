@@ -113,6 +113,65 @@ def resolve_make(e2studio_cli: Path, explicit_make: Path | None) -> Path:
     raise RuntimeError("GNU make was not found. Set RX65N_BG96_MAKE or provide a valid e2 studio path.")
 
 
+def selected_mbedtls_config(tls_backend: str, require_tls_version: str | None) -> str | None:
+    if tls_backend.lower() != "tsip":
+        return None
+    normalized_tls = (require_tls_version or "").lower()
+    if normalized_tls in {"tlsv1.3", "tls1.3", "tls13"}:
+        return "aws_mbedtls_config_with_tsip13.h"
+    return "aws_mbedtls_config_with_tsip.h"
+
+
+def use_mbedtls_config_file(app_dir: Path, config_file: str) -> None:
+    cproject = app_dir / ".cproject"
+    if not cproject.exists():
+        raise RuntimeError(f".cproject not found: {cproject}")
+
+    content = cproject.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r'MBEDTLS_CONFIG_FILE=&lt;&quot;aws_mbedtls_config_with_tsip(?:13)?\.h&quot;&gt;'
+    )
+    replacement = f'MBEDTLS_CONFIG_FILE=&lt;&quot;{config_file}&quot;&gt;'
+    updated, count = pattern.subn(replacement, content)
+    if count == 0:
+        raise RuntimeError(f"TSIP mbed TLS config macro not found in {cproject}")
+    cproject.write_text(updated, encoding="utf-8", newline="")
+    print(f"Selected mbed TLS config for OTA candidate: {config_file}")
+
+
+def generated_mbedtls_configs(app_dir: Path) -> set[str]:
+    hardware_debug = app_dir / "HardwareDebug"
+    if not hardware_debug.exists():
+        return set()
+
+    configs: set[str] = set()
+    command_file_names = {"cSubCommand.tmp", "cDepSubCommand.tmp"}
+    config_re = re.compile(r'MBEDTLS_CONFIG_FILE=<"([^"]+)">')
+    for path in hardware_debug.rglob("*"):
+        if path.name not in command_file_names or not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        configs.update(config_re.findall(text))
+    return configs
+
+
+def clear_generated_build_files(app_dir: Path) -> None:
+    hardware_debug = app_dir / "HardwareDebug"
+    if hardware_debug.exists():
+        shutil.rmtree(hardware_debug)
+        print(f"Cleared generated build files: {hardware_debug}")
+
+
+def reset_generated_build_files_on_config_drift(app_dir: Path, expected_config: str) -> None:
+    configs = generated_mbedtls_configs(app_dir)
+    if configs and configs != {expected_config}:
+        print(
+            "Generated build files use a different TSIP mbed TLS config; "
+            f"regenerating. Expected: {expected_config}, observed: {', '.join(sorted(configs))}"
+        )
+        clear_generated_build_files(app_dir)
+
+
 def resolve_e2studio_headless(e2studio_cli: Path) -> Path:
     if not e2studio_cli.exists():
         raise RuntimeError(f"e2 studio executable not found: {e2studio_cli}")
@@ -186,6 +245,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--e2studio-timeout", type=int, default=600)
     parser.add_argument("--make", type=Path, default=Path(os.environ["RX65N_BG96_MAKE"]) if os.environ.get("RX65N_BG96_MAKE") else None)
     parser.add_argument("--ccrx-bin", type=Path, default=None)
+    parser.add_argument(
+        "--tls-backend",
+        choices=("software", "tsip"),
+        default=os.environ.get("RX65N_BG96_TLS_BACKEND", "software"),
+    )
+    parser.add_argument(
+        "--require-tls-version",
+        default=os.environ.get("RX65N_BG96_REQUIRE_TLS_VERSION", ""),
+    )
     return parser.parse_args()
 
 
@@ -210,6 +278,10 @@ def main() -> int:
 
     make_exe = resolve_make(args.e2studio_cli, args.make)
     build_env = build_environment(args.e2studio_cli, args.ccrx_bin)
+    tls_config = selected_mbedtls_config(args.tls_backend, args.require_tls_version)
+
+    print(f"TLS backend: {args.tls_backend}")
+    print(f"Require TLS version: {args.require_tls_version or '<none>'}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     version_text = ".".join(str(part) for part in args.version)
@@ -235,6 +307,10 @@ def main() -> int:
     snapshots = {path: path.read_bytes() for path in snapshot_paths if path.exists()}
     original = snapshots[demo_config].decode("utf-8")
     try:
+        if tls_config:
+            use_mbedtls_config_file(app_dir, tls_config)
+            reset_generated_build_files_on_config_drift(app_dir, tls_config)
+
         if not app_makefile.exists():
             with log_path.open("w", encoding="utf-8", errors="replace") as log:
                 run_e2studio_managed_build(

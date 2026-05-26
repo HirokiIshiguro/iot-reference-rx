@@ -17,6 +17,7 @@ from bg96_bootloader_integration import default_rfp_cli, run_rfp, write_serial_t
 
 
 VERSION_RE = re.compile(r"Application version (\d+)\.(\d+)\.(\d+)")
+TLS_VERSION_RE = re.compile(r"TLS handshake successful: version\s+(\S+)")
 MARKERS = {
     "ota_task_started": "Start OTA Update Task",
     "waiting_for_job": "Waiting for OTA job",
@@ -76,6 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-version", required=True)
     parser.add_argument("--raw-log", type=Path)
     parser.add_argument("--summary-json", type=Path)
+    parser.add_argument("--require-tls-version", default=os.environ.get("RX65N_BG96_REQUIRE_TLS_VERSION", ""))
     parser.add_argument("--rfp-cli", default=default_rfp_cli())
     parser.add_argument("--rfp-device", default=os.environ.get("RFP_DEVICE", "RX65x"))
     parser.add_argument("--rfp-tool", default=os.environ.get("BG96_BOOTLOADER_E2LITE_SERIAL", "OBE110020"))
@@ -107,6 +109,8 @@ def missing_required_markers(detected: dict[str, dict]) -> list[str]:
 def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) -> dict:
     detected: dict[str, dict] = {}
     versions: list[str] = []
+    tls_versions: list[str] = []
+    tls_events: list[dict] = []
     errors: list[str] = []
     partial = ""
     start = time.time()
@@ -167,6 +171,12 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
                 version = ".".join(match.groups())
                 if version not in versions:
                     versions.append(version)
+            tls_match = TLS_VERSION_RE.search(stripped)
+            if tls_match:
+                tls_version = tls_match.group(1)
+                tls_events.append({"version": tls_version, "seen_at": round(elapsed, 3), "line": stripped})
+                if tls_version not in tls_versions:
+                    tls_versions.append(tls_version)
             for pattern in ERROR_PATTERNS:
                 if pattern.lower() in stripped.lower():
                     errors.append(stripped)
@@ -192,6 +202,8 @@ def monitor_once(args: argparse.Namespace, port: serial.Serial, attempt: int) ->
         "attempt": attempt,
         "expected_version": args.expected_version,
         "versions_seen": versions,
+        "tls_versions_seen": tls_versions,
+        "tls_events": tls_events,
         "detected_markers": detected,
         "missing_required": missing_required_markers(detected),
         "errors": errors,
@@ -204,9 +216,11 @@ def is_retryable_error(error: str) -> bool:
     return any(pattern.lower() in error.lower() for pattern in RETRYABLE_ERROR_PATTERNS)
 
 
-def aggregate_summaries(summaries: list[dict], expected_version: str) -> dict:
+def aggregate_summaries(summaries: list[dict], expected_version: str, require_tls_version: str | None) -> dict:
     detected: dict[str, dict] = {}
     versions: list[str] = []
+    tls_versions: list[str] = []
+    tls_events: list[dict] = []
     errors: list[str] = []
     total_bytes = 0
     duration_seconds = 0.0
@@ -218,23 +232,36 @@ def aggregate_summaries(summaries: list[dict], expected_version: str) -> dict:
         for version in summary.get("versions_seen", []):
             if version not in versions:
                 versions.append(version)
+        for version in summary.get("tls_versions_seen", []):
+            if version not in tls_versions:
+                tls_versions.append(version)
+        tls_events.extend(summary.get("tls_events", []))
         for marker_id, marker in summary.get("detected_markers", {}).items():
             if marker_id not in detected:
                 detected[marker_id] = dict(marker, attempt=attempt)
         errors.extend(summary.get("errors", []))
 
     blocking_errors = [error for error in errors if not is_retryable_error(error)]
+    require_tls_version = (require_tls_version or "").strip()
+    tls_version_ok = True
+    if require_tls_version:
+        tls_version_ok = bool(tls_versions) and all(version == require_tls_version for version in tls_versions)
     success = (
         all(marker in detected for marker in REQUIRED_PROGRESS)
         and has_accepted_image(detected)
         and expected_version in versions
         and not blocking_errors
+        and tls_version_ok
     )
 
     return {
         "success": success,
         "expected_version": expected_version,
         "versions_seen": versions,
+        "require_tls_version": require_tls_version,
+        "tls_versions_seen": tls_versions,
+        "tls_version_ok": tls_version_ok,
+        "tls_events": tls_events,
         "detected_markers": detected,
         "missing_required": missing_required_markers(detected),
         "errors": errors,
@@ -276,13 +303,16 @@ def main() -> int:
     finally:
         port.close()
 
-    summary = aggregate_summaries(summaries, args.expected_version)
+    summary = aggregate_summaries(summaries, args.expected_version, args.require_tls_version)
     if args.summary_json:
         args.summary_json.parent.mkdir(parents=True, exist_ok=True)
         args.summary_json.write_text(json.dumps(summary, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
 
     print("\n--- OTA Summary ---")
     print(json.dumps(summary, indent=2, ensure_ascii=True))
+    if args.require_tls_version:
+        status = "PASS" if summary["tls_version_ok"] else "FAIL"
+        print(f"[{status}] Required TLS version: {args.require_tls_version}")
     if summary["success"]:
         print("[PASS] app OTA update verified")
         return 0

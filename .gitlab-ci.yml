@@ -1410,7 +1410,9 @@ build_rx65n_bg96_ota:
         --signing-key "$signingKey" `
         --e2studio-cli "$env:E2STUDIO_CLI_BG96" `
         --workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96_OTA" `
-        --e2studio-timeout "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS"
+        --e2studio-timeout "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS" `
+        --tls-backend "$env:RX65N_BG96_TLS_BACKEND" `
+        --require-tls-version "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       $versionToken = $version -replace '\.', '_'
@@ -1712,6 +1714,10 @@ test_rx65n_bg96_ota:
       fi
 
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      tls_version_args=()
+      if [ -n "${RX65N_BG96_REQUIRE_TLS_VERSION:-}" ]; then
+        tls_version_args+=(--require-tls-version "${RX65N_BG96_REQUIRE_TLS_VERSION}")
+      fi
       python3 tools/bg96_ota_monitor.py \
         --uart-port "${uart_port}" \
         --expected-version "${version}" \
@@ -1726,6 +1732,7 @@ test_rx65n_bg96_ota:
         --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
         --raw-log "$artifact_dir/ota_uart_raw.log" \
         --summary-json "$artifact_dir/ota_summary.json" \
+        "${tls_version_args[@]}" \
         2>&1 | tee "$artifact_dir/test_ota_console.log"
       status="${PIPESTATUS[0]}"
       exit "$status"
@@ -2885,6 +2892,10 @@ test_rx72n_ether_ota:
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+      tls_version_args=()
+      if [ -n "${RX72N_REQUIRE_TLS_VERSION:-}" ]; then
+        tls_version_args+=(--require-tls-version "$RX72N_REQUIRE_TLS_VERSION")
+      fi
 
       python tools/test_ota.py \
         --port "$RX72N_LINUX_UART_PORT" \
@@ -2896,6 +2907,7 @@ test_rx72n_ether_ota:
         --no-reset \
         --raw-log "$artifact_dir/ota_uart_raw.log" \
         --summary-json "$artifact_dir/ota_summary.json" \
+        "${tls_version_args[@]}" \
         2>&1 | tee "$artifact_dir/test_ota_console.log"
 
       if [ "${PIPESTATUS[0]}" -ne 0 ]; then
