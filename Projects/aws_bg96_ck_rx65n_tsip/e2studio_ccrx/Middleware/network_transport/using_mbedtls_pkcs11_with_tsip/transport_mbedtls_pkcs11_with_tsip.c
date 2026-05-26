@@ -501,7 +501,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                             pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
                             sizeof( pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS ) ) ) ? pdTRUE : pdFALSE;
 
-        if( ( xPrivateKeyLabelIsDevice == pdTRUE ) &&
+        if( ( glTlsDisableTsipTlsAccelOverride == 0 ) &&
+            ( xPrivateKeyLabelIsDevice == pdTRUE ) &&
             ( pdTRUE == xTsipProvisioningLoadClientRsa2048KeyPair() ) )
         {
             xUseTsipRuntimeKey = pdTRUE;

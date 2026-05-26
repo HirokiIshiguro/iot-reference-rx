@@ -92,6 +92,10 @@
 #include "tinycbor_serializer.h"
 #include "store.h"
 
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    #include "transport_mbedtls_pkcs11_with_tsip.h"
+#endif
+
 #include "unique_id.h"
 
 /**
@@ -317,6 +321,10 @@ static bool prvSubscribeToRegisterThingResponseTopics( void );
  */
 static bool prvUnsubscribeFromRegisterThingResponseTopics( void );
 
+static void prvSetFleetSoftwareCredentialMode( void );
+
+static void prvClearFleetSoftwareCredentialMode( void );
+
 /**
  * @brief The task used to demonstrate the FP API.
  *
@@ -332,6 +340,22 @@ static bool prvUnsubscribeFromRegisterThingResponseTopics( void );
 static int prvFleetProvisioningTask( void * pvParameters );
 
 void vStartFleetProvisioningDemo(void);
+
+/*-----------------------------------------------------------*/
+
+static void prvSetFleetSoftwareCredentialMode( void )
+{
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    vTlsTransportSetDisableTsipTlsAccelOverride( 1 );
+#endif
+}
+
+static void prvClearFleetSoftwareCredentialMode( void )
+{
+#if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    vTlsTransportClearDisableTsipTlsAccelOverride();
+#endif
+}
 
 /*-----------------------------------------------------------*/
 
@@ -753,6 +777,7 @@ int prvFleetProvisioningTask( void * pvParameters )
                  * connection fails, retries after a timeout. Timeout value will
                  * exponentially increase until maximum attempts are reached. */
                 LogInfo( ( "Establishing MQTT session with claim certificate..." ) );
+                prvSetFleetSoftwareCredentialMode();
                 xStatus = xEstablishMqttSession( &xMqttContext,
                                                  &xNetworkContext,
                                                  &xBuffer,
@@ -760,6 +785,7 @@ int prvFleetProvisioningTask( void * pvParameters )
                                                  pkcs11configLABEL_CLAIM_CERTIFICATE,
                                                  pkcs11configLABEL_CLAIM_PRIVATE_KEY,
                                                  pcDemoID);
+                prvClearFleetSoftwareCredentialMode();
 
                 if( xStatus == false )
                 {
@@ -932,6 +958,7 @@ int prvFleetProvisioningTask( void * pvParameters )
         if( xStatus == true )
         {
             LogInfo( ( "Establishing MQTT session with provisioned certificate..." ) );
+            prvSetFleetSoftwareCredentialMode();
             xStatus = xEstablishMqttSession( &xMqttContext,
                                              &xNetworkContext,
                                              &xBuffer,
@@ -939,6 +966,7 @@ int prvFleetProvisioningTask( void * pvParameters )
                                              pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
                                              pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS,
                                              pcThingName );
+            prvClearFleetSoftwareCredentialMode();
 
             if( xStatus != true )
             {

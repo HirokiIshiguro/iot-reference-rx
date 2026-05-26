@@ -23,6 +23,7 @@ except ImportError:
 DEFAULT_LOG_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", "COM7"))
 DEFAULT_LOG_BAUD = int(os.environ.get("UART_BAUD_RATE", "921600"))
 DEFAULT_TIMEOUT = 240
+TLS_VERSION_RE = re.compile(r"TLS handshake successful: version\s+(\S+)")
 
 MARKERS = [
     ("claim_mqtt", "Established connection with claim credentials."),
@@ -85,6 +86,8 @@ def monitor_uart(port, baud, timeout, reset_cmd):
     errors = []
     certificate_id = None
     thing_name = None
+    tls_versions = []
+    tls_events = []
     total_bytes = 0
     total_lines = 0
     buffer = ""
@@ -134,6 +137,20 @@ def monitor_uart(port, baud, timeout, reset_cmd):
                     if "Received AWS IoT Thing name:" in line:
                         thing_name = line.split("Received AWS IoT Thing name:", 1)[1].strip()
 
+                    tls_match = TLS_VERSION_RE.search(line)
+                    if tls_match:
+                        tls_version = tls_match.group(1)
+                        tls_events.append(
+                            {
+                                "version": tls_version,
+                                "seen_at": round(time.time() - start, 3),
+                                "line": line,
+                            }
+                        )
+                        if tls_version not in tls_versions:
+                            tls_versions.append(tls_version)
+                        print(f"[MILESTONE] tls_version: {tls_version}")
+
                     for pattern in ERROR_PATTERNS:
                         if pattern in line:
                             errors.append(line)
@@ -157,7 +174,14 @@ def monitor_uart(port, baud, timeout, reset_cmd):
         ser.close()
         print(f"Closed {port}")
 
-    return results, errors, total_bytes, total_lines, thing_name, certificate_id
+    return results, errors, total_bytes, total_lines, thing_name, certificate_id, tls_versions, tls_events
+
+
+def tls_requirement_ok(require_tls_version, tls_versions):
+    require_tls_version = (require_tls_version or "").strip()
+    if not require_tls_version:
+        return True
+    return bool(tls_versions) and all(version == require_tls_version for version in tls_versions)
 
 
 def main():
@@ -169,7 +193,9 @@ def main():
     parser.add_argument("--label", default=os.environ.get("FLEET_TEST_LABEL", "RX72N"))
     parser.add_argument("--summary-json", help="Optional path to write fleet provisioning summary JSON")
     parser.add_argument("--app-reset-retries", type=int, default=int(os.environ.get("FLEET_APP_RESET_RETRIES", "0")))
+    parser.add_argument("--require-tls-version", default=os.environ.get("FLEET_REQUIRE_TLS_VERSION", ""))
     args = parser.parse_args()
+    require_tls_version = args.require_tls_version.strip()
 
     print("=" * 60)
     print(f"{args.label} Fleet Provisioning Test")
@@ -177,18 +203,20 @@ def main():
     print(f"Log Port: {args.log_port}")
     print(f"Log Baud: {args.log_baud}")
     print(f"Timeout:  {args.timeout}s")
+    print(f"Required TLS: {require_tls_version or '(not enforced)'}")
     print("=" * 60)
 
     attempts = []
     for attempt in range(1, args.app_reset_retries + 2):
         if attempt > 1:
             print(f"[RETRY] restarting fleet test after cellular init failure ({attempt}/{args.app_reset_retries + 1})")
-        results, errors, total_bytes, total_lines, thing_name, certificate_id = monitor_uart(
+        results, errors, total_bytes, total_lines, thing_name, certificate_id, tls_versions, tls_events = monitor_uart(
             args.log_port,
             args.log_baud,
             args.timeout,
             args.reset_cmd,
         )
+        tls_ok = tls_requirement_ok(require_tls_version, tls_versions)
         attempts.append(
             {
                 "attempt": attempt,
@@ -198,6 +226,9 @@ def main():
                 "total_lines": total_lines,
                 "thing_name": thing_name,
                 "certificate_id": certificate_id,
+                "tls_versions_seen": list(tls_versions),
+                "tls_version_ok": tls_ok,
+                "tls_events": list(tls_events),
             }
         )
         if all(results.values()):
@@ -206,13 +237,19 @@ def main():
         if not retryable or attempt > args.app_reset_retries:
             break
 
+    completed = all(results.values()) and tls_requirement_ok(require_tls_version, tls_versions)
     summary = {
+        "success": completed,
         "results": results,
         "errors": errors,
         "total_bytes": total_bytes,
         "total_lines": total_lines,
         "thing_name": thing_name,
         "certificate_id": certificate_id,
+        "require_tls_version": require_tls_version,
+        "tls_versions_seen": tls_versions,
+        "tls_version_ok": tls_requirement_ok(require_tls_version, tls_versions),
+        "tls_events": tls_events,
         "attempts": attempts,
     }
     if args.summary_json:
@@ -225,9 +262,12 @@ def main():
     print(f"RX total: {total_bytes} bytes / {total_lines} lines")
     print(f"Thing name: {thing_name or '(not observed)'}")
     print(f"Certificate ID: {certificate_id or '(not observed)'}")
+    print(f"TLS versions: {', '.join(tls_versions) or '(none)'}")
+    if require_tls_version:
+        status = "PASS" if tls_requirement_ok(require_tls_version, tls_versions) else "FAIL"
+        print(f"[{status}] Required TLS version: {require_tls_version}")
     for name, _ in MARKERS:
         print(f"[{'PASS' if results[name] else 'FAIL'}] {name}")
-    completed = all(results.values())
     if errors:
         print("Non-fatal errors observed before completion:" if completed else "Errors:")
         for line in errors[:10]:
