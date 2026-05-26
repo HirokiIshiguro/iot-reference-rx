@@ -9,10 +9,12 @@
 ### 予定
 
 - Mbed TLS 3.6.4 以降へ TSIP 連携を移植し、TLS 1.3 session resumption と
-  0-RTT を LANBENCH や AWS IoT Core 接続で検証する計画です。
+  0-RTT を LANBENCH など SessionTicket を発行できるTLSエンドポイントで検証する計画です。
   現時点の `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
   TSIP backend と組み合わせて実機CIで確認済みですが、resumption と 0-RTT は
-  まだリリース対象外です。
+  まだリリース対象外です。AWS IoT Core は
+  [SessionTicket TLS extension をサポートしていない](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)
+  ため、AWS IoT Core 接続での TLS 1.3 resumption / 0-RTT はサービス側対応待ちです。
 
 - Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
   性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
