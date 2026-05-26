@@ -8,7 +8,7 @@
 
 ## 最新テスト結果
 
-最終更新: 2026-05-24 JST。RX72N TSIP transport include order 修正後、
+最終更新: 2026-05-26 JST。RX72N TSIP transport include order 修正後、
 [matrix pipeline #5858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5858) /
 [#5877](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5877) /
 [#5896](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5896) /
@@ -17,18 +17,24 @@
 で耐久確認を行いました。#5950 は 17/18 行成功後に最後の
 RX65N/BG96 TSIP Fleet 行だけキャンセルされたため、同一コミット・同一条件の
 [focused pipeline #5969](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969)
-で補完確認しています。これにより、TSIP と TLS 1.3 の組み合わせ 6 セルを除く
-18/18 セルが5回成功済みです。通常スケジュールは `PIPELINE_PROFILE=nightly_matrix`
+で補完確認しています。さらに TSIP backend + TLS 1.3 MQTT は、main merge commit
+`7ed373c9` 上の [focused pipeline #6045](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6045) /
+[#6046](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6046) /
+[#6047](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6047) /
+[#6048](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6048) /
+[#6049](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049)
+で5回連続成功しています。これにより、TSIP と TLS 1.3 の OTA / Fleet 4 セルを除く
+20/20 セルが5回成功済みです。通常スケジュールは `PIPELINE_PROFILE=nightly_matrix`
 で実行し、focused 行を子パイプラインとして展開します。
 
 | <small>MCU環境</small> | <small>MQTT</small> | <small>OTA</small> | <small>Fleet</small> | <small>TLS1.3 MQTT</small> | <small>TLS1.3 OTA</small> | <small>TLS1.3 Fleet</small> |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | <small>RX72N/Ether<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5951)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5959)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5953)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5961)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5955)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5956)</small> |
-| <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5958)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5963)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5964)</small> |  |  |  |
+| <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5958)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5963)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5964)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049)</small> |  |  |
 | <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5952)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5954)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5957)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5960)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5962)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5965)</small> |
-| <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5966)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5967)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969)</small> |  |  |  |
+| <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5966)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5967)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049)</small> |  |  |
 
-<small>`✓` は同一コミット上で5回テストOKを確認済みのセルです。表中のリンクは5回目確認時の子パイプライン、または補完確認パイプラインを示します。空欄は5回成功の昇格条件をまだ満たしていないセルです。TSIP 対応 TLS 1.3 は `RX72N_REQUIRE_TLS_VERSION=TLSv1.3` / `RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3` と TSIP backend の組み合わせで段階的に検証します。昇格後に対象セル起因の失敗が 1 回でも出た場合は、該当セルを再度 stabilizing 扱いへ戻します。停電、配線作業、Runner 障害など対象セルの実装品質と無関係な外乱は連続成功/失敗判定から除外します。</small>
+<small>`✓` はセルごとに同一コミット上で5回テストOKを確認済みであることを示します。表中のリンクは5回目確認時の子パイプライン、または補完確認パイプラインを示します。空欄は5回成功の昇格条件をまだ満たしていないセルです。TSIP 対応 TLS 1.3 OTA / Fleet は `RX72N_REQUIRE_TLS_VERSION=TLSv1.3` / `RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3` と TSIP backend の組み合わせで段階的に検証します。昇格後に対象セル起因の失敗が 1 回でも出た場合は、該当セルを再度 stabilizing 扱いへ戻します。停電、配線作業、Runner 障害など対象セルの実装品質と無関係な外乱は連続成功/失敗判定から除外します。</small>
 
 ## About This Fork / このフォークについて
 
@@ -245,8 +251,9 @@ Current hardware validation status is summarized in the **最新テスト結果*
 the top of this README. As of
 [v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0),
 MQTT / OTA / Fleet Provisioning are validated on both RX72N/Ether and
-RX65N/BG96 for software TLS and TSIP TLS backends, except for the intentionally
-deferred TSIP + TLS 1.3 combinations.
+RX65N/BG96 for software TLS and TSIP TLS backends. TSIP + TLS 1.3 MQTT is also
+validated on both boards; TSIP + TLS 1.3 OTA / Fleet Provisioning remains
+intentionally deferred.
 
 RX65N/BG96 TSIP hardware validation uses RX65N-specific UFPK-derived runtime
 provisioning payloads and the matching static AWS IoT certificate documented in
@@ -276,6 +283,9 @@ PIPELINE_PROFILE=focused RX65N_BG96_TEST_SCOPE=ota RUN_RX72N_BUILD=false RX72N_S
 
 # Manual/API software TLS 1.3 MQTT on both boards
 PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=mqtt RX65N_BG96_TEST_SCOPE=mqtt AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com RX72N_REQUIRE_TLS_VERSION=TLSv1.3 RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3
+
+# Manual/API TSIP TLS 1.3 MQTT on both boards
+PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=mqtt RX65N_BG96_TEST_SCOPE=mqtt RX72N_TLS_BACKEND=tsip RX65N_BG96_TLS_BACKEND=tsip AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com RX72N_REQUIRE_TLS_VERSION=TLSv1.3 RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3 RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com
 ```
 
 ### Scheduled Hardware Regressions
@@ -284,7 +294,7 @@ The project-level GitLab pipeline schedule is part of the reference pipeline des
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix` | Runs the focused rows represented in the latest matrix. TSIP + TLS 1.3 rows are intentionally left out until that backend combination is implemented and validated. |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix` | Runs the focused rows represented in the latest matrix. TSIP + TLS 1.3 MQTT is validated; OTA / Fleet rows remain stabilizing until that backend combination is implemented and validated. |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
