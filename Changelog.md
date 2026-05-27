@@ -8,8 +8,11 @@
 
 ### 予定
 
-- Mbed TLS 3.6.4 以降へ TSIP 連携を移植し、TLS 1.3 session resumption と
-  0-RTT を LANBENCH など SessionTicket を発行できるTLSエンドポイントで検証する計画です。
+- Mbed TLS 3.6.4 の software TLS 1.3 path では、SessionTicket を発行できる
+  LANBENCH 対向で TLS 1.3 session resumption と 0-RTT early data 受理まで確認しました。
+  実績は [tsip_mbedtls13 MR !4](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/4)
+  および [pipeline #6135](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6135)
+  で参照できます。次はこの成果を `iot-reference-rx` 側の Mbed TLS 3.6.4 / TSIP 連携へ段階的に展開します。
   現時点の `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
   TSIP backend と組み合わせて実機CIで確認済みですが、resumption と 0-RTT は
   まだリリース対象外です。AWS IoT Core は
