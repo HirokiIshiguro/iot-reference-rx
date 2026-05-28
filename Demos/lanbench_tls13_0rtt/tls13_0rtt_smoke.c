@@ -138,6 +138,15 @@ static const uint16_t usTls13OnlyGroups[] =
     0U
 };
 
+#if ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U )
+static const uint16_t usTls13TsipSignatureAlgorithms[] =
+{
+    MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256,
+    MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA256,
+    MBEDTLS_TLS1_3_SIG_NONE
+};
+#endif
+
 long tls13_0rtt_mbedtls_time( long * plTime )
 {
     long lSeconds;
@@ -321,6 +330,9 @@ static BaseType_t prvConfigureContext( Tls13ZeroRttContext_t * pxContext )
                           &pxContext->xCtrDrbg );
     mbedtls_ssl_conf_ciphersuites( &pxContext->xConfig, lTls13OnlyCipherSuites );
     mbedtls_ssl_conf_groups( &pxContext->xConfig, usTls13OnlyGroups );
+#if ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U )
+    mbedtls_ssl_conf_sig_algs( &pxContext->xConfig, usTls13TsipSignatureAlgorithms );
+#endif
 
 #if defined( MBEDTLS_DEBUG_C )
     mbedtls_ssl_conf_dbg( &pxContext->xConfig, prvMbedtlsDebug, NULL );

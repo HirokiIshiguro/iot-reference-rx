@@ -288,12 +288,11 @@ static int ssl_tls13_write_tsip_certificate_verify_body(mbedtls_ssl_context *ssl
 '@
     $sslText = $sslText.Replace($loopAnchor, $loopReplacement)
 
-    $keyMatchAnchor = @'
-        if (!mbedtls_ssl_tls13_check_sig_alg_cert_key_match(*sig_alg, own_key)) {
+    $supportCheckAnchor = @'
+        if (!mbedtls_ssl_tls13_sig_alg_for_cert_verify_is_supported(*sig_alg)) {
             continue;
         }
 
-        if (mbedtls_ssl_get_pk_type_and_md_alg_from_sig_alg(
 '@
     $tsipCallBlock = @'
 #if defined(TSIP_TLS_API_ENABLE)
@@ -314,13 +313,20 @@ static int ssl_tls13_write_tsip_certificate_verify_body(mbedtls_ssl_context *ssl
         }
 #endif /* TSIP_TLS_API_ENABLE */
 
-        if (!mbedtls_ssl_tls13_check_sig_alg_cert_key_match(*sig_alg, own_key)) {
+        if (!mbedtls_ssl_tls13_sig_alg_for_cert_verify_is_supported(*sig_alg)) {
             continue;
         }
 
-        if (mbedtls_ssl_get_pk_type_and_md_alg_from_sig_alg(
 '@
-    $sslText = $sslText.Replace($keyMatchAnchor, $tsipCallBlock)
+    if (-not $sslText.Contains($supportCheckAnchor)) {
+        throw "TLS 1.3 CertificateVerify support-check anchor not found in $sslTls13Generic"
+    }
+    $sslText = $sslText.Replace($supportCheckAnchor, $tsipCallBlock)
+
+    $tsipCallCount = [regex]::Matches($sslText, 'ssl_tls13_write_tsip_certificate_verify_body\(ssl,').Count
+    if ($tsipCallCount -ne 1) {
+        throw "Unexpected TSIP CertificateVerify hook count in ${sslTls13Generic}: $tsipCallCount"
+    }
 
     Set-Content -LiteralPath $sslTls13Generic -Value $sslText -Encoding UTF8
 }
