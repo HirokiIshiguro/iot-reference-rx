@@ -56,6 +56,14 @@ extern void vTsipMbedtlsThreadingCompatInit( void );
 #endif
 BaseType_t OtaSelfTest(void);
 
+#ifndef LANBENCH_TLS13_0RTT_ENABLE
+    #define LANBENCH_TLS13_0RTT_ENABLE    ( 0U )
+#endif
+
+#if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
+    #include "tls13_0rtt_smoke.h"
+#endif
+
 #if (ENABLE_CREDENTIAL_BY_CLI == 0)
 void vAssignCredentials(void);
 extern int32_t xprvWriteCacheEntry(size_t KeyLength,
@@ -204,7 +212,9 @@ void main_task(void)
 
         configPRINTF(("---------STARTING DEMO---------\r\n"));
 
-        #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
+        #if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
+            vStartTls13ZeroRttSmoke();
+        #elif (ENABLE_FLEET_PROVISIONING_DEMO == 1)
             vStartFleetProvisioningDemo();
         #else
             xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);

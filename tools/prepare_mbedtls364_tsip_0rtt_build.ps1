@@ -9,13 +9,18 @@ $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $projectDir = Join-Path $projectRoot "Projects\$ProjectName\e2studio_ccrx"
 if (-not (Test-Path -LiteralPath $projectDir)) {
-    throw "RX72N TSIP project directory is missing: $projectDir"
+    throw "TSIP project directory is missing: $projectDir"
 }
 
 $cproject = Join-Path $projectDir ".cproject"
 $projectFile = Join-Path $projectDir ".project"
+$projectLocalStagedMbedtls = Join-Path $projectDir "Middleware/3rdparty/mbedtls_with_TSIP"
 $normalMbedtls = Join-Path $projectRoot "Middleware/3rdparty/mbedtls"
-$stagedMbedtls = Join-Path $projectRoot "Middleware/3rdparty/mbedtls_with_TSIP"
+$stagedMbedtls = if (Test-Path -LiteralPath (Split-Path -Parent $projectLocalStagedMbedtls)) {
+    $projectLocalStagedMbedtls
+} else {
+    Join-Path $projectRoot "Middleware/3rdparty/mbedtls_with_TSIP"
+}
 
 if (-not (Test-Path -LiteralPath $normalMbedtls)) {
     throw "Normal Mbed TLS submodule is missing: $normalMbedtls"
@@ -28,6 +33,8 @@ if (-not (Test-Path -LiteralPath $projectFile)) {
 }
 
 Write-Host "Staging normal Mbed TLS 3.6.x into mbedtls_with_TSIP path for TSIP 0-RTT build."
+Write-Host "  source: $normalMbedtls"
+Write-Host "  staged: $stagedMbedtls"
 New-Item -ItemType Directory -Force -Path $stagedMbedtls | Out-Null
 robocopy $normalMbedtls $stagedMbedtls /MIR /XD .git /XF .git | Out-Host
 if ($LASTEXITCODE -ge 8) {

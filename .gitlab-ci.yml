@@ -513,6 +513,18 @@ matrix_rx65n_bg96_tsip_tls13_fleet:
     RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
     AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
 
+matrix_rx65n_bg96_tsip_tls13_resumption_0rtt:
+  extends: .nightly_matrix_rx65n_bg96
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && ($LANBENCH_MBEDTLS_0RTT_HOST || $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true")'
+      when: on_success
+    - when: never
+  variables:
+    RX65N_BG96_TEST_SCOPE: "tls13_0rtt"
+    RX65N_BG96_TLS_BACKEND: "tsip"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_TLS13_0RTT_ENABLE: "true"
+
 build_rx72n_ether:
   stage: build
   tags:
@@ -963,15 +975,15 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_tls13_0rtt_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_HOST'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && ($RX65N_BG96_TLS_BACKEND == "software" || $RX65N_BG96_TLS_BACKEND == "tsip") && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_HOST'
       when: on_success
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true"'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && ($RX65N_BG96_TLS_BACKEND == "software" || $RX65N_BG96_TLS_BACKEND == "tsip") && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true"'
       when: on_success
     - when: never
 
 .rx65n_bg96_tls13_0rtt_auto_ec2_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && ($RX65N_BG96_TLS_BACKEND == "software" || $RX65N_BG96_TLS_BACKEND == "tsip") && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
       when: on_success
     - when: never
 
@@ -1487,7 +1499,7 @@ test_rx65n_bg96_tls13_0rtt:
     - job: reset_rx65n_bg96_app
       artifacts: true
   script:
-    - echo "=== Verify CK-RX65N BG96 software TLS 1.3 resumption and 0-RTT ==="
+    - echo "=== Verify CK-RX65N BG96 ${RX65N_BG96_TLS_BACKEND} TLS 1.3 resumption and 0-RTT ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_tls13_0rtt"
       mkdir -p "$artifact_dir"
@@ -1542,7 +1554,7 @@ cleanup_lanbench_tls13_0rtt_server:
   resource_group: lanbench-tls13-0rtt-ec2
   allow_failure: true
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && ($RX65N_BG96_TLS_BACKEND == "software" || $RX65N_BG96_TLS_BACKEND == "tsip") && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
       when: always
     - when: never
   dependencies:

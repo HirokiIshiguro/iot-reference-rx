@@ -29,7 +29,9 @@ switch ($normalizedTlsBackend) {
     default { throw "Unsupported RX65N BG96 TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
 }
 $useTsipTls13Config = ($normalizedTlsBackend -eq "tsip") -and ($normalizedRequireTlsVersion -in @("tlsv1.3", "tls1.3", "tls13"))
-$useSoftwareTls13ZeroRttConfig = $Tls13ZeroRtt.IsPresent
+$useTls13ZeroRttConfig = $Tls13ZeroRtt.IsPresent
+$useSoftwareTls13ZeroRttConfig = $useTls13ZeroRttConfig -and ($normalizedTlsBackend -eq "software")
+$useTsipTls13ZeroRttConfig = $useTls13ZeroRttConfig -and ($normalizedTlsBackend -eq "tsip")
 $bootProject = Join-Path $projectRoot "Projects\boot_loader_ck_rx65n\e2studio_ccrx"
 $appProject = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx"
 $lanbenchTls13ZeroRttConfigHeader = Join-Path $appProject "Demos\include\lanbench_tls13_0rtt_config.h"
@@ -169,10 +171,7 @@ function Write-LanbenchTls13ZeroRttConfigHeader {
     Write-Host "Generated LANBENCH TLS 1.3 0-RTT config header: $lanbenchTls13ZeroRttConfigHeader"
 }
 
-function Enable-SoftwareTls13ZeroRttBuild {
-    if ($normalizedTlsBackend -ne "software") {
-        throw "-Tls13ZeroRtt is currently supported only with RX65N/BG96 software TLS backend."
-    }
+function Assert-Tls13ZeroRttBuildInputs {
     if ($normalizedRequireTlsVersion -notin @("tlsv1.3", "tls1.3", "tls13")) {
         throw "-Tls13ZeroRtt requires -RequireTlsVersion TLSv1.3."
     }
@@ -185,11 +184,22 @@ function Enable-SoftwareTls13ZeroRttBuild {
     if ($LanbenchTls13ZeroRttPort -notmatch '^\d+$') {
         throw "LANBENCH TLS 1.3 0-RTT port must be numeric: $LanbenchTls13ZeroRttPort"
     }
+}
 
+function Enable-SoftwareTls13ZeroRttBuild {
+    Assert-Tls13ZeroRttBuildInputs
     Use-MbedTlsConfigFile -ProjectDir $appProject -ConfigFile "aws_mbedtls_config_tls13_0rtt.h"
     $configAnchor = '<listOptionValue builtIn="false" value="MBEDTLS_CONFIG_FILE=&lt;&quot;aws_mbedtls_config_tls13_0rtt.h&quot;&gt;"/>'
     Add-CompilerDefine -ProjectDir $appProject -Define 'LANBENCH_TLS13_0RTT_ENABLE=1' -Anchor $configAnchor
     Add-CompilerDefine -ProjectDir $appProject -Define 'LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE=1' -Anchor $configAnchor
+    Write-LanbenchTls13ZeroRttConfigHeader
+}
+
+function Enable-TsipTls13ZeroRttBuild {
+    Assert-Tls13ZeroRttBuildInputs
+    & (Join-Path $projectRoot "tools\prepare_mbedtls364_tsip_0rtt_build.ps1") `
+        -ProjectRoot $projectRoot `
+        -ProjectName $appProjectName
     Write-LanbenchTls13ZeroRttConfigHeader
 }
 
@@ -423,6 +433,8 @@ function Clear-GeneratedBuildFiles {
 function Reset-ManagedBuildFilesOnMbedTlsConfigDrift {
     $expectedConfig = if ($useSoftwareTls13ZeroRttConfig) {
         "aws_mbedtls_config_tls13_0rtt.h"
+    } elseif ($useTsipTls13ZeroRttConfig) {
+        "aws_mbedtls_config_with_tsip13_0rtt.h"
     } elseif ($useTsipTls13Config) {
         "aws_mbedtls_config_with_tsip13.h"
     } elseif ($normalizedTlsBackend -eq "tsip") {
@@ -440,7 +452,7 @@ function Reset-ManagedBuildFilesOnMbedTlsConfigDrift {
         return
     }
 
-    $configMatches = Select-String -Path $commandFiles.FullName -Pattern 'MBEDTLS_CONFIG_FILE=<"aws_mbedtls_config(_with_tsip13|_with_tsip|_tls13_0rtt)?\.h">' -ErrorAction SilentlyContinue
+    $configMatches = Select-String -Path $commandFiles.FullName -Pattern 'MBEDTLS_CONFIG_FILE=<"aws_mbedtls_config(_with_tsip13_0rtt|_with_tsip13|_with_tsip|_tls13_0rtt)?\.h">' -ErrorAction SilentlyContinue
     if (-not $configMatches) {
         return
     }
@@ -511,7 +523,7 @@ Write-Host "Using CC-RX bin: $ccrxBinDir"
 Write-Host "TLS backend: $normalizedTlsBackend"
 Write-Host "Require TLS version: $(if ($RequireTlsVersion) { $RequireTlsVersion } else { '<none>' })"
 Write-Host "TSIP TLS 1.3 config: $useTsipTls13Config"
-Write-Host "TLS 1.3 resumption/0-RTT config: $useSoftwareTls13ZeroRttConfig"
+Write-Host "TLS 1.3 resumption/0-RTT config: $useTls13ZeroRttConfig"
 if ($busyBoxBin) {
     Write-Host "Using e2 studio BusyBox tools: $busyBoxBin"
 }
@@ -531,6 +543,10 @@ $patchApplied = $false
 try {
     if ($useSoftwareTls13ZeroRttConfig) {
         Enable-SoftwareTls13ZeroRttBuild
+        Clear-GeneratedBuildFiles
+    }
+    elseif ($useTsipTls13ZeroRttConfig) {
+        Enable-TsipTls13ZeroRttBuild
         Clear-GeneratedBuildFiles
     }
     elseif ($useTsipTls13Config) {
