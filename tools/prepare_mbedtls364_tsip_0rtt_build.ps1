@@ -9,13 +9,18 @@ $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $projectDir = Join-Path $projectRoot "Projects\$ProjectName\e2studio_ccrx"
 if (-not (Test-Path -LiteralPath $projectDir)) {
-    throw "RX72N TSIP project directory is missing: $projectDir"
+    throw "TSIP project directory is missing: $projectDir"
 }
 
 $cproject = Join-Path $projectDir ".cproject"
 $projectFile = Join-Path $projectDir ".project"
+$projectLocalStagedMbedtls = Join-Path $projectDir "Middleware/3rdparty/mbedtls_with_TSIP"
 $normalMbedtls = Join-Path $projectRoot "Middleware/3rdparty/mbedtls"
-$stagedMbedtls = Join-Path $projectRoot "Middleware/3rdparty/mbedtls_with_TSIP"
+$stagedMbedtls = if (Test-Path -LiteralPath (Split-Path -Parent $projectLocalStagedMbedtls)) {
+    $projectLocalStagedMbedtls
+} else {
+    Join-Path $projectRoot "Middleware/3rdparty/mbedtls_with_TSIP"
+}
 
 if (-not (Test-Path -LiteralPath $normalMbedtls)) {
     throw "Normal Mbed TLS submodule is missing: $normalMbedtls"
@@ -28,6 +33,8 @@ if (-not (Test-Path -LiteralPath $projectFile)) {
 }
 
 Write-Host "Staging normal Mbed TLS 3.6.x into mbedtls_with_TSIP path for TSIP 0-RTT build."
+Write-Host "  source: $normalMbedtls"
+Write-Host "  staged: $stagedMbedtls"
 New-Item -ItemType Directory -Force -Path $stagedMbedtls | Out-Null
 robocopy $normalMbedtls $stagedMbedtls /MIR /XD .git /XF .git | Out-Host
 if ($LASTEXITCODE -ge 8) {
@@ -120,7 +127,37 @@ Set-Content -LiteralPath $projectFile -Value $projectText -Encoding UTF8
 $sslTls13Generic = Join-Path $stagedMbedtls "library/ssl_tls13_generic.c"
 $sslText = Get-Content -LiteralPath $sslTls13Generic -Raw
 
+function Convert-NewLine {
+    param(
+        [string] $Text,
+        [string] $NewLine
+    )
+
+    return (($Text -replace "`r`n", "`n") -replace "`r", "`n") -replace "`n", $NewLine
+}
+
+function Replace-RequiredRegex {
+    param(
+        [string] $Text,
+        [string] $Pattern,
+        [string] $Replacement,
+        [string] $ErrorMessage
+    )
+
+    $regex = [regex]::new($Pattern)
+    if (-not $regex.IsMatch($Text)) {
+        throw $ErrorMessage
+    }
+
+    return $regex.Replace(
+        $Text,
+        [System.Text.RegularExpressions.MatchEvaluator] { param($match) $Replacement },
+        1)
+}
+
 if ($sslText -notmatch 'R_TSIP_Tls13CertificateVerifyGenerate') {
+    $sslNewLine = if ($sslText.Contains("`r`n")) { "`r`n" } else { "`n" }
+
     $includeAnchor = '#include "psa_util_internal.h"'
     $includeBlock = @'
 
@@ -147,7 +184,7 @@ extern volatile uint32_t gTsipTlsProbeTls13CertificateVerifyGenerateLastBytes;
 #define SSL_TLS13_TSIP_CERT_VERIFY_SKIP_CERT_KEY       (0x5453434bU)
 #endif /* TSIP_TLS_API_ENABLE */
 '@
-    $sslText = $sslText.Replace($includeAnchor, $includeAnchor + $includeBlock)
+    $sslText = $sslText.Replace($includeAnchor, $includeAnchor + (Convert-NewLine -Text $includeBlock -NewLine $sslNewLine))
 
     $parseAnchor = "MBEDTLS_CHECK_RETURN_CRITICAL`r`nstatic int ssl_tls13_parse_certificate_verify"
     if ($sslText -notmatch [regex]::Escape($parseAnchor)) {
@@ -262,17 +299,8 @@ static int ssl_tls13_write_tsip_certificate_verify_body(mbedtls_ssl_context *ssl
 #endif /* TSIP_TLS_API_ENABLE */
 
 '@
-    $sslText = $sslText.Replace($parseAnchor, $helperBlock + $parseAnchor)
+    $sslText = $sslText.Replace($parseAnchor, (Convert-NewLine -Text $helperBlock -NewLine $sslNewLine) + $parseAnchor)
 
-    $loopAnchor = @'
-    for (; *sig_alg != MBEDTLS_TLS1_3_SIG_NONE; sig_alg++) {
-        psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
-        mbedtls_pk_type_t pk_type = MBEDTLS_PK_NONE;
-        mbedtls_md_type_t md_alg = MBEDTLS_MD_NONE;
-        psa_algorithm_t psa_algorithm = PSA_ALG_NONE;
-        unsigned char verify_hash[PSA_HASH_MAX_SIZE];
-        size_t verify_hash_len;
-'@
     $loopReplacement = @'
     for (; *sig_alg != MBEDTLS_TLS1_3_SIG_NONE; sig_alg++) {
         psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
@@ -286,14 +314,19 @@ static int ssl_tls13_write_tsip_certificate_verify_body(mbedtls_ssl_context *ssl
         size_t tsip_cert_verify_len = 0;
 #endif /* TSIP_TLS_API_ENABLE */
 '@
-    $sslText = $sslText.Replace($loopAnchor, $loopReplacement)
+    $loopPattern = '    for \(; \*sig_alg != MBEDTLS_TLS1_3_SIG_NONE; sig_alg\+\+\) \{\r?\n' +
+        '        psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;\r?\n' +
+        '        mbedtls_pk_type_t pk_type = MBEDTLS_PK_NONE;\r?\n' +
+        '        mbedtls_md_type_t md_alg = MBEDTLS_MD_NONE;\r?\n' +
+        '        psa_algorithm_t psa_algorithm = PSA_ALG_NONE;\r?\n' +
+        '        unsigned char verify_hash\[PSA_HASH_MAX_SIZE\];\r?\n' +
+        '        size_t verify_hash_len;\r?\n'
+    $sslText = Replace-RequiredRegex `
+        -Text $sslText `
+        -Pattern $loopPattern `
+        -Replacement (Convert-NewLine -Text $loopReplacement -NewLine $sslNewLine) `
+        -ErrorMessage "TLS 1.3 CertificateVerify loop anchor not found in $sslTls13Generic"
 
-    $supportCheckAnchor = @'
-        if (!mbedtls_ssl_tls13_sig_alg_for_cert_verify_is_supported(*sig_alg)) {
-            continue;
-        }
-
-'@
     $tsipCallBlock = @'
 #if defined(TSIP_TLS_API_ENABLE)
         ret = ssl_tls13_write_tsip_certificate_verify_body(ssl,
@@ -318,12 +351,16 @@ static int ssl_tls13_write_tsip_certificate_verify_body(mbedtls_ssl_context *ssl
         }
 
 '@
-    if (-not $sslText.Contains($supportCheckAnchor)) {
-        throw "TLS 1.3 CertificateVerify support-check anchor not found in $sslTls13Generic"
-    }
-    $sslText = $sslText.Replace($supportCheckAnchor, $tsipCallBlock)
+    $supportCheckPattern = '        if \(!mbedtls_ssl_tls13_sig_alg_for_cert_verify_is_supported\(\*sig_alg\)\) \{\r?\n' +
+        '            continue;\r?\n' +
+        '        \}\r?\n\r?\n'
+    $sslText = Replace-RequiredRegex `
+        -Text $sslText `
+        -Pattern $supportCheckPattern `
+        -Replacement (Convert-NewLine -Text $tsipCallBlock -NewLine $sslNewLine) `
+        -ErrorMessage "TLS 1.3 CertificateVerify support-check anchor not found in $sslTls13Generic"
 
-    $tsipCallCount = [regex]::Matches($sslText, 'ssl_tls13_write_tsip_certificate_verify_body\(ssl,').Count
+    $tsipCallCount = [regex]::Matches($sslText, 'ssl_tls13_write_tsip_certificate_verify_body\s*\(\s*ssl\s*,').Count
     if ($tsipCallCount -ne 1) {
         throw "Unexpected TSIP CertificateVerify hook count in ${sslTls13Generic}: $tsipCallCount"
     }

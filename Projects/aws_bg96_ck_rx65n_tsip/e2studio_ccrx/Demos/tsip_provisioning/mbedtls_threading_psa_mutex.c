@@ -10,7 +10,13 @@
 
 #include "mbedtls/threading.h"
 
-#if defined(MBEDTLS_THREADING_C) && defined(MBEDTLS_PSA_CRYPTO_C)
+/*
+ * The TLS 1.3 0-RTT smoke build stages stock Mbed TLS 3.6.x into the TSIP
+ * path. That tree already owns the PSA mutex globals in library/threading.c.
+ */
+#if defined(MBEDTLS_THREADING_C) && defined(MBEDTLS_PSA_CRYPTO_C) && \
+    !defined(LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE) && \
+    !defined(LANBENCH_TLS13_0RTT_TSIP_ENABLE)
 mbedtls_threading_mutex_t mbedtls_threading_key_slot_mutex;
 mbedtls_threading_mutex_t mbedtls_threading_psa_globaldata_mutex;
 mbedtls_threading_mutex_t mbedtls_threading_psa_rngdata_mutex;
@@ -29,7 +35,9 @@ void vTsipMbedtlsThreadingCompatInit( void )
 
     if( 0 == initialized )
     {
-    #if defined(MBEDTLS_PSA_CRYPTO_C)
+    #if defined(MBEDTLS_PSA_CRYPTO_C) && \
+        !defined(LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE) && \
+        !defined(LANBENCH_TLS13_0RTT_TSIP_ENABLE)
         mbedtls_platform_mutex_init( &mbedtls_threading_key_slot_mutex );
         mbedtls_platform_mutex_init( &mbedtls_threading_psa_globaldata_mutex );
         mbedtls_platform_mutex_init( &mbedtls_threading_psa_rngdata_mutex );

@@ -60,6 +60,9 @@
 
 #if ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U )
     #include "aws_clientcredential_keys.h"
+    #include "core_pkcs11.h"
+    #include "core_pkcs11_config_defaults.h"
+    #include "core_pkcs11_pal.h"
     #include "tsip_provisioning_store.h"
 
     extern volatile uint32_t gTsipTlsProbeTls13CertificateVerifyGenerateAttempts;
@@ -110,6 +113,8 @@ static void prvContextFree( Tls13ZeroRttContext_t * pxContext );
 static BaseType_t prvConfigureContext( Tls13ZeroRttContext_t * pxContext );
 #if ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U )
 static BaseType_t prvConfigureTsipClientCertificate( Tls13ZeroRttContext_t * pxContext );
+static BaseType_t prvLoadTsipClientCertificateFromPkcs11( unsigned char ** ppucClientCertificate,
+                                                          size_t * pxClientCertificateLength );
 static void prvPrintTsipCertificateVerifyStats( void );
 #endif
 static BaseType_t prvConnectSocket( Tls13ZeroRttContext_t * pxContext );
@@ -418,16 +423,34 @@ static BaseType_t prvConfigureTsipClientCertificate( Tls13ZeroRttContext_t * pxC
 {
     int lMbedtlsError;
     const char * pcClientCertificate = keyCLIENT_CERTIFICATE_PEM;
+    unsigned char * pucRuntimeClientCertificate = NULL;
+    const unsigned char * pucClientCertificate = ( const unsigned char * ) pcClientCertificate;
+    size_t xClientCertificateLength = 0U;
 
     if( NULL == pcClientCertificate )
     {
-        FreeRTOS_printf( ( "[LANBENCH] TSIP 0RTT client certificate is not configured\r\n" ) );
-        return pdFALSE;
+        if( pdTRUE != prvLoadTsipClientCertificateFromPkcs11( &pucRuntimeClientCertificate,
+                                                              &xClientCertificateLength ) )
+        {
+            FreeRTOS_printf( ( "[LANBENCH] TSIP 0RTT client certificate is not configured\r\n" ) );
+            return pdFALSE;
+        }
+
+        pucClientCertificate = pucRuntimeClientCertificate;
+    }
+    else
+    {
+        xClientCertificateLength = strlen( pcClientCertificate ) + 1U;
     }
 
     lMbedtlsError = mbedtls_x509_crt_parse( &pxContext->xClientCert,
-                                            ( const unsigned char * ) pcClientCertificate,
-                                            strlen( pcClientCertificate ) + 1U );
+                                            pucClientCertificate,
+                                            xClientCertificateLength );
+    if( NULL != pucRuntimeClientCertificate )
+    {
+        vPortFree( pucRuntimeClientCertificate );
+    }
+
     if( 0 != lMbedtlsError )
     {
         prvPrintMbedtlsError( "x509_crt_parse_client", lMbedtlsError );
@@ -452,6 +475,80 @@ static BaseType_t prvConfigureTsipClientCertificate( Tls13ZeroRttContext_t * pxC
     }
 
     FreeRTOS_printf( ( "[LANBENCH] TSIP client certificate configured for TLS13 0RTT smoke\r\n" ) );
+    return pdTRUE;
+}
+
+static BaseType_t prvLoadTsipClientCertificateFromPkcs11( unsigned char ** ppucClientCertificate,
+                                                          size_t * pxClientCertificateLength )
+{
+    CK_BYTE_PTR pucStoredCertificate = NULL;
+    CK_BBOOL xIsPrivate = CK_FALSE;
+    CK_OBJECT_HANDLE xCertificateHandle;
+    CK_ULONG ulStoredCertificateLength = 0UL;
+    CK_RV xPkcs11Result;
+    unsigned char * pucClientCertificate;
+    size_t xParseLength;
+
+    if( ( NULL == ppucClientCertificate ) || ( NULL == pxClientCertificateLength ) )
+    {
+        return pdFALSE;
+    }
+
+    *ppucClientCertificate = NULL;
+    *pxClientCertificateLength = 0U;
+
+    xCertificateHandle = PKCS11_PAL_FindObject(
+        ( CK_BYTE_PTR ) pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS,
+        ( CK_ULONG ) strlen( pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS ) );
+
+    if( CK_INVALID_HANDLE == xCertificateHandle )
+    {
+        FreeRTOS_printf( ( "[LANBENCH] TSIP 0RTT client certificate not found in PKCS11 store\r\n" ) );
+        return pdFALSE;
+    }
+
+    xPkcs11Result = PKCS11_PAL_GetObjectValue( xCertificateHandle,
+                                               &pucStoredCertificate,
+                                               &ulStoredCertificateLength,
+                                               &xIsPrivate );
+    if( ( CKR_OK != xPkcs11Result ) ||
+        ( NULL == pucStoredCertificate ) ||
+        ( 0UL == ulStoredCertificateLength ) )
+    {
+        if( NULL != pucStoredCertificate )
+        {
+            PKCS11_PAL_GetObjectValueCleanup( pucStoredCertificate, ulStoredCertificateLength );
+        }
+
+        FreeRTOS_printf( ( "[LANBENCH] TSIP 0RTT client certificate read failed status=0x%08lx bytes=%lu\r\n",
+                           ( unsigned long ) xPkcs11Result,
+                           ( unsigned long ) ulStoredCertificateLength ) );
+        return pdFALSE;
+    }
+
+    pucClientCertificate = ( unsigned char * ) pvPortMalloc( ( size_t ) ulStoredCertificateLength + 1U );
+    if( NULL == pucClientCertificate )
+    {
+        PKCS11_PAL_GetObjectValueCleanup( pucStoredCertificate, ulStoredCertificateLength );
+        FreeRTOS_printf( ( "[LANBENCH] TSIP 0RTT client certificate alloc failed bytes=%lu\r\n",
+                           ( unsigned long ) ulStoredCertificateLength ) );
+        return pdFALSE;
+    }
+
+    memcpy( pucClientCertificate, pucStoredCertificate, ( size_t ) ulStoredCertificateLength );
+    pucClientCertificate[ ulStoredCertificateLength ] = '\0';
+
+    xParseLength = ( '\0' == pucClientCertificate[ ulStoredCertificateLength - 1UL ] ) ?
+                   ( size_t ) ulStoredCertificateLength :
+                   ( ( size_t ) ulStoredCertificateLength + 1U );
+
+    PKCS11_PAL_GetObjectValueCleanup( pucStoredCertificate, ulStoredCertificateLength );
+
+    *ppucClientCertificate = pucClientCertificate;
+    *pxClientCertificateLength = xParseLength;
+
+    FreeRTOS_printf( ( "[LANBENCH] TSIP 0RTT client certificate loaded from PKCS11 store bytes=%lu\r\n",
+                       ( unsigned long ) ulStoredCertificateLength ) );
     return pdTRUE;
 }
 #endif
