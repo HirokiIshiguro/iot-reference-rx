@@ -24,8 +24,11 @@
 #if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
 
 #include "FreeRTOS.h"
-#include "FreeRTOS_IP.h"
 #include "task.h"
+
+#ifndef FreeRTOS_printf
+    #define FreeRTOS_printf( X )    configPRINTF( X )
+#endif
 
 #include "tcp_sockets_wrapper.h"
 #include "mbedtls_bio_tcp_sockets_wrapper.h"
@@ -48,6 +51,7 @@
 #endif
 
 #include "tls13_0rtt_smoke.h"
+#include "lanbench_tls13_0rtt_config.h"
 
 #if ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U )
     #include "aws_clientcredential_keys.h"
@@ -289,7 +293,7 @@ static void prvContextFree( Tls13ZeroRttContext_t * pxContext )
 
 static BaseType_t prvConfigureContext( Tls13ZeroRttContext_t * pxContext )
 {
-    static const unsigned char ucPersonalization[] = "rx72n-tls13-0rtt";
+    static const unsigned char ucPersonalization[] = "iotref-tls13-0rtt";
     int lMbedtlsError;
 
 #if defined( MBEDTLS_PSA_CRYPTO_C )
