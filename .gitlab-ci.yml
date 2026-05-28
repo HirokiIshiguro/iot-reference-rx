@@ -648,15 +648,21 @@ build_rx65n_bg96:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
     - python -m pip install --user cryptography
     - |
-      $buildArgs = @(
-        "-ProjectRoot", "$env:CI_PROJECT_DIR",
-        "-E2Studio", "$env:E2STUDIO_CLI_BG96",
-        "-Workspace", "$env:E2STUDIO_WORKSPACE_RX65N_BG96",
-        "-LogFile", "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log",
-        "-E2StudioTimeoutSeconds", "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS",
-        "-TlsBackend", "$env:RX65N_BG96_TLS_BACKEND",
-        "-RequireTlsVersion", "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
-      )
+      $buildArgs = @()
+      function Add-BuildArg([string]$Name, [string]$Value) {
+        if ($null -ne $Value -and $Value -ne "") {
+          $script:buildArgs += $Name
+          $script:buildArgs += $Value
+        }
+      }
+
+      Add-BuildArg "-ProjectRoot" "$env:CI_PROJECT_DIR"
+      Add-BuildArg "-E2Studio" "$env:E2STUDIO_CLI_BG96"
+      Add-BuildArg "-Workspace" "$env:E2STUDIO_WORKSPACE_RX65N_BG96"
+      Add-BuildArg "-LogFile" "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log"
+      Add-BuildArg "-E2StudioTimeoutSeconds" "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS"
+      Add-BuildArg "-TlsBackend" "$env:RX65N_BG96_TLS_BACKEND"
+      Add-BuildArg "-RequireTlsVersion" "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
       if ($env:RX65N_BG96_TLS13_0RTT_ENABLE -eq "true") {
         $buildArgs += "-Tls13ZeroRtt"
       }
