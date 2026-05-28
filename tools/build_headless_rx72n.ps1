@@ -6,7 +6,8 @@ param(
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log"),
     [int]$E2StudioTimeoutSeconds = 600,
     [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" }),
-    [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" })
+    [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" }),
+    [switch]$Tls13ZeroRtt
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +29,10 @@ switch ($normalizedTlsBackend) {
     default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
 }
 $useTsipTls13Config = ($normalizedTlsBackend -eq "tsip") -and ($normalizedRequireTlsVersion -in @("tlsv1.3", "tls1.3", "tls13"))
+$useTsipTls13ZeroRttConfig = $Tls13ZeroRtt.IsPresent
+if ($useTsipTls13ZeroRttConfig -and (-not $useTsipTls13Config)) {
+    throw "RX72N TLS 1.3 0-RTT smoke requires -TlsBackend tsip and -RequireTlsVersion TLSv1.3."
+}
 $projectNames = @(
     "boot_loader_rx72n_envision_kit",
     $appProjectName
@@ -68,6 +73,11 @@ foreach ($projectName in $projectNames) {
     if (Test-Path -LiteralPath $cprojectPath) {
         $metadataSnapshots[$cprojectPath] = [System.IO.File]::ReadAllBytes($cprojectPath)
     }
+
+    $projectFilePath = Join-Path $projectDir ".project"
+    if (Test-Path -LiteralPath $projectFilePath) {
+        $metadataSnapshots[$projectFilePath] = [System.IO.File]::ReadAllBytes($projectFilePath)
+    }
 }
 
 $imports = @()
@@ -88,6 +98,7 @@ Write-Host "Log file:  $logFile"
 Write-Host "TLS backend: $normalizedTlsBackend"
 Write-Host "Require TLS version: $(if ($RequireTlsVersion) { $RequireTlsVersion } else { '<none>' })"
 Write-Host "TSIP TLS 1.3 config: $useTsipTls13Config"
+Write-Host "TSIP TLS 1.3 0-RTT config: $useTsipTls13ZeroRttConfig"
 foreach ($projectName in $projectNames) {
     Write-Host "Import:    $(Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx")"
 }
@@ -196,7 +207,12 @@ function Invoke-E2StudioCli {
 
 try {
     Remove-Item -Force -LiteralPath $logFile -ErrorAction SilentlyContinue
-    if ($useTsipTls13Config) {
+    if ($useTsipTls13ZeroRttConfig) {
+        & (Join-Path $projectRoot "tools\prepare_mbedtls364_tsip_0rtt_build.ps1") `
+            -ProjectRoot $projectRoot `
+            -ProjectName $appProjectName
+    }
+    elseif ($useTsipTls13Config) {
         Use-MbedTlsConfigFile `
             -ProjectDir (Join-Path $projectRoot "$projectsPath\$appProjectName\e2studio_ccrx") `
             -ConfigFile "aws_mbedtls_config_with_tsip13.h"

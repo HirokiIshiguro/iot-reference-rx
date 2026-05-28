@@ -10,6 +10,7 @@ param(
     [int]$E2StudioTimeoutSeconds = 600,
     [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" }),
     [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" }),
+    [switch]$Tls13ZeroRtt,
     [switch]$KeepRenderedHeaders
 )
 
@@ -116,7 +117,8 @@ try {
         -LogFile $LogFile `
         -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds `
         -TlsBackend $TlsBackend `
-        -RequireTlsVersion $RequireTlsVersion
+        -RequireTlsVersion $RequireTlsVersion `
+        -Tls13ZeroRtt:$Tls13ZeroRtt
 }
 finally {
     if (-not $KeepRenderedHeaders) {

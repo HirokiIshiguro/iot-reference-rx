@@ -57,6 +57,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "tsip_provisioning_cli.h"
 #endif
 
+#ifndef LANBENCH_TLS13_0RTT_ENABLE
+#define LANBENCH_TLS13_0RTT_ENABLE    ( 0U )
+#endif
+
+#if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
+#include "tls13_0rtt_smoke.h"
+#endif
+
 EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 bool ApplicationCounter (uint32_t xWaitTime);
@@ -287,7 +295,11 @@ void main_task(void *pvParameters)
         FreeRTOS_printf(("---------STARTING DEMO---------\r\n"));
         prvDisplayWrite("Starting demo\r\n");
 
-            #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
+            #if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
+                xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
+                vStartTls13ZeroRttSmoke();
+                prvDisplayWrite("TLS1.3 0RTT bench\r\n");
+            #elif (ENABLE_FLEET_PROVISIONING_DEMO == 1)
                 vStartFleetProvisioningDemo();
             #else
                 xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
