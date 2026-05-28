@@ -26,7 +26,7 @@ if ($instanceIds.Count -eq 0) {
     if ($LASTEXITCODE -ne 0) {
         throw "failed to query EC2 instances"
     }
-    $instanceIds = (($query | Out-String).Trim() -split '\s+') | Where-Object { $_ }
+    $instanceIds = @((($query | Out-String).Trim() -split '\s+') | Where-Object { $_ })
 }
 
 $summary = [ordered]@{
