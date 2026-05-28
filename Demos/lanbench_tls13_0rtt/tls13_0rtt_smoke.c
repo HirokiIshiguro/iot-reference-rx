@@ -40,7 +40,12 @@
 #include "mbedtls/pk.h"
 #include "mbedtls/platform_time.h"
 #include "mbedtls/ssl.h"
+#include "mbedtls/threading.h"
 #include "mbedtls/x509_crt.h"
+
+#if defined( MBEDTLS_THREADING_ALT )
+    #include "threading_alt.h"
+#endif
 
 #if defined( MBEDTLS_DEBUG_C )
     #include "mbedtls/debug.h"
@@ -99,6 +104,7 @@ typedef struct Tls13ZeroRttContext
 
 static void prvTls13ZeroRttTask( void * pvParameters );
 static BaseType_t prvRunTls13ZeroRttSmoke( void );
+static void prvEnsureMbedtlsThreading( void );
 static void prvContextInit( Tls13ZeroRttContext_t * pxContext );
 static void prvContextFree( Tls13ZeroRttContext_t * pxContext );
 static BaseType_t prvConfigureContext( Tls13ZeroRttContext_t * pxContext );
@@ -218,6 +224,8 @@ static BaseType_t prvRunTls13ZeroRttSmoke( void )
     BaseType_t xResult = pdFALSE;
     BaseType_t xTicketSaved = pdFALSE;
 
+    prvEnsureMbedtlsThreading();
+
     pxContext = ( Tls13ZeroRttContext_t * ) pvPortMalloc( sizeof( *pxContext ) );
     if( NULL == pxContext )
     {
@@ -257,6 +265,19 @@ static BaseType_t prvRunTls13ZeroRttSmoke( void )
     mbedtls_ssl_session_free( &xSavedSession );
 
     return xResult;
+}
+
+static void prvEnsureMbedtlsThreading( void )
+{
+#if defined( MBEDTLS_THREADING_C ) && defined( MBEDTLS_THREADING_ALT )
+    if( mbedtls_mutex_lock != mbedtls_platform_mutex_lock )
+    {
+        mbedtls_threading_set_alt( mbedtls_platform_mutex_init,
+                                   mbedtls_platform_mutex_free,
+                                   mbedtls_platform_mutex_lock,
+                                   mbedtls_platform_mutex_unlock );
+    }
+#endif
 }
 
 static void prvContextInit( Tls13ZeroRttContext_t * pxContext )
