@@ -67,7 +67,7 @@
 /* PKCS #11 includes. */
 #include "core_pkcs11.h"
 
-#if defined( TSIP_RUNTIME_PROVISIONING_ENABLE )
+#if defined( TSIP_RUNTIME_PROVISIONING_ENABLE ) && !defined( LANBENCH_TLS13_0RTT_TSIP_ENABLE )
     #error "TSIP runtime provisioning builds must include using_mbedtls_pkcs11_with_tsip before using_mbedtls_pkcs11."
 #endif
 

@@ -8,6 +8,21 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE
+#define LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE    ( 0U )
+#endif
+
+#ifndef LANBENCH_TLS13_0RTT_TSIP_ENABLE
+#define LANBENCH_TLS13_0RTT_TSIP_ENABLE        ( 0U )
+#endif
+
+#ifndef LANBENCH_TLS13_0RTT_ENABLE
+#define LANBENCH_TLS13_0RTT_ENABLE             ( ( LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE != 0U ) || \
+                                                  ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U ) )
+#endif
+
+#if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
+
 #include "FreeRTOS.h"
 #include "FreeRTOS_IP.h"
 #include "task.h"
@@ -34,19 +49,6 @@
 
 #include "tls13_0rtt_smoke.h"
 
-#ifndef LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE
-#define LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE    ( 0U )
-#endif
-
-#ifndef LANBENCH_TLS13_0RTT_TSIP_ENABLE
-#define LANBENCH_TLS13_0RTT_TSIP_ENABLE        ( 0U )
-#endif
-
-#ifndef LANBENCH_TLS13_0RTT_ENABLE
-#define LANBENCH_TLS13_0RTT_ENABLE             ( ( LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE != 0U ) || \
-                                                  ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U ) )
-#endif
-
 #if ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U )
     #include "aws_clientcredential_keys.h"
     #include "tsip_provisioning_store.h"
@@ -58,8 +60,6 @@
     extern volatile uint32_t gTsipTlsProbeTls13CertificateVerifyGenerateLastScheme;
     extern volatile uint32_t gTsipTlsProbeTls13CertificateVerifyGenerateLastBytes;
 #endif
-
-#if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
 
 #ifndef LANBENCH_TLS13_0RTT_HOST
 #define LANBENCH_TLS13_0RTT_HOST              "192.168.10.103"
