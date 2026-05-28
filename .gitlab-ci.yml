@@ -963,7 +963,9 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_tls13_0rtt_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && ($LANBENCH_MBEDTLS_0RTT_HOST || $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true")'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_HOST'
+      when: on_success
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true"'
       when: on_success
     - when: never
 
@@ -1493,6 +1495,14 @@ test_rx65n_bg96_tls13_0rtt:
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
         echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
         exit 1
+      fi
+
+      lanbench_env="$CI_PROJECT_DIR/artifacts/prepare_lanbench_tls13_0rtt_server/lanbench_tls13_0rtt.env"
+      if [ -f "$lanbench_env" ]; then
+        set -a
+        # shellcheck disable=SC1090
+        . "$lanbench_env"
+        set +a
       fi
 
       if [ -z "${LANBENCH_MBEDTLS_0RTT_HOST:-}" ]; then
