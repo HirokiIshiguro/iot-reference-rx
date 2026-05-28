@@ -37,6 +37,10 @@ commit `d91f2271` 上の [focused pipeline #6072](https://gitlab.saffti.jp/oss/i
 [#6075](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6075) /
 [#6076](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6076)
 で5回連続成功しています。これにより、TLS 1.3 full handshake までの24/24 セルが5回成功済みです。
+LANBENCH / TLSエンドポイント基礎テストでは、RX72N/Ether TSIP の TLS 1.3 session resumption / 0-RTT を
+MR [!121](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/121) の
+commit `4554f1b2` 上の [focused pipeline #6175](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175)
+で確認しています。
 通常スケジュールは `PIPELINE_PROFILE=nightly_matrix`
 で実行し、focused 行を子パイプラインとして展開します。
 
@@ -56,11 +60,11 @@ commit `d91f2271` 上の [focused pipeline #6072](https://gitlab.saffti.jp/oss/i
 | <small>MCU環境</small> | <small>TLS1.3 Resumption</small> | <small>TLS1.3 0-RTT</small> |
 |---|:-:|:-:|
 | <small>RX72N/Ether<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6094)</small> | <small>[✓](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6135)</small> |
-| <small>RX72N/Ether<br>TSIP</small> |  |  |
+| <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175)</small> |
 | <small>RX65N/BG96<br>software</small> |  |  |
 | <small>RX65N/BG96<br>TSIP</small> |  |  |
 
-<small>この表は AWS IoT Core ではなく、SessionTicket を発行できる LANBENCH / Mbed TLS `ssl_server2` などのTLSエンドポイントに対する基礎実験結果です。RX72N/Ether software の resumption は [tsip_mbedtls13 MR !3](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/3)、0-RTT は [tsip_mbedtls13 MR !4](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/4) で確認しています。空欄は同等条件で未確認のセルです。</small>
+<small>この表は AWS IoT Core ではなく、SessionTicket を発行できる LANBENCH / Mbed TLS `ssl_server2` などのTLSエンドポイントに対する基礎実験結果です。RX72N/Ether software の resumption は [tsip_mbedtls13 MR !3](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/3)、0-RTT は [tsip_mbedtls13 MR !4](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/4) で確認しています。RX72N/Ether TSIP の resumption / 0-RTT は [iot-reference-rx MR !121](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/121) と [pipeline #6175](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175) で確認しています。この経路では TLS 1.3 CertificateVerify に TSIP ドライバ API を使い、record path / key schedule / session ticket / early data は Mbed TLS 3.6.4 software path で扱います。空欄は同等条件で未確認のセルです。</small>
 
 ## About This Fork / このフォークについて
 
