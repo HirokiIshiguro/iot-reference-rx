@@ -42,6 +42,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "mqtt_agent_task.h"
 #include "bg96_probe.h"
 
+#ifndef LANBENCH_TLS13_0RTT_ENABLE
+    #define LANBENCH_TLS13_0RTT_ENABLE    ( 0U )
+#endif
+
+#if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
+    #include "tls13_0rtt_smoke.h"
+#endif
+
 st_cellular_ctrl_t cellular_ctrl;
 extern bool Connect2AP( void );
 
@@ -195,7 +203,9 @@ void main_task(void)
 
         configPRINTF(("---------STARTING DEMO---------\r\n"));
 
-        #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
+        #if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
+            vStartTls13ZeroRttSmoke();
+        #elif (ENABLE_FLEET_PROVISIONING_DEMO == 1)
             vStartFleetProvisioningDemo();
         #else
             xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);

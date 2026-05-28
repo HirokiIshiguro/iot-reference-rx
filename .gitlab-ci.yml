@@ -1,5 +1,6 @@
 stages:
   - nightly_matrix
+  - lanbench_prepare
   - build
   - pre_test_cleanup
   - flash
@@ -60,6 +61,7 @@ variables:
   #   mqtt  - flash, download app, provision credentials, and verify MQTT.
   #   ota   - mqtt + AWS IoT OTA.
   #   fleet - build and verify the Fleet Provisioning image.
+  #   tls13_0rtt - software TLS 1.3 resumption + 0-RTT LANBENCH smoke.
   #   full  - ota + Fleet Provisioning path.
   RX65N_BG96_TEST_SCOPE: "build"
   RX65N_BG96_SKIP_HW_TESTS: "false"
@@ -89,6 +91,7 @@ variables:
   RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: ""
   # RX65N_BG96_TLS_BACKEND: software or tsip.
   RX65N_BG96_TLS_BACKEND: "software"
+  RX65N_BG96_TLS13_0RTT_ENABLE: "false"
   RX65N_BG96_UART_BAUD_RATE: "921600"
   # TSIP runtime provisioning payloads are read from masked CI/CD variables by
   # tools/provision_tsip_over_uart.py and sent to the board over UART.
@@ -152,7 +155,14 @@ variables:
   # RX72N_TLS_BACKEND: software or tsip.
   RX72N_TLS_BACKEND: "software"
   RX72N_TLS13_0RTT_ENABLE: "false"
+  # Cellular LANBENCH 0-RTT focused jobs need a public host reachable from BG96.
+  LANBENCH_MBEDTLS_0RTT_HOST: ""
+  LANBENCH_MBEDTLS_0RTT_SERVER_NAME: ""
   LANBENCH_MBEDTLS_0RTT_PORT: "5443"
+  LANBENCH_MBEDTLS_0RTT_AUTO_EC2: "true"
+  LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_NAME: "iot-reference-rx-lanbench-tls13-0rtt"
+  LANBENCH_MBEDTLS_0RTT_EC2_SECURITY_GROUP_NAME: "iot-reference-rx-lanbench-tls13-0rtt-5443"
+  LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_TYPE: "t4g.nano"
   LANBENCH_MBEDTLS_0RTT_AUTH_MODE: "optional"
   LANBENCH_MBEDTLS_0RTT_CA_FILE: "none"
   LANBENCH_MBEDTLS_0RTT_SIG_ALGS: "ecdsa_secp256r1_sha256,rsa_pss_rsae_sha256"
@@ -444,6 +454,18 @@ matrix_rx65n_bg96_software_tls13_fleet:
     RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
     AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
 
+matrix_rx65n_bg96_software_tls13_resumption_0rtt:
+  extends: .nightly_matrix_rx65n_bg96
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && ($LANBENCH_MBEDTLS_0RTT_HOST || $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true")'
+      when: on_success
+    - when: never
+  variables:
+    RX65N_BG96_TEST_SCOPE: "tls13_0rtt"
+    RX65N_BG96_TLS_BACKEND: "software"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.3"
+    RX65N_BG96_TLS13_0RTT_ENABLE: "true"
+
 matrix_rx65n_bg96_tsip_mqtt:
   extends: .nightly_matrix_rx65n_bg96
   variables:
@@ -579,6 +601,33 @@ build_rx72n_ether:
       - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
     expire_in: 7 days
 
+prepare_lanbench_tls13_0rtt_server:
+  stage: lanbench_prepare
+  extends:
+    - .aws_cli_windows_job
+    - .rx65n_bg96_tls13_0rtt_auto_ec2_rules
+  resource_group: lanbench-tls13-0rtt-ec2
+  script:
+    - Write-Host "=== Prepare public LANBENCH TLS 1.3 0-RTT server ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      & "$env:CI_PROJECT_DIR\tools\aws\create_lanbench_tls13_0rtt_ec2.ps1" `
+        -Region "$env:AWS_DEFAULT_REGION" `
+        -InstanceName "$env:LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_NAME" `
+        -InstanceType "$env:LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_TYPE" `
+        -SecurityGroupName "$env:LANBENCH_MBEDTLS_0RTT_EC2_SECURITY_GROUP_NAME" `
+        -Port ([int]$env:LANBENCH_MBEDTLS_0RTT_PORT) `
+        -OutputJson "$artifactDir\lanbench_tls13_0rtt_ec2.json" `
+        -OutputEnv "$artifactDir\lanbench_tls13_0rtt.env"
+  artifacts:
+    when: always
+    reports:
+      dotenv: artifacts/prepare_lanbench_tls13_0rtt_server/lanbench_tls13_0rtt.env
+    paths:
+      - artifacts/prepare_lanbench_tls13_0rtt_server/
+    expire_in: 1 day
+
 build_rx65n_bg96:
   stage: build
   tags:
@@ -591,18 +640,55 @@ build_rx65n_bg96:
     - if: '$RUN_RX65N_BG96_BUILD == "true"'
       when: on_success
     - when: never
+  needs:
+    - job: prepare_lanbench_tls13_0rtt_server
+      artifacts: true
+      optional: true
   script:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
     - python -m pip install --user cryptography
     - |
-      & "$env:CI_PROJECT_DIR\tools\build_headless_rx65n_bg96.ps1" `
-      -ProjectRoot "$env:CI_PROJECT_DIR" `
-      -E2Studio "$env:E2STUDIO_CLI_BG96" `
-      -Workspace "$env:E2STUDIO_WORKSPACE_RX65N_BG96" `
-      -LogFile "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log" `
-      -E2StudioTimeoutSeconds $env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS `
-      -TlsBackend "$env:RX65N_BG96_TLS_BACKEND" `
-      -RequireTlsVersion "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
+      $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
+      if ($env:RX65N_BG96_TLS13_0RTT_ENABLE -eq "true" -and (Test-Path -LiteralPath $lanbenchEnv)) {
+        Get-Content -LiteralPath $lanbenchEnv | ForEach-Object {
+          if ($_ -match '^\s*([^#=\s]+)=(.*)\s*$') {
+            [Environment]::SetEnvironmentVariable($matches[1], $matches[2], "Process")
+          }
+        }
+      }
+
+      $buildArgs = @{
+        ProjectRoot = "$env:CI_PROJECT_DIR"
+        LogFile = "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log"
+      }
+      if ($env:E2STUDIO_CLI_BG96) {
+        $buildArgs.E2Studio = "$env:E2STUDIO_CLI_BG96"
+      }
+      if ($env:E2STUDIO_WORKSPACE_RX65N_BG96) {
+        $buildArgs.Workspace = "$env:E2STUDIO_WORKSPACE_RX65N_BG96"
+      }
+      if ($env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS) {
+        $buildArgs.E2StudioTimeoutSeconds = [int]$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS
+      }
+      if ($env:RX65N_BG96_TLS_BACKEND) {
+        $buildArgs.TlsBackend = "$env:RX65N_BG96_TLS_BACKEND"
+      }
+      if ($env:RX65N_BG96_REQUIRE_TLS_VERSION) {
+        $buildArgs.RequireTlsVersion = "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
+      }
+      if ($env:RX65N_BG96_TLS13_0RTT_ENABLE -eq "true") {
+        $buildArgs.Tls13ZeroRtt = $true
+        if ($env:LANBENCH_MBEDTLS_0RTT_HOST) {
+          $buildArgs.LanbenchTls13ZeroRttHost = "$env:LANBENCH_MBEDTLS_0RTT_HOST"
+        }
+        if ($env:LANBENCH_MBEDTLS_0RTT_SERVER_NAME) {
+          $buildArgs.LanbenchTls13ZeroRttServerName = "$env:LANBENCH_MBEDTLS_0RTT_SERVER_NAME"
+        }
+        if ($env:LANBENCH_MBEDTLS_0RTT_PORT) {
+          $buildArgs.LanbenchTls13ZeroRttPort = "$env:LANBENCH_MBEDTLS_0RTT_PORT"
+        }
+      }
+      & "$env:CI_PROJECT_DIR\tools\build_headless_rx65n_bg96.ps1" @buildArgs
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx65n_bg96"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -841,13 +927,13 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_flash_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|download|app|provision|mqtt|ota|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|download|app|provision|mqtt|ota|tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
 .rx65n_bg96_download_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(download|app|provision|mqtt|ota|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(download|app|provision|mqtt|ota|tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
@@ -859,7 +945,7 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_provision_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
@@ -869,9 +955,29 @@ build_rx72n_ether_fleet:
       when: on_success
     - when: never
 
+.rx65n_bg96_app_reset_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(mqtt|tls13_0rtt|full)$/'
+      when: on_success
+    - when: never
+
+.rx65n_bg96_tls13_0rtt_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_HOST'
+      when: on_success
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true"'
+      when: on_success
+    - when: never
+
+.rx65n_bg96_tls13_0rtt_auto_ec2_rules:
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $RX65N_BG96_REQUIRE_TLS_VERSION =~ /^TLSv?1\.3$/ && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
+      when: on_success
+    - when: never
+
 .rx65n_bg96_credential_prepare_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota|tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
@@ -1265,7 +1371,7 @@ reset_rx65n_bg96_app:
   stage: app_reset
   extends:
     - .rx65n_bg96_linux_hw_job
-    - .rx65n_bg96_mqtt_rules
+    - .rx65n_bg96_app_reset_rules
   needs:
     - job: download_rx65n_bg96_app
       artifacts: true
@@ -1366,6 +1472,97 @@ test_rx65n_bg96_mqtt:
     paths:
       - artifacts/test_rx65n_bg96_mqtt/
     expire_in: 7 days
+
+test_rx65n_bg96_tls13_0rtt:
+  stage: test
+  extends:
+    - .rx65n_bg96_linux_hw_job
+    - .rx65n_bg96_tls13_0rtt_rules
+  needs:
+    - job: prepare_lanbench_tls13_0rtt_server
+      artifacts: true
+      optional: true
+    - job: download_rx65n_bg96_app
+      artifacts: true
+    - job: reset_rx65n_bg96_app
+      artifacts: true
+  script:
+    - echo "=== Verify CK-RX65N BG96 software TLS 1.3 resumption and 0-RTT ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_tls13_0rtt"
+      mkdir -p "$artifact_dir"
+      actual_host="$(hostname)"
+      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
+        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+
+      lanbench_env="$CI_PROJECT_DIR/artifacts/prepare_lanbench_tls13_0rtt_server/lanbench_tls13_0rtt.env"
+      if [ -f "$lanbench_env" ]; then
+        set -a
+        # shellcheck disable=SC1090
+        . "$lanbench_env"
+        set +a
+      fi
+
+      if [ -z "${LANBENCH_MBEDTLS_0RTT_HOST:-}" ]; then
+        echo "LANBENCH_MBEDTLS_0RTT_HOST is required for cellular 0-RTT smoke." >&2
+        exit 1
+      fi
+
+      uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
+      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
+        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
+      fi
+      if [ -z "$uart_port" ]; then
+        echo "RX65N BG96 UART port was not selected." >&2
+        exit 1
+      fi
+
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      reset_cmd="${RX65N_BG96_LINUX_RFP_CLI} -device ${RX65N_BG96_RFP_DEVICE} -tool ${rfp_tool} -if ${RX65N_BG96_RFP_INTERFACE} -speed ${RX65N_BG96_RFP_SPEED} -auth id ${RX65N_BG96_RFP_AUTH_ID} -sig -run -noquery"
+      python3 -u tools/test_lanbench_tls13_0rtt_rx72n.py \
+        --port "${uart_port}" \
+        --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+        --timeout "${LANBENCH_MBEDTLS_0RTT_TIMEOUT_SECONDS:-480}" \
+        --log "$artifact_dir/lanbench_tls13_0rtt.log" \
+        --reset-cmd "$reset_cmd" \
+        2>&1 | tee "$artifact_dir/lanbench_tls13_0rtt_console.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_rx65n_bg96_tls13_0rtt/
+    expire_in: 7 days
+
+cleanup_lanbench_tls13_0rtt_server:
+  stage: credential_cleanup
+  extends: .aws_cli_windows_job
+  resource_group: lanbench-tls13-0rtt-ec2
+  allow_failure: true
+  rules:
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && $RX65N_BG96_TLS_BACKEND == "software" && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
+      when: always
+    - when: never
+  dependencies:
+    - prepare_lanbench_tls13_0rtt_server
+  script:
+    - $ErrorActionPreference = "Continue"
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_lanbench_tls13_0rtt_server"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $metaPath = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt_ec2.json"
+      & "$env:CI_PROJECT_DIR\tools\aws\terminate_lanbench_tls13_0rtt_ec2.ps1" `
+        -Region "$env:AWS_DEFAULT_REGION" `
+        -InstanceName "$env:LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_NAME" `
+        -MetadataJson "$metaPath" `
+        -OutputJson "$artifactDir\cleanup_summary.json"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/cleanup_lanbench_tls13_0rtt_server/
+    expire_in: 1 day
 
 build_rx65n_bg96_ota:
   stage: ota_build

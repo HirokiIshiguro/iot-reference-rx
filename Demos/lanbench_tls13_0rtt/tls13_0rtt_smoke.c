@@ -24,8 +24,11 @@
 #if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
 
 #include "FreeRTOS.h"
-#include "FreeRTOS_IP.h"
 #include "task.h"
+
+#ifndef FreeRTOS_printf
+    #define FreeRTOS_printf( X )    configPRINTF( X )
+#endif
 
 #include "tcp_sockets_wrapper.h"
 #include "mbedtls_bio_tcp_sockets_wrapper.h"
@@ -37,7 +40,12 @@
 #include "mbedtls/pk.h"
 #include "mbedtls/platform_time.h"
 #include "mbedtls/ssl.h"
+#include "mbedtls/threading.h"
 #include "mbedtls/x509_crt.h"
+
+#if defined( MBEDTLS_THREADING_ALT )
+    #include "threading_alt.h"
+#endif
 
 #if defined( MBEDTLS_DEBUG_C )
     #include "mbedtls/debug.h"
@@ -48,6 +56,7 @@
 #endif
 
 #include "tls13_0rtt_smoke.h"
+#include "lanbench_tls13_0rtt_config.h"
 
 #if ( LANBENCH_TLS13_0RTT_TSIP_ENABLE != 0U )
     #include "aws_clientcredential_keys.h"
@@ -95,6 +104,7 @@ typedef struct Tls13ZeroRttContext
 
 static void prvTls13ZeroRttTask( void * pvParameters );
 static BaseType_t prvRunTls13ZeroRttSmoke( void );
+static void prvEnsureMbedtlsThreading( void );
 static void prvContextInit( Tls13ZeroRttContext_t * pxContext );
 static void prvContextFree( Tls13ZeroRttContext_t * pxContext );
 static BaseType_t prvConfigureContext( Tls13ZeroRttContext_t * pxContext );
@@ -214,6 +224,8 @@ static BaseType_t prvRunTls13ZeroRttSmoke( void )
     BaseType_t xResult = pdFALSE;
     BaseType_t xTicketSaved = pdFALSE;
 
+    prvEnsureMbedtlsThreading();
+
     pxContext = ( Tls13ZeroRttContext_t * ) pvPortMalloc( sizeof( *pxContext ) );
     if( NULL == pxContext )
     {
@@ -255,6 +267,19 @@ static BaseType_t prvRunTls13ZeroRttSmoke( void )
     return xResult;
 }
 
+static void prvEnsureMbedtlsThreading( void )
+{
+#if defined( MBEDTLS_THREADING_C ) && defined( MBEDTLS_THREADING_ALT )
+    if( mbedtls_mutex_lock != mbedtls_platform_mutex_lock )
+    {
+        mbedtls_threading_set_alt( mbedtls_platform_mutex_init,
+                                   mbedtls_platform_mutex_free,
+                                   mbedtls_platform_mutex_lock,
+                                   mbedtls_platform_mutex_unlock );
+    }
+#endif
+}
+
 static void prvContextInit( Tls13ZeroRttContext_t * pxContext )
 {
     memset( pxContext, 0, sizeof( *pxContext ) );
@@ -289,7 +314,7 @@ static void prvContextFree( Tls13ZeroRttContext_t * pxContext )
 
 static BaseType_t prvConfigureContext( Tls13ZeroRttContext_t * pxContext )
 {
-    static const unsigned char ucPersonalization[] = "rx72n-tls13-0rtt";
+    static const unsigned char ucPersonalization[] = "iotref-tls13-0rtt";
     int lMbedtlsError;
 
 #if defined( MBEDTLS_PSA_CRYPTO_C )
