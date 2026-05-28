@@ -648,25 +648,27 @@ build_rx65n_bg96:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
     - python -m pip install --user cryptography
     - |
-      $buildArgs = @("-ProjectRoot", "$env:CI_PROJECT_DIR")
+      $buildArgs = @{
+        ProjectRoot = "$env:CI_PROJECT_DIR"
+        LogFile = "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log"
+      }
       if ($env:E2STUDIO_CLI_BG96) {
-        $buildArgs += @("-E2Studio", "$env:E2STUDIO_CLI_BG96")
+        $buildArgs.E2Studio = "$env:E2STUDIO_CLI_BG96"
       }
       if ($env:E2STUDIO_WORKSPACE_RX65N_BG96) {
-        $buildArgs += @("-Workspace", "$env:E2STUDIO_WORKSPACE_RX65N_BG96")
+        $buildArgs.Workspace = "$env:E2STUDIO_WORKSPACE_RX65N_BG96"
       }
-      $buildArgs += @("-LogFile", "$env:CI_PROJECT_DIR\rx65n_bg96_e2studio_build.log")
       if ($env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS) {
-        $buildArgs += @("-E2StudioTimeoutSeconds", "$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS")
+        $buildArgs.E2StudioTimeoutSeconds = [int]$env:RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS
       }
       if ($env:RX65N_BG96_TLS_BACKEND) {
-        $buildArgs += @("-TlsBackend", "$env:RX65N_BG96_TLS_BACKEND")
+        $buildArgs.TlsBackend = "$env:RX65N_BG96_TLS_BACKEND"
       }
       if ($env:RX65N_BG96_REQUIRE_TLS_VERSION) {
-        $buildArgs += @("-RequireTlsVersion", "$env:RX65N_BG96_REQUIRE_TLS_VERSION")
+        $buildArgs.RequireTlsVersion = "$env:RX65N_BG96_REQUIRE_TLS_VERSION"
       }
       if ($env:RX65N_BG96_TLS13_0RTT_ENABLE -eq "true") {
-        $buildArgs += @("-Tls13ZeroRtt")
+        $buildArgs.Tls13ZeroRtt = $true
       }
       & "$env:CI_PROJECT_DIR\tools\build_headless_rx65n_bg96.ps1" @buildArgs
     - |
