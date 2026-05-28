@@ -15,10 +15,17 @@
   で参照できます。この成果は `iot-reference-rx` 側の RX72N/Ether TSIP backend にも横展開し、
   [MR !121](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/121) と
   [pipeline #6175](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175)
-  で TLS 1.3 session resumption と 0-RTT early data 送信まで確認しました。
+  で TLS 1.3 session resumption と 0-RTT early data 送信まで確認しました。さらに
+  RX65N/BG96 software backend へも横展開し、
+  [MR !122](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/122) と
+  [pipeline #6191](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6191)
+  で initial TLS 1.3 接続、NewSessionTicket 受信、session ticket 保存、96 bytes の
+  0-RTT early data 送信、resumed TLS 1.3 接続、PASS まで確認しました。
+  BG96経路では、セルラー網から到達できる一時的なEC2上の Mbed TLS `ssl_server2` を
+  GitLab CI から起動して対向にしています。
   現時点の `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
   TSIP backend と組み合わせて実機CIで確認済みですが、resumption と 0-RTT は
-  まだリリース対象外です。次は RX65N/BG96 側への展開、耐久確認、リリース化を進めます。
+  まだリリース対象外です。次は RX65N/BG96 TSIP 側への展開、耐久確認、リリース化を進めます。
   AWS IoT Core は
   [SessionTicket TLS extension をサポートしていない](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)
   ため、AWS IoT Core 接続での TLS 1.3 resumption / 0-RTT はサービス側対応待ちです。
