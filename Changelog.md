@@ -21,11 +21,26 @@
   [pipeline #6191](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6191)
   で initial TLS 1.3 接続、NewSessionTicket 受信、session ticket 保存、96 bytes の
   0-RTT early data 送信、resumed TLS 1.3 接続、PASS まで確認しました。
+  RX65N/BG96 TSIP backend へも横展開し、
+  [MR !123](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/123) と
+  [pipeline #6204](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6204)
+  で同じ LANBENCH TLS 1.3 resumption / 0-RTT smoke の PASS まで確認しています。
+  RX72N/Ether TSIP backend については、main merge commit `5aefbb4d` 上の
+  `nightly_matrix` [#6355](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6355) /
+  [#6388](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6388) /
+  [#6406](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6406) /
+  [#6424](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6424) /
+  [#6442](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6442)
+  で5回通過したため、README の LANBENCH 表では5回目の child pipeline
+  [#6454](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6454)
+  を証跡にして `✓` へ昇格しました。RX65N/BG96 software / TSIP の LANBENCH 行は、
+  上記5回の `nightly_matrix` では該当 bridge が生成されていないため、初回 focused/API 確認の
+  `1/5` として残しています。
   BG96経路では、セルラー網から到達できる一時的なEC2上の Mbed TLS `ssl_server2` を
   GitLab CI から起動して対向にしています。
   現時点の `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
   TSIP backend と組み合わせて実機CIで確認済みですが、resumption と 0-RTT は
-  まだリリース対象外です。次は RX65N/BG96 TSIP 側への展開、耐久確認、リリース化を進めます。
+  まだリリース対象外です。次は BG96 LANBENCH 行のスケジューラ5回通過確認とリリース化を進めます。
   AWS IoT Core は
   [SessionTicket TLS extension をサポートしていない](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)
   ため、AWS IoT Core 接続での TLS 1.3 resumption / 0-RTT はサービス側対応待ちです。
