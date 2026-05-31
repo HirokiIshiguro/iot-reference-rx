@@ -3,7 +3,7 @@
 ## 最新リリース
 
 最新のsafftiリリースタグは
-[v202604.00-LTS-rx-1.0.0-saffti-1.2.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.2.0)
+[v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0)
 です。変更点は [Changelog.md](Changelog.md) を参照してください。
 
 ## 検証状況
@@ -43,7 +43,7 @@ upstream は CK-RX65N v2 のみを公式サポートしており、**RX72N に�
 Base version: **202604.00-LTS-rx** (FreeRTOS 202604.00 LTS)
 
 Latest saffti release:
-**[v202604.00-LTS-rx-1.0.0-saffti-1.2.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.2.0)**
+**[v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0)**
 
 ## Supported Board / 対応ボード
 
