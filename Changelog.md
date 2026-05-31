@@ -47,14 +47,26 @@
   [#6487](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6487) /
   [#6489](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6489)
   で5回通過したため、README の RX65N/BG96 software / TSIP LANBENCH 行も `✓` へ昇格しました。
+  RX72N/Ether software も benchmark project main commit `fa057a02` 上の focused/API
+  [#6492](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6492) /
+  [#6493](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6493) /
+  [#6494](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6494) /
+  [#6495](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6495) /
+  [#6496](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6496)
+  で5回通過したため、README の RX72N/Ether software LANBENCH 行も `✓` へ昇格しました。
   BG96経路では、セルラー網から到達できる一時的なEC2上の Mbed TLS `ssl_server2` を
   GitLab CI から起動して対向にしています。
   現時点の `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
   TSIP backend と組み合わせて実機CIで確認済みで、次リリース候補では LANBENCH 対向の
-  resumption と 0-RTT も RX65N/BG96 software / TSIP と RX72N/Ether TSIP で5回成功済みです。
+  resumption と 0-RTT も RX72N/Ether software / TSIP と RX65N/BG96 software / TSIP で5回成功済みです。
   AWS IoT Core は
   [SessionTicket TLS extension をサポートしていない](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)
   ため、AWS IoT Core 接続での TLS 1.3 resumption / 0-RTT はサービス側対応待ちです。
+
+- 夜間スケジューラは `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` を前提に、
+  README の AWS IoT Core / LANBENCH 表で `✓` とした全パタンを1日1回回す方針へ更新しました。
+  RX72N/Ether software LANBENCH は `tsip_mbedtls13` benchmark project への downstream bridge で
+  同じ nightly matrix 起点から実行します。
 
 - Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
   性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
