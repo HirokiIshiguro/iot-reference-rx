@@ -63,6 +63,11 @@
   [SessionTicket TLS extension をサポートしていない](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)
   ため、AWS IoT Core 接続での TLS 1.3 resumption / 0-RTT はサービス側対応待ちです。
 
+- 夜間スケジューラは `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` を前提に、
+  README の AWS IoT Core / LANBENCH 表で `✓` とした全パタンを1日1回回す方針へ更新しました。
+  RX72N/Ether software LANBENCH は `tsip_mbedtls13` benchmark project への downstream bridge で
+  同じ nightly matrix 起点から実行します。
+
 - Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
   性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
 
