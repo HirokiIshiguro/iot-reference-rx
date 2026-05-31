@@ -8,7 +8,7 @@
 
 ## 最新テスト結果
 
-最終更新: 2026-05-29 JST。RX72N TSIP transport include order 修正後、
+最終更新: 2026-05-31 JST。RX72N TSIP transport include order 修正後、
 [matrix pipeline #5858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5858) /
 [#5877](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5877) /
 [#5896](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5896) /
@@ -46,8 +46,33 @@ commit `7c4976ff` 上の [focused pipeline #6191](https://gitlab.saffti.jp/oss/i
 で確認しています。さらに RX65N/BG96 TSIP の TLS 1.3 session resumption / 0-RTT を
 MR [!123](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/123) の
 commit `268d9466` 上の [focused pipeline #6204](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6204)
-で確認しています。これらの LANBENCH セルは初回の focused/API 確認であり、
-スケジューラパイプラインでの5回安定通過確認は未完了です。
+で確認しています。RX72N/Ether TSIP の LANBENCH TLS 1.3 session resumption / 0-RTT は、
+main merge commit `5aefbb4d` 上の `nightly_matrix`
+[#6355](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6355) /
+[#6388](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6388) /
+[#6406](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6406) /
+[#6424](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6424) /
+[#6442](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6442)
+で5回通過し、5回目の child pipeline
+[#6454](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6454)
+で `test_rx72n_ether_tls13_0rtt` の PASS を確認しています。RX65N/BG96 software は、
+同じ main merge commit `5aefbb4d` 上の focused/API
+[#6466](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6466) /
+[#6482](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6482) /
+[#6484](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6484) /
+[#6486](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6486) /
+[#6488](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6488)
+で5回通過し、5回目の `test_rx65n_bg96_tls13_0rtt`
+[job #44770](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/44770)
+で `early_status=1` と PASS を確認しています。RX65N/BG96 TSIP も
+[#6469](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6469) /
+[#6483](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6483) /
+[#6485](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6485) /
+[#6487](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6487) /
+[#6489](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6489)
+で5回通過し、5回目の `test_rx65n_bg96_tls13_0rtt`
+[job #44779](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/44779)
+で `early_status=1` と PASS を確認しています。
 通常スケジュールは `PIPELINE_PROFILE=nightly_matrix`
 で実行し、focused 行を子パイプラインとして展開します。
 
@@ -67,11 +92,11 @@ commit `268d9466` 上の [focused pipeline #6204](https://gitlab.saffti.jp/oss/i
 | <small>MCU環境</small> | <small>TLS1.3 Resumption</small> | <small>TLS1.3 0-RTT</small> |
 |---|:-:|:-:|
 | <small>RX72N/Ether<br>software</small> | <small>[1/5](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6094)</small> | <small>[1/5](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6135)</small> |
-| <small>RX72N/Ether<br>TSIP</small> | <small>[1/5](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175)</small> | <small>[1/5](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175)</small> |
-| <small>RX65N/BG96<br>software</small> | <small>[1/5](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6191)</small> | <small>[1/5](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6191)</small> |
-| <small>RX65N/BG96<br>TSIP</small> | <small>[1/5](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6204)</small> | <small>[1/5](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6204)</small> |
+| <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6454)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6454)</small> |
+| <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6488)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6488)</small> |
+| <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6489)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6489)</small> |
 
-<small>この表は AWS IoT Core ではなく、SessionTicket を発行できる LANBENCH / Mbed TLS `ssl_server2` などのTLSエンドポイントに対する基礎実験結果です。表中の `1/5` は同等条件の初回 focused/API 確認済みであることを示し、スケジューラまたは同等のmatrix実行で5回通過したセルを `✓` に昇格します。RX72N/Ether software は benchmark project 側の証跡であり、現行の iot-reference-rx nightly matrix schedule には含まれていません。RX72N/Ether software の resumption は [tsip_mbedtls13 MR !3](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/3)、0-RTT は [tsip_mbedtls13 MR !4](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/4) で確認しています。RX72N/Ether TSIP の resumption / 0-RTT は [iot-reference-rx MR !121](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/121) と [pipeline #6175](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175) で確認しています。RX65N/BG96 software の resumption / 0-RTT は [iot-reference-rx MR !122](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/122) と [pipeline #6191](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6191) で確認しています。RX65N/BG96 TSIP の resumption / 0-RTT は [iot-reference-rx MR !123](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/123) と [pipeline #6204](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6204) で確認しています。BG96経路では、セルラー網から到達できる一時的なEC2上の Mbed TLS `ssl_server2` をGitLab CIから起動して対向にしています。TSIP経路では TLS 1.3 CertificateVerify に TSIP ドライバ API を使い、record path / key schedule / session ticket / early data は Mbed TLS 3.6.4 software path で扱います。</small>
+<small>この表は AWS IoT Core ではなく、SessionTicket を発行できる LANBENCH / Mbed TLS `ssl_server2` などのTLSエンドポイントに対する基礎実験結果です。表中の `1/5` は同等条件の初回 focused/API 確認済みであることを示し、スケジューラまたは同等のmatrix実行で5回通過したセルを `✓` に昇格します。RX72N/Ether software は benchmark project 側の証跡であり、現行の iot-reference-rx nightly matrix schedule には含まれていません。RX72N/Ether software の resumption は [tsip_mbedtls13 MR !3](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/3)、0-RTT は [tsip_mbedtls13 MR !4](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/4) で確認しています。RX72N/Ether TSIP の resumption / 0-RTT は [iot-reference-rx MR !121](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/121) と [pipeline #6175](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6175) で初回確認し、main merge commit `5aefbb4d` 上の `nightly_matrix` [#6355](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6355) / [#6388](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6388) / [#6406](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6406) / [#6424](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6424) / [#6442](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6442) で5回通過したため、5回目の child pipeline [#6454](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6454) を `✓` の証跡にしています。#6424 は RX72N/Ether TSIP TLS 1.3 MQTT build の一過性失敗を retry で回復していますが、LANBENCH child pipeline [#6435](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6435) 自体は成功しているため、RX72N/Ether TSIP LANBENCH セル起因の失敗としては扱いません。RX65N/BG96 software の resumption / 0-RTT は [iot-reference-rx MR !122](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/122) と [pipeline #6191](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6191) で初回確認し、main merge commit `5aefbb4d` 上の focused/API [#6466](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6466) / [#6482](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6482) / [#6484](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6484) / [#6486](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6486) / [#6488](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6488) で5回通過したため、#6488 を `✓` の証跡にしています。RX65N/BG96 TSIP の resumption / 0-RTT は [iot-reference-rx MR !123](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/123) と [pipeline #6204](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6204) で初回確認し、main merge commit `5aefbb4d` 上の focused/API [#6469](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6469) / [#6483](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6483) / [#6485](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6485) / [#6487](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6487) / [#6489](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6489) で5回通過したため、#6489 を `✓` の証跡にしています。BG96経路では、セルラー網から到達できる一時的なEC2上の Mbed TLS `ssl_server2` をGitLab CIから起動して対向にしています。TSIP経路では TLS 1.3 CertificateVerify に TSIP ドライバ API を使い、record path / key schedule / session ticket / early data は Mbed TLS 3.6.4 software path で扱います。</small>
 
 ## About This Fork / このフォークについて
 
@@ -331,7 +356,7 @@ The project-level GitLab pipeline schedule is part of the reference pipeline des
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=false` | Runs the non-stabilizing focused rows represented in the latest matrix, including software/TSIP TLS 1.2, TLS 1.3 MQTT, and LANBENCH TLS 1.3 resumption / 0-RTT rows for RX72N/Ether TSIP and RX65N/BG96 software/TSIP. Stabilizing rows such as selected TLS 1.3 OTA / Fleet Provisioning rows require `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true`. |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=false` | Runs the non-stabilizing focused rows represented in the latest matrix, including software/TSIP TLS 1.2, TLS 1.3 MQTT, and the RX72N/Ether TSIP LANBENCH TLS 1.3 resumption / 0-RTT row. RX65N/BG96 software / TSIP LANBENCH TLS 1.3 resumption / 0-RTT rows have also reached 5 focused/API passes on main commit `5aefbb4d`; keep future matrix coverage aligned with those bridge rows when they are scheduled. Stabilizing rows such as selected TLS 1.3 OTA / Fleet Provisioning rows require `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true`. |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
