@@ -4,9 +4,29 @@
 最初のsafftiタグは、対応するルネサス公式タグからの差分です。
 それ以降のsafftiタグは、直前のsafftiタグからの差分です。
 
+## リリース一覧 / Release Overview
+
+| Tag | 主な内容 |
+|---|---|
+| [v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0) | LANBENCH TLS 1.3 session resumption / 0-RTT の4経路5回成功と夜間 matrix 整備 |
+| [v202604.00-LTS-rx-1.0.0-saffti-1.2.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.2.0) | TSIP backend + TLS 1.3 の MQTT / OTA / Fleet Provisioning 実機CI確認 |
+| [v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0) | RX72N/RX65N の OTA・Fleet Provisioning 実機CI整備 |
+| [v202604.00-LTS-rx-1.0.0-saffti-1.0.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.0.0) | FreeRTOS 202604.00 LTS-rx ベースの初回 saffti タグ |
+
 ## Coming Soon
 
 ### 予定
+
+以降は今後のリリース候補です。
+
+- Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
+  性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
+
+- RX72N 経由でセカンダリ MCU を更新する OTA リファレンスを追加する予定です。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.3.0
+
+### 追加
 
 - Mbed TLS 3.6.4 の software TLS 1.3 path では、SessionTicket を発行できる
   LANBENCH 対向で TLS 1.3 session resumption と 0-RTT early data 受理まで確認しました。
@@ -56,8 +76,8 @@
   で5回通過したため、README の RX72N/Ether software LANBENCH 行も `✓` へ昇格しました。
   BG96経路では、セルラー網から到達できる一時的なEC2上の Mbed TLS `ssl_server2` を
   GitLab CI から起動して対向にしています。
-  現時点の `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
-  TSIP backend と組み合わせて実機CIで確認済みで、次リリース候補では LANBENCH 対向の
+  前リリース `v202604.00-LTS-rx-1.0.0-saffti-1.2.0` では TLS 1.3 full handshake を
+  TSIP backend と組み合わせて実機CIで確認済みで、本リリースでは LANBENCH 対向の
   resumption と 0-RTT も RX72N/Ether software / TSIP と RX65N/BG96 software / TSIP で5回成功済みです。
   AWS IoT Core は
   [SessionTicket TLS extension をサポートしていない](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)
@@ -67,11 +87,6 @@
   README の AWS IoT Core / LANBENCH 表で `✓` とした全パタンを1日1回回す方針へ更新しました。
   RX72N/Ether software LANBENCH は `tsip_mbedtls13` benchmark project への downstream bridge で
   同じ nightly matrix 起点から実行します。
-
-- Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
-  性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
-
-- RX72N 経由でセカンダリ MCU を更新する OTA リファレンスを追加する予定です。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.2.0
 
