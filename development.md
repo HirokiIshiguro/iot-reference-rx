@@ -64,6 +64,43 @@ RUN_MQTT_SMOKE=false
 RUN_S3_BENCH=false
 ```
 
+## Multi-project integration-test repositories
+
+Use a dedicated `integration-test` repository when a project group must combine
+two or more independently generated projects, such as 「MCUBoot + アプリ」 or
+「TrustZone（セキュア）+ TrustZone（ノンセキュア）」. A single component repository
+should not own cross-project layout, signing, secure/non-secure boundary, or
+hardware download policy by itself.
+
+For these project groups, prefer this configuration-management shape:
+
+- Keep each buildable component in its own sibling repository. For example,
+  keep the bootloader, application, secure image, and non-secure image as
+  separate projects when e2 studio/FSP generates and builds them separately.
+- Pin component repositories from the `integration-test` repository with
+  submodules under `deps/`. The submodule SHA is the source of truth for the
+  exact combination under test.
+- Put cross-project contracts in the `integration-test` repository or in the
+  component repository that naturally owns the contract, then copy the contract
+  into CI artifacts. Examples include MCUboot slot layout JSON, memory-region
+  constraints, signing-key selection for test images, TrustZone SAU/IDAU
+  boundaries, NSC header/import-library handoff, and flash download addresses.
+- Build, sign, combine, and package in the `integration-test` pipeline. Component
+  repositories may prove that each project builds alone, but the
+  `integration-test` pipeline proves that the pinned set is coherent.
+- Update from leaf to root. First merge component changes in `app`, `mcuboot`,
+  `secure`, or `non-secure`; then update the submodule pins and contract checks
+  in `integration-test`.
+- Gate hardware download or execution jobs with explicit variables and
+  board/probe-specific `resource_group` names. Require a debugger serial number
+  when multiple probes can be attached to the same host.
+- Publish machine-readable and human-readable evidence together, such as JUnit
+  XML plus a QC evidence Markdown file listing submodule pins, produced images,
+  slot addresses, and hardware download inputs.
+- Keep internal runner names, credentials, cloud resource names, and customer or
+  company-specific project paths out of OSS repositories. Store secrets only in
+  GitLab CI/CD variables and document public variable names instead of values.
+
 ## Applying the same pattern elsewhere
 
 For other hardware CI projects, prefer this shape:
