@@ -112,6 +112,7 @@
 #define MAX_NUM_OF_OTA_DATA_BUFFERS              (3)
 #define MAX_RETRY_ERASE_AREA                     (3)
 #define MAX_NUM_OF_OTA_FILE_BLOCKS               (128U)
+#define SECONDARY_OTA_RA0E2_FILEPATH_PREFIX      "/secondary/ra0e2"
 
 /* Max bytes supported for a file signature (3072 bit RSA is 384 bytes). */
 #define OTA_MAX_SIGNATURE_SIZE                   (384U)
@@ -258,6 +259,7 @@ static bool jobDocumentParser(char *message,
 static bool sendSuccessMessage(void);
 static bool sendFailedMessage(void);
 static bool saveInitVersion(void);
+static bool isSecondaryRa0e2OtaJob(void);
 
 static size_t stringBuilderUInt32Hex(char *pBuffer,
                                      size_t bufferSizeBytes,
@@ -1525,15 +1527,40 @@ static void processOTAEvents(void)
         LogInfo(("Activate Image event Received \n"));
         LogInfo(("-----------------------\n"));
 
-        if (true == saveInitVersion())
+        if (true == isSecondaryRa0e2OtaJob())
         {
-            vTaskDelay(pdMS_TO_TICKS(5000));
-            nextEvent.eventId = OtaAgentEventVersionCheck;
-            OtaSendEvent_FreeRTOS(&nextEvent);
-        }
+            if (true == imageActivationHandler())
+            {
+                LogInfo(("Secondary RA0E2 OTA activation requested.\n"));
+                vTaskDelay(pdMS_TO_TICKS(5000));
 
-        /* Start the new image */
-        imageActivationHandler();
+                if (OtaPalSuccess == otaPal_SetPlatformImageState(&jobFields, OtaImageStateAccepted))
+                {
+                    sendSuccessMessage();
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                }
+                else
+                {
+                    sendFailedMessage();
+                }
+            }
+            else
+            {
+                sendFailedMessage();
+            }
+        }
+        else
+        {
+            if (true == saveInitVersion())
+            {
+                vTaskDelay(pdMS_TO_TICKS(5000));
+                nextEvent.eventId = OtaAgentEventVersionCheck;
+                OtaSendEvent_FreeRTOS(&nextEvent);
+            }
+
+            /* Start the new image */
+            imageActivationHandler();
+        }
 
         otaAgentState = OtaAgentStateStopped;
         break;
@@ -1786,6 +1813,29 @@ static bool saveInitVersion(void)
 }
 /******************************************************************************
  End of function saveInitVersion
+ *****************************************************************************/
+
+/******************************************************************************
+ * Function Name: isSecondaryRa0e2OtaJob
+ * Description  : Checks whether the current OTA job targets the RA0E2 secondary
+ *                MCU slot. Secondary OTA does not reboot the primary RX65N, so
+ *                it uses a direct completion path after the reset request.
+ * Return Value : true   Secondary RA0E2 OTA job
+ *              : false  Primary RX65N OTA job or another target
+ *****************************************************************************/
+static bool isSecondaryRa0e2OtaJob(void)
+{
+    const size_t prefixLength = strlen(SECONDARY_OTA_RA0E2_FILEPATH_PREFIX);
+
+    if ((NULL == jobFields.filepath) || (jobFields.filepathLen < prefixLength))
+    {
+        return false;
+    }
+
+    return (0 == strncmp(jobFields.filepath, SECONDARY_OTA_RA0E2_FILEPATH_PREFIX, prefixLength));
+}
+/******************************************************************************
+ End of function isSecondaryRa0e2OtaJob
  *****************************************************************************/
 
 /******************************************************************************
