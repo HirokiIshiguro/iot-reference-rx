@@ -1,8 +1,9 @@
 # CLAUDE.md — iot-reference-rx
 
-> Current scope note:
+> Current scope note (2026-06-20):
 > This fork maintains the RX72N Envision Kit Ethernet reference and the CK-RX65N V1 + BG96 cellular reference under `Projects/`.
-> Historical CK-RX65N / DA16600 / RYZ014A notes below are preserved as reference and may not match the current maintained project set.
+> RX72N migration work has already been integrated into this repository, including the build / flash / provision / MQTT baseline path.
+> Older Phase 8 notes and CK-RX65N / DA16600 / RYZ014A notes below are preserved as historical bring-up records and may not match the current maintained project set.
 
 ## Maintained Projects
 
@@ -21,11 +22,12 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 公式サポートボードは CK-RX65N v2 のみだが、FIT モジュール・r_fwup・NetworkInterface 等の
 内部実装は RX72N を含む複数の RX MCU に対応済み。
 
-本リポジトリは upstream を GitLab にインポートしたもので、以下の目的で運用する:
+本リポジトリは upstream を GitLab にインポートしたもので、現在は以下の目的で運用する:
 
-1. **CK-RX65N (V1) で CI/CD パイプラインを先行構築**（rx72n-envision-kit Phase 8a）
-2. **RX72N Envision Kit への移植**（Phase 8b）
-3. 移植完了後、rx72n-envision-kit の FreeRTOS 基盤を本リポジトリベースに置き換え
+1. **RX72N Envision Kit Ethernet** の FreeRTOS / AWS IoT / OTA 基盤を維持する
+2. **CK-RX65N V1 + BG96 cellular** の FreeRTOS / AWS IoT / OTA 基盤を維持する
+3. 実機 GitLab CI で build / flash / provision / MQTT / OTA の退行を検出できる状態を保つ
+4. LANBENCH TLS 1.3 resumption / 0-RTT など、通信・暗号系の実機検証結果を継続的に記録する
 
 ### CK-RX65N V1 と V2 の違い
 
@@ -43,16 +45,17 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 
 | # | Goal | Status |
 |---|------|--------|
-| 1 | CK-RX65N (V1) で aws_ether プロジェクトのビルド・フラッシュ・テスト自動化 | Done |
-| 2 | AWS IoT Core 接続テスト（MQTT PubSub） | Done |
-| 3 | OTA テスト自動化 | Done (known stabilization follow-up: issue #9) |
-| 4 | RX72N Envision Kit への移植 | Planned |
+| 1 | CK-RX65N V1 + BG96 のビルド・フラッシュ・MQTT・OTA 自動化 | Done |
+| 2 | RX72N Envision Kit Ethernet の移植と実機 CI baseline 化 | Done |
+| 3 | AWS IoT Core 接続テスト（MQTT PubSub） | Done |
+| 4 | OTA テスト自動化 | Done |
+| 5 | LANBENCH TLS 1.3 resumption / 0-RTT 実機検証 | Done / maintained |
 
 ## Repository Locations / リポジトリ
 
 | Role | URL |
 |------|-----|
-| GitLab (primary) | https://shelty2.servegame.com/oss/import/github/renesas/iot-reference-rx |
+| GitLab (primary) | https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx |
 | GitHub (mirror) | https://github.com/HirokiIshiguro/iot-reference-rx |
 | GitHub (upstream) | https://github.com/renesas/iot-reference-rx |
 
@@ -150,7 +153,10 @@ pwsh -File tools/build_headless_rx72n.ps1 \
 
 ### Runner 接続情報
 
-> 詳細なハードウェア構成は [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config/-/blob/main/CLAUDE.md) を参照。
+> 詳細なハードウェア構成、SSH ログイン方法、runner と実機の接続対応は
+> [hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config/-/blob/main/CLAUDE.md) を正本として参照する。
+> このファイル内の個別シリアル番号・COM ポート・IP アドレスは bring-up 当時の記録を含むため、
+> 実験前には hardware-config と CI/CD Variables の現在値を確認すること。
 
 | Item | Value |
 |------|-------|
@@ -403,10 +409,9 @@ happy path 判定メモ:
 
 > Historical note:
 > The detailed Step 8 notes below describe the earlier CK-RX65N pipeline track.
-> In the current RX72N-only branch, `.gitlab-ci.yml` now covers the RX72N baseline path
+> In the current maintained branch, `.gitlab-ci.yml` covers the RX72N baseline path
 > `build_rx72n_ether -> flash_rx72n_ether -> provision_rx72n_ether_mqtt -> test_rx72n_ether_mqtt`,
-> while the rendered-credential candidate path remains
-> `build_rx72n_ether_mqtt_candidate -> package_rx72n_ether_mqtt_candidate_rsu`.
+> and the CK-RX65N BG96 baseline path. Historical rendered-credential candidate notes remain below.
 
 2026-03-08 時点の実装状態:
 
@@ -576,10 +581,10 @@ git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
 
 | Project | Relation |
 |---------|----------|
-| [rx72n-envision-kit](https://shelty2.servegame.com/oss/import/github/renesas/rx72n-envision-kit) | Phase 8 の親プロジェクト。移植先 |
-| [OTA ナレッジベース](https://shelty2.servegame.com/oss/experiment/embedded/mcu/elemental/ota) | MCU OTA 技術全般のナレッジ |
-| [AWS IoT Core ナレッジ](https://shelty2.servegame.com/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
-| [hardware-config](https://shelty2.servegame.com/oss/infra/hardware-config) | Runner 接続ハードウェア構成一元管理 |
+| [rx72n-envision-kit](https://gitlab.saffti.jp/oss/import/github/renesas/rx72n-envision-kit) | RX72N 移植元の履歴参照プロジェクト |
+| [OTA ナレッジベース](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/elemental/ota) | MCU OTA 技術全般のナレッジ |
+| [AWS IoT Core ナレッジ](https://gitlab.saffti.jp/oss/experiment/cloud/aws/iot-core/claude) | AWS IoT OTA 実装ナレッジ |
+| [hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config) | Runner 接続ハードウェア構成、SSH ログイン方法、実機配線の正本 |
 
 ## Known Pitfalls / 既知の注意事項
 
