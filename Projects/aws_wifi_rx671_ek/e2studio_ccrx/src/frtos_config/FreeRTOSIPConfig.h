@@ -9,7 +9,7 @@
 #define ipconfigBYTE_ORDER                         pdFREERTOS_LITTLE_ENDIAN
 
 #define ipconfigHAS_DEBUG_PRINTF                  0
-#define ipconfigHAS_PRINTF                        0
+#define ipconfigHAS_PRINTF                        1
 
 #define ipconfigUSE_NETWORK_EVENT_HOOK            1
 #define ipconfigUSE_DHCP                          1

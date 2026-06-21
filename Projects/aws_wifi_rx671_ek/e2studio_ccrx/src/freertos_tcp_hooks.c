@@ -1,7 +1,9 @@
 /*
  * Application hooks required by FreeRTOS+TCP.
  */
+#include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -47,6 +49,35 @@ volatile uint32_t g_iptrace_network_output_last_ethertype;
 volatile uint32_t g_iptrace_network_output_last_protocol;
 
 static uint32_t g_random_state = 0x6711a9afUL;
+
+void vLoggingPrintf(const char * pcFormatString, ...)
+{
+    char buffer[192];
+    va_list args;
+    int length;
+    int index;
+
+    if (NULL == pcFormatString)
+    {
+        return;
+    }
+
+    va_start(args, pcFormatString);
+    length = vsnprintf(buffer, sizeof(buffer), pcFormatString, args);
+    va_end(args);
+
+    if (length < 0)
+    {
+        return;
+    }
+
+    buffer[sizeof(buffer) - 1U] = '\0';
+
+    for (index = 0; (index < (int)(sizeof(buffer) - 1U)) && ('\0' != buffer[index]); index++)
+    {
+        debug_putchar(buffer[index]);
+    }
+}
 
 static uint32_t pack_be16(const uint8_t * p)
 {

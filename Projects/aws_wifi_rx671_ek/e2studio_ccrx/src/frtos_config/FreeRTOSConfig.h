@@ -433,6 +433,11 @@
 extern void vAssertCalled( void );
 #define configASSERT( x ) do { if( ( x ) == 0 ) vAssertCalled(); } while( 0 )
 
+/* Route FreeRTOS/FreeRTOS+TCP printf-style diagnostics to the SCI6 debug
+ * console. See src/freertos_tcp_hooks.c for the implementation. */
+extern void vLoggingPrintf( const char * pcFormatString, ... );
+#define configPRINTF( X )    vLoggingPrintf X
+
  /******************************************************************************/
  /* Definitions that include or exclude functionality. *************************/
  /******************************************************************************/
