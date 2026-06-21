@@ -1,0 +1,65 @@
+/*
+* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+*
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+
+/***********************************************************************************************************************
+* File Name        : r_smc_interrupt.c
+* Version          : 1.2.100
+* Device(s)        : R5F5671EHxFB
+* Description      : This file implements interrupt setting.
+***********************************************************************************************************************/
+
+/***********************************************************************************************************************
+Pragma directive
+***********************************************************************************************************************/
+/* Start user code for pragma. Do not edit comment generated here */
+/* End user code. Do not edit comment generated here */
+
+/***********************************************************************************************************************
+Includes
+***********************************************************************************************************************/
+#include "r_cg_macrodriver.h"
+#include "r_smc_interrupt.h"
+/* Start user code for include. Do not edit comment generated here */
+/* End user code. Do not edit comment generated here */
+#include "r_cg_userdefine.h"
+
+/***********************************************************************************************************************
+Global variables and functions
+***********************************************************************************************************************/
+/* Start user code for global. Do not edit comment generated here */
+/* End user code. Do not edit comment generated here */
+
+/***********************************************************************************************************************
+* Function Name: R_Interrupt_Create
+* Description  : This function Used to set the fast interrupt or group interrupt 
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+
+void R_Interrupt_Create(void)
+{
+    /* Disable group BL0 interrupt*/
+    IEN(ICU,GROUPBL0) = 0U;
+    
+    /* Disable group BL1 interrupt*/
+    IEN(ICU,GROUPBL1) = 0U;
+    
+
+    /* Set group BL0 interrupt priority level */
+    IPR(ICU,GROUPBL0) = _03_ICU_PRIORITY_LEVEL3;
+
+    /* Set group BL1 interrupt priority level */
+    IPR(ICU,GROUPBL1) = ICU_ICU_GROUPBL1_PRIORITY;
+
+    /* Enable group BL0 interrupt */
+    IEN(ICU,GROUPBL0) = 1U;
+
+    /* Enable group BL1 interrupt */
+    IEN(ICU,GROUPBL1) = 1U;
+}
+
+/* Start user code for adding. Do not edit comment generated here */
+/* End user code. Do not edit comment generated here */

@@ -1,7 +1,7 @@
 # CLAUDE.md — iot-reference-rx
 
 > Current scope note (2026-06-20):
-> This fork maintains the RX72N Envision Kit Ethernet reference and the CK-RX65N V1 + BG96 cellular reference under `Projects/`.
+> This fork maintains the RX72N Envision Kit Ethernet reference, the CK-RX65N V1 + BG96 cellular reference, and the EK-RX671 + Type 1YN Wi-Fi staging project under `Projects/`.
 > RX72N migration work has already been integrated into this repository, including the build / flash / provision / MQTT baseline path.
 > Older Phase 8 notes and CK-RX65N / DA16600 / RYZ014A notes below are preserved as historical bring-up records and may not match the current maintained project set.
 
@@ -11,6 +11,7 @@
 |-------|--------------|-------------|-------------|--------|
 | RX72N Envision Kit | Ethernet | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | Maintained |
 | CK-RX65N V1 | BG96 cellular | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | Maintained |
+| EK-RX671 | Murata Type 1YN Wi-Fi over SDIO | `Projects/aws_wifi_rx671_ek/e2studio_ccrx/` | Future work | Staging |
 
 CK-RX65N + BG96 was ported from the stable OSS OTA reference group:
 `https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-ota`.
@@ -26,8 +27,9 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 
 1. **RX72N Envision Kit Ethernet** の FreeRTOS / AWS IoT / OTA 基盤を維持する
 2. **CK-RX65N V1 + BG96 cellular** の FreeRTOS / AWS IoT / OTA 基盤を維持する
-3. 実機 GitLab CI で build / flash / provision / MQTT / OTA の退行を検出できる状態を保つ
-4. LANBENCH TLS 1.3 resumption / 0-RTT など、通信・暗号系の実機検証結果を継続的に記録する
+3. **EK-RX671 + Type 1YN Wi-Fi** の WHD/SDIO bring-up を FreeRTOS+TCP / AWS IoT baseline へ統合する
+4. 実機 GitLab CI で build / flash / provision / MQTT / OTA の退行を検出できる状態を保つ
+5. LANBENCH TLS 1.3 resumption / 0-RTT など、通信・暗号系の実機検証結果を継続的に記録する
 
 ### CK-RX65N V1 と V2 の違い
 
@@ -114,6 +116,7 @@ git submodule update --init --recursive
 | Project | Directory | Output | Description |
 |---------|-----------|--------|-------------|
 | aws_ether_rx72n_envision_kit | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `.mot`, `.abs`, `.x` | RX72N Ethernet + AWS IoT デモ（local bring-up / MQTT / OTA task startup） |
+| aws_wifi_rx671_ek | `Projects/aws_wifi_rx671_ek/e2studio_ccrx/` | `.mot`, `.abs`, `.x` | EK-RX671 + Type 1YN WHD/SDIO Wi-Fi staging（scan / JOIN verified before import; FreeRTOS+TCP integration in progress） |
 | boot_loader_rx72n_envision_kit | `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/` | `.mot` | RX72N OTA 用デュアルバンクブートローダ |
 
 ### Headless Build（CLI）

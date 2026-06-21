@@ -20,8 +20,9 @@ The upstream repository officially supports only the CK-RX65N v2 board and does 
 
 1. **Adding RX72N Envision Kit support** — porting the FreeRTOS + AWS IoT demo (Ethernet, MQTT PubSub, OTA) to the RX72N Envision Kit, which is not covered upstream
 2. **Adding CK-RX65N + BG96 cellular support** — carrying the proven OSS CK-RX65N/BG96 OTA reference into this tree as the recommended cellular modem path for this fork
-3. **Improving the boot loader** — replacing the upstream's simple dual-bank boot loader with a production-grade design, with the ultimate goal of integrating [MCUboot](https://www.mcuboot.com/) as the secure boot loader
-4. **CI/CD integration** — automated build, flash, provisioning, and MQTT/OTA testing via GitLab CI with hardware-in-the-loop
+3. **Adding EK-RX671 + Type 1YN Wi-Fi staging** — carrying the WHD/SDIO bring-up into this tree as the starting point for FreeRTOS+TCP and AWS IoT over Wi-Fi
+4. **Improving the boot loader** — replacing the upstream's simple dual-bank boot loader with a production-grade design, with the ultimate goal of integrating [MCUboot](https://www.mcuboot.com/) as the secure boot loader
+5. **CI/CD integration** — automated build, flash, provisioning, and MQTT/OTA testing via GitLab CI with hardware-in-the-loop
 
 本リポジトリは [renesas/iot-reference-rx](https://github.com/renesas/iot-reference-rx) のフォークです。
 upstream は CK-RX65N v2 のみを公式サポートしており、**RX72N には対応していません**。
@@ -29,8 +30,9 @@ upstream は CK-RX65N v2 のみを公式サポートしており、**RX72N に�
 
 1. **RX72N Envision Kit 対応の追加** — upstream にない RX72N 向け FreeRTOS + AWS IoT デモ（Ethernet / MQTT PubSub / OTA）の移植
 2. **CK-RX65N + BG96 Cellular 対応の追加** — 安定してOTA可能なOSS版CK-RX65N/BG96構成を、このフォークの推奨セルラー構成として取り込み
-3. **ブートローダの本格化** — upstream の簡易デュアルバンクブートローダを本格仕様に変更。最終的には [MCUboot](https://www.mcuboot.com/) への換装を予定
-4. **CI/CD 統合** — GitLab CI による自動ビルド・フラッシュ・プロビジョニング・MQTT/OTA テスト（実機接続 Runner）
+3. **EK-RX671 + Type 1YN Wi-Fi 対応の追加** — WHD/SDIO bring-up を `iot-reference-rx` の FreeRTOS/AWS IoT baseline へ統合するためのステージングプロジェクトを追加
+4. **ブートローダの本格化** — upstream の簡易デュアルバンクブートローダを本格仕様に変更。最終的には [MCUboot](https://www.mcuboot.com/) への換装を予定
+5. **CI/CD 統合** — GitLab CI による自動ビルド・フラッシュ・プロビジョニング・MQTT/OTA テスト（実機接続 Runner）
 
 ### Upstream
 
@@ -51,6 +53,7 @@ Latest saffti release:
 |-------|-----|------|------------|-----|--------------|
 | **RX72N Envision Kit** | RX72N (R5F572NN) | RXv3 | 4 MB (dual-bank) | 1 MB + 512 KB | Ethernet (on-board) |
 | **CK-RX65N V1 + BG96** | RX65N dual-bank | RXv2 | 2 MB (dual-bank) | 640 KB | Cellular Cat-M1/NB-IoT (Quectel BG96) |
+| **EK-RX671 + Type 1YN** | RX671 (R5F5671E) | RXv3 | 2 MB | 384 KB + 8 KB E2 data flash | Wi-Fi over SDIO (Murata Type 1YN / CYW43439) |
 
 > **Note:** The upstream RYZ014A cellular project is obsolete in practice. This fork keeps BG96 as the maintained cellular reference path.
 
@@ -66,6 +69,7 @@ The following e2 studio projects are maintained under `Projects/`:
 | CK-RX65N BG96 Boot Loader | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | RX65N dual-bank boot loader for BG96 OTA |
 | CK-RX65N BG96 AWS Demo | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | FreeRTOS + AWS IoT demo (MQTT PubSub, OTA) over BG96 cellular |
 | CK-RX65N BG96 AWS Demo with TSIP | `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` | BG96 cellular demo using the TSIP-enabled TLS backend; hardware validation requires RX65N-specific TSIP wrapped blobs |
+| EK-RX671 Type 1YN Wi-Fi Staging | `Projects/aws_wifi_rx671_ek/e2studio_ccrx/` | WHD/SDIO Wi-Fi bring-up project; FreeRTOS+TCP/AWS IoT integration in progress |
 
 ### Boot Loader Architecture / ブートローダ構成
 
