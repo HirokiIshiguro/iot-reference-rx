@@ -1,0 +1,716 @@
+diff --git a/WiFi_Host_Driver/inc/whd_events.h b/WiFi_Host_Driver/inc/whd_events.h
+index 629281e..1ee29da 100644
+--- a/WiFi_Host_Driver/inc/whd_events.h
++++ b/WiFi_Host_Driver/inc/whd_events.h
+@@ -117,7 +117,11 @@ typedef enum sup_auth_status
+ 
+ #define WHD_MSG_IFNAME_MAX 16 /**< Max length of Interface name */
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ /**
+  * Structure to store ethernet header fields in event packets
+@@ -170,7 +174,11 @@ typedef struct whd_event
+     /* data portion follows */
+ } whd_event_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /** @addtogroup event WHD Event handling API
+  *  Functions that allow user applications to receive event callbacks and set event handlers
+diff --git a/WiFi_Host_Driver/inc/whd_types.h b/WiFi_Host_Driver/inc/whd_types.h
+index 48c509e..967a420 100644
+--- a/WiFi_Host_Driver/inc/whd_types.h
++++ b/WiFi_Host_Driver/inc/whd_types.h
+@@ -678,7 +678,11 @@ typedef struct
+ /**
+  * Structure for storing scan results
+  */
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ typedef struct whd_scan_result
+ {
+     whd_ssid_t SSID;                            /**< Service Set Identification (i.e. Name of Access Point)                    */
+@@ -695,7 +699,11 @@ typedef struct whd_scan_result
+     uint8_t *ie_ptr;                            /**< Pointer to received Beacon/Probe Response IE(Information Element)         */
+     uint32_t ie_len;                            /**< Length of IE(Information Element)                                         */
+ } whd_scan_result_t;
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /**
+  * Structure to store scan result parameters for each AP
+@@ -901,7 +909,11 @@ typedef uint32_t whd_result_t;
+  */
+ typedef whd_buffer_t whd_buffer_queue_ptr_t;
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ /**
+  * Structure for storing AP information
+@@ -928,7 +940,11 @@ typedef struct
+     whd_mac_t mac_list[1];   /**< Variable length array of MAC addresses */
+ } whd_maclist_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /**
+  * Time value in milliseconds
+diff --git a/WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h b/WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h
+index 3ac0952..a1d8f22 100644
+--- a/WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h
++++ b/WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h
+@@ -55,7 +55,11 @@ typedef enum
+ *             Structures
+ ******************************************************/
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ typedef struct
+ {
+@@ -63,7 +67,11 @@ typedef struct
+     uint32_t data[1];
+ } whd_transfer_bytes_packet_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ typedef void (*whd_bus_irq_callback_t)(void *handler_arg, uint32_t event);
+ 
+diff --git a/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.c b/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.c
+index b976428..e0f0462 100644
+--- a/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.c
++++ b/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.c
+@@ -113,16 +113,63 @@ static whd_result_t whd_bus_sdio_irq_register(whd_driver_t whd_driver);
+ static whd_result_t whd_bus_sdio_irq_enable(whd_driver_t whd_driver, whd_bool_t enable);
+ static whd_result_t whd_bus_sdio_init_oob_intr(whd_driver_t whd_driver);
+ static whd_result_t whd_bus_sdio_deinit_oob_intr(whd_driver_t whd_driver);
+-static whd_result_t whd_bus_sdio_register_oob_intr(whd_driver_t whd_driver);
+-static whd_result_t whd_bus_sdio_unregister_oob_intr(whd_driver_t whd_driver);
+-static whd_result_t whd_bus_sdio_enable_oob_intr(whd_driver_t whd_driver, whd_bool_t enable);
+-
+-/******************************************************
+-*             Global Function definitions
+-******************************************************/
+-
+-uint32_t whd_bus_sdio_attach(whd_driver_t whd_driver, whd_sdio_config_t *whd_sdio_config, cyhal_sdio_t *sdio_obj)
+-{
++static whd_result_t whd_bus_sdio_register_oob_intr(whd_driver_t whd_driver);
++static whd_result_t whd_bus_sdio_unregister_oob_intr(whd_driver_t whd_driver);
++static whd_result_t whd_bus_sdio_enable_oob_intr(whd_driver_t whd_driver, whd_bool_t enable);
++
++static uint32_t whd_bus_sdio_make_cmd52_arg(whd_bus_transfer_direction_t direction,
++                                            whd_bus_function_t function, uint32_t address, uint8_t value);
++static uint32_t whd_bus_sdio_make_cmd53_arg(whd_bus_transfer_direction_t direction,
++                                            whd_bus_function_t function, sdio_transfer_mode_t mode,
++                                            uint32_t address, whd_bool_t increment, uint32_t count);
++
++/******************************************************
++*             Global Function definitions
++******************************************************/
++
++static uint32_t whd_bus_sdio_make_cmd52_arg(whd_bus_transfer_direction_t direction,
++                                            whd_bus_function_t function, uint32_t address, uint8_t value)
++{
++    uint32_t arg = 0;
++
++    if (direction == BUS_WRITE)
++    {
++        arg |= (1UL << 31);
++    }
++    arg |= ( (uint32_t)(function & BUS_FUNCTION_MASK) << 28 );
++    arg |= ( (address & BIT_MASK(17) ) << 9 );
++    arg |= value;
++
++    return arg;
++}
++
++static uint32_t whd_bus_sdio_make_cmd53_arg(whd_bus_transfer_direction_t direction,
++                                            whd_bus_function_t function, sdio_transfer_mode_t mode,
++                                            uint32_t address, whd_bool_t increment, uint32_t count)
++{
++    uint32_t arg = 0;
++
++    if (direction == BUS_WRITE)
++    {
++        arg |= (1UL << 31);
++    }
++    arg |= ( (uint32_t)(function & BUS_FUNCTION_MASK) << 28 );
++    if (mode != SDIO_BYTE_MODE)
++    {
++        arg |= (1UL << 27);
++    }
++    if (increment == WHD_TRUE)
++    {
++        arg |= (1UL << 26);
++    }
++    arg |= ( (address & BIT_MASK(17) ) << 9 );
++    arg |= (count & BIT_MASK(9) );
++
++    return arg;
++}
++
++uint32_t whd_bus_sdio_attach(whd_driver_t whd_driver, whd_sdio_config_t *whd_sdio_config, cyhal_sdio_t *sdio_obj)
++{
+     struct whd_bus_info *whd_bus_info;
+ 
+     if (!whd_driver || !whd_sdio_config)
+@@ -761,10 +808,10 @@ static whd_result_t whd_bus_sdio_transfer(whd_driver_t whd_driver, whd_bus_trans
+     {
+         return whd_bus_sdio_cmd52(whd_driver, direction, function, address, *data, response_expected, data);
+     }
+-    else if (whd_driver->internal_info.whd_wlan_status.state == WLAN_UP)
+-    {
+-        return whd_bus_sdio_cmd53(whd_driver, direction, function,
+-                                  (data_size >= (uint16_t)64) ? SDIO_BLOCK_MODE : SDIO_BYTE_MODE, address, data_size,
++    else if ( (function == WLAN_FUNCTION) || (whd_driver->internal_info.whd_wlan_status.state == WLAN_UP) )
++    {
++        return whd_bus_sdio_cmd53(whd_driver, direction, function,
++                                  (data_size >= (uint16_t)64) ? SDIO_BLOCK_MODE : SDIO_BYTE_MODE, address, data_size,
+                                   data, response_expected, NULL);
+     }
+     else
+@@ -779,10 +826,13 @@ static whd_result_t whd_bus_sdio_transfer(whd_driver_t whd_driver, whd_bus_trans
+             if (result != WHD_SUCCESS)
+             {
+                 return result;
+-            }
+-            data += data_blk_size;
+-            address += data_blk_size;
+-        }
++            }
++            data += data_blk_size;
++            if (function != WLAN_FUNCTION)
++            {
++                address += data_blk_size;
++            }
++        }
+         if (data_byte_size)
+         {
+             result = whd_bus_sdio_cmd53(whd_driver, direction, function, SDIO_BYTE_MODE, address,
+@@ -792,23 +842,18 @@ static whd_result_t whd_bus_sdio_transfer(whd_driver_t whd_driver, whd_bus_trans
+     }
+ }
+ 
+-static whd_result_t whd_bus_sdio_cmd52(whd_driver_t whd_driver, whd_bus_transfer_direction_t direction,
+-                                       whd_bus_function_t function, uint32_t address, uint8_t value,
+-                                       sdio_response_needed_t response_expected, uint8_t *response)
+-{
+-    uint32_t sdio_response;
+-    whd_result_t result;
+-    sdio_cmd_argument_t arg;
+-    arg.value = 0;
+-    arg.cmd52.function_number = (unsigned int)(function & BUS_FUNCTION_MASK);
+-    arg.cmd52.register_address = (unsigned int)(address & 0x00001ffff);
+-    arg.cmd52.rw_flag = (unsigned int)( (direction == BUS_WRITE) ? 1 : 0 );
+-    arg.cmd52.write_data = value;
+-
+-    WHD_BUS_STATS_INCREMENT_VARIABLE(whd_driver->bus_priv, cmd52);
+-    result = cyhal_sdio_send_cmd(whd_driver->bus_priv->sdio_obj, (cyhal_transfer_t)direction,
+-                                 CYHAL_SDIO_CMD_IO_RW_DIRECT, arg.value,
+-                                 &sdio_response);
++static whd_result_t whd_bus_sdio_cmd52(whd_driver_t whd_driver, whd_bus_transfer_direction_t direction,
++                                       whd_bus_function_t function, uint32_t address, uint8_t value,
++                                       sdio_response_needed_t response_expected, uint8_t *response)
++{
++    uint32_t sdio_response;
++    whd_result_t result;
++    uint32_t arg = whd_bus_sdio_make_cmd52_arg(direction, function, address, value);
++
++    WHD_BUS_STATS_INCREMENT_VARIABLE(whd_driver->bus_priv, cmd52);
++    result = cyhal_sdio_send_cmd(whd_driver->bus_priv->sdio_obj, (cyhal_transfer_t)direction,
++                                 CYHAL_SDIO_CMD_IO_RW_DIRECT, arg,
++                                 &sdio_response);
+     WHD_BUS_STATS_CONDITIONAL_INCREMENT_VARIABLE(whd_driver->bus_priv, (result != WHD_SUCCESS), cmd52_fail);
+ 
+     if (response != NULL)
+@@ -827,48 +872,43 @@ static whd_result_t whd_bus_sdio_cmd53(whd_driver_t whd_driver, whd_bus_transfer
+                                        whd_bus_function_t function, sdio_transfer_mode_t mode, uint32_t address,
+                                        uint16_t data_size, uint8_t *data,
+                                        sdio_response_needed_t response_expected, uint32_t *response)
+-{
+-    sdio_cmd_argument_t arg;
+-    whd_result_t result;
++{
++    uint32_t arg;
++    whd_result_t result;
+ 
+     if (direction == BUS_WRITE)
+     {
+         WHD_BUS_STATS_INCREMENT_VARIABLE(whd_driver->bus_priv, cmd53_write);
+     }
+ 
+-    arg.value = 0;
+-    arg.cmd53.function_number = (unsigned int)(function & BUS_FUNCTION_MASK);
+-    arg.cmd53.register_address = (unsigned int)(address & BIT_MASK(17) );
+-    arg.cmd53.op_code = (unsigned int)1;
+-    arg.cmd53.rw_flag = (unsigned int)( (direction == BUS_WRITE) ? 1 : 0 );
+-
+-    if (mode == SDIO_BYTE_MODE)
+-    {
+-        whd_assert("whd_bus_sdio_cmd53: data_size > 512 for byte mode", (data_size <= (uint16_t )512) );
+-        arg.cmd53.count = (unsigned int)(data_size & 0x1FF);
+-
+-        result =
+-            cyhal_sdio_bulk_transfer(whd_driver->bus_priv->sdio_obj, (cyhal_transfer_t)direction, arg.value,
+-                                     (uint32_t *)data, data_size, response);
++    if (mode == SDIO_BYTE_MODE)
++    {
++        whd_assert("whd_bus_sdio_cmd53: data_size > 512 for byte mode", (data_size <= (uint16_t )512) );
++        arg = whd_bus_sdio_make_cmd53_arg(direction, function, mode, address, WHD_TRUE, data_size);
++
++        result =
++            cyhal_sdio_bulk_transfer(whd_driver->bus_priv->sdio_obj, (cyhal_transfer_t)direction, arg,
++                                     (uint32_t *)data, data_size, response);
+ 
+         if (result != CY_RSLT_SUCCESS)
+         {
+             WPRINT_WHD_ERROR( ("%s:%d cyhal_sdio_bulk_transfer SDIO_BYTE_MODE failed\n", __func__, __LINE__) );
+             goto done;
+         }
+-    }
+-    else
+-    {
+-        arg.cmd53.count = (unsigned int)( (data_size / (uint16_t)SDIO_64B_BLOCK) & BIT_MASK(9) );
+-        if ( (uint32_t)(arg.cmd53.count * (uint16_t)SDIO_64B_BLOCK) < data_size )
+-        {
+-            ++arg.cmd53.count;
+-        }
+-        arg.cmd53.block_mode = (unsigned int)1;
+-
+-        result =
+-            cyhal_sdio_bulk_transfer(whd_driver->bus_priv->sdio_obj, (cyhal_transfer_t)direction, arg.value,
+-                                     (uint32_t *)data, data_size, response);
++    }
++    else
++    {
++        uint32_t block_count = (uint32_t)(data_size / (uint16_t)SDIO_64B_BLOCK) & BIT_MASK(9);
++
++        if ( (block_count * (uint16_t)SDIO_64B_BLOCK) < data_size )
++        {
++            ++block_count;
++        }
++        arg = whd_bus_sdio_make_cmd53_arg(direction, function, mode, address, WHD_TRUE, block_count);
++
++        result =
++            cyhal_sdio_bulk_transfer(whd_driver->bus_priv->sdio_obj, (cyhal_transfer_t)direction, arg,
++                                     (uint32_t *)data, data_size, response);
+ 
+         if (result != CY_RSLT_SUCCESS)
+         {
+diff --git a/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.h b/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.h
+index 9aae7b5..fe3a234 100644
+--- a/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.h
++++ b/WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.h
+@@ -38,7 +38,11 @@ extern "C" {
+ /******************************************************
+ *             Structures
+ ******************************************************/
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ typedef struct
+ {
+     unsigned char stuff_bits;
+@@ -133,7 +137,11 @@ typedef enum
+ } sdio_response_needed_t;
+ 
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /******************************************************
+ *             Macros
+diff --git a/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.c b/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.c
+index 8e2f568..985415f 100644
+--- a/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.c
++++ b/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.c
+@@ -96,7 +96,11 @@ typedef enum
+ *             Structures
+ ******************************************************/
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ typedef struct
+ {
+@@ -104,7 +108,11 @@ typedef struct
+     uint8_t response_delay[4];
+ } gspi_backplane_f1_read_header_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ typedef struct
+ {
+diff --git a/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.h b/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.h
+index 48dbf61..3eb0191 100644
+--- a/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.h
++++ b/WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.h
+@@ -37,14 +37,22 @@ extern "C" {
+ 
+ typedef uint32_t whd_bus_gspi_header_t;
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ typedef struct
+ {
+     whd_bus_gspi_header_t gspi_header;
+ } whd_bus_header_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ #define WHD_BUS_SPI_HEADER_SIZE                     (sizeof(whd_bus_header_t) )
+ 
+diff --git a/WiFi_Host_Driver/src/include/whd_cdc_bdc.h b/WiFi_Host_Driver/src/include/whd_cdc_bdc.h
+index 7df6b0f..fce163a 100644
+--- a/WiFi_Host_Driver/src/include/whd_cdc_bdc.h
++++ b/WiFi_Host_Driver/src/include/whd_cdc_bdc.h
+@@ -61,7 +61,11 @@ typedef enum sdpcm_command_type_enum
+ /******************************************************
+ *               Structures
+ ******************************************************/
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ typedef struct
+ {
+     uint32_t cmd;    /* ioctl command value */
+@@ -86,7 +90,11 @@ typedef struct
+     uint16_t ethertype;
+ } ethernet_header_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /** Event list element structure
+  *
+diff --git a/WiFi_Host_Driver/src/include/whd_chip.h b/WiFi_Host_Driver/src/include/whd_chip.h
+index 2adc492..c8487df 100644
+--- a/WiFi_Host_Driver/src/include/whd_chip.h
++++ b/WiFi_Host_Driver/src/include/whd_chip.h
+@@ -128,7 +128,11 @@ typedef struct
+     uint32_t keep_wlan_awake;
+ } whd_wlan_status_t;
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ /* 802.11 Information Element structures */
+ 
+@@ -318,7 +322,11 @@ void whd_ioctl_log_add_event(whd_driver_t whd_driver, uint32_t cmd, uint16_t fla
+ 
+ whd_result_t whd_ioctl_print(whd_driver_t whd_driver);
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ typedef struct whd_internal_info
+ {
+@@ -340,7 +348,11 @@ typedef struct whd_internal_info
+ 
+ } whd_internal_info_t;
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ typedef struct
+ {
+@@ -349,7 +361,11 @@ typedef struct
+     uint8_t data[64];
+ } whd_country_info_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ void whd_internal_info_init(whd_driver_t whd_driver);
+ 
+diff --git a/WiFi_Host_Driver/src/include/whd_events_int.h b/WiFi_Host_Driver/src/include/whd_events_int.h
+index e648dd6..11d7b2d 100644
+--- a/WiFi_Host_Driver/src/include/whd_events_int.h
++++ b/WiFi_Host_Driver/src/include/whd_events_int.h
+@@ -410,7 +410,11 @@ typedef enum
+     WHD_EVENT_ENTRY_MAX
+ } whd_event_entry_t;
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ typedef struct whd_event_eth_hdr
+ {
+     uint16_t subtype;      /** Vendor specific..32769 */
+@@ -451,7 +455,11 @@ typedef struct whd_event
+     /* data portion follows */
+ } whd_event_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /** @endcond */
+ 
+diff --git a/WiFi_Host_Driver/src/include/whd_sdpcm.h b/WiFi_Host_Driver/src/include/whd_sdpcm.h
+index 49f7a05..eb32c65 100644
+--- a/WiFi_Host_Driver/src/include/whd_sdpcm.h
++++ b/WiFi_Host_Driver/src/include/whd_sdpcm.h
+@@ -77,7 +77,11 @@ typedef struct
+     uint8_t bus_header[BUS_HEADER_LEN];
+ } bus_common_header_t;
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ typedef struct
+ {
+     bus_common_header_t common;
+@@ -90,7 +94,11 @@ typedef struct
+     uint8_t _padding[2];
+     bdc_header_t bdc_header;
+ } data_header_t;
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /******************************************************
+ *             Function declarations
+diff --git a/WiFi_Host_Driver/src/include/whd_types_int.h b/WiFi_Host_Driver/src/include/whd_types_int.h
+index 8ad4e1f..09e89eb 100644
+--- a/WiFi_Host_Driver/src/include/whd_types_int.h
++++ b/WiFi_Host_Driver/src/include/whd_types_int.h
+@@ -182,13 +182,21 @@ extern "C"
+ /******************************************************
+ *             Structures and Enumerations
+ ******************************************************/
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ typedef struct
+ {
+     whd_buffer_queue_ptr_t queue_next;
+     char bus_header[MAX_BUS_HEADER_SIZE];
+ } whd_buffer_header_t;
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /* 802.11 Information Element Identification Numbers (as per section 8.4.2.1 of 802.11-2012) */
+ typedef enum
+diff --git a/WiFi_Host_Driver/src/include/whd_wlioctl.h b/WiFi_Host_Driver/src/include/whd_wlioctl.h
+index 556068e..47ad5a1 100644
+--- a/WiFi_Host_Driver/src/include/whd_wlioctl.h
++++ b/WiFi_Host_Driver/src/include/whd_wlioctl.h
+@@ -3166,7 +3166,11 @@ typedef struct wl_rssi_event
+ #define WLFEATURE_DISABLE_11N_AMPDU_RX    0x00000040
+ #define WLFEATURE_DISABLE_11N_GF    0x00000080
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ typedef struct sta_prbreq_wps_ie_hdr
+ {
+@@ -3220,7 +3224,11 @@ struct edcf_acparam
+ typedef struct edcf_acparam edcf_acparam_t;
+ 
+ /* Stop packing structures */
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /* discovery state */
+ typedef struct wl_p2p_disc_st
+@@ -3490,7 +3498,11 @@ struct wl_clm_dload_info
+ };
+ typedef struct wl_clm_dload_info wl_clm_dload_info_t;
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ typedef struct mesh_peer_info
+ {
+     uint16_t mesh_peer_prot_id;
+@@ -3580,7 +3592,11 @@ typedef struct wl_extjoin_params
+ #define WL_AUTH_OPEN_SHARED     2   /* try open, then shared if open failed w/rc 13 */
+ #define WL_AUTH_SAE             3   /* Simultaneous Authentication of Equals (SAE) */
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ #ifdef __cplusplus
+ } /* extern "C" */
+diff --git a/WiFi_Host_Driver/src/whd_sdpcm.c b/WiFi_Host_Driver/src/whd_sdpcm.c
+index 89e8d88..abcf3bf 100644
+--- a/WiFi_Host_Driver/src/whd_sdpcm.c
++++ b/WiFi_Host_Driver/src/whd_sdpcm.c
+@@ -64,7 +64,11 @@
+ *             Local Structures
+ ******************************************************/
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ /*TODO: Keep this typedef? (in preference to the defines above */
+ #if 0
+@@ -136,7 +140,11 @@ typedef struct bcm_event
+     } event;
+ } sdpcm_bcm_event_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /******************************************************
+ *             Static Variables
+diff --git a/WiFi_Host_Driver/src/whd_wifi_api.c b/WiFi_Host_Driver/src/whd_wifi_api.c
+index a4a5c0c..0fd70e3 100644
+--- a/WiFi_Host_Driver/src/whd_wifi_api.c
++++ b/WiFi_Host_Driver/src/whd_wifi_api.c
+@@ -83,7 +83,11 @@
+ *             Local Structures
+ ******************************************************/
+ 
+-#pragma pack(1)
++#if defined(__CCRX__)
++#pragma pack
++#else
++#pragma pack(1)
++#endif
+ 
+ typedef struct
+ {
+@@ -105,7 +109,11 @@ typedef struct
+     cy_semaphore_t scan_semaphore;
+ } whd_scan_userdata_t;
+ 
+-#pragma pack()
++#if defined(__CCRX__)
++#pragma unpack
++#else
++#pragma pack()
++#endif
+ 
+ /******************************************************
+ *             Static Variables
