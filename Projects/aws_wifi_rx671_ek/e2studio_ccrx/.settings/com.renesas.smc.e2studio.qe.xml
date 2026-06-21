@@ -10,7 +10,13 @@
         <Setting id="PD7" value="SDHI_D1"/>
         <Setting id="PD6" value="SDHI_D0"/>
         <Setting id="P81" value="SDHI_CD"/>
+        <Setting id="P41" value="AN001"/>
+        <Setting id="P40" value="AN000"/>
+        <Setting id="P43" value="AN003"/>
+        <Setting id="P42" value="AN002"/>
+        <Setting id="P45" value="AN005"/>
         <Setting id="P01" value="RXD6"/>
+        <Setting id="P44" value="AN004"/>
         <Setting id="P00" value="TXD6"/>
         <Setting id="P36" value="EXTAL"/>
         <Setting id="XCOUT" value="XCOUT"/>
@@ -29,12 +35,15 @@
     </Segment>
     <Segment id="Component">
         <Setting id="r_bsp" value="FIT"/>
+        <Setting id="r_s12ad_rx" value="FIT"/>
         <Setting id="r_sdhi_rx" value="FIT"/>
         <Setting id="r_sdio_rx" value="FIT"/>
         <Setting id="FreeRTOS_Object" value=""/>
+        <Setting id="r_tsip_rx" value="FIT"/>
         <Setting id="r_byteq" value="FIT"/>
         <Setting id="r_sci_rx" value="FIT"/>
         <Setting id="FreeRTOS_Kernel" value=""/>
+        <Setting id="r_flash_rx" value="FIT"/>
         <Segment component="r_bsp7.70" id="r_bsp" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="BSP_CFG_SWINT_UNIT1_ENABLE" value="0"/>
             <Setting id="BSP_CFG_LOW_LEVEL_INTERFACE_STDIO_ENABLE" value="1"/>
@@ -66,7 +75,7 @@
             <Setting id="BSP_CFG_ID_CODE_LONG_4" value="0xFFFFFFFF"/>
             <Setting id="BSP_CFG_ID_CODE_LONG_2" value="0xFFFFFFFF"/>
             <Setting id="BSP_CFG_ID_CODE_LONG_3" value="0xFFFFFFFF"/>
-            <Setting id="BSP_CFG_USER_CHARPUT_FUNCTION" value="my_sw_charput_function"/>
+            <Setting id="BSP_CFG_USER_CHARPUT_FUNCTION" value="debug_uart_stdio_charput"/>
             <Setting id="BSP_CFG_TRUSTED_MODE_FUNCTION" value="0xFFFFFFFF"/>
             <Setting id="BSP_CFG_SCI_UART_TERMINAL_BITRATE" value="921600"/>
             <Setting id="BSP_CFG_SWINT_TASK_BUFFER_NUMBER" value="8"/>
@@ -79,7 +88,7 @@
             <Setting id="BSP_CFG_USER_LOCKING_SW_UNLOCK_FUNCTION" value="my_sw_unlocking_function"/>
             <Setting id="BSP_CFG_NONCACHEABLE_AREA1_SIZE" value="0x0"/>
             <Setting id="BSP_CFG_MEMORY_BUS1_PRIORITY" value="0"/>
-            <Setting id="BSP_CFG_USER_CHARPUT_ENABLED" value="0"/>
+            <Setting id="BSP_CFG_USER_CHARPUT_ENABLED" value="1"/>
             <Setting id="BSP_CFG_SWINT_IPR_INITIAL_VALUE" value="0x1"/>
             <Setting id="BSP_CFG_RUN_IN_USER_MODE" value="0"/>
             <Setting id="BSP_CFG_USER_LOCKING_HW_LOCK_FUNCTION" value="my_hw_locking_function"/>
@@ -89,7 +98,7 @@
             <Setting id="BSP_CFG_INTERNAL_EXPANSION_BUS_PRIORITY" value="0"/>
             <Setting id="BSP_CFG_USER_EXIT_CRITICAL_FUNCTION" value="my_exit_critical_function"/>
             <Setting id="BSP_CFG_USER_LOCKING_TYPE" value="bsp_lock_t"/>
-            <Setting id="BSP_CFG_HEAP_BYTES" value="0x400"/>
+            <Setting id="BSP_CFG_HEAP_BYTES" value="0x8000"/>
             <Setting id="BSP_CFG_HOCO_TRIMMING_ENABLE" value="0"/>
             <Setting id="BSP_CFG_FIT_IPL_MAX" value="0xF"/>
             <Setting id="BSP_CFG_BOOTLOADER_PROJECT" value="0"/>
@@ -109,11 +118,14 @@
             <Setting id="BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED" value="0"/>
             <Setting id="BSP_CFG_USER_EXCLUSIVE_CONTROL_ENABLE" value="0"/>
         </Segment>
+        <Segment component="r_s12ad_rx5.50" id="r_s12ad_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="ADC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+        </Segment>
         <Segment component="r_sdhi_rx2.20" id="r_sdhi_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="SDHI_CFG_CH0_CD_ACTIVE" value="1"/>
             <Setting id="SDHI_CFG_CH1_INT_LEVEL" value="10"/>
             <Setting id="SDHI_CFG_LONGQ_ENABLE" value="/* #define"/>
-            <Setting id="SDHI_CFG_CH0_INT_LEVEL_DMADTC" value="10"/>
+            <Setting id="SDHI_CFG_CH0_INT_LEVEL_DMADTC" value="4"/>
             <Setting id="SDHI_CFG_CH1_CD_ACTIVE" value="1"/>
             <Setting id="SDHI_CFG_CH1_WP_ACTIVE" value="1"/>
             <Setting id="SDHI_CFG_DIV_DEFAULT_SPEED" value="SDHI_DIV_4"/>
@@ -121,7 +133,7 @@
             <Setting id="SDHI_CFG_SDOPT_TOP" value="0x00e0u"/>
             <Setting id="SDHI_CFG_CH0_INCLUDED" value="1"/>
             <Setting id="SDHI_CFG_CH1_INCLUDED" value="0"/>
-            <Setting id="SDHI_CFG_CH0_INT_LEVEL" value="10"/>
+            <Setting id="SDHI_CFG_CH0_INT_LEVEL" value="4"/>
             <Setting id="SDHI_CFG_PARAM_CHECKING_ENABLE" value="1"/>
             <Setting id="SDHI_CFG_CH0_EN_NESTED_INT" value="0"/>
             <Setting id="SDHI_CFG_CH1_INT_LEVEL_DMADTC" value="10"/>
@@ -137,6 +149,80 @@
             <Setting id="SDIO_CFG_IO_READY_POLL_COUNT" value="1000"/>
         </Segment>
         <Segment component="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.objectfreertos11.1.0-rx-1.0.0" id="FreeRTOS_Object" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="r_tsip_rx1.23" id="r_tsip_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="TSIP_ECDH_P256" value="0"/>
+            <Setting id="TSIP_AES_256_CBC_ENCRYPT" value="0"/>
+            <Setting id="TSIP_RSAES_2048" value="0"/>
+            <Setting id="TSIP_AES_128_GCM_ENCRYPT" value="0"/>
+            <Setting id="TSIP_MD5" value="0"/>
+            <Setting id="TSIP_SHA_1_HMAC" value="0"/>
+            <Setting id="TSIP_RSASSA_4096" value="0"/>
+            <Setting id="TSIP_ARC4_ENCRYPT" value="0"/>
+            <Setting id="TSIP_AES_128_CCM_DECRYPT" value="0"/>
+            <Setting id="TSIP_RSA_RETRY_COUNT_FOR_RSA_KEY_GENERATION" value="5120*2"/>
+            <Setting id="TSIP_MULTI_THREADING" value="0"/>
+            <Setting id="TSIP_TDES_CBC_ENCRYPT" value="0"/>
+            <Setting id="AES128-ECB" value="0"/>
+            <Setting id="AES256" value="0"/>
+            <Setting id="TSIP_TDES_ECB_DECRYPT" value="0"/>
+            <Setting id="TSIP_AES_128_CMAC" value="0"/>
+            <Setting id="AES256-CBC" value="0"/>
+            <Setting id="TSIP_AES_128_ECB_ENCRYPT" value="0"/>
+            <Setting id="TSIP_AES_256_CBC_DECRYPT" value="0"/>
+            <Setting id="TSIP_RSASSA_3072" value="0"/>
+            <Setting id="TSIP_TLS" value="0"/>
+            <Setting id="TSIP_MULTI_THREADING_UNLOCK_FUNCTION" value="user_unlock_function"/>
+            <Setting id="TSIP_AES_128_ECB_DECRYPT" value="0"/>
+            <Setting id="TSIP_AES_256_KEY_WRAP" value="0"/>
+            <Setting id="AES128-CBC" value="0"/>
+            <Setting id="TSIP_TDES_CBC_DECRYPT" value="0"/>
+            <Setting id="TDES" value="0"/>
+            <Setting id="TSIP_AES_256_ECB_DECRYPT" value="0"/>
+            <Setting id="RSAES-PKCS1" value="0"/>
+            <Setting id="TSIP_MULTI_THREADING_LOCK_FUNCTION" value="user_lock_function"/>
+            <Setting id="TSIP_ECDSA_P256" value="0"/>
+            <Setting id="TSIP_FIRMWARE_UPDATE" value="0"/>
+            <Setting id="TSIP_TDES_ECB_ENCRYPT" value="0"/>
+            <Setting id="TSIP_ECDSA_P192" value="0"/>
+            <Setting id="TSIP_AES_128_CBC_DECRYPT" value="0"/>
+            <Setting id="TSIP_RSAES_3072" value="0"/>
+            <Setting id="AES256-ECB" value="0"/>
+            <Setting id="TSIP_USER_SHA_384_FUNCTION" value="user_sha384_function"/>
+            <Setting id="TSIP_AES_128_CTR" value="0"/>
+            <Setting id="TSIP_ECDSA_P224" value="0"/>
+            <Setting id="TSIP_SHA_256" value="0"/>
+            <Setting id="TSIP_RSASSA_2048" value="0"/>
+            <Setting id="TSIP_AES_256_ECB_ENCRYPT" value="0"/>
+            <Setting id="TSIP_ECDSA_P384" value="0"/>
+            <Setting id="TDES-ECB" value="0"/>
+            <Setting id="ARC4" value="0"/>
+            <Setting id="TSIP_AES_128_CBC_ENCRYPT" value="0"/>
+            <Setting id="TSIP_AES_256_GCM_ENCRYPT" value="0"/>
+            <Setting id="ECDSA" value="0"/>
+            <Setting id="TSIP_AES_256_CMAC" value="0"/>
+            <Setting id="TSIP_RSAES_1024" value="0"/>
+            <Setting id="TSIP_AES_128_GCM_DECRYPT" value="0"/>
+            <Setting id="TSIP_SHA_1" value="0"/>
+            <Setting id="TSIP_AES_128_KEY_WRAP" value="0"/>
+            <Setting id="TSIP_ARC4_DECRYPT" value="0"/>
+            <Setting id="TSIP_USER_SHA_384_ENABLED" value="0"/>
+            <Setting id="AES128-GCM" value="0"/>
+            <Setting id="TSIP_AES_256_CTR" value="0"/>
+            <Setting id="TSIP_AES_256_CCM_DECRYPT" value="0"/>
+            <Setting id="AES128-CCM" value="0"/>
+            <Setting id="TSIP_RSAES_4096" value="0"/>
+            <Setting id="TSIP_AES_256_GCM_DECRYPT" value="0"/>
+            <Setting id="TSIP_SECURE_BOOT" value="0"/>
+            <Setting id="AES256-CCM" value="0"/>
+            <Setting id="TSIP_AES_256_CCM_ENCRYPT" value="0"/>
+            <Setting id="AES128" value="0"/>
+            <Setting id="RSASSA-PKCS1" value="0"/>
+            <Setting id="TSIP_RSASSA_1024" value="0"/>
+            <Setting id="AES256-GCM" value="0"/>
+            <Setting id="TSIP_AES_128_CCM_ENCRYPT" value="0"/>
+            <Setting id="TDES-CBC" value="0"/>
+            <Setting id="TSIP_SHA_256_HMAC" value="0"/>
+        </Segment>
         <Segment component="r_byteq2.20" id="r_byteq" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="BYTEQ_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
             <Setting id="BYTEQ_CFG_MAX_CTRL_BLKS" value="32"/>
@@ -353,6 +439,13 @@
             <Setting id="SCI_CFG_CH2_TX_SIGNAL_TRANSITION_TIMING_INCLUDED" value="0"/>
         </Segment>
         <Segment component="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.kernelfreertos11.1.0-rx-1.0.0" id="FreeRTOS_Kernel" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="r_flash_rx5.30" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+            <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
+            <Setting id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" value="1"/>
+            <Setting id="FLASH_CFG_CODE_FLASH_ENABLE" value="1"/>
+            <Setting id="FLASH_CFG_CODE_FLASH_BGO" value="1"/>
+        </Segment>
     </Segment>
     <Segment id="Clock">
         <Setting id="SubCLK" value="32.768"/>

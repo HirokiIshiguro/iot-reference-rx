@@ -52,7 +52,7 @@ void R_Interrupt_Create(void)
     IPR(ICU,GROUPBL0) = _03_ICU_PRIORITY_LEVEL3;
 
     /* Set group BL1 interrupt priority level */
-    IPR(ICU,GROUPBL1) = ICU_ICU_GROUPBL1_PRIORITY;
+    IPR(ICU,GROUPBL1) = _04_ICU_PRIORITY_LEVEL4;
 
     /* Enable group BL0 interrupt */
     IEN(ICU,GROUPBL0) = 1U;

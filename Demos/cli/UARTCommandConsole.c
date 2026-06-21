@@ -289,12 +289,18 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
  *********************************************************************************************************************/
 void vOutputString(const char *pcMessage)
 {
+    #if ( defined( configOUTPUT_STRING_USES_DEBUG_UART ) && ( configOUTPUT_STRING_USES_DEBUG_UART == 1 ) )
+    extern void debug_puts( const char * text );
+
+    debug_puts( pcMessage );
+    #else
     {
         unsigned short usStringLength = (unsigned short)strlen(pcMessage);
 
         /* Cast to type "signed char *" and (unsigned short) to be compatible with parameter type */
         vSerialPutString((signed char *)pcMessage, usStringLength);
     }
+    #endif
 }
 /**********************************************************************************************************************
  End of function vOutputString

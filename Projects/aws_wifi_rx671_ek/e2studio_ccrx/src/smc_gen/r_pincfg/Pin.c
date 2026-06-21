@@ -42,6 +42,36 @@ void R_Pins_Create(void)
 {
     R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
 
+    /* Set AN000 pin */
+    PORT4.PMR.BYTE &= 0xFEU;
+    PORT4.PDR.BYTE &= 0xFEU;
+    MPC.P40PFS.BYTE = 0x80U;
+
+    /* Set AN001 pin */
+    PORT4.PMR.BYTE &= 0xFDU;
+    PORT4.PDR.BYTE &= 0xFDU;
+    MPC.P41PFS.BYTE = 0x80U;
+
+    /* Set AN002 pin */
+    PORT4.PMR.BYTE &= 0xFBU;
+    PORT4.PDR.BYTE &= 0xFBU;
+    MPC.P42PFS.BYTE = 0x80U;
+
+    /* Set AN003 pin */
+    PORT4.PMR.BYTE &= 0xF7U;
+    PORT4.PDR.BYTE &= 0xF7U;
+    MPC.P43PFS.BYTE = 0x80U;
+
+    /* Set AN004 pin */
+    PORT4.PMR.BYTE &= 0xEFU;
+    PORT4.PDR.BYTE &= 0xEFU;
+    MPC.P44PFS.BYTE = 0x80U;
+
+    /* Set AN005 pin */
+    PORT4.PMR.BYTE &= 0xDFU;
+    PORT4.PDR.BYTE &= 0xDFU;
+    MPC.P45PFS.BYTE = 0x80U;
+
     /* Set EXTAL pin */
     PORT3.PMR.BYTE &= 0xBFU;
     PORT3.PDR.BYTE &= 0xBFU;

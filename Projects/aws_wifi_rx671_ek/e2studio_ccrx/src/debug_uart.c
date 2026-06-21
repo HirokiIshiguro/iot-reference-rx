@@ -9,15 +9,22 @@
 #include <string.h>
 
 #include "platform.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "iot_logging_task.h"
 #include "r_sci_rx_if.h"
 #include "r_sci_rx_pinset.h"
 #include "debug_uart.h"
 
 #define DEBUG_UART_BAUD_RATE   (921600U)
+#define DEBUG_STDIO_LINE_BYTES (160U)
 
 static sci_hdl_t         g_sci6;
 static volatile bool     g_sci6_ready;
 static volatile uint32_t g_sci6_err_count;   /* framing/parity/overflow tally */
+static char              g_stdio_line[DEBUG_STDIO_LINE_BYTES];
+static uint16_t          g_stdio_line_length;
+static volatile bool     g_stdio_flush_active;
 
 /*
  * SCI event callback. Transmit is polled (see sci6_wait_tx_idle), so the
@@ -126,6 +133,71 @@ void debug_putchar(char output_char)
         sci6_send_byte('\r');
     }
     sci6_send_byte(output_char);
+}
+
+static void debug_stdio_flush(bool append_newline)
+{
+    char line[DEBUG_STDIO_LINE_BYTES + 3U];
+    uint16_t length = g_stdio_line_length;
+
+    if (g_stdio_flush_active)
+    {
+        return;
+    }
+    if ((0U == length) && (!append_newline))
+    {
+        return;
+    }
+
+    g_stdio_flush_active = true;
+    if (DEBUG_STDIO_LINE_BYTES < length)
+    {
+        length = DEBUG_STDIO_LINE_BYTES;
+    }
+
+    memcpy(line, g_stdio_line, length);
+    g_stdio_line_length = 0U;
+
+    if (append_newline)
+    {
+        line[length] = '\r';
+        length++;
+        line[length] = '\n';
+        length++;
+    }
+    line[length] = '\0';
+
+    if (taskSCHEDULER_RUNNING == xTaskGetSchedulerState())
+    {
+        vLoggingPrint(line);
+    }
+    else
+    {
+        debug_puts(line);
+    }
+
+    g_stdio_flush_active = false;
+}
+
+void debug_uart_stdio_charput(char output_char)
+{
+    if ('\r' == output_char)
+    {
+        return;
+    }
+    if ('\n' == output_char)
+    {
+        debug_stdio_flush(true);
+        return;
+    }
+
+    if (g_stdio_line_length >= (DEBUG_STDIO_LINE_BYTES - 1U))
+    {
+        debug_stdio_flush(false);
+    }
+
+    g_stdio_line[g_stdio_line_length] = output_char;
+    g_stdio_line_length++;
 }
 
 void debug_puts(const char * text)

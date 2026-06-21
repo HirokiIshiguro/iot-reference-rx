@@ -27,6 +27,8 @@
 #include "./src/targets/rx65n/r_flash_rx65n.h"
 #elif defined(BSP_MCU_RX72N)
 #include "./src/targets/rx72n/r_flash_rx72n.h"
+#elif defined(BSP_MCU_RX671)
+#include "./src/targets/rx671/r_flash_rx671.h"
 #else
 #error "Unsupported RX MCU for OTA PAL flash programming"
 #endif
@@ -837,7 +839,7 @@ static BaseType_t prvActivateBank(void)
      */
     LogInfo(("prvActivateBank: defer bank toggle to RX65N bootloader"));
     return pdTRUE;
-#elif defined(BSP_MCU_RX72N)
+#elif defined(BSP_MCU_RX72N) || defined(BSP_MCU_RX671)
     flash_err_t err;
 
     R_BSP_SoftwareDelay(5000U, BSP_DELAY_MILLISECS);

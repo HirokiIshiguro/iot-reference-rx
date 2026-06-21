@@ -19,6 +19,14 @@
 
 以降は今後のリリース候補です。
 
+- EK-RX671 + Murata Type 1YN Wi-Fi project is being promoted from SDIO/WHD
+  bring-up to an `iot-reference-rx` AWS baseline. The current development
+  branch builds `Projects/aws_wifi_rx671_ek/e2studio_ccrx` headlessly, keeps
+  Wi-Fi and AWS IoT credentials in ignored local headers, verifies SCI6 logging
+  on COM5 at 921600 bps, joins an AP through WHD over SDIO, starts
+  FreeRTOS+TCP, and completes an AWS IoT MQTT smoke connection with
+  `AWS MQTT=0`.
+
 - Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
   性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
 

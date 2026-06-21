@@ -554,6 +554,12 @@
         <pinItem allocation="121$B" comments="" direction="None" id="SDHI_CLK" isUsedBySoftware="true" locked="false" operationMode="" status="65280"/>
         <pinItem allocation="18" comments="" direction="None" id="XCOUT" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="7" comments="" direction="None" id="RXD6" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="135" comments="" direction="None" id="AN005" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="141" comments="" direction="None" id="AN000" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="139" comments="" direction="None" id="AN001" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="138" comments="" direction="None" id="AN002" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="137" comments="" direction="None" id="AN003" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="136" comments="" direction="None" id="AN004" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="17" comments="" direction="None" id="XCIN" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="8" comments="" direction="None" id="TXD6" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="22" comments="" direction="None" id="EXTAL" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
@@ -689,12 +695,12 @@
                 <gridItem id="BSP_CFG_USER_STACK_ENABLE" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_USTACK_BYTES" selectedIndex="0x1000"/>
                 <gridItem id="BSP_CFG_ISTACK_BYTES" selectedIndex="0x400"/>
-                <gridItem id="BSP_CFG_HEAP_BYTES" selectedIndex="0x400"/>
+                <gridItem id="BSP_CFG_HEAP_BYTES" selectedIndex="0x8000"/>
                 <gridItem id="BSP_CFG_IO_LIB_ENABLE" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_USER_CHARGET_ENABLED" selectedIndex="0"/>
                 <gridItem id="BSP_CFG_USER_CHARGET_FUNCTION" selectedIndex="my_sw_charget_function"/>
-                <gridItem id="BSP_CFG_USER_CHARPUT_ENABLED" selectedIndex="0"/>
-                <gridItem id="BSP_CFG_USER_CHARPUT_FUNCTION" selectedIndex="my_sw_charput_function"/>
+                <gridItem id="BSP_CFG_USER_CHARPUT_ENABLED" selectedIndex="1"/>
+                <gridItem id="BSP_CFG_USER_CHARPUT_FUNCTION" selectedIndex="debug_uart_stdio_charput"/>
                 <gridItem id="BSP_CFG_RUN_IN_USER_MODE" selectedIndex="0"/>
                 <gridItem id="BSP_CFG_ID_CODE_LONG_1" selectedIndex="0xFFFFFFFF"/>
                 <gridItem id="BSP_CFG_ID_CODE_LONG_2" selectedIndex="0xFFFFFFFF"/>
@@ -762,7 +768,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="b35f5c5f-61ba-4400-a56b-fdae56d29207" inuse="true" name="FreeRTOS_Kernel">
+        <configuration enable="true" exclude="false" id="966cf5d4-e01f-4c87-a09e-aba48b1eafc9" inuse="true" name="FreeRTOS_Kernel">
             <component description="This component is a part of RTOS Configurator feature that allow user to use the GUI to configure kernel setting of FreeRTOS." detailDescription="" display="FreeRTOS_Kernel" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.kernel" version="11.1.0-rx-1.0.0">
                 <gridItem id="configCPU_CLOCK_HZ" selectedIndex="BSP_ICLK_HZ"/>
                 <gridItem id="configPERIPHERAL_CLOCK_HZ" selectedIndex="BSP_PCLKB_HZ"/>
@@ -793,9 +799,9 @@
                 <gridItem id="configTIMER_QUEUE_LENGTH" selectedIndex="5"/>
                 <gridItem id="configUSE_EVENT_GROUPS" selectedIndex="1"/>
                 <gridItem id="configUSE_STREAM_BUFFERS" selectedIndex="1"/>
-                <gridItem id="configSUPPORT_STATIC_ALLOCATION" selectedIndex="0"/>
+                <gridItem id="configSUPPORT_STATIC_ALLOCATION" selectedIndex="1"/>
                 <gridItem id="configSUPPORT_DYNAMIC_ALLOCATION" selectedIndex="1"/>
-                <gridItem id="configTOTAL_HEAP_SIZE_N" selectedIndex="8"/>
+                <gridItem id="configTOTAL_HEAP_SIZE_N" selectedIndex="224"/>
                 <gridItem id="configTOTAL_HEAP_SIZE" selectedIndex="( size_t ) ( configTOTAL_HEAP_SIZE_N * 1024 )"/>
                 <gridItem id="configAPPLICATION_ALLOCATED_HEAP" selectedIndex="0"/>
                 <gridItem id="configSTACK_ALLOCATION_FROM_SEPARATE_HEAP" selectedIndex="0"/>
@@ -841,7 +847,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="6f1d43d9-ec18-4e18-b948-fb9d57013488" inuse="true" name="FreeRTOS_Object">
+        <configuration enable="true" exclude="false" id="14474392-68c0-4dca-b2d8-41d29020833b" inuse="true" name="FreeRTOS_Object">
             <allocatable id="OBJECT" name="OBJECT" type="">
                 <allocatable id="TASK" name="TASK" type="">
                     <allocatable id="TASKOBJECTLINK1" name="TASK" readonly="true" type="">
@@ -1208,6 +1214,185 @@
                 <gridItem id="SDHI_CFG_LONGQ_ENABLE" selectedIndex="0"/>
                 <gridItem id="SDHI_CFG_CH0_EN_NESTED_INT" selectedIndex="0"/>
                 <gridItem id="SDHI_CFG_CH0_EN_SBFAI_NESTED_INT" selectedIndex="0"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_flash_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.70&#10;This module allows the user to program, erase, write and blankcheck the Code and/or Data flash." detailDescription="Flash API for RX100, RX200, RX600. and RX700." display="r_flash_rx" id="r_flash_rx5.30" version="5.30">
+                <gridItem id="FLASH_CFG_PARAM_CHECKING_ENABLE" selectedIndex="1"/>
+                <gridItem id="FLASH_CFG_CODE_FLASH_ENABLE" selectedIndex="1"/>
+                <gridItem id="FLASH_CFG_DATA_FLASH_BGO" selectedIndex="1"/>
+                <gridItem id="FLASH_CFG_CODE_FLASH_BGO" selectedIndex="1"/>
+                <gridItem id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" selectedIndex="1"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_s12ad_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.70&#10;This A/D driver supports the temperature sensor, internal reference voltage sensor, and all analog channels available on the MCU. Single scan and continuous scanning are supported. Group and Double Trigger modes are supported. Triggers may be synchronous, asynchronous, or initiated by software. " detailDescription="ADC Driver" display="r_s12ad_rx" id="r_s12ad_rx5.50" version="5.50">
+                <gridItem id="AN000" selectedIndex="1"/>
+                <gridItem id="AN001" selectedIndex="1"/>
+                <gridItem id="AN002" selectedIndex="1"/>
+                <gridItem id="AN003" selectedIndex="1"/>
+                <gridItem id="AN004" selectedIndex="1"/>
+                <gridItem id="AN005" selectedIndex="1"/>
+                <gridItem id="AN006" selectedIndex="0"/>
+                <gridItem id="AN007" selectedIndex="0"/>
+                <gridItem id="AN008" selectedIndex="0"/>
+                <gridItem id="AN009" selectedIndex="0"/>
+                <gridItem id="AN010" selectedIndex="0"/>
+                <gridItem id="AN011" selectedIndex="0"/>
+                <gridItem id="AN012" selectedIndex="0"/>
+                <gridItem id="AN013" selectedIndex="0"/>
+                <gridItem id="AN014" selectedIndex="0"/>
+                <gridItem id="AN015" selectedIndex="0"/>
+                <gridItem id="AN016" selectedIndex="0"/>
+                <gridItem id="AN017" selectedIndex="0"/>
+                <gridItem id="AN018" selectedIndex="0"/>
+                <gridItem id="AN019" selectedIndex="0"/>
+                <gridItem id="AN020" selectedIndex="0"/>
+                <gridItem id="AN021" selectedIndex="0"/>
+                <gridItem id="AN022" selectedIndex="0"/>
+                <gridItem id="AN023" selectedIndex="0"/>
+                <gridItem id="AN024" selectedIndex="0"/>
+                <gridItem id="AN025" selectedIndex="0"/>
+                <gridItem id="AN026" selectedIndex="0"/>
+                <gridItem id="AN027" selectedIndex="0"/>
+                <gridItem id="AN028" selectedIndex="0"/>
+                <gridItem id="AN029" selectedIndex="0"/>
+                <gridItem id="AN030" selectedIndex="0"/>
+                <gridItem id="AN031" selectedIndex="0"/>
+                <gridItem id="VREFH0" selectedIndex="0"/>
+                <gridItem id="VREFL0" selectedIndex="0"/>
+                <gridItem id="ADTRG0#" selectedIndex="0"/>
+                <gridItem id="ADST0" selectedIndex="0"/>
+                <gridItem id="PGAVSS0" selectedIndex="0"/>
+                <gridItem id="PGAOUT0" selectedIndex="0"/>
+                <gridItem id="S12AD0" selectedIndex="1"/>
+                <gridItem id="AN100" selectedIndex="0"/>
+                <gridItem id="AN101" selectedIndex="0"/>
+                <gridItem id="AN102" selectedIndex="0"/>
+                <gridItem id="AN103" selectedIndex="0"/>
+                <gridItem id="AN104" selectedIndex="0"/>
+                <gridItem id="AN105" selectedIndex="0"/>
+                <gridItem id="AN106" selectedIndex="0"/>
+                <gridItem id="AN107" selectedIndex="0"/>
+                <gridItem id="AN108" selectedIndex="0"/>
+                <gridItem id="AN109" selectedIndex="0"/>
+                <gridItem id="AN110" selectedIndex="0"/>
+                <gridItem id="AN111" selectedIndex="0"/>
+                <gridItem id="AN112" selectedIndex="0"/>
+                <gridItem id="AN113" selectedIndex="0"/>
+                <gridItem id="AN114" selectedIndex="0"/>
+                <gridItem id="AN115" selectedIndex="0"/>
+                <gridItem id="AN116" selectedIndex="0"/>
+                <gridItem id="AN117" selectedIndex="0"/>
+                <gridItem id="AN118" selectedIndex="0"/>
+                <gridItem id="AN119" selectedIndex="0"/>
+                <gridItem id="AN120" selectedIndex="0"/>
+                <gridItem id="ANEX0" selectedIndex="0"/>
+                <gridItem id="ANEX1" selectedIndex="0"/>
+                <gridItem id="ADTRG1#" selectedIndex="0"/>
+                <gridItem id="ADST1" selectedIndex="0"/>
+                <gridItem id="PGAVSS1" selectedIndex="0"/>
+                <gridItem id="S12AD1" selectedIndex="0"/>
+                <gridItem id="AN200" selectedIndex="0"/>
+                <gridItem id="AN201" selectedIndex="0"/>
+                <gridItem id="AN202" selectedIndex="0"/>
+                <gridItem id="AN203" selectedIndex="0"/>
+                <gridItem id="AN204" selectedIndex="0"/>
+                <gridItem id="AN205" selectedIndex="0"/>
+                <gridItem id="AN206" selectedIndex="0"/>
+                <gridItem id="AN207" selectedIndex="0"/>
+                <gridItem id="AN208" selectedIndex="0"/>
+                <gridItem id="AN209" selectedIndex="0"/>
+                <gridItem id="AN210" selectedIndex="0"/>
+                <gridItem id="AN211" selectedIndex="0"/>
+                <gridItem id="AN216" selectedIndex="0"/>
+                <gridItem id="AN217" selectedIndex="0"/>
+                <gridItem id="ADTRG2#" selectedIndex="0"/>
+                <gridItem id="ADST2" selectedIndex="0"/>
+                <gridItem id="S12AD2" selectedIndex="0"/>
+                <gridItem id="ADC_CFG_PARAM_CHECKING_ENABLE" selectedIndex="0"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_tsip_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.30&#10;Support functions: AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA, ECC, Random number generate, Key management, secure boot/secure firmware update." detailDescription="TSIP(Trusted Secure IP) driver." display="r_tsip_rx" id="r_tsip_rx1.23" version="1.23">
+                <gridItem id="AES128" selectedIndex="0"/>
+                <gridItem id="AES128-ECB" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_ECB_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_ECB_DECRYPT" selectedIndex="0"/>
+                <gridItem id="AES128-CBC" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_CBC_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_CBC_DECRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_CTR" selectedIndex="0"/>
+                <gridItem id="AES128-GCM" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_GCM_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_GCM_DECRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_CMAC" selectedIndex="0"/>
+                <gridItem id="AES128-CCM" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_CCM_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_CCM_DECRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_128_KEY_WRAP" selectedIndex="0"/>
+                <gridItem id="AES256" selectedIndex="0"/>
+                <gridItem id="AES256-ECB" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_ECB_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_ECB_DECRYPT" selectedIndex="0"/>
+                <gridItem id="AES256-CBC" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_CBC_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_CBC_DECRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_CTR" selectedIndex="0"/>
+                <gridItem id="AES256-GCM" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_GCM_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_GCM_DECRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_CMAC" selectedIndex="0"/>
+                <gridItem id="AES256-CCM" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_CCM_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_CCM_DECRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_AES_256_KEY_WRAP" selectedIndex="0"/>
+                <gridItem id="TDES" selectedIndex="0"/>
+                <gridItem id="TDES-ECB" selectedIndex="0"/>
+                <gridItem id="TSIP_TDES_ECB_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_TDES_ECB_DECRYPT" selectedIndex="0"/>
+                <gridItem id="TDES-CBC" selectedIndex="0"/>
+                <gridItem id="TSIP_TDES_CBC_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_TDES_CBC_DECRYPT" selectedIndex="0"/>
+                <gridItem id="ARC4" selectedIndex="0"/>
+                <gridItem id="TSIP_ARC4_ENCRYPT" selectedIndex="0"/>
+                <gridItem id="TSIP_ARC4_DECRYPT" selectedIndex="0"/>
+                <gridItem id="RSAES-PKCS1" selectedIndex="0"/>
+                <gridItem id="TSIP_RSAES_1024" selectedIndex="0"/>
+                <gridItem id="TSIP_RSAES_2048" selectedIndex="0"/>
+                <gridItem id="TSIP_RSAES_3072" selectedIndex="0"/>
+                <gridItem id="TSIP_RSAES_4096" selectedIndex="0"/>
+                <gridItem id="RSASSA-PKCS1" selectedIndex="0"/>
+                <gridItem id="TSIP_RSASSA_1024" selectedIndex="0"/>
+                <gridItem id="TSIP_RSASSA_2048" selectedIndex="0"/>
+                <gridItem id="TSIP_RSASSA_3072" selectedIndex="0"/>
+                <gridItem id="TSIP_RSASSA_4096" selectedIndex="0"/>
+                <gridItem id="TSIP_RSA_RETRY_COUNT_FOR_RSA_KEY_GENERATION" selectedIndex="5120*2"/>
+                <gridItem id="ECDSA" selectedIndex="0"/>
+                <gridItem id="TSIP_ECDSA_P192" selectedIndex="0"/>
+                <gridItem id="TSIP_ECDSA_P224" selectedIndex="0"/>
+                <gridItem id="TSIP_ECDSA_P256" selectedIndex="0"/>
+                <gridItem id="TSIP_ECDSA_P384" selectedIndex="0"/>
+                <gridItem id="TSIP_SHA_1" selectedIndex="0"/>
+                <gridItem id="TSIP_SHA_256" selectedIndex="0"/>
+                <gridItem id="TSIP_MD5" selectedIndex="0"/>
+                <gridItem id="TSIP_SHA_1_HMAC" selectedIndex="0"/>
+                <gridItem id="TSIP_SHA_256_HMAC" selectedIndex="0"/>
+                <gridItem id="TSIP_USER_SHA_384_ENABLED" selectedIndex="0"/>
+                <gridItem id="TSIP_USER_SHA_384_FUNCTION" selectedIndex="user_sha384_function"/>
+                <gridItem id="TSIP_ECDH_P256" selectedIndex="0"/>
+                <gridItem id="TSIP_TLS" selectedIndex="0"/>
+                <gridItem id="TSIP_SECURE_BOOT" selectedIndex="0"/>
+                <gridItem id="TSIP_FIRMWARE_UPDATE" selectedIndex="0"/>
+                <gridItem id="TSIP_MULTI_THREADING" selectedIndex="0"/>
+                <gridItem id="TSIP_MULTI_THREADING_LOCK_FUNCTION" selectedIndex="user_lock_function"/>
+                <gridItem id="TSIP_MULTI_THREADING_UNLOCK_FUNCTION" selectedIndex="user_unlock_function"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>

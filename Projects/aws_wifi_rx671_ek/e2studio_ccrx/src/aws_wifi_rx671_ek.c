@@ -11,13 +11,16 @@
 ***********************************************************************************************************************/
 #include "FreeRTOS.h"
 #include "task.h"
+#include "event_groups.h"
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_Sockets.h"
+#include "iot_logging_task.h"
 #include "r_smc_entry.h"
 #include "debug_uart.h"
 #include "sdio_host.h"
 #include "whd_join_config.h"
 #include "whd_bringup.h"
+#include "aws_iot_mqtt_smoke.h"
 
 #if BSP_CFG_CPLUSPLUS == 1
 extern void abort(void);
@@ -26,10 +29,14 @@ extern void abort(void);
 #define DIAG_PING_TARGET_IP         FreeRTOS_inet_addr_quick(192U, 168U, 10U, 105U)
 #define DIAG_PING_PERIOD_TICKS      pdMS_TO_TICKS(5000U)
 #define DIAG_PING_PAYLOAD_BYTES     (32U)
+#define MAIN_LOGGING_TASK_STACK_SIZE       (configMINIMAL_STACK_SIZE * 6U)
+#define MAIN_LOGGING_MESSAGE_QUEUE_LENGTH  (15U)
 
 extern volatile uint32_t g_freertos_tcp_network_up;
+extern void UserInitialization(void);
 
-volatile uint32_t g_diag_ping_enable = 1U;
+volatile uint32_t g_logging_task_init_result;
+volatile uint32_t g_diag_ping_enable = 0U;
 volatile uint32_t g_diag_ping_send_count;
 volatile uint32_t g_diag_ping_last_result;
 volatile uint32_t g_diag_ping_last_identifier;
@@ -40,6 +47,7 @@ volatile uint32_t g_diag_ping_task_loop_count;
 volatile uint32_t g_diag_ping_task_condition_count;
 volatile uint32_t g_diag_ping_heap_before_create;
 volatile uint32_t g_diag_ping_heap_after_create;
+EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 static bool mac_is_zero(const uint8_t mac[6])
 {
@@ -117,6 +125,7 @@ static void start_freertos_tcp_after_join(void)
         result = xTaskCreate(diag_ping_task, "DIAG_PING", 1024U, NULL, tskIDLE_PRIORITY + 1, NULL);
         g_diag_ping_task_create_result = (uint32_t)result;
         g_diag_ping_heap_after_create = xPortGetFreeHeapSize();
+        aws_iot_mqtt_smoke_start();
     }
 #else
     debug_puts("FreeRTOS+TCP skipped (WHD_JOIN_ENABLE=0)\r\n");
@@ -133,8 +142,16 @@ void main_task(void *pvParameters)
 
     /* Bring up the SCI6 debug console (COM port @ 921600 8N1, P00/P01). */
     debug_uart_init();
+    UserInitialization();
+    xStartDemoEventGroup = xEventGroupCreate();
     debug_puts("\r\n=== aws_wifi_rx671_ek boot ===\r\n");
     debug_puts("SCI6 debug console up @921600 8N1 (P00=TXD6/P01=RXD6)\r\n");
+    g_logging_task_init_result = (uint32_t)xLoggingTaskInitialize(MAIN_LOGGING_TASK_STACK_SIZE,
+                                                                  tskIDLE_PRIORITY + 2U,
+                                                                  MAIN_LOGGING_MESSAGE_QUEUE_LENGTH);
+    debug_puts((pdPASS == (BaseType_t)g_logging_task_init_result) ?
+               "FreeRTOS logging task OK\r\n" :
+               "FreeRTOS logging task NG\r\n");
 
 #if WHD_BRINGUP_ENABLE
     whd_bringup_run();
@@ -463,6 +480,11 @@ void main_task(void *pvParameters)
 
     vTaskDelete(NULL);
 
+}
+
+BaseType_t OtaSelfTest(void)
+{
+    return pdTRUE;
 }
 
 #if BSP_CFG_CPLUSPLUS == 1

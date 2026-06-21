@@ -20,7 +20,7 @@ The upstream repository officially supports only the CK-RX65N v2 board and does 
 
 1. **Adding RX72N Envision Kit support** — porting the FreeRTOS + AWS IoT demo (Ethernet, MQTT PubSub, OTA) to the RX72N Envision Kit, which is not covered upstream
 2. **Adding CK-RX65N + BG96 cellular support** — carrying the proven OSS CK-RX65N/BG96 OTA reference into this tree as the recommended cellular modem path for this fork
-3. **Adding EK-RX671 + Type 1YN Wi-Fi staging** — carrying the WHD/SDIO bring-up into this tree as the starting point for FreeRTOS+TCP and AWS IoT over Wi-Fi
+3. **Adding EK-RX671 + Type 1YN Wi-Fi support** — carrying the WHD/SDIO bring-up into this tree and extending it to FreeRTOS+TCP plus an AWS IoT MQTT smoke baseline over Wi-Fi
 4. **Improving the boot loader** — replacing the upstream's simple dual-bank boot loader with a production-grade design, with the ultimate goal of integrating [MCUboot](https://www.mcuboot.com/) as the secure boot loader
 5. **CI/CD integration** — automated build, flash, provisioning, and MQTT/OTA testing via GitLab CI with hardware-in-the-loop
 
@@ -30,7 +30,7 @@ upstream は CK-RX65N v2 のみを公式サポートしており、**RX72N に�
 
 1. **RX72N Envision Kit 対応の追加** — upstream にない RX72N 向け FreeRTOS + AWS IoT デモ（Ethernet / MQTT PubSub / OTA）の移植
 2. **CK-RX65N + BG96 Cellular 対応の追加** — 安定してOTA可能なOSS版CK-RX65N/BG96構成を、このフォークの推奨セルラー構成として取り込み
-3. **EK-RX671 + Type 1YN Wi-Fi 対応の追加** — WHD/SDIO bring-up を `iot-reference-rx` の FreeRTOS/AWS IoT baseline へ統合するためのステージングプロジェクトを追加
+3. **EK-RX671 + Type 1YN Wi-Fi 対応の追加** — WHD/SDIO bring-up を `iot-reference-rx` の FreeRTOS/AWS IoT baseline へ統合し、FreeRTOS+TCP と AWS IoT MQTT smoke まで到達
 4. **ブートローダの本格化** — upstream の簡易デュアルバンクブートローダを本格仕様に変更。最終的には [MCUboot](https://www.mcuboot.com/) への換装を予定
 5. **CI/CD 統合** — GitLab CI による自動ビルド・フラッシュ・プロビジョニング・MQTT/OTA テスト（実機接続 Runner）
 
@@ -69,7 +69,7 @@ The following e2 studio projects are maintained under `Projects/`:
 | CK-RX65N BG96 Boot Loader | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | RX65N dual-bank boot loader for BG96 OTA |
 | CK-RX65N BG96 AWS Demo | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | FreeRTOS + AWS IoT demo (MQTT PubSub, OTA) over BG96 cellular |
 | CK-RX65N BG96 AWS Demo with TSIP | `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` | BG96 cellular demo using the TSIP-enabled TLS backend; hardware validation requires RX65N-specific TSIP wrapped blobs |
-| EK-RX671 Type 1YN Wi-Fi Staging | `Projects/aws_wifi_rx671_ek/e2studio_ccrx/` | WHD/SDIO Wi-Fi bring-up project; FreeRTOS+TCP/AWS IoT integration in progress |
+| EK-RX671 Type 1YN Wi-Fi | `Projects/aws_wifi_rx671_ek/e2studio_ccrx/` | WHD/SDIO Wi-Fi bring-up project with FreeRTOS+TCP and AWS IoT MQTT smoke baseline |
 
 ### Boot Loader Architecture / ブートローダ構成
 
@@ -148,6 +148,23 @@ pwsh -File tools/build_headless_rx65n_bg96.ps1 \
 ```
 
 The script imports and builds both `boot_loader_ck_rx65n` and `aws_bg96_ck_rx65n`, then verifies `.mot` / `.abs` / `.x` outputs.
+
+For the EK-RX671 + Type 1YN Wi-Fi baseline:
+
+```bash
+pwsh -File tools/build_headless_rx671_wifi.ps1 \
+  -ProjectRoot <repo_root> \
+  -E2Studio C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe \
+  -Workspace <temp_workspace> \
+  -WifiConfigFile <local_wifi_config> \
+  -AwsIotConfigDir <local_aws_iot_credential_dir>
+```
+
+The script imports and builds `Projects/aws_wifi_rx671_ek/e2studio_ccrx`,
+initializes required submodules, applies the project-local WHD patch, and
+generates ignored local headers for Wi-Fi and AWS IoT credentials. The verified
+hardware baseline uses SCI6 on COM5 at 921600 bps and reaches `AWS MQTT=0`
+after WHD JOIN, DHCP, TLS, and MQTT connect/disconnect.
 
 ### Flash / 書き込み方法
 
