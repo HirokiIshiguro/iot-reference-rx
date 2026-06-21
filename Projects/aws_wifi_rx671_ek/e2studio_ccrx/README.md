@@ -41,13 +41,24 @@ argument and Function 2 FIFO handling needed for WHD scan/JOIN.
 | `WHD_JOIN_SSID` | `""` | AP SSID. Do not commit real credentials. |
 | `WHD_JOIN_PASSPHRASE` | `""` | AP passphrase. Do not commit real credentials. |
 | `WHD_JOIN_SECURITY` | `WHD_SECURITY_WPA2_AES_PSK` | Initial security mode for AP JOIN testing. |
-| `WHD_SDIO_SOFTIRQ_POLL_MS` | `1` | Temporary SDIO soft-IRQ poll period for WHD event wakeups. `0` disables the bridge for low-level isolation. |
+| `WHD_SDIO_SOFTIRQ_POLL_MS` | `0` | Temporary SDIO soft-IRQ poll period for WHD event wakeups. Use `1` for the current AP JOIN / ping baseline when the SDHI in-band interrupt path is being isolated. |
 | `WHD_SDIO_DIAG_FAIL_LIMIT` | `16` | Maximum CMD52/CMD53 failure diagnostics printed per command class. |
 | `WHD_SDIO_PRE_CMD53_CLOCKS` | `1` | Force the CYW43439 backplane clocks and KSO once before the first F1 CMD53, matching the proven primitive backplane-read sequence without modifying WHD core code. |
 
-For a real AP JOIN run, pass the credential macros as local compiler defines or
-temporarily edit `whd_join_config.h` in the working tree only. The repository
-default intentionally leaves JOIN disabled.
+For a real AP JOIN run, do not edit this tracked header with real credentials.
+Use the headless build helper from the repository root instead:
+
+```powershell
+pwsh -File tools/build_headless_rx671_wifi.ps1 `
+  -WifiConfigFile C:\ai\codex\ref\wifi.txt `
+  -SoftIrqPollMs 1
+```
+
+The helper generates ignored `src/whd_join_config_local.h` and temporarily
+injects `WHD_JOIN_USE_LOCAL_CONFIG` into `.cproject` for that build only. A
+local header by itself is not enough; the compiler define is what makes
+`whd_join_config.h` include it. The repository default intentionally leaves
+JOIN disabled.
 
 ## WHD resource flash layout
 
@@ -83,15 +94,27 @@ q
 Use `-SelectEmuBySN 853004952` when both the external J-Link Compact PLUS and
 another SEGGER probe are connected.
 
+The repository root also provides a thin helper that emits the same Commander
+script into a temporary file:
+
+```powershell
+pwsh -File tools/load_rx671_wifi_jlink.ps1 `
+  -FirmwareBin C:\path\to\local\type1yn-fw\43439A0.bin `
+  -NvramBin C:\path\to\local\type1yn-fw\nvram_1yn.bin `
+  -ClmBlob C:\path\to\local\type1yn-fw\43439A0.clm_blob `
+  -Run
+```
+
 ## Temporary interrupt model
 
 The current WHD SDIO backend is still synchronous and mostly polled. WHD expects
 an SDIO card-interrupt callback to wake its internal thread for control/event
 traffic, so `src/whd_port/cyhal_sdhc.c` can provide a FreeRTOS software timer
 that periodically calls the registered `CYHAL_SDIO_CARD_INTERRUPT` handler.
-The bridge is enabled by default at a conservative 1 ms period. Set
-`WHD_SDIO_SOFTIRQ_POLL_MS=0` only when isolating lower-level SDIO bring-up,
-because scan/JOIN need WHD's internal thread to observe firmware events.
+The bridge is disabled by default in the tracked project so the SDHI in-band
+interrupt path remains visible during bring-up. Set
+`WHD_SDIO_SOFTIRQ_POLL_MS=1` through the local JOIN config when reproducing the
+current AP JOIN / ping baseline with software wakeups.
 
 The RX671 + Type 1YN bench also needs the Broadcom backplane clock/KSO sequence
 that was proven in the primitive SDIO project before the first F1 CMD53. WHD

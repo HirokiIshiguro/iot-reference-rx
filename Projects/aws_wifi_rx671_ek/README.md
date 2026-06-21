@@ -58,11 +58,49 @@ pwsh -File Projects/aws_wifi_rx671_ek/apply_whd_patch.ps1
 pwsh -File tools/build_headless_rx671_wifi.ps1
 ```
 
+For the hardware-verified AP JOIN / ping baseline, keep the credentials outside
+git and let the headless build script generate the ignored local header:
+
+```powershell
+pwsh -File tools/build_headless_rx671_wifi.ps1 `
+  -WifiConfigFile C:\ai\codex\ref\wifi.txt `
+  -SoftIrqPollMs 1
+```
+
+The Wi-Fi config file can be either a single whitespace-separated line:
+
+```text
+<ssid> <passphrase>
+```
+
+or key/value lines:
+
+```text
+SSID=<ssid>
+PASS=<passphrase>
+```
+
+The script writes
+`e2studio_ccrx/src/whd_join_config_local.h`, which is ignored by git, and
+temporarily injects `WHD_JOIN_USE_LOCAL_CONFIG` into `.cproject` only for the
+headless build. The tracked e2 studio project is restored after the build, so
+re-run this command after a clean checkout or clean workspace.
+
 Expected outputs:
 
 - `e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.mot`
 - `e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.abs`
 - `e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.x`
+
+Load the generated image and local WHD resources with J-Link Commander:
+
+```powershell
+pwsh -File tools/load_rx671_wifi_jlink.ps1 `
+  -FirmwareBin C:\path\to\local\type1yn-fw\43439A0.bin `
+  -NvramBin C:\path\to\local\type1yn-fw\nvram_1yn.bin `
+  -ClmBlob C:\path\to\local\type1yn-fw\43439A0.clm_blob `
+  -Run
+```
 
 ## FreeRTOS+TCP Integration Plan
 
