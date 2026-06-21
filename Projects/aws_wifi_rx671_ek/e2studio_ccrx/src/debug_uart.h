@@ -21,9 +21,13 @@ void debug_uart_init(void);
  * pieces no larger than the free space, then waits for the line to drain. */
 void debug_puts(const char * text);
 
-/* Single-character output used by the BSP stdio charput hook. This lets WHD's
- * existing WPRINT/printf diagnostics share the SCI6 console. */
+/* Direct single-character output for local printf-free diagnostics. */
 void debug_putchar(char output_char);
+
+/* BSP stdio charput hook. Buffers printf output by line, then hands completed
+ * lines to the FreeRTOS logging task so WHD's WPRINT path does not block in
+ * the C library debug-console backend. */
+void debug_uart_stdio_charput(char output_char);
 
 /* printf-free line builders. Each writes at the cursor and returns the new
  * cursor; the caller sizes the buffer and writes the final '\0'. */

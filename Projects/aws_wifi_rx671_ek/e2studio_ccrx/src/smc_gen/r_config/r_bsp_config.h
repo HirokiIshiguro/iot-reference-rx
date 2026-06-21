@@ -177,7 +177,7 @@ Configuration Options
 #define BSP_CFG_USER_CHARGET_FUNCTION     my_sw_charget_function
 
 #define BSP_CFG_USER_CHARPUT_ENABLED    (1)
-#define BSP_CFG_USER_CHARPUT_FUNCTION     debug_putchar
+#define BSP_CFG_USER_CHARPUT_FUNCTION     debug_uart_stdio_charput
 
 /* After reset MCU will operate in Supervisor mode. To switch to User mode, set this macro to '1'. For more information
    on the differences between these 2 modes see the CPU >> Processor Mode section of your MCU's hardware manual.

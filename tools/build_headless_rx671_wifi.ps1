@@ -4,7 +4,12 @@ param(
     [string]$Workspace = "C:\iotref-rx671-wifi-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx671_wifi_e2studio_build.log"),
     [string]$WifiConfigFile = "",
+    [string]$AwsIotConfigDir = "",
+    [string]$AwsIotEndpoint = "",
+    [string]$AwsIotThingName = "",
     [switch]$UseLocalJoinConfig,
+    [switch]$UseAwsIotLocalConfig,
+    [switch]$UseTsipEntropy,
     [int]$SoftIrqPollMs = -1,
     [int]$WlanAllowBusSleepDelayMs = 600000
 )
@@ -19,7 +24,24 @@ $whdDir = Join-Path $projectRoot "Projects\$projectName\external\wifi-host-drive
 $whdPatch = Join-Path $projectRoot "Projects\$projectName\external\patches\whd-v1.70.0-ccrx-portability.patch"
 $cproject = Join-Path $projectDir ".cproject"
 $localJoinConfig = Join-Path $projectDir "src\whd_join_config_local.h"
-$useLocalJoinConfigForBuild = $UseLocalJoinConfig.IsPresent -or (-not [string]::IsNullOrWhiteSpace($WifiConfigFile))
+$localAwsIotConfig = Join-Path $projectDir "src\frtos_config\aws_iot_config_local.h"
+$defaultAwsIotConfigDir = "C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01"
+$useLocalJoinConfigForBuild = $UseLocalJoinConfig.IsPresent -or
+    (-not [string]::IsNullOrWhiteSpace($WifiConfigFile)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD))
+$useAwsIotLocalConfigForBuild = $UseAwsIotLocalConfig.IsPresent -or
+    (-not [string]::IsNullOrWhiteSpace($AwsIotConfigDir)) -or
+    (Test-Path -LiteralPath $defaultAwsIotConfigDir) -or
+    (-not [string]::IsNullOrWhiteSpace($AwsIotEndpoint)) -or
+    (-not [string]::IsNullOrWhiteSpace($AwsIotThingName)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_ENDPOINT)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_ENDPOINT)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM_FILE)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_PEM)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_FILE))
 
 if (-not (Test-Path -LiteralPath $E2Studio)) {
     throw "e2 studio executable not found: $E2Studio"
@@ -29,8 +51,31 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectDir ".project"))) {
     throw "e2 studio project not found: $projectDir"
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $whdDir ".git"))) {
-    throw "WHD submodule is not initialized. Run: git submodule update --init --recursive Projects/aws_wifi_rx671_ek/external/wifi-host-driver"
+$submodulePaths = @(
+    "Projects/$projectName/external/wifi-host-driver",
+    "Middleware/3rdparty/mbedtls",
+    "Middleware/FreeRTOS/FreeRTOS-Kernel",
+    "Middleware/FreeRTOS/FreeRTOS-Plus-TCP",
+    "Middleware/FreeRTOS/coreMQTT",
+    "Middleware/FreeRTOS/coreMQTT-Agent",
+    "Middleware/FreeRTOS/coreJSON",
+    "Middleware/FreeRTOS/backoffAlgorithm",
+    "Middleware/FreeRTOS/corePKCS11",
+    "Middleware/3rdparty/littlefs",
+    "Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c",
+    "Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk",
+    "Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk"
+)
+
+foreach ($submodulePath in $submodulePaths) {
+    $submoduleFullPath = Join-Path $projectRoot ($submodulePath -replace '/', '\')
+    if (-not (Test-Path -LiteralPath (Join-Path $submoduleFullPath ".git"))) {
+        Write-Host "Initializing submodule: $submodulePath"
+        & git -C $projectRoot submodule update --init --recursive $submodulePath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to initialize submodule: $submodulePath"
+        }
+    }
 }
 
 if (-not (Test-Path -LiteralPath $whdPatch)) {
@@ -107,6 +152,24 @@ function Read-WifiConfig {
     }
 }
 
+function Read-WifiConfigFromEnvironment {
+    $ssid = $env:RX671_EK_WIFI_SSID
+    $passphrase = $env:RX671_EK_WIFI_PASSPHRASE
+
+    if ([string]::IsNullOrWhiteSpace($passphrase)) {
+        $passphrase = $env:RX671_EK_WIFI_PASSWORD
+    }
+
+    if ([string]::IsNullOrWhiteSpace($ssid) -or [string]::IsNullOrWhiteSpace($passphrase)) {
+        throw "Wi-Fi config environment must contain RX671_EK_WIFI_SSID and RX671_EK_WIFI_PASSPHRASE."
+    }
+
+    return @{
+        Ssid       = $ssid
+        Passphrase = $passphrase
+    }
+}
+
 function Write-LocalJoinConfig {
     param(
         [string]$Path,
@@ -135,6 +198,150 @@ function Write-LocalJoinConfig {
     $lines += @(
         "",
         "#endif /* WHD_JOIN_CONFIG_LOCAL_H_ */",
+        ""
+    )
+
+    [System.IO.File]::WriteAllLines($Path, $lines, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Get-FirstNonEmpty {
+    param([string[]]$Values)
+
+    foreach ($value in $Values) {
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+        }
+    }
+
+    return ""
+}
+
+function Read-TextFromValueOrPath {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ""
+    }
+
+    if (Test-Path -LiteralPath $Value) {
+        return [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $Value).Path)
+    }
+
+    return $Value
+}
+
+function Read-AwsIotMetadata {
+    param([string]$Path)
+
+    $metadata = @{}
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $metadata
+    }
+
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        $trimmed = $line.Trim()
+        if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith("#")) {
+            continue
+        }
+
+        if ($trimmed -match '^([^=:\s]+)\s*[:=]\s*(.+)$') {
+            $metadata[$Matches[1].Trim().ToUpperInvariant()] = $Matches[2].Trim().Trim('"')
+        }
+    }
+
+    return $metadata
+}
+
+function Read-AwsIotConfig {
+    param(
+        [string]$ConfigDir,
+        [string]$EndpointOverride,
+        [string]$ThingNameOverride
+    )
+
+    $resolvedDir = $ConfigDir
+    if ([string]::IsNullOrWhiteSpace($resolvedDir) -and (Test-Path -LiteralPath $defaultAwsIotConfigDir)) {
+        $resolvedDir = $defaultAwsIotConfigDir
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($resolvedDir)) {
+        $resolvedDir = (Resolve-Path -LiteralPath $resolvedDir).Path
+        $metadata = Read-AwsIotMetadata -Path (Join-Path $resolvedDir "metadata.txt")
+        $endpoint = Get-FirstNonEmpty @($EndpointOverride, $metadata["ENDPOINT"])
+        $thingName = Get-FirstNonEmpty @($ThingNameOverride, $metadata["THING_NAME"], $metadata["THING"])
+        $certPath = Join-Path $resolvedDir "device-certificate.pem"
+        $keyPath = Join-Path $resolvedDir "device-private-key.pem"
+
+        if (-not (Test-Path -LiteralPath $certPath)) {
+            throw "AWS IoT client certificate not found: $certPath"
+        }
+        if (-not (Test-Path -LiteralPath $keyPath)) {
+            throw "AWS IoT client private key not found: $keyPath"
+        }
+
+        return @{
+            Endpoint  = $endpoint
+            ThingName = $thingName
+            CertPem   = [System.IO.File]::ReadAllText($certPath)
+            KeyPem    = [System.IO.File]::ReadAllText($keyPath)
+        }
+    }
+
+    $endpoint = Get-FirstNonEmpty @($EndpointOverride, $env:RX671_EK_AWS_IOT_ENDPOINT, $env:AWS_IOT_ENDPOINT)
+    $thingName = Get-FirstNonEmpty @($ThingNameOverride, $env:RX671_EK_AWS_IOT_THING_NAME, $env:AWS_IOT_THING_NAME)
+    $certValue = Get-FirstNonEmpty @(
+        $env:RX671_EK_AWS_IOT_CERT_PEM,
+        $env:RX671_EK_AWS_IOT_CERT_PEM_FILE,
+        $env:AWS_IOT_CERT_PEM,
+        $env:AWS_IOT_CERT_FILE,
+        $env:AWS_IOT_CERT
+    )
+    $keyValue = Get-FirstNonEmpty @(
+        $env:RX671_EK_AWS_IOT_PRIVATE_KEY_PEM,
+        $env:RX671_EK_AWS_IOT_PRIVATE_KEY_PEM_FILE,
+        $env:AWS_IOT_PRIVATE_KEY_PEM,
+        $env:AWS_IOT_PRIVATE_KEY_FILE,
+        $env:AWS_IOT_PRIVATE_KEY,
+        $env:AWS_IOT_PRIVKEY,
+        $env:AWS_IOT_PRIVKEY_FILE
+    )
+
+    return @{
+        Endpoint  = $endpoint
+        ThingName = $thingName
+        CertPem   = Read-TextFromValueOrPath -Value $certValue
+        KeyPem    = Read-TextFromValueOrPath -Value $keyValue
+    }
+}
+
+function Write-LocalAwsIotConfig {
+    param(
+        [string]$Path,
+        [hashtable]$Config
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Config["Endpoint"]) -or
+        [string]::IsNullOrWhiteSpace($Config["ThingName"]) -or
+        [string]::IsNullOrWhiteSpace($Config["CertPem"]) -or
+        [string]::IsNullOrWhiteSpace($Config["KeyPem"])) {
+        throw "AWS IoT local config requires endpoint, thing name, client certificate, and private key."
+    }
+
+    $lines = @(
+        "/*",
+        " * Generated by tools/build_headless_rx671_wifi.ps1.",
+        " * This file contains local AWS IoT credentials and is intentionally ignored by git.",
+        " */",
+        "#ifndef AWS_IOT_CONFIG_LOCAL_H_",
+        "#define AWS_IOT_CONFIG_LOCAL_H_",
+        "",
+        "#define AWS_IOT_MQTT_ENABLE             (1)",
+        "#define AWS_IOT_ENDPOINT                `"$((ConvertTo-CStringLiteral $Config["Endpoint"]))`"",
+        "#define AWS_IOT_THING_NAME              `"$((ConvertTo-CStringLiteral $Config["ThingName"]))`"",
+        "#define AWS_IOT_CLIENT_CERT_PEM         `"$((ConvertTo-CStringLiteral $Config["CertPem"]))`"",
+        "#define AWS_IOT_CLIENT_PRIVATE_KEY_PEM  `"$((ConvertTo-CStringLiteral $Config["KeyPem"]))`"",
+        "",
+        "#endif /* AWS_IOT_CONFIG_LOCAL_H_ */",
         ""
     )
 
@@ -193,6 +400,9 @@ Write-Host "Log file:  $logFilePath"
 if ($useLocalJoinConfigForBuild) {
     Write-Host "Local AP JOIN config: enabled"
 }
+if ($useAwsIotLocalConfigForBuild) {
+    Write-Host "Local AWS IoT config: enabled"
+}
 if ($WlanAllowBusSleepDelayMs -ge 0) {
     Write-Host "WHD WLAN bus sleep delay: ${WlanAllowBusSleepDelayMs} ms"
 }
@@ -206,11 +416,28 @@ try {
             $wifi = Read-WifiConfig -Path $WifiConfigFile
             Write-LocalJoinConfig -Path $localJoinConfig -Ssid $wifi["Ssid"] -Passphrase $wifi["Passphrase"] -PollMs $SoftIrqPollMs
             Write-Host "Generated ignored local JOIN header: $localJoinConfig"
+        } elseif ((-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
+                  (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
+                  (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD))) {
+            $wifi = Read-WifiConfigFromEnvironment
+            Write-LocalJoinConfig -Path $localJoinConfig -Ssid $wifi["Ssid"] -Passphrase $wifi["Passphrase"] -PollMs $SoftIrqPollMs
+            Write-Host "Generated ignored local JOIN header from environment: $localJoinConfig"
         } elseif (-not (Test-Path -LiteralPath $localJoinConfig)) {
             throw "Local JOIN config was requested but not found: $localJoinConfig"
         }
 
         $cprojectDefines += "WHD_JOIN_USE_LOCAL_CONFIG"
+    }
+
+    if ($useAwsIotLocalConfigForBuild) {
+        $awsIotConfig = Read-AwsIotConfig -ConfigDir $AwsIotConfigDir -EndpointOverride $AwsIotEndpoint -ThingNameOverride $AwsIotThingName
+        Write-LocalAwsIotConfig -Path $localAwsIotConfig -Config $awsIotConfig
+        Write-Host "Generated ignored local AWS IoT header: $localAwsIotConfig"
+        $cprojectDefines += "AWS_IOT_USE_LOCAL_CONFIG"
+    }
+
+    if ($UseTsipEntropy.IsPresent) {
+        $cprojectDefines += "AWS_IOT_USE_TSIP_ENTROPY"
     }
 
     if ($WlanAllowBusSleepDelayMs -ge 0) {

@@ -16,7 +16,14 @@
  *********************************************************************************************************************/
 #include <string.h>
 #include "platform.h"   /* __LIT for all compilers*/
+
+#include "FreeRTOS.h"
+#include "task.h"
+
+#if defined (BSP_MCU_RX65N) || (BSP_MCU_RX651) || (BSP_MCU_RX64M) || \
+    defined (BSP_MCU_RX63N) || (BSP_MCU_RX631) || (BSP_MCU_RX630)
 #include "r_s12ad_rx_if.h"
+#endif
 
 #if BSP_CFG_MCU_PART_ENCRYPTION_INCLUDED == true
 #include "r_tsip_rx_if.h"

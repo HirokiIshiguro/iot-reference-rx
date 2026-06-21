@@ -8,8 +8,8 @@ tree:
 
 - EK-RX671 SDHI + in-house `r_sdio_rx`
 - Infineon WHD v1.70.0 through a project-local submodule
-- Type 1YN firmware boot, MAC read, AP scan, and WPA2-PSK JOIN verified on
-  hardware in the source experiment repository
+- Type 1YN firmware boot, MAC read, AP scan, WPA2-PSK JOIN, FreeRTOS+TCP, and
+  AWS IoT MQTT smoke verified on hardware
 - No AP credentials or firmware blobs committed
 
 The e2 studio project name is `aws_wifi_rx671_ek`.
@@ -43,7 +43,10 @@ Known verified baseline:
 - WHD WLAN bus sleep delay: kept awake for the bring-up run
   (`PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`)
 - WHD bring-up: `whd_wifi_on`, AP scan, WPA2-PSK JOIN, and MAC read succeeded
-- FreeRTOS+TCP: PC-to-board ping succeeded after Wi-Fi JOIN
+- FreeRTOS+TCP: DHCP/network-up reached after Wi-Fi JOIN; PC-to-board ping was
+  verified on the earlier RX671 Wi-Fi baseline
+- AWS IoT smoke: TLS connection to AWS IoT Core succeeded and the MQTT smoke
+  task completed with `AWS MQTT=0`
 - J-Link Commander observation:
   - SDHI SDIO in-band interrupt counters increased during traffic
   - WHD RX counters increased during ping traffic
@@ -51,8 +54,8 @@ Known verified baseline:
   - RX network buffers were allocated and submitted to the FreeRTOS+TCP IP task
 
 The baseline is intended to remain on a dedicated development branch until the
-Wi-Fi stack, throughput measurement, provisioning, TSIP, and boot-loader
-variants are separated into reviewable milestones.
+Wi-Fi throughput path, provisioning, TSIP, and boot-loader variants are
+separated into reviewable milestones.
 
 ## Build
 
@@ -70,6 +73,7 @@ git and let the headless build script generate the ignored local header:
 ```powershell
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
+  -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
   -SoftIrqPollMs 1 `
   -WlanAllowBusSleepDelayMs 600000
 ```
@@ -92,6 +96,12 @@ The script writes
 temporarily injects `WHD_JOIN_USE_LOCAL_CONFIG` into `.cproject` only for the
 headless build. The tracked e2 studio project is restored after the build, so
 re-run this command after a clean checkout or clean workspace.
+
+When `-AwsIotConfigDir` is supplied, the script also writes ignored
+`e2studio_ccrx/src/frtos_config/aws_iot_config_local.h` and temporarily injects
+`AWS_IOT_USE_LOCAL_CONFIG`. The directory is expected to contain the local AWS
+IoT endpoint/thing metadata plus the device certificate and private key. These
+credentials must remain outside git.
 
 The same helper also temporarily injects
 `PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`, matching the hardware run

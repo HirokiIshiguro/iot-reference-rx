@@ -1,12 +1,9 @@
 /*
  * Application hooks required by FreeRTOS+TCP.
  */
-#include <stdarg.h>
 #include <stdint.h>
-#include <stdio.h>
 
 #include "FreeRTOS.h"
-#include "task.h"
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_DHCP.h"
 
@@ -47,37 +44,6 @@ volatile uint32_t g_iptrace_network_output_tcp;
 volatile uint32_t g_iptrace_network_output_last_length;
 volatile uint32_t g_iptrace_network_output_last_ethertype;
 volatile uint32_t g_iptrace_network_output_last_protocol;
-
-static uint32_t g_random_state = 0x6711a9afUL;
-
-void vLoggingPrintf(const char * pcFormatString, ...)
-{
-    char buffer[192];
-    va_list args;
-    int length;
-    int index;
-
-    if (NULL == pcFormatString)
-    {
-        return;
-    }
-
-    va_start(args, pcFormatString);
-    length = vsnprintf(buffer, sizeof(buffer), pcFormatString, args);
-    va_end(args);
-
-    if (length < 0)
-    {
-        return;
-    }
-
-    buffer[sizeof(buffer) - 1U] = '\0';
-
-    for (index = 0; (index < (int)(sizeof(buffer) - 1U)) && ('\0' != buffer[index]); index++)
-    {
-        debug_putchar(buffer[index]);
-    }
-}
 
 static uint32_t pack_be16(const uint8_t * p)
 {
@@ -206,24 +172,6 @@ const char * pcApplicationHostnameHook(void)
     return "rx671-1yn";
 }
 
-BaseType_t xApplicationGetRandomNumber(uint32_t * pul_number)
-{
-    uint32_t x = g_random_state;
-
-    x ^= (x << 13);
-    x ^= (x >> 17);
-    x ^= (x << 5);
-    x += (uint32_t)xTaskGetTickCount();
-    g_random_state = x;
-
-    if (NULL != pul_number)
-    {
-        *pul_number = x;
-    }
-
-    return pdTRUE;
-}
-
 eDHCPCallbackAnswer_t xApplicationDHCPHook(eDHCPCallbackPhase_t phase, uint32_t ip_address)
 {
     g_freertos_tcp_dhcp_hook_count++;
@@ -231,18 +179,6 @@ eDHCPCallbackAnswer_t xApplicationDHCPHook(eDHCPCallbackPhase_t phase, uint32_t 
     g_freertos_tcp_dhcp_ip = ip_address;
 
     return eDHCPContinue;
-}
-
-uint32_t ulApplicationGetNextSequenceNumber(uint32_t source_address,
-                                            uint16_t source_port,
-                                            uint32_t destination_address,
-                                            uint16_t destination_port)
-{
-    uint32_t rnd;
-
-    (void)xApplicationGetRandomNumber(&rnd);
-    return rnd ^ source_address ^ destination_address ^
-           ((uint32_t)source_port << 16) ^ (uint32_t)destination_port;
 }
 
 void vApplicationPingReplyHook(ePingReplyStatus_t status, uint16_t identifier)

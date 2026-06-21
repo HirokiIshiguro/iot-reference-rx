@@ -3,7 +3,8 @@
 `aws_wifi_rx671_ek` e2 studio project for EK-RX671 + Murata Type 1YN
 (CYW43439). This is the host tree for integrating the Infineon Wi-Fi Host
 Driver (WHD) on top of the SDIO bus layer (`r_sdhi_rx` + the in-house
-`r_sdio_rx`), targeting WHD init → chip up → scan → join.
+`r_sdio_rx`), targeting WHD init -> chip up -> scan -> join -> FreeRTOS+TCP ->
+AWS IoT MQTT smoke.
 
 It carries forward the SDIO bring-up and RF-proof work from the
 `ek-rx671-sdio-type1yn` experiment repository: sustained WLAN operation
@@ -12,8 +13,8 @@ hand-written, per the
 [Issue #30](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/elemental/protocol/sd/sdio/murata/type-1yn/host/renesas/ek-rx671/-/issues/30)
 WHD-integration decision.
 
-Current state: WHD bring-up path is compiled into the project. The project now
-contains:
+Current state: WHD bring-up, FreeRTOS+TCP, and a minimal AWS IoT MQTT smoke path
+are compiled into the project. The project now contains:
 
 - SCI6 debug console (`src/debug_uart.*`, board USB-serial path at 921600 8N1).
 - Minimal WHD resource, packet-buffer and network glue in `src/whd_port`.
@@ -21,6 +22,9 @@ contains:
 - A `whd_bringup_run()` sequence that calls `whd_init`,
   `whd_bus_sdio_attach`, `whd_wifi_on`, reads the STA MAC address, scans APs,
   and can optionally join an AP.
+- A FreeRTOS+TCP network interface bridge for WHD, plus a small AWS IoT MQTT
+  smoke task that connects, performs TLS/MQTT setup, disconnects, and reports
+  `AWS MQTT=0` on success.
 
 The WHD core itself is kept as an external submodule. Firmware/NVRAM/CLM blobs
 are not committed to this repository. Apply
@@ -51,6 +55,7 @@ Use the headless build helper from the repository root instead:
 ```powershell
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
+  -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
   -SoftIrqPollMs 1 `
   -WlanAllowBusSleepDelayMs 600000
 ```
@@ -60,6 +65,12 @@ injects `WHD_JOIN_USE_LOCAL_CONFIG` into `.cproject` for that build only. A
 local header by itself is not enough; the compiler define is what makes
 `whd_join_config.h` include it. The repository default intentionally leaves
 JOIN disabled.
+
+For AWS IoT smoke testing, pass `-AwsIotConfigDir` or the equivalent
+environment variables consumed by `tools/build_headless_rx671_wifi.ps1`. The
+helper generates ignored `src/frtos_config/aws_iot_config_local.h` and injects
+`AWS_IOT_USE_LOCAL_CONFIG` only for the build. Do not commit local endpoint,
+certificate, or private-key material.
 
 For the current PC-to-board ping baseline, the same helper also temporarily
 injects `PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`. The WHD v1.70.0

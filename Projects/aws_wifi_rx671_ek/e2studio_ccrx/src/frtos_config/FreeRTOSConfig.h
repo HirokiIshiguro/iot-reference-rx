@@ -89,7 +89,7 @@
  *     context by default. If enabling DPFPU context in a task, you must call
  *     vPortTaskUsesDPFPU() in this task before using DPFPU instructions.
  * 2 = Enable DPFPU support for all tasks: All tasks have DPFPU context by default. */
-#define configUSE_TASK_DPFPU_SUPPORT                2
+#define configUSE_TASK_DPFPU_SUPPORT                1
 
 /* Interrupt priority configuration for Renesas RX port. */
 /* Set the interrupt vector used for the RTOS tick interrupt. This is typically
@@ -269,7 +269,7 @@
  * timer task (in words, not in bytes!).  The timer task is a standard FreeRTOS
  * task.  See https://www.freertos.org/RTOS-software-timer-service-daemon-task.html
  * Only used if configUSE_TIMERS is set to 1. */
-#define configTIMER_TASK_STACK_DEPTH    (( unsigned short ) 1024)
+#define configTIMER_TASK_STACK_DEPTH    (configMINIMAL_STACK_SIZE)
 
 /* configTIMER_QUEUE_LENGTH sets the length of the queue (the number of discrete
  * items the queue can hold) used to send commands to the timer task.  See
@@ -308,7 +308,7 @@
  * memory in the build.  Set to 0 to exclude the ability to create statically
  * allocated objects from the build.  Defaults to 0 if left undefined.  See
  * https://www.freertos.org/Static_Vs_Dynamic_Memory_Allocation.html. */
-#define configSUPPORT_STATIC_ALLOCATION              0
+#define configSUPPORT_STATIC_ALLOCATION              1
 
 /* Set configSUPPORT_DYNAMIC_ALLOCATION to 1 to include FreeRTOS API functions
  * that create FreeRTOS objects (tasks, queues, etc.) using dynamically allocated
@@ -319,7 +319,7 @@
 
 /* Set the total heap size in kilobytes. This value must be greater than 0 and
  * less than or equal to the device RAM capacity. */
-#define configTOTAL_HEAP_SIZE_N                      64
+#define configTOTAL_HEAP_SIZE_N                      224
 
 /* Set the total size of the FreeRTOS heap, in bytes, when heap_1.c, heap_2.c
  * or heap_4.c are included in the build.  This value is defaulted to 4096 bytes but
@@ -400,7 +400,7 @@
  * functions introduce a dependency on string formatting functions that would
  * otherwise not exist - hence they are kept separate.  Defaults to 0 if left
  * undefined. */
-#define configUSE_STATS_FORMATTING_FUNCTIONS    0
+#define configUSE_STATS_FORMATTING_FUNCTIONS    1
 
 /******************************************************************************/
 /* Co-routine related definitions. ********************************************/
@@ -433,10 +433,21 @@
 extern void vAssertCalled( void );
 #define configASSERT( x ) do { if( ( x ) == 0 ) vAssertCalled(); } while( 0 )
 
-/* Route FreeRTOS/FreeRTOS+TCP printf-style diagnostics to the SCI6 debug
- * console. See src/freertos_tcp_hooks.c for the implementation. */
-extern void vLoggingPrintf( const char * pcFormatString, ... );
+/* Match the RX65N/RX72N logging stack interface.  Middleware/logging owns
+ * vLoggingPrintf()/vLoggingPrint(), while RX671 maps vOutputString() to SCI6. */
+extern void vLoggingPrintf( const char * pcFormat, ... );
 #define configPRINTF( X )    vLoggingPrintf X
+
+extern void vLoggingPrint( const char * pcMessage );
+#define configPRINT( X )     vLoggingPrint( X )
+
+extern void vOutputString( const char * pcMessage );
+#define configPRINT_STRING( x )    vOutputString( x )
+#define configOUTPUT_STRING_USES_DEBUG_UART    1
+
+#define configLOGGING_MAX_MESSAGE_LENGTH            192
+#define configLOGGING_INCLUDE_TIME_AND_TASK_NAME    1
+#define configCOMMAND_INT_MAX_OUTPUT_SIZE           850
 
  /******************************************************************************/
  /* Definitions that include or exclude functionality. *************************/
@@ -471,6 +482,7 @@ extern void vLoggingPrintf( const char * pcFormatString, ... );
 #define INCLUDE_xTaskAbortDelay                0
 #define INCLUDE_xTaskGetHandle                 0
 #define INCLUDE_xTaskResumeFromISR             1
+#define INCLUDE_xQueueGetMutexHolder           1
 
 /* When the FIT configurator or the Smart Configurator is used, platform.h has to be used. */
 #define configINCLUDE_PLATFORM_H_INSTEAD_OF_IODEFINE_H  1
