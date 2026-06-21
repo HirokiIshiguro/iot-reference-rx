@@ -5,7 +5,8 @@ param(
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx671_wifi_e2studio_build.log"),
     [string]$WifiConfigFile = "",
     [switch]$UseLocalJoinConfig,
-    [int]$SoftIrqPollMs = -1
+    [int]$SoftIrqPollMs = -1,
+    [int]$WlanAllowBusSleepDelayMs = 600000
 )
 
 $ErrorActionPreference = "Stop"
@@ -192,9 +193,14 @@ Write-Host "Log file:  $logFilePath"
 if ($useLocalJoinConfigForBuild) {
     Write-Host "Local AP JOIN config: enabled"
 }
+if ($WlanAllowBusSleepDelayMs -ge 0) {
+    Write-Host "WHD WLAN bus sleep delay: ${WlanAllowBusSleepDelayMs} ms"
+}
 
 $cprojectBytes = $null
 try {
+    $cprojectDefines = @()
+
     if ($useLocalJoinConfigForBuild) {
         if (-not [string]::IsNullOrWhiteSpace($WifiConfigFile)) {
             $wifi = Read-WifiConfig -Path $WifiConfigFile
@@ -204,9 +210,19 @@ try {
             throw "Local JOIN config was requested but not found: $localJoinConfig"
         }
 
+        $cprojectDefines += "WHD_JOIN_USE_LOCAL_CONFIG"
+    }
+
+    if ($WlanAllowBusSleepDelayMs -ge 0) {
+        $cprojectDefines += "PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=$WlanAllowBusSleepDelayMs"
+    }
+
+    if ($cprojectDefines.Count -gt 0) {
         $cprojectBytes = [System.IO.File]::ReadAllBytes($cproject)
-        $cprojectText = [System.IO.File]::ReadAllText($cproject)
-        $patchedCProject = Add-CProjectDefine -Text $cprojectText -Define "WHD_JOIN_USE_LOCAL_CONFIG"
+        $patchedCProject = [System.IO.File]::ReadAllText($cproject)
+        foreach ($define in $cprojectDefines) {
+            $patchedCProject = Add-CProjectDefine -Text $patchedCProject -Define $define
+        }
         [System.IO.File]::WriteAllText($cproject, $patchedCProject, [System.Text.UTF8Encoding]::new($false))
     }
 

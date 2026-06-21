@@ -51,7 +51,8 @@ Use the headless build helper from the repository root instead:
 ```powershell
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
-  -SoftIrqPollMs 1
+  -SoftIrqPollMs 1 `
+  -WlanAllowBusSleepDelayMs 600000
 ```
 
 The helper generates ignored `src/whd_join_config_local.h` and temporarily
@@ -59,6 +60,14 @@ injects `WHD_JOIN_USE_LOCAL_CONFIG` into `.cproject` for that build only. A
 local header by itself is not enough; the compiler define is what makes
 `whd_join_config.h` include it. The repository default intentionally leaves
 JOIN disabled.
+
+For the current PC-to-board ping baseline, the same helper also temporarily
+injects `PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`. The WHD v1.70.0
+upstream default is 10 ms; the ping-success run kept the WLAN bus awake because
+the 10 ms sleep timing prevented ARP/ICMP traffic from reaching the SDIO
+Function 2 CMD53 data path reliably on the RX671 bring-up stack. The project
+patch only makes this WHD macro overrideable; the tracked e2 studio project is
+restored after the headless build.
 
 ## WHD resource flash layout
 

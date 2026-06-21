@@ -36,6 +36,8 @@ Known verified baseline:
 - Hardware: EK-RX671 + Murata Type 1YN over SDIO
 - Probe: SEGGER J-Link Compact PLUS over JTAG
 - Serial console: SCI6 on COM5 at 921600 bps
+- WHD WLAN bus sleep delay: kept awake for the bring-up run
+  (`PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`)
 - WHD bring-up: `whd_wifi_on`, AP scan, WPA2-PSK JOIN, and MAC read succeeded
 - FreeRTOS+TCP: PC-to-board ping succeeded after Wi-Fi JOIN
 - J-Link Commander observation:
@@ -64,7 +66,8 @@ git and let the headless build script generate the ignored local header:
 ```powershell
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
-  -SoftIrqPollMs 1
+  -SoftIrqPollMs 1 `
+  -WlanAllowBusSleepDelayMs 600000
 ```
 
 The Wi-Fi config file can be either a single whitespace-separated line:
@@ -85,6 +88,13 @@ The script writes
 temporarily injects `WHD_JOIN_USE_LOCAL_CONFIG` into `.cproject` only for the
 headless build. The tracked e2 studio project is restored after the build, so
 re-run this command after a clean checkout or clean workspace.
+
+The same helper also temporarily injects
+`PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`, matching the hardware run
+where PC-to-board ping succeeded. The upstream WHD default is 10 ms, and that
+allowed the WLAN bus to sleep before ARP/ICMP traffic reached the SDIO Function
+2 data path on this bring-up branch. Pass `-WlanAllowBusSleepDelayMs -1` only
+when intentionally testing the unmodified WHD sleep timing.
 
 Expected outputs:
 
