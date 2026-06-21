@@ -36,6 +36,10 @@ Known verified baseline:
 - Hardware: EK-RX671 + Murata Type 1YN over SDIO
 - Probe: SEGGER J-Link Compact PLUS over JTAG
 - Serial console: SCI6 on COM5 at 921600 bps
+  - COM3 was identified as the SEGGER CDC interface (`VID_1366/PID_1024`) on
+    the tested host and did not receive the RX671 SCI6 boot log.
+  - COM5 was identified as the EK-RX671 FTDI USB-serial path
+    (`VID_0403/PID_6015`) and received the SCI6 boot/WHD/FreeRTOS log.
 - WHD WLAN bus sleep delay: kept awake for the bring-up run
   (`PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`)
 - WHD bring-up: `whd_wifi_on`, AP scan, WPA2-PSK JOIN, and MAC read succeeded
