@@ -88,28 +88,36 @@ diff --git a/WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h b/W
 index 3ac0952..a1d8f22 100644
 --- a/WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h
 +++ b/WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h
-@@ -55,7 +55,11 @@ typedef enum
+@@ -45,7 +45,9 @@ typedef enum
+ /******************************************************
+ *             Macros
+ ******************************************************/
++#ifndef PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS
+ #define PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS 10
++#endif
+ 
+ #define DELAYED_BUS_RELEASE_SCHEDULE(whd_driver, schedule) do {  whd_delayed_bus_release_schedule_update(whd_driver, \
+                                                                                                          schedule); \
+@@ -55,7 +57,11 @@ typedef enum
  *             Structures
  ******************************************************/
  
--#pragma pack(1)
 +#if defined(__CCRX__)
 +#pragma pack
 +#else
-+#pragma pack(1)
+ #pragma pack(1)
 +#endif
  
  typedef struct
  {
-@@ -63,7 +67,11 @@ typedef struct
+@@ -63,7 +69,11 @@ typedef struct
      uint32_t data[1];
  } whd_transfer_bytes_packet_t;
  
--#pragma pack()
 +#if defined(__CCRX__)
 +#pragma unpack
 +#else
-+#pragma pack()
+ #pragma pack()
 +#endif
  
  typedef void (*whd_bus_irq_callback_t)(void *handler_arg, uint32_t event);
