@@ -768,7 +768,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="966cf5d4-e01f-4c87-a09e-aba48b1eafc9" inuse="true" name="FreeRTOS_Kernel">
+        <configuration enable="true" exclude="false" id="5d39646f-94d4-4366-a7bf-4a24d6044e4f" inuse="true" name="FreeRTOS_Kernel">
             <component description="This component is a part of RTOS Configurator feature that allow user to use the GUI to configure kernel setting of FreeRTOS." detailDescription="" display="FreeRTOS_Kernel" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.kernel" version="11.1.0-rx-1.0.0">
                 <gridItem id="configCPU_CLOCK_HZ" selectedIndex="BSP_ICLK_HZ"/>
                 <gridItem id="configPERIPHERAL_CLOCK_HZ" selectedIndex="BSP_PCLKB_HZ"/>
@@ -816,12 +816,12 @@
                 <gridItem id="configCHECK_FOR_STACK_OVERFLOW" selectedIndex="2"/>
                 <gridItem id="configGENERATE_RUN_TIME_STATS" selectedIndex="0"/>
                 <gridItem id="configUSE_TRACE_FACILITY" selectedIndex="1"/>
-                <gridItem id="configUSE_STATS_FORMATTING_FUNCTIONS" selectedIndex="0"/>
+                <gridItem id="configUSE_STATS_FORMATTING_FUNCTIONS" selectedIndex="1"/>
                 <gridItem id="configUSE_CO_ROUTINES" selectedIndex="0"/>
                 <gridItem id="configMAX_CO_ROUTINE_PRIORITIES" selectedIndex="2"/>
                 <gridItem id="configASSERT" selectedIndex="do { if( ( x ) == 0 ) vAssertCalled(); } while( 0 )"/>
                 <gridItem id="configUSE_TASK_NOTIFICATIONS" selectedIndex="1"/>
-                <gridItem id="configUSE_TASK_DPFPU_SUPPORT" selectedIndex="2"/>
+                <gridItem id="configUSE_TASK_DPFPU_SUPPORT" selectedIndex="1"/>
                 <gridItem id="configUSE_MUTEXES" selectedIndex="1"/>
                 <gridItem id="configUSE_RECURSIVE_MUTEXES" selectedIndex="1"/>
                 <gridItem id="configUSE_COUNTING_SEMAPHORES" selectedIndex="1"/>
@@ -847,7 +847,7 @@
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
-        <configuration enable="true" exclude="false" id="14474392-68c0-4dca-b2d8-41d29020833b" inuse="true" name="FreeRTOS_Object">
+        <configuration enable="true" exclude="false" id="3cdd6950-a736-4b0c-ba67-e5a538cf6e5d" inuse="true" name="FreeRTOS_Object">
             <allocatable id="OBJECT" name="OBJECT" type="">
                 <allocatable id="TASK" name="TASK" type="">
                     <allocatable id="TASKOBJECTLINK1" name="TASK" readonly="true" type="">
@@ -1393,6 +1393,27 @@
                 <gridItem id="TSIP_MULTI_THREADING" selectedIndex="0"/>
                 <gridItem id="TSIP_MULTI_THREADING_LOCK_FUNCTION" selectedIndex="user_lock_function"/>
                 <gridItem id="TSIP_MULTI_THREADING_UNLOCK_FUNCTION" selectedIndex="user_unlock_function"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_dtc_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.70&#10;This driver gives the user an easy API to control the MCU's DTC. DTC module transfers the data corresponding to an interrupt when it signals to DTC. Each module can register its transfer settings with DTC driver such as: interrupt number, destination and source address, data counter, transfer mode (3 modes: normal, repeat, block), enable or disable chain transfer." detailDescription="DTC driver" display="r_dtc_rx" id="r_dtc_rx4.60" version="4.60">
+                <gridItem id="DTC_CFG_PARAM_CHECKING_ENABLE" selectedIndex="0"/>
+                <gridItem id="DTC_CFG_DISABLE_ALL_ACT_SOURCE" selectedIndex="1"/>
+                <gridItem id="DTC_CFG_SHORT_ADDRESS_MODE" selectedIndex="0"/>
+                <gridItem id="DTC_CFG_TRANSFER_DATA_READ_SKIP_EN" selectedIndex="1"/>
+                <gridItem id="DTC_CFG_USE_DMAC_FIT_MODULE" selectedIndex="1"/>
+                <gridItem id="DTC_CFG_USE_SEQUENCE_TRANSFER" selectedIndex="0"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
+        <configuration inuse="true" name="r_dmaca_rx">
+            <component description="依存モジュール: r_bsp バージョン 7.60&#10;This driver gives the user an easy API to control the MCU's DMAC. DMAC module transfers the data&#10;                 corresponding to an interrupt when it signals to DMAC. Each module can register its transfer settings with DMAC driver such as: interrupt number, destination and source address, data counter, transfer mode (3 modes: normal, repeat, block), enable or disable chain transfer." detailDescription="DMAC driver" display="r_dmaca_rx" id="r_dmaca_rx3.42" version="3.42">
+                <gridItem id="DMACA_CFG_PARAM_CHECKING_ENABLE" selectedIndex="0"/>
+                <gridItem id="DMACA_CFG_USE_DTC_FIT_MODULE" selectedIndex="0"/>
+                <gridItem id="DMACA_CFG_EN_NESTED_INT" selectedIndex="0"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>

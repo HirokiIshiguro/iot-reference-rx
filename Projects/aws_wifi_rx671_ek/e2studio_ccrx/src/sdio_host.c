@@ -15,12 +15,96 @@
  */
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "platform.h"
 #include "r_sdhi_rx_if.h"
+#include "r_sdhi_rx_config.h"
 #include "r_sdhi_rx_pinset.h"
 #include "r_sdio_rx_if.h"
 #include "sdio_host.h"
+
+#define SDIO_HOST_CMD53_XFER_CPU   (0U)
+#define SDIO_HOST_CMD53_XFER_DTC   (1U)
+#define SDIO_HOST_CMD53_XFER_DMACA (2U)
+
+#ifndef SDIO_HOST_CFG_RUN_CLOCK_DIV
+#define SDIO_HOST_CFG_RUN_CLOCK_DIV    (SDHI_DIV_8)
+#endif
+
+#ifndef SDIO_HOST_CMD53_XFER_ENGINE
+#define SDIO_HOST_CMD53_XFER_ENGINE SDIO_HOST_CMD53_XFER_DTC
+#endif
+
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
+#include "r_dtc_rx_if.h"
+#endif
+
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DMACA)
+#include "r_dmaca_rx_if.h"
+#endif
+
+#if ((SDIO_HOST_CMD53_XFER_ENGINE != SDIO_HOST_CMD53_XFER_CPU) && \
+     (SDIO_HOST_CMD53_XFER_ENGINE != SDIO_HOST_CMD53_XFER_DTC) && \
+     (SDIO_HOST_CMD53_XFER_ENGINE != SDIO_HOST_CMD53_XFER_DMACA))
+#error "SDIO_HOST_CMD53_XFER_ENGINE must be SDIO_HOST_CMD53_XFER_CPU, SDIO_HOST_CMD53_XFER_DTC, or SDIO_HOST_CMD53_XFER_DMACA."
+#endif
+
+#ifndef SDIO_HOST_CMD53_DTC_WAIT_COUNT
+#define SDIO_HOST_CMD53_DTC_WAIT_COUNT (SDHI_CMD_TIMEOUT)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DTC_FUNCTION
+#define SDIO_HOST_CMD53_DTC_FUNCTION (2U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DTC_READ_ENABLE
+#define SDIO_HOST_CMD53_DTC_READ_ENABLE (1U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DTC_WRITE_ENABLE
+#define SDIO_HOST_CMD53_DTC_WRITE_ENABLE (1U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DTC_MIN_BYTES
+#define SDIO_HOST_CMD53_DTC_MIN_BYTES (512U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_CH
+#define SDIO_HOST_CMD53_DMACA_CH DMACA_CH0
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_INT_LEVEL
+#define SDIO_HOST_CMD53_DMACA_INT_LEVEL SDHI_CFG_CH0_INT_LEVEL_DMADTC
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_WAIT_COUNT
+#define SDIO_HOST_CMD53_DMACA_WAIT_COUNT (SDHI_CMD_TIMEOUT)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_FUNCTION
+#define SDIO_HOST_CMD53_DMACA_FUNCTION (2U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_READ_ENABLE
+#define SDIO_HOST_CMD53_DMACA_READ_ENABLE (1U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_WRITE_ENABLE
+#define SDIO_HOST_CMD53_DMACA_WRITE_ENABLE (1U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_MIN_BYTES
+#define SDIO_HOST_CMD53_DMACA_MIN_BYTES (512U)
+#endif
+
+#ifndef SDIO_HOST_CMD53_DMACA_BLOCK_MODE
+#define SDIO_HOST_CMD53_DMACA_BLOCK_MODE (0U)
+#endif
+
+volatile uint32_t g_sdio_host_run_clock_div;
+volatile uint32_t g_sdio_host_run_clock_status;
+volatile uint32_t g_sdio_host_cmd53_xfer_engine = SDIO_HOST_CMD53_XFER_ENGINE;
 
 /* SDHI command-word fields not exported by r_sdhi_rx_if.h (local in the perf
  * project too). */
@@ -51,9 +135,12 @@
 
 /* CCCR bus interface control (F0 reg 0x07) fields for the 4-bit switch. */
 #define SDIO_CCCR_BUS_IF_CONTROL (0x07UL)         /* CCCR bus interface control */
+#define SDIO_CCCR_HIGH_SPEED     (0x13UL)         /* CCCR high-speed control    */
 #define SDIO_BUS_WIDTH_MASK     (0x03U)           /* bus width field           */
 #define SDIO_BUS_WIDTH_4BIT     (0x02U)           /* 4-bit bus                 */
 #define SDIO_BUS_CD_DISABLE     (0x80U)           /* disable DAT3 CD pull-up   */
+#define SDIO_HIGH_SPEED_SHS     (0x01U)           /* supports high speed       */
+#define SDIO_HIGH_SPEED_EHS     (0x02U)           /* enable high speed         */
 
 /* Broadcom force-HT and WAKEUPCTRL bits (the header carries only the ALP /
  * FORCE_ALP set). perf FORCEs the clocks (not just requests ALP) before the
@@ -382,6 +469,49 @@ static uint32_t g_cmd53_diag_data0 = 0U;
 /* Per-function SDIO block size (bytes), set by sdio_host_set_block_size and used
  * by the CMD53 block-mode transfer. */
 static uint16_t g_sdio_block_size[SDIO_MAX_FUNCTION + 1U];
+static bool g_sdio_high_speed_enabled = false;
+
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
+static bool g_cmd53_dtc_opened = false;
+static volatile bool g_cmd53_dtc_active = false;
+static volatile uint32_t g_cmd53_dtc_count = 0U;
+static volatile uint32_t g_cmd53_dtc_fallback_count = 0U;
+static volatile uint32_t g_cmd53_dtc_error = 0U;
+static volatile uint32_t g_cmd53_dtc_ok_count = 0U;
+static volatile uint32_t g_cmd53_dtc_fail_count = 0U;
+static volatile uint32_t g_cmd53_dtc_last_seq = 0U;
+static volatile uint32_t g_cmd53_dtc_last_ctrl = 0U;
+static volatile uint32_t g_cmd53_dtc_last_addr = 0U;
+static volatile uint32_t g_cmd53_dtc_last_len = 0U;
+static volatile uint32_t g_cmd53_dtc_last_blocks = 0U;
+static volatile uint32_t g_cmd53_dtc_last_data = 0U;
+static volatile uint32_t g_cmd53_dtc_last_r5 = 0U;
+static volatile uint32_t g_cmd53_dtc_last_s1 = 0U;
+static volatile uint32_t g_cmd53_dtc_last_s2 = 0U;
+static dtc_transfer_data_t g_cmd53_dtc_data;
+static dtc_transfer_data_cfg_t g_cmd53_dtc_cfg;
+static dtc_cmd_arg_t g_cmd53_dtc_args;
+#endif
+
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DMACA)
+static bool g_cmd53_dmaca_opened = false;
+static volatile bool g_cmd53_dmaca_active = false;
+static volatile uint32_t g_cmd53_dmaca_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_fallback_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_error = 0U;
+static volatile uint32_t g_cmd53_dmaca_ok_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_fail_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_seq = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_ctrl = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_addr = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_len = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_blocks = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_data = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_r5 = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_s1 = 0U;
+static volatile uint32_t g_cmd53_dmaca_last_s2 = 0U;
+static dmaca_transfer_data_cfg_t g_cmd53_dmaca_cfg;
+#endif
 
 /*
  * Issue #28 force-stop: a CMD53 whose data phase never starts leaves the
@@ -680,6 +810,636 @@ static bool sdhi_can_accept_read_done_error(uint32_t sdsts1, uint32_t sdsts2)
     return ((0U != (sdersts1 & SDHI_SDERSTS1_RDCRCE)) && (0U == sdersts2));
 }
 
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
+static sdhi_status_t sdio_cmd53_dtc_callback(void * p_context)
+{
+    (void)p_context;
+    g_cmd53_dtc_count++;
+    return SDHI_SUCCESS;
+}
+
+static bool sdio_cmd53_dtc_open_once(void)
+{
+    dtc_err_t ret;
+
+    if (g_cmd53_dtc_opened)
+    {
+        return true;
+    }
+
+    ret = R_DTC_Open();
+    if ((DTC_SUCCESS != ret) && (DTC_ERR_OPENED != ret))
+    {
+        g_cmd53_dtc_error = 0x01000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    if (SDHI_SUCCESS != R_SDHI_IntSDBuffCallback(SDHI_CH0, sdio_cmd53_dtc_callback))
+    {
+        g_cmd53_dtc_error = 0x02000000UL;
+        return false;
+    }
+
+    g_cmd53_dtc_args.act_src = (dtc_activation_source_t)DTCE_SDHI_SBFAI;
+    g_cmd53_dtc_args.chain_transfer_nr = 0U;
+    g_cmd53_dtc_args.p_transfer_data = &g_cmd53_dtc_data;
+    g_cmd53_dtc_args.p_data_cfg = &g_cmd53_dtc_cfg;
+
+    g_cmd53_dtc_opened = true;
+    return true;
+}
+
+static bool sdio_cmd53_dtc_is_eligible(const uint8_t * p_data, uint32_t block_size, uint32_t block_count)
+{
+    if (0U != (((uint32_t)p_data) & SDHI_ADDR_BOUNDARY))
+    {
+        g_cmd53_dtc_error = 0x10000000UL | (((uint32_t)p_data) & SDHI_ADDR_BOUNDARY);
+        return false;
+    }
+
+    if ((0UL == block_count) || (65535UL < block_count) ||
+        (0UL == block_size) || (0UL != (block_size & 0x03UL)) || (256UL < (block_size / 4UL)))
+    {
+        g_cmd53_dtc_error = 0x11000000UL | ((block_size & 0xffffUL) << 8) | (block_count & 0xffUL);
+        return false;
+    }
+
+    return true;
+}
+
+static bool sdio_cmd53_dtc_prepare(bool write, uint8_t * p_data, uint32_t block_size, uint32_t block_count,
+                                   uint32_t buff_reg)
+{
+    dtc_err_t ret;
+
+    if (!sdio_cmd53_dtc_open_once())
+    {
+        return false;
+    }
+
+    memset(&g_cmd53_dtc_data, 0, sizeof(g_cmd53_dtc_data));
+    memset(&g_cmd53_dtc_cfg, 0, sizeof(g_cmd53_dtc_cfg));
+
+    g_cmd53_dtc_cfg.transfer_mode = DTC_TRANSFER_MODE_BLOCK;
+    g_cmd53_dtc_cfg.data_size = DTC_DATA_SIZE_LWORD;
+    g_cmd53_dtc_cfg.src_addr_mode = write ? DTC_SRC_ADDR_INCR : DTC_SRC_ADDR_FIXED;
+    g_cmd53_dtc_cfg.chain_transfer_enable = DTC_CHAIN_TRANSFER_DISABLE;
+    g_cmd53_dtc_cfg.chain_transfer_mode = DTC_CHAIN_TRANSFER_CONTINUOUSLY;
+    g_cmd53_dtc_cfg.response_interrupt = DTC_INTERRUPT_AFTER_ALL_COMPLETE;
+    g_cmd53_dtc_cfg.repeat_block_side = write ? DTC_REPEAT_BLOCK_DESTINATION : DTC_REPEAT_BLOCK_SOURCE;
+    g_cmd53_dtc_cfg.dest_addr_mode = write ? DTC_DES_ADDR_FIXED : DTC_DES_ADDR_INCR;
+    g_cmd53_dtc_cfg.source_addr = write ? (uint32_t)p_data : buff_reg;
+    g_cmd53_dtc_cfg.dest_addr = write ? buff_reg : (uint32_t)p_data;
+    g_cmd53_dtc_cfg.transfer_count = block_count;
+    g_cmd53_dtc_cfg.block_size = (uint16_t)(block_size / 4UL);
+
+    (void)R_SDHI_DisableIcuInt(SDHI_CH0, SDHI_HWINT_BUFFER);
+    (void)R_DTC_Control(DTC_CMD_ACT_SRC_DISABLE, NULL, &g_cmd53_dtc_args);
+
+    ret = R_DTC_Create(g_cmd53_dtc_args.act_src, &g_cmd53_dtc_data, &g_cmd53_dtc_cfg, 0U);
+    if (DTC_SUCCESS != ret)
+    {
+        g_cmd53_dtc_error = 0x03000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    ret = R_DTC_Control(DTC_CMD_ACT_SRC_ENABLE, NULL, &g_cmd53_dtc_args);
+    if (DTC_SUCCESS != ret)
+    {
+        g_cmd53_dtc_error = 0x04000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    ret = R_DTC_Control(DTC_CMD_DTC_START, NULL, NULL);
+    if (DTC_SUCCESS != ret)
+    {
+        g_cmd53_dtc_error = 0x05000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    return true;
+}
+
+static bool sdio_cmd53_dtc_wait(uint32_t dtc_start_count, uint32_t * p_sdsts1, uint32_t * p_sdsts2)
+{
+    uint32_t timeout = SDIO_HOST_CMD53_DTC_WAIT_COUNT;
+
+    while ((g_cmd53_dtc_count == dtc_start_count) && (0UL != timeout))
+    {
+        timeout--;
+    }
+
+    (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS1, p_sdsts1);
+    (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS2, p_sdsts2);
+
+    if (g_cmd53_dtc_count == dtc_start_count)
+    {
+        g_cmd53_dtc_error = 0x06000000UL | (*p_sdsts2 & 0xffffUL);
+        return false;
+    }
+
+    if (0U != (*p_sdsts2 & SDHI_SDSTS2_ERR_BITS))
+    {
+        g_cmd53_dtc_error = 0x07000000UL | (*p_sdsts2 & 0xffffUL);
+        return false;
+    }
+
+    return true;
+}
+
+static bool sdio_cmd53_try_transfer_blocks_dtc(bool write, uint8_t function, uint32_t address, bool increment,
+                                               uint8_t * p_data, uint32_t block_count, uint32_t block_size,
+                                               uint32_t length, uint32_t buff_reg, uint32_t cmd,
+                                               uint32_t * p_r5, uint32_t * p_sdsts1, uint32_t * p_sdsts2,
+                                               bool * p_used)
+{
+    bool ok;
+    bool relaxed_read_crc;
+    uint32_t arg;
+    uint32_t live_sdsts1 = 0U;
+    uint32_t live_sdsts2 = 0U;
+    uint32_t dtc_start_count;
+    uint32_t ready_mask = write ? SDHI_SDIMSK2_WE : SDHI_SDIMSK2_RE;
+
+    *p_used = false;
+
+    if (function != SDIO_HOST_CMD53_DTC_FUNCTION)
+    {
+        g_cmd53_dtc_fallback_count++;
+        return false;
+    }
+
+    if (((!write) && (0U == SDIO_HOST_CMD53_DTC_READ_ENABLE)) ||
+        (write && (0U == SDIO_HOST_CMD53_DTC_WRITE_ENABLE)))
+    {
+        g_cmd53_dtc_fallback_count++;
+        return false;
+    }
+
+    if (length < SDIO_HOST_CMD53_DTC_MIN_BYTES)
+    {
+        g_cmd53_dtc_fallback_count++;
+        return false;
+    }
+
+    if (!sdio_cmd53_dtc_is_eligible(p_data, block_size, block_count))
+    {
+        g_cmd53_dtc_fallback_count++;
+        return false;
+    }
+
+    if (!sdio_cmd53_dtc_prepare(write, p_data, block_size, block_count, buff_reg))
+    {
+        g_cmd53_dtc_fallback_count++;
+        return false;
+    }
+
+    g_cmd53_dtc_last_seq++;
+    g_cmd53_dtc_last_ctrl = (write ? 1UL : 0UL) |
+                            (((uint32_t)function) << 8) |
+                            (increment ? (1UL << 16) : 0UL);
+    g_cmd53_dtc_last_addr = address;
+    g_cmd53_dtc_last_len = length;
+    g_cmd53_dtc_last_blocks = ((block_size & 0xffffUL) << 16) | (block_count & 0xffffUL);
+    g_cmd53_dtc_last_data = (uint32_t)p_data;
+    g_cmd53_dtc_last_r5 = 0U;
+    g_cmd53_dtc_last_s1 = 0U;
+    g_cmd53_dtc_last_s2 = 0U;
+
+    *p_used = true;
+    arg = R_SDIO_MakeCmd53Arg(write, function, address, increment, true, block_count);
+
+    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_TRNS_RESP | SDHI_SDSTS1_DETECT_BITS,
+                               SDHI_SDIMSK2_CLEAR | ready_mask);
+    (void)R_SDHI_ClearIntMask(SDHI_CH0, 0U, ready_mask);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDSIZE, block_size);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDSTOP, SDHI_SDSTOP_SEC_ENABLE);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDBLKCNT, block_count);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDIOMD, SDHI_SDIOMD_INTEN);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDDMAEN, SDHI_SDDMAEN_DMASDRW);
+    (void)R_SDHI_SetIntMask(SDHI_CH0, 0U, ready_mask);
+    (void)R_SDHI_EnableIcuInt(SDHI_CH0, SDHI_HWINT_BUFFER);
+
+    dtc_start_count = g_cmd53_dtc_count;
+    g_cmd53_dtc_active = true;
+    ok = sdhi_cmd53_issue(arg, cmd, p_r5, p_sdsts1, p_sdsts2);
+    if ((!write) && (!ok))
+    {
+        (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS1, &live_sdsts1);
+        (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS2, &live_sdsts2);
+        if ((0U != (*p_sdsts1 & SDHI_SDSTS1_RSPEND)) ||
+            (0U != (live_sdsts1 & SDHI_SDSTS1_RSPEND)) ||
+            sdhi_can_read_crc_error_block(*p_sdsts2))
+        {
+            *p_sdsts1 = live_sdsts1;
+            *p_sdsts2 = live_sdsts2;
+            ok = true;
+        }
+    }
+
+    if (ok)
+    {
+        (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_RESP, 0U);
+        ok = sdio_cmd53_dtc_wait(dtc_start_count, p_sdsts1, p_sdsts2);
+        relaxed_read_crc = (!write) && (!ok) && sdhi_can_read_crc_error_block(*p_sdsts2);
+        if (relaxed_read_crc)
+        {
+            ok = true;
+        }
+    }
+
+    g_cmd53_dtc_active = false;
+    (void)R_DTC_Control(DTC_CMD_ACT_SRC_DISABLE, NULL, &g_cmd53_dtc_args);
+
+    if (ok)
+    {
+        uint32_t clear_mask = ready_mask;
+
+        if ((!write) && (0U != ((*p_sdsts2) & SDHI_SDSTS2_READ_CRC_ERR)))
+        {
+            clear_mask |= SDHI_SDSTS2_READ_CRC_ERR;
+        }
+        (void)R_SDHI_ClearSdstsReg(SDHI_CH0, 0U, clear_mask);
+
+        ok = sdhi_wait_status(SDHI_SDSTS1_ACEND, 0U, p_sdsts1, p_sdsts2);
+        if ((!ok) && (!write) && sdhi_can_accept_read_done_error(*p_sdsts1, *p_sdsts2))
+        {
+            ok = true;
+        }
+        (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDSTS1_ACEND,
+                                   ok ? ((*p_sdsts2) & SDHI_SDSTS2_ERR_BITS) : 0U);
+    }
+
+    if (!ok)
+    {
+        g_cmd53_dtc_fail_count++;
+        sdhi_cmd53_capture_diag(*p_sdsts1, *p_sdsts2, *p_r5);
+        sdhi_cmd53_force_stop(p_sdsts2);
+    }
+
+    (void)R_SDHI_DisableIcuInt(SDHI_CH0, SDHI_HWINT_BUFFER);
+    (void)R_SDHI_ClearIntMask(SDHI_CH0, 0U, ready_mask);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDDMAEN, 0U);
+    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, 0U, SDHI_SDIMSK2_CLEAR | ready_mask);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDSTOP, SDHI_SDSTOP_INIT);
+
+    if (ok)
+    {
+        g_cmd53_dtc_ok_count++;
+        g_cmd53_diag_stage = 0xFFU;
+        g_cmd53_dtc_error = 0U;
+    }
+    g_cmd53_dtc_last_r5 = *p_r5;
+    g_cmd53_dtc_last_s1 = *p_sdsts1;
+    g_cmd53_dtc_last_s2 = *p_sdsts2;
+    return ok;
+}
+#endif
+
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DMACA)
+static void sdio_cmd53_dmaca_callback(void)
+{
+    dmaca_stat_t stat;
+
+    g_cmd53_dmaca_count++;
+    (void)R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_DTIF_STATUS_CLR, &stat);
+}
+
+static bool sdio_cmd53_dmaca_open_once(void)
+{
+    dmaca_return_t ret;
+
+    if (g_cmd53_dmaca_opened)
+    {
+        return true;
+    }
+
+    ret = R_DMACA_Open(SDIO_HOST_CMD53_DMACA_CH);
+    if ((DMACA_SUCCESS != ret) && (DMACA_SUCCESS_DTC_BUSY != ret))
+    {
+        g_cmd53_dmaca_error = 0x01000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    ret = R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_DISABLE, NULL);
+    if (DMACA_SUCCESS != ret)
+    {
+        g_cmd53_dmaca_error = 0x02000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    ret = R_DMACA_Int_Callback(SDIO_HOST_CMD53_DMACA_CH, (void *)sdio_cmd53_dmaca_callback);
+    if (DMACA_SUCCESS != ret)
+    {
+        g_cmd53_dmaca_error = 0x03000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    ret = R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_ALL_ENABLE, NULL);
+    if (DMACA_SUCCESS != ret)
+    {
+        g_cmd53_dmaca_error = 0x03100000UL | (uint32_t)ret;
+        return false;
+    }
+
+    g_cmd53_dmaca_opened = true;
+    return true;
+}
+
+static bool sdio_cmd53_dmaca_is_eligible(const uint8_t * p_data, uint32_t block_size, uint32_t block_count)
+{
+    uint32_t transfer_words = (block_size * block_count) / 4UL;
+
+    if (0U != (((uint32_t)p_data) & SDHI_ADDR_BOUNDARY))
+    {
+        g_cmd53_dmaca_error = 0x10000000UL | (((uint32_t)p_data) & SDHI_ADDR_BOUNDARY);
+        return false;
+    }
+
+#if (SDIO_HOST_CMD53_DMACA_BLOCK_MODE != 0U)
+    if ((0UL == block_count) || (65535UL < block_count) ||
+        (0UL == block_size) || (0UL != (block_size & 0x03UL)) || (1024UL < (block_size / 4UL)))
+    {
+        g_cmd53_dmaca_error = 0x11000000UL | ((block_size & 0xffffUL) << 8) | (block_count & 0xffUL);
+        return false;
+    }
+#else
+    if ((0UL == transfer_words) || (65535UL < transfer_words) ||
+        (0UL == block_size) || (0UL != (block_size & 0x03UL)))
+    {
+        g_cmd53_dmaca_error = 0x11000000UL | ((block_size & 0xffffUL) << 8) | (block_count & 0xffUL);
+        return false;
+    }
+#endif
+
+    return true;
+}
+
+static bool sdio_cmd53_dmaca_prepare(bool write, uint8_t * p_data, uint32_t block_size, uint32_t block_count,
+                                     uint32_t buff_reg)
+{
+    dmaca_return_t ret;
+    dmaca_stat_t stat;
+
+    if (!sdio_cmd53_dmaca_open_once())
+    {
+        return false;
+    }
+
+    memset(&g_cmd53_dmaca_cfg, 0, sizeof(g_cmd53_dmaca_cfg));
+#if (SDIO_HOST_CMD53_DMACA_BLOCK_MODE != 0U)
+    g_cmd53_dmaca_cfg.transfer_mode = DMACA_TRANSFER_MODE_BLOCK;
+    g_cmd53_dmaca_cfg.repeat_block_side = write ? DMACA_REPEAT_BLOCK_DESTINATION : DMACA_REPEAT_BLOCK_SOURCE;
+#else
+    g_cmd53_dmaca_cfg.transfer_mode = DMACA_TRANSFER_MODE_NORMAL;
+    g_cmd53_dmaca_cfg.repeat_block_side = DMACA_REPEAT_BLOCK_DISABLE;
+#endif
+    g_cmd53_dmaca_cfg.data_size = DMACA_DATA_SIZE_LWORD;
+    g_cmd53_dmaca_cfg.act_source = (dmaca_activation_source_t)DTCE_SDHI_SBFAI;
+    g_cmd53_dmaca_cfg.request_source = DMACA_TRANSFER_REQUEST_PERIPHERAL;
+    g_cmd53_dmaca_cfg.dtie_request = DMACA_TRANSFER_END_INTERRUPT_ENABLE;
+    g_cmd53_dmaca_cfg.esie_request = DMACA_TRANSFER_ESCAPE_END_INTERRUPT_DISABLE;
+    g_cmd53_dmaca_cfg.rptie_request = DMACA_REPEAT_SIZE_END_INTERRUPT_DISABLE;
+    g_cmd53_dmaca_cfg.sarie_request = DMACA_SRC_ADDR_EXT_REP_AREA_OVER_INTERRUPT_DISABLE;
+    g_cmd53_dmaca_cfg.darie_request = DMACA_DES_ADDR_EXT_REP_AREA_OVER_INTERRUPT_DISABLE;
+    g_cmd53_dmaca_cfg.src_addr_mode = write ? DMACA_SRC_ADDR_INCR : DMACA_SRC_ADDR_FIXED;
+    g_cmd53_dmaca_cfg.src_addr_repeat_area = DMACA_SRC_ADDR_EXT_REP_AREA_NONE;
+    g_cmd53_dmaca_cfg.des_addr_mode = write ? DMACA_DES_ADDR_FIXED : DMACA_DES_ADDR_INCR;
+    g_cmd53_dmaca_cfg.des_addr_repeat_area = DMACA_DES_ADDR_EXT_REP_AREA_NONE;
+    g_cmd53_dmaca_cfg.offset_value = 0U;
+    g_cmd53_dmaca_cfg.interrupt_sel = DMACA_CLEAR_INTERRUPT_FLAG_BEGINNING_TRANSFER;
+    g_cmd53_dmaca_cfg.p_src_addr = write ? (void *)p_data : (void *)buff_reg;
+    g_cmd53_dmaca_cfg.p_des_addr = write ? (void *)buff_reg : (void *)p_data;
+#if (SDIO_HOST_CMD53_DMACA_BLOCK_MODE != 0U)
+    g_cmd53_dmaca_cfg.transfer_count = block_count;
+#else
+    g_cmd53_dmaca_cfg.transfer_count = (block_size * block_count) / 4UL;
+#endif
+    g_cmd53_dmaca_cfg.block_size = (uint16_t)(block_size / 4UL);
+
+    (void)R_SDHI_DisableIcuInt(SDHI_CH0, SDHI_HWINT_BUFFER);
+    (void)R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_DISABLE, &stat);
+    (void)R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_DTIF_STATUS_CLR, &stat);
+    (void)R_DMACA_Int_Disable(SDIO_HOST_CMD53_DMACA_CH);
+
+    ret = R_DMACA_Create(SDIO_HOST_CMD53_DMACA_CH, &g_cmd53_dmaca_cfg);
+    if (DMACA_SUCCESS != ret)
+    {
+        g_cmd53_dmaca_error = 0x04000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    ret = R_DMACA_Int_Enable(SDIO_HOST_CMD53_DMACA_CH, SDIO_HOST_CMD53_DMACA_INT_LEVEL);
+    if (DMACA_SUCCESS != ret)
+    {
+        g_cmd53_dmaca_error = 0x05000000UL | (uint32_t)ret;
+        return false;
+    }
+
+    return true;
+}
+
+static bool sdio_cmd53_dmaca_wait(uint32_t dmaca_start_count, uint32_t * p_sdsts1, uint32_t * p_sdsts2)
+{
+    uint32_t timeout = SDIO_HOST_CMD53_DMACA_WAIT_COUNT;
+    dmaca_stat_t stat;
+    dmaca_return_t ret;
+
+    while ((g_cmd53_dmaca_count == dmaca_start_count) && (0UL != timeout))
+    {
+        ret = R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_STATUS_GET, &stat);
+        if ((DMACA_SUCCESS == ret) && stat.dtif_stat)
+        {
+            g_cmd53_dmaca_count++;
+            (void)R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_DTIF_STATUS_CLR, &stat);
+            break;
+        }
+        timeout--;
+    }
+
+    (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS1, p_sdsts1);
+    (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS2, p_sdsts2);
+
+    if (g_cmd53_dmaca_count == dmaca_start_count)
+    {
+        g_cmd53_dmaca_error = 0x06000000UL | (*p_sdsts2 & 0xffffUL);
+        return false;
+    }
+
+    if (0U != (*p_sdsts2 & SDHI_SDSTS2_ERR_BITS))
+    {
+        g_cmd53_dmaca_error = 0x07000000UL | (*p_sdsts2 & 0xffffUL);
+        return false;
+    }
+
+    return true;
+}
+
+static bool sdio_cmd53_try_transfer_blocks_dmaca(bool write, uint8_t function, uint32_t address, bool increment,
+                                                 uint8_t * p_data, uint32_t block_count, uint32_t block_size,
+                                                 uint32_t length, uint32_t buff_reg, uint32_t cmd,
+                                                 uint32_t * p_r5, uint32_t * p_sdsts1, uint32_t * p_sdsts2,
+                                                 bool * p_used)
+{
+    bool ok;
+    bool relaxed_read_crc;
+    uint32_t arg;
+    uint32_t live_sdsts1 = 0U;
+    uint32_t live_sdsts2 = 0U;
+    uint32_t dmaca_start_count;
+    uint32_t ready_mask = write ? SDHI_SDIMSK2_WE : SDHI_SDIMSK2_RE;
+    dmaca_stat_t stat;
+    dmaca_return_t ret;
+
+    (void)length;
+    *p_used = false;
+
+    if (function != SDIO_HOST_CMD53_DMACA_FUNCTION)
+    {
+        g_cmd53_dmaca_fallback_count++;
+        return false;
+    }
+
+    if (((!write) && (0U == SDIO_HOST_CMD53_DMACA_READ_ENABLE)) ||
+        (write && (0U == SDIO_HOST_CMD53_DMACA_WRITE_ENABLE)))
+    {
+        g_cmd53_dmaca_fallback_count++;
+        return false;
+    }
+
+    if (length < SDIO_HOST_CMD53_DMACA_MIN_BYTES)
+    {
+        g_cmd53_dmaca_fallback_count++;
+        return false;
+    }
+
+    if (!sdio_cmd53_dmaca_is_eligible(p_data, block_size, block_count))
+    {
+        g_cmd53_dmaca_fallback_count++;
+        return false;
+    }
+
+    if (!sdio_cmd53_dmaca_prepare(write, p_data, block_size, block_count, buff_reg))
+    {
+        g_cmd53_dmaca_fallback_count++;
+        return false;
+    }
+
+    g_cmd53_dmaca_last_seq++;
+    g_cmd53_dmaca_last_ctrl = (write ? 1UL : 0UL) |
+                              (((uint32_t)function) << 8) |
+                              (increment ? (1UL << 16) : 0UL);
+    g_cmd53_dmaca_last_addr = address;
+    g_cmd53_dmaca_last_len = length;
+    g_cmd53_dmaca_last_blocks = ((block_size & 0xffffUL) << 16) | (block_count & 0xffffUL);
+    g_cmd53_dmaca_last_data = (uint32_t)p_data;
+    g_cmd53_dmaca_last_r5 = 0U;
+    g_cmd53_dmaca_last_s1 = 0U;
+    g_cmd53_dmaca_last_s2 = 0U;
+
+    *p_used = true;
+    arg = R_SDIO_MakeCmd53Arg(write, function, address, increment, true, block_count);
+
+    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_TRNS_RESP | SDHI_SDSTS1_DETECT_BITS,
+                               SDHI_SDIMSK2_CLEAR | ready_mask);
+    (void)R_SDHI_ClearIntMask(SDHI_CH0, 0U, ready_mask);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDSIZE, block_size);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDSTOP, SDHI_SDSTOP_SEC_ENABLE);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDBLKCNT, block_count);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDIOMD, SDHI_SDIOMD_INTEN);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDDMAEN, SDHI_SDDMAEN_DMASDRW);
+    (void)R_SDHI_SetIntMask(SDHI_CH0, 0U, ready_mask);
+    (void)R_SDHI_EnableIcuInt(SDHI_CH0, SDHI_HWINT_BUFFER);
+
+    dmaca_start_count = g_cmd53_dmaca_count;
+    g_cmd53_dmaca_active = true;
+    ret = R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_ENABLE, &stat);
+    if (DMACA_SUCCESS != ret)
+    {
+        ok = false;
+        *p_sdsts1 = 0U;
+        *p_sdsts2 = 0U;
+        g_cmd53_dmaca_error = 0x08000000UL | (uint32_t)ret;
+    }
+    else
+    {
+        ok = sdhi_cmd53_issue(arg, cmd, p_r5, p_sdsts1, p_sdsts2);
+        if ((!write) && (!ok))
+        {
+            (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS1, &live_sdsts1);
+            (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDSTS2, &live_sdsts2);
+            if ((0U != (*p_sdsts1 & SDHI_SDSTS1_RSPEND)) ||
+                (0U != (live_sdsts1 & SDHI_SDSTS1_RSPEND)) ||
+                sdhi_can_read_crc_error_block(*p_sdsts2))
+            {
+                *p_sdsts1 = live_sdsts1;
+                *p_sdsts2 = live_sdsts2;
+                ok = true;
+            }
+        }
+    }
+
+    if (ok)
+    {
+        (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_RESP, 0U);
+        ok = sdio_cmd53_dmaca_wait(dmaca_start_count, p_sdsts1, p_sdsts2);
+        relaxed_read_crc = (!write) && (!ok) && sdhi_can_read_crc_error_block(*p_sdsts2);
+        if (relaxed_read_crc)
+        {
+            ok = true;
+        }
+    }
+
+    g_cmd53_dmaca_active = false;
+    (void)R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_DISABLE, &stat);
+    (void)R_DMACA_Control(SDIO_HOST_CMD53_DMACA_CH, DMACA_CMD_DTIF_STATUS_CLR, &stat);
+    (void)R_DMACA_Int_Disable(SDIO_HOST_CMD53_DMACA_CH);
+
+    if (ok)
+    {
+        uint32_t clear_mask = ready_mask;
+
+        if ((!write) && (0U != ((*p_sdsts2) & SDHI_SDSTS2_READ_CRC_ERR)))
+        {
+            clear_mask |= SDHI_SDSTS2_READ_CRC_ERR;
+        }
+        (void)R_SDHI_ClearSdstsReg(SDHI_CH0, 0U, clear_mask);
+
+        ok = sdhi_wait_status(SDHI_SDSTS1_ACEND, 0U, p_sdsts1, p_sdsts2);
+        if ((!ok) && (!write) && sdhi_can_accept_read_done_error(*p_sdsts1, *p_sdsts2))
+        {
+            ok = true;
+        }
+        (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDSTS1_ACEND,
+                                   ok ? ((*p_sdsts2) & SDHI_SDSTS2_ERR_BITS) : 0U);
+    }
+
+    if (!ok)
+    {
+        g_cmd53_dmaca_fail_count++;
+        sdhi_cmd53_capture_diag(*p_sdsts1, *p_sdsts2, *p_r5);
+        sdhi_cmd53_force_stop(p_sdsts2);
+    }
+
+    (void)R_SDHI_DisableIcuInt(SDHI_CH0, SDHI_HWINT_BUFFER);
+    (void)R_SDHI_ClearIntMask(SDHI_CH0, 0U, ready_mask);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDDMAEN, 0U);
+    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, 0U, SDHI_SDIMSK2_CLEAR | ready_mask);
+    (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDSTOP, SDHI_SDSTOP_INIT);
+
+    if (ok)
+    {
+        g_cmd53_dmaca_ok_count++;
+        g_cmd53_diag_stage = 0xFFU;
+        g_cmd53_dmaca_error = 0U;
+    }
+    g_cmd53_dmaca_last_r5 = *p_r5;
+    g_cmd53_dmaca_last_s1 = *p_sdsts1;
+    g_cmd53_dmaca_last_s2 = *p_sdsts2;
+    return ok;
+}
+#endif
+
 /*
  * CMD53 block-mode transfer (read or write) of block_count blocks of the
  * function's configured block size. SDSIZE = block size, SDBLKCNT = block count,
@@ -735,6 +1495,34 @@ static bool sdio_cmd53_transfer_blocks(bool write, uint8_t function, uint32_t ad
     {
         cmd = write ? SDHI_CMD53_BLOCK_WRITE : SDHI_CMD53_BLOCK_READ;
     }
+
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
+    {
+        bool dma_used = false;
+
+        ok = sdio_cmd53_try_transfer_blocks_dtc(write, function, address, increment,
+                                                p_data, block_count, block_size, length,
+                                                buff_reg, cmd, p_r5, &sdsts1, &sdsts2,
+                                                &dma_used);
+        if (dma_used)
+        {
+            return ok;
+        }
+    }
+#elif (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DMACA)
+    {
+        bool dma_used = false;
+
+        ok = sdio_cmd53_try_transfer_blocks_dmaca(write, function, address, increment,
+                                                  p_data, block_count, block_size, length,
+                                                  buff_reg, cmd, p_r5, &sdsts1, &sdsts2,
+                                                  &dma_used);
+        if (dma_used)
+        {
+            return ok;
+        }
+    }
+#endif
 
     (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_TRNS_RESP | SDHI_SDSTS1_DETECT_BITS,
                                SDHI_SDIMSK2_CLEAR | ready_mask);
@@ -932,16 +1720,19 @@ bool sdio_host_set_high_speed(void)
     uint8_t speed = 0U;
     uint8_t readback = 0U;
 
-    if (!sdio_host_cmd52_read(0U, 0x13U, &speed))
+    g_sdio_high_speed_enabled = false;
+
+    if (!sdio_host_cmd52_read(0U, SDIO_CCCR_HIGH_SPEED, &speed))
     {
         return false;
     }
-    if (0U != (speed & 0x01U))   /* SHS: card supports high speed */
+    if (0U != (speed & SDIO_HIGH_SPEED_SHS))
     {
-        if (!sdio_host_cmd52_write(0U, 0x13U, (uint8_t)(speed | 0x02U), &readback))  /* EHS */
+        if (!sdio_host_cmd52_write(0U, SDIO_CCCR_HIGH_SPEED, (uint8_t)(speed | SDIO_HIGH_SPEED_EHS), &readback))
         {
             return false;
         }
+        g_sdio_high_speed_enabled = (0U != (readback & SDIO_HIGH_SPEED_EHS));
     }
     return true;
 }
@@ -1047,12 +1838,28 @@ bool sdio_host_set_bus_4bit(void)
 }
 
 /*
- * Raise the SDHI clock from the ~400 kHz identification divider (DIV_256) used
- * for enumerate to a run divider (DIV_4) before any CMD53 data transfer.
+ * Raise the SDHI clock from the ~400 kHz identification divider used for
+ * enumerate. SDIO_HOST_CFG_RUN_CLOCK_DIV selects the stable run divider.
+ * Defining SDIO_HOST_USE_HIGH_SPEED_CLOCK enables the 30 MHz DIV_2 path after
+ * CCCR EHS is observed; on this bench that path is kept explicit because it can
+ * break early CMD53 transfers.
  */
 bool sdio_host_set_run_clock(void)
 {
-    return (SDHI_SUCCESS == R_SDHI_SetClock(SDHI_CH0, SDHI_DIV_8, SDHI_CLOCK_ENABLE));
+    sdhi_status_t status;
+#if defined(SDIO_HOST_USE_HIGH_SPEED_CLOCK)
+    uint32_t div = g_sdio_high_speed_enabled ? SDHI_CFG_DIV_HIGH_SPEED : SDHI_CFG_DIV_DEFAULT_SPEED;
+#else
+    uint32_t div = (uint32_t)SDIO_HOST_CFG_RUN_CLOCK_DIV;
+
+    (void)g_sdio_high_speed_enabled;
+#endif
+
+    g_sdio_host_run_clock_div = div;
+    status = R_SDHI_SetClock(SDHI_CH0, div, SDHI_CLOCK_ENABLE);
+    g_sdio_host_run_clock_status = (uint32_t)status;
+
+    return (SDHI_SUCCESS == status);
 }
 
 /*

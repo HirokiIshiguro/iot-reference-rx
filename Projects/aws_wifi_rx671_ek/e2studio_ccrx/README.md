@@ -59,7 +59,9 @@ pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
   -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
   -SoftIrqPollMs 1 `
-  -WlanAllowBusSleepDelayMs 600000
+  -WlanAllowBusSleepDelayMs 600000 `
+  -SdioRunClockDiv SDHI_DIV_8 `
+  -SdioCmd53XferEngine SDIO_HOST_CMD53_XFER_DTC
 ```
 
 The helper generates ignored `src/whd_join_config_local.h` and temporarily
@@ -81,6 +83,58 @@ the 10 ms sleep timing prevented ARP/ICMP traffic from reaching the SDIO
 Function 2 CMD53 data path reliably on the RX671 bring-up stack. The project
 patch only makes this WHD macro overrideable; the tracked e2 studio project is
 restored after the headless build.
+
+## Performance tuning knobs
+
+The tracked SDIO host raises the post-enumeration SDHI clock to `SDHI_DIV_8`.
+With the current 120 MHz PCLKA setting this is the stable Wi-Fi bring-up
+baseline. The headless build helper can temporarily override the divider without
+editing the project:
+
+```powershell
+pwsh -File tools/build_headless_rx671_wifi.ps1 `
+  -WifiConfigFile C:\ai\codex\ref\wifi.txt `
+  -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
+  -SdioRunClockDiv SDHI_DIV_4
+```
+
+`SDHI_DIV_4` and `SDHI_DIV_2` are useful for signal-margin experiments after
+removing the SDIO sniffer board, but they should be treated as measurement
+settings until the Type 1YN bus margin is confirmed with J-Link/Tracealyzer and
+packet captures. A DIV_4 smoke run reached `whd_wifi_on()` but timed out after
+one CMD53 Function 2 read failed to assert the receive-buffer-ready condition;
+the DIV_8 run completed WHD bring-up (`g_whd_bringup_stage = 90`) and obtained
+an IPv4 address. The current source exposes `g_sdio_host_run_clock_div` and
+`g_sdio_host_run_clock_status` as J-Link-visible diagnostics.
+
+FreeRTOS+TCP sliding windows are enabled for Wi-Fi throughput work. The current
+defaults use 16 MSS for both RX and TX stream buffers, 128 TCP window segment
+descriptors, and 48 network buffer descriptors. This is intended to prevent the
+TCP layer from becoming the first bottleneck while SDHI clocking and SDIO
+transfer CPU cost are measured.
+
+The SDIO CMD53 data path can be built with CPU copy, DTC, or DMACA transfer.
+The tracked default is DTC because it completes WHD bring-up, AP JOIN, DHCP,
+and the AWS IoT MQTT smoke path on EK-RX671 + Type 1YN. DMACA support is kept
+as an experimental build option for the next tuning pass; current DMACA smoke
+runs stop during WHD bring-up immediately after `sdio pre-cmd53 ok`, before the
+WLAN MAC/firmware strings are printed.
+
+| Build-time value | Meaning | Current status |
+|---|---|---|
+| `SDIO_HOST_CMD53_XFER_CPU` | PIO copy through `SDBUFR` | Fallback / comparison path |
+| `SDIO_HOST_CMD53_XFER_DTC` | DTC transfers between memory and SDHI `SDBUFR` | Default stable path |
+| `SDIO_HOST_CMD53_XFER_DMACA` | DMACA transfers between memory and SDHI `SDBUFR` | Experimental, not the default |
+
+The helper exposes the selector through `-SdioCmd53XferEngine` or
+`RX671_EK_SDIO_CMD53_XFER_ENGINE`. Direction and threshold overrides are also
+available for targeted experiments:
+`-SdioCmd53DtcReadEnable`, `-SdioCmd53DtcWriteEnable`,
+`-SdioCmd53DtcMinBytes`, `-SdioCmd53DmacaReadEnable`,
+`-SdioCmd53DmacaWriteEnable`, `-SdioCmd53DmacaMinBytes`, and
+`-SdioCmd53DmacaBlockMode`. The helper waits for e2 studio child build
+processes before restoring `.cproject`, so these temporary defines remain in
+effect until `make` / `ccrx` / `rlink` finish.
 
 ## WHD linked resource layout
 

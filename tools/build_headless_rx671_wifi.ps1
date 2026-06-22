@@ -11,7 +11,17 @@ param(
     [switch]$UseAwsIotLocalConfig,
     [switch]$UseTsipEntropy,
     [int]$SoftIrqPollMs = -1,
-    [int]$WlanAllowBusSleepDelayMs = 600000
+    [int]$WlanAllowBusSleepDelayMs = 600000,
+    [string]$SdioRunClockDiv = "",
+    [string]$SdioCmd53XferEngine = "",
+    [string]$SdioCmd53DtcReadEnable = "",
+    [string]$SdioCmd53DtcWriteEnable = "",
+    [string]$SdioCmd53DtcMinBytes = "",
+    [string]$SdioCmd53DmacaReadEnable = "",
+    [string]$SdioCmd53DmacaWriteEnable = "",
+    [string]$SdioCmd53DmacaMinBytes = "",
+    [string]$SdioCmd53DmacaBlockMode = "",
+    [switch]$SdioUseHighSpeedClock
 )
 
 $ErrorActionPreference = "Stop"
@@ -376,6 +386,115 @@ function Add-CProjectDefine {
     return $Text.Replace($needle, $insert)
 }
 
+function Remove-DirectoryBestEffort {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    try {
+        Remove-Item -LiteralPath $Path -Recurse -Force
+    } catch {
+        Write-Warning "Could not remove $Label '$Path' before build: $($_.Exception.Message)"
+        Write-Warning "Continuing; e2 studio -cleanBuild will attempt to refresh build outputs."
+    }
+}
+
+function Wait-RxBuildProcesses {
+    param(
+        [Parameter(Mandatory = $true)]
+        [datetime]$Since,
+        [int]$TimeoutSeconds = 900
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $buildProcs = Get-Process -ErrorAction SilentlyContinue |
+            Where-Object {
+                (($_.ProcessName -eq "make") -or
+                 ($_.ProcessName -eq "ccrx") -or
+                 ($_.ProcessName -eq "rlink")) -and
+                ($null -ne $_.StartTime) -and
+                ($_.StartTime -ge $Since)
+            }
+
+        if (-not $buildProcs) {
+            return
+        }
+
+        $summary = ($buildProcs | Group-Object ProcessName | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ", "
+        Write-Host "Waiting for e2 studio child build processes: $summary"
+        Start-Sleep -Seconds 5
+    }
+
+    Write-Warning "Timed out waiting for e2 studio child build processes to exit."
+}
+
+function Invoke-E2StudioHeadlessBuild {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Executable,
+        [Parameter(Mandatory = $true)]
+        [string]$WorkspacePath,
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+        [Parameter(Mandatory = $true)]
+        [string]$BuildTarget,
+        [Parameter(Mandatory = $true)]
+        [string]$OutputLog
+    )
+
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $Executable
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+
+    foreach ($arg in @(
+        "-nosplash",
+        "-application",
+        "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+        "-data",
+        $WorkspacePath,
+        "-import",
+        $ProjectPath,
+        "-cleanBuild",
+        $BuildTarget
+    )) {
+        [void]$psi.ArgumentList.Add($arg)
+    }
+
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+    $stderrTask = $proc.StandardError.ReadToEndAsync()
+    $proc.WaitForExit()
+    $stdoutTask.Wait()
+    $stderrTask.Wait()
+
+    $outputChunks = @($stdoutTask.Result, $stderrTask.Result) | Where-Object { -not [string]::IsNullOrEmpty($_) }
+    $logText = [string]::Join([Environment]::NewLine, $outputChunks)
+    try {
+        [System.IO.File]::WriteAllText($OutputLog, $logText, [System.Text.UTF8Encoding]::new($false))
+    } catch {
+        Write-Warning "Could not write e2 studio build log '$OutputLog': $($_.Exception.Message)"
+        $fallbackLog = "$OutputLog.codex.log"
+        [System.IO.File]::WriteAllText($fallbackLog, $logText, [System.Text.UTF8Encoding]::new($false))
+        Write-Warning "Wrote captured e2 studio build log to '$fallbackLog' instead."
+    }
+    if (-not [string]::IsNullOrEmpty($logText)) {
+        Write-Host $logText
+    }
+
+    return $proc.ExitCode
+}
+
 $reverseCheckArgs = @("-C", $whdDir, "apply", "--reverse", "--check", $whdPatch)
 $forwardCheckArgs = @("-C", $whdDir, "apply", "--check", $whdPatch)
 
@@ -397,14 +516,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Type 1YN blob staging failed with exit code $LASTEXITCODE"
 }
 
-if (Test-Path -LiteralPath $Workspace) {
-    Remove-Item -LiteralPath $Workspace -Recurse -Force
-}
+Remove-DirectoryBestEffort -Path $Workspace -Label "workspace"
 
 $hardwareDebug = Join-Path $projectDir "HardwareDebug"
-if (Test-Path -LiteralPath $hardwareDebug) {
-    Remove-Item -LiteralPath $hardwareDebug -Recurse -Force
-}
+Remove-DirectoryBestEffort -Path $hardwareDebug -Label "HardwareDebug"
 
 $logFilePath = [System.IO.Path]::GetFullPath($LogFile)
 Write-Host "=== RX671 Wi-Fi import + build ==="
@@ -420,6 +535,20 @@ if ($useAwsIotLocalConfigForBuild) {
 if ($WlanAllowBusSleepDelayMs -ge 0) {
     Write-Host "WHD WLAN bus sleep delay: ${WlanAllowBusSleepDelayMs} ms"
 }
+if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
+    Write-Host "SDIO run clock divider override: $SdioRunClockDiv"
+}
+$effectiveSdioCmd53XferEngine = Get-FirstNonEmpty @($SdioCmd53XferEngine, $env:RX671_EK_SDIO_CMD53_XFER_ENGINE)
+if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
+    Write-Host "SDIO CMD53 transfer engine override: $effectiveSdioCmd53XferEngine"
+}
+$effectiveSdioCmd53DtcReadEnable = Get-FirstNonEmpty @($SdioCmd53DtcReadEnable, $env:RX671_EK_SDIO_CMD53_DTC_READ_ENABLE)
+$effectiveSdioCmd53DtcWriteEnable = Get-FirstNonEmpty @($SdioCmd53DtcWriteEnable, $env:RX671_EK_SDIO_CMD53_DTC_WRITE_ENABLE)
+$effectiveSdioCmd53DtcMinBytes = Get-FirstNonEmpty @($SdioCmd53DtcMinBytes, $env:RX671_EK_SDIO_CMD53_DTC_MIN_BYTES)
+$effectiveSdioCmd53DmacaReadEnable = Get-FirstNonEmpty @($SdioCmd53DmacaReadEnable, $env:RX671_EK_SDIO_CMD53_DMACA_READ_ENABLE)
+$effectiveSdioCmd53DmacaWriteEnable = Get-FirstNonEmpty @($SdioCmd53DmacaWriteEnable, $env:RX671_EK_SDIO_CMD53_DMACA_WRITE_ENABLE)
+$effectiveSdioCmd53DmacaMinBytes = Get-FirstNonEmpty @($SdioCmd53DmacaMinBytes, $env:RX671_EK_SDIO_CMD53_DMACA_MIN_BYTES)
+$effectiveSdioCmd53DmacaBlockMode = Get-FirstNonEmpty @($SdioCmd53DmacaBlockMode, $env:RX671_EK_SDIO_CMD53_DMACA_BLOCK_MODE)
 
 $cprojectBytes = $null
 try {
@@ -458,6 +587,39 @@ try {
         $cprojectDefines += "PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=$WlanAllowBusSleepDelayMs"
     }
 
+    if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
+        $cprojectDefines += "SDIO_HOST_CFG_RUN_CLOCK_DIV=$SdioRunClockDiv"
+    }
+
+    if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
+        $cprojectDefines += "SDIO_HOST_USE_HIGH_SPEED_CLOCK"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_XFER_ENGINE=$effectiveSdioCmd53XferEngine"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DtcReadEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DTC_READ_ENABLE=$effectiveSdioCmd53DtcReadEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DtcWriteEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DTC_WRITE_ENABLE=$effectiveSdioCmd53DtcWriteEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DtcMinBytes)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DTC_MIN_BYTES=$effectiveSdioCmd53DtcMinBytes"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaReadEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_READ_ENABLE=$effectiveSdioCmd53DmacaReadEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaWriteEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_WRITE_ENABLE=$effectiveSdioCmd53DmacaWriteEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaMinBytes)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_MIN_BYTES=$effectiveSdioCmd53DmacaMinBytes"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaBlockMode)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_BLOCK_MODE=$effectiveSdioCmd53DmacaBlockMode"
+    }
+
     if ($cprojectDefines.Count -gt 0) {
         $cprojectBytes = [System.IO.File]::ReadAllBytes($cproject)
         $patchedCProject = [System.IO.File]::ReadAllText($cproject)
@@ -467,15 +629,23 @@ try {
         [System.IO.File]::WriteAllText($cproject, $patchedCProject, [System.Text.UTF8Encoding]::new($false))
     }
 
-    & $E2Studio `
-        -nosplash `
-        -application org.eclipse.cdt.managedbuilder.core.headlessbuild `
-        -data $Workspace `
-        -import $projectDir `
-        -cleanBuild "$projectName/HardwareDebug" 2>&1 | Tee-Object -FilePath $logFilePath
+    $buildStart = Get-Date
+    $e2StudioExitCode = Invoke-E2StudioHeadlessBuild `
+        -Executable $E2Studio `
+        -WorkspacePath $Workspace `
+        -ProjectPath $projectDir `
+        -BuildTarget "$projectName/HardwareDebug" `
+        -OutputLog $logFilePath
+    Wait-RxBuildProcesses -Since $buildStart
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "e2 studio build failed with exit code $LASTEXITCODE"
+    $motOutput = Join-Path $hardwareDebug "$projectName.mot"
+    $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
+        ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
+
+    if (($e2StudioExitCode -ne 0) -and (-not $motWasUpdated)) {
+        throw "e2 studio build failed with exit code $e2StudioExitCode"
+    } elseif ($e2StudioExitCode -ne 0) {
+        Write-Warning "e2 studio returned exit code $e2StudioExitCode before child build completion, but output was refreshed."
     }
 } finally {
     if ($null -ne $cprojectBytes) {

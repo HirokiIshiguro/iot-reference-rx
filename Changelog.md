@@ -25,7 +25,14 @@
   Wi-Fi and AWS IoT credentials in ignored local headers, verifies SCI6 logging
   on COM5 at 921600 bps, joins an AP through WHD over SDIO, starts
   FreeRTOS+TCP, and completes an AWS IoT MQTT smoke connection with
-  `AWS MQTT=0`.
+  `AWS MQTT=0`. Throughput tuning has started by making the SDHI CMD53 run
+  clock configurable from the headless build, keeping the stable DIV_8 bring-up
+  path as the tracked default while exposing DIV_4/DIV_2 measurement overrides,
+  enabling FreeRTOS+TCP sliding windows for the Wi-Fi path, and adding DTC/DMAC
+  FIT modules for the SDIO CMD53 data path. The DTC CMD53 path is the current
+  stable default and has completed WHD bring-up, DHCP, TLS, and MQTT smoke on
+  EK-RX671 + Type 1YN; DMACA remains an experimental selector for the next
+  tuning pass.
 
 - Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
   性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。

@@ -71,8 +71,11 @@ void sdio_host_note_cmd52_write(uint8_t function, uint32_t address, uint8_t valu
  * backplane reads. */
 bool sdio_host_set_bus_4bit(void);
 
-/* Raise the SDHI clock from the identification divider to a run divider
- * (DIV_4) before any CMD53 data transfer. Returns true on success. Call after
+/* Raise the SDHI clock from the identification divider to the configured run
+ * divider before any CMD53 data transfer. The default is the conservative
+ * SDHI_DIV_8 path used by the Wi-Fi bring-up baseline; define
+ * SDIO_HOST_CFG_RUN_CLOCK_DIV at build time to try a faster divider such as
+ * SDHI_DIV_4 or SDHI_DIV_2. Returns true on success. Call after
  * switching to 4-bit and before backplane reads. */
 bool sdio_host_set_run_clock(void);
 
