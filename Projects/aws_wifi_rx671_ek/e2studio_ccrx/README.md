@@ -26,8 +26,10 @@ are compiled into the project. The project now contains:
   smoke task that connects, performs TLS/MQTT setup, disconnects, and reports
   `AWS MQTT=0` on success.
 
-The WHD core itself is kept as an external submodule. Firmware/NVRAM/CLM blobs
-are not committed to this repository. Apply
+The WHD core itself is kept as an external submodule. The Type 1YN
+firmware/NVRAM/CLM source revisions are pinned under
+`../external/type1yn-blobs/sources`, while generated staging files are ignored
+by git and linked into the firmware image. Apply
 `../external/patches/whd-v1.70.0-ccrx-portability.patch` to the WHD submodule
 before building; the patch carries CC-RX packing fixes plus the SDIO CMD52/CMD53
 argument and Function 2 FIFO handling needed for WHD scan/JOIN.
@@ -80,19 +82,22 @@ Function 2 CMD53 data path reliably on the RX671 bring-up stack. The project
 patch only makes this WHD macro overrideable; the tracked e2 studio project is
 restored after the headless build.
 
-## WHD resource flash layout
+## WHD linked resource layout
 
-The Type 1YN / CYW43439 WHD resources are loaded separately into code flash:
+The Type 1YN / CYW43439 WHD resources are staged from pinned source
+submodules by `../external/type1yn-blobs/stage_type1yn_blobs.ps1`, then linked
+into code flash by CC-RX `-binary` options:
 
-| Resource | Local source artifact | Flash address |
-|---|---|---:|
-| WLAN firmware | `artifacts/fw/43439A0.bin` | `0xFFF00000` |
-| NVRAM | `artifacts/fw/nvram_1yn.bin` | `0xFFF80000` |
-| CLM blob | `artifacts/fw/43439A0.clm_blob` | `0xFFF90000` |
+| Resource | Staged file | Linker section | C symbol | Flash address |
+|---|---|---|---|---:|
+| WLAN firmware | `../external/type1yn-blobs/staging/43439A0.bin` | `TYPE1YN_FW_BLOB` | `g_type1yn_firmware_bin` | `0xFFF00000` |
+| NVRAM | `../external/type1yn-blobs/staging/nvram_1yn.bin` | `TYPE1YN_NVRAM_BLOB` | `g_type1yn_nvram_bin` | `0xFFF80000` |
+| CLM blob | `../external/type1yn-blobs/staging/43439A0.clm_blob` | `TYPE1YN_CLM_BLOB` | `g_type1yn_clm_blob` | `0xFFF90000` |
 
-The resource provider in `src/whd_port/whd_port_resource.c` reads those fixed
-addresses through the WHD resource callback API. If erased flash is present at
-those locations, `whd_wifi_on` will fail during firmware/resource handling.
+The resource provider in `src/whd_port/whd_port_resource.c` exposes those
+symbols through the WHD resource callback API. The fixed section addresses keep
+the layout compatible with earlier primitive SDIO experiments, but the normal
+J-Link load path now only needs the generated `.mot` file.
 
 Example J-Link Commander flow:
 
@@ -103,9 +108,6 @@ speed 4000
 jtagconf -1 -1
 connect
 loadfile <repo_root>\Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug\aws_wifi_rx671_ek.mot
-loadbin C:\path\to\local\type1yn-fw\43439A0.bin 0xFFF00000
-loadbin C:\path\to\local\type1yn-fw\nvram_1yn.bin 0xFFF80000
-loadbin C:\path\to\local\type1yn-fw\43439A0.clm_blob 0xFFF90000
 r
 g
 q
@@ -118,12 +120,12 @@ The repository root also provides a thin helper that emits the same Commander
 script into a temporary file:
 
 ```powershell
-pwsh -File tools/load_rx671_wifi_jlink.ps1 `
-  -FirmwareBin C:\path\to\local\type1yn-fw\43439A0.bin `
-  -NvramBin C:\path\to\local\type1yn-fw\nvram_1yn.bin `
-  -ClmBlob C:\path\to\local\type1yn-fw\43439A0.clm_blob `
-  -Run
+pwsh -File tools/load_rx671_wifi_jlink.ps1 -Run
 ```
+
+The optional `-FirmwareBin`, `-NvramBin`, and `-ClmBlob` arguments remain
+available for manual override/debug loads, but the normal project image already
+contains the staged resources.
 
 ## Temporary interrupt model
 

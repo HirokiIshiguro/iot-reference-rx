@@ -10,7 +10,8 @@ tree:
 - Infineon WHD v1.70.0 through a project-local submodule
 - Type 1YN firmware boot, MAC read, AP scan, WPA2-PSK JOIN, FreeRTOS+TCP, and
   AWS IoT MQTT smoke verified on hardware
-- No AP credentials or firmware blobs committed
+- No AP credentials committed; Type 1YN WHD blob source revisions are pinned as
+  submodules and generated staging files are ignored
 
 The e2 studio project name is `aws_wifi_rx671_ek`.
 
@@ -20,6 +21,7 @@ The e2 studio project name is `aws_wifi_rx671_ek`.
 |---|---|
 | `e2studio_ccrx/` | EK-RX671 e2 studio CCRX application project |
 | `external/wifi-host-driver/` | WHD v1.70.0 submodule |
+| `external/type1yn-blobs/` | Pinned source submodules and ignored staging for Type 1YN firmware/NVRAM/CLM blobs |
 | `external/patches/whd-v1.70.0-ccrx-portability.patch` | Required WHD CC-RX/SDIO patch |
 | `apply_whd_patch.ps1` | Helper to re-apply the WHD patch after submodule checkout |
 
@@ -59,11 +61,11 @@ separated into reviewable milestones.
 
 ## Build
 
-Initialize submodules and apply the WHD patch before building:
+Use the headless build helper from the repository root. It initializes the
+required submodules, applies the WHD CC-RX patch if needed, validates/stages the
+Type 1YN firmware/NVRAM/CLM blobs, and builds the e2 studio project:
 
 ```powershell
-git submodule update --init --recursive Projects/aws_wifi_rx671_ek/external/wifi-host-driver
-pwsh -File Projects/aws_wifi_rx671_ek/apply_whd_patch.ps1
 pwsh -File tools/build_headless_rx671_wifi.ps1
 ```
 
@@ -116,15 +118,15 @@ Expected outputs:
 - `e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.abs`
 - `e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.x`
 
-Load the generated image and local WHD resources with J-Link Commander:
+The generated `.mot` includes the Type 1YN WHD resources linked into code flash
+by CC-RX `-binary` options. Load the image with J-Link Commander:
 
 ```powershell
-pwsh -File tools/load_rx671_wifi_jlink.ps1 `
-  -FirmwareBin C:\path\to\local\type1yn-fw\43439A0.bin `
-  -NvramBin C:\path\to\local\type1yn-fw\nvram_1yn.bin `
-  -ClmBlob C:\path\to\local\type1yn-fw\43439A0.clm_blob `
-  -Run
+pwsh -File tools/load_rx671_wifi_jlink.ps1 -Run
 ```
+
+The loader still accepts `-FirmwareBin`, `-NvramBin`, and `-ClmBlob` for
+manual override/debug runs, but they are not required for the normal build.
 
 ## FreeRTOS+TCP Integration Plan
 
