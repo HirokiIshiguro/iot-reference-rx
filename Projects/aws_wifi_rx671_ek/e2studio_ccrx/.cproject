@@ -210,12 +210,12 @@
 									<listOptionValue builtIn="false" value="D_2=R_2"/>
 									<listOptionValue builtIn="false" value="D_8=R_8"/>
 								</option>
-								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.1990832357" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" value="SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8/04,PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P/0FFE00000,EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC" valueType="string"/>
+								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.1990832357" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" value="SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8/04,PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P/0FFE00000,TYPE1YN_FW_BLOB/0FFF00000,TYPE1YN_NVRAM_BLOB/0FFF80000,TYPE1YN_CLM_BLOB/0FFF90000,EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC" valueType="string"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore.2030047513" name="追加するオプション（すべての指定オプションの前に追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore" valueType="stringList">
 									<listOptionValue builtIn="false" value=""/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userAfter.1602501506" name="追加するオプション（すべての指定オプションの後ろに追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userAfter" valueType="stringList">
-									<listOptionValue builtIn="false" value=""/>
+									<listOptionValue builtIn="false" value="-binary=../../external/type1yn-blobs/staging/43439A0.bin(TYPE1YN_FW_BLOB:4/DATA,_g_type1yn_firmware_bin),../../external/type1yn-blobs/staging/nvram_1yn.bin(TYPE1YN_NVRAM_BLOB:4/DATA,_g_type1yn_nvram_bin),../../external/type1yn-blobs/staging/43439A0.clm_blob(TYPE1YN_CLM_BLOB:4/DATA,_g_type1yn_clm_blob)"/>
 								</option>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.vect.1283124339" name="可変ベクタテーブルのアドレス未設定ベクタ番号に指定するアドレス (-vect)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.vect" value="_undefined_interrupt_source_isr" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.showSymbol.113378946" name="シンボル情報を出力する (-show=symbol)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.showSymbol" value="true" valueType="boolean"/>

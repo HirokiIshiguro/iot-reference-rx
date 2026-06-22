@@ -22,6 +22,7 @@ $projectName = "aws_wifi_rx671_ek"
 $projectDir = Join-Path $projectRoot "Projects\$projectName\e2studio_ccrx"
 $whdDir = Join-Path $projectRoot "Projects\$projectName\external\wifi-host-driver"
 $whdPatch = Join-Path $projectRoot "Projects\$projectName\external\patches\whd-v1.70.0-ccrx-portability.patch"
+$type1ynBlobStageScript = Join-Path $projectRoot "Projects\$projectName\external\type1yn-blobs\stage_type1yn_blobs.ps1"
 $cproject = Join-Path $projectDir ".cproject"
 $localJoinConfig = Join-Path $projectDir "src\whd_join_config_local.h"
 $localAwsIotConfig = Join-Path $projectDir "src\frtos_config\aws_iot_config_local.h"
@@ -53,6 +54,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectDir ".project"))) {
 
 $submodulePaths = @(
     "Projects/$projectName/external/wifi-host-driver",
+    "Projects/$projectName/external/type1yn-blobs/sources/firmware-wifi-host-driver",
+    "Projects/$projectName/external/type1yn-blobs/sources/wifi-resources",
+    "Projects/$projectName/external/type1yn-blobs/sources/cyw-fmac-nvram",
     "Middleware/3rdparty/mbedtls",
     "Middleware/FreeRTOS/FreeRTOS-Kernel",
     "Middleware/FreeRTOS/FreeRTOS-Plus-TCP",
@@ -80,6 +84,10 @@ foreach ($submodulePath in $submodulePaths) {
 
 if (-not (Test-Path -LiteralPath $whdPatch)) {
     throw "WHD patch not found: $whdPatch"
+}
+
+if (-not (Test-Path -LiteralPath $type1ynBlobStageScript)) {
+    throw "Type 1YN blob staging script not found: $type1ynBlobStageScript"
 }
 
 function Test-GitApply {
@@ -381,6 +389,12 @@ if (Test-GitApply $reverseCheckArgs) {
     }
 } else {
     throw "WHD patch state is neither clean nor applied. Check submodule status: $whdDir"
+}
+
+Write-Host "Staging Type 1YN WHD blobs..."
+& $type1ynBlobStageScript
+if ($LASTEXITCODE -ne 0) {
+    throw "Type 1YN blob staging failed with exit code $LASTEXITCODE"
 }
 
 if (Test-Path -LiteralPath $Workspace) {

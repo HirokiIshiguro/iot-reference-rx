@@ -1,10 +1,9 @@
 /*
- * WHD firmware/NVRAM/CLM resources backed by fixed RX671 code-flash addresses.
+ * WHD firmware/NVRAM/CLM resources linked into RX671 code flash.
  *
- * The binary blobs are not committed to the repository. Load them separately:
- *  - 43439A0.bin              -> 0xFFF00000
- *  - nvram_1yn.bin            -> 0xFFF80000
- *  - 43439A0.clm_blob         -> 0xFFF90000
+ * The binary blobs are pinned as project-local submodules, staged by
+ * external/type1yn-blobs/stage_type1yn_blobs.ps1, and linked by CC-RX
+ * -binary options into the TYPE1YN_*_BLOB sections.
  */
 #include <stdint.h>
 #include <stddef.h>
@@ -15,12 +14,13 @@
 
 #define WHD_RESOURCE_BLOCK_BYTES        (1024UL)
 
-#define TYPE1YN_FW_FLASH_ADDR           (0xFFF00000UL)
-#define TYPE1YN_FW_FLASH_SIZE           (249066UL)
-#define TYPE1YN_NVRAM_FLASH_ADDR        (0xFFF80000UL)
-#define TYPE1YN_NVRAM_FLASH_SIZE        (816UL)
-#define TYPE1YN_CLM_FLASH_ADDR          (0xFFF90000UL)
-#define TYPE1YN_CLM_FLASH_SIZE          (4752UL)
+#define TYPE1YN_FW_BLOB_SIZE            (249066UL)
+#define TYPE1YN_NVRAM_BLOB_SIZE         (816UL)
+#define TYPE1YN_CLM_BLOB_SIZE           (4752UL)
+
+extern const uint8_t g_type1yn_firmware_bin[];
+extern const uint8_t g_type1yn_nvram_bin[];
+extern const uint8_t g_type1yn_clm_blob[];
 
 typedef struct st_whd_resource_entry
 {
@@ -38,16 +38,16 @@ static whd_result_t whd_resource_lookup(whd_resource_type_t type, whd_resource_e
     switch (type)
     {
         case WHD_RESOURCE_WLAN_FIRMWARE:
-            p_entry->p_data = (const uint8_t *)TYPE1YN_FW_FLASH_ADDR;
-            p_entry->size   = TYPE1YN_FW_FLASH_SIZE;
+            p_entry->p_data = g_type1yn_firmware_bin;
+            p_entry->size   = TYPE1YN_FW_BLOB_SIZE;
             break;
         case WHD_RESOURCE_WLAN_NVRAM:
-            p_entry->p_data = (const uint8_t *)TYPE1YN_NVRAM_FLASH_ADDR;
-            p_entry->size   = TYPE1YN_NVRAM_FLASH_SIZE;
+            p_entry->p_data = g_type1yn_nvram_bin;
+            p_entry->size   = TYPE1YN_NVRAM_BLOB_SIZE;
             break;
         case WHD_RESOURCE_WLAN_CLM:
-            p_entry->p_data = (const uint8_t *)TYPE1YN_CLM_FLASH_ADDR;
-            p_entry->size   = TYPE1YN_CLM_FLASH_SIZE;
+            p_entry->p_data = g_type1yn_clm_blob;
+            p_entry->size   = TYPE1YN_CLM_BLOB_SIZE;
             break;
         default:
             return WHD_WLAN_NOTFOUND;

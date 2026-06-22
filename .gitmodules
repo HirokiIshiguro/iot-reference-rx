@@ -76,3 +76,12 @@
 [submodule "Projects/aws_wifi_rx671_ek/external/wifi-host-driver"]
 	path = Projects/aws_wifi_rx671_ek/external/wifi-host-driver
 	url = https://github.com/Infineon/wifi-host-driver.git
+[submodule "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/firmware-wifi-host-driver"]
+	path = Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/firmware-wifi-host-driver
+	url = https://github.com/Infineon/wifi-host-driver.git
+[submodule "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/wifi-resources"]
+	path = Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/wifi-resources
+	url = https://github.com/Infineon/wifi-resources.git
+[submodule "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/cyw-fmac-nvram"]
+	path = Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/cyw-fmac-nvram
+	url = https://github.com/murata-wireless/cyw-fmac-nvram.git

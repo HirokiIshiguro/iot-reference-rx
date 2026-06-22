@@ -235,7 +235,7 @@ void whd_bringup_run(void)
     g_whd_bringup_join_mode = 0U;
 
     debug_puts("WHD bring-up start\r\n");
-    debug_puts("WHD resource flash: fw=FFF00000 nvram=FFF80000 clm=FFF90000\r\n");
+    debug_puts("WHD resources linked: fw=TYPE1YN_FW_BLOB nvram=TYPE1YN_NVRAM_BLOB clm=TYPE1YN_CLM_BLOB\r\n");
 
     memset(&init_config, 0, sizeof(init_config));
     init_config.thread_stack_start = g_whd_thread_stack;
