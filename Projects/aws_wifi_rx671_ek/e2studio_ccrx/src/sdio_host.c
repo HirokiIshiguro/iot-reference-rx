@@ -22,6 +22,26 @@
 #include "r_sdio_rx_if.h"
 #include "sdio_host.h"
 
+#define SDIO_HOST_CMD53_BLOCK_TRANSFER_CPU   (0)
+#define SDIO_HOST_CMD53_BLOCK_TRANSFER_DMACA (1)
+#define SDIO_HOST_CMD53_BLOCK_TRANSFER_DTC   (2)
+
+#ifndef SDIO_HOST_CMD53_BLOCK_TRANSFER
+#define SDIO_HOST_CMD53_BLOCK_TRANSFER       SDIO_HOST_CMD53_BLOCK_TRANSFER_CPU
+#endif
+
+#ifndef SDIO_HOST_DMACA_CHANNEL
+#define SDIO_HOST_DMACA_CHANNEL              DMACA_CH0
+#endif
+
+#ifndef SDIO_HOST_DMACA_TIMEOUT
+#define SDIO_HOST_DMACA_TIMEOUT              (1000000UL)
+#endif
+
+#if (SDIO_HOST_CMD53_BLOCK_TRANSFER == SDIO_HOST_CMD53_BLOCK_TRANSFER_DMACA)
+#include "r_dmaca_rx_if.h"
+#endif
+
 /* SDHI command-word fields not exported by r_sdhi_rx_if.h (local in the perf
  * project too). */
 #define SDHI_CMDIDX_MASK        (0x3fU)
@@ -383,6 +403,184 @@ static uint32_t g_cmd53_diag_data0 = 0U;
  * by the CMD53 block-mode transfer. */
 static uint16_t g_sdio_block_size[SDIO_MAX_FUNCTION + 1U];
 
+#if (SDIO_HOST_CMD53_BLOCK_TRANSFER == SDIO_HOST_CMD53_BLOCK_TRANSFER_DMACA)
+static bool g_sdio_dmaca_open;
+
+static bool sdio_cmd53_dmaca_init(void)
+{
+    dmaca_stat_t stat;
+    dmaca_return_t err;
+
+    if (g_sdio_dmaca_open)
+    {
+        return true;
+    }
+
+    R_DMACA_Init();
+    err = R_DMACA_Open(SDIO_HOST_DMACA_CHANNEL);
+    if (DMACA_SUCCESS != err)
+    {
+        return false;
+    }
+
+    (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_DISABLE, &stat);
+    g_sdio_dmaca_open = true;
+    return true;
+}
+
+static bool sdio_cmd53_transfer_block_dmaca(bool write, volatile uint32_t * p_sdbufr,
+                                            uint8_t * p_data, uint32_t block_size)
+{
+    dmaca_transfer_data_cfg_t cfg;
+    dmaca_stat_t stat;
+    dmaca_return_t err;
+    uint32_t timeout = SDIO_HOST_DMACA_TIMEOUT;
+
+    if ((0UL != (((uint32_t)p_data) & 0x03UL)) || (0UL != (block_size & 0x03UL)))
+    {
+        return false;
+    }
+    if (!sdio_cmd53_dmaca_init())
+    {
+        return false;
+    }
+
+    (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_DISABLE, &stat);
+    (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_SOFT_REQ_CLR, &stat);
+    (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_DTIF_STATUS_CLR, &stat);
+    (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_ESIF_STATUS_CLR, &stat);
+
+    cfg.transfer_mode        = DMACA_TRANSFER_MODE_NORMAL;
+    cfg.repeat_block_side    = DMACA_REPEAT_BLOCK_DISABLE;
+    cfg.data_size            = DMACA_DATA_SIZE_LWORD;
+    cfg.act_source           = (dmaca_activation_source_t)0;
+    cfg.request_source       = DMACA_TRANSFER_REQUEST_SOFTWARE;
+    cfg.dtie_request         = DMACA_TRANSFER_END_INTERRUPT_DISABLE;
+    cfg.esie_request         = DMACA_TRANSFER_ESCAPE_END_INTERRUPT_DISABLE;
+    cfg.rptie_request        = DMACA_REPEAT_SIZE_END_INTERRUPT_DISABLE;
+    cfg.sarie_request        = DMACA_SRC_ADDR_EXT_REP_AREA_OVER_INTERRUPT_DISABLE;
+    cfg.darie_request        = DMACA_DES_ADDR_EXT_REP_AREA_OVER_INTERRUPT_DISABLE;
+    cfg.src_addr_repeat_area = DMACA_SRC_ADDR_EXT_REP_AREA_NONE;
+    cfg.des_addr_repeat_area = DMACA_DES_ADDR_EXT_REP_AREA_NONE;
+    cfg.offset_value         = 0UL;
+    cfg.interrupt_sel        = DMACA_CLEAR_INTERRUPT_FLAG_BEGINNING_TRANSFER;
+    cfg.transfer_count       = block_size / 4UL;
+    cfg.block_size           = 0U;
+    cfg.rsv[0]               = 0U;
+    cfg.rsv[1]               = 0U;
+
+    if (write)
+    {
+        cfg.src_addr_mode = DMACA_SRC_ADDR_INCR;
+        cfg.des_addr_mode = DMACA_DES_ADDR_FIXED;
+        cfg.p_src_addr    = (void *)p_data;
+        cfg.p_des_addr    = (void *)p_sdbufr;
+    }
+    else
+    {
+        cfg.src_addr_mode = DMACA_SRC_ADDR_FIXED;
+        cfg.des_addr_mode = DMACA_DES_ADDR_INCR;
+        cfg.p_src_addr    = (void *)p_sdbufr;
+        cfg.p_des_addr    = (void *)p_data;
+    }
+
+    err = R_DMACA_Create(SDIO_HOST_DMACA_CHANNEL, &cfg);
+    if (DMACA_SUCCESS == err)
+    {
+        err = R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_ENABLE, &stat);
+    }
+    if (DMACA_SUCCESS == err)
+    {
+        err = R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_SOFT_REQ_WITH_AUTO_CLR_REQ, &stat);
+    }
+    if (DMACA_SUCCESS != err)
+    {
+        (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_DISABLE, &stat);
+        return false;
+    }
+
+    do
+    {
+        err = R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_STATUS_GET, &stat);
+        if ((DMACA_SUCCESS == err) && (!stat.act_stat) && (0UL == stat.transfer_count))
+        {
+            (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_DISABLE, &stat);
+            (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_DTIF_STATUS_CLR, &stat);
+            return true;
+        }
+        if ((DMACA_SUCCESS != err) || stat.esif_stat)
+        {
+            break;
+        }
+    } while (0UL != --timeout);
+
+    (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_DISABLE, &stat);
+    (void)R_DMACA_Control(SDIO_HOST_DMACA_CHANNEL, DMACA_CMD_SOFT_REQ_CLR, &stat);
+    return false;
+}
+#endif
+
+static void sdio_cmd53_transfer_block_cpu(bool write, volatile uint32_t * p_sdbufr,
+                                          uint8_t * p_data, uint32_t block_size,
+                                          uint32_t block_index)
+{
+    uint32_t byte_index = block_index * block_size;
+    uint32_t word_index;
+    uint32_t word;
+
+    for (word_index = 0UL; word_index < (block_size / 4UL); word_index++)
+    {
+        if (write)
+        {
+            word = ((uint32_t)p_data[byte_index]) |
+                   ((uint32_t)p_data[byte_index + 1UL] << 8) |
+                   ((uint32_t)p_data[byte_index + 2UL] << 16) |
+                   ((uint32_t)p_data[byte_index + 3UL] << 24);
+            p_sdbufr[0] = word;
+        }
+        else
+        {
+            (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDBUFR, &word);
+            if ((0UL == block_index) && (0UL == word_index))
+            {
+                g_cmd53_diag_data0 = word;
+            }
+            p_data[byte_index]       = (uint8_t)word;
+            p_data[byte_index + 1UL] = (uint8_t)(word >> 8);
+            p_data[byte_index + 2UL] = (uint8_t)(word >> 16);
+            p_data[byte_index + 3UL] = (uint8_t)(word >> 24);
+        }
+        byte_index += 4UL;
+    }
+}
+
+static bool sdio_cmd53_transfer_block(bool write, volatile uint32_t * p_sdbufr,
+                                      uint8_t * p_data, uint32_t block_size,
+                                      uint32_t block_index)
+{
+#if (SDIO_HOST_CMD53_BLOCK_TRANSFER == SDIO_HOST_CMD53_BLOCK_TRANSFER_DMACA)
+    uint32_t byte_index = block_index * block_size;
+
+    if (sdio_cmd53_transfer_block_dmaca(write, p_sdbufr, &p_data[byte_index], block_size))
+    {
+        if (!write && (0UL == block_index))
+        {
+            g_cmd53_diag_data0 = ((uint32_t)p_data[0]) |
+                                 ((uint32_t)p_data[1] << 8) |
+                                 ((uint32_t)p_data[2] << 16) |
+                                 ((uint32_t)p_data[3] << 24);
+        }
+        return true;
+    }
+#elif (SDIO_HOST_CMD53_BLOCK_TRANSFER == SDIO_HOST_CMD53_BLOCK_TRANSFER_DTC)
+    /* DTC needs SDHI SBFAI as the activation source. Keep this path as a safe
+     * CPU fallback until the SDHI interrupt-driven data phase owns BRE/BWE. */
+#endif
+
+    sdio_cmd53_transfer_block_cpu(write, p_sdbufr, p_data, block_size, block_index);
+    return true;
+}
+
 /*
  * Issue #28 force-stop: a CMD53 whose data phase never starts leaves the
  * command engine CBSY, and a busy host then silently swallows every later
@@ -696,9 +894,6 @@ static bool sdio_cmd53_transfer_blocks(bool write, uint8_t function, uint32_t ad
     uint32_t sdsts2 = 0U;
     uint32_t arg;
     uint32_t block_index;
-    uint32_t byte_index;
-    uint32_t word_index;
-    uint32_t word;
     uint32_t clear_mask;
     uint32_t block_size = g_sdio_block_size[function];
     uint32_t length = block_size * block_count;
@@ -795,30 +990,11 @@ static bool sdio_cmd53_transfer_blocks(bool write, uint8_t function, uint32_t ad
         }
         (void)R_SDHI_ClearSdstsReg(SDHI_CH0, 0U, clear_mask);
 
-        byte_index = block_index * block_size;
-        for (word_index = 0UL; word_index < (block_size / 4UL); word_index++)
+        if (!sdio_cmd53_transfer_block(write, p_sdbufr, p_data, block_size, block_index))
         {
-            if (write)
-            {
-                word = ((uint32_t)p_data[byte_index]) |
-                       ((uint32_t)p_data[byte_index + 1UL] << 8) |
-                       ((uint32_t)p_data[byte_index + 2UL] << 16) |
-                       ((uint32_t)p_data[byte_index + 3UL] << 24);
-                p_sdbufr[0] = word;
-            }
-            else
-            {
-                (void)R_SDHI_InReg(SDHI_CH0, SDHI_SDBUFR, &word);
-                if ((0UL == block_index) && (0UL == word_index))
-                {
-                    g_cmd53_diag_data0 = word;
-                }
-                p_data[byte_index]       = (uint8_t)word;
-                p_data[byte_index + 1UL] = (uint8_t)(word >> 8);
-                p_data[byte_index + 2UL] = (uint8_t)(word >> 16);
-                p_data[byte_index + 3UL] = (uint8_t)(word >> 24);
-            }
-            byte_index += 4UL;
+            ok = false;
+            sdhi_cmd53_capture_diag(sdsts1, sdsts2, *p_r5);
+            break;
         }
     }
 

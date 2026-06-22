@@ -36,8 +36,10 @@
     <Segment id="Component">
         <Setting id="r_bsp" value="FIT"/>
         <Setting id="r_s12ad_rx" value="FIT"/>
+        <Setting id="r_dmaca_rx" value="FIT"/>
         <Setting id="r_sdhi_rx" value="FIT"/>
         <Setting id="r_sdio_rx" value="FIT"/>
+        <Setting id="r_dtc_rx" value="FIT"/>
         <Setting id="FreeRTOS_Object" value=""/>
         <Setting id="r_tsip_rx" value="FIT"/>
         <Setting id="r_byteq" value="FIT"/>
@@ -121,6 +123,11 @@
         <Segment component="r_s12ad_rx5.50" id="r_s12ad_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="ADC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
         </Segment>
+        <Segment component="r_dmaca_rx3.42" id="r_dmaca_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="DMACA_CFG_USE_DTC_FIT_MODULE" value="0"/>
+            <Setting id="DMACA_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+            <Setting id="DMACA_CFG_EN_NESTED_INT" value="0"/>
+        </Segment>
         <Segment component="r_sdhi_rx2.20" id="r_sdhi_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="SDHI_CFG_CH0_CD_ACTIVE" value="1"/>
             <Setting id="SDHI_CFG_CH1_INT_LEVEL" value="10"/>
@@ -147,6 +154,14 @@
             <Setting id="SDIO_CFG_CMD53_MAX_BYTE_COUNT" value="512"/>
             <Setting id="SDIO_CFG_BACKPLANE_WINDOW_CACHE_ENABLE" value="1"/>
             <Setting id="SDIO_CFG_IO_READY_POLL_COUNT" value="1000"/>
+        </Segment>
+        <Segment component="r_dtc_rx4.60" id="r_dtc_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="DTC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+            <Setting id="DTC_CFG_DISABLE_ALL_ACT_SOURCE" value="DTC_ENABLE"/>
+            <Setting id="DTC_CFG_USE_DMAC_FIT_MODULE" value="DTC_ENABLE"/>
+            <Setting id="DTC_CFG_TRANSFER_DATA_READ_SKIP_EN" value="DTC_ENABLE"/>
+            <Setting id="DTC_CFG_USE_SEQUENCE_TRANSFER" value="DTC_DISABLE"/>
+            <Setting id="DTC_CFG_SHORT_ADDRESS_MODE" value="DTC_DISABLE"/>
         </Segment>
         <Segment component="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.objectfreertos11.1.0-rx-1.0.0" id="FreeRTOS_Object" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         <Segment component="r_tsip_rx1.23" id="r_tsip_rx" source="com.renesas.smc.tools.swcomponent.fit.source">

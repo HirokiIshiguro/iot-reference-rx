@@ -51,6 +51,24 @@ argument and Function 2 FIFO handling needed for WHD scan/JOIN.
 | `WHD_SDIO_DIAG_FAIL_LIMIT` | `16` | Maximum CMD52/CMD53 failure diagnostics printed per command class. |
 | `WHD_SDIO_PRE_CMD53_CLOCKS` | `1` | Force the CYW43439 backplane clocks and KSO once before the first F1 CMD53, matching the proven primitive backplane-read sequence without modifying WHD core code. |
 
+## SDIO CMD53 transfer engine
+
+The project registers both `r_dtc_rx` and `r_dmaca_rx` FIT modules so the SDIO
+data path can be tuned without changing the Smart Configurator component set
+again. The current tracked build keeps the proven CPU-copy path as the default
+baseline, and `sdio_host.c` exposes a compile-time selector for experiments:
+
+| Macro | Value | State |
+|---|---:|---|
+| `SDIO_HOST_CMD53_BLOCK_TRANSFER_CPU` | `0` | Default. Copies each CMD53 block through the CPU. |
+| `SDIO_HOST_CMD53_BLOCK_TRANSFER_DMACA` | `1` | Experimental software-triggered DMACA copy between `SDBUFR` and the WHD buffer. |
+| `SDIO_HOST_CMD53_BLOCK_TRANSFER_DTC` | `2` | Reserved. DTC should be connected after the SDHI interrupt-driven BRE/BWE data phase owns the transfer timing. |
+
+Select DMACA by adding
+`-define=SDIO_HOST_CMD53_BLOCK_TRANSFER=SDIO_HOST_CMD53_BLOCK_TRANSFER_DMACA`
+to the CC-RX compiler options for a measurement build. Keep the CPU baseline
+available when comparing throughput or isolating bring-up regressions.
+
 For a real AP JOIN run, do not edit this tracked header with real credentials.
 Use the headless build helper from the repository root instead:
 
