@@ -61,25 +61,36 @@ separated into reviewable milestones.
 
 ## TCP Throughput Tuning Notes
 
-The current throughput tuning baseline uses the interrupt-driven WHD path,
-SDHI high-speed clock, and the SDIO CMD53 DTC transfer engine. The headless
-build helper can also generate an ignored TCP smoke-test header so these
-parameters are reproducible without committing local network settings.
+The current throughput tuning baseline uses the interrupt-driven WHD path, the
+Smart Configurator high-speed SDHI run clock (`SDHI_CFG_DIV_HIGH_SPEED`, which
+maps to `SDHI_DIV_2` in this project), and the SDIO CMD53 DTC transfer engine.
+With the current RX671 clock tree, SDHI is derived from PCLKB=60 MHz, so this
+means SDCLK=30 MHz. `SDHI_DIV_1` would drive SDCLK at 60 MHz and is kept out of
+the tracked baseline because SDIO High-Speed / Type 1YN and the RX671 SDHI AC
+timing all cap this path at 50 MHz. Reaching the top of the spec should be a
+separate clock-profile experiment, for example PCLKB near 48-50 MHz with the
+PCLKB/1 divider.
+
+The headless build helper can also generate an ignored TCP smoke-test header so
+these parameters are reproducible without committing local network settings.
 
 Representative hardware settings used during the first tuning pass:
 
 - `-SoftIrqPollMs 0`
-- `-SdioUseHighSpeedClock`
+- `-SdioRunClockDiv SDHI_DIV_2` (or omit this option and use the tracked default)
 - `-SdioCmd53XferEngine 1`
+- `-SdioCmd53DtcMinBytes 64` (tracked default)
 - `-FreeRtosHeapSizeKb 256`
 - `-TcpWinSegCount 240`
 - `-NetworkBufferDescriptors 64`
+- `-WhdPortBufferCount 16` (default; increase for buffer-pressure A/B tests)
 - `-TcpThroughputTxBufferBytes 65536`
 - `-TcpThroughputRxBufferBytes 65536`
 - `-TcpThroughputTxWindowMss 44`
 - `-TcpThroughputRxWindowMss 44`
 
-Representative 10 MiB plain TCP results with DTC-backed CMD53 transfers:
+Representative 10 MiB plain TCP results with DTC-backed CMD53 transfers before
+the SDHI clock increase:
 
 | Application chunk setting | RX671 to PC | PC to RX671 | Notes |
 |---|---:|---:|---|
@@ -92,6 +103,70 @@ benefits from larger `FreeRTOS_send()` requests, while the PC-to-RX671 receive
 path stayed more stable with a smaller `FreeRTOS_recv()` request size. Static
 buffers above the current split-chunk baseline need a separate RAM placement or
 allocation strategy before they can be treated as a stable tuning point.
+
+Follow-up measurements on 2026-06-23 rechecked the lower SDIO layers after the
+WHD buffer allocator change. With the direct EK-RX671 to Type 1YN SDIO wiring
+used for this run, `SDHI_DIV_2` completed AP JOIN, DHCP, and the TCP smoke test
+with no DTC failures. Earlier DIV4 failures were tied to an experimental
+PORTD high-speed-drive run and are not treated as the baseline result.
+
+SDHI divider mapping for the current clock profile:
+
+| Setting | SDCLK with PCLKB=60 MHz | Use |
+|---|---:|---|
+| `SDHI_DIV_8` | 7.5 MHz | Low-speed fallback and signal-integrity reference |
+| `SDHI_DIV_4` | 15 MHz | Intermediate A/B point |
+| `SDHI_DIV_2` | 30 MHz | Current tracked default and verified throughput baseline |
+| `SDHI_DIV_1` / PCLKB | 60 MHz | Out of SDIO/Type 1YN/RX671 50 MHz limit; overclock experiment only |
+
+Representative 10 MiB plain TCP results:
+
+| SDIO setting | RX671 to PC | PC to RX671 | Status |
+|---|---:|---:|---|
+| CPU copy, `SDHI_DIV_8` | 14.48 Mbps | 15.03 Mbps | Stable reference |
+| DTC, `SDHI_DIV_8`, 512-byte threshold | 14.40 Mbps | 14.11 Mbps | Stable, but many small-transfer fallbacks |
+| DTC, `SDHI_DIV_8`, 64-byte threshold | 14.47 Mbps | 15.43 Mbps | Stable low-speed fallback; small-transfer fallback removed |
+| DTC, `SDHI_DIV_2`, 64-byte threshold | 38.2-38.5 Mbps | 30.2-32.0 Mbps | Current tracked default; `clkdiv=0`, DTC failures 0 |
+| DMACA, `SDHI_DIV_8`, 64-byte threshold | n/a | n/a | Experimental; stalled before WLAN firmware/MAC log |
+| CPU copy, `SDHI_DIV_4`, PORTD high-speed drive | n/a | n/a | Failed in `whd_wifi_on()`; `clkdiv=1`, `dscr2=FC`, `f2retry=2` |
+| DTC, `SDHI_DIV_4`, PORTD high-speed drive | n/a | n/a | Failed in `whd_wifi_on()`; `clkdiv=1`, `xfer=1`, `dscr2=FC`, `f2retry=6` |
+
+The 64-byte DTC threshold is now the default because Type 1YN/WHD programs a
+64-byte Function 2 block size and this setting moved nearly all Function 2
+block transfers out of the CPU fallback path without introducing DTC errors.
+`SDHI_DIV_4`, `-SdioUseHighSpeedClock`, and `-SdioHighSpeedDrive` remain useful
+signal-margin experiments. `SDHI_DIV_1` should not be used as a normal tuning
+target with PCLKB=60 MHz; it exceeds the 50 MHz SDIO/Type 1YN/RX671 limit.
+If more SDIO clock margin is needed after `SDHI_DIV_2`, introduce a separate
+clock profile that keeps SDCLK at or below the specification limit.
+
+Clock-limit references checked for this decision:
+
+- SDIO Simplified Specification Version 3.00: SDIO High-Speed mode is up to
+  50 MHz at 3.3 V signaling.
+- Murata Type 1YN data sheet: SDIO High Speed Mode `fPP` is specified up to
+  50 MHz.
+- RX671 hardware manual `r01uh0899jj0120-rx671.pdf`: SDHI clock is generated
+  from PCLKB, `SDCLKCR=0xFF` selects PCLKB directly, and SDHI_CLK output cycle
+  time `tPP(SD)` is 20 ns minimum.
+
+The WHD port buffer pool now uses an O(1) free-stack allocator instead of a
+linear slot search. Keep these J-Link/Tracealyzer symbols in the measurement
+notes when changing TCP window, network-buffer, and SDIO transfer settings:
+
+- `g_whd_port_buffer_max_in_use`
+- `g_whd_port_buffer_current_in_use`
+- `g_whd_port_buffer_alloc_temp_fail_count`
+- `g_whd_port_buffer_alloc_perm_fail_count`
+- `g_whd_port_buffer_wait_loop_count`
+
+The TCP throughput smoke task also emits these values on COM5 as
+`[TCPTHR] whdbuf ...` lines before and after each direction test.
+
+If the temporary failure or wait counters increase during a throughput run,
+repeat the build with a larger `-WhdPortBufferCount` before changing the
+FreeRTOS+TCP window again. The WHD source remains unmodified; these knobs only
+change the RX671 project-local WHD port layer.
 
 ## Build
 
@@ -165,8 +240,10 @@ pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -FreeRtosHeapSizeKb 256 `
   -TcpWinSegCount 240 `
   -NetworkBufferDescriptors 64 `
-  -SdioUseHighSpeedClock `
+  -WhdPortBufferCount 16 `
+  -SdioRunClockDiv SDHI_DIV_2 `
   -SdioCmd53XferEngine 1 `
+  -SdioCmd53DtcMinBytes 64 `
   -TcpThroughputEnable `
   -TcpThroughputHost 192.168.10.105 `
   -TcpThroughputPort 5004 `

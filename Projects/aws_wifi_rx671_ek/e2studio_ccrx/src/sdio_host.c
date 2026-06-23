@@ -29,11 +29,15 @@
 #define SDIO_HOST_CMD53_XFER_DMACA (2U)
 
 #ifndef SDIO_HOST_CFG_RUN_CLOCK_DIV
-#define SDIO_HOST_CFG_RUN_CLOCK_DIV    (SDHI_DIV_8)
+#define SDIO_HOST_CFG_RUN_CLOCK_DIV    (SDHI_CFG_DIV_HIGH_SPEED)
 #endif
 
 #ifndef SDIO_HOST_CMD53_XFER_ENGINE
 #define SDIO_HOST_CMD53_XFER_ENGINE SDIO_HOST_CMD53_XFER_DTC
+#endif
+
+#ifndef SDIO_HOST_CFG_HIGH_SPEED_DRIVE
+#define SDIO_HOST_CFG_HIGH_SPEED_DRIVE (0U)
 #endif
 
 #if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
@@ -67,7 +71,7 @@
 #endif
 
 #ifndef SDIO_HOST_CMD53_DTC_MIN_BYTES
-#define SDIO_HOST_CMD53_DTC_MIN_BYTES (512U)
+#define SDIO_HOST_CMD53_DTC_MIN_BYTES (64U)
 #endif
 
 #ifndef SDIO_HOST_CMD53_DMACA_CH
@@ -105,6 +109,8 @@
 volatile uint32_t g_sdio_host_run_clock_div;
 volatile uint32_t g_sdio_host_run_clock_status;
 volatile uint32_t g_sdio_host_cmd53_xfer_engine = SDIO_HOST_CMD53_XFER_ENGINE;
+volatile uint32_t g_sdio_host_portd_dscr;
+volatile uint32_t g_sdio_host_portd_dscr2;
 
 /* SDHI command-word fields not exported by r_sdhi_rx_if.h (local in the perf
  * project too). */
@@ -141,6 +147,9 @@ volatile uint32_t g_sdio_host_cmd53_xfer_engine = SDIO_HOST_CMD53_XFER_ENGINE;
 #define SDIO_BUS_CD_DISABLE     (0x80U)           /* disable DAT3 CD pull-up   */
 #define SDIO_HIGH_SPEED_SHS     (0x01U)           /* supports high speed       */
 #define SDIO_HIGH_SPEED_EHS     (0x02U)           /* enable high speed         */
+
+#define SDIO_HOST_PORTD_SDIO_MASK     (0xFCU)     /* PD2..PD7: DAT2/3/CMD/CLK/D0/1 */
+#define SDIO_HOST_PORTD_NON_SDIO_MASK (0x03U)
 
 /* Broadcom force-HT and WAKEUPCTRL bits (the header carries only the ALP /
  * FORCE_ALP set). perf FORCEs the clocks (not just requests ALP) before the
@@ -184,6 +193,18 @@ volatile uint32_t g_sdio_host_cmd53_xfer_engine = SDIO_HOST_CMD53_XFER_ENGINE;
 
 static bool sdhi_can_read_crc_error_block(uint32_t sdsts2);
 static bool sdhi_can_accept_read_done_error(uint32_t sdsts1, uint32_t sdsts2);
+
+static void sdio_host_apply_pin_drive(void)
+{
+    PORTD.DSCR.BYTE = (uint8_t)(PORTD.DSCR.BYTE | SDIO_HOST_PORTD_SDIO_MASK);
+#if (SDIO_HOST_CFG_HIGH_SPEED_DRIVE != 0)
+    PORTD.DSCR2.BYTE = (uint8_t)(PORTD.DSCR2.BYTE | SDIO_HOST_PORTD_SDIO_MASK);
+#else
+    PORTD.DSCR2.BYTE = (uint8_t)(PORTD.DSCR2.BYTE & SDIO_HOST_PORTD_NON_SDIO_MASK);
+#endif
+    g_sdio_host_portd_dscr = (uint32_t)PORTD.DSCR.BYTE;
+    g_sdio_host_portd_dscr2 = (uint32_t)PORTD.DSCR2.BYTE;
+}
 
 static void sd_slot_release_sdio_pins(void)
 {
@@ -333,6 +354,7 @@ bool sdio_host_init(void)
     sd_slot_power_on();
 
     R_SDHI_PinSetInit();
+    sdio_host_apply_pin_drive();
 
     if (SDHI_SUCCESS != R_SDHI_Open(SDHI_CH0))
     {
@@ -341,6 +363,7 @@ bool sdio_host_init(void)
 
     (void)R_SDHI_SetBus(SDHI_CH0, SDHI_PORT_1BIT);
     R_SDHI_PinSetTransfer();
+    sdio_host_apply_pin_drive();
 
     /* ~400 kHz identification clock. */
     if (SDHI_SUCCESS != R_SDHI_SetClock(SDHI_CH0, SDHI_DIV_256, SDHI_CLOCK_ENABLE))
@@ -1905,15 +1928,15 @@ bool sdio_host_set_bus_4bit(void)
         return false;
     }
     R_SDHI_PinSetTransfer();
+    sdio_host_apply_pin_drive();
     return true;
 }
 
 /*
  * Raise the SDHI clock from the ~400 kHz identification divider used for
- * enumerate. SDIO_HOST_CFG_RUN_CLOCK_DIV selects the stable run divider.
- * Defining SDIO_HOST_USE_HIGH_SPEED_CLOCK enables the 30 MHz DIV_2 path after
- * CCCR EHS is observed; on this bench that path is kept explicit because it can
- * break early CMD53 transfers.
+ * enumerate. The default follows the Smart Configurator high-speed divider
+ * (SDHI_CFG_DIV_HIGH_SPEED); SDIO_HOST_CFG_RUN_CLOCK_DIV is only for explicit
+ * performance sweeps or fallback comparison.
  */
 bool sdio_host_set_run_clock(void)
 {

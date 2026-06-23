@@ -40,6 +40,13 @@ extern volatile uint32_t g_whd_network_tx_no_buffer;
 extern volatile uint32_t g_whd_network_tx_drop_not_ready;
 extern volatile uint32_t g_whd_network_tx_drop_no_data;
 extern volatile uint32_t g_whd_network_tx_tcp;
+extern volatile uint32_t g_whd_port_buffer_current_in_use;
+extern volatile uint32_t g_whd_port_buffer_max_in_use;
+extern volatile uint32_t g_whd_port_buffer_alloc_temp_fail_count;
+extern volatile uint32_t g_whd_port_buffer_alloc_perm_fail_count;
+extern volatile uint32_t g_whd_port_buffer_wait_loop_count;
+extern volatile uint32_t g_whd_port_buffer_last_request_size;
+extern volatile uint32_t g_whd_port_buffer_last_request_direction;
 
 #if TCP_THROUGHPUT_ENABLE
 
@@ -186,10 +193,37 @@ static void log_network_diag(const char * label)
     debug_puts(line);
 }
 
+static void log_whd_buffer_diag(const char * label)
+{
+    char line[240];
+    char * p = line;
+
+    p = append_text(p, "[TCPTHR] whdbuf ");
+    p = append_text(p, label);
+    p = append_text(p, " cur=");
+    p = append_dec32(p, g_whd_port_buffer_current_in_use);
+    p = append_text(p, " max=");
+    p = append_dec32(p, g_whd_port_buffer_max_in_use);
+    p = append_text(p, " tempfail=");
+    p = append_dec32(p, g_whd_port_buffer_alloc_temp_fail_count);
+    p = append_text(p, " permfail=");
+    p = append_dec32(p, g_whd_port_buffer_alloc_perm_fail_count);
+    p = append_text(p, " waitloop=");
+    p = append_dec32(p, g_whd_port_buffer_wait_loop_count);
+    p = append_text(p, " lastsz=");
+    p = append_dec32(p, g_whd_port_buffer_last_request_size);
+    p = append_text(p, " lastdir=");
+    p = append_dec32(p, g_whd_port_buffer_last_request_direction);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
 static void log_perf_diag(const char * label)
 {
     log_resource_diag(label);
     log_network_diag(label);
+    log_whd_buffer_diag(label);
 }
 
 static void log_result(const char * label, uint32_t bytes, uint32_t elapsed_ms)

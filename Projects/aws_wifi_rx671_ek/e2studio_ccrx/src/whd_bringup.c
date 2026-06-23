@@ -56,6 +56,11 @@ extern volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
+extern volatile uint32_t g_sdio_host_run_clock_div;
+extern volatile uint32_t g_sdio_host_run_clock_status;
+extern volatile uint32_t g_sdio_host_cmd53_xfer_engine;
+extern volatile uint32_t g_sdio_host_portd_dscr;
+extern volatile uint32_t g_sdio_host_portd_dscr2;
 
 static void whd_record_stage(uint32_t stage, uint32_t result)
 {
@@ -121,10 +126,20 @@ static void whd_log_powersave_mode(const char * label, uint32_t result, uint32_t
 
 static void whd_log_sdio_diag(const char * label)
 {
-    char line[192];
+    char line[240];
     char * p = line;
 
     p = append_text(p, label);
+    p = append_text(p, " clkdiv=");
+    p = append_hex32(p, g_sdio_host_run_clock_div);
+    p = append_text(p, " clkst=");
+    p = append_hex32(p, g_sdio_host_run_clock_status);
+    p = append_text(p, " xfer=");
+    p = append_dec32(p, g_sdio_host_cmd53_xfer_engine);
+    p = append_text(p, " dscr=");
+    p = append_hex32(p, g_sdio_host_portd_dscr);
+    p = append_text(p, " dscr2=");
+    p = append_hex32(p, g_sdio_host_portd_dscr2);
     p = append_text(p, " irq_en=");
     p = append_dec32(p, g_whd_sdio_sdhi_irq_enable_count);
     p = append_text(p, " defer=");

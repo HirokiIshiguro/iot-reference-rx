@@ -60,7 +60,7 @@ pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
   -SoftIrqPollMs 1 `
   -WlanAllowBusSleepDelayMs 600000 `
-  -SdioRunClockDiv SDHI_DIV_8 `
+  -SdioRunClockDiv SDHI_DIV_2 `
   -SdioCmd53XferEngine SDIO_HOST_CMD53_XFER_DTC
 ```
 
@@ -86,26 +86,28 @@ restored after the headless build.
 
 ## Performance tuning knobs
 
-The tracked SDIO host raises the post-enumeration SDHI clock to `SDHI_DIV_8`.
-With the current 120 MHz PCLKA setting this is the stable Wi-Fi bring-up
-baseline. The headless build helper can temporarily override the divider without
-editing the project:
+The tracked SDIO host raises the post-enumeration SDHI clock to the Smart
+Configurator high-speed divider (`SDHI_CFG_DIV_HIGH_SPEED`). In the current
+RX671 clock profile the SDHI peripheral is derived from PCLKB=60 MHz, so the
+tracked high-speed divider is `SDHI_DIV_2` and the measured SDCLK is 30 MHz.
+This is the fastest verified in-spec baseline in this project. `SDHI_DIV_1`
+would select PCLKB directly and drive SDCLK at 60 MHz; keep that for explicit
+overclock experiments only because SDIO High-Speed / Type 1YN and RX671 SDHI
+timing limit this interface to 50 MHz. The headless build helper can
+temporarily override the divider without editing the project:
 
 ```powershell
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
   -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
-  -SdioRunClockDiv SDHI_DIV_4
+  -SdioRunClockDiv SDHI_DIV_8
 ```
 
-`SDHI_DIV_4` and `SDHI_DIV_2` are useful for signal-margin experiments after
-removing the SDIO sniffer board, but they should be treated as measurement
-settings until the Type 1YN bus margin is confirmed with J-Link/Tracealyzer and
-packet captures. A DIV_4 smoke run reached `whd_wifi_on()` but timed out after
-one CMD53 Function 2 read failed to assert the receive-buffer-ready condition;
-the DIV_8 run completed WHD bring-up (`g_whd_bringup_stage = 90`) and obtained
-an IPv4 address. The current source exposes `g_sdio_host_run_clock_div` and
-`g_sdio_host_run_clock_status` as J-Link-visible diagnostics.
+`SDHI_DIV_8` is useful as a low-speed fallback and signal-integrity reference.
+`SDHI_DIV_4`, `-SdioUseHighSpeedClock`, and `-SdioHighSpeedDrive` remain
+measurement settings for A/B tests. The current source exposes
+`g_sdio_host_run_clock_div` and `g_sdio_host_run_clock_status` as J-Link-visible
+diagnostics; a healthy DIV2 throughput run logs `clkdiv=00000000`.
 
 FreeRTOS+TCP sliding windows are enabled for Wi-Fi throughput work. The current
 defaults use 16 MSS for both RX and TX stream buffers, 128 TCP window segment
@@ -135,6 +137,12 @@ available for targeted experiments:
 `-SdioCmd53DmacaBlockMode`. The helper waits for e2 studio child build
 processes before restoring `.cproject`, so these temporary defines remain in
 effect until `make` / `ccrx` / `rlink` finish.
+
+The tracked DTC threshold is 64 bytes. This matches the WHD-programmed Function
+2 block size for Type 1YN and avoids falling back to CPU copies for ordinary
+64-byte SDIO block transfers. A 10 MiB TCP smoke run with
+`SDIO_HOST_CMD53_DTC_MIN_BYTES=64` completed with zero DTC failures and only the
+non-Function/bring-up fallback counters remaining.
 
 ## WHD linked resource layout
 

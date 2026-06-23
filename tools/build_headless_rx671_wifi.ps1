@@ -17,6 +17,9 @@ param(
     [int]$FreeRtosHeapSizeKb = -1,
     [int]$TcpWinSegCount = -1,
     [int]$NetworkBufferDescriptors = -1,
+    [int]$WhdPortBufferCount = -1,
+    [int]$WhdPortBufferPayloadBytes = -1,
+    [int]$WhdPortBufferHeadroomBytes = -1,
     [string]$SdioRunClockDiv = "",
     [string]$SdioCmd53XferEngine = "",
     [string]$SdioCmd53DtcReadEnable = "",
@@ -27,6 +30,7 @@ param(
     [string]$SdioCmd53DmacaMinBytes = "",
     [string]$SdioCmd53DmacaBlockMode = "",
     [switch]$SdioUseHighSpeedClock,
+    [switch]$SdioHighSpeedDrive,
     [switch]$TcpThroughputEnable,
     [string]$TcpThroughputHost = "",
     [int]$TcpThroughputPort = -1,
@@ -706,6 +710,12 @@ if ($WlanAllowBusSleepDelayMs -ge 0) {
 if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
     Write-Host "SDIO run clock divider override: $SdioRunClockDiv"
 }
+if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
+    Write-Host "SDIO high-speed CCCR/EHS clock path: enabled"
+}
+if ($SdioHighSpeedDrive.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_HIGH_SPEED_DRIVE)) {
+    Write-Host "SDIO PORTD high-speed interface drive: enabled"
+}
 $effectiveSdioCmd53XferEngine = Get-FirstNonEmpty @($SdioCmd53XferEngine, $env:RX671_EK_SDIO_CMD53_XFER_ENGINE)
 if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
     Write-Host "SDIO CMD53 transfer engine override: $effectiveSdioCmd53XferEngine"
@@ -782,6 +792,15 @@ try {
     if ($NetworkBufferDescriptors -gt 0) {
         $cprojectDefines += "RX671_NETWORK_BUFFER_DESCRIPTORS=$NetworkBufferDescriptors"
     }
+    if ($WhdPortBufferCount -gt 0) {
+        $cprojectDefines += "WHD_PORT_BUFFER_COUNT=$WhdPortBufferCount"
+    }
+    if ($WhdPortBufferPayloadBytes -gt 0) {
+        $cprojectDefines += "WHD_PORT_BUFFER_PAYLOAD=$WhdPortBufferPayloadBytes"
+    }
+    if ($WhdPortBufferHeadroomBytes -gt 0) {
+        $cprojectDefines += "WHD_PORT_BUFFER_HEADROOM=$WhdPortBufferHeadroomBytes"
+    }
     if ($FreeRtosHeapSizeKb -gt 0) {
         $cprojectDefines += "RX671_FREERTOS_HEAP_SIZE_KB=$FreeRtosHeapSizeKb"
     }
@@ -792,6 +811,10 @@ try {
 
     if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
         $cprojectDefines += "SDIO_HOST_USE_HIGH_SPEED_CLOCK"
+    }
+
+    if ($SdioHighSpeedDrive.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_HIGH_SPEED_DRIVE)) {
+        $cprojectDefines += "SDIO_HOST_CFG_HIGH_SPEED_DRIVE=1"
     }
 
     if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
