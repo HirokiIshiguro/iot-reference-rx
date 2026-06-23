@@ -194,6 +194,19 @@ workflow:
         RX72N_TEST_SCOPE: "full"
       when: always
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - Projects/aws_wifi_rx671_ek/**/*
+        - tools/build_headless_rx671_wifi.ps1
+        - tools/load_rx671_wifi_jlink.ps1
+      variables:
+        PIPELINE_PROFILE: "mr-rx671"
+        # RX671 Wi-Fi work is validated on its own bench for now. Keep legacy
+        # RX65N/RX72N lanes at build coverage so unrelated hardware/DNS state
+        # does not block RX671-only SDIO/WHD changes.
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX72N_TEST_SCOPE: "build"
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       variables:
         PIPELINE_PROFILE: "mr"
         # MR standard keeps daily feedback short while covering both transports.
