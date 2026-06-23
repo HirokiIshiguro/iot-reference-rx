@@ -319,7 +319,10 @@
 
 /* Set the total heap size in kilobytes. This value must be greater than 0 and
  * less than or equal to the device RAM capacity. */
-#define configTOTAL_HEAP_SIZE_N                      224
+#ifndef RX671_FREERTOS_HEAP_SIZE_KB
+#define RX671_FREERTOS_HEAP_SIZE_KB                  224
+#endif
+#define configTOTAL_HEAP_SIZE_N                      RX671_FREERTOS_HEAP_SIZE_KB
 
 /* Set the total size of the FreeRTOS heap, in bytes, when heap_1.c, heap_2.c
  * or heap_4.c are included in the build.  This value is defaulted to 4096 bytes but

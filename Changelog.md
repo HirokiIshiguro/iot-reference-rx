@@ -25,7 +25,33 @@
   Wi-Fi and AWS IoT credentials in ignored local headers, verifies SCI6 logging
   on COM5 at 921600 bps, joins an AP through WHD over SDIO, starts
   FreeRTOS+TCP, and completes an AWS IoT MQTT smoke connection with
-  `AWS MQTT=0`.
+  `AWS MQTT=0`. Throughput tuning has started by making the SDHI CMD53 run
+  clock configurable from the headless build, enabling FreeRTOS+TCP sliding
+  windows for the Wi-Fi path, and adding DTC/DMAC FIT modules for the SDIO
+  CMD53 data path. The DTC CMD53 path is the current stable default and has
+  completed WHD bring-up, DHCP, TLS, and MQTT smoke on EK-RX671 + Type 1YN;
+  DMACA remains an experimental selector for the next tuning pass. The TCP
+  throughput smoke test can now generate local, ignored test configuration from
+  the headless build helper, including FreeRTOS+TCP window sizing,
+  network-buffer descriptor count, and separate TX/RX application chunk sizes.
+  The current stable split-chunk baseline is TX 14600 bytes / RX 5840 bytes
+  with 64 KiB socket buffers and 44-MSS windows. The WHD port buffer pool now
+  uses an O(1) free stack and exposes J-Link-readable counters for peak in-use
+  slots, temporary allocation failures, permanent allocation failures, and wait
+  loops, so buffer pressure can be separated from SDIO clock, DTC/DMAC, and
+  FreeRTOS+TCP window effects during the next tuning pass. A follow-up SDIO
+  transfer sweep makes the DTC CMD53 threshold 64 bytes to match the Type 1YN
+  Function 2 block size and promotes the Smart Configurator high-speed divider
+  (`SDHI_CFG_DIV_HIGH_SPEED`, `SDHI_DIV_2` with the current 60 MHz PCLKB) as the
+  tracked run clock. This raises the 10 MiB TCP smoke result from the DIV_8
+  14-15 Mbps reference to about 38 Mbps RX671-to-PC and 30-32 Mbps PC-to-RX671
+  with zero DTC failures. `SDHI_DIV_1` is documented as a 60 MHz overclock under
+  the current clock tree and is not a normal baseline because SDIO High-Speed,
+  Type 1YN, and RX671 SDHI timing all limit this interface to 50 MHz.
+  RX671-focused merge requests now keep the existing RX65N/RX72N
+  CI lanes at build coverage so unrelated legacy-board hardware or DNS state
+  does not block RX671 SDIO/WHD tuning work before the dedicated RX671 CI lane
+  is promoted.
 
 - Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
   性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。

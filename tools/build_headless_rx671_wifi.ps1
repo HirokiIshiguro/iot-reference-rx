@@ -9,9 +9,42 @@ param(
     [string]$AwsIotThingName = "",
     [switch]$UseLocalJoinConfig,
     [switch]$UseAwsIotLocalConfig,
+    [switch]$SkipAwsIotConfig,
     [switch]$UseTsipEntropy,
     [int]$SoftIrqPollMs = -1,
-    [int]$WlanAllowBusSleepDelayMs = 600000
+    [int]$WlanAllowBusSleepDelayMs = 600000,
+    [switch]$WlanDisablePowersave,
+    [int]$FreeRtosHeapSizeKb = -1,
+    [int]$TcpWinSegCount = -1,
+    [int]$NetworkBufferDescriptors = -1,
+    [int]$WhdPortBufferCount = -1,
+    [int]$WhdPortBufferPayloadBytes = -1,
+    [int]$WhdPortBufferHeadroomBytes = -1,
+    [string]$SdioRunClockDiv = "",
+    [string]$SdioCmd53XferEngine = "",
+    [string]$SdioCmd53DtcReadEnable = "",
+    [string]$SdioCmd53DtcWriteEnable = "",
+    [string]$SdioCmd53DtcMinBytes = "",
+    [string]$SdioCmd53DmacaReadEnable = "",
+    [string]$SdioCmd53DmacaWriteEnable = "",
+    [string]$SdioCmd53DmacaMinBytes = "",
+    [string]$SdioCmd53DmacaBlockMode = "",
+    [switch]$SdioUseHighSpeedClock,
+    [switch]$SdioHighSpeedDrive,
+    [switch]$TcpThroughputEnable,
+    [string]$TcpThroughputHost = "",
+    [int]$TcpThroughputPort = -1,
+    [string]$TcpThroughputMode = "",
+    [int]$TcpThroughputBytes = -1,
+    [int]$TcpThroughputChunkBytes = -1,
+    [int]$TcpThroughputTxChunkBytes = -1,
+    [int]$TcpThroughputRxChunkBytes = -1,
+    [int]$TcpThroughputIterations = -1,
+    [int]$TcpThroughputTxBufferBytes = -1,
+    [int]$TcpThroughputRxBufferBytes = -1,
+    [int]$TcpThroughputTxWindowMss = -1,
+    [int]$TcpThroughputRxWindowMss = -1,
+    [int]$TcpThroughputProgressBytes = -1
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,13 +59,14 @@ $type1ynBlobStageScript = Join-Path $projectRoot "Projects\$projectName\external
 $cproject = Join-Path $projectDir ".cproject"
 $localJoinConfig = Join-Path $projectDir "src\whd_join_config_local.h"
 $localAwsIotConfig = Join-Path $projectDir "src\frtos_config\aws_iot_config_local.h"
+$localTcpThroughputConfig = Join-Path $projectDir "src\frtos_config\tcp_throughput_config_local.h"
 $defaultAwsIotConfigDir = "C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01"
 $useLocalJoinConfigForBuild = $UseLocalJoinConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($WifiConfigFile)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD))
-$useAwsIotLocalConfigForBuild = $UseAwsIotLocalConfig.IsPresent -or
+$useAwsIotLocalConfigForBuild = (-not $SkipAwsIotConfig.IsPresent) -and ($UseAwsIotLocalConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotConfigDir)) -or
     (Test-Path -LiteralPath $defaultAwsIotConfigDir) -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotEndpoint)) -or
@@ -42,7 +76,35 @@ $useAwsIotLocalConfigForBuild = $UseAwsIotLocalConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM_FILE)) -or
     (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_PEM)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_FILE))
+    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_FILE)))
+$useTcpThroughputLocalConfigForBuild = $TcpThroughputEnable.IsPresent -or
+    (-not [string]::IsNullOrWhiteSpace($TcpThroughputHost)) -or
+    ($TcpThroughputPort -ge 0) -or
+    (-not [string]::IsNullOrWhiteSpace($TcpThroughputMode)) -or
+    ($TcpThroughputBytes -ge 0) -or
+    ($TcpThroughputChunkBytes -ge 0) -or
+    ($TcpThroughputTxChunkBytes -ge 0) -or
+    ($TcpThroughputRxChunkBytes -ge 0) -or
+    ($TcpThroughputIterations -ge 0) -or
+    ($TcpThroughputTxBufferBytes -ge 0) -or
+    ($TcpThroughputRxBufferBytes -ge 0) -or
+    ($TcpThroughputTxWindowMss -ge 0) -or
+    ($TcpThroughputRxWindowMss -ge 0) -or
+    ($TcpThroughputProgressBytes -ge 0) -or
+    ("1" -eq $env:RX671_EK_TCP_THROUGHPUT_ENABLE) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_HOST)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_PORT)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_MODE)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_CHUNK_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_TX_CHUNK_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_CHUNK_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_ITERATIONS)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_TX_BUFFER_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_BUFFER_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_TX_WINDOW_MSS)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_WINDOW_MSS)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_PROGRESS_BYTES))
 
 if (-not (Test-Path -LiteralPath $E2Studio)) {
     throw "e2 studio executable not found: $E2Studio"
@@ -212,6 +274,123 @@ function Write-LocalJoinConfig {
     [System.IO.File]::WriteAllLines($Path, $lines, [System.Text.UTF8Encoding]::new($false))
 }
 
+function ConvertTo-IPv4Octets {
+    param([string]$Address)
+
+    $ip = [System.Net.IPAddress]::Parse($Address)
+    if ($ip.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
+        throw "TCP throughput host must be an IPv4 address: $Address"
+    }
+
+    return $ip.GetAddressBytes()
+}
+
+function ConvertTo-TcpThroughputModeDefine {
+    param([string]$Mode)
+
+    if ([string]::IsNullOrWhiteSpace($Mode)) {
+        return "TCP_THROUGHPUT_MODE_BOTH"
+    }
+
+    switch ($Mode.Trim().ToLowerInvariant()) {
+        "sink"   { return "TCP_THROUGHPUT_MODE_SINK" }
+        "tx"     { return "TCP_THROUGHPUT_MODE_SINK" }
+        "send"   { return "TCP_THROUGHPUT_MODE_SINK" }
+        "source" { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "rx"     { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "recv"   { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "both"   { return "TCP_THROUGHPUT_MODE_BOTH" }
+        "3"      { return "TCP_THROUGHPUT_MODE_BOTH" }
+        "2"      { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "1"      { return "TCP_THROUGHPUT_MODE_SINK" }
+        default  { throw "Unsupported TCP throughput mode '$Mode'. Use sink/source/both." }
+    }
+}
+
+function Get-ConfigInt {
+    param(
+        [int]$Value,
+        [string]$EnvValue,
+        [int]$DefaultValue
+    )
+
+    if ($Value -ge 0) {
+        return $Value
+    }
+    if (-not [string]::IsNullOrWhiteSpace($EnvValue)) {
+        return [int]$EnvValue
+    }
+
+    return $DefaultValue
+}
+
+function Write-LocalTcpThroughputConfig {
+    param(
+        [string]$Path,
+        [string]$TargetHost,
+        [int]$Port,
+        [string]$Mode,
+        [int]$Bytes,
+        [int]$ChunkBytes,
+        [int]$TxChunkBytes,
+        [int]$RxChunkBytes,
+        [int]$Iterations,
+        [int]$TxBufferBytes,
+        [int]$RxBufferBytes,
+        [int]$TxWindowMss,
+        [int]$RxWindowMss,
+        [int]$ProgressBytes
+    )
+
+    $effectiveHost = Get-FirstNonEmpty @($TargetHost, $env:RX671_EK_TCP_THROUGHPUT_HOST, "192.168.10.105")
+    $octets = ConvertTo-IPv4Octets -Address $effectiveHost
+    $effectivePort = Get-ConfigInt -Value $Port -EnvValue $env:RX671_EK_TCP_THROUGHPUT_PORT -DefaultValue 5001
+    $effectiveMode = ConvertTo-TcpThroughputModeDefine (Get-FirstNonEmpty @($Mode, $env:RX671_EK_TCP_THROUGHPUT_MODE, "both"))
+    $effectiveBytes = Get-ConfigInt -Value $Bytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_BYTES -DefaultValue 10485760
+    $effectiveChunkBytes = Get-ConfigInt -Value $ChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_CHUNK_BYTES -DefaultValue 1460
+    $effectiveTxChunkBytes = Get-ConfigInt -Value $TxChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_CHUNK_BYTES -DefaultValue $effectiveChunkBytes
+    $effectiveRxChunkBytes = Get-ConfigInt -Value $RxChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_CHUNK_BYTES -DefaultValue $effectiveChunkBytes
+    $effectiveIterations = Get-ConfigInt -Value $Iterations -EnvValue $env:RX671_EK_TCP_THROUGHPUT_ITERATIONS -DefaultValue 1
+    $effectiveTxBufferBytes = Get-ConfigInt -Value $TxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_BUFFER_BYTES -DefaultValue 65536
+    $effectiveRxBufferBytes = Get-ConfigInt -Value $RxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_BUFFER_BYTES -DefaultValue 65536
+    $effectiveTxWindowMss = Get-ConfigInt -Value $TxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_WINDOW_MSS -DefaultValue 44
+    $effectiveRxWindowMss = Get-ConfigInt -Value $RxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_WINDOW_MSS -DefaultValue 44
+    $effectiveProgressBytes = Get-ConfigInt -Value $ProgressBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_PROGRESS_BYTES -DefaultValue 0
+
+    $lines = @(
+        "/*",
+        " * Generated by tools/build_headless_rx671_wifi.ps1.",
+        " * This file contains local TCP throughput test settings and is intentionally ignored by git.",
+        " */",
+        "#ifndef TCP_THROUGHPUT_CONFIG_LOCAL_H_",
+        "#define TCP_THROUGHPUT_CONFIG_LOCAL_H_",
+        "",
+        "#define TCP_THROUGHPUT_ENABLE           (1U)",
+        "#define TCP_THROUGHPUT_HOST_IP0         ($($octets[0])U)",
+        "#define TCP_THROUGHPUT_HOST_IP1         ($($octets[1])U)",
+        "#define TCP_THROUGHPUT_HOST_IP2         ($($octets[2])U)",
+        "#define TCP_THROUGHPUT_HOST_IP3         ($($octets[3])U)",
+        "#define TCP_THROUGHPUT_PORT             (${effectivePort}U)",
+        "#define TCP_THROUGHPUT_MODE             $effectiveMode",
+        "#define TCP_THROUGHPUT_TOTAL_BYTES      (${effectiveBytes}UL)",
+        "#define TCP_THROUGHPUT_CHUNK_BYTES      (${effectiveChunkBytes}U)",
+        "#define TCP_THROUGHPUT_TX_CHUNK_BYTES   (${effectiveTxChunkBytes}U)",
+        "#define TCP_THROUGHPUT_RX_CHUNK_BYTES   (${effectiveRxChunkBytes}U)",
+        "#define TCP_THROUGHPUT_ITERATIONS       (${effectiveIterations}U)",
+        "#define TCP_THROUGHPUT_TX_BUFFER_BYTES  (${effectiveTxBufferBytes}UL)",
+        "#define TCP_THROUGHPUT_RX_BUFFER_BYTES  (${effectiveRxBufferBytes}UL)",
+        "#define TCP_THROUGHPUT_TX_WINDOW_MSS    (${effectiveTxWindowMss}L)",
+        "#define TCP_THROUGHPUT_RX_WINDOW_MSS    (${effectiveRxWindowMss}L)",
+        "#define TCP_THROUGHPUT_PROGRESS_BYTES   (${effectiveProgressBytes}UL)",
+        "",
+        "#endif /* TCP_THROUGHPUT_CONFIG_LOCAL_H_ */",
+        ""
+    )
+
+    [System.IO.File]::WriteAllLines($Path, $lines, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "TCP throughput: host=$effectiveHost port=$effectivePort mode=$effectiveMode bytes=$effectiveBytes chunk=$effectiveChunkBytes txchunk=$effectiveTxChunkBytes rxchunk=$effectiveRxChunkBytes iterations=$effectiveIterations txbuf=$effectiveTxBufferBytes rxbuf=$effectiveRxBufferBytes txwin=$effectiveTxWindowMss rxwin=$effectiveRxWindowMss progress=$effectiveProgressBytes"
+}
+
 function Get-FirstNonEmpty {
     param([string[]]$Values)
 
@@ -376,6 +555,115 @@ function Add-CProjectDefine {
     return $Text.Replace($needle, $insert)
 }
 
+function Remove-DirectoryBestEffort {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    try {
+        Remove-Item -LiteralPath $Path -Recurse -Force
+    } catch {
+        Write-Warning "Could not remove $Label '$Path' before build: $($_.Exception.Message)"
+        Write-Warning "Continuing; e2 studio -cleanBuild will attempt to refresh build outputs."
+    }
+}
+
+function Wait-RxBuildProcesses {
+    param(
+        [Parameter(Mandatory = $true)]
+        [datetime]$Since,
+        [int]$TimeoutSeconds = 900
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $buildProcs = Get-Process -ErrorAction SilentlyContinue |
+            Where-Object {
+                (($_.ProcessName -eq "make") -or
+                 ($_.ProcessName -eq "ccrx") -or
+                 ($_.ProcessName -eq "rlink")) -and
+                ($null -ne $_.StartTime) -and
+                ($_.StartTime -ge $Since)
+            }
+
+        if (-not $buildProcs) {
+            return
+        }
+
+        $summary = ($buildProcs | Group-Object ProcessName | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ", "
+        Write-Host "Waiting for e2 studio child build processes: $summary"
+        Start-Sleep -Seconds 5
+    }
+
+    Write-Warning "Timed out waiting for e2 studio child build processes to exit."
+}
+
+function Invoke-E2StudioHeadlessBuild {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Executable,
+        [Parameter(Mandatory = $true)]
+        [string]$WorkspacePath,
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+        [Parameter(Mandatory = $true)]
+        [string]$BuildTarget,
+        [Parameter(Mandatory = $true)]
+        [string]$OutputLog
+    )
+
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $Executable
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+
+    foreach ($arg in @(
+        "-nosplash",
+        "-application",
+        "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+        "-data",
+        $WorkspacePath,
+        "-import",
+        $ProjectPath,
+        "-cleanBuild",
+        $BuildTarget
+    )) {
+        [void]$psi.ArgumentList.Add($arg)
+    }
+
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+    $stderrTask = $proc.StandardError.ReadToEndAsync()
+    $proc.WaitForExit()
+    $stdoutTask.Wait()
+    $stderrTask.Wait()
+
+    $outputChunks = @($stdoutTask.Result, $stderrTask.Result) | Where-Object { -not [string]::IsNullOrEmpty($_) }
+    $logText = [string]::Join([Environment]::NewLine, $outputChunks)
+    try {
+        [System.IO.File]::WriteAllText($OutputLog, $logText, [System.Text.UTF8Encoding]::new($false))
+    } catch {
+        Write-Warning "Could not write e2 studio build log '$OutputLog': $($_.Exception.Message)"
+        $fallbackLog = "$OutputLog.codex.log"
+        [System.IO.File]::WriteAllText($fallbackLog, $logText, [System.Text.UTF8Encoding]::new($false))
+        Write-Warning "Wrote captured e2 studio build log to '$fallbackLog' instead."
+    }
+    if (-not [string]::IsNullOrEmpty($logText)) {
+        Write-Host $logText
+    }
+
+    return $proc.ExitCode
+}
+
 $reverseCheckArgs = @("-C", $whdDir, "apply", "--reverse", "--check", $whdPatch)
 $forwardCheckArgs = @("-C", $whdDir, "apply", "--check", $whdPatch)
 
@@ -397,14 +685,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Type 1YN blob staging failed with exit code $LASTEXITCODE"
 }
 
-if (Test-Path -LiteralPath $Workspace) {
-    Remove-Item -LiteralPath $Workspace -Recurse -Force
-}
+Remove-DirectoryBestEffort -Path $Workspace -Label "workspace"
 
 $hardwareDebug = Join-Path $projectDir "HardwareDebug"
-if (Test-Path -LiteralPath $hardwareDebug) {
-    Remove-Item -LiteralPath $hardwareDebug -Recurse -Force
-}
+Remove-DirectoryBestEffort -Path $hardwareDebug -Label "HardwareDebug"
 
 $logFilePath = [System.IO.Path]::GetFullPath($LogFile)
 Write-Host "=== RX671 Wi-Fi import + build ==="
@@ -417,9 +701,32 @@ if ($useLocalJoinConfigForBuild) {
 if ($useAwsIotLocalConfigForBuild) {
     Write-Host "Local AWS IoT config: enabled"
 }
+if ($useTcpThroughputLocalConfigForBuild) {
+    Write-Host "Local TCP throughput config: enabled"
+}
 if ($WlanAllowBusSleepDelayMs -ge 0) {
     Write-Host "WHD WLAN bus sleep delay: ${WlanAllowBusSleepDelayMs} ms"
 }
+if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
+    Write-Host "SDIO run clock divider override: $SdioRunClockDiv"
+}
+if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
+    Write-Host "SDIO high-speed CCCR/EHS clock path: enabled"
+}
+if ($SdioHighSpeedDrive.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_HIGH_SPEED_DRIVE)) {
+    Write-Host "SDIO PORTD high-speed interface drive: enabled"
+}
+$effectiveSdioCmd53XferEngine = Get-FirstNonEmpty @($SdioCmd53XferEngine, $env:RX671_EK_SDIO_CMD53_XFER_ENGINE)
+if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
+    Write-Host "SDIO CMD53 transfer engine override: $effectiveSdioCmd53XferEngine"
+}
+$effectiveSdioCmd53DtcReadEnable = Get-FirstNonEmpty @($SdioCmd53DtcReadEnable, $env:RX671_EK_SDIO_CMD53_DTC_READ_ENABLE)
+$effectiveSdioCmd53DtcWriteEnable = Get-FirstNonEmpty @($SdioCmd53DtcWriteEnable, $env:RX671_EK_SDIO_CMD53_DTC_WRITE_ENABLE)
+$effectiveSdioCmd53DtcMinBytes = Get-FirstNonEmpty @($SdioCmd53DtcMinBytes, $env:RX671_EK_SDIO_CMD53_DTC_MIN_BYTES)
+$effectiveSdioCmd53DmacaReadEnable = Get-FirstNonEmpty @($SdioCmd53DmacaReadEnable, $env:RX671_EK_SDIO_CMD53_DMACA_READ_ENABLE)
+$effectiveSdioCmd53DmacaWriteEnable = Get-FirstNonEmpty @($SdioCmd53DmacaWriteEnable, $env:RX671_EK_SDIO_CMD53_DMACA_WRITE_ENABLE)
+$effectiveSdioCmd53DmacaMinBytes = Get-FirstNonEmpty @($SdioCmd53DmacaMinBytes, $env:RX671_EK_SDIO_CMD53_DMACA_MIN_BYTES)
+$effectiveSdioCmd53DmacaBlockMode = Get-FirstNonEmpty @($SdioCmd53DmacaBlockMode, $env:RX671_EK_SDIO_CMD53_DMACA_BLOCK_MODE)
 
 $cprojectBytes = $null
 try {
@@ -454,8 +761,85 @@ try {
         $cprojectDefines += "AWS_IOT_USE_TSIP_ENTROPY"
     }
 
+    if ($useTcpThroughputLocalConfigForBuild) {
+        Write-LocalTcpThroughputConfig `
+            -Path $localTcpThroughputConfig `
+            -TargetHost $TcpThroughputHost `
+            -Port $TcpThroughputPort `
+            -Mode $TcpThroughputMode `
+            -Bytes $TcpThroughputBytes `
+            -ChunkBytes $TcpThroughputChunkBytes `
+            -TxChunkBytes $TcpThroughputTxChunkBytes `
+            -RxChunkBytes $TcpThroughputRxChunkBytes `
+            -Iterations $TcpThroughputIterations `
+            -TxBufferBytes $TcpThroughputTxBufferBytes `
+            -RxBufferBytes $TcpThroughputRxBufferBytes `
+            -TxWindowMss $TcpThroughputTxWindowMss `
+            -RxWindowMss $TcpThroughputRxWindowMss `
+            -ProgressBytes $TcpThroughputProgressBytes
+        $cprojectDefines += "TCP_THROUGHPUT_USE_LOCAL_CONFIG"
+    }
+
     if ($WlanAllowBusSleepDelayMs -ge 0) {
         $cprojectDefines += "PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=$WlanAllowBusSleepDelayMs"
+    }
+    if ($WlanDisablePowersave.IsPresent -or ("1" -eq $env:RX671_EK_WLAN_DISABLE_POWERSAVE)) {
+        $cprojectDefines += "WHD_JOIN_DISABLE_POWERSAVE=1"
+    }
+    if ($TcpWinSegCount -gt 0) {
+        $cprojectDefines += "RX671_TCP_WIN_SEG_COUNT=$TcpWinSegCount"
+    }
+    if ($NetworkBufferDescriptors -gt 0) {
+        $cprojectDefines += "RX671_NETWORK_BUFFER_DESCRIPTORS=$NetworkBufferDescriptors"
+    }
+    if ($WhdPortBufferCount -gt 0) {
+        $cprojectDefines += "WHD_PORT_BUFFER_COUNT=$WhdPortBufferCount"
+    }
+    if ($WhdPortBufferPayloadBytes -gt 0) {
+        $cprojectDefines += "WHD_PORT_BUFFER_PAYLOAD=$WhdPortBufferPayloadBytes"
+    }
+    if ($WhdPortBufferHeadroomBytes -gt 0) {
+        $cprojectDefines += "WHD_PORT_BUFFER_HEADROOM=$WhdPortBufferHeadroomBytes"
+    }
+    if ($FreeRtosHeapSizeKb -gt 0) {
+        $cprojectDefines += "RX671_FREERTOS_HEAP_SIZE_KB=$FreeRtosHeapSizeKb"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
+        $cprojectDefines += "SDIO_HOST_CFG_RUN_CLOCK_DIV=$SdioRunClockDiv"
+    }
+
+    if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
+        $cprojectDefines += "SDIO_HOST_USE_HIGH_SPEED_CLOCK"
+    }
+
+    if ($SdioHighSpeedDrive.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_HIGH_SPEED_DRIVE)) {
+        $cprojectDefines += "SDIO_HOST_CFG_HIGH_SPEED_DRIVE=1"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_XFER_ENGINE=$effectiveSdioCmd53XferEngine"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DtcReadEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DTC_READ_ENABLE=$effectiveSdioCmd53DtcReadEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DtcWriteEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DTC_WRITE_ENABLE=$effectiveSdioCmd53DtcWriteEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DtcMinBytes)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DTC_MIN_BYTES=$effectiveSdioCmd53DtcMinBytes"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaReadEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_READ_ENABLE=$effectiveSdioCmd53DmacaReadEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaWriteEnable)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_WRITE_ENABLE=$effectiveSdioCmd53DmacaWriteEnable"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaMinBytes)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_MIN_BYTES=$effectiveSdioCmd53DmacaMinBytes"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53DmacaBlockMode)) {
+        $cprojectDefines += "SDIO_HOST_CMD53_DMACA_BLOCK_MODE=$effectiveSdioCmd53DmacaBlockMode"
     }
 
     if ($cprojectDefines.Count -gt 0) {
@@ -467,15 +851,23 @@ try {
         [System.IO.File]::WriteAllText($cproject, $patchedCProject, [System.Text.UTF8Encoding]::new($false))
     }
 
-    & $E2Studio `
-        -nosplash `
-        -application org.eclipse.cdt.managedbuilder.core.headlessbuild `
-        -data $Workspace `
-        -import $projectDir `
-        -cleanBuild "$projectName/HardwareDebug" 2>&1 | Tee-Object -FilePath $logFilePath
+    $buildStart = Get-Date
+    $e2StudioExitCode = Invoke-E2StudioHeadlessBuild `
+        -Executable $E2Studio `
+        -WorkspacePath $Workspace `
+        -ProjectPath $projectDir `
+        -BuildTarget "$projectName/HardwareDebug" `
+        -OutputLog $logFilePath
+    Wait-RxBuildProcesses -Since $buildStart
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "e2 studio build failed with exit code $LASTEXITCODE"
+    $motOutput = Join-Path $hardwareDebug "$projectName.mot"
+    $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
+        ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
+
+    if (($e2StudioExitCode -ne 0) -and (-not $motWasUpdated)) {
+        throw "e2 studio build failed with exit code $e2StudioExitCode"
+    } elseif ($e2StudioExitCode -ne 0) {
+        Write-Warning "e2 studio returned exit code $e2StudioExitCode before child build completion, but output was refreshed."
     }
 } finally {
     if ($null -ne $cprojectBytes) {

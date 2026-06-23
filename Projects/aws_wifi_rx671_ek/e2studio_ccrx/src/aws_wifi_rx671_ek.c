@@ -21,6 +21,7 @@
 #include "whd_join_config.h"
 #include "whd_bringup.h"
 #include "aws_iot_mqtt_smoke.h"
+#include "tcp_throughput_smoke.h"
 
 #if BSP_CFG_CPLUSPLUS == 1
 extern void abort(void);
@@ -126,6 +127,7 @@ static void start_freertos_tcp_after_join(void)
         g_diag_ping_task_create_result = (uint32_t)result;
         g_diag_ping_heap_after_create = xPortGetFreeHeapSize();
         aws_iot_mqtt_smoke_start();
+        tcp_throughput_smoke_start();
     }
 #else
     debug_puts("FreeRTOS+TCP skipped (WHD_JOIN_ENABLE=0)\r\n");

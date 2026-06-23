@@ -21,7 +21,14 @@
 #define ipconfigIPv4_BACKWARD_COMPATIBLE          1
 
 #define ipconfigUSE_TCP                           1
-#define ipconfigUSE_TCP_WIN                       0
+#define ipconfigUSE_TCP_WIN                       1
+#define ipconfigTCP_MSS                           ( ipconfigNETWORK_MTU - 40 )
+#define ipconfigTCP_RX_BUFFER_LENGTH              ( 16 * ipconfigTCP_MSS )
+#define ipconfigTCP_TX_BUFFER_LENGTH              ( 16 * ipconfigTCP_MSS )
+#ifndef RX671_TCP_WIN_SEG_COUNT
+#define RX671_TCP_WIN_SEG_COUNT                   128
+#endif
+#define ipconfigTCP_WIN_SEG_COUNT                 RX671_TCP_WIN_SEG_COUNT
 #define ipconfigUSE_DNS                           1
 #define ipconfigUSE_DNS_CACHE                     1
 #define ipconfigUSE_LLMNR                         0
@@ -29,7 +36,10 @@
 #define ipconfigUSE_MDNS                          0
 
 #define ipconfigNETWORK_MTU                       1500
-#define ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS    24
+#ifndef RX671_NETWORK_BUFFER_DESCRIPTORS
+#define RX671_NETWORK_BUFFER_DESCRIPTORS          48
+#endif
+#define ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS    RX671_NETWORK_BUFFER_DESCRIPTORS
 #define ipconfigEVENT_QUEUE_LENGTH                ( ipconfigNUM_NETWORK_BUFFER_DESCRIPTORS + 8 )
 #define ipconfigIP_TASK_PRIORITY                  3
 #define ipconfigIP_TASK_STACK_SIZE_WORDS          1536
