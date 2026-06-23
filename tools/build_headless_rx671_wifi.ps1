@@ -9,9 +9,14 @@ param(
     [string]$AwsIotThingName = "",
     [switch]$UseLocalJoinConfig,
     [switch]$UseAwsIotLocalConfig,
+    [switch]$SkipAwsIotConfig,
     [switch]$UseTsipEntropy,
     [int]$SoftIrqPollMs = -1,
     [int]$WlanAllowBusSleepDelayMs = 600000,
+    [switch]$WlanDisablePowersave,
+    [int]$FreeRtosHeapSizeKb = -1,
+    [int]$TcpWinSegCount = -1,
+    [int]$NetworkBufferDescriptors = -1,
     [string]$SdioRunClockDiv = "",
     [string]$SdioCmd53XferEngine = "",
     [string]$SdioCmd53DtcReadEnable = "",
@@ -21,7 +26,21 @@ param(
     [string]$SdioCmd53DmacaWriteEnable = "",
     [string]$SdioCmd53DmacaMinBytes = "",
     [string]$SdioCmd53DmacaBlockMode = "",
-    [switch]$SdioUseHighSpeedClock
+    [switch]$SdioUseHighSpeedClock,
+    [switch]$TcpThroughputEnable,
+    [string]$TcpThroughputHost = "",
+    [int]$TcpThroughputPort = -1,
+    [string]$TcpThroughputMode = "",
+    [int]$TcpThroughputBytes = -1,
+    [int]$TcpThroughputChunkBytes = -1,
+    [int]$TcpThroughputTxChunkBytes = -1,
+    [int]$TcpThroughputRxChunkBytes = -1,
+    [int]$TcpThroughputIterations = -1,
+    [int]$TcpThroughputTxBufferBytes = -1,
+    [int]$TcpThroughputRxBufferBytes = -1,
+    [int]$TcpThroughputTxWindowMss = -1,
+    [int]$TcpThroughputRxWindowMss = -1,
+    [int]$TcpThroughputProgressBytes = -1
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,13 +55,14 @@ $type1ynBlobStageScript = Join-Path $projectRoot "Projects\$projectName\external
 $cproject = Join-Path $projectDir ".cproject"
 $localJoinConfig = Join-Path $projectDir "src\whd_join_config_local.h"
 $localAwsIotConfig = Join-Path $projectDir "src\frtos_config\aws_iot_config_local.h"
+$localTcpThroughputConfig = Join-Path $projectDir "src\frtos_config\tcp_throughput_config_local.h"
 $defaultAwsIotConfigDir = "C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01"
 $useLocalJoinConfigForBuild = $UseLocalJoinConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($WifiConfigFile)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD))
-$useAwsIotLocalConfigForBuild = $UseAwsIotLocalConfig.IsPresent -or
+$useAwsIotLocalConfigForBuild = (-not $SkipAwsIotConfig.IsPresent) -and ($UseAwsIotLocalConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotConfigDir)) -or
     (Test-Path -LiteralPath $defaultAwsIotConfigDir) -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotEndpoint)) -or
@@ -52,7 +72,35 @@ $useAwsIotLocalConfigForBuild = $UseAwsIotLocalConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM_FILE)) -or
     (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_PEM)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_FILE))
+    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_FILE)))
+$useTcpThroughputLocalConfigForBuild = $TcpThroughputEnable.IsPresent -or
+    (-not [string]::IsNullOrWhiteSpace($TcpThroughputHost)) -or
+    ($TcpThroughputPort -ge 0) -or
+    (-not [string]::IsNullOrWhiteSpace($TcpThroughputMode)) -or
+    ($TcpThroughputBytes -ge 0) -or
+    ($TcpThroughputChunkBytes -ge 0) -or
+    ($TcpThroughputTxChunkBytes -ge 0) -or
+    ($TcpThroughputRxChunkBytes -ge 0) -or
+    ($TcpThroughputIterations -ge 0) -or
+    ($TcpThroughputTxBufferBytes -ge 0) -or
+    ($TcpThroughputRxBufferBytes -ge 0) -or
+    ($TcpThroughputTxWindowMss -ge 0) -or
+    ($TcpThroughputRxWindowMss -ge 0) -or
+    ($TcpThroughputProgressBytes -ge 0) -or
+    ("1" -eq $env:RX671_EK_TCP_THROUGHPUT_ENABLE) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_HOST)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_PORT)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_MODE)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_CHUNK_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_TX_CHUNK_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_CHUNK_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_ITERATIONS)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_TX_BUFFER_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_BUFFER_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_TX_WINDOW_MSS)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_WINDOW_MSS)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_PROGRESS_BYTES))
 
 if (-not (Test-Path -LiteralPath $E2Studio)) {
     throw "e2 studio executable not found: $E2Studio"
@@ -220,6 +268,123 @@ function Write-LocalJoinConfig {
     )
 
     [System.IO.File]::WriteAllLines($Path, $lines, [System.Text.UTF8Encoding]::new($false))
+}
+
+function ConvertTo-IPv4Octets {
+    param([string]$Address)
+
+    $ip = [System.Net.IPAddress]::Parse($Address)
+    if ($ip.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
+        throw "TCP throughput host must be an IPv4 address: $Address"
+    }
+
+    return $ip.GetAddressBytes()
+}
+
+function ConvertTo-TcpThroughputModeDefine {
+    param([string]$Mode)
+
+    if ([string]::IsNullOrWhiteSpace($Mode)) {
+        return "TCP_THROUGHPUT_MODE_BOTH"
+    }
+
+    switch ($Mode.Trim().ToLowerInvariant()) {
+        "sink"   { return "TCP_THROUGHPUT_MODE_SINK" }
+        "tx"     { return "TCP_THROUGHPUT_MODE_SINK" }
+        "send"   { return "TCP_THROUGHPUT_MODE_SINK" }
+        "source" { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "rx"     { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "recv"   { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "both"   { return "TCP_THROUGHPUT_MODE_BOTH" }
+        "3"      { return "TCP_THROUGHPUT_MODE_BOTH" }
+        "2"      { return "TCP_THROUGHPUT_MODE_SOURCE" }
+        "1"      { return "TCP_THROUGHPUT_MODE_SINK" }
+        default  { throw "Unsupported TCP throughput mode '$Mode'. Use sink/source/both." }
+    }
+}
+
+function Get-ConfigInt {
+    param(
+        [int]$Value,
+        [string]$EnvValue,
+        [int]$DefaultValue
+    )
+
+    if ($Value -ge 0) {
+        return $Value
+    }
+    if (-not [string]::IsNullOrWhiteSpace($EnvValue)) {
+        return [int]$EnvValue
+    }
+
+    return $DefaultValue
+}
+
+function Write-LocalTcpThroughputConfig {
+    param(
+        [string]$Path,
+        [string]$TargetHost,
+        [int]$Port,
+        [string]$Mode,
+        [int]$Bytes,
+        [int]$ChunkBytes,
+        [int]$TxChunkBytes,
+        [int]$RxChunkBytes,
+        [int]$Iterations,
+        [int]$TxBufferBytes,
+        [int]$RxBufferBytes,
+        [int]$TxWindowMss,
+        [int]$RxWindowMss,
+        [int]$ProgressBytes
+    )
+
+    $effectiveHost = Get-FirstNonEmpty @($TargetHost, $env:RX671_EK_TCP_THROUGHPUT_HOST, "192.168.10.105")
+    $octets = ConvertTo-IPv4Octets -Address $effectiveHost
+    $effectivePort = Get-ConfigInt -Value $Port -EnvValue $env:RX671_EK_TCP_THROUGHPUT_PORT -DefaultValue 5001
+    $effectiveMode = ConvertTo-TcpThroughputModeDefine (Get-FirstNonEmpty @($Mode, $env:RX671_EK_TCP_THROUGHPUT_MODE, "both"))
+    $effectiveBytes = Get-ConfigInt -Value $Bytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_BYTES -DefaultValue 10485760
+    $effectiveChunkBytes = Get-ConfigInt -Value $ChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_CHUNK_BYTES -DefaultValue 1460
+    $effectiveTxChunkBytes = Get-ConfigInt -Value $TxChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_CHUNK_BYTES -DefaultValue $effectiveChunkBytes
+    $effectiveRxChunkBytes = Get-ConfigInt -Value $RxChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_CHUNK_BYTES -DefaultValue $effectiveChunkBytes
+    $effectiveIterations = Get-ConfigInt -Value $Iterations -EnvValue $env:RX671_EK_TCP_THROUGHPUT_ITERATIONS -DefaultValue 1
+    $effectiveTxBufferBytes = Get-ConfigInt -Value $TxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_BUFFER_BYTES -DefaultValue 65536
+    $effectiveRxBufferBytes = Get-ConfigInt -Value $RxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_BUFFER_BYTES -DefaultValue 65536
+    $effectiveTxWindowMss = Get-ConfigInt -Value $TxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_WINDOW_MSS -DefaultValue 44
+    $effectiveRxWindowMss = Get-ConfigInt -Value $RxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_WINDOW_MSS -DefaultValue 44
+    $effectiveProgressBytes = Get-ConfigInt -Value $ProgressBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_PROGRESS_BYTES -DefaultValue 0
+
+    $lines = @(
+        "/*",
+        " * Generated by tools/build_headless_rx671_wifi.ps1.",
+        " * This file contains local TCP throughput test settings and is intentionally ignored by git.",
+        " */",
+        "#ifndef TCP_THROUGHPUT_CONFIG_LOCAL_H_",
+        "#define TCP_THROUGHPUT_CONFIG_LOCAL_H_",
+        "",
+        "#define TCP_THROUGHPUT_ENABLE           (1U)",
+        "#define TCP_THROUGHPUT_HOST_IP0         ($($octets[0])U)",
+        "#define TCP_THROUGHPUT_HOST_IP1         ($($octets[1])U)",
+        "#define TCP_THROUGHPUT_HOST_IP2         ($($octets[2])U)",
+        "#define TCP_THROUGHPUT_HOST_IP3         ($($octets[3])U)",
+        "#define TCP_THROUGHPUT_PORT             (${effectivePort}U)",
+        "#define TCP_THROUGHPUT_MODE             $effectiveMode",
+        "#define TCP_THROUGHPUT_TOTAL_BYTES      (${effectiveBytes}UL)",
+        "#define TCP_THROUGHPUT_CHUNK_BYTES      (${effectiveChunkBytes}U)",
+        "#define TCP_THROUGHPUT_TX_CHUNK_BYTES   (${effectiveTxChunkBytes}U)",
+        "#define TCP_THROUGHPUT_RX_CHUNK_BYTES   (${effectiveRxChunkBytes}U)",
+        "#define TCP_THROUGHPUT_ITERATIONS       (${effectiveIterations}U)",
+        "#define TCP_THROUGHPUT_TX_BUFFER_BYTES  (${effectiveTxBufferBytes}UL)",
+        "#define TCP_THROUGHPUT_RX_BUFFER_BYTES  (${effectiveRxBufferBytes}UL)",
+        "#define TCP_THROUGHPUT_TX_WINDOW_MSS    (${effectiveTxWindowMss}L)",
+        "#define TCP_THROUGHPUT_RX_WINDOW_MSS    (${effectiveRxWindowMss}L)",
+        "#define TCP_THROUGHPUT_PROGRESS_BYTES   (${effectiveProgressBytes}UL)",
+        "",
+        "#endif /* TCP_THROUGHPUT_CONFIG_LOCAL_H_ */",
+        ""
+    )
+
+    [System.IO.File]::WriteAllLines($Path, $lines, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "TCP throughput: host=$effectiveHost port=$effectivePort mode=$effectiveMode bytes=$effectiveBytes chunk=$effectiveChunkBytes txchunk=$effectiveTxChunkBytes rxchunk=$effectiveRxChunkBytes iterations=$effectiveIterations txbuf=$effectiveTxBufferBytes rxbuf=$effectiveRxBufferBytes txwin=$effectiveTxWindowMss rxwin=$effectiveRxWindowMss progress=$effectiveProgressBytes"
 }
 
 function Get-FirstNonEmpty {
@@ -532,6 +697,9 @@ if ($useLocalJoinConfigForBuild) {
 if ($useAwsIotLocalConfigForBuild) {
     Write-Host "Local AWS IoT config: enabled"
 }
+if ($useTcpThroughputLocalConfigForBuild) {
+    Write-Host "Local TCP throughput config: enabled"
+}
 if ($WlanAllowBusSleepDelayMs -ge 0) {
     Write-Host "WHD WLAN bus sleep delay: ${WlanAllowBusSleepDelayMs} ms"
 }
@@ -583,8 +751,39 @@ try {
         $cprojectDefines += "AWS_IOT_USE_TSIP_ENTROPY"
     }
 
+    if ($useTcpThroughputLocalConfigForBuild) {
+        Write-LocalTcpThroughputConfig `
+            -Path $localTcpThroughputConfig `
+            -TargetHost $TcpThroughputHost `
+            -Port $TcpThroughputPort `
+            -Mode $TcpThroughputMode `
+            -Bytes $TcpThroughputBytes `
+            -ChunkBytes $TcpThroughputChunkBytes `
+            -TxChunkBytes $TcpThroughputTxChunkBytes `
+            -RxChunkBytes $TcpThroughputRxChunkBytes `
+            -Iterations $TcpThroughputIterations `
+            -TxBufferBytes $TcpThroughputTxBufferBytes `
+            -RxBufferBytes $TcpThroughputRxBufferBytes `
+            -TxWindowMss $TcpThroughputTxWindowMss `
+            -RxWindowMss $TcpThroughputRxWindowMss `
+            -ProgressBytes $TcpThroughputProgressBytes
+        $cprojectDefines += "TCP_THROUGHPUT_USE_LOCAL_CONFIG"
+    }
+
     if ($WlanAllowBusSleepDelayMs -ge 0) {
         $cprojectDefines += "PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=$WlanAllowBusSleepDelayMs"
+    }
+    if ($WlanDisablePowersave.IsPresent -or ("1" -eq $env:RX671_EK_WLAN_DISABLE_POWERSAVE)) {
+        $cprojectDefines += "WHD_JOIN_DISABLE_POWERSAVE=1"
+    }
+    if ($TcpWinSegCount -gt 0) {
+        $cprojectDefines += "RX671_TCP_WIN_SEG_COUNT=$TcpWinSegCount"
+    }
+    if ($NetworkBufferDescriptors -gt 0) {
+        $cprojectDefines += "RX671_NETWORK_BUFFER_DESCRIPTORS=$NetworkBufferDescriptors"
+    }
+    if ($FreeRtosHeapSizeKb -gt 0) {
+        $cprojectDefines += "RX671_FREERTOS_HEAP_SIZE_KB=$FreeRtosHeapSizeKb"
     }
 
     if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {

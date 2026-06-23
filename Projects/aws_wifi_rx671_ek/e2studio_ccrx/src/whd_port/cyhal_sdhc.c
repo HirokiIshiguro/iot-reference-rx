@@ -26,6 +26,7 @@
 #include "task.h"
 #include "timers.h"
 
+#include "platform.h"
 #include "debug_uart.h"
 #include "r_sdhi_rx_if.h"
 #include "sdio_host.h"
@@ -49,6 +50,7 @@ static TaskHandle_t g_sdio_sdhi_irq_task;
 static volatile bool g_sdio_softirq_enabled;
 static volatile bool g_sdio_sdhi_irq_enabled;
 static volatile bool g_sdio_sdhi_irq_latched;
+static uint32_t g_sdio_sdhi_irq_enable_count;
 static uint32_t g_cmd52_fail_log_count;
 static uint32_t g_cmd53_fail_log_count;
 static bool g_pre_cmd53_clocks_ready;
@@ -60,6 +62,8 @@ volatile uint32_t g_whd_sdio_sdhi_irq_rearm_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_last_status;
 volatile uint32_t g_whd_sdio_sdhi_irq_notify_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_task_count;
+volatile uint32_t g_whd_sdio_sdhi_irq_enable_count;
+volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
 volatile uint32_t g_whd_sdio_softirq_notify_count;
 volatile uint32_t g_whd_sdio_softirq_pending_count;
 volatile uint32_t g_whd_sdio_irq_task_state;
@@ -94,6 +98,10 @@ volatile uint32_t g_whd_sdio_cmd53_last_r5;
 volatile uint32_t g_whd_sdio_cmd53_last_ok;
 volatile uint32_t g_whd_sdio_cmd53_last_result;
 volatile uint32_t g_whd_sdio_cmd53_last_data0;
+volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
+volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
+volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
+volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_abort_count;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_stage;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_s1;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_s2;
@@ -423,10 +431,13 @@ static void sdio_sdhi_irq_task(void * pvParameters)
             g_whd_sdio_irq_task_state = 5U;
         }
 
-        /* Let the WHD worker run and drain the SDPCM interrupt source before
-         * re-enabling the level-like DAT1/IOIRQ source in SDHI. */
+        /* Optionally let the WHD worker drain the SDPCM interrupt source before
+         * re-enabling the level-like DAT1/IOIRQ source in SDHI. The performance
+         * path keeps this at zero so RX is not quantized by the FreeRTOS tick. */
         g_whd_sdio_irq_task_state = 6U;
-        vTaskDelay(1U);
+#if (WHD_SDIO_SDHI_IRQ_REARM_DELAY_TICKS > 0U)
+        vTaskDelay((TickType_t)WHD_SDIO_SDHI_IRQ_REARM_DELAY_TICKS);
+#endif
 
         if (g_sdio_sdhi_irq_enabled && g_sdio_sdhi_irq_latched)
         {
@@ -458,6 +469,23 @@ static void sdio_sdhi_irq_enable(bool enable)
 #if WHD_SDIO_USE_SDHI_IRQ
     if (enable)
     {
+        g_sdio_sdhi_irq_enable_count++;
+        g_whd_sdio_sdhi_irq_enable_count = g_sdio_sdhi_irq_enable_count;
+
+#if WHD_SDIO_SDHI_IRQ_DEFER_FIRST_ENABLE
+        if (1U == g_sdio_sdhi_irq_enable_count)
+        {
+            g_sdio_sdhi_irq_enabled = false;
+            g_sdio_sdhi_irq_latched = false;
+            g_whd_sdio_sdhi_irq_deferred_enable_count++;
+            (void)R_SDHI_IntSdioCallback(SDHI_CH0, sdio_sdhi_irq_callback);
+            (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDIOMD, SDHI_SDIOMD_INTEN);
+            (void)R_SDHI_ClearSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
+            (void)R_SDHI_ClearSdiostsReg(SDHI_CH0, SDHI_SDIOSTS_IOIRQ);
+            return;
+        }
+#endif
+
         if (NULL == g_sdio_sdhi_irq_task)
         {
             (void)xTaskCreate(sdio_sdhi_irq_task, "sdio_irq",
@@ -836,6 +864,35 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
 
     ok = sdio_host_cmd53(write, function, address, increment, block_mode,
                          (uint8_t *)data, count, &r5);
+#if (WHD_SDIO_CMD53_F2_BYTE_READ_RETRY > 0U)
+    if ((!ok) && (!write) && (2U == function) && (!block_mode))
+    {
+        uint32_t retry;
+
+        for (retry = 0U; retry < WHD_SDIO_CMD53_F2_BYTE_READ_RETRY; retry++)
+        {
+            g_whd_sdio_cmd53_f2_byte_read_retry_count++;
+#if WHD_SDIO_CMD53_F2_BYTE_READ_ABORT_ON_RETRY
+            if (sdio_host_abort_function(function))
+            {
+                g_whd_sdio_cmd53_f2_byte_read_retry_abort_count++;
+            }
+#endif
+            R_BSP_SoftwareDelay(WHD_SDIO_CMD53_F2_BYTE_READ_RETRY_DELAY_US, BSP_DELAY_MICROSECS);
+            ok = sdio_host_cmd53(write, function, address, increment, block_mode,
+                                 (uint8_t *)data, count, &r5);
+            if (ok)
+            {
+                g_whd_sdio_cmd53_f2_byte_read_recovered_count++;
+                break;
+            }
+        }
+        if (!ok)
+        {
+            g_whd_sdio_cmd53_f2_byte_read_retry_fail_count++;
+        }
+    }
+#endif
     data0 = sdio_debug_data0(data, length);
     sdio_end_bus();
     sdio_sdhi_irq_rearm_after_bus();

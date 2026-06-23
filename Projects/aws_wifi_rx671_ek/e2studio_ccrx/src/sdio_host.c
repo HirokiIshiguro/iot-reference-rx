@@ -185,6 +185,43 @@ volatile uint32_t g_sdio_host_cmd53_xfer_engine = SDIO_HOST_CMD53_XFER_ENGINE;
 static bool sdhi_can_read_crc_error_block(uint32_t sdsts2);
 static bool sdhi_can_accept_read_done_error(uint32_t sdsts1, uint32_t sdsts2);
 
+static void sd_slot_release_sdio_pins(void)
+{
+    R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
+
+    PORTD.PMR.BIT.B5 = 0U;     /* CLK */
+    PORTD.PDR.BIT.B5 = 0U;
+    PORTD.PCR.BIT.B5 = 0U;
+    MPC.PD5PFS.BYTE = 0x00U;
+
+    PORTD.PMR.BIT.B4 = 0U;     /* CMD */
+    PORTD.PDR.BIT.B4 = 0U;
+    PORTD.PCR.BIT.B4 = 0U;
+    MPC.PD4PFS.BYTE = 0x00U;
+
+    PORTD.PMR.BIT.B6 = 0U;     /* D0 */
+    PORTD.PDR.BIT.B6 = 0U;
+    PORTD.PCR.BIT.B6 = 0U;
+    MPC.PD6PFS.BYTE = 0x00U;
+
+    PORTD.PMR.BIT.B7 = 0U;     /* D1 / IOIRQ */
+    PORTD.PDR.BIT.B7 = 0U;
+    PORTD.PCR.BIT.B7 = 0U;
+    MPC.PD7PFS.BYTE = 0x00U;
+
+    PORTD.PMR.BIT.B2 = 0U;     /* D2 */
+    PORTD.PDR.BIT.B2 = 0U;
+    PORTD.PCR.BIT.B2 = 0U;
+    MPC.PD2PFS.BYTE = 0x00U;
+
+    PORTD.PMR.BIT.B3 = 0U;     /* D3 */
+    PORTD.PDR.BIT.B3 = 0U;
+    PORTD.PCR.BIT.B3 = 0U;
+    MPC.PD3PFS.BYTE = 0x00U;
+
+    R_BSP_RegisterProtectEnable(BSP_REG_PROTECT_MPC);
+}
+
 /*
  * EK-RX671 SD slot power enable. P51 drives the +3V3_SD power switch. Cycle it
  * off (1 s) then on (settle 500 ms) so the card boots from a clean power state
@@ -193,6 +230,8 @@ static bool sdhi_can_accept_read_done_error(uint32_t sdsts1, uint32_t sdsts2);
  */
 static void sd_slot_power_on(void)
 {
+    sd_slot_release_sdio_pins();
+
     PORT5.PMR.BIT.B1 = 0U;     /* P51 as GPIO */
     PORT5.PDR.BIT.B1 = 1U;     /* output      */
     PORT5.PODR.BIT.B1 = 0U;    /* power off   */
@@ -476,6 +515,11 @@ static bool g_cmd53_dtc_opened = false;
 static volatile bool g_cmd53_dtc_active = false;
 static volatile uint32_t g_cmd53_dtc_count = 0U;
 static volatile uint32_t g_cmd53_dtc_fallback_count = 0U;
+static volatile uint32_t g_cmd53_dtc_fb_function_count = 0U;
+static volatile uint32_t g_cmd53_dtc_fb_disabled_count = 0U;
+static volatile uint32_t g_cmd53_dtc_fb_small_count = 0U;
+static volatile uint32_t g_cmd53_dtc_fb_ineligible_count = 0U;
+static volatile uint32_t g_cmd53_dtc_fb_prepare_count = 0U;
 static volatile uint32_t g_cmd53_dtc_error = 0U;
 static volatile uint32_t g_cmd53_dtc_ok_count = 0U;
 static volatile uint32_t g_cmd53_dtc_fail_count = 0U;
@@ -498,6 +542,11 @@ static bool g_cmd53_dmaca_opened = false;
 static volatile bool g_cmd53_dmaca_active = false;
 static volatile uint32_t g_cmd53_dmaca_count = 0U;
 static volatile uint32_t g_cmd53_dmaca_fallback_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_fb_function_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_fb_disabled_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_fb_small_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_fb_ineligible_count = 0U;
+static volatile uint32_t g_cmd53_dmaca_fb_prepare_count = 0U;
 static volatile uint32_t g_cmd53_dmaca_error = 0U;
 static volatile uint32_t g_cmd53_dmaca_ok_count = 0U;
 static volatile uint32_t g_cmd53_dmaca_fail_count = 0U;
@@ -966,6 +1015,7 @@ static bool sdio_cmd53_try_transfer_blocks_dtc(bool write, uint8_t function, uin
     if (function != SDIO_HOST_CMD53_DTC_FUNCTION)
     {
         g_cmd53_dtc_fallback_count++;
+        g_cmd53_dtc_fb_function_count++;
         return false;
     }
 
@@ -973,24 +1023,28 @@ static bool sdio_cmd53_try_transfer_blocks_dtc(bool write, uint8_t function, uin
         (write && (0U == SDIO_HOST_CMD53_DTC_WRITE_ENABLE)))
     {
         g_cmd53_dtc_fallback_count++;
+        g_cmd53_dtc_fb_disabled_count++;
         return false;
     }
 
     if (length < SDIO_HOST_CMD53_DTC_MIN_BYTES)
     {
         g_cmd53_dtc_fallback_count++;
+        g_cmd53_dtc_fb_small_count++;
         return false;
     }
 
     if (!sdio_cmd53_dtc_is_eligible(p_data, block_size, block_count))
     {
         g_cmd53_dtc_fallback_count++;
+        g_cmd53_dtc_fb_ineligible_count++;
         return false;
     }
 
     if (!sdio_cmd53_dtc_prepare(write, p_data, block_size, block_count, buff_reg))
     {
         g_cmd53_dtc_fallback_count++;
+        g_cmd53_dtc_fb_prepare_count++;
         return false;
     }
 
@@ -1297,6 +1351,7 @@ static bool sdio_cmd53_try_transfer_blocks_dmaca(bool write, uint8_t function, u
     if (function != SDIO_HOST_CMD53_DMACA_FUNCTION)
     {
         g_cmd53_dmaca_fallback_count++;
+        g_cmd53_dmaca_fb_function_count++;
         return false;
     }
 
@@ -1304,24 +1359,28 @@ static bool sdio_cmd53_try_transfer_blocks_dmaca(bool write, uint8_t function, u
         (write && (0U == SDIO_HOST_CMD53_DMACA_WRITE_ENABLE)))
     {
         g_cmd53_dmaca_fallback_count++;
+        g_cmd53_dmaca_fb_disabled_count++;
         return false;
     }
 
     if (length < SDIO_HOST_CMD53_DMACA_MIN_BYTES)
     {
         g_cmd53_dmaca_fallback_count++;
+        g_cmd53_dmaca_fb_small_count++;
         return false;
     }
 
     if (!sdio_cmd53_dmaca_is_eligible(p_data, block_size, block_count))
     {
         g_cmd53_dmaca_fallback_count++;
+        g_cmd53_dmaca_fb_ineligible_count++;
         return false;
     }
 
     if (!sdio_cmd53_dmaca_prepare(write, p_data, block_size, block_count, buff_reg))
     {
         g_cmd53_dmaca_fallback_count++;
+        g_cmd53_dmaca_fb_prepare_count++;
         return false;
     }
 
@@ -1709,6 +1768,18 @@ bool sdio_host_cmd52_write(uint8_t function, uint32_t address, uint8_t data, uin
 {
     uint32_t r5 = 0U;
     return (SDIO_SUCCESS == R_SDIO_Cmd52Write(&g_sdio_ctrl, function, address, data, true, p_readback, &r5));
+}
+
+bool sdio_host_abort_function(uint8_t function)
+{
+    uint8_t readback = 0U;
+
+    if (function > 7U)
+    {
+        return false;
+    }
+
+    return sdio_host_cmd52_write(0U, SDIO_CCCR_IO_ABORT, function, &readback);
 }
 
 /*
@@ -2558,4 +2629,149 @@ void sdio_host_cmd53_diag_ext(uint8_t * p_stage, uint32_t * p_s1, uint32_t * p_s
     {
         *p_data0 = g_cmd53_diag_data0;
     }
+}
+
+void sdio_host_cmd53_xfer_diag(uint32_t * p_engine, uint32_t * p_done,
+                               uint32_t * p_ok, uint32_t * p_fail,
+                               uint32_t * p_fallback, uint32_t * p_error)
+{
+    if (NULL != p_engine)
+    {
+        *p_engine = g_sdio_host_cmd53_xfer_engine;
+    }
+
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
+    if (NULL != p_done)
+    {
+        *p_done = g_cmd53_dtc_count;
+    }
+    if (NULL != p_ok)
+    {
+        *p_ok = g_cmd53_dtc_ok_count;
+    }
+    if (NULL != p_fail)
+    {
+        *p_fail = g_cmd53_dtc_fail_count;
+    }
+    if (NULL != p_fallback)
+    {
+        *p_fallback = g_cmd53_dtc_fallback_count;
+    }
+    if (NULL != p_error)
+    {
+        *p_error = g_cmd53_dtc_error;
+    }
+#elif (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DMACA)
+    if (NULL != p_done)
+    {
+        *p_done = g_cmd53_dmaca_count;
+    }
+    if (NULL != p_ok)
+    {
+        *p_ok = g_cmd53_dmaca_ok_count;
+    }
+    if (NULL != p_fail)
+    {
+        *p_fail = g_cmd53_dmaca_fail_count;
+    }
+    if (NULL != p_fallback)
+    {
+        *p_fallback = g_cmd53_dmaca_fallback_count;
+    }
+    if (NULL != p_error)
+    {
+        *p_error = g_cmd53_dmaca_error;
+    }
+#else
+    if (NULL != p_done)
+    {
+        *p_done = 0U;
+    }
+    if (NULL != p_ok)
+    {
+        *p_ok = 0U;
+    }
+    if (NULL != p_fail)
+    {
+        *p_fail = 0U;
+    }
+    if (NULL != p_fallback)
+    {
+        *p_fallback = 0U;
+    }
+    if (NULL != p_error)
+    {
+        *p_error = 0U;
+    }
+#endif
+}
+
+void sdio_host_cmd53_xfer_fallback_diag(uint32_t * p_function, uint32_t * p_disabled,
+                                        uint32_t * p_small, uint32_t * p_ineligible,
+                                        uint32_t * p_prepare)
+{
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
+    if (NULL != p_function)
+    {
+        *p_function = g_cmd53_dtc_fb_function_count;
+    }
+    if (NULL != p_disabled)
+    {
+        *p_disabled = g_cmd53_dtc_fb_disabled_count;
+    }
+    if (NULL != p_small)
+    {
+        *p_small = g_cmd53_dtc_fb_small_count;
+    }
+    if (NULL != p_ineligible)
+    {
+        *p_ineligible = g_cmd53_dtc_fb_ineligible_count;
+    }
+    if (NULL != p_prepare)
+    {
+        *p_prepare = g_cmd53_dtc_fb_prepare_count;
+    }
+#elif (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DMACA)
+    if (NULL != p_function)
+    {
+        *p_function = g_cmd53_dmaca_fb_function_count;
+    }
+    if (NULL != p_disabled)
+    {
+        *p_disabled = g_cmd53_dmaca_fb_disabled_count;
+    }
+    if (NULL != p_small)
+    {
+        *p_small = g_cmd53_dmaca_fb_small_count;
+    }
+    if (NULL != p_ineligible)
+    {
+        *p_ineligible = g_cmd53_dmaca_fb_ineligible_count;
+    }
+    if (NULL != p_prepare)
+    {
+        *p_prepare = g_cmd53_dmaca_fb_prepare_count;
+    }
+#else
+    if (NULL != p_function)
+    {
+        *p_function = 0U;
+    }
+    if (NULL != p_disabled)
+    {
+        *p_disabled = 0U;
+    }
+    if (NULL != p_small)
+    {
+        *p_small = 0U;
+    }
+    if (NULL != p_ineligible)
+    {
+        *p_ineligible = 0U;
+    }
+    if (NULL != p_prepare)
+    {
+        *p_prepare = 0U;
+    }
+#endif
 }

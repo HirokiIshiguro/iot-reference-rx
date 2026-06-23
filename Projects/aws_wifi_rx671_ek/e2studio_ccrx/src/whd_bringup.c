@@ -48,6 +48,15 @@ volatile uint32_t g_whd_bringup_target_channel;
 volatile uint8_t  g_whd_bringup_target_bssid[6];
 volatile uint32_t g_whd_bringup_join_mode;
 
+extern volatile uint32_t g_whd_sdio_sdhi_irq_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_notify_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_task_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_enable_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
+extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
+extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
+extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
+
 static void whd_record_stage(uint32_t stage, uint32_t result)
 {
     g_whd_bringup_stage = stage;
@@ -90,6 +99,48 @@ static void whd_log_result(const char * label, uint32_t result)
     p = append_text(p, label);
     p = append_text(p, "=");
     p = append_hex32(p, result);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
+static void whd_log_powersave_mode(const char * label, uint32_t result, uint32_t mode)
+{
+    char line[96];
+    char * p = line;
+
+    p = append_text(p, label);
+    p = append_text(p, "=");
+    p = append_hex32(p, result);
+    p = append_text(p, " mode=");
+    p = append_dec32(p, mode);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
+static void whd_log_sdio_diag(const char * label)
+{
+    char line[192];
+    char * p = line;
+
+    p = append_text(p, label);
+    p = append_text(p, " irq_en=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_enable_count);
+    p = append_text(p, " defer=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_deferred_enable_count);
+    p = append_text(p, " irq=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_count);
+    p = append_text(p, " notify=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_notify_count);
+    p = append_text(p, " task=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_task_count);
+    p = append_text(p, " f2retry=");
+    p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_retry_count);
+    p = append_text(p, " f2rec=");
+    p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_recovered_count);
+    p = append_text(p, " f2fail=");
+    p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_retry_fail_count);
     p = append_text(p, "\r\n");
     *p = '\0';
     debug_puts(line);
@@ -293,8 +344,10 @@ void whd_bringup_run(void)
     whd_log_result("whd_wifi_on", result);
     if (WHD_SUCCESS != result)
     {
+        whd_log_sdio_diag("whd_wifi_on diag");
         return;
     }
+    whd_log_sdio_diag("whd_wifi_on ok");
 
     {
         whd_mac_t mac;
@@ -383,6 +436,26 @@ void whd_bringup_run(void)
             {
                 int32_t rssi = 0;
                 uint32_t channel = 0U;
+                uint32_t powersave_mode = 0xffffffffUL;
+
+#if WHD_JOIN_DISABLE_POWERSAVE
+                result = whd_wifi_get_powersave_mode(g_whd_ifp, &powersave_mode);
+                whd_record_stage(831U, result);
+                whd_log_powersave_mode("whd_wifi_get_powersave_mode(before)", result, powersave_mode);
+
+                result = whd_wifi_disable_powersave(g_whd_ifp);
+                whd_record_stage(832U, result);
+                whd_log_result("whd_wifi_disable_powersave", result);
+
+                powersave_mode = 0xffffffffUL;
+                result = whd_wifi_get_powersave_mode(g_whd_ifp, &powersave_mode);
+                whd_record_stage(833U, result);
+                whd_log_powersave_mode("whd_wifi_get_powersave_mode(after)", result, powersave_mode);
+#else
+                result = whd_wifi_get_powersave_mode(g_whd_ifp, &powersave_mode);
+                whd_record_stage(831U, result);
+                whd_log_powersave_mode("whd_wifi_get_powersave_mode", result, powersave_mode);
+#endif
 
                 result = whd_wifi_get_rssi(g_whd_ifp, &rssi);
                 whd_record_stage(84U, result);

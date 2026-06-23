@@ -32,7 +32,12 @@
   FIT modules for the SDIO CMD53 data path. The DTC CMD53 path is the current
   stable default and has completed WHD bring-up, DHCP, TLS, and MQTT smoke on
   EK-RX671 + Type 1YN; DMACA remains an experimental selector for the next
-  tuning pass. RX671-focused merge requests now keep the existing RX65N/RX72N
+  tuning pass. The TCP throughput smoke test can now generate local, ignored
+  test configuration from the headless build helper, including FreeRTOS+TCP
+  window sizing, network-buffer descriptor count, and separate TX/RX application
+  chunk sizes. The current stable split-chunk baseline is TX 14600 bytes / RX
+  5840 bytes with 64 KiB socket buffers and 44-MSS windows, measuring about
+  23 Mbps in both directions over Type 1YN SDIO Wi-Fi. RX671-focused merge requests now keep the existing RX65N/RX72N
   CI lanes at build coverage so unrelated legacy-board hardware or DNS state
   does not block RX671 SDIO/WHD tuning work before the dedicated RX671 CI lane
   is promoted.

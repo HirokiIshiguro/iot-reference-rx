@@ -17,8 +17,9 @@
 
 #define WHD_PORT_BUFFER_COUNT           (16U)
 #define WHD_PORT_BUFFER_HEADROOM        (128U)
+#define WHD_PORT_BUFFER_TX_ALIGN_BIAS   (2U)
 #define WHD_PORT_BUFFER_PAYLOAD         (2048U)
-#define WHD_PORT_BUFFER_STORAGE         (WHD_PORT_BUFFER_HEADROOM + WHD_PORT_BUFFER_PAYLOAD)
+#define WHD_PORT_BUFFER_STORAGE         (WHD_PORT_BUFFER_HEADROOM + WHD_PORT_BUFFER_TX_ALIGN_BIAS + WHD_PORT_BUFFER_PAYLOAD)
 #define WHD_PORT_BUFFER_WORDS           ((WHD_PORT_BUFFER_STORAGE + sizeof(uint32_t) - 1U) / sizeof(uint32_t))
 
 typedef struct st_whd_port_buffer
@@ -59,8 +60,6 @@ static whd_port_buffer_t * whd_port_buffer_from_handle(whd_buffer_t buffer)
 static whd_result_t whd_port_host_buffer_get(whd_buffer_t * buffer, whd_buffer_dir_t direction,
                                              unsigned short size, unsigned long wait)
 {
-    (void)direction;
-
     if (NULL == buffer)
     {
         return WHD_BADARG;
@@ -83,8 +82,15 @@ static whd_result_t whd_port_host_buffer_get(whd_buffer_t * buffer, whd_buffer_d
 
             if (!p_slot->in_use)
             {
+                uint32_t headroom = WHD_PORT_BUFFER_HEADROOM;
+
+                if (WHD_NETWORK_TX == direction)
+                {
+                    headroom += WHD_PORT_BUFFER_TX_ALIGN_BIAS;
+                }
+
                 p_slot->in_use      = true;
-                p_slot->p_current   = &whd_port_buffer_start(p_slot)[WHD_PORT_BUFFER_HEADROOM];
+                p_slot->p_current   = &whd_port_buffer_start(p_slot)[headroom];
                 p_slot->current_size = (uint16_t)size;
                 *buffer = (whd_buffer_t)p_slot;
                 taskEXIT_CRITICAL();

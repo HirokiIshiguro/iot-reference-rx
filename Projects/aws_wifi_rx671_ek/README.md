@@ -59,6 +59,40 @@ The baseline is intended to remain on a dedicated development branch until the
 Wi-Fi throughput path, provisioning, TSIP, and boot-loader variants are
 separated into reviewable milestones.
 
+## TCP Throughput Tuning Notes
+
+The current throughput tuning baseline uses the interrupt-driven WHD path,
+SDHI high-speed clock, and the SDIO CMD53 DTC transfer engine. The headless
+build helper can also generate an ignored TCP smoke-test header so these
+parameters are reproducible without committing local network settings.
+
+Representative hardware settings used during the first tuning pass:
+
+- `-SoftIrqPollMs 0`
+- `-SdioUseHighSpeedClock`
+- `-SdioCmd53XferEngine 1`
+- `-FreeRtosHeapSizeKb 256`
+- `-TcpWinSegCount 240`
+- `-NetworkBufferDescriptors 64`
+- `-TcpThroughputTxBufferBytes 65536`
+- `-TcpThroughputRxBufferBytes 65536`
+- `-TcpThroughputTxWindowMss 44`
+- `-TcpThroughputRxWindowMss 44`
+
+Representative 10 MiB plain TCP results with DTC-backed CMD53 transfers:
+
+| Application chunk setting | RX671 to PC | PC to RX671 | Notes |
+|---|---:|---:|---|
+| shared `5840` bytes | 22.9 Mbps | 23.8 Mbps | Balanced baseline |
+| shared `8760` bytes | 23.1 Mbps | 23.2 Mbps | Larger TX request without RX regression |
+| TX `14600` bytes / RX `5840` bytes | 23.1-23.2 Mbps | 23.5-24.0 Mbps | Current stable split-chunk baseline |
+
+The split TX/RX chunk setting is useful because the RX671-to-PC send path
+benefits from larger `FreeRTOS_send()` requests, while the PC-to-RX671 receive
+path stayed more stable with a smaller `FreeRTOS_recv()` request size. Static
+buffers above the current split-chunk baseline need a separate RAM placement or
+allocation strategy before they can be treated as a stable tuning point.
+
 ## Build
 
 Use the headless build helper from the repository root. It initializes the
@@ -76,9 +110,13 @@ git and let the headless build script generate the ignored local header:
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
   -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
-  -SoftIrqPollMs 1 `
+  -SoftIrqPollMs 0 `
   -WlanAllowBusSleepDelayMs 600000
 ```
+
+Use `-SoftIrqPollMs 0` for the performance baseline so WHD is woken by the
+SDHI in-band IOIRQ path. A non-zero SoftIRQ poll period is useful only as a
+bring-up fallback or for A/B comparison against the interrupt-driven path.
 
 The Wi-Fi config file can be either a single whitespace-separated line:
 
@@ -111,6 +149,37 @@ where PC-to-board ping succeeded. The upstream WHD default is 10 ms, and that
 allowed the WLAN bus to sleep before ARP/ICMP traffic reached the SDIO Function
 2 data path on this bring-up branch. Pass `-WlanAllowBusSleepDelayMs -1` only
 when intentionally testing the unmodified WHD sleep timing.
+
+For a local plain TCP throughput smoke test, add the TCP options to the same
+headless build invocation. The generated
+`e2studio_ccrx/src/frtos_config/tcp_throughput_config_local.h` is ignored by
+git:
+
+```powershell
+pwsh -File tools/build_headless_rx671_wifi.ps1 `
+  -WifiConfigFile C:\ai\codex\ref\wifi.txt `
+  -SkipAwsIotConfig `
+  -SoftIrqPollMs 0 `
+  -WlanAllowBusSleepDelayMs 600000 `
+  -WlanDisablePowersave `
+  -FreeRtosHeapSizeKb 256 `
+  -TcpWinSegCount 240 `
+  -NetworkBufferDescriptors 64 `
+  -SdioUseHighSpeedClock `
+  -SdioCmd53XferEngine 1 `
+  -TcpThroughputEnable `
+  -TcpThroughputHost 192.168.10.105 `
+  -TcpThroughputPort 5004 `
+  -TcpThroughputMode both `
+  -TcpThroughputBytes 10485760 `
+  -TcpThroughputChunkBytes 5840 `
+  -TcpThroughputTxChunkBytes 14600 `
+  -TcpThroughputRxChunkBytes 5840 `
+  -TcpThroughputTxBufferBytes 65536 `
+  -TcpThroughputRxBufferBytes 65536 `
+  -TcpThroughputTxWindowMss 44 `
+  -TcpThroughputRxWindowMss 44
+```
 
 Expected outputs:
 

@@ -48,6 +48,11 @@ bool sdio_host_enable_function(uint8_t function, uint8_t * p_ready);
  * readback byte and returns true on success. */
 bool sdio_host_cmd52_write(uint8_t function, uint32_t address, uint8_t data, uint8_t * p_readback);
 
+/* Abort an in-flight SDIO transfer for one IO function through CCCR IO_ABORT.
+ * This is intended for recovery paths after the SDHI command/data engine has
+ * already been force-stopped. */
+bool sdio_host_abort_function(uint8_t function);
+
 /* Enable SDIO high speed if the card supports it (CCCR 0x13). Part of the
  * proven pre-CMD53 setup; call after F1 enable. Returns true on success. */
 bool sdio_host_set_high_speed(void);
@@ -142,5 +147,15 @@ void sdio_host_cmd53_diag(uint8_t * p_stage, uint32_t * p_s1, uint32_t * p_s2, u
 void sdio_host_cmd53_diag_ext(uint8_t * p_stage, uint32_t * p_s1, uint32_t * p_s2,
                               uint32_t * p_er1, uint32_t * p_er2,
                               uint32_t * p_r5, uint32_t * p_data0);
+
+/* CMD53 transfer-engine diagnostics. engine: 0=CPU, 1=DTC, 2=DMACA. */
+void sdio_host_cmd53_xfer_diag(uint32_t * p_engine, uint32_t * p_done,
+                               uint32_t * p_ok, uint32_t * p_fail,
+                               uint32_t * p_fallback, uint32_t * p_error);
+
+/* CMD53 transfer-engine fallback diagnostics. */
+void sdio_host_cmd53_xfer_fallback_diag(uint32_t * p_function, uint32_t * p_disabled,
+                                        uint32_t * p_small, uint32_t * p_ineligible,
+                                        uint32_t * p_prepare);
 
 #endif /* SDIO_HOST_H_ */
