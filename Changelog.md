@@ -13,50 +13,36 @@
 | [v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0) | RX72N/RX65N の OTA・Fleet Provisioning 実機CI整備 |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.0.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.0.0) | FreeRTOS 202604.00 LTS-rx ベースの初回 saffti タグ |
 
-## Coming Soon
-
-### 予定
+## 予定
 
 以降は今後のリリース候補です。
 
-- EK-RX671 + Murata Type 1YN Wi-Fi project is being promoted from SDIO/WHD
-  bring-up to an `iot-reference-rx` AWS baseline. The current development
-  branch builds `Projects/aws_wifi_rx671_ek/e2studio_ccrx` headlessly, keeps
-  Wi-Fi and AWS IoT credentials in ignored local headers, verifies SCI6 logging
-  on COM5 at 921600 bps, joins an AP through WHD over SDIO, starts
-  FreeRTOS+TCP, and completes an AWS IoT MQTT smoke connection with
-  `AWS MQTT=0`. Throughput tuning has started by making the SDHI CMD53 run
-  clock configurable from the headless build, enabling FreeRTOS+TCP sliding
-  windows for the Wi-Fi path, and adding DTC/DMAC FIT modules for the SDIO
-  CMD53 data path. The DTC CMD53 path is the current stable default and has
-  completed WHD bring-up, DHCP, TLS, and MQTT smoke on EK-RX671 + Type 1YN;
-  DMACA remains an experimental selector for the next tuning pass. The TCP
-  throughput smoke test can now generate local, ignored test configuration from
-  the headless build helper, including FreeRTOS+TCP window sizing,
-  network-buffer descriptor count, and separate TX/RX application chunk sizes.
-  The current stable split-chunk baseline is TX 14600 bytes / RX 5840 bytes
-  with 64 KiB socket buffers and 44-MSS windows. The WHD port buffer pool now
-  uses an O(1) free stack and exposes J-Link-readable counters for peak in-use
-  slots, temporary allocation failures, permanent allocation failures, and wait
-  loops, so buffer pressure can be separated from SDIO clock, DTC/DMAC, and
-  FreeRTOS+TCP window effects during the next tuning pass. A follow-up SDIO
-  transfer sweep makes the DTC CMD53 threshold 64 bytes to match the Type 1YN
-  Function 2 block size and promotes the Smart Configurator high-speed divider
-  (`SDHI_CFG_DIV_HIGH_SPEED`, `SDHI_DIV_2` with the current 60 MHz PCLKB) as the
-  tracked run clock. This raises the 10 MiB TCP smoke result from the DIV_8
-  14-15 Mbps reference to about 38 Mbps RX671-to-PC and 30-32 Mbps PC-to-RX671
-  with zero DTC failures. `SDHI_DIV_1` is documented as a 60 MHz overclock under
-  the current clock tree and is not a normal baseline because SDIO High-Speed,
-  Type 1YN, and RX671 SDHI timing all limit this interface to 50 MHz.
-  RX671-focused merge requests now keep the existing RX65N/RX72N
-  CI lanes at build coverage so unrelated legacy-board hardware or DNS state
-  does not block RX671 SDIO/WHD tuning work before the dedicated RX671 CI lane
-  is promoted.
+### EK-RX671 + Murata Type 1YN Wi-Fi
 
-- Tracealyzer を用いた CPU 負荷率とタスク挙動の可視化を導入し、TSIP offload 時の
-  性能変化を処理時間だけでなく CPU 使用率でも確認できるようにします。
+- `Projects/aws_wifi_rx671_ek/e2studio_ccrx` を EK-RX671 + Type 1YN の AWS Wi-Fi 基準プロジェクトとして整備中です。
+- 現在はヘッドレスビルド、COM5/SCI6ログ、WHD経由のAP JOIN、FreeRTOS+TCP、AWS IoT MQTT smoke まで確認済みです。
+- SDIO CMD53のDTC転送を安定版として採用し、DMACAは次回以降の比較候補として残しています。
+- Wi-Fi認証情報、AWS IoT認証情報、TCPスループット試験設定はgit管理外のローカルヘッダで注入します。
+- SDCLK 48MHz実験は規格内で動作しましたが、ICLK低下の影響もあり効果が小さいため、現時点の基準は `ICLK=120MHz / PCLKB=60MHz / SDCLK=30MHz` に戻します。
+- 最終的な速度チューニングは、TLS、OTA、TSIPによるTLS加速が安定した後に、SDHIクロック、DTC/DMAC、FreeRTOS+TCPバッファ、WHD結合部をまとめて再評価します。
 
-- RX72N 経由でセカンダリ MCU を更新する OTA リファレンスを追加する予定です。
+#### 現在の通信速度
+
+10MiBの平文TCPスモーク試験で確認した代表値です。`RX671 -> PC` はRX671からホストPCへの送信、`PC -> RX671` はホストPCからRX671への受信を示します。
+
+| 条件 | SDCLK | CMD53転送 | 主なTCP/バッファ条件 | RX671 -> PC | PC -> RX671 | 状態 |
+|---|---:|---|---|---:|---:|---|
+| 低速基準 | 7.5MHz | CPU copy | 初期比較用 | 14.48Mbps | 15.03Mbps | 安定 |
+| DTC低速 | 7.5MHz | DTC、512byte閾値 | 小転送のCPU fallbackが多い | 14.40Mbps | 14.11Mbps | 安定 |
+| DTC低速改善 | 7.5MHz | DTC、64byte閾値 | Type 1YN Function 2 block sizeに合わせる | 14.47Mbps | 15.43Mbps | 安定 |
+| 現在の基準 | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window | 38.2-38.5Mbps | 30.2-32.0Mbps | 採用中 |
+| 48MHz実験 | 48MHz | DTC、64byte閾値 | `PLL=192MHz`、`ICLK=96MHz`、同じTCP条件 | 39.6-39.9Mbps | 31.8-32.3Mbps | 効果限定、未採用 |
+
+### 共通の今後作業
+
+- TracealyzerでCPU負荷率、タスク挙動、SDIO/WHD/FreeRTOS+TCP境界の待ち時間を可視化します。
+- TSIP offload時の性能変化を、処理時間だけでなくCPU使用率でも確認します。
+- RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.3.0
 
