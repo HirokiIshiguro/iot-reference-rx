@@ -28,15 +28,16 @@
 
 #### 現在の通信速度
 
-10MiBの平文TCPスモーク試験で確認した代表値です。`RX671 -> PC` はRX671からホストPCへの送信、`PC -> RX671` はホストPCからRX671への受信を示します。
+10MiBの平文TCPスモーク試験で確認した代表値です。`RX671 -> Host` はRX671からLANBENCHホストへの送信、`Host -> RX671` はLANBENCHホストからRX671への受信を示します。現在の再現用基準は、mbedTLS benchmarkと同じRPi#2上の共通Go LANBENCHを使い、SOURCE側はRX671でペイロード検証を行わない条件に揃えます。
 
-| 条件 | SDCLK | CMD53転送 | 主なTCP/バッファ条件 | RX671 -> PC | PC -> RX671 | 状態 |
-|---|---:|---|---|---:|---:|---|
-| 低速基準 | 7.5MHz | CPU copy | 初期比較用 | 14.48Mbps | 15.03Mbps | 安定 |
-| DTC低速 | 7.5MHz | DTC、512byte閾値 | 小転送のCPU fallbackが多い | 14.40Mbps | 14.11Mbps | 安定 |
-| DTC低速改善 | 7.5MHz | DTC、64byte閾値 | Type 1YN Function 2 block sizeに合わせる | 14.47Mbps | 15.43Mbps | 安定 |
-| 現在の基準 | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window | 38.2-38.5Mbps | 30.2-32.0Mbps | 採用中 |
-| 48MHz実験 | 48MHz | DTC、64byte閾値 | `PLL=192MHz`、`ICLK=96MHz`、同じTCP条件 | 39.6-39.9Mbps | 31.8-32.3Mbps | 効果限定、未採用 |
+| 条件 | ホスト | SDCLK | CMD53転送 | 主なTCP/バッファ条件 | RX671 -> Host | Host -> RX671 | 状態 |
+|---|---|---:|---|---|---:|---:|---|
+| 低速基準 | PC | 7.5MHz | CPU copy | 初期比較用 | 14.48Mbps | 15.03Mbps | 参考 |
+| DTC低速 | PC | 7.5MHz | DTC、512byte閾値 | 小転送のCPU fallbackが多い | 14.40Mbps | 14.11Mbps | 参考 |
+| DTC低速改善 | PC | 7.5MHz | DTC、64byte閾値 | Type 1YN Function 2 block sizeに合わせる | 14.47Mbps | 15.43Mbps | 参考 |
+| PC対向最速値 | PC | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window | 38.2-38.5Mbps | 30.2-32.0Mbps | 参考、RPi基準とは混在しない |
+| 48MHz実験 | PC | 48MHz | DTC、64byte閾値 | `PLL=192MHz`、`ICLK=96MHz`、同じTCP条件 | 39.6-39.9Mbps | 31.8-32.3Mbps | 効果限定、未採用 |
+| RPi#2統一基準 | RPi#2 / 共通Go LANBENCH | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window、SOURCE verifyなし | 32.476Mbps | 19.288Mbps | 採用中、mbedTLS benchmarkと同条件 |
 
 ### 共通の今後作業
 
