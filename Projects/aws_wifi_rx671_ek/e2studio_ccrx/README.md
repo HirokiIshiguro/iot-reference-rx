@@ -144,6 +144,63 @@ The tracked DTC threshold is 64 bytes. This matches the WHD-programmed Function
 `SDIO_HOST_CMD53_DTC_MIN_BYTES=64` completed with zero DTC failures and only the
 non-Function/bring-up fallback counters remaining.
 
+## Tracealyzer over J-Link RTT
+
+The project links Percepio's official TraceRecorderSource as a submodule at
+`../external/TraceRecorderSource`. Project-local configuration lives in
+`src/tracealyzer_config`; `src/tracealyzer_freertos_wrap` installs the
+Tracealyzer hooks after the RX FreeRTOS port types are visible to CC-RX.
+Small wrappers in `src/tracealyzer_recorder` compile only the Recorder core,
+FreeRTOS kernel port, and J-Link RTT stream port needed by this project.
+
+`main_task()` starts the recorder with `TRC_START`. This target-start mode is
+intentional for the EK-RX671 automation path: the first CLI bring-up confirmed
+that the RTT control channel was visible and Tracealyzer CLI could write start
+commands to down-buffer 1, but `TRC_START_FROM_HOST` produced 0-byte PSF files
+on this integration. With `TRC_START`, both `JLinkRTTLogger` and Tracealyzer
+CLI capture recorder data from up-buffer 1 (`TzData`). Use `reset=true` when a
+capture should begin from reset/boot; use `reset=false` only when attaching to
+an already running image.
+
+The CC-RX map contains `__SEGGER_RTT`; use that address as the Tracealyzer CLI
+RTT block address for deterministic connection.
+
+After a headless build, confirm the address with:
+
+```powershell
+Select-String `
+  -Path Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug\aws_wifi_rx671_ek.map `
+  -Pattern '__SEGGER_RTT'
+```
+
+Example CLI capture:
+
+```powershell
+$tracealyzer = 'C:\Program Files\Percepio\Tracealyzer 4\Tracealyzer.exe'
+$work = Split-Path $tracealyzer
+$out = 'C:\ai\codex\ek-rx671-iot-reference-rx\artifacts\tracealyzer-cli\rx671-wifi-capture.psf'
+$conn = 'connection=SEGGER RTT;serial=853004952;usb=true;speed=4000;upbuffer=1;downbuffer=1;debuggerinterface=0;device=R5F5671E;debugger=JLink;blockaddress=0x00043cfc;ti=false;reset=true;sbs=true;numcores=1'
+
+Start-Process -FilePath $tracealyzer `
+  -ArgumentList @('stream', '-t', '10', '-c', ('"' + $conn + '"'), '-o', ('"' + $out + '"')) `
+  -WorkingDirectory $work -Wait -PassThru
+
+Start-Process -FilePath $tracealyzer `
+  -ArgumentList @('export-log', ('"' + $out + '"'), ('"' + $out + '.log.txt"')) `
+  -WorkingDirectory $work -Wait -PassThru
+
+Start-Process -FilePath $tracealyzer `
+  -ArgumentList @('export-actors', ('"' + $out + '"'), ('"' + $out + '.actors.txt"')) `
+  -WorkingDirectory $work -Wait -PassThru
+```
+
+The checked value `0x00043cfc` is the `__SEGGER_RTT` address from the verified
+2026-06-26 build; always refresh it from the current `.map` file after changing
+the project or linker layout. The same bring-up produced valid PSF captures
+with both `reset=true` (boot-aligned trace) and `reset=false` (attach to a
+running self-start trace). The Tracealyzer analysis commands use positional
+arguments (`export-log <input.psf> <output.txt>`), not `-i` / `-o` options.
+
 ## WHD linked resource layout
 
 The Type 1YN / CYW43439 WHD resources are staged from pinned source

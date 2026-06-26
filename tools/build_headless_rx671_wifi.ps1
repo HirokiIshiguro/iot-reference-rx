@@ -1,6 +1,8 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
+    [string]$Make = "",
+    [string]$CcrxBin = "",
     [string]$Workspace = "C:\iotref-rx671-wifi-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx671_wifi_e2studio_build.log"),
     [string]$WifiConfigFile = "",
@@ -116,6 +118,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectDir ".project"))) {
 
 $submodulePaths = @(
     "Projects/$projectName/external/wifi-host-driver",
+    "Projects/$projectName/external/TraceRecorderSource",
     "Projects/$projectName/external/type1yn-blobs/sources/firmware-wifi-host-driver",
     "Projects/$projectName/external/type1yn-blobs/sources/wifi-resources",
     "Projects/$projectName/external/type1yn-blobs/sources/cyw-fmac-nvram",
@@ -605,6 +608,104 @@ function Wait-RxBuildProcesses {
     Write-Warning "Timed out waiting for e2 studio child build processes to exit."
 }
 
+function Resolve-PluginTool {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PluginPattern,
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath
+    )
+
+    $eclipseDir = Split-Path -Parent $E2Studio
+    $pluginsDir = Join-Path $eclipseDir "plugins"
+    if (-not (Test-Path -LiteralPath $pluginsDir)) {
+        return $null
+    }
+
+    $pluginDirs = Get-ChildItem -Path $pluginsDir -Directory -Filter $PluginPattern -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending
+    foreach ($pluginDir in $pluginDirs) {
+        $candidate = Join-Path $pluginDir.FullName $RelativePath
+        if (Test-Path -LiteralPath $candidate) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    return $null
+}
+
+function Resolve-Make {
+    if (-not [string]::IsNullOrWhiteSpace($Make)) {
+        if (-not (Test-Path -LiteralPath $Make)) {
+            throw "make executable not found: $Make"
+        }
+        return (Resolve-Path -LiteralPath $Make).Path
+    }
+
+    $candidate = Resolve-PluginTool "com.renesas.ide.exttools.gnumake.win32.x86_64_*" "mk\make.exe"
+    if ($candidate) {
+        return $candidate
+    }
+
+    $command = Get-Command make.exe -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    throw "GNU make was not found. Set -Make to the e2 studio make.exe path."
+}
+
+function Resolve-CcrxBin {
+    if (-not [string]::IsNullOrWhiteSpace($CcrxBin)) {
+        if (-not (Test-Path -LiteralPath $CcrxBin)) {
+            throw "CC-RX bin directory not found: $CcrxBin"
+        }
+        return (Resolve-Path -LiteralPath $CcrxBin).Path
+    }
+
+    foreach ($candidate in @($env:CCRX_BIN, $env:BIN_RX, "C:\Program Files (x86)\Renesas\RX\3_7_0\bin")) {
+        if ((-not [string]::IsNullOrWhiteSpace($candidate)) -and (Test-Path -LiteralPath $candidate)) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    throw "CC-RX bin directory was not found. Set -CcrxBin, CCRX_BIN, or BIN_RX."
+}
+
+function Add-PathEntry {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or (-not (Test-Path -LiteralPath $Path))) {
+        return
+    }
+
+    $resolved = (Resolve-Path -LiteralPath $Path).Path
+    $entries = $env:Path -split ';'
+    if ($entries -notcontains $resolved) {
+        $env:Path = "$resolved;$env:Path"
+    }
+}
+
+function Invoke-MakeTarget {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BuildDir,
+        [Parameter(Mandatory = $true)]
+        [string]$Target
+    )
+
+    Write-Host "Invoking make target: $Target"
+    Push-Location $BuildDir
+    try {
+        & $script:makeExe -r $Target
+        if ($LASTEXITCODE -ne 0) {
+            throw "make target '$Target' failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Invoke-E2StudioHeadlessBuild {
     param(
         [Parameter(Mandatory = $true)]
@@ -720,6 +821,10 @@ $effectiveSdioCmd53XferEngine = Get-FirstNonEmpty @($SdioCmd53XferEngine, $env:R
 if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
     Write-Host "SDIO CMD53 transfer engine override: $effectiveSdioCmd53XferEngine"
 }
+$script:makeExe = Resolve-Make
+Add-PathEntry (Split-Path -Parent $script:makeExe)
+Add-PathEntry (Resolve-CcrxBin)
+
 $effectiveSdioCmd53DtcReadEnable = Get-FirstNonEmpty @($SdioCmd53DtcReadEnable, $env:RX671_EK_SDIO_CMD53_DTC_READ_ENABLE)
 $effectiveSdioCmd53DtcWriteEnable = Get-FirstNonEmpty @($SdioCmd53DtcWriteEnable, $env:RX671_EK_SDIO_CMD53_DTC_WRITE_ENABLE)
 $effectiveSdioCmd53DtcMinBytes = Get-FirstNonEmpty @($SdioCmd53DtcMinBytes, $env:RX671_EK_SDIO_CMD53_DTC_MIN_BYTES)
@@ -864,10 +969,18 @@ try {
     $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
         ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
 
-    if (($e2StudioExitCode -ne 0) -and (-not $motWasUpdated)) {
-        throw "e2 studio build failed with exit code $e2StudioExitCode"
+    if (($e2StudioExitCode -ne 0) -or (-not $motWasUpdated)) {
+        Write-Warning "e2 studio build returned exit code $e2StudioExitCode or did not refresh .mot through the default all target."
+        Write-Host "Ensuring the loadable image with an explicit .mot make target."
+        Invoke-MakeTarget -BuildDir $hardwareDebug -Target "$projectName.mot"
+        $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
+            ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
+    }
+
+    if (-not $motWasUpdated) {
+        throw "Expected .mot output was not refreshed: $motOutput"
     } elseif ($e2StudioExitCode -ne 0) {
-        Write-Warning "e2 studio returned exit code $e2StudioExitCode before child build completion, but output was refreshed."
+        Write-Warning "e2 studio returned exit code $e2StudioExitCode, but .mot/.abs/.map were refreshed by the explicit make target."
     }
 } finally {
     if ($null -ne $cprojectBytes) {
@@ -875,7 +988,7 @@ try {
     }
 }
 
-foreach ($extension in @(".mot", ".abs", ".x")) {
+foreach ($extension in @(".mot", ".abs", ".map")) {
     $output = Join-Path $hardwareDebug "$projectName$extension"
     if (-not (Test-Path -LiteralPath $output)) {
         throw "Expected build output missing: $output"
