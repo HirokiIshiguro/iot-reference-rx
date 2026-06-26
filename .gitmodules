@@ -85,3 +85,6 @@
 [submodule "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/cyw-fmac-nvram"]
 	path = Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/cyw-fmac-nvram
 	url = https://github.com/murata-wireless/cyw-fmac-nvram.git
+[submodule "Projects/aws_wifi_rx671_ek/external/TraceRecorderSource"]
+	path = Projects/aws_wifi_rx671_ek/external/TraceRecorderSource
+	url = https://github.com/percepio/TraceRecorderSource.git

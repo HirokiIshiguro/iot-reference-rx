@@ -22,7 +22,7 @@
 #include "whd_bringup.h"
 #include "aws_iot_mqtt_smoke.h"
 #include "tcp_throughput_smoke.h"
-#include "SEGGER_RTT.h"
+#include "trcRecorder.h"
 
 #if BSP_CFG_CPLUSPLUS == 1
 extern void abort(void);
@@ -143,7 +143,7 @@ void main_task(void *pvParameters)
 
     (void)pvParameters;
 
-    SEGGER_RTT_Init();
+    (void)xTraceEnable(TRC_START);
 
     /* Bring up the SCI6 debug console (COM port @ 921600 8N1, P00/P01). */
     debug_uart_init();

@@ -545,5 +545,20 @@
 			<type>2</type>
 			<locationURI>PARENT-1-PROJECT_LOC/external/wifi-host-driver/External</locationURI>
 		</link>
+		<link>
+			<name>trace_recorder/include</name>
+			<type>2</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/TraceRecorderSource/include</locationURI>
+		</link>
+		<link>
+			<name>trace_recorder/kernelports/FreeRTOS/include</name>
+			<type>2</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/TraceRecorderSource/kernelports/FreeRTOS/include</locationURI>
+		</link>
+		<link>
+			<name>trace_recorder/streamports/Jlink_RTT/include</name>
+			<type>2</type>
+			<locationURI>PARENT-1-PROJECT_LOC/external/TraceRecorderSource/streamports/Jlink_RTT/include</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

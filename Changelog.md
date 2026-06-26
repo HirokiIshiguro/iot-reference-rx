@@ -24,6 +24,7 @@
 - SDIO CMD53のDTC転送を安定版として採用し、DMACAは次回以降の比較候補として残しています。
 - Wi-Fi認証情報、AWS IoT認証情報、TCPスループット試験設定はgit管理外のローカルヘッダで注入します。
 - SDCLK 48MHz実験は規格内で動作しましたが、ICLK低下の影響もあり効果が小さいため、現時点の基準は `ICLK=120MHz / PCLKB=60MHz / SDCLK=30MHz` に戻します。
+- Percepio公式TraceRecorderSourceをサブモジュール化し、J-Link RTT経由のTracealyzer CLI取得を確認済みです。
 - 最終的な速度チューニングは、TLS、OTA、TSIPによるTLS加速が安定した後に、SDHIクロック、DTC/DMAC、FreeRTOS+TCPバッファ、WHD結合部をまとめて再評価します。
 
 #### 現在の通信速度
@@ -42,7 +43,7 @@
 ### 共通の今後作業
 
 - TracealyzerでCPU負荷率、タスク挙動、SDIO/WHD/FreeRTOS+TCP境界の待ち時間を可視化します。
-- `aws_wifi_rx671_ek` は J-Link RTT control block をリンクし、map の `__SEGGER_RTT` から Tracealyzer CLI 用の RTT block address を取得できるようにします。
+- `aws_wifi_rx671_ek` は map の `__SEGGER_RTT` をTracealyzer CLI用のRTT block addressとして使い、`reset=true` の有界取得を標準手順にします。
 - TSIP offload時の性能変化を、処理時間だけでなくCPU使用率でも確認します。
 - RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
 

@@ -37,6 +37,7 @@ Includes   <System Includes> , "Project Includes"
 #include "r_smc_entry.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "trcRecorder.h"
 
 #if (BSP_CFG_RTOS_USED == 1)
 
@@ -274,6 +275,8 @@ void Processing_Before_Start_Kernel(void)
     Kernel_Object_init();
 
     /************** task creation ****************************/
+    (void)xTraceInitialize();
+
     /* Main task. */
     ret = xTaskCreate(main_task, "MAIN_TASK", 1024, NULL, 3, NULL);
     if (pdPASS != ret)
