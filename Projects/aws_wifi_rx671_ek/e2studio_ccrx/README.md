@@ -144,6 +144,22 @@ The tracked DTC threshold is 64 bytes. This matches the WHD-programmed Function
 `SDIO_HOST_CMD53_DTC_MIN_BYTES=64` completed with zero DTC failures and only the
 non-Function/bring-up fallback counters remaining.
 
+## J-Link RTT map symbol
+
+`src/segger_rtt` links the minimal SEGGER RTT control block into this project.
+`main_task()` calls `SEGGER_RTT_Init()` before the SCI6 debug console is
+initialized. This does not enable the Tracealyzer Recorder by itself; it only
+makes the CC-RX map contain `__SEGGER_RTT` so Tracealyzer CLI can be pointed at
+the exact RTT block address from the current build.
+
+After a headless build, confirm the address with:
+
+```powershell
+Select-String `
+  -Path Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug\aws_wifi_rx671_ek.map `
+  -Pattern '__SEGGER_RTT'
+```
+
 ## WHD linked resource layout
 
 The Type 1YN / CYW43439 WHD resources are staged from pinned source

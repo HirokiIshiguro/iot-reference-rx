@@ -42,6 +42,7 @@
 ### 共通の今後作業
 
 - TracealyzerでCPU負荷率、タスク挙動、SDIO/WHD/FreeRTOS+TCP境界の待ち時間を可視化します。
+- `aws_wifi_rx671_ek` は J-Link RTT control block をリンクし、map の `__SEGGER_RTT` から Tracealyzer CLI 用の RTT block address を取得できるようにします。
 - TSIP offload時の性能変化を、処理時間だけでなくCPU使用率でも確認します。
 - RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
 
