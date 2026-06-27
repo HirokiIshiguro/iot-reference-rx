@@ -141,9 +141,11 @@ else()  # CC-RX
 ${_opts}")
 
     # 4) リンク(rlink → .abs)
+    #    オブジェクトの再コンパイルで確実に再リンクされるよう、TARGET_OBJECTS を
+    #    依存に含める（fw_obj ターゲット依存だけでは個別オブジェクト変更を追えない）。
     add_custom_command(OUTPUT "${_abs}"
         COMMAND "${RX_RLINK}" "-subcommand=${_link_sub}"
-        DEPENDS fw_obj "${_port_obj}" "${_rtlib}" "${_link_sub}"
+        DEPENDS fw_obj $<TARGET_OBJECTS:fw_obj> "${_port_obj}" "${_rtlib}" "${_link_sub}"
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" VERBATIM
         COMMENT "rlink -> ${FW_NAME}.abs")
 
