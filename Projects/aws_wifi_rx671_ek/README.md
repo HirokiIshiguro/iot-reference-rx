@@ -81,13 +81,23 @@ Representative hardware settings used during the first tuning pass:
 - `-SdioCmd53XferEngine 1`
 - `-SdioCmd53DtcMinBytes 64` (tracked default)
 - `-FreeRtosHeapSizeKb 256`
-- `-TcpWinSegCount 240`
-- `-NetworkBufferDescriptors 64`
+- `-TcpWinSegCount 128`
+- `-NetworkBufferDescriptors 48`
 - `-WhdPortBufferCount 16` (default; increase for buffer-pressure A/B tests)
 - `-TcpThroughputTxBufferBytes 65536`
 - `-TcpThroughputRxBufferBytes 65536`
 - `-TcpThroughputTxWindowMss 44`
 - `-TcpThroughputRxWindowMss 44`
+
+The FreeRTOS heap default is 256 KiB for this project. A 224 KiB heap was
+rejected for the throughput baseline because the 64 KiB socket-buffer / 44-MSS
+window SOURCE run exhausted the heap around 40 KiB of received payload and
+entered `vApplicationMallocFailedHook`. With 256 KiB, the same 10 MiB SOURCE
+run completed and left about 18 KiB minimum free heap in the measured run.
+For larger TCP buffer/window A/B tests, build SINK and SOURCE as separate
+throughput images. Packing both directions plus 64 KiB socket buffers, 44-MSS
+windows, more than 48 network buffers, and the 256 KiB heap into one image can
+overflow RX671 RAM.
 
 Representative 10 MiB plain TCP results with DTC-backed CMD53 transfers before
 the SDHI clock increase:
@@ -131,6 +141,21 @@ Representative 10 MiB plain TCP results:
 | CPU copy, `SDHI_DIV_4`, PORTD high-speed drive | n/a | n/a | Failed in `whd_wifi_on()`; `clkdiv=1`, `dscr2=FC`, `f2retry=2` |
 | DTC, `SDHI_DIV_4`, PORTD high-speed drive | n/a | n/a | Failed in `whd_wifi_on()`; `clkdiv=1`, `xfer=1`, `dscr2=FC`, `f2retry=6` |
 
+Tracealyzer CLI diagnostic run on 2026-06-27:
+
+| Direction | LANBENCH peer | Chunk / buffer condition | Throughput | Transfer-window CPU load | Dominant actor |
+|---|---|---|---:|---:|---|
+| Host to RX671 | RPi#2 wired `192.168.10.203:5001` | host source chunk 4096 bytes, RX chunk 4096 bytes, 64 KiB socket buffers, 44-MSS windows | 15.857 Mbps board-side / 16.631 Mbps host-side | 96.96% busy | WHD 85.59%, IP-Task 9.57% |
+
+The 2026-06-27 run was taken with J-Link and the SD sniffer board restored, so
+it is a diagnostic point for CPU-load attribution rather than a replacement for
+the direct-wiring high-speed baseline above. It confirmed that the current
+SOURCE receive path is CPU-bound mainly in the WHD task while the application
+throughput task itself consumes only about 1.6% of the transfer window. This
+points the next tuning pass toward WHD/SDPCM packet handling, FreeRTOS+TCP
+buffer pressure, and LANBENCH chunk/window alignment before changing the SDHI
+clock again.
+
 The 64-byte DTC threshold is now the default because Type 1YN/WHD programs a
 64-byte Function 2 block size and this setting moved nearly all Function 2
 block transfers out of the CPU fallback path without introducing DTC errors.
@@ -162,6 +187,12 @@ notes when changing TCP window, network-buffer, and SDIO transfer settings:
 
 The TCP throughput smoke task also emits these values on COM5 as
 `[TCPTHR] whdbuf ...` lines before and after each direction test.
+
+When Tracealyzer is enabled, the same task also emits the compact `TCPTHR` User
+Event channel. The result line uses `res m=<mode> b=<bytes> ms=<elapsed>
+k=<Mbps_x1000>` so `export-log` can be parsed without relying on UART output.
+The payload-transfer window is bounded by `phase=12` and `res m=2` for SOURCE
+tests, which makes CPU-load attribution from Tracealyzer CLI repeatable.
 
 If the temporary failure or wait counters increase during a throughput run,
 repeat the build with a larger `-WhdPortBufferCount` before changing the
@@ -225,10 +256,14 @@ allowed the WLAN bus to sleep before ARP/ICMP traffic reached the SDIO Function
 2 data path on this bring-up branch. Pass `-WlanAllowBusSleepDelayMs -1` only
 when intentionally testing the unmodified WHD sleep timing.
 
-For a local plain TCP throughput smoke test, add the TCP options to the same
-headless build invocation. The generated
+For a local plain TCP throughput smoke test, start the common Go LANBENCH
+server on the wired RPi#2 path, then add the TCP options to the same headless
+build invocation. The generated
 `e2studio_ccrx/src/frtos_config/tcp_throughput_config_local.h` is ignored by
-git:
+git. The smoke task speaks the LANBENCH command protocol: `SINK <bytes>` sends
+the deterministic LANBENCH payload to the host and reads the host `OK` line,
+while `SOURCE <bytes>` reads the host `DATA <bytes>` header, receives the
+payload, then reads the host `OK` line.
 
 ```powershell
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
@@ -238,16 +273,16 @@ pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WlanAllowBusSleepDelayMs 600000 `
   -WlanDisablePowersave `
   -FreeRtosHeapSizeKb 256 `
-  -TcpWinSegCount 240 `
-  -NetworkBufferDescriptors 64 `
+  -TcpWinSegCount 128 `
+  -NetworkBufferDescriptors 48 `
   -WhdPortBufferCount 16 `
   -SdioRunClockDiv SDHI_DIV_2 `
   -SdioCmd53XferEngine 1 `
   -SdioCmd53DtcMinBytes 64 `
   -TcpThroughputEnable `
-  -TcpThroughputHost 192.168.10.105 `
-  -TcpThroughputPort 5004 `
-  -TcpThroughputMode both `
+  -TcpThroughputHost 192.168.10.203 `
+  -TcpThroughputPort 5001 `
+  -TcpThroughputMode source `
   -TcpThroughputBytes 10485760 `
   -TcpThroughputChunkBytes 5840 `
   -TcpThroughputTxChunkBytes 14600 `

@@ -320,7 +320,7 @@
 /* Set the total heap size in kilobytes. This value must be greater than 0 and
  * less than or equal to the device RAM capacity. */
 #ifndef RX671_FREERTOS_HEAP_SIZE_KB
-#define RX671_FREERTOS_HEAP_SIZE_KB                  224
+#define RX671_FREERTOS_HEAP_SIZE_KB                  256
 #endif
 #define configTOTAL_HEAP_SIZE_N                      RX671_FREERTOS_HEAP_SIZE_KB
 
