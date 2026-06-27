@@ -15,6 +15,10 @@
 #include "tcp_throughput_config.h"
 #include "tcp_throughput_smoke.h"
 
+#if (defined(CONFIG_USE_PERCEPIO_TRACE_RECORDER) && (CONFIG_USE_PERCEPIO_TRACE_RECORDER == 1))
+#include "trcRecorder.h"
+#endif
+
 extern volatile uint32_t g_freertos_tcp_network_up;
 
 volatile uint32_t g_tcp_throughput_enable_seen;
@@ -28,6 +32,11 @@ volatile uint32_t g_tcp_throughput_last_bytes;
 volatile uint32_t g_tcp_throughput_last_ms;
 volatile uint32_t g_tcp_throughput_last_mbps_x1000;
 volatile uint32_t g_tcp_throughput_win_status;
+volatile uint32_t g_tcp_throughput_source_phase;
+volatile uint32_t g_tcp_throughput_source_received_live;
+volatile uint32_t g_tcp_throughput_source_recv_count;
+volatile int32_t g_tcp_throughput_source_last_recv;
+volatile int32_t g_tcp_throughput_source_last_status;
 
 extern volatile uint32_t g_whd_network_rx_frames;
 extern volatile uint32_t g_whd_network_rx_to_ip;
@@ -61,6 +70,48 @@ static union
 } s_tcp_buffer_storage;
 
 #define s_tcp_buffer (s_tcp_buffer_storage.bytes)
+
+#if (defined(CONFIG_USE_PERCEPIO_TRACE_RECORDER) && (CONFIG_USE_PERCEPIO_TRACE_RECORDER == 1))
+static TraceStringHandle_t s_tcp_trace_channel;
+static TraceStringHandle_t s_tcp_trace_phase_fmt;
+static TraceStringHandle_t s_tcp_trace_result_fmt;
+static uint8_t s_tcp_trace_initialized;
+
+static void tcp_trace_init(void)
+{
+    if (0U == s_tcp_trace_initialized)
+    {
+        (void)xTraceStringRegister("TCPTHR", &s_tcp_trace_channel);
+        (void)xTraceStringRegister("phase=%u value=%u", &s_tcp_trace_phase_fmt);
+        (void)xTraceStringRegister("res m=%u b=%u ms=%u k=%u", &s_tcp_trace_result_fmt);
+        s_tcp_trace_initialized = 1U;
+    }
+}
+
+static void tcp_trace_phase(uint32_t phase, uint32_t value)
+{
+    tcp_trace_init();
+    (void)xTracePrintF2(s_tcp_trace_channel,
+                        s_tcp_trace_phase_fmt,
+                        (TraceUnsignedBaseType_t)phase,
+                        (TraceUnsignedBaseType_t)value);
+}
+
+static void tcp_trace_result(uint32_t mode, uint32_t bytes, uint32_t ms, uint32_t mbps_x1000)
+{
+    tcp_trace_init();
+    (void)xTracePrintF4(s_tcp_trace_channel,
+                        s_tcp_trace_result_fmt,
+                        (TraceUnsignedBaseType_t)mode,
+                        (TraceUnsignedBaseType_t)bytes,
+                        (TraceUnsignedBaseType_t)ms,
+                        (TraceUnsignedBaseType_t)mbps_x1000);
+}
+#else
+#define tcp_trace_phase(phase, value) ((void)(phase), (void)(value))
+#define tcp_trace_result(mode, bytes, ms, mbps_x1000) \
+    ((void)(mode), (void)(bytes), (void)(ms), (void)(mbps_x1000))
+#endif
 
 static char * append_dec64(char * dst, uint64_t value)
 {
@@ -316,6 +367,138 @@ static void log_sdio_xfer_diag(const char * label)
     debug_puts(line);
 }
 
+static uint8_t lanbench_pattern_byte(uint32_t index)
+{
+    return (uint8_t)(((index * 31UL) + 17UL) & 0xFFUL);
+}
+
+static void lanbench_fill_pattern(uint8_t * buffer, uint32_t offset, uint32_t length)
+{
+    uint32_t i;
+
+    for (i = 0U; i < length; i++)
+    {
+        buffer[i] = lanbench_pattern_byte(offset + i);
+    }
+}
+
+static int32_t socket_send_all(Socket_t socket, const uint8_t * buffer, uint32_t length)
+{
+    uint32_t sent = 0U;
+
+    while (sent < length)
+    {
+        BaseType_t n = FreeRTOS_send(socket, &buffer[sent], (BaseType_t)(length - sent), 0);
+
+        if (0 >= n)
+        {
+            return (int32_t)n;
+        }
+        sent += (uint32_t)n;
+    }
+
+    return 0;
+}
+
+static int32_t socket_recv_line(Socket_t socket, char * line, uint32_t line_size)
+{
+    uint32_t used = 0U;
+
+    if (0U == line_size)
+    {
+        return -100;
+    }
+
+    while ((used + 1U) < line_size)
+    {
+        char ch;
+        BaseType_t n = FreeRTOS_recv(socket, &ch, 1, 0);
+
+        if (0 >= n)
+        {
+            line[used] = '\0';
+            return (int32_t)n;
+        }
+
+        if ('\n' == ch)
+        {
+            line[used] = '\0';
+            return (int32_t)used;
+        }
+
+        if ('\r' != ch)
+        {
+            line[used] = ch;
+            used++;
+        }
+    }
+
+    line[used] = '\0';
+    return -101;
+}
+
+static int32_t socket_send_lanbench_command(Socket_t socket, const char * command, uint32_t bytes)
+{
+    char line[40];
+    char * p = line;
+
+    p = append_text(p, command);
+    p = append_text(p, " ");
+    p = append_dec32(p, bytes);
+    p = append_text(p, "\n");
+    *p = '\0';
+
+    return socket_send_all(socket, (const uint8_t *)line, (uint32_t)strlen(line));
+}
+
+static int32_t parse_data_header(const char * line, uint32_t expected_bytes)
+{
+    uint32_t value = 0U;
+    const char * p;
+
+    if (0 != strncmp(line, "DATA ", 5U))
+    {
+        return -102;
+    }
+
+    p = &line[5];
+    if (('\0' == *p) || ('0' > *p) || ('9' < *p))
+    {
+        return -103;
+    }
+
+    while (('\0' != *p) && ('0' <= *p) && ('9' >= *p))
+    {
+        value = (value * 10UL) + (uint32_t)(*p - '0');
+        p++;
+    }
+
+    return (value == expected_bytes) ? 0 : -104;
+}
+
+static int32_t read_lanbench_result(Socket_t socket, const char * label)
+{
+    char result[160];
+    char line[220];
+    char * p = line;
+    int32_t status = socket_recv_line(socket, result, sizeof(result));
+
+    if (0 > status)
+    {
+        return status;
+    }
+
+    p = append_text(p, "[TCPTHR] host ");
+    p = append_text(p, label);
+    p = append_text(p, " ");
+    p = append_text(p, result);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+
+    return 0;
+}
+
 static Socket_t open_connected_socket(int32_t * p_status)
 {
     Socket_t socket;
@@ -387,13 +570,22 @@ static int32_t run_sink_once(uint32_t iteration)
         return status;
     }
 
-    memset(s_tcp_buffer, 0xa5, (size_t)TCP_THROUGHPUT_TX_CHUNK_BYTES);
+    status = socket_send_lanbench_command(socket, "SINK", (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES);
+    if (0 != status)
+    {
+        (void)FreeRTOS_shutdown(socket, FREERTOS_SHUT_RDWR);
+        (void)FreeRTOS_closesocket(socket);
+        return status;
+    }
+
+    tcp_trace_phase(20U, (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES);
     start_ticks = xTaskGetTickCount();
     while (sent < (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES)
     {
         uint32_t remaining = (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES - sent;
         uint32_t request = (remaining < (uint32_t)TCP_THROUGHPUT_TX_CHUNK_BYTES) ?
                            remaining : (uint32_t)TCP_THROUGHPUT_TX_CHUNK_BYTES;
+        lanbench_fill_pattern(s_tcp_buffer, sent, request);
         BaseType_t n = FreeRTOS_send(socket, s_tcp_buffer, request, 0);
 
         if (0 >= n)
@@ -412,10 +604,19 @@ static int32_t run_sink_once(uint32_t iteration)
     }
     end_ticks = xTaskGetTickCount();
 
+    if (0 == status)
+    {
+        status = read_lanbench_result(socket, "sink");
+    }
+
     (void)FreeRTOS_shutdown(socket, FREERTOS_SHUT_RDWR);
     (void)FreeRTOS_closesocket(socket);
 
     log_result("sink", sent, (uint32_t)((end_ticks - start_ticks) * portTICK_PERIOD_MS));
+    tcp_trace_result((uint32_t)TCP_THROUGHPUT_MODE_SINK,
+                     sent,
+                     g_tcp_throughput_last_ms,
+                     g_tcp_throughput_last_mbps_x1000);
     log_sdio_xfer_diag("sink");
     log_perf_diag("sink_end");
     return status;
@@ -433,27 +634,79 @@ static int32_t run_source_once(uint32_t iteration)
 #endif
 
     (void)iteration;
+    g_tcp_throughput_source_phase = 1U;
+    g_tcp_throughput_source_received_live = 0U;
+    g_tcp_throughput_source_recv_count = 0U;
+    g_tcp_throughput_source_last_recv = 0;
+    g_tcp_throughput_source_last_status = 0;
+    tcp_trace_phase(10U, (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES);
     log_perf_diag("source_begin");
     socket = open_connected_socket(&status);
     if (FREERTOS_INVALID_SOCKET == socket)
     {
+        g_tcp_throughput_source_last_status = status;
+        return status;
+    }
+
+    g_tcp_throughput_source_phase = 2U;
+    debug_puts("[TCPTHR] source_cmd_begin\r\n");
+    tcp_trace_phase(11U, (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES);
+    status = socket_send_lanbench_command(socket, "SOURCE", (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES);
+    g_tcp_throughput_source_last_status = status;
+    log_status("source_cmd_status", status);
+    if (0 == status)
+    {
+        char header[40];
+
+        g_tcp_throughput_source_phase = 3U;
+        debug_puts("[TCPTHR] source_header_wait\r\n");
+        status = socket_recv_line(socket, header, sizeof(header));
+        g_tcp_throughput_source_last_status = status;
+        log_status("source_header_recv_status", status);
+        if (0 <= status)
+        {
+            status = parse_data_header(header, (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES);
+            g_tcp_throughput_source_last_status = status;
+            log_status("source_header_parse_status", status);
+        }
+    }
+
+    if (0 != status)
+    {
+        (void)FreeRTOS_shutdown(socket, FREERTOS_SHUT_RDWR);
+        (void)FreeRTOS_closesocket(socket);
         return status;
     }
 
     start_ticks = xTaskGetTickCount();
+    g_tcp_throughput_source_phase = 4U;
+    debug_puts("[TCPTHR] source_payload_begin\r\n");
+    tcp_trace_phase(12U, (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES);
     while (received < (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES)
     {
         uint32_t remaining = (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES - received;
         uint32_t request = (remaining < (uint32_t)TCP_THROUGHPUT_RX_CHUNK_BYTES) ?
                            remaining : (uint32_t)TCP_THROUGHPUT_RX_CHUNK_BYTES;
+        if (0U == received)
+        {
+            debug_puts("[TCPTHR] source_first_recv_wait\r\n");
+        }
         BaseType_t n = FreeRTOS_recv(socket, s_tcp_buffer, request, 0);
+        g_tcp_throughput_source_last_recv = (int32_t)n;
 
         if (0 >= n)
         {
             status = (int32_t)n;
+            g_tcp_throughput_source_last_status = status;
             break;
         }
+        if (0U == received)
+        {
+            log_status("source_first_recv_n", (int32_t)n);
+        }
         received += (uint32_t)n;
+        g_tcp_throughput_source_received_live = received;
+        g_tcp_throughput_source_recv_count++;
 #if (TCP_THROUGHPUT_PROGRESS_BYTES > 0UL)
         if ((0U != next_progress) && (received >= next_progress))
         {
@@ -464,12 +717,25 @@ static int32_t run_source_once(uint32_t iteration)
     }
     end_ticks = xTaskGetTickCount();
 
+    if (0 == status)
+    {
+        g_tcp_throughput_source_phase = 5U;
+        status = read_lanbench_result(socket, "source");
+        g_tcp_throughput_source_last_status = status;
+    }
+
     (void)FreeRTOS_shutdown(socket, FREERTOS_SHUT_RDWR);
     (void)FreeRTOS_closesocket(socket);
 
     log_result("source", received, (uint32_t)((end_ticks - start_ticks) * portTICK_PERIOD_MS));
+    tcp_trace_result((uint32_t)TCP_THROUGHPUT_MODE_SOURCE,
+                     received,
+                     g_tcp_throughput_last_ms,
+                     g_tcp_throughput_last_mbps_x1000);
     log_sdio_xfer_diag("source");
     log_perf_diag("source_end");
+    g_tcp_throughput_source_phase = 6U;
+    tcp_trace_phase(19U, (uint32_t)status);
     return status;
 }
 
@@ -487,6 +753,7 @@ static void tcp_throughput_task(void * p_parameters)
     }
 
     debug_puts("[TCPTHR] network ready\r\n");
+    tcp_trace_phase(1U, (uint32_t)TCP_THROUGHPUT_MODE);
     log_perf_diag("task_begin");
 
     for (i = 0U; i < (uint32_t)TCP_THROUGHPUT_ITERATIONS; i++)
@@ -511,6 +778,7 @@ static void tcp_throughput_task(void * p_parameters)
     }
 
     debug_puts("[TCPTHR] done\r\n");
+    tcp_trace_phase(99U, (uint32_t)TCP_THROUGHPUT_MODE);
     log_perf_diag("task_done");
     vTaskDelete(NULL);
 }
