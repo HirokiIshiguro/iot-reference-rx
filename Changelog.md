@@ -25,6 +25,8 @@
 - Wi-Fi認証情報、AWS IoT認証情報、TCPスループット試験設定はgit管理外のローカルヘッダで注入します。
 - SDCLK 48MHz実験は規格内で動作しましたが、ICLK低下の影響もあり効果が小さいため、現時点の基準は `ICLK=120MHz / PCLKB=60MHz / SDCLK=30MHz` に戻します。
 - Percepio公式TraceRecorderSourceをサブモジュール化し、J-Link RTT経由のTracealyzer CLI取得を確認済みです。
+- SDHI IRQ本格実装の差分観測用として、`WHD_SDIO_USE_SDHI_IRQ=0`、`WHD_SDIO_SOFTIRQ_POLL_MS=1` のsoftirq-only基準を固定します。
+- 最終目標はSDHI IRQ全面ONの割り込み駆動実装です。softirq-onlyは安定動作と性能差分を測る比較用基準として扱います。
 - 最終的な速度チューニングは、TLS、OTA、TSIPによるTLS加速が安定した後に、SDHIクロック、DTC/DMAC、FreeRTOS+TCPバッファ、WHD結合部をまとめて再評価します。
 
 #### 現在の通信速度
@@ -39,6 +41,8 @@
 | PC対向最速値 | PC | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window | 38.2-38.5Mbps | 30.2-32.0Mbps | 参考、RPi基準とは混在しない |
 | 48MHz実験 | PC | 48MHz | DTC、64byte閾値 | `PLL=192MHz`、`ICLK=96MHz`、同じTCP条件 | 39.6-39.9Mbps | 31.8-32.3Mbps | 効果限定、未採用 |
 | RPi#2統一基準 | RPi#2 / 共通Go LANBENCH | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window、SOURCE verifyなし | 32.476Mbps | 19.288Mbps | 採用中、mbedTLS benchmarkと同条件 |
+| softirq-only比較基準 | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファなし | 未測定 | 31.524Mbps | SDHI IRQ実装前の差分観測用 |
+| softirq-only + スニファ | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファあり | 未測定 | 31.149Mbps | 波形観測ありの差分観測用 |
 
 ### 共通の今後作業
 

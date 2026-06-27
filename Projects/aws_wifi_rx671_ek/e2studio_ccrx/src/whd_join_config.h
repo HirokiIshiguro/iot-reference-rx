@@ -50,11 +50,11 @@
 #endif
 
 #ifndef WHD_SDIO_SOFTIRQ_POLL_MS
-#define WHD_SDIO_SOFTIRQ_POLL_MS       (0U)
+#define WHD_SDIO_SOFTIRQ_POLL_MS       (1U)
 #endif
 
 #ifndef WHD_SDIO_USE_SDHI_IRQ
-#define WHD_SDIO_USE_SDHI_IRQ          (1)
+#define WHD_SDIO_USE_SDHI_IRQ          (0)
 #endif
 
 #ifndef WHD_SDIO_SOFTIRQ_ALWAYS_NOTIFY
