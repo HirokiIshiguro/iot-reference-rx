@@ -25,24 +25,28 @@
 - Wi-Fi認証情報、AWS IoT認証情報、TCPスループット試験設定はgit管理外のローカルヘッダで注入します。
 - SDCLK 48MHz実験は規格内で動作しましたが、ICLK低下の影響もあり効果が小さいため、現時点の基準は `ICLK=120MHz / PCLKB=60MHz / SDCLK=30MHz` に戻します。
 - Percepio公式TraceRecorderSourceをサブモジュール化し、J-Link RTT経由のTracealyzer CLI取得を確認済みです。
-- SDHI IRQ本格実装の差分観測用として、`WHD_SDIO_USE_SDHI_IRQ=0`、`WHD_SDIO_SOFTIRQ_POLL_MS=1` のsoftirq-only基準を固定します。
-- 最終目標はSDHI IRQ全面ONの割り込み駆動実装です。softirq-onlyは安定動作と性能差分を測る比較用基準として扱います。
+- SDHI IRQ全面ONの割り込み駆動を現在の主経路にします。softirq-onlyは安定動作と性能差分を測る比較用基準として残します。
+- SDスニファボードありの測定では、WHD bring-up中は`SDHI_DIV_4`、WHD bring-up完了後に`SDHI_DIV_2`へ上げる二段SDCLK設定を基準点として確認しました。
+- 正本の既定バッファはRAM消費を優先し、TCP socket buffer/windowは4 MSS、WHD port bufferは4個、network buffer descriptorは48個を基準にします。
+- 40Mbps級を狙う大きめのTCP windowやsocket bufferは、性能探索用のローカルビルド条件として扱います。
 - 最終的な速度チューニングは、TLS、OTA、TSIPによるTLS加速が安定した後に、SDHIクロック、DTC/DMAC、FreeRTOS+TCPバッファ、WHD結合部をまとめて再評価します。
 
 #### 現在の通信速度
 
 10MiBの平文TCPスモーク試験で確認した代表値です。`RX671 -> Host` はRX671からLANBENCHホストへの送信、`Host -> RX671` はLANBENCHホストからRX671への受信を示します。現在の再現用基準は、mbedTLS benchmarkと同じRPi#2上の共通Go LANBENCHを使い、SOURCE側はRX671でペイロード検証を行わない条件に揃えます。
 
-| 条件 | ホスト | SDCLK | CMD53転送 | 主なTCP/バッファ条件 | RX671 -> Host | Host -> RX671 | 状態 |
-|---|---|---:|---|---|---:|---:|---|
-| 低速基準 | PC | 7.5MHz | CPU copy | 初期比較用 | 14.48Mbps | 15.03Mbps | 参考 |
-| DTC低速 | PC | 7.5MHz | DTC、512byte閾値 | 小転送のCPU fallbackが多い | 14.40Mbps | 14.11Mbps | 参考 |
-| DTC低速改善 | PC | 7.5MHz | DTC、64byte閾値 | Type 1YN Function 2 block sizeに合わせる | 14.47Mbps | 15.43Mbps | 参考 |
-| PC対向最速値 | PC | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window | 38.2-38.5Mbps | 30.2-32.0Mbps | 参考、RPi基準とは混在しない |
-| 48MHz実験 | PC | 48MHz | DTC、64byte閾値 | `PLL=192MHz`、`ICLK=96MHz`、同じTCP条件 | 39.6-39.9Mbps | 31.8-32.3Mbps | 効果限定、未採用 |
-| RPi#2統一基準 | RPi#2 / 共通Go LANBENCH | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window、SOURCE verifyなし | 32.476Mbps | 19.288Mbps | 採用中、mbedTLS benchmarkと同条件 |
-| softirq-only比較基準 | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファなし | 未測定 | 31.524Mbps | SDHI IRQ実装前の差分観測用 |
-| softirq-only + スニファ | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファあり | 未測定 | 31.149Mbps | 波形観測ありの差分観測用 |
+| 条件 | ホスト | SDCLK | CMD53転送 | 主なTCP/バッファ条件 | RX671 -> Host | Host -> RX671 | CPU負荷 | 状態 |
+|---|---|---:|---|---|---:|---:|---|---|
+| 低速基準 | PC | 7.5MHz | CPU copy | 初期比較用 | 14.48Mbps | 15.03Mbps | - | 参考 |
+| DTC低速 | PC | 7.5MHz | DTC、512byte閾値 | 小転送のCPU fallbackが多い | 14.40Mbps | 14.11Mbps | - | 参考 |
+| DTC低速改善 | PC | 7.5MHz | DTC、64byte閾値 | Type 1YN Function 2 block sizeに合わせる | 14.47Mbps | 15.43Mbps | - | 参考 |
+| PC対向最速値 | PC | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window | 38.2-38.5Mbps | 30.2-32.0Mbps | - | 参考、RPi基準とは混在しない |
+| 48MHz実験 | PC | 48MHz | DTC、64byte閾値 | `PLL=192MHz`、`ICLK=96MHz`、同じTCP条件 | 39.6-39.9Mbps | 31.8-32.3Mbps | - | 効果限定、未採用 |
+| RPi#2省RAM基準 | RPi#2 / 共通Go LANBENCH | 30MHz | DTC、64byte閾値 | TX/RX chunk 5840byte、socket 5840byte、4-MSS window、WHD port buffer 4個、SOURCE verifyなし | 14.650Mbps | 10.338Mbps | - | 正本既定候補、RAM消費優先 |
+| RPi#2性能探索 | RPi#2 / 共通Go LANBENCH | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window、SOURCE verifyなし | 32.476Mbps | 19.288Mbps | - | ローカル実験条件、正本既定にはしない |
+| SDHI IRQ + スニファ基準 | RPi#2 wired / 共通Go LANBENCH | WHD bring-up時15MHz、bring-up後30MHz | DTC、64byte閾値 | SDHI IRQ direct notify、TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window、WHD port buffer 4個、SOURCE verifyなし | 35.231Mbps | 32.338Mbps | SINK約100%、SOURCE約88.6% | 現在の性能基準点 |
+| softirq-only比較基準 | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファなし | 未測定 | 31.524Mbps | - | SDHI IRQ差分観測用 |
+| softirq-only + スニファ | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファあり | 未測定 | 31.149Mbps | - | 波形観測ありの差分観測用 |
 
 ### 共通の今後作業
 

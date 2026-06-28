@@ -1940,7 +1940,6 @@ bool sdio_host_set_bus_4bit(void)
  */
 bool sdio_host_set_run_clock(void)
 {
-    sdhi_status_t status;
 #if defined(SDIO_HOST_USE_HIGH_SPEED_CLOCK)
     uint32_t div = g_sdio_high_speed_enabled ? SDHI_CFG_DIV_HIGH_SPEED : SDHI_CFG_DIV_DEFAULT_SPEED;
 #else
@@ -1948,6 +1947,13 @@ bool sdio_host_set_run_clock(void)
 
     (void)g_sdio_high_speed_enabled;
 #endif
+
+    return sdio_host_set_clock_div(div);
+}
+
+bool sdio_host_set_clock_div(uint32_t div)
+{
+    sdhi_status_t status;
 
     g_sdio_host_run_clock_div = div;
     status = R_SDHI_SetClock(SDHI_CH0, div, SDHI_CLOCK_ENABLE);

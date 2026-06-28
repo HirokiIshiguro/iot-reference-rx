@@ -24,6 +24,14 @@
 
 #define WHD_NETWORK_DEBUG_HEAD_BYTES    (64U)
 
+#ifndef WHD_NETWORK_PROTOCOL_DIAG
+#define WHD_NETWORK_PROTOCOL_DIAG       (1)
+#endif
+
+#ifndef WHD_NETWORK_READY_CHECK_EACH_TX
+#define WHD_NETWORK_READY_CHECK_EACH_TX (1)
+#endif
+
 volatile uint32_t g_whd_network_rx_frames;
 volatile uint32_t g_whd_network_rx_to_ip;
 volatile uint32_t g_whd_network_rx_dropped;
@@ -88,6 +96,7 @@ static NetworkInterface_t * g_whd_network_interface;
 static void capture_head(volatile uint8_t * p_dst, volatile uint32_t * p_captured,
                          const uint8_t * p_src, uint16_t length)
 {
+#if (WHD_NETWORK_PROTOCOL_DIAG != 0)
     uint32_t i;
     uint32_t captured = ((uint32_t)length > WHD_NETWORK_DEBUG_HEAD_BYTES) ?
                         WHD_NETWORK_DEBUG_HEAD_BYTES : (uint32_t)length;
@@ -97,6 +106,12 @@ static void capture_head(volatile uint8_t * p_dst, volatile uint32_t * p_capture
     {
         p_dst[i] = p_src[i];
     }
+#else
+    (void)p_dst;
+    (void)p_src;
+    (void)length;
+    *p_captured = 0U;
+#endif
 }
 
 static void clear_rx_debug_observation(void)
@@ -163,6 +178,7 @@ static void count_protocol(const uint8_t * p_data, uint16_t length,
                            volatile uint32_t * p_udp,
                            volatile uint32_t * p_tcp)
 {
+#if (WHD_NETWORK_PROTOCOL_DIAG != 0)
     if ((NULL != p_data) && (length >= 14U))
     {
         uint32_t ethertype = pack_be16(&p_data[12]);
@@ -197,11 +213,30 @@ static void count_protocol(const uint8_t * p_data, uint16_t length,
             (*p_ipv6)++;
         }
     }
+#else
+    (void)p_data;
+    (void)length;
+    (void)p_arp;
+    (void)p_ipv4;
+    (void)p_ipv6;
+    (void)p_icmp;
+    (void)p_udp;
+    (void)p_tcp;
+#endif
 }
 
 static BaseType_t whd_network_is_ready(whd_interface_t ifp)
 {
     return ((NULL != ifp) && (WHD_SUCCESS == whd_wifi_is_ready_to_transceive(ifp))) ? pdTRUE : pdFALSE;
+}
+
+static BaseType_t whd_network_is_ready_for_tx(whd_interface_t ifp)
+{
+#if (WHD_NETWORK_READY_CHECK_EACH_TX != 0)
+    return whd_network_is_ready(ifp);
+#else
+    return ((NULL != ifp) && (0U != g_whd_network_link_up)) ? pdTRUE : pdFALSE;
+#endif
 }
 
 static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buffer_t buffer)
@@ -225,7 +260,7 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
                      p_data, length);
     }
 
-    if ((NULL != p_data) && (length >= 14U))
+    if ((WHD_NETWORK_PROTOCOL_DIAG != 0) && (NULL != p_data) && (length >= 14U))
     {
         g_whd_network_rx_last_dst_0_3 = pack_be32(&p_data[0]);
         g_whd_network_rx_last_dst_4_5 = pack_be16(&p_data[4]);
@@ -344,7 +379,7 @@ static BaseType_t whd_freertos_network_output(NetworkInterface_t * px_interface,
     if ((NULL != px_descriptor) &&
         (NULL != px_descriptor->pucEthernetBuffer) &&
         (0U != px_descriptor->xDataLength) &&
-        (pdTRUE == whd_network_is_ready(ifp)))
+        (pdTRUE == whd_network_is_ready_for_tx(ifp)))
     {
         whd_result_t whd_result;
 
@@ -362,7 +397,7 @@ static BaseType_t whd_freertos_network_output(NetworkInterface_t * px_interface,
                 uint16_t tx_length = (uint16_t)px_descriptor->xDataLength;
 
                 g_whd_network_tx_last_length = (uint32_t)tx_length;
-                if (tx_length >= 14U)
+                if ((WHD_NETWORK_PROTOCOL_DIAG != 0) && (tx_length >= 14U))
                 {
                     g_whd_network_tx_last_dst_0_3 = pack_be32(&p_tx[0]);
                     g_whd_network_tx_last_dst_4_5 = pack_be16(&p_tx[4]);

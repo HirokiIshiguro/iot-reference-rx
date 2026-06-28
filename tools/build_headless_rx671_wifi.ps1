@@ -22,7 +22,11 @@ param(
     [int]$WhdPortBufferCount = -1,
     [int]$WhdPortBufferPayloadBytes = -1,
     [int]$WhdPortBufferHeadroomBytes = -1,
+    [int]$WhdNetworkProtocolDiag = -1,
+    [int]$WhdNetworkReadyCheckEachTx = -1,
+    [int]$IpTraceProtocolDiag = -1,
     [string]$SdioRunClockDiv = "",
+    [string]$SdioPostWifiOnClockDiv = "",
     [string]$SdioCmd53XferEngine = "",
     [string]$SdioCmd53DtcReadEnable = "",
     [string]$SdioCmd53DtcWriteEnable = "",
@@ -46,7 +50,8 @@ param(
     [int]$TcpThroughputRxBufferBytes = -1,
     [int]$TcpThroughputTxWindowMss = -1,
     [int]$TcpThroughputRxWindowMss = -1,
-    [int]$TcpThroughputProgressBytes = -1
+    [int]$TcpThroughputProgressBytes = -1,
+    [int]$TcpThroughputSinkFillPattern = -1
 )
 
 $ErrorActionPreference = "Stop"
@@ -93,6 +98,7 @@ $useTcpThroughputLocalConfigForBuild = $TcpThroughputEnable.IsPresent -or
     ($TcpThroughputTxWindowMss -ge 0) -or
     ($TcpThroughputRxWindowMss -ge 0) -or
     ($TcpThroughputProgressBytes -ge 0) -or
+    ($TcpThroughputSinkFillPattern -ge 0) -or
     ("1" -eq $env:RX671_EK_TCP_THROUGHPUT_ENABLE) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_HOST)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_PORT)) -or
@@ -106,7 +112,8 @@ $useTcpThroughputLocalConfigForBuild = $TcpThroughputEnable.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_BUFFER_BYTES)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_TX_WINDOW_MSS)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_RX_WINDOW_MSS)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_PROGRESS_BYTES))
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_PROGRESS_BYTES)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_TCP_THROUGHPUT_SINK_FILL_PATTERN))
 
 if (-not (Test-Path -LiteralPath $E2Studio)) {
     throw "e2 studio executable not found: $E2Studio"
@@ -342,7 +349,8 @@ function Write-LocalTcpThroughputConfig {
         [int]$RxBufferBytes,
         [int]$TxWindowMss,
         [int]$RxWindowMss,
-        [int]$ProgressBytes
+        [int]$ProgressBytes,
+        [int]$SinkFillPattern
     )
 
     $effectiveHost = Get-FirstNonEmpty @($TargetHost, $env:RX671_EK_TCP_THROUGHPUT_HOST, "192.168.10.105")
@@ -354,11 +362,12 @@ function Write-LocalTcpThroughputConfig {
     $effectiveTxChunkBytes = Get-ConfigInt -Value $TxChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_CHUNK_BYTES -DefaultValue $effectiveChunkBytes
     $effectiveRxChunkBytes = Get-ConfigInt -Value $RxChunkBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_CHUNK_BYTES -DefaultValue $effectiveChunkBytes
     $effectiveIterations = Get-ConfigInt -Value $Iterations -EnvValue $env:RX671_EK_TCP_THROUGHPUT_ITERATIONS -DefaultValue 1
-    $effectiveTxBufferBytes = Get-ConfigInt -Value $TxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_BUFFER_BYTES -DefaultValue 65536
-    $effectiveRxBufferBytes = Get-ConfigInt -Value $RxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_BUFFER_BYTES -DefaultValue 65536
-    $effectiveTxWindowMss = Get-ConfigInt -Value $TxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_WINDOW_MSS -DefaultValue 44
-    $effectiveRxWindowMss = Get-ConfigInt -Value $RxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_WINDOW_MSS -DefaultValue 44
+    $effectiveTxBufferBytes = Get-ConfigInt -Value $TxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_BUFFER_BYTES -DefaultValue 5840
+    $effectiveRxBufferBytes = Get-ConfigInt -Value $RxBufferBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_BUFFER_BYTES -DefaultValue 5840
+    $effectiveTxWindowMss = Get-ConfigInt -Value $TxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_TX_WINDOW_MSS -DefaultValue 4
+    $effectiveRxWindowMss = Get-ConfigInt -Value $RxWindowMss -EnvValue $env:RX671_EK_TCP_THROUGHPUT_RX_WINDOW_MSS -DefaultValue 4
     $effectiveProgressBytes = Get-ConfigInt -Value $ProgressBytes -EnvValue $env:RX671_EK_TCP_THROUGHPUT_PROGRESS_BYTES -DefaultValue 0
+    $effectiveSinkFillPattern = Get-ConfigInt -Value $SinkFillPattern -EnvValue $env:RX671_EK_TCP_THROUGHPUT_SINK_FILL_PATTERN -DefaultValue 1
 
     $lines = @(
         "/*",
@@ -385,13 +394,14 @@ function Write-LocalTcpThroughputConfig {
         "#define TCP_THROUGHPUT_TX_WINDOW_MSS    (${effectiveTxWindowMss}L)",
         "#define TCP_THROUGHPUT_RX_WINDOW_MSS    (${effectiveRxWindowMss}L)",
         "#define TCP_THROUGHPUT_PROGRESS_BYTES   (${effectiveProgressBytes}UL)",
+        "#define TCP_THROUGHPUT_SINK_FILL_PATTERN (${effectiveSinkFillPattern}U)",
         "",
         "#endif /* TCP_THROUGHPUT_CONFIG_LOCAL_H_ */",
         ""
     )
 
     [System.IO.File]::WriteAllLines($Path, $lines, [System.Text.UTF8Encoding]::new($false))
-    Write-Host "TCP throughput: host=$effectiveHost port=$effectivePort mode=$effectiveMode bytes=$effectiveBytes chunk=$effectiveChunkBytes txchunk=$effectiveTxChunkBytes rxchunk=$effectiveRxChunkBytes iterations=$effectiveIterations txbuf=$effectiveTxBufferBytes rxbuf=$effectiveRxBufferBytes txwin=$effectiveTxWindowMss rxwin=$effectiveRxWindowMss progress=$effectiveProgressBytes"
+    Write-Host "TCP throughput: host=$effectiveHost port=$effectivePort mode=$effectiveMode bytes=$effectiveBytes chunk=$effectiveChunkBytes txchunk=$effectiveTxChunkBytes rxchunk=$effectiveRxChunkBytes iterations=$effectiveIterations txbuf=$effectiveTxBufferBytes rxbuf=$effectiveRxBufferBytes txwin=$effectiveTxWindowMss rxwin=$effectiveRxWindowMss progress=$effectiveProgressBytes sinkfill=$effectiveSinkFillPattern"
 }
 
 function Get-FirstNonEmpty {
@@ -545,14 +555,20 @@ function Add-CProjectDefine {
     )
 
     $option = "-define=$Define"
-    if ($Text.Contains($option)) {
-        return $Text
+    $defineName = $Define
+    $equals = $Define.IndexOf("=")
+    if ($equals -ge 0) {
+        $defineName = $Define.Substring(0, $equals)
     }
 
     $needle = '<listOptionValue builtIn="false" value="-define=__FUNCTION__=__func__"/>'
     if (-not $Text.Contains($needle)) {
         throw "Could not find the CCRX userBefore define anchor in .cproject."
     }
+
+    $definePattern = '(?m)^[ \t]*<listOptionValue builtIn="false" value="-define=' +
+        [regex]::Escape($defineName) + '(?:=[^"]*)?"/>\r?\n?'
+    $Text = [regex]::Replace($Text, $definePattern, "")
 
     $insert = "$needle`r`n`t`t`t`t`t`t`t`t`t<listOptionValue builtIn=`"false`" value=`"$option`"/>"
     return $Text.Replace($needle, $insert)
@@ -811,6 +827,9 @@ if ($WlanAllowBusSleepDelayMs -ge 0) {
 if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
     Write-Host "SDIO run clock divider override: $SdioRunClockDiv"
 }
+if (-not [string]::IsNullOrWhiteSpace($SdioPostWifiOnClockDiv)) {
+    Write-Host "SDIO post-whd_wifi_on clock divider override: $SdioPostWifiOnClockDiv"
+}
 if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
     Write-Host "SDIO high-speed CCCR/EHS clock path: enabled"
 }
@@ -881,7 +900,8 @@ try {
             -RxBufferBytes $TcpThroughputRxBufferBytes `
             -TxWindowMss $TcpThroughputTxWindowMss `
             -RxWindowMss $TcpThroughputRxWindowMss `
-            -ProgressBytes $TcpThroughputProgressBytes
+            -ProgressBytes $TcpThroughputProgressBytes `
+            -SinkFillPattern $TcpThroughputSinkFillPattern
         $cprojectDefines += "TCP_THROUGHPUT_USE_LOCAL_CONFIG"
     }
 
@@ -906,12 +926,33 @@ try {
     if ($WhdPortBufferHeadroomBytes -gt 0) {
         $cprojectDefines += "WHD_PORT_BUFFER_HEADROOM=$WhdPortBufferHeadroomBytes"
     }
+    $effectiveWhdNetworkProtocolDiag = Get-FirstNonEmpty @(
+        ($(if ($WhdNetworkProtocolDiag -ge 0) { "$WhdNetworkProtocolDiag" } else { "" })),
+        $env:RX671_EK_WHD_NETWORK_PROTOCOL_DIAG)
+    if (-not [string]::IsNullOrWhiteSpace($effectiveWhdNetworkProtocolDiag)) {
+        $cprojectDefines += "WHD_NETWORK_PROTOCOL_DIAG=$effectiveWhdNetworkProtocolDiag"
+    }
+    $effectiveWhdNetworkReadyCheckEachTx = Get-FirstNonEmpty @(
+        ($(if ($WhdNetworkReadyCheckEachTx -ge 0) { "$WhdNetworkReadyCheckEachTx" } else { "" })),
+        $env:RX671_EK_WHD_NETWORK_READY_CHECK_EACH_TX)
+    if (-not [string]::IsNullOrWhiteSpace($effectiveWhdNetworkReadyCheckEachTx)) {
+        $cprojectDefines += "WHD_NETWORK_READY_CHECK_EACH_TX=$effectiveWhdNetworkReadyCheckEachTx"
+    }
+    $effectiveIpTraceProtocolDiag = Get-FirstNonEmpty @(
+        ($(if ($IpTraceProtocolDiag -ge 0) { "$IpTraceProtocolDiag" } else { "" })),
+        $env:RX671_EK_IPTRACE_PROTOCOL_DIAG)
+    if (-not [string]::IsNullOrWhiteSpace($effectiveIpTraceProtocolDiag)) {
+        $cprojectDefines += "RX671_IPTRACE_PROTOCOL_DIAG=$effectiveIpTraceProtocolDiag"
+    }
     if ($FreeRtosHeapSizeKb -gt 0) {
         $cprojectDefines += "RX671_FREERTOS_HEAP_SIZE_KB=$FreeRtosHeapSizeKb"
     }
 
     if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
         $cprojectDefines += "SDIO_HOST_CFG_RUN_CLOCK_DIV=$SdioRunClockDiv"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($SdioPostWifiOnClockDiv)) {
+        $cprojectDefines += "SDIO_HOST_CFG_POST_WIFI_ON_CLOCK_DIV=$SdioPostWifiOnClockDiv"
     }
 
     if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {

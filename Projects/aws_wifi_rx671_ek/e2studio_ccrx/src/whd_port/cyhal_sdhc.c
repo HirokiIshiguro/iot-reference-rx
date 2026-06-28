@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "whd.h"
 #include "cy_result.h"
@@ -49,6 +50,7 @@ static TimerHandle_t g_sdio_softirq_timer;
 static TaskHandle_t g_sdio_sdhi_irq_task;
 static volatile bool g_sdio_softirq_enabled;
 static volatile bool g_sdio_sdhi_irq_enabled;
+static volatile bool g_sdio_sdhi_irq_hw_armed;
 static volatile bool g_sdio_sdhi_irq_latched;
 static uint32_t g_sdio_sdhi_irq_enable_count;
 static uint32_t g_cmd52_fail_log_count;
@@ -62,6 +64,7 @@ volatile uint32_t g_whd_sdio_sdhi_irq_rearm_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_last_status;
 volatile uint32_t g_whd_sdio_sdhi_irq_notify_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_task_count;
+volatile uint32_t g_whd_sdio_sdhi_irq_direct_notify_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_enable_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
 volatile uint32_t g_whd_sdio_softirq_notify_count;
@@ -102,6 +105,7 @@ volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
 volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
 volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
 volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_abort_count;
+volatile uint32_t g_whd_sdio_cmd53_f2_empty_tag_zero_count;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_stage;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_s1;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_s2;
@@ -368,7 +372,9 @@ static void sdio_softirq_enable(bool enable)
 
 static sdhi_status_t sdio_sdhi_irq_callback(uint32_t sdiosts)
 {
+#if !WHD_SDIO_SDHI_IRQ_DIRECT_NOTIFY
     BaseType_t higher_priority_task_woken = pdFALSE;
+#endif
 
     g_whd_sdio_sdhi_irq_last_status = sdiosts;
 
@@ -387,6 +393,23 @@ static sdhi_status_t sdio_sdhi_irq_callback(uint32_t sdiosts)
     (void)R_SDHI_ClearSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
     (void)R_SDHI_ClearSdiostsReg(SDHI_CH0, SDHI_SDIOSTS_IOIRQ);
 
+#if WHD_SDIO_SDHI_IRQ_DIRECT_NOTIFY
+    if (g_sdio_sdhi_irq_enabled && (NULL != g_sdio_irq_handler))
+    {
+        g_whd_sdio_sdhi_irq_notify_count++;
+        g_whd_sdio_sdhi_irq_direct_notify_count++;
+        g_whd_sdio_irq_handler_ptr_last = (uint32_t)(uintptr_t)g_sdio_irq_handler;
+        g_whd_sdio_irq_handler_arg_last = (uint32_t)(uintptr_t)g_sdio_irq_handler_arg;
+        g_whd_sdio_irq_handler_event_last = (uint32_t)CYHAL_SDIO_CARD_INTERRUPT;
+        g_whd_sdio_irq_handler_enter_count++;
+        g_sdio_irq_handler(g_sdio_irq_handler_arg, CYHAL_SDIO_CARD_INTERRUPT);
+        g_whd_sdio_irq_handler_exit_count++;
+    }
+    else
+    {
+        g_whd_sdio_sdhi_irq_ignored_count++;
+    }
+#else
     if (g_sdio_sdhi_irq_enabled && (NULL != g_sdio_sdhi_irq_task))
     {
         g_whd_sdio_sdhi_irq_notify_count++;
@@ -397,6 +420,7 @@ static sdhi_status_t sdio_sdhi_irq_callback(uint32_t sdiosts)
     {
         g_whd_sdio_sdhi_irq_ignored_count++;
     }
+#endif
 
     return SDHI_SUCCESS;
 }
@@ -430,31 +454,28 @@ static void sdio_sdhi_irq_task(void * pvParameters)
             g_whd_sdio_sdhi_irq_ignored_count++;
             g_whd_sdio_irq_task_state = 5U;
         }
-
-        /* Optionally let the WHD worker drain the SDPCM interrupt source before
-         * re-enabling the level-like DAT1/IOIRQ source in SDHI. The performance
-         * path keeps this at zero so RX is not quantized by the FreeRTOS tick. */
-        g_whd_sdio_irq_task_state = 6U;
-#if (WHD_SDIO_SDHI_IRQ_REARM_DELAY_TICKS > 0U)
-        vTaskDelay((TickType_t)WHD_SDIO_SDHI_IRQ_REARM_DELAY_TICKS);
-#endif
-
-        if (g_sdio_sdhi_irq_enabled && g_sdio_sdhi_irq_latched)
-        {
-            g_whd_sdio_irq_task_state = 7U;
-            g_sdio_sdhi_irq_latched = false;
-            (void)R_SDHI_ClearSdiostsReg(SDHI_CH0, SDHI_SDIOSTS_IOIRQ);
-            (void)R_SDHI_SetSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
-            g_whd_sdio_sdhi_irq_rearm_count++;
-        }
-        g_whd_sdio_irq_task_state = 8U;
     }
+}
+
+static void sdio_sdhi_irq_arm_hw(void)
+{
+#if WHD_SDIO_USE_SDHI_IRQ
+    if (g_sdio_sdhi_irq_enabled && !g_sdio_sdhi_irq_hw_armed)
+    {
+        g_sdio_sdhi_irq_latched = false;
+        (void)R_SDHI_ClearSdiostsReg(SDHI_CH0, SDHI_SDIOSTS_IOIRQ);
+        (void)R_SDHI_SetSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
+        (void)R_SDHI_EnableIcuInt(SDHI_CH0, SDHI_HWINT_ACCESS_CD);
+        g_sdio_sdhi_irq_hw_armed = true;
+        g_whd_sdio_sdhi_irq_rearm_count++;
+    }
+#endif
 }
 
 static void sdio_sdhi_irq_rearm_after_bus(void)
 {
 #if WHD_SDIO_USE_SDHI_IRQ
-    if (g_sdio_sdhi_irq_enabled && g_sdio_sdhi_irq_latched)
+    if (g_sdio_sdhi_irq_enabled && g_sdio_sdhi_irq_hw_armed && g_sdio_sdhi_irq_latched)
     {
         g_sdio_sdhi_irq_latched = false;
         (void)R_SDHI_ClearSdiostsReg(SDHI_CH0, SDHI_SDIOSTS_IOIRQ);
@@ -472,20 +493,7 @@ static void sdio_sdhi_irq_enable(bool enable)
         g_sdio_sdhi_irq_enable_count++;
         g_whd_sdio_sdhi_irq_enable_count = g_sdio_sdhi_irq_enable_count;
 
-#if WHD_SDIO_SDHI_IRQ_DEFER_FIRST_ENABLE
-        if (1U == g_sdio_sdhi_irq_enable_count)
-        {
-            g_sdio_sdhi_irq_enabled = false;
-            g_sdio_sdhi_irq_latched = false;
-            g_whd_sdio_sdhi_irq_deferred_enable_count++;
-            (void)R_SDHI_IntSdioCallback(SDHI_CH0, sdio_sdhi_irq_callback);
-            (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDIOMD, SDHI_SDIOMD_INTEN);
-            (void)R_SDHI_ClearSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
-            (void)R_SDHI_ClearSdiostsReg(SDHI_CH0, SDHI_SDIOSTS_IOIRQ);
-            return;
-        }
-#endif
-
+#if !WHD_SDIO_SDHI_IRQ_DIRECT_NOTIFY
         if (NULL == g_sdio_sdhi_irq_task)
         {
             (void)xTaskCreate(sdio_sdhi_irq_task, "sdio_irq",
@@ -498,18 +506,21 @@ static void sdio_sdhi_irq_enable(bool enable)
             g_sdio_sdhi_irq_enabled = false;
             return;
         }
+#endif
 
         g_sdio_sdhi_irq_latched = false;
         g_sdio_sdhi_irq_enabled = true;
+        g_sdio_sdhi_irq_hw_armed = false;
         (void)R_SDHI_IntSdioCallback(SDHI_CH0, sdio_sdhi_irq_callback);
         (void)R_SDHI_OutReg(SDHI_CH0, SDHI_SDIOMD, SDHI_SDIOMD_INTEN);
         (void)R_SDHI_ClearSdiostsReg(SDHI_CH0, SDHI_SDIOSTS_IOIRQ);
-        (void)R_SDHI_SetSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
-        (void)R_SDHI_EnableIcuInt(SDHI_CH0, SDHI_HWINT_ACCESS_CD);
+        (void)R_SDHI_ClearSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
+        sdio_sdhi_irq_arm_hw();
     }
     else
     {
         g_sdio_sdhi_irq_enabled = false;
+        g_sdio_sdhi_irq_hw_armed = false;
         g_sdio_sdhi_irq_latched = false;
         (void)R_SDHI_ClearSdioIntMask(SDHI_CH0, SDHI_SDIOIMSK_IOIRQ);
         (void)R_SDHI_DisableIcuInt(SDHI_CH0, SDHI_HWINT_ACCESS_CD);
@@ -618,6 +629,41 @@ static void sdio_log_cmd53_fail(bool write, uint8_t function, uint32_t address, 
     p = append_text(p, "\r\n");
     *p = '\0';
     debug_puts(line);
+}
+
+static bool sdio_should_zero_empty_f2_tag(bool write, uint8_t function, uint32_t address,
+                                         bool block_mode, uint32_t count, uint16_t length)
+{
+#if WHD_SDIO_CMD53_F2_EMPTY_TAG_AS_ZERO
+    uint8_t stage = 0U;
+    uint32_t s1 = 0U;
+    uint32_t s2 = 0U;
+    uint32_t er1 = 0U;
+    uint32_t er2 = 0U;
+    uint32_t r5 = 0U;
+    uint32_t data0 = 0U;
+
+    if (write || (2U != function) || (0U != address) || block_mode || (4U != count) || (4U != length))
+    {
+        return false;
+    }
+
+    sdio_host_cmd53_diag_ext(&stage, &s1, &s2, &er1, &er2, &r5, &data0);
+
+    /* WHD treats the F2/address-0 length-tag read as legal even when no frame
+     * exists; the SDIO device should then return a zero tag. RX SDHI can expose
+     * that as "CMD53 accepted, receive buffer never filled", so translate only
+     * this initial 4-byte tag read into the zero-tag result WHD expects. */
+    return (2U == stage) && (0U != (s1 & SDHI_SDIMSK1_RESP)) && (0U == data0);
+#else
+    (void)write;
+    (void)function;
+    (void)address;
+    (void)block_mode;
+    (void)count;
+    (void)length;
+    return false;
+#endif
 }
 
 static bool sdio_prepare_pre_cmd53(uint8_t function)
@@ -893,6 +939,12 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
         }
     }
 #endif
+    if ((!ok) && sdio_should_zero_empty_f2_tag(write, function, address, block_mode, count, length))
+    {
+        memset((void *)data, 0, length);
+        ok = true;
+        g_whd_sdio_cmd53_f2_empty_tag_zero_count++;
+    }
     data0 = sdio_debug_data0(data, length);
     sdio_end_bus();
     sdio_sdhi_irq_rearm_after_bus();

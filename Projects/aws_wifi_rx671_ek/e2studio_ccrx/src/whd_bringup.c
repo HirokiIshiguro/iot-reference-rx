@@ -16,11 +16,14 @@
 #include "whd_types.h"
 
 #include "debug_uart.h"
+#include "sdio_host.h"
 #include "whd_join_config.h"
 #include "whd_port.h"
 #include "whd_bringup.h"
 
 #define WHD_THREAD_STACK_BYTES          (8192UL)
+#define WHD_SDIO_TRACE_DEPTH            (32U)
+#define WHD_SDIO_TRACE_MASK             (WHD_SDIO_TRACE_DEPTH - 1U)
 
 static uint32_t g_whd_thread_stack[WHD_THREAD_STACK_BYTES / sizeof(uint32_t)];
 #if WHD_SCAN_ENABLE
@@ -51,11 +54,16 @@ volatile uint32_t g_whd_bringup_join_mode;
 extern volatile uint32_t g_whd_sdio_sdhi_irq_count;
 extern volatile uint32_t g_whd_sdio_sdhi_irq_notify_count;
 extern volatile uint32_t g_whd_sdio_sdhi_irq_task_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_direct_notify_count;
 extern volatile uint32_t g_whd_sdio_sdhi_irq_enable_count;
 extern volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
+extern volatile uint32_t g_whd_sdio_cmd53_f2_empty_tag_zero_count;
+extern volatile uint32_t g_whd_sdio_trace_index;
+extern volatile uint32_t g_whd_sdio_trace_frozen;
+extern volatile uint32_t g_whd_sdio_trace[WHD_SDIO_TRACE_DEPTH][9];
 extern volatile uint32_t g_sdio_host_run_clock_div;
 extern volatile uint32_t g_sdio_host_run_clock_status;
 extern volatile uint32_t g_sdio_host_cmd53_xfer_engine;
@@ -150,15 +158,75 @@ static void whd_log_sdio_diag(const char * label)
     p = append_dec32(p, g_whd_sdio_sdhi_irq_notify_count);
     p = append_text(p, " task=");
     p = append_dec32(p, g_whd_sdio_sdhi_irq_task_count);
+    p = append_text(p, " direct=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_direct_notify_count);
     p = append_text(p, " f2retry=");
     p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_retry_count);
     p = append_text(p, " f2rec=");
     p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_recovered_count);
     p = append_text(p, " f2fail=");
     p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_retry_fail_count);
+    p = append_text(p, " f2zero=");
+    p = append_dec32(p, g_whd_sdio_cmd53_f2_empty_tag_zero_count);
     p = append_text(p, "\r\n");
     *p = '\0';
     debug_puts(line);
+}
+
+static void whd_log_sdio_trace(const char * label)
+{
+    uint32_t end = g_whd_sdio_trace_index;
+    uint32_t start = (end > WHD_SDIO_TRACE_DEPTH) ? (end - WHD_SDIO_TRACE_DEPTH) : 0U;
+    uint32_t i;
+
+    debug_puts(label);
+    debug_puts(" frozen=");
+    {
+        char header[40];
+        char * p = header;
+
+        p = append_dec32(p, g_whd_sdio_trace_frozen);
+        p = append_text(p, "\r\n");
+        *p = '\0';
+        debug_puts(header);
+    }
+
+    for (i = start; i < end; i++)
+    {
+        uint32_t slot = i & WHD_SDIO_TRACE_MASK;
+        uint32_t kind = g_whd_sdio_trace[slot][0];
+        char line[176];
+        char * p = line;
+
+        if (0U == kind)
+        {
+            continue;
+        }
+
+        p = append_text(p, "sdio tr i=");
+        p = append_dec32(p, i);
+        p = append_text(p, " k=");
+        p = append_dec32(p, kind);
+        p = append_text(p, " w=");
+        p = append_dec32(p, g_whd_sdio_trace[slot][1]);
+        p = append_text(p, " f=");
+        p = append_dec32(p, g_whd_sdio_trace[slot][2]);
+        p = append_text(p, " a=");
+        p = append_hex32(p, g_whd_sdio_trace[slot][3]);
+        p = append_text(p, " c=");
+        p = append_dec32(p, g_whd_sdio_trace[slot][4]);
+        p = append_text(p, " l=");
+        p = append_dec32(p, g_whd_sdio_trace[slot][5]);
+        p = append_text(p, " r5=");
+        p = append_hex32(p, g_whd_sdio_trace[slot][6]);
+        p = append_text(p, " rs=");
+        p = append_hex32(p, g_whd_sdio_trace[slot][7]);
+        p = append_text(p, " d=");
+        p = append_hex32(p, g_whd_sdio_trace[slot][8]);
+        p = append_text(p, "\r\n");
+        *p = '\0';
+        debug_puts(line);
+    }
 }
 
 static void whd_log_mac(const char * label, const whd_mac_t * p_mac)
@@ -360,6 +428,7 @@ void whd_bringup_run(void)
     if (WHD_SUCCESS != result)
     {
         whd_log_sdio_diag("whd_wifi_on diag");
+        whd_log_sdio_trace("whd_wifi_on trace");
         return;
     }
     whd_log_sdio_diag("whd_wifi_on ok");
@@ -428,6 +497,11 @@ void whd_bringup_run(void)
         g_whd_bringup_join_result = result;
         whd_record_stage(81U, result);
         whd_log_result("whd_wifi_join", result);
+        if (WHD_SUCCESS != result)
+        {
+            whd_log_sdio_diag("whd_wifi_join diag");
+            whd_log_sdio_trace("whd_wifi_join trace");
+        }
         if (WHD_SUCCESS == result)
         {
             whd_mac_t bssid;
@@ -492,6 +566,17 @@ void whd_bringup_run(void)
     }
 #else
     debug_puts("WHD join skipped (WHD_JOIN_ENABLE=0)\r\n");
+#endif
+
+#if defined(SDIO_HOST_CFG_POST_WIFI_ON_CLOCK_DIV)
+    if (sdio_host_set_clock_div((uint32_t)SDIO_HOST_CFG_POST_WIFI_ON_CLOCK_DIV))
+    {
+        whd_log_sdio_diag("post_bringup_clock ok");
+    }
+    else
+    {
+        whd_log_sdio_diag("post_bringup_clock ng");
+    }
 #endif
 
     whd_record_stage(90U, 0U);

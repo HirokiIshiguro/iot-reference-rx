@@ -16,7 +16,7 @@
 #include "whd_port.h"
 
 #ifndef WHD_PORT_BUFFER_COUNT
-#define WHD_PORT_BUFFER_COUNT           (16U)
+#define WHD_PORT_BUFFER_COUNT           (4U)
 #endif
 #ifndef WHD_PORT_BUFFER_HEADROOM
 #define WHD_PORT_BUFFER_HEADROOM        (128U)

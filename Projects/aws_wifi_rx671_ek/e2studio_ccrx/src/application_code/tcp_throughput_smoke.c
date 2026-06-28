@@ -37,6 +37,15 @@ volatile uint32_t g_tcp_throughput_source_received_live;
 volatile uint32_t g_tcp_throughput_source_recv_count;
 volatile int32_t g_tcp_throughput_source_last_recv;
 volatile int32_t g_tcp_throughput_source_last_status;
+volatile uint32_t g_tcp_throughput_sink_send_count;
+volatile uint32_t g_tcp_throughput_sink_send_partial_count;
+volatile uint32_t g_tcp_throughput_sink_send_min;
+volatile uint32_t g_tcp_throughput_sink_send_max;
+volatile uint32_t g_tcp_throughput_sink_send_last;
+volatile uint32_t g_tcp_throughput_sink_send_block_ticks;
+volatile uint32_t g_tcp_throughput_sink_send_block_max_ticks;
+volatile uint32_t g_tcp_throughput_sink_send_zero_count;
+volatile uint32_t g_tcp_throughput_sink_send_error_count;
 
 extern volatile uint32_t g_whd_network_rx_frames;
 extern volatile uint32_t g_whd_network_rx_to_ip;
@@ -56,6 +65,17 @@ extern volatile uint32_t g_whd_port_buffer_alloc_perm_fail_count;
 extern volatile uint32_t g_whd_port_buffer_wait_loop_count;
 extern volatile uint32_t g_whd_port_buffer_last_request_size;
 extern volatile uint32_t g_whd_port_buffer_last_request_direction;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_ignored_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_rearm_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_last_status;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_notify_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_task_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_direct_notify_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_enable_count;
+extern volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
+extern volatile uint32_t g_whd_sdio_softirq_notify_count;
+extern volatile uint32_t g_whd_sdio_softirq_pending_count;
 
 #if TCP_THROUGHPUT_ENABLE
 
@@ -63,13 +83,7 @@ extern volatile uint32_t g_whd_port_buffer_last_request_direction;
     (((TCP_THROUGHPUT_TX_CHUNK_BYTES) > (TCP_THROUGHPUT_RX_CHUNK_BYTES)) ? \
      (TCP_THROUGHPUT_TX_CHUNK_BYTES) : (TCP_THROUGHPUT_RX_CHUNK_BYTES))
 
-static union
-{
-    uint32_t align;
-    uint8_t  bytes[TCP_THROUGHPUT_BUFFER_BYTES];
-} s_tcp_buffer_storage;
-
-#define s_tcp_buffer (s_tcp_buffer_storage.bytes)
+static uint8_t * s_tcp_buffer;
 
 #if (defined(CONFIG_USE_PERCEPIO_TRACE_RECORDER) && (CONFIG_USE_PERCEPIO_TRACE_RECORDER == 1))
 static TraceStringHandle_t s_tcp_trace_channel;
@@ -367,6 +381,121 @@ static void log_sdio_xfer_diag(const char * label)
     debug_puts(line);
 }
 
+static void log_sdio_irq_diag(const char * label)
+{
+    char line[240];
+    char * p = line;
+
+    p = append_text(p, "[TCPTHR] sdio_irq ");
+    p = append_text(p, label);
+    p = append_text(p, " en=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_enable_count);
+    p = append_text(p, " defer=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_deferred_enable_count);
+    p = append_text(p, " irq=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_count);
+    p = append_text(p, " notify=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_notify_count);
+    p = append_text(p, " task=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_task_count);
+    p = append_text(p, " direct=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_direct_notify_count);
+    p = append_text(p, " rearm=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_rearm_count);
+    p = append_text(p, " ignored=");
+    p = append_dec32(p, g_whd_sdio_sdhi_irq_ignored_count);
+    p = append_text(p, " sts=");
+    p = append_hex32(p, g_whd_sdio_sdhi_irq_last_status);
+    p = append_text(p, " softn=");
+    p = append_dec32(p, g_whd_sdio_softirq_notify_count);
+    p = append_text(p, " softp=");
+    p = append_dec32(p, g_whd_sdio_softirq_pending_count);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
+static void reset_sink_send_diag(void)
+{
+    g_tcp_throughput_sink_send_count = 0U;
+    g_tcp_throughput_sink_send_partial_count = 0U;
+    g_tcp_throughput_sink_send_min = 0xFFFFFFFFUL;
+    g_tcp_throughput_sink_send_max = 0U;
+    g_tcp_throughput_sink_send_last = 0U;
+    g_tcp_throughput_sink_send_block_ticks = 0U;
+    g_tcp_throughput_sink_send_block_max_ticks = 0U;
+    g_tcp_throughput_sink_send_zero_count = 0U;
+    g_tcp_throughput_sink_send_error_count = 0U;
+}
+
+static void update_sink_send_diag(BaseType_t n, uint32_t request, TickType_t elapsed_ticks)
+{
+    if (0 < n)
+    {
+        uint32_t sent = (uint32_t)n;
+
+        g_tcp_throughput_sink_send_count++;
+        g_tcp_throughput_sink_send_last = sent;
+        if (sent < g_tcp_throughput_sink_send_min)
+        {
+            g_tcp_throughput_sink_send_min = sent;
+        }
+        if (sent > g_tcp_throughput_sink_send_max)
+        {
+            g_tcp_throughput_sink_send_max = sent;
+        }
+        if (sent < request)
+        {
+            g_tcp_throughput_sink_send_partial_count++;
+        }
+        g_tcp_throughput_sink_send_block_ticks += (uint32_t)elapsed_ticks;
+        if ((uint32_t)elapsed_ticks > g_tcp_throughput_sink_send_block_max_ticks)
+        {
+            g_tcp_throughput_sink_send_block_max_ticks = (uint32_t)elapsed_ticks;
+        }
+    }
+    else if (0 == n)
+    {
+        g_tcp_throughput_sink_send_zero_count++;
+    }
+    else
+    {
+        g_tcp_throughput_sink_send_error_count++;
+    }
+}
+
+static void log_sink_send_diag(const char * label)
+{
+    char line[240];
+    char * p = line;
+    uint32_t min_send = (0xFFFFFFFFUL == g_tcp_throughput_sink_send_min) ? 0U :
+                        g_tcp_throughput_sink_send_min;
+
+    p = append_text(p, "[TCPTHR] send ");
+    p = append_text(p, label);
+    p = append_text(p, " count=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_count);
+    p = append_text(p, " partial=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_partial_count);
+    p = append_text(p, " min=");
+    p = append_dec32(p, min_send);
+    p = append_text(p, " max=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_max);
+    p = append_text(p, " last=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_last);
+    p = append_text(p, " z=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_zero_count);
+    p = append_text(p, " err=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_error_count);
+    p = append_text(p, " ticks=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_block_ticks);
+    p = append_text(p, " maxt=");
+    p = append_dec32(p, g_tcp_throughput_sink_send_block_max_ticks);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
 static uint8_t lanbench_pattern_byte(uint32_t index)
 {
     return (uint8_t)(((index * 31UL) + 17UL) & 0xFFUL);
@@ -563,6 +692,7 @@ static int32_t run_sink_once(uint32_t iteration)
 #endif
 
     (void)iteration;
+    reset_sink_send_diag();
     log_perf_diag("sink_begin");
     socket = open_connected_socket(&status);
     if (FREERTOS_INVALID_SOCKET == socket)
@@ -585,8 +715,15 @@ static int32_t run_sink_once(uint32_t iteration)
         uint32_t remaining = (uint32_t)TCP_THROUGHPUT_TOTAL_BYTES - sent;
         uint32_t request = (remaining < (uint32_t)TCP_THROUGHPUT_TX_CHUNK_BYTES) ?
                            remaining : (uint32_t)TCP_THROUGHPUT_TX_CHUNK_BYTES;
+        TickType_t send_start_ticks;
+        TickType_t send_elapsed_ticks;
+#if (TCP_THROUGHPUT_SINK_FILL_PATTERN != 0U)
         lanbench_fill_pattern(s_tcp_buffer, sent, request);
+#endif
+        send_start_ticks = xTaskGetTickCount();
         BaseType_t n = FreeRTOS_send(socket, s_tcp_buffer, request, 0);
+        send_elapsed_ticks = xTaskGetTickCount() - send_start_ticks;
+        update_sink_send_diag(n, request, send_elapsed_ticks);
 
         if (0 >= n)
         {
@@ -617,7 +754,9 @@ static int32_t run_sink_once(uint32_t iteration)
                      sent,
                      g_tcp_throughput_last_ms,
                      g_tcp_throughput_last_mbps_x1000);
+    log_sink_send_diag("sink");
     log_sdio_xfer_diag("sink");
+    log_sdio_irq_diag("sink");
     log_perf_diag("sink_end");
     return status;
 }
@@ -733,6 +872,7 @@ static int32_t run_source_once(uint32_t iteration)
                      g_tcp_throughput_last_ms,
                      g_tcp_throughput_last_mbps_x1000);
     log_sdio_xfer_diag("source");
+    log_sdio_irq_diag("source");
     log_perf_diag("source_end");
     g_tcp_throughput_source_phase = 6U;
     tcp_trace_phase(19U, (uint32_t)status);
@@ -755,6 +895,18 @@ static void tcp_throughput_task(void * p_parameters)
     debug_puts("[TCPTHR] network ready\r\n");
     tcp_trace_phase(1U, (uint32_t)TCP_THROUGHPUT_MODE);
     log_perf_diag("task_begin");
+
+    s_tcp_buffer = (uint8_t *)pvPortMalloc((size_t)TCP_THROUGHPUT_BUFFER_BYTES);
+    if (NULL == s_tcp_buffer)
+    {
+        debug_puts("[TCPTHR] buffer alloc NG\r\n");
+        tcp_trace_phase(98U, (uint32_t)TCP_THROUGHPUT_BUFFER_BYTES);
+        vTaskDelete(NULL);
+        return;
+    }
+#if (TCP_THROUGHPUT_SINK_FILL_PATTERN == 0U)
+    memset(s_tcp_buffer, 0xA5, (size_t)TCP_THROUGHPUT_BUFFER_BYTES);
+#endif
 
     for (i = 0U; i < (uint32_t)TCP_THROUGHPUT_ITERATIONS; i++)
     {
@@ -780,6 +932,8 @@ static void tcp_throughput_task(void * p_parameters)
     debug_puts("[TCPTHR] done\r\n");
     tcp_trace_phase(99U, (uint32_t)TCP_THROUGHPUT_MODE);
     log_perf_diag("task_done");
+    vPortFree(s_tcp_buffer);
+    s_tcp_buffer = NULL;
     vTaskDelete(NULL);
 }
 

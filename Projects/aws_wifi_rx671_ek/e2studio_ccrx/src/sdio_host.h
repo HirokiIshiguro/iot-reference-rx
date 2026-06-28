@@ -83,6 +83,7 @@ bool sdio_host_set_bus_4bit(void);
  * comparison. Returns true on success. Call after switching to 4-bit and before
  * backplane reads. */
 bool sdio_host_set_run_clock(void);
+bool sdio_host_set_clock_div(uint32_t div);
 
 /* Request the ALP backplane clock (F1 CHIPCLKCSR) and poll for ALP_AVAIL.
  * Writes the final CSR byte. Sets the ALP_AVAIL status bit but is NOT enough on

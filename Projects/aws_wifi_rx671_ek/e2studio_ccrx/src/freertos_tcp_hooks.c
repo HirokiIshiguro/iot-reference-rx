@@ -9,6 +9,10 @@
 
 #include "debug_uart.h"
 
+#ifndef RX671_IPTRACE_PROTOCOL_DIAG
+#define RX671_IPTRACE_PROTOCOL_DIAG    (1)
+#endif
+
 volatile uint32_t g_freertos_tcp_network_up;
 volatile uint32_t g_freertos_tcp_ip_address;
 volatile uint32_t g_freertos_tcp_netmask;
@@ -45,10 +49,12 @@ volatile uint32_t g_iptrace_network_output_last_length;
 volatile uint32_t g_iptrace_network_output_last_ethertype;
 volatile uint32_t g_iptrace_network_output_last_protocol;
 
+#if (RX671_IPTRACE_PROTOCOL_DIAG != 0)
 static uint32_t pack_be16(const uint8_t * p)
 {
     return (((uint32_t)p[0] << 8) | (uint32_t)p[1]);
 }
+#endif
 
 static void count_trace_protocol(const uint8_t * buffer, uint32_t length,
                                  volatile uint32_t * arp_count,
@@ -59,6 +65,7 @@ static void count_trace_protocol(const uint8_t * buffer, uint32_t length,
                                  volatile uint32_t * last_ethertype,
                                  volatile uint32_t * last_protocol)
 {
+#if (RX671_IPTRACE_PROTOCOL_DIAG != 0)
     if ((NULL != buffer) && (length >= 14U))
     {
         uint32_t ethertype = pack_be16(&buffer[12]);
@@ -93,6 +100,17 @@ static void count_trace_protocol(const uint8_t * buffer, uint32_t length,
             }
         }
     }
+#else
+    (void)buffer;
+    (void)length;
+    (void)arp_count;
+    (void)ipv4_count;
+    (void)icmp_count;
+    (void)udp_count;
+    (void)tcp_count;
+    (void)last_ethertype;
+    (void)last_protocol;
+#endif
 }
 
 void vWifiRx671IpTraceNetworkEventReceived(uint32_t event)

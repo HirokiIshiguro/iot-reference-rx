@@ -47,9 +47,12 @@ argument and Function 2 FIFO handling needed for WHD scan/JOIN.
 | `WHD_JOIN_SSID` | `""` | AP SSID. Do not commit real credentials. |
 | `WHD_JOIN_PASSPHRASE` | `""` | AP passphrase. Do not commit real credentials. |
 | `WHD_JOIN_SECURITY` | `WHD_SECURITY_WPA2_AES_PSK` | Initial security mode for AP JOIN testing. |
-| `WHD_SDIO_SOFTIRQ_POLL_MS` | `0` | Temporary SDIO soft-IRQ poll period for WHD event wakeups. Use `1` for the current AP JOIN / ping baseline when the SDHI in-band interrupt path is being isolated. |
+| `WHD_SDIO_SOFTIRQ_POLL_MS` | `0` | Temporary SDIO soft-IRQ poll period for WHD event wakeups. Keep `0` for the interrupt-driven performance baseline; use `1` only as a comparison/fallback. |
+| `WHD_SDIO_USE_SDHI_IRQ` | `1` | Use the RX671 SDHI in-band IOIRQ path for WHD card interrupts. |
+| `WHD_SDIO_SDHI_IRQ_DIRECT_NOTIFY` | `1` | Call the WHD SDIO interrupt handler directly from the SDHI callback path instead of quantizing wakeups through a separate FreeRTOS task. |
 | `WHD_SDIO_DIAG_FAIL_LIMIT` | `16` | Maximum CMD52/CMD53 failure diagnostics printed per command class. |
 | `WHD_SDIO_PRE_CMD53_CLOCKS` | `1` | Force the CYW43439 backplane clocks and KSO once before the first F1 CMD53, matching the proven primitive backplane-read sequence without modifying WHD core code. |
+| `WHD_SDIO_CMD53_F2_EMPTY_TAG_AS_ZERO` | `1` | Treat an empty Function 2 length-tag read as the zero tag that WHD expects when no frame is pending. |
 
 For a real AP JOIN run, do not edit this tracked header with real credentials.
 Use the headless build helper from the repository root instead:
@@ -58,9 +61,10 @@ Use the headless build helper from the repository root instead:
 pwsh -File tools/build_headless_rx671_wifi.ps1 `
   -WifiConfigFile C:\ai\codex\ref\wifi.txt `
   -AwsIotConfigDir C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01 `
-  -SoftIrqPollMs 1 `
+  -SoftIrqPollMs 0 `
   -WlanAllowBusSleepDelayMs 600000 `
-  -SdioRunClockDiv SDHI_DIV_2 `
+  -SdioRunClockDiv SDHI_DIV_4 `
+  -SdioPostWifiOnClockDiv 0 `
   -SdioCmd53XferEngine SDIO_HOST_CMD53_XFER_DTC
 ```
 
@@ -105,15 +109,22 @@ pwsh -File tools/build_headless_rx671_wifi.ps1 `
 
 `SDHI_DIV_8` is useful as a low-speed fallback and signal-integrity reference.
 `SDHI_DIV_4`, `-SdioUseHighSpeedClock`, and `-SdioHighSpeedDrive` remain
-measurement settings for A/B tests. The current source exposes
-`g_sdio_host_run_clock_div` and `g_sdio_host_run_clock_status` as J-Link-visible
-diagnostics; a healthy DIV2 throughput run logs `clkdiv=00000000`.
+measurement settings for A/B tests. With the SD sniffer board installed, the
+current high-speed reference build starts WHD bring-up at `SDHI_DIV_4` and then
+raises the clock to `SDHI_DIV_2` after WHD JOIN/control-plane setup by passing
+`-SdioPostWifiOnClockDiv 0` (`0` is the FIT enum value for `SDHI_DIV_2`). The
+current source exposes `g_sdio_host_run_clock_div` and
+`g_sdio_host_run_clock_status` as J-Link-visible diagnostics; a healthy DIV2
+throughput run logs `clkdiv=00000000`.
 
-FreeRTOS+TCP sliding windows are enabled for Wi-Fi throughput work. The current
-defaults use 16 MSS for both RX and TX stream buffers, 128 TCP window segment
-descriptors, and 48 network buffer descriptors. This is intended to prevent the
-TCP layer from becoming the first bottleneck while SDHI clocking and SDIO
-transfer CPU cost are measured.
+FreeRTOS+TCP sliding windows are enabled for Wi-Fi throughput work. The tracked
+defaults keep the per-socket RX/TX stream buffers to 4 MSS (`5840` bytes) and
+use 48 network buffer descriptors. With `BufferAllocation_2.c`, the descriptor
+pool itself is about 2.7 KiB of static RAM; packet payload buffers are allocated
+from the FreeRTOS heap only while they are in flight. Larger windows and socket
+buffers are useful for throughput experiments, but keep them in local build
+overrides so the committed project does not consume the RX671 RAM budget by
+default.
 
 The SDIO CMD53 data path can be built with CPU copy, DTC, or DMACA transfer.
 The tracked default is DTC because it completes WHD bring-up, AP JOIN, DHCP,
@@ -246,16 +257,19 @@ The optional `-FirmwareBin`, `-NvramBin`, and `-ClmBlob` arguments remain
 available for manual override/debug loads, but the normal project image already
 contains the staged resources.
 
-## Temporary interrupt model
+## SDHI interrupt model
 
-The current WHD SDIO backend is still synchronous and mostly polled. WHD expects
-an SDIO card-interrupt callback to wake its internal thread for control/event
-traffic, so `src/whd_port/cyhal_sdhc.c` can provide a FreeRTOS software timer
-that periodically calls the registered `CYHAL_SDIO_CARD_INTERRUPT` handler.
-The bridge is disabled by default in the tracked project so the SDHI in-band
-interrupt path remains visible during bring-up. Set
-`WHD_SDIO_SOFTIRQ_POLL_MS=1` through the local JOIN config when reproducing the
-current AP JOIN / ping baseline with software wakeups.
+The current WHD SDIO backend uses the RX671 SDHI in-band IOIRQ path by default.
+WHD expects an SDIO card-interrupt callback to wake its internal thread for
+control/event traffic, and `src/whd_port/cyhal_sdhc.c` wires that callback to
+the SDHI SDIO interrupt. The performance baseline keeps
+`WHD_SDIO_USE_SDHI_IRQ=1`, `WHD_SDIO_SDHI_IRQ_DIRECT_NOTIFY=1`, and
+`WHD_SDIO_SOFTIRQ_POLL_MS=0`.
+
+The software timer wakeup path remains available only as an A/B comparison or
+bring-up fallback. Set `WHD_SDIO_USE_SDHI_IRQ=0` and
+`WHD_SDIO_SOFTIRQ_POLL_MS=1` through the local JOIN config when intentionally
+reproducing the older softirq-only baseline.
 
 The RX671 + Type 1YN bench also needs the Broadcom backplane clock/KSO sequence
 that was proven in the primitive SDIO project before the first F1 CMD53. WHD
@@ -264,12 +278,12 @@ requests ALP during `whd_bus_sdio_init`, but the current board path has required
 clock data. `WHD_SDIO_PRE_CMD53_CLOCKS=1` keeps that quirk contained in the
 `cyhal_sdio` backend rather than forking WHD.
 
-This is intentionally a bring-up bridge:
+This remains intentionally project-local:
 
 - It keeps the RX671-specific WHD core edits in one external patch instead of
   copying WHD sources into this repository.
-- It keeps AP JOIN testing possible before the real SDHI interrupt path is
-  fully connected.
+- It keeps softirq-only AP JOIN testing available without making it the normal
+  high-speed data path.
 - It must be replaced by SDHI `SDACI` / in-band SDIO interrupt handling for the
   performance-focused driver path.
 
