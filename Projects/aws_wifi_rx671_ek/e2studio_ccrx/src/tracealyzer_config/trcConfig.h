@@ -14,12 +14,25 @@ extern "C" {
 
 #include "platform.h"
 
+#ifndef TRACEALYZER_CPU_LOAD_LOW_NOISE
+#define TRACEALYZER_CPU_LOAD_LOW_NOISE 1
+#endif
+
 #define TRC_CFG_HARDWARE_PORT              TRC_HARDWARE_PORT_Renesas_RX600
-#define TRC_CFG_SCHEDULING_ONLY            0
 #define TRC_CFG_INCLUDE_MEMMANG_EVENTS     0
+
+#if (TRACEALYZER_CPU_LOAD_LOW_NOISE != 0)
+#define TRC_CFG_SCHEDULING_ONLY            1
+#define TRC_CFG_INCLUDE_USER_EVENTS        0
+#define TRC_CFG_INCLUDE_ISR_TRACING        0
+#define TRC_CFG_INCLUDE_READY_EVENTS       0
+#else
+#define TRC_CFG_SCHEDULING_ONLY            0
 #define TRC_CFG_INCLUDE_USER_EVENTS        1
 #define TRC_CFG_INCLUDE_ISR_TRACING        1
 #define TRC_CFG_INCLUDE_READY_EVENTS       1
+#endif
+
 #define TRC_CFG_INCLUDE_OSTICK_EVENTS      0
 
 #define TRC_CFG_ENTRY_SLOTS                80
