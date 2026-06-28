@@ -59,6 +59,28 @@ The baseline is intended to remain on a dedicated development branch until the
 Wi-Fi throughput path, provisioning, TSIP, and boot-loader variants are
 separated into reviewable milestones.
 
+## Tracealyzer Capture Policy
+
+The RX671 Wi-Fi project defaults Tracealyzer to a CPU-load low-noise profile:
+
+- `TRACEALYZER_CPU_LOAD_LOW_NOISE = 1`
+- scheduling-only recorder mode
+- user, ISR, ready, memory, and OS tick events disabled
+- J-Link RTT up-buffer kept at 8 KiB
+- RTT write mode remains `SEGGER_RTT_MODE_NO_BLOCK_SKIP`
+
+The goal is to make high-throughput TCP captures usable only when the
+Tracealyzer Live Stream "Missed Events" counter stays at zero for the full
+measurement interval. Keep `NO_BLOCK_SKIP` so an unattached Tracealyzer host
+cannot stall the target firmware. For SDIO or WHD event-flow debugging, build
+with `TRACEALYZER_CPU_LOAD_LOW_NOISE=0` and treat the resulting CPU-load graph
+as diagnostic-only unless missed events still remain zero.
+
+Do not increase the RTT up-buffer casually on RX671. 12 KiB, 16 KiB, and 32 KiB
+all overflowed the current linker RAM layout in this project; the default
+low-noise profile therefore reduces recorder event volume instead of spending
+additional RAM on a larger RTT FIFO.
+
 ## TCP Throughput Tuning Notes
 
 The current throughput tuning baseline uses the interrupt-driven WHD path, the
