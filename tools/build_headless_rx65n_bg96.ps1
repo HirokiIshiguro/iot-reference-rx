@@ -3,7 +3,7 @@ param(
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studio-cli.exe",
     [string]$Workspace = "C:\iotref-rx65n-bg96-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build.log"),
-    [int]$E2StudioTimeoutSeconds = 600,
+    [int]$E2StudioTimeoutSeconds = 1800,
     [string]$Make = $env:RX65N_BG96_MAKE,
     [string]$CcrxBin = $env:BIN_RX,
     [string]$TlsBackend = $(if ($env:RX65N_BG96_TLS_BACKEND) { $env:RX65N_BG96_TLS_BACKEND } else { "software" }),
@@ -267,6 +267,8 @@ function Invoke-Tool {
             Write-ProcessOutput @($stdoutPath, $stderrPath)
             throw "build command timed out after $E2StudioTimeoutSeconds seconds: $FilePath $($Arguments -join ' ')"
         }
+        $process.WaitForExit()
+        $process.Refresh()
         Write-ProcessOutput @($stdoutPath, $stderrPath)
         if ($process.ExitCode -ne 0) {
             if ($AllowNonZeroExit) {
