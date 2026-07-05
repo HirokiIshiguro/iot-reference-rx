@@ -98,7 +98,11 @@ variables:
   RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE: "128"
   RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS: "30"
   RX65N_BG96_TSIP_FLEET_ENABLE: "false"
-  RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS: "600"
+  # CK-RX65N/BG96 clean builds generate e2 studio makefiles and then run
+  # deterministic make rebuilds. The application build has crossed 600s under
+  # CI load, and a local clean generation run crossed 1200s while still
+  # compiling mbedTLS, so keep the watchdog finite but above observed time.
+  RX65N_BG96_E2STUDIO_TIMEOUT_SECONDS: "1800"
   RX65N_BG96_DYNAMIC_IOT_CREDENTIALS: "true"
   RX65N_BG96_IOT_POLICY_NAME: "ck-rx65n-policy"
   RX65N_BG96_THING_NAME_PREFIX: "rx65n-bg96"
@@ -955,6 +959,8 @@ build_rx72n_ether_fleet:
     - exec-shell
     - os-windows
     - $AWS_CLI_RUNNER_TAG
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
   before_script:
     - $ErrorActionPreference = "Stop"
     - |
