@@ -441,6 +441,7 @@ matrix_rx72n_ether_software_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    GIT_SUBMODULE_STRATEGY: "none"
     MBEDTLS_BUILD_VARIANT: "software-0rtt"
     RUN_HW_TESTS: "true"
     RUN_LAN_BENCH: "true"
