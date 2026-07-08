@@ -75,6 +75,14 @@ if (-not $text.Contains($configAnchor)) {
 $text = Add-CompilerDefine -Text $text -Define 'LANBENCH_TLS13_0RTT_ENABLE=1' -Anchor $configAnchor
 $text = Add-CompilerDefine -Text $text -Define 'LANBENCH_TLS13_0RTT_TSIP_ENABLE=1' -Anchor $configAnchor
 
+$lanbenchPort = if ($env:LANBENCH_MBEDTLS_0RTT_PORT) { $env:LANBENCH_MBEDTLS_0RTT_PORT } else { "" }
+if (-not [string]::IsNullOrWhiteSpace($lanbenchPort)) {
+    if ($lanbenchPort -notmatch '^\d+$') {
+        throw "LANBENCH_MBEDTLS_0RTT_PORT must be numeric: $lanbenchPort"
+    }
+    $text = Add-CompilerDefine -Text $text -Define "LANBENCH_TLS_PORT=${lanbenchPort}U" -Anchor $configAnchor
+}
+
 $text = $text.Replace(
     'Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c',
     'Middleware/network_transport/using_mbedtls_pkcs11_with_tsip/transport_mbedtls_pkcs11_with_tsip.c'
