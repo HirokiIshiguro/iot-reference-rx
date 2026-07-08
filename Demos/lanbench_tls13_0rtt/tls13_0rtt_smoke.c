@@ -74,7 +74,7 @@
 #endif
 
 #ifndef LANBENCH_TLS13_0RTT_HOST
-#define LANBENCH_TLS13_0RTT_HOST              "192.168.10.103"
+#define LANBENCH_TLS13_0RTT_HOST              "192.168.10.203"
 #endif
 
 #ifndef LANBENCH_TLS13_0RTT_SERVER_NAME

@@ -425,6 +425,8 @@ matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
     RX72N_TLS_BACKEND: "tsip"
     RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
     RX72N_TLS13_0RTT_ENABLE: "true"
+    LANBENCH_MBEDTLS_0RTT_HOST: "192.168.10.203"
+    LANBENCH_MBEDTLS_0RTT_PORT: "15445"
 
 matrix_rx72n_ether_software_tls13_resumption_0rtt:
   stage: nightly_matrix
@@ -441,6 +443,9 @@ matrix_rx72n_ether_software_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+    LANBENCH_MBEDTLS_0RTT_HOST: "192.168.10.203"
+    LANBENCH_MBEDTLS_0RTT_PORT: "15445"
     MBEDTLS_BUILD_VARIANT: "software-0rtt"
     RUN_HW_TESTS: "true"
     RUN_LAN_BENCH: "true"
@@ -2418,6 +2423,7 @@ test_rx72n_ether_tls13_0rtt:
       server_artifact_dir="$artifact_dir/mbedtls_0rtt_server"
       mkdir -p "$server_artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      python -m pip install --quiet jsonschema
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
       mbedtls_repo_url="${MBEDTLS_0RTT_REPO_URL:-https://gitlab.saffti.jp/oss/import/github/mbed-tls/mbedtls.git}"
