@@ -57,6 +57,41 @@ function Add-CompilerDefine {
     return $Text.Replace($Anchor, $insert)
 }
 
+function Set-LanbenchZeroRttHost {
+    param(
+        [string] $ProjectRoot,
+        [string] $HostName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($HostName)) {
+        return
+    }
+    if ($HostName -notmatch '^[A-Za-z0-9._-]+$') {
+        throw "LANBENCH_MBEDTLS_0RTT_HOST contains unsupported characters: $HostName"
+    }
+
+    $sourcePaths = @(
+        (Join-Path $ProjectRoot "Demos/include/lanbench_tls13_0rtt_config.h"),
+        (Join-Path $ProjectRoot "Demos/lanbench_tls13_0rtt/tls13_0rtt_smoke.c")
+    )
+    $pattern = '(?m)^(\s*#define\s+LANBENCH_TLS13_0RTT_HOST\s+)"[^"]+"'
+
+    foreach ($sourcePath in $sourcePaths) {
+        if (-not (Test-Path -LiteralPath $sourcePath)) {
+            throw "0-RTT smoke source is missing: $sourcePath"
+        }
+
+        $sourceText = Get-Content -LiteralPath $sourcePath -Raw
+        $replacement = "`${1}`"$HostName`""
+        if ($sourceText -notmatch $pattern) {
+            throw "LANBENCH_TLS13_0RTT_HOST default macro not found in $sourcePath"
+        }
+
+        $sourceText = [regex]::Replace($sourceText, $pattern, $replacement, 1)
+        Set-Content -LiteralPath $sourcePath -Value $sourceText -Encoding UTF8
+    }
+}
+
 $text = Get-Content -LiteralPath $cproject -Raw
 
 $text = $text.Replace(
@@ -82,6 +117,9 @@ if (-not [string]::IsNullOrWhiteSpace($lanbenchPort)) {
     }
     $text = Add-CompilerDefine -Text $text -Define "LANBENCH_TLS_PORT=${lanbenchPort}U" -Anchor $configAnchor
 }
+
+$lanbenchHost = if ($env:LANBENCH_MBEDTLS_0RTT_HOST) { $env:LANBENCH_MBEDTLS_0RTT_HOST } else { "" }
+Set-LanbenchZeroRttHost -ProjectRoot $projectRoot -HostName $lanbenchHost
 
 $text = $text.Replace(
     'Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c',
