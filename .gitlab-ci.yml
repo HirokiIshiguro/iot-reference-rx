@@ -2418,6 +2418,7 @@ test_rx72n_ether_tls13_0rtt:
       server_artifact_dir="$artifact_dir/mbedtls_0rtt_server"
       mkdir -p "$server_artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      python -m pip install --quiet jsonschema
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
       mbedtls_repo_url="${MBEDTLS_0RTT_REPO_URL:-https://gitlab.saffti.jp/oss/import/github/mbed-tls/mbedtls.git}"
