@@ -21,6 +21,11 @@ The RX72N Envision Kit software-TLS project enables the demo. The matching TSIP
 project compiles and links the shared source but leaves it disabled until TSIP's
 global provisioning and handshake state has connection-safe synchronization.
 
+Two simultaneous software-TLS handshakes exceed the original single 320 KiB
+FreeRTOS heap. The software-TLS RX72N project therefore uses `heap_5` with its
+existing 320 KiB lower-RAM region plus a 248 KiB region in the mapped upper-RAM
+gap. The linker keeps that region below the fixed framebuffer at `0x0085E000`.
+
 ## AWS IoT policy requirement
 
 The primary MQTT client ID is the provisioned Thing name and must be at most
