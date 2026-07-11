@@ -87,6 +87,9 @@
  */
 #define ENABLE_OTA_UPDATE_DEMO              (1)
 
+/* Enable the persistent secondary TLS/MQTT session demo. */
+#define ENABLE_MULTI_TLS_DEMO               (1)
+
 /**
  * @brief Path of the file containing the provisioning claim certificate. This
  * certificate is used to connect to AWS IoT Core and use Fleet Provisioning

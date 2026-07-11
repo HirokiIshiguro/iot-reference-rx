@@ -135,6 +135,9 @@ variables:
   #   full  - flash/provision/MQTT + OTA + Fleet Provisioning cleanup path.
   RX72N_TEST_SCOPE: "build"
   RUN_RX72N_HW_TESTS: "false"
+  # Opt-in until the RX72N software-TLS dual-session demo has accumulated
+  # stable hardware evidence. Enable together with RX72N_TEST_SCOPE=mqtt.
+  RUN_RX72N_MULTI_TLS_TEST: "false"
   RUN_RX72N_OTA_TESTS: "false"
   RUN_RX72N_FLEET_TESTS: "false"
   RX72N_CLEANUP_FLEET_RESOURCES: "true"
@@ -155,6 +158,8 @@ variables:
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
   RX72N_MQTT_TEST_TIMEOUT: "600"
   RX72N_MQTT_TEST_REPEAT_COUNT: "1"
+  RX72N_MULTI_TLS_TEST_TIMEOUT: "180"
+  RX72N_MULTI_TLS_MIN_OVERLAP_SECONDS: "30"
   RX72N_FLEET_TEST_TIMEOUT: "600"
   # RX72N_TLS_BACKEND: software or tsip.
   RX72N_TLS_BACKEND: "software"
@@ -2407,6 +2412,43 @@ test_rx72n_ether_mqtt:
     when: always
     paths:
       - artifacts/test_rx72n_ether_mqtt/
+    expire_in: 7 days
+
+test_rx72n_ether_multi_tls:
+  stage: test
+  extends: .rx72n_linux_hw_job
+  needs:
+    - job: test_rx72n_ether_mqtt
+      artifacts: false
+  rules:
+    - if: '$RUN_RX72N_MULTI_TLS_TEST == "true" && $RX72N_TLS_BACKEND == "software" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+      when: on_success
+    - when: never
+  script:
+    - echo "=== Verify persistent RX72N dual TLS/MQTT sessions ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_multi_tls"
+      mkdir -p "$artifact_dir"
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      set +e
+      python tools/ci/monitor_multi_tls.py \
+        --uart-port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout "$RX72N_MULTI_TLS_TEST_TIMEOUT" \
+        --min-overlap-seconds "$RX72N_MULTI_TLS_MIN_OVERLAP_SECONDS" \
+        --reset-cmd "$reset_cmd" \
+        --raw-log "$artifact_dir/multi_tls_uart.log" \
+        --summary-json "$artifact_dir/multi_tls_summary.json" \
+        2>&1 | tee "$artifact_dir/monitor_multi_tls.log"
+      status=${PIPESTATUS[0]}
+      set -e
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_rx72n_ether_multi_tls/
     expire_in: 7 days
 
 test_rx72n_ether_tls13_0rtt:

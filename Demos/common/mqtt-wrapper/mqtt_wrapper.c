@@ -124,15 +124,10 @@ static void prvPublishCommandCallback(MQTTAgentCommandContext_t * pCmdCallbackCo
 {
     TaskHandle_t xTaskHandle = (struct tskTaskControlBlock *) pCmdCallbackContext->xTaskToNotify;
 
-
+    configASSERT(NULL != pReturnInfo);
     if (NULL != xTaskHandle)
     {
-        uint32_t ulNotifyValue = MQTTSuccess; /* ( pxReturnInfo->returnCode & 0xFFFFFF ); */
-/* */
-/*      if( pxReturnInfo->pSubackCodes ) */
-/*      { */
-/*          ulNotifyValue += ( pxReturnInfo->pSubackCodes[ 0 ] << 24 ); */
-/*      } */
+        uint32_t ulNotifyValue = ((uint32_t)pReturnInfo->returnCode & 0x00FFFFFFU);
 
         (void) xTaskNotifyIndexed(xTaskHandle,
                                 MQTT_AGENT_NOTIFY_IDX,
@@ -202,8 +197,10 @@ bool mqttWrapper_publish(char *    topic,
     {
         MQTTStatus_t mqttStatus = MQTTSuccess;
 
-        /* TODO: This should be static or should we wait? */
-        static MQTTPublishInfo_t pubInfo      = { 0 };
+        /* This function waits for the agent command to complete, so the publish
+         * descriptor can remain task-local. Keeping it local also allows
+         * independent application tasks to publish through the agent safely. */
+        MQTTPublishInfo_t pubInfo             = { 0 };
         MQTTAgentContext_t *     xAgentHandle = &xGlobalMqttAgentContext;
 
         pubInfo.qos             = MQTTQoS0;

@@ -197,8 +197,14 @@ function Invoke-E2StudioCli {
             Write-ProcessOutput @($stdoutPath, $stderrPath)
             throw "e2 studio CLI timed out after $E2StudioTimeoutSeconds seconds: $E2Studio $($Arguments -join ' ')"
         }
+        # With redirected output, the timed overload can return before the
+        # Process object has refreshed its final state. Complete the wait and
+        # refresh explicitly so long builds do not yield a null ExitCode.
+        $process.WaitForExit()
+        $process.Refresh()
+        $exitCode = $process.ExitCode
         Write-ProcessOutput @($stdoutPath, $stderrPath)
-        return $process.ExitCode
+        return $exitCode
     }
     finally {
         Remove-Item -Force -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue

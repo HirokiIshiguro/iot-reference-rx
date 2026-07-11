@@ -86,6 +86,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/key_flash_wr_with_tsip}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/tsip_provisioning}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/mqtt_agent}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/multi_tls}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/Fleet_Provisioning_With_CSR_Demo}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/common/pkcs11_helpers}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/dev_mode_key_provisioning/include}&quot;"/>
@@ -277,6 +278,7 @@
 									<listOptionValue builtIn="false" value="&quot;.\Demos/common/pkcs11_helpers\pkcs11_helpers.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/dev_mode_key_provisioning/src\aws_dev_mode_key_provisioning.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Demos/mqtt_agent\mqtt_agent_task.obj&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;.\Demos/multi_tls\multi_tls_demo.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/3rdparty/littlefs\lfs.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/3rdparty/littlefs\lfs_util.obj&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;.\Middleware/3rdparty/mbedtls_with_TSIP/library\aes.obj&quot;"/>

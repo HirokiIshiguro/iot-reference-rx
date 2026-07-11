@@ -50,6 +50,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
+#if defined(ENABLE_MULTI_TLS_DEMO) && (ENABLE_MULTI_TLS_DEMO == 1)
+#include "multi_tls_demo.h"
+#endif
 #include "r_simple_glcdc_config_rx_if.h"
 #include "r_simple_graphic_if.h"
 
@@ -282,6 +285,12 @@ void main_task(void *pvParameters)
                 xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
 
                 vStartMQTTAgent (appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY);
+
+                #if defined(ENABLE_MULTI_TLS_DEMO) && (ENABLE_MULTI_TLS_DEMO == 1)
+                    vStartMultiTlsDemo();
+                    prvDisplayWrite("Multi TLS demo start\r\n");
+                #endif
+
                 prvDisplayWrite("MQTT task start\r\n");
 
                 vStartSimplePubSubDemo ();
