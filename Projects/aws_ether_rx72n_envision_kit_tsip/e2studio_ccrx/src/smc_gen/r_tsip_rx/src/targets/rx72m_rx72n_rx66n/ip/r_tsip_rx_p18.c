@@ -117,7 +117,7 @@ e_tsip_err_t R_TSIP_GenerateTdesRandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xcd9e542cu), change_endian_long(0x657c3c86u), change_endian_long(0x9482bbfau), change_endian_long(0xe3a7e1ebu));
@@ -153,7 +153,7 @@ e_tsip_err_t R_TSIP_GenerateTdesRandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_A4H.WORD = 0x000c0b0cu;
@@ -178,7 +178,7 @@ e_tsip_err_t R_TSIP_GenerateTdesRandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x93471862u), change_endian_long(0x89e722bfu), change_endian_long(0x82c7ff45u), change_endian_long(0x7a05edbbu));
@@ -195,7 +195,7 @@ e_tsip_err_t R_TSIP_GenerateTdesRandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_B0H.WORD = 0x00000100u;
@@ -205,14 +205,14 @@ e_tsip_err_t R_TSIP_GenerateTdesRandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x0000100bu;
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xb093920cu), change_endian_long(0x843b5eaau), change_endian_long(0x00899645u), change_endian_long(0x6fcc066cu));

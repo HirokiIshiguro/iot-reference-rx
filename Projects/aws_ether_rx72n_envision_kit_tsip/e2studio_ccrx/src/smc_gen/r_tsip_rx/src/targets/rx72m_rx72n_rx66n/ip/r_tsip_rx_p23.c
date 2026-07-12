@@ -169,7 +169,7 @@ e_tsip_err_t R_TSIP_GenerateFirmwareMacSub(uint32_t *InData_KeyIndex, uint32_t *
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x21fedf61u), change_endian_long(0x07878f82u), change_endian_long(0xd9bad8ccu), change_endian_long(0x24848860u));
@@ -336,7 +336,7 @@ resume_point:
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_E0H.WORD = 0x81040000u;
@@ -379,7 +379,7 @@ resume_point:
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x00050e5du;
@@ -388,7 +388,7 @@ resume_point:
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000361u;
@@ -408,7 +408,7 @@ resume_point:
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x036e2bf5u), change_endian_long(0xe7a7797fu), change_endian_long(0x504085cbu), change_endian_long(0x002119a8u));

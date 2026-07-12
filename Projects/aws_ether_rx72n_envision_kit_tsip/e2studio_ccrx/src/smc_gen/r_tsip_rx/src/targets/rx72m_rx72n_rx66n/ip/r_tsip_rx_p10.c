@@ -161,7 +161,7 @@ e_tsip_err_t R_TSIP_UpdateTlsRsaDataSub(uint32_t *InData_IV, uint32_t *InData_In
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x0e722d01u), change_endian_long(0x292b9b2au), change_endian_long(0x5a50ac2du), change_endian_long(0xadf6751fu));
@@ -209,7 +209,7 @@ e_tsip_err_t R_TSIP_UpdateTlsRsaDataSub(uint32_t *InData_IV, uint32_t *InData_In
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x00013103u;
@@ -232,7 +232,7 @@ e_tsip_err_t R_TSIP_UpdateTlsRsaDataSub(uint32_t *InData_IV, uint32_t *InData_In
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x00012303u;
@@ -313,7 +313,7 @@ e_tsip_err_t R_TSIP_UpdateTlsRsaDataSub(uint32_t *InData_IV, uint32_t *InData_In
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_04H.WORD = 0x00000213u;
@@ -340,7 +340,7 @@ e_tsip_err_t R_TSIP_UpdateTlsRsaDataSub(uint32_t *InData_IV, uint32_t *InData_In
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_04H.WORD = 0x00000213u;
@@ -369,7 +369,7 @@ e_tsip_err_t R_TSIP_UpdateTlsRsaDataSub(uint32_t *InData_IV, uint32_t *InData_In
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x1b9ebb22u), change_endian_long(0x0fe98e17u), change_endian_long(0x16b67195u), change_endian_long(0xf4a120a0u));

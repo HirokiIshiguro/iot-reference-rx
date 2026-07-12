@@ -116,7 +116,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_ECH.WORD = 0x0000b540u;
@@ -127,7 +127,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_ECH.WORD = 0x0000b540u;
@@ -138,7 +138,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_ECH.WORD = 0x0000b540u;
@@ -149,7 +149,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_2CH.WORD = 0x00000015u;
@@ -400,7 +400,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_24H.WORD = 0x00004c0cu;
@@ -466,7 +466,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_24H.WORD = 0x000084d0u;
@@ -490,7 +490,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func028(OFS_ADR);
@@ -516,7 +516,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_24H.WORD = 0x000009c0u;
@@ -554,7 +554,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_24H.WORD = 0x00001dc0u;
@@ -599,7 +599,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_34H.WORD = 0x00000002u;
@@ -878,7 +878,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             /* WAIT_LOOP */
@@ -904,7 +904,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000052u;
@@ -929,7 +929,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000362u;
@@ -948,7 +948,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             RX72M_RX72N_RX66N_func100(change_endian_long(0x2c290bceu), change_endian_long(0xe9781100u), change_endian_long(0x9d15af05u), change_endian_long(0xccb8fbc1u));
@@ -1065,7 +1065,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_E0H.WORD = 0x800c0000u;
@@ -1074,7 +1074,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_18H.WORD = 0x00000004u;
@@ -1126,7 +1126,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_E0H.WORD = 0x810c0000u;
@@ -1135,7 +1135,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_38H.WORD = 0x00003000u;
@@ -1186,7 +1186,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_34H.WORD = 0x00000002u;
@@ -1309,7 +1309,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_24H.WORD = 0x000084d0u;
@@ -1339,7 +1339,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_24H.WORD = 0x0000880cu;
@@ -1362,7 +1362,7 @@ e_tsip_err_t R_TSIP_EcdsaP384SigunatureVerificationSub(uint32_t *InData_KeyIndex
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_24H.WORD = 0x000009c0u;

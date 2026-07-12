@@ -146,7 +146,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateHandshakeSecretSub(uint32_t *InData_SharedSecre
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_C4H.WORD = 0x400c0b0cu;
@@ -182,7 +182,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateHandshakeSecretSub(uint32_t *InData_SharedSecre
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -200,7 +200,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateHandshakeSecretSub(uint32_t *InData_SharedSecre
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xc5f4c5edu), change_endian_long(0x1ce3d30au), change_endian_long(0xb077254fu), change_endian_long(0x36a7e871u));
@@ -285,7 +285,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateHandshakeSecretSub(uint32_t *InData_SharedSecre
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000057u;
@@ -314,7 +314,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateHandshakeSecretSub(uint32_t *InData_SharedSecre
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000352u;

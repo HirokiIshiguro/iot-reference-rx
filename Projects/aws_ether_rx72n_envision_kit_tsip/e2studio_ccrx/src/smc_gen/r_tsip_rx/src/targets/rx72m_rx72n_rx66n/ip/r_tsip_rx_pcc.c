@@ -186,7 +186,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateMasterSecretSub(uint32_t *InData_Cmd, uint32_t 
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xeaf93ab6u), change_endian_long(0x55db2513u), change_endian_long(0x07b34517u), change_endian_long(0xdf146dadu));
@@ -241,7 +241,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateMasterSecretSub(uint32_t *InData_Cmd, uint32_t 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -259,7 +259,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateMasterSecretSub(uint32_t *InData_Cmd, uint32_t 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x854cf8b0u), change_endian_long(0x8c0b6b73u), change_endian_long(0x089001e0u), change_endian_long(0x8e762208u));
@@ -313,7 +313,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateMasterSecretSub(uint32_t *InData_Cmd, uint32_t 
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_28H.WORD = 0x00870001u;
@@ -336,7 +336,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateMasterSecretSub(uint32_t *InData_Cmd, uint32_t 
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000057u;
@@ -362,7 +362,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateMasterSecretSub(uint32_t *InData_Cmd, uint32_t 
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000352u;

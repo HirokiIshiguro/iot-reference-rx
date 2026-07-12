@@ -101,7 +101,7 @@ e_tsip_err_t R_TSIP_Sha256HmacFinalSub(uint32_t *InData_Cmd, uint32_t *InData_MA
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_7CH.WORD = 0x00000011u;
@@ -127,7 +127,7 @@ e_tsip_err_t R_TSIP_Sha256HmacFinalSub(uint32_t *InData_Cmd, uint32_t *InData_MA
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000054u;
@@ -268,7 +268,7 @@ e_tsip_err_t R_TSIP_Sha256HmacFinalSub(uint32_t *InData_Cmd, uint32_t *InData_MA
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x00000800u;
@@ -285,7 +285,7 @@ e_tsip_err_t R_TSIP_Sha256HmacFinalSub(uint32_t *InData_Cmd, uint32_t *InData_MA
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_A4H.WORD = 0x00050805u;
@@ -293,7 +293,7 @@ e_tsip_err_t R_TSIP_Sha256HmacFinalSub(uint32_t *InData_Cmd, uint32_t *InData_MA
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_104H.WORD = 0x00000761u;

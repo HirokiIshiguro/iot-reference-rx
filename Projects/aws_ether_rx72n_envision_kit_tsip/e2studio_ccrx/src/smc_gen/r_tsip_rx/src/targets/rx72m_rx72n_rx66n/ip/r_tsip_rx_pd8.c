@@ -130,7 +130,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateServerRandomSub(uint32_t *InData_Type, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xbd65344bu), change_endian_long(0xcf7b9750u), change_endian_long(0x196d9f67u), change_endian_long(0xb0faeac5u));
@@ -148,7 +148,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateServerRandomSub(uint32_t *InData_Type, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000068u;
@@ -211,7 +211,7 @@ e_tsip_err_t R_TSIP_TlsSVGenerateServerRandomSub(uint32_t *InData_Type, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_04H.WORD = 0x00000222u;

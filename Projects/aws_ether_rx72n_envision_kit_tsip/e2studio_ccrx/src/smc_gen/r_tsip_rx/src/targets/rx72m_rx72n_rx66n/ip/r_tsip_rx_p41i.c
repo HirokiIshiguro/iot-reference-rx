@@ -220,7 +220,7 @@ e_tsip_err_t R_TSIP_Aes128CmacInitSub(uint32_t *InData_KeyType, uint32_t *InData
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x962582ceu), change_endian_long(0x9ab36350u), change_endian_long(0x46385b92u), change_endian_long(0x60b57f31u));

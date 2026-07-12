@@ -194,7 +194,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0xe8908738u), change_endian_long(0xe75abcafu), change_endian_long(0xae4e20ecu), change_endian_long(0xe61ee38au));
@@ -222,7 +222,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_C4H.WORD = 0x400c0b0cu;
@@ -258,7 +258,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -276,7 +276,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             RX72M_RX72N_RX66N_func100(change_endian_long(0x667f0590u), change_endian_long(0x40e223bfu), change_endian_long(0x42c9ed9cu), change_endian_long(0x50cb022bu));
@@ -331,7 +331,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -349,7 +349,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 RX72M_RX72N_RX66N_func100(change_endian_long(0xab5b74d5u), change_endian_long(0x621c2190u), change_endian_long(0xcfea5274u), change_endian_long(0x4c50fcd7u));
@@ -391,7 +391,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_104H.WORD = 0x00000057u;
@@ -415,7 +415,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_28H.WORD = 0x008f0001u;
@@ -449,7 +449,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_34H.WORD = 0x00000408u;
@@ -485,7 +485,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateResumptionHandshakeSecretSub(uint32_t *InData
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_104H.WORD = 0x00000352u;

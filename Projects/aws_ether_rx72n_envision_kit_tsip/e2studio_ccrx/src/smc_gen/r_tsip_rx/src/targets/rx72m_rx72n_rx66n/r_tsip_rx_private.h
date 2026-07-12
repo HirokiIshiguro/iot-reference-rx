@@ -97,6 +97,25 @@
 
 #define TSIP_PRV_USE_ECC (TSIP_PRV_USE_ECDSA | TSIP_ECDH_P256)
 
+/*
+ * Optional application hook for the procedure-busy (REG_00H.B25) wait.
+ * An OS-less application does not define TSIP_CFG_WAIT_LOOP_HOOK_ENABLE and
+ * therefore compiles to the original empty polling loop.
+ */
+#ifndef TSIP_CFG_WAIT_LOOP_HOOK_ENABLE
+#define TSIP_CFG_WAIT_LOOP_HOOK_ENABLE   (0)
+#endif
+
+#if TSIP_CFG_WAIT_LOOP_HOOK_ENABLE == 1
+#ifndef TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION
+#error "TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION must be defined when the TSIP wait hook is enabled"
+#endif
+void TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION(void);
+#define TSIP_PRV_WAIT_LOOP_HOOK()        TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION()
+#else
+#define TSIP_PRV_WAIT_LOOP_HOOK()        ((void) 0)
+#endif
+
 /**********************************************************************************************************************
  Global Typedef definitions
  *********************************************************************************************************************/

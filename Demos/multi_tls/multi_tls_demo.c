@@ -62,6 +62,10 @@
 #define MULTI_TLS_PAYLOAD_SIZE                  (64U)
 #define MULTI_TLS_MARKER_SIZE                   (160U)
 
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+extern void vTsipWaitLoopGetStats(uint32_t *pulCalls, uint32_t *pulDelays);
+#endif
+
 /* The transport interface intentionally leaves NetworkContext opaque. Every
  * consumer defines the single transport pointer needed by this application. */
 struct NetworkContext
@@ -230,6 +234,10 @@ static void prvMaybeReportBothUpLocked(void)
 static void prvMaybeReportComplete(void)
 {
     TickType_t xNow = xTaskGetTickCount();
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    uint32_t ulTsipWaitCalls = 0U;
+    uint32_t ulTsipWaitDelays = 0U;
+#endif
 
     prvLockState();
     if ((pdTRUE == xSecondaryReconnectObserved) &&
@@ -241,7 +249,15 @@ static void prvMaybeReportComplete(void)
         (pdFALSE == xTestCompleteReported))
     {
         xTestCompleteReported = pdTRUE;
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+        vTsipWaitLoopGetStats(&ulTsipWaitCalls, &ulTsipWaitDelays);
+        prvEvidencePrintf("[MULTI_TLS] TEST_COMPLETE tsip_wait_mode=hybrid_tick "
+                          "tsip_wait_calls=%lu tsip_wait_delays=%lu\r\n",
+                          (unsigned long)ulTsipWaitCalls,
+                          (unsigned long)ulTsipWaitDelays);
+#else
         prvEvidencePrintf("[MULTI_TLS] TEST_COMPLETE\r\n");
+#endif
     }
     prvUnlockState();
 }

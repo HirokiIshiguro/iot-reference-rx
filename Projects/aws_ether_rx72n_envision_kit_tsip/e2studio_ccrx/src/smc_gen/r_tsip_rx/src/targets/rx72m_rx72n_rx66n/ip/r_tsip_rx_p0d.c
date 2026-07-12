@@ -162,7 +162,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x621ace48u), change_endian_long(0xb3c11baau), change_endian_long(0x651bab06u), change_endian_long(0xcdb98a0cu));
@@ -200,7 +200,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_A4H.WORD = 0x200c3b0du;
@@ -209,7 +209,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_A4H.WORD = 0x000c0b0cu;
@@ -248,7 +248,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x00012303u;
@@ -271,7 +271,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xe603c72bu), change_endian_long(0xd3c5adceu), change_endian_long(0x801cc689u), change_endian_long(0x44a90044u));
@@ -291,7 +291,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_04H.WORD = 0x00000213u;
@@ -344,7 +344,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xd954cabcu), change_endian_long(0x04f3b09au), change_endian_long(0xa4bd51fcu), change_endian_long(0x7f59d8bbu));
@@ -361,7 +361,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_04H.WORD = 0x00000213u;
@@ -390,7 +390,7 @@ e_tsip_err_t R_TSIP_UpdateRsa2048PublicKeyIndexSub(uint32_t *InData_IV, uint32_t
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x30fb9a64u), change_endian_long(0x4015286bu), change_endian_long(0x60d3170au), change_endian_long(0x42e4b500u));

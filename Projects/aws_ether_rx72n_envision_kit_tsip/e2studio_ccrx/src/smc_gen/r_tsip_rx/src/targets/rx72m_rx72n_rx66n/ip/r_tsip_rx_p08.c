@@ -116,7 +116,7 @@ e_tsip_err_t R_TSIP_GenerateAes256RandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x2410cda6u), change_endian_long(0x74358482u), change_endian_long(0x112d3d12u), change_endian_long(0xe6b2d809u));
@@ -152,7 +152,7 @@ e_tsip_err_t R_TSIP_GenerateAes256RandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_A4H.WORD = 0x000c0b0cu;
@@ -177,7 +177,7 @@ e_tsip_err_t R_TSIP_GenerateAes256RandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x5eebaefcu), change_endian_long(0x1d1ead2cu), change_endian_long(0xa7907160u), change_endian_long(0x9abf2eb7u));
@@ -194,7 +194,7 @@ e_tsip_err_t R_TSIP_GenerateAes256RandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x813c0172u), change_endian_long(0x0c5d9ac2u), change_endian_long(0x7d27234bu), change_endian_long(0x15352864u));
@@ -205,7 +205,7 @@ e_tsip_err_t R_TSIP_GenerateAes256RandomKeyIndexSub(uint32_t *OutData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000351u;

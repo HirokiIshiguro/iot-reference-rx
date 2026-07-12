@@ -234,7 +234,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000362u;
@@ -253,7 +253,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0xc1ac81bcu), change_endian_long(0xdca6b482u), change_endian_long(0xe31230acu), change_endian_long(0xa34fd1fau));
@@ -281,7 +281,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_28H.WORD = 0x00bf0001u;
@@ -300,14 +300,14 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_00H.WORD = 0x0000020fu;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_ECH.WORD = 0x00008c00u;
@@ -320,7 +320,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_ECH.WORD = 0x0000b480u;
@@ -349,7 +349,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x00001004u;
@@ -361,7 +361,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x00002fc0u;
@@ -388,14 +388,14 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_00H.WORD = 0x00000207u;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_ECH.WORD = 0x00001004u;
@@ -415,7 +415,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_ECH.WORD = 0x0000b420u;
@@ -425,7 +425,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00008362u;
@@ -448,7 +448,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_00H.WORD = 0x00013203u;
@@ -468,7 +468,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_C4H.WORD = 0x40f007bdu;
@@ -489,14 +489,14 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_00H.WORD = 0x0000020fu;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000362u;
@@ -515,7 +515,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             RX72M_RX72N_RX66N_func100(change_endian_long(0x594a195du), change_endian_long(0xfd980dc6u), change_endian_long(0xd4cb9a26u), change_endian_long(0xff32bc3fu));
@@ -546,7 +546,7 @@ e_tsip_err_t R_TSIP_TlsEncryptPreMasterSecretSub(uint32_t *InData_PubKey, uint32
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 /* WAIT_LOOP */

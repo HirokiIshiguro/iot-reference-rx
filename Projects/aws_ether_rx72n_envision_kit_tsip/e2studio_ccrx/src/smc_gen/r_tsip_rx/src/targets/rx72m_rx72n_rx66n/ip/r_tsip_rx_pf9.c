@@ -115,7 +115,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_28H.WORD = 0x008d0001u;
@@ -134,7 +134,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func103();
@@ -151,7 +151,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func103();
@@ -168,7 +168,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func103();
@@ -184,14 +184,14 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x0000020bu;
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_24H.WORD = 0x000019c0u;
@@ -287,7 +287,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_24H.WORD = 0x0000f008u;
@@ -390,7 +390,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_24H.WORD = 0x0000880cu;
@@ -483,7 +483,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x200c3b0du;
@@ -492,7 +492,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000c0b0cu;
@@ -509,7 +509,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000232u;
@@ -554,7 +554,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000212u;
@@ -610,7 +610,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x200c3b0du;
@@ -619,7 +619,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000c0b0cu;
@@ -636,7 +636,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000232u;
@@ -675,7 +675,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000222u;
@@ -710,7 +710,7 @@ e_tsip_err_t R_TSIP_GenerateEccP384RandomKeyIndexSub(uint32_t *OutData_PubKeyInd
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000212u;

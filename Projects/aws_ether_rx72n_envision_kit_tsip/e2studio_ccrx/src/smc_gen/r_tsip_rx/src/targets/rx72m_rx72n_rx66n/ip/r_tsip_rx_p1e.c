@@ -164,7 +164,7 @@ e_tsip_err_t R_TSIP_UpdateEccPrivateKeyIndexSub(uint32_t *InData_Cmd, uint32_t *
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xbff89e1cu), change_endian_long(0xeda99353u), change_endian_long(0x0c9a0d5au), change_endian_long(0x6e556023u));
@@ -202,7 +202,7 @@ e_tsip_err_t R_TSIP_UpdateEccPrivateKeyIndexSub(uint32_t *InData_Cmd, uint32_t *
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_A4H.WORD = 0x200c3b0du;
@@ -211,7 +211,7 @@ e_tsip_err_t R_TSIP_UpdateEccPrivateKeyIndexSub(uint32_t *InData_Cmd, uint32_t *
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000068u;
@@ -281,7 +281,7 @@ e_tsip_err_t R_TSIP_UpdateEccPrivateKeyIndexSub(uint32_t *InData_Cmd, uint32_t *
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_04H.WORD = 0x00000213u;
@@ -310,7 +310,7 @@ e_tsip_err_t R_TSIP_UpdateEccPrivateKeyIndexSub(uint32_t *InData_Cmd, uint32_t *
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xee95c97fu), change_endian_long(0xa9301ad3u), change_endian_long(0x632993a4u), change_endian_long(0x0b1954bfu));

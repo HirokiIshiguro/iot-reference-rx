@@ -79,7 +79,12 @@ def parse_marker(line: str) -> tuple[str, dict[str, str]] | None:
 class MultiTlsEvidence:
     """Stateful evaluator for timestamped multi-TLS UART lines."""
 
-    def __init__(self, min_overlap_seconds: float = 30.0, max_duration_seconds: float = 180.0):
+    def __init__(
+        self,
+        min_overlap_seconds: float = 30.0,
+        max_duration_seconds: float = 180.0,
+        require_tsip_wait: bool = False,
+    ):
         if min_overlap_seconds < 0:
             raise ValueError("min_overlap_seconds must be non-negative")
         if max_duration_seconds <= 0:
@@ -87,6 +92,7 @@ class MultiTlsEvidence:
 
         self.min_overlap_seconds = float(min_overlap_seconds)
         self.max_duration_seconds = float(max_duration_seconds)
+        self.require_tsip_wait = bool(require_tsip_wait)
         self.events: list[dict[str, Any]] = []
         self.protocol_errors: list[str] = []
         self.up = {session: False for session in SESSION_IDS}
@@ -103,6 +109,7 @@ class MultiTlsEvidence:
         self.overlap_windows: list[dict[str, Any]] = []
         self.current_overlap: dict[str, Any] | None = None
         self.complete_at: float | None = None
+        self.tsip_wait_evidence: dict[str, Any] | None = None
         self.last_elapsed = 0.0
 
     def consume_line(self, line: str, elapsed: float) -> bool:
@@ -143,11 +150,38 @@ class MultiTlsEvidence:
         elif event == "TEST_COMPLETE":
             if self.complete_at is None:
                 self.complete_at = elapsed
+                self._capture_tsip_wait(fields)
             else:
                 self.protocol_errors.append("duplicate TEST_COMPLETE marker")
         else:
             self.protocol_errors.append(f"unknown MULTI_TLS event: {event}")
         return self.complete_at is not None
+
+    def _capture_tsip_wait(self, fields: dict[str, str]) -> None:
+        mode = fields.get("tsip_wait_mode", "")
+        calls_text = fields.get("tsip_wait_calls", "")
+        delays_text = fields.get("tsip_wait_delays", "")
+
+        if not (mode or calls_text or delays_text):
+            return
+
+        try:
+            calls = int(calls_text)
+            delays = int(delays_text)
+            if calls < 0 or delays < 0:
+                raise ValueError
+        except ValueError:
+            self.protocol_errors.append(
+                "TEST_COMPLETE: TSIP wait counters must be non-negative integers"
+            )
+            calls = None
+            delays = None
+
+        self.tsip_wait_evidence = {
+            "mode": mode,
+            "calls": calls,
+            "delays": delays,
+        }
 
     def _session(self, event: str, fields: dict[str, str]) -> int | None:
         try:
@@ -437,6 +471,15 @@ class MultiTlsEvidence:
             "post_reconnect_session_1_tx_rx": bool(post_pairs["1"]),
             "post_reconnect_session_2_tx_rx": bool(post_pairs["2"]),
             "session_2_stable_after_reconnect": not session2_down_after_reconnect,
+            "tsip_wait_hook_exercised": (
+                not self.require_tsip_wait
+                or (
+                    bool(self.tsip_wait_evidence)
+                    and self.tsip_wait_evidence["mode"] == "hybrid_tick"
+                    and bool(self.tsip_wait_evidence["calls"])
+                    and bool(self.tsip_wait_evidence["delays"])
+                )
+            ),
             "no_protocol_errors": not self.protocol_errors,
         }
         failures = [name for name, passed in checks.items() if not passed]
@@ -472,6 +515,7 @@ class MultiTlsEvidence:
                 "session_1_outage_matching_sequences": outage_pairs,
                 "post_reconnect_matching_sequences": post_pairs,
             },
+            "tsip_wait_evidence": self.tsip_wait_evidence,
             "overlap_windows": windows,
             "identity_checks": self.identity_checks,
             "sessions": {
@@ -586,7 +630,11 @@ def monitor_uart(args: argparse.Namespace) -> dict[str, Any]:
     except ImportError as exc:  # pragma: no cover - depends on runner image
         raise RuntimeError("pyserial not installed; run: pip install pyserial") from exc
 
-    evidence = MultiTlsEvidence(args.min_overlap_seconds, args.timeout)
+    evidence = MultiTlsEvidence(
+        args.min_overlap_seconds,
+        args.timeout,
+        require_tsip_wait=getattr(args, "require_tsip_wait", False),
+    )
     partial = ""
     total_bytes = 0
     start = time.monotonic()
@@ -695,6 +743,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--no-reset",
         action="store_true",
         help="Monitor an already-running target without issuing a reset",
+    )
+    parser.add_argument(
+        "--require-tsip-wait",
+        action="store_true",
+        help="Require non-zero hybrid TSIP wait-hook counters in TEST_COMPLETE",
     )
     parser.add_argument("--raw-log", type=Path)
     parser.add_argument("--summary-json", type=Path)

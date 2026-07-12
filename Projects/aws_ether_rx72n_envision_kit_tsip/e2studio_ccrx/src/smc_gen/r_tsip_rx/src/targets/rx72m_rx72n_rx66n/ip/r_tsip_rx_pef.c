@@ -219,7 +219,7 @@ e_tsip_err_t R_TSIP_Tls13GeneratePreSharedKeySub(uint32_t *InData_Cmd, uint32_t 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -237,7 +237,7 @@ e_tsip_err_t R_TSIP_Tls13GeneratePreSharedKeySub(uint32_t *InData_Cmd, uint32_t 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0xcb6f2877u), change_endian_long(0x1fa77f9cu), change_endian_long(0xde9ed88du), change_endian_long(0x54b1410fu));
@@ -276,7 +276,7 @@ e_tsip_err_t R_TSIP_Tls13GeneratePreSharedKeySub(uint32_t *InData_Cmd, uint32_t 
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_C4H.WORD = 0x400c0b0cu;
@@ -293,7 +293,7 @@ e_tsip_err_t R_TSIP_Tls13GeneratePreSharedKeySub(uint32_t *InData_Cmd, uint32_t 
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000352u;

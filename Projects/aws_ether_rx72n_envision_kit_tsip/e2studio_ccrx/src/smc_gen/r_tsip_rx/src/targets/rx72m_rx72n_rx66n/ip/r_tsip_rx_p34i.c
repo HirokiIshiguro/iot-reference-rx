@@ -232,7 +232,7 @@ e_tsip_err_t R_TSIP_Aes256GcmEncryptInitSub(uint32_t *InData_KeyType, uint32_t *
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x1a18033eu), change_endian_long(0xf84fe48du), change_endian_long(0xa349ec5cu), change_endian_long(0x7d8b1e5bu));
@@ -296,7 +296,7 @@ e_tsip_err_t R_TSIP_Aes256GcmEncryptInitSub(uint32_t *InData_KeyType, uint32_t *
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_74H.WORD = 0x00000004u;

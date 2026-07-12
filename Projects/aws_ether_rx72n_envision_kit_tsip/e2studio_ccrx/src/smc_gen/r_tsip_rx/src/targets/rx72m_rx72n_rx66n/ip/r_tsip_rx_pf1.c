@@ -219,7 +219,7 @@ e_tsip_err_t R_TSIP_EcdsaSigunatureVerificationSub(uint32_t *InData_Cmd, uint32_
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         /* WAIT_LOOP */
@@ -253,7 +253,7 @@ e_tsip_err_t R_TSIP_EcdsaSigunatureVerificationSub(uint32_t *InData_Cmd, uint32_
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000362u;
@@ -272,7 +272,7 @@ e_tsip_err_t R_TSIP_EcdsaSigunatureVerificationSub(uint32_t *InData_Cmd, uint32_
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x565bda65u), change_endian_long(0x60e17beau), change_endian_long(0x3dfab8b2u), change_endian_long(0x36d029b3u));
@@ -304,7 +304,7 @@ e_tsip_err_t R_TSIP_EcdsaSigunatureVerificationSub(uint32_t *InData_Cmd, uint32_
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_ECH.WORD = 0x30003380u;

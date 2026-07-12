@@ -156,7 +156,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_28H.WORD = 0x00870001u;
@@ -181,7 +181,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -199,7 +199,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x6863541eu), change_endian_long(0x1eba91e4u), change_endian_long(0x386806d2u), change_endian_long(0xc3ad1cf7u));
@@ -264,7 +264,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_C4H.WORD = 0x000c0b0cu;
@@ -284,7 +284,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             RX72M_RX72N_RX66N_func022();
@@ -311,7 +311,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -329,7 +329,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x0ba94fa1u), change_endian_long(0x60af9d88u), change_endian_long(0x1261f7ebu), change_endian_long(0x3e09dc9au));
@@ -398,7 +398,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_24H.WORD = 0x0000880cu;
@@ -422,7 +422,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_24H.WORD = 0x0000880cu;
@@ -604,7 +604,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x3420ab40u;
@@ -630,14 +630,14 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x00000313u;
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_7CH.WORD = 0x00000001u;
@@ -655,7 +655,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_74H.WORD = 0x00000004u;
@@ -675,14 +675,14 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x00005313u;
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_104H.WORD = 0x00000354u;
@@ -701,14 +701,14 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x00000313u;
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x00003113u;
@@ -716,7 +716,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x00003513u;
@@ -724,7 +724,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_24H.WORD = 0x000050d0u;
@@ -744,7 +744,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_C4H.WORD = 0x400c0b0cu;
@@ -753,7 +753,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_D0H.WORD = 0x00000100u;
@@ -763,7 +763,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_04H.WORD = 0x00000222u;
@@ -799,7 +799,7 @@ e_tsip_err_t R_TSIP_DlmsCosemCalculateZSub(uint32_t *InData_KeyType, uint32_t *I
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_04H.WORD = 0x00000212u;

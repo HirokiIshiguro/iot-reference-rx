@@ -28,6 +28,7 @@ def feed_happy_path(
     reconnect_generation=2,
     reconnect_both_at=36.0,
     complete_at=68.0,
+    test_complete_fields=None,
 ):
     tls2 = "0x200" if duplicate_tls_context else "0x201"
     generation_1 = {"connection_generation": 1} if include_generation else {}
@@ -59,7 +60,7 @@ def feed_happy_path(
             (37.1, marker("HEARTBEAT_RX", session=1, seq=3)),
             (38.0, marker("HEARTBEAT_TX", session=2, seq=2)),
             (38.1, marker("HEARTBEAT_RX", session=2, seq=2)),
-            (complete_at, marker("TEST_COMPLETE")),
+            (complete_at, marker("TEST_COMPLETE", **(test_complete_fields or {}))),
         ]
     )
     if session1_down_at is not None:
@@ -126,6 +127,40 @@ class MultiTlsEvidenceTests(unittest.TestCase):
         self.assertTrue(summary["success"])
         self.assertEqual(summary["timeline"]["second_both_up_seconds"], 35.0)
         self.assertEqual(summary["timeline"]["post_reconnect_overlap_seconds"], 33.0)
+
+    def test_requires_nonzero_tsip_hybrid_wait_evidence_when_requested(self):
+        evidence = MultiTlsEvidence(
+            min_overlap_seconds=30,
+            max_duration_seconds=90,
+            require_tsip_wait=True,
+        )
+        feed_happy_path(
+            evidence,
+            test_complete_fields={
+                "tsip_wait_mode": "hybrid_tick",
+                "tsip_wait_calls": 4096,
+                "tsip_wait_delays": 16,
+            },
+        )
+
+        summary = evidence.build_summary()
+
+        self.assertTrue(summary["success"])
+        self.assertTrue(summary["checks"]["tsip_wait_hook_exercised"])
+        self.assertEqual(summary["tsip_wait_evidence"]["delays"], 16)
+
+    def test_rejects_missing_tsip_wait_evidence_when_requested(self):
+        evidence = MultiTlsEvidence(
+            min_overlap_seconds=30,
+            max_duration_seconds=90,
+            require_tsip_wait=True,
+        )
+        feed_happy_path(evidence)
+
+        summary = evidence.build_summary()
+
+        self.assertFalse(summary["success"])
+        self.assertIn("tsip_wait_hook_exercised", summary["failures"])
 
     def test_rejects_shared_tls_context(self):
         evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)

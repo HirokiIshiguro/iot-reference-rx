@@ -105,7 +105,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00003f62u;
@@ -134,7 +134,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_34H.WORD = 0x00000104u;
@@ -167,7 +167,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_34H.WORD = 0x00000108u;
@@ -200,7 +200,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_34H.WORD = 0x00000304u;
@@ -233,7 +233,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_34H.WORD = 0x00000308u;
@@ -266,7 +266,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     /* WAIT_LOOP */
@@ -292,7 +292,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     /* WAIT_LOOP */
@@ -318,7 +318,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     /* WAIT_LOOP */
@@ -344,7 +344,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000362u;
@@ -363,7 +363,7 @@ void RX72M_RX72N_RX66N_func025(uint32_t ARG1)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
 }

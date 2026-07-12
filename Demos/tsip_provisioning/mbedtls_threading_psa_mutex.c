@@ -8,7 +8,17 @@
  */
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 
+#include <stdint.h>
+
+#include "FreeRTOS.h"
+#include "task.h"
 #include "mbedtls/threading.h"
+#include "platform.h"
+
+#define TSIP_WAIT_LOOP_DELAY_INTERVAL    (256UL)
+
+static volatile uint32_t ulTsipWaitLoopCalls = 0UL;
+static volatile uint32_t ulTsipWaitLoopDelays = 0UL;
 
 /*
  * The TLS 1.3 0-RTT smoke build stages stock Mbed TLS 3.6.x into the TSIP
@@ -54,5 +64,39 @@ void vTsipMbedtlsThreadingCompatInit( void )
     }
 }
 #endif
+
+/*
+ * Hybrid wait used by the RX72N FreeRTOS integration. Short TSIP operations
+ * remain pure polling; a long REG_00H.B25 wait yields for one tick after every
+ * 256 polls. Never call the scheduler from startup, an ISR, a critical
+ * section, or the TSIP self-check path where global interrupts are disabled.
+ */
+void vTsipWaitLoopHook( void )
+{
+    uint32_t ulCalls = ++ulTsipWaitLoopCalls;
+
+    if( ( 0UL == ( ulCalls & ( TSIP_WAIT_LOOP_DELAY_INTERVAL - 1UL ) ) ) &&
+        ( taskSCHEDULER_RUNNING == xTaskGetSchedulerState() ) &&
+        ( 0UL != ( R_BSP_GET_PSW() & 0x00010000UL ) ) &&
+        ( 0UL == R_BSP_CpuInterruptLevelRead() ) )
+    {
+        ++ulTsipWaitLoopDelays;
+        vTaskDelay( 1U );
+    }
+}
+
+void vTsipWaitLoopGetStats( uint32_t * pulCalls,
+                            uint32_t * pulDelays )
+{
+    if( NULL != pulCalls )
+    {
+        *pulCalls = ulTsipWaitLoopCalls;
+    }
+
+    if( NULL != pulDelays )
+    {
+        *pulDelays = ulTsipWaitLoopDelays;
+    }
+}
 
 #endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */

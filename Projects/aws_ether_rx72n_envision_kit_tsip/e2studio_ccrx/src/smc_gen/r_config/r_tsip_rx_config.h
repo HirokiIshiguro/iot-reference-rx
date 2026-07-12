@@ -132,6 +132,14 @@
 #define TSIP_MULTI_THREADING_LOCK_FUNCTION      (user_lock_function)
 #define TSIP_MULTI_THREADING_UNLOCK_FUNCTION    (user_unlock_function)
 
+/*
+ * Give the RTOS an opportunity to run while the TSIP procedure engine is
+ * busy. The driver defaults to a no-op when these macros are not supplied,
+ * so bare-metal projects retain the original polling behavior.
+ */
+#define TSIP_CFG_WAIT_LOOP_HOOK_ENABLE           (1)
+#define TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION         (vTsipWaitLoopHook)
+
 /* Key update. */
 #if defined BSP_MCU_RX231 || defined BSP_MCU_RX23W || defined BSP_MCU_RX26T || \
     defined BSP_MCU_RX66T || defined BSP_MCU_RX72T

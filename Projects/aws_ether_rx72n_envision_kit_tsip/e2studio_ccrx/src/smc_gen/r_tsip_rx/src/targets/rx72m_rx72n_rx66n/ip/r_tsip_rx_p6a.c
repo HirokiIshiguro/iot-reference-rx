@@ -248,7 +248,7 @@ e_tsip_err_t R_TSIP_AESKeyWrapSub(uint32_t *InData_Cmd, uint32_t *InData_KeyInde
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x22c25a99u), change_endian_long(0x8051e097u), change_endian_long(0x581ec562u), change_endian_long(0x9d571934u));
@@ -287,7 +287,7 @@ e_tsip_err_t R_TSIP_AESKeyWrapSub(uint32_t *InData_Cmd, uint32_t *InData_KeyInde
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000051u;
@@ -332,7 +332,7 @@ e_tsip_err_t R_TSIP_AESKeyWrapSub(uint32_t *InData_Cmd, uint32_t *InData_KeyInde
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x000027fcu;
@@ -358,7 +358,7 @@ e_tsip_err_t R_TSIP_AESKeyWrapSub(uint32_t *InData_Cmd, uint32_t *InData_KeyInde
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             RX72M_RX72N_RX66N_func100(change_endian_long(0x42ececcbu), change_endian_long(0xd2320b20u), change_endian_long(0x302d9a28u), change_endian_long(0x0c50848eu));
@@ -402,7 +402,7 @@ e_tsip_err_t R_TSIP_AESKeyWrapSub(uint32_t *InData_Cmd, uint32_t *InData_KeyInde
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_E0H.WORD = 0x8182001fu;
@@ -410,7 +410,7 @@ e_tsip_err_t R_TSIP_AESKeyWrapSub(uint32_t *InData_Cmd, uint32_t *InData_KeyInde
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_E0H.WORD = 0x80040000u;
@@ -418,7 +418,7 @@ e_tsip_err_t R_TSIP_AESKeyWrapSub(uint32_t *InData_Cmd, uint32_t *InData_KeyInde
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_ECH.WORD = 0x00000824u;

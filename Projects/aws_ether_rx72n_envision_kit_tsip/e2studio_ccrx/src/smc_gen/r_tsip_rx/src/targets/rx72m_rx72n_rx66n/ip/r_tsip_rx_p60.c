@@ -153,7 +153,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000361u;
@@ -184,7 +184,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000361u;
@@ -245,7 +245,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_A4H.WORD = 0x200c3b0du;
@@ -254,7 +254,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_A4H.WORD = 0x000c0b0cu;
@@ -285,7 +285,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_00H.WORD = 0x00002383u;
@@ -308,7 +308,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0xd335739fu), change_endian_long(0xd882518du), change_endian_long(0x7ab16272u), change_endian_long(0xbfc7bfb4u));
@@ -332,7 +332,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_00H.WORD = 0x00002383u;
@@ -355,7 +355,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x1925ac0bu), change_endian_long(0xee54de02u), change_endian_long(0x93ae8449u), change_endian_long(0x76c5f2fcu));
@@ -393,7 +393,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x4177c4abu), change_endian_long(0x11e444aeu), change_endian_long(0xa14fc826u), change_endian_long(0xe6f776d0u));
@@ -410,7 +410,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000212u;
@@ -439,7 +439,7 @@ e_tsip_err_t R_TSIP_GenerateRsa1024PrivateKeyIndexSub(uint32_t *InData_SharedKey
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x1b12bf26u), change_endian_long(0x974231ecu), change_endian_long(0xa06dc166u), change_endian_long(0x33ffe6d2u));

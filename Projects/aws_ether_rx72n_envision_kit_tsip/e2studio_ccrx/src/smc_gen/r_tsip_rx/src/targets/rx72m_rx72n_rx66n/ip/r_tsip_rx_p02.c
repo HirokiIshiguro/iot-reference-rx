@@ -234,7 +234,7 @@ e_tsip_err_t R_TSIP_SelfCheck2Sub(void)
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x41001eddu;
@@ -242,7 +242,7 @@ e_tsip_err_t R_TSIP_SelfCheck2Sub(void)
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         /* WAIT_LOOP */
@@ -256,7 +256,7 @@ e_tsip_err_t R_TSIP_SelfCheck2Sub(void)
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(0xcf78ed4eu, 0x4ff64300u, 0x8ad88f55u, 0xa29c58a7u);
@@ -287,7 +287,7 @@ e_tsip_err_t R_TSIP_SelfCheck2Sub(void)
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000b0805u;
@@ -295,7 +295,7 @@ e_tsip_err_t R_TSIP_SelfCheck2Sub(void)
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x00070805u;
@@ -303,7 +303,7 @@ e_tsip_err_t R_TSIP_SelfCheck2Sub(void)
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(0xbba74fe0u, 0x7627e09cu, 0x81ad4ecfu, 0xfca52694u);

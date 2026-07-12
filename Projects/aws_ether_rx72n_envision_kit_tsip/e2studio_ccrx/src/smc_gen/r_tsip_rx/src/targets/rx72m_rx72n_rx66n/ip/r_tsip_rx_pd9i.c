@@ -160,7 +160,7 @@ e_tsip_err_t R_TSIP_TdesEncryptDecryptInitSub(uint32_t *InData_Cmd, uint32_t *In
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xaa93abedu), change_endian_long(0x7d24508fu), change_endian_long(0x3c531516u), change_endian_long(0x1aa2ddb7u));

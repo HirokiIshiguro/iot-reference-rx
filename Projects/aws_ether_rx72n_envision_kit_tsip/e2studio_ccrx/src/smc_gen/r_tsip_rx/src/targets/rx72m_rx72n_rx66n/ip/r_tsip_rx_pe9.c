@@ -159,7 +159,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xba5e806au), change_endian_long(0x6e97f792u), change_endian_long(0xfb4f61cbu), change_endian_long(0xcb26d515u));
@@ -176,7 +176,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x407afe05u), change_endian_long(0x4ae08941u), change_endian_long(0x6126f689u), change_endian_long(0x84e351ccu));
@@ -193,14 +193,14 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x0000020bu;
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_24H.WORD = 0x000019c0u;
@@ -488,14 +488,14 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_00H.WORD = 0x00000207u;
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000c2b0du;
@@ -504,7 +504,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_D0H.WORD = 0x00000100u;
@@ -514,7 +514,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000223u;
@@ -550,7 +550,7 @@ e_tsip_err_t R_TSIP_GenerateTlsP256EccKeyIndexSub(uint32_t *OutData_KeyIndex, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000213u;

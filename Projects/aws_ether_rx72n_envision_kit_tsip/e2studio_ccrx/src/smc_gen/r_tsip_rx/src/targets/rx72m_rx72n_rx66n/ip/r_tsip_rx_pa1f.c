@@ -150,7 +150,7 @@ e_tsip_err_t R_TSIP_Aes256CcmEncryptFinalSub(uint32_t *InData_TextLen, uint32_t 
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_ECH.WORD = 0x00000821u;
@@ -214,7 +214,7 @@ e_tsip_err_t R_TSIP_Aes256CcmEncryptFinalSub(uint32_t *InData_TextLen, uint32_t 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_04H.WORD = 0x00000113u;

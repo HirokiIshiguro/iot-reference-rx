@@ -208,7 +208,7 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000362u;
@@ -227,7 +227,7 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x8278b771u), change_endian_long(0xf99bd5e1u), change_endian_long(0x6f9400ceu), change_endian_long(0x0d1c9d59u));
@@ -296,14 +296,14 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_00H.WORD = 0x00000207u;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_104H.WORD = 0x00000068u;
@@ -344,7 +344,7 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x01886c01u;
@@ -381,14 +381,14 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_00H.WORD = 0x00002007u;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_04H.WORD = 0x0000020fu;
@@ -404,7 +404,7 @@ e_tsip_err_t R_TSIP_TlsGenerateVerifyDataSub(uint32_t *InData_Sel_VerifyData, ui
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             RX72M_RX72N_RX66N_func102(change_endian_long(0x9a12b2fbu), change_endian_long(0xd885517bu), change_endian_long(0x639c1470u), change_endian_long(0x49584b41u));

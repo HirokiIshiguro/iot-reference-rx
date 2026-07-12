@@ -2431,6 +2431,10 @@ test_rx72n_ether_multi_tls:
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+      tsip_wait_args=()
+      if [ "$RX72N_TLS_BACKEND" = "tsip" ]; then
+        tsip_wait_args+=(--require-tsip-wait)
+      fi
 
       set +e
       python tools/ci/monitor_multi_tls.py \
@@ -2438,6 +2442,7 @@ test_rx72n_ether_multi_tls:
         --baud "$RX72N_LINUX_UART_BAUD_RATE" \
         --timeout "$RX72N_MULTI_TLS_TEST_TIMEOUT" \
         --min-overlap-seconds "$RX72N_MULTI_TLS_MIN_OVERLAP_SECONDS" \
+        "${tsip_wait_args[@]}" \
         --reset-cmd "$reset_cmd" \
         --raw-log "$artifact_dir/multi_tls_uart.log" \
         --summary-json "$artifact_dir/multi_tls_summary.json" \

@@ -186,7 +186,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -204,7 +204,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x00c6706du), change_endian_long(0x613fa15bu), change_endian_long(0x79ef6006u), change_endian_long(0x435b0bfau));
@@ -292,7 +292,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_28H.WORD = 0x008f0001u;
@@ -311,7 +311,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000057u;
@@ -329,14 +329,14 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_00H.WORD = 0x00000513u;
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_28H.WORD = 0x008f0001u;
@@ -355,7 +355,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000057u;
@@ -374,14 +374,14 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_00H.WORD = 0x00000513u;
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_28H.WORD = 0x008f0001u;
@@ -401,7 +401,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000057u;
@@ -440,7 +440,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x7054dbccu), change_endian_long(0x5c70f250u), change_endian_long(0x6f40d82eu), change_endian_long(0x6483fcd6u));
@@ -507,7 +507,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateServerHandshakeTrafficKeySub(uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000352u;

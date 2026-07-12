@@ -185,7 +185,7 @@ e_tsip_err_t R_TSIP_Tls13SVClientHandshakeVerificationSub(uint32_t *InData_Cmd, 
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -203,7 +203,7 @@ e_tsip_err_t R_TSIP_Tls13SVClientHandshakeVerificationSub(uint32_t *InData_Cmd, 
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xda20829cu), change_endian_long(0x7fd5e36fu), change_endian_long(0xbb72d4e9u), change_endian_long(0x58e89b13u));
@@ -264,7 +264,7 @@ e_tsip_err_t R_TSIP_Tls13SVClientHandshakeVerificationSub(uint32_t *InData_Cmd, 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_ECH.WORD = 0x0000b400u;
@@ -286,7 +286,7 @@ e_tsip_err_t R_TSIP_Tls13SVClientHandshakeVerificationSub(uint32_t *InData_Cmd, 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x00050805u;
@@ -294,7 +294,7 @@ e_tsip_err_t R_TSIP_Tls13SVClientHandshakeVerificationSub(uint32_t *InData_Cmd, 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x00900c05u;
@@ -303,7 +303,7 @@ e_tsip_err_t R_TSIP_Tls13SVClientHandshakeVerificationSub(uint32_t *InData_Cmd, 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x00900c45u;
@@ -311,7 +311,7 @@ e_tsip_err_t R_TSIP_Tls13SVClientHandshakeVerificationSub(uint32_t *InData_Cmd, 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x59244060u), change_endian_long(0x5c4549fdu), change_endian_long(0x9bd2e44fu), change_endian_long(0x88d85e64u));

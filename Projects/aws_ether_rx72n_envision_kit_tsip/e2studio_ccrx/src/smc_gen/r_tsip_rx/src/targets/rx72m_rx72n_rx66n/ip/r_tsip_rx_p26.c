@@ -143,7 +143,7 @@ e_tsip_err_t R_TSIP_VerifyFirmwareMacSub(uint32_t *InData_Program, uint32_t MAX_
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000361u;

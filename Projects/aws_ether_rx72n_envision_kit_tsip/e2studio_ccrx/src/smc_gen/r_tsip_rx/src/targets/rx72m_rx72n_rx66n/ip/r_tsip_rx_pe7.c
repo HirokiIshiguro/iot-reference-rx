@@ -261,7 +261,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x0000362eu;
@@ -295,7 +295,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x00013203u;
@@ -315,7 +315,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_C4H.WORD = 0x40f007bdu;
@@ -336,14 +336,14 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x0000020fu;
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_C4H.WORD = 0x400007bdu;
@@ -361,7 +361,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     RX72M_RX72N_RX66N_func101(change_endian_long(0xf65401c0u), change_endian_long(0x57dcfbecu), change_endian_long(0xf604fb95u), change_endian_long(0xaa0c5695u));
@@ -389,7 +389,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x00003223u;
@@ -409,7 +409,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_C4H.WORD = 0x400007bdu;
@@ -427,7 +427,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     RX72M_RX72N_RX66N_func101(change_endian_long(0x4d121a54u), change_endian_long(0x2fc8815du), change_endian_long(0x4e6380b3u), change_endian_long(0xa65b4c03u));
@@ -502,7 +502,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_104H.WORD = 0x00000068u;
@@ -518,14 +518,14 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x08005807u;
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_D0H.WORD = 0x00000314u;
@@ -549,7 +549,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_ECH.WORD = 0x0000b7c0u;
@@ -559,14 +559,14 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_00H.WORD = 0x08000807u;
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_F8H.WORD = 0x00000040u;
@@ -672,7 +672,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         /* WAIT_LOOP */
@@ -779,7 +779,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_24H.WORD = 0x000009c0u;
@@ -836,7 +836,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_C4H.WORD = 0x000c0805u;
@@ -845,7 +845,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         RX72M_RX72N_RX66N_func100(change_endian_long(0x0e4c150au), change_endian_long(0xa100cfe0u), change_endian_long(0x2ba10279u), change_endian_long(0xcea6f2b8u));
@@ -1288,7 +1288,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_24H.WORD = 0x000019c0u;
@@ -1478,7 +1478,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                         /* WAIT_LOOP */
                         while (0u != TSIP.REG_00H.BIT.B25)
                         {
-                            /* waiting */
+                            TSIP_PRV_WAIT_LOOP_HOOK();
                         }
                         TSIP.REG_1CH.WORD = 0x00001800u;
                         TSIP.REG_28H.WORD = 0x00870001u;
@@ -1567,14 +1567,14 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                             /* WAIT_LOOP */
                             while (0u != TSIP.REG_00H.BIT.B25)
                             {
-                                /* waiting */
+                                TSIP_PRV_WAIT_LOOP_HOOK();
                             }
                             TSIP.REG_1CH.WORD = 0x00001800u;
                             TSIP.REG_00H.WORD = 0x00000207u;
                             /* WAIT_LOOP */
                             while (0u != TSIP.REG_00H.BIT.B25)
                             {
-                                /* waiting */
+                                TSIP_PRV_WAIT_LOOP_HOOK();
                             }
                             TSIP.REG_1CH.WORD = 0x00001800u;
                             RX72M_RX72N_RX66N_func100(change_endian_long(0xb61937f6u), change_endian_long(0x6f06fa5du), change_endian_long(0xe1c0a92fu), change_endian_long(0x9620f012u));
@@ -1584,7 +1584,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                             /* WAIT_LOOP */
                             while (0u != TSIP.REG_00H.BIT.B25)
                             {
-                                /* waiting */
+                                TSIP_PRV_WAIT_LOOP_HOOK();
                             }
                             TSIP.REG_1CH.WORD = 0x00001800u;
                             TSIP.REG_00H.WORD = 0x00002343u;
@@ -1607,7 +1607,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                             /* WAIT_LOOP */
                             while (0u != TSIP.REG_00H.BIT.B25)
                             {
-                                /* waiting */
+                                TSIP_PRV_WAIT_LOOP_HOOK();
                             }
                             TSIP.REG_1CH.WORD = 0x00001800u;
                             RX72M_RX72N_RX66N_func100(change_endian_long(0x62cf2989u), change_endian_long(0xc4dfc186u), change_endian_long(0x5e6f5fc0u), change_endian_long(0x06da1817u));
@@ -1624,7 +1624,7 @@ e_tsip_err_t R_TSIP_TlsServersEphemeralEcdhPublicKeyRetrievesSub(uint32_t *InDat
                             /* WAIT_LOOP */
                             while (0u != TSIP.REG_00H.BIT.B25)
                             {
-                                /* waiting */
+                                TSIP_PRV_WAIT_LOOP_HOOK();
                             }
                             TSIP.REG_1CH.WORD = 0x00001800u;
                             TSIP.REG_04H.WORD = 0x00000212u;

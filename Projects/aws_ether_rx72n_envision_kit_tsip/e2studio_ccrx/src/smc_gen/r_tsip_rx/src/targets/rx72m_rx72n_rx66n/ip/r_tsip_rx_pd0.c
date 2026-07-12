@@ -186,7 +186,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateResumptionMasterSecretSub(uint32_t *InData_Cmd,
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -204,7 +204,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateResumptionMasterSecretSub(uint32_t *InData_Cmd,
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xc17364f7u), change_endian_long(0xe1c4f29bu), change_endian_long(0xbd7e836bu), change_endian_long(0x1422b07bu));
@@ -279,7 +279,7 @@ e_tsip_err_t R_TSIP_Tls13GenerateResumptionMasterSecretSub(uint32_t *InData_Cmd,
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_104H.WORD = 0x00000352u;

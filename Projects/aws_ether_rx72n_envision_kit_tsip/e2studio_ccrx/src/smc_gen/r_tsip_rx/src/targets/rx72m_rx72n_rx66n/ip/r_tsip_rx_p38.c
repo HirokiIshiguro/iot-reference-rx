@@ -138,7 +138,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_ECH.WORD = 0x0000b500u;
@@ -149,7 +149,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_24H.WORD = 0x0000dcd0u;
@@ -254,7 +254,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         TSIP.REG_C4H.WORD = 0x000007bdu;
@@ -272,7 +272,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x541c57cau), change_endian_long(0x10a29a18u), change_endian_long(0x3d7f10acu), change_endian_long(0x57791783u));
@@ -341,7 +341,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_24H.WORD = 0x0000880cu;
@@ -365,7 +365,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_24H.WORD = 0x0000880cu;
@@ -539,7 +539,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_C4H.WORD = 0x400c0b0cu;
@@ -556,7 +556,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_04H.WORD = 0x00000222u;
@@ -592,7 +592,7 @@ e_tsip_err_t R_TSIP_Tls13SVGenerateEcdheSharedSecretSub(uint32_t *InData_Cmd, ui
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_04H.WORD = 0x00000212u;

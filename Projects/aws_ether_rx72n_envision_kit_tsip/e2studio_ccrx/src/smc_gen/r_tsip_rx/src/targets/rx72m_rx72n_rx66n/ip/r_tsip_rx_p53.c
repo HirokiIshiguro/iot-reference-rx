@@ -152,7 +152,7 @@ e_tsip_err_t R_TSIP_Rsa1024ModularExponentEncryptSub(uint32_t *InData_KeyIndex, 
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_A4H.WORD = 0x00f0088du;
@@ -170,14 +170,14 @@ e_tsip_err_t R_TSIP_Rsa1024ModularExponentEncryptSub(uint32_t *InData_KeyIndex, 
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x0000010fu;
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_00H.WORD = 0x00003183u;
@@ -199,7 +199,7 @@ e_tsip_err_t R_TSIP_Rsa1024ModularExponentEncryptSub(uint32_t *InData_KeyIndex, 
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000361u;
@@ -218,7 +218,7 @@ e_tsip_err_t R_TSIP_Rsa1024ModularExponentEncryptSub(uint32_t *InData_KeyIndex, 
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x6b72b99eu), change_endian_long(0x9fd88ac1u), change_endian_long(0xc3e6c062u), change_endian_long(0x98e2f29eu));
@@ -293,7 +293,7 @@ e_tsip_err_t R_TSIP_Rsa1024ModularExponentEncryptSub(uint32_t *InData_KeyIndex, 
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         /* WAIT_LOOP */

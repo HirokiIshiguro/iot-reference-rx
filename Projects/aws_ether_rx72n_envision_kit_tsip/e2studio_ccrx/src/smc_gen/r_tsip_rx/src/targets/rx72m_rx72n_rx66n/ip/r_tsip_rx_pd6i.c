@@ -143,7 +143,7 @@ e_tsip_err_t R_TSIP_Arc4EncryptDecryptInitSub(uint32_t *InData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000361u;
@@ -162,7 +162,7 @@ e_tsip_err_t R_TSIP_Arc4EncryptDecryptInitSub(uint32_t *InData_KeyIndex)
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0xf66380f7u), change_endian_long(0x066f057du), change_endian_long(0xfe936032u), change_endian_long(0x65eae5f0u));
@@ -200,7 +200,7 @@ e_tsip_err_t R_TSIP_Arc4EncryptDecryptInitSub(uint32_t *InData_KeyIndex)
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         return TSIP_SUCCESS;
