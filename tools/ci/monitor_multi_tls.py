@@ -3,6 +3,7 @@
 
 Expected firmware markers are deliberately machine-readable::
 
+    [MULTI_TLS] TEST_START generation=1
     [MULTI_TLS] SESSION_UP s=1 cid=89abcdef net=0x100 tls=0x200 \
         sock=1 gen=1
     [MULTI_TLS] BOTH_UP
@@ -108,6 +109,7 @@ class MultiTlsEvidence:
         self.identity_checks: list[dict[str, Any]] = []
         self.overlap_windows: list[dict[str, Any]] = []
         self.current_overlap: dict[str, Any] | None = None
+        self.test_start_at: float | None = None
         self.complete_at: float | None = None
         self.tsip_wait_evidence: dict[str, Any] | None = None
         self.last_elapsed = 0.0
@@ -127,6 +129,12 @@ class MultiTlsEvidence:
             return self.complete_at is not None
 
         event, fields = parsed
+        # RFP may leave a final marker from the old image in the UART buffer
+        # after the pre-reset drain. Only the new image's one-shot TEST_START
+        # establishes the evidence epoch.
+        if event != "TEST_START" and self.test_start_at is None:
+            return False
+
         record = {
             "event": event,
             "at_seconds": _round(elapsed),
@@ -137,7 +145,12 @@ class MultiTlsEvidence:
         if "_parse_error" in fields:
             self.protocol_errors.append(f"{event}: {fields['_parse_error']}")
 
-        if event == "SESSION_UP":
+        if event == "TEST_START":
+            if self.test_start_at is None:
+                self.test_start_at = elapsed
+            else:
+                self.protocol_errors.append("duplicate TEST_START marker")
+        elif event == "SESSION_UP":
             self._session_up(fields, elapsed, record)
         elif event == "SESSION_DOWN":
             self._session_down(fields, elapsed, record)
@@ -443,6 +456,7 @@ class MultiTlsEvidence:
         )
 
         checks = {
+            "test_start_seen": self.test_start_at is not None,
             "test_complete_seen": self.complete_at is not None,
             "duration_within_bound": self.complete_at is not None
             and self.complete_at <= self.max_duration_seconds,
@@ -496,6 +510,9 @@ class MultiTlsEvidence:
             "failures": failures,
             "protocol_errors": list(self.protocol_errors),
             "timeline": {
+                "test_start_seconds": _round(self.test_start_at)
+                if self.test_start_at is not None
+                else None,
                 "first_both_up_seconds": _round(first_both) if first_both is not None else None,
                 "session_2_down_seconds": _round(session2_down) if session2_down is not None else None,
                 "session_2_reconnect_seconds": _round(session2_reconnect)

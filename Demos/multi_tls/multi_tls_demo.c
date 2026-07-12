@@ -618,6 +618,10 @@ void vStartMultiTlsDemo(void)
     xMultiTlsStateMutex = xSemaphoreCreateMutex();
     configASSERT(NULL != xMultiTlsStateMutex);
 
+    /* Establish a boot boundary for the UART monitor. RFP can leave a final
+     * heartbeat from the pre-reset image buffered after the port was drained. */
+    prvEvidencePrintf("[MULTI_TLS] TEST_START generation=1\r\n");
+
     xResult = xTaskCreate(prvPrimaryHeartbeatTask,
                           "MultiTLS-1",
                           MULTI_TLS_PRIMARY_TASK_STACK_SIZE,

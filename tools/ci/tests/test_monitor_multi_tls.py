@@ -36,6 +36,7 @@ def feed_happy_path(
         {"connection_generation": reconnect_generation} if include_generation else {}
     )
     events = [
+        (0.0, marker("TEST_START", generation=1)),
         (0.0, marker("SESSION_UP", session=1, client_id="thing-mtls-1", network_ctx="0x100", tls_ctx="0x200", socket=1, **generation_1)),
         (1.0, marker("SESSION_UP", session=2, client_id="thing-mtls-2", network_ctx="0x101", tls_ctx=tls2, socket=2, **generation_1)),
         (2.0, marker("BOTH_UP")),
@@ -117,6 +118,19 @@ class MultiTlsEvidenceTests(unittest.TestCase):
         self.assertEqual(len(summary["identity_checks"]), 2)
         self.assertEqual(summary["timeline"]["session_2_initial_connection_generation"], 1)
         self.assertEqual(summary["timeline"]["session_2_reconnect_connection_generation"], 2)
+
+    def test_ignores_stale_marker_before_test_start(self):
+        evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)
+        evidence.consume_line(marker("HEARTBEAT_RX", session=1, seq=99), 0.0)
+        feed_happy_path(evidence)
+
+        summary = evidence.build_summary()
+
+        self.assertTrue(summary["success"])
+        self.assertNotIn(
+            "99",
+            [event["seq"] for event in summary["sessions"]["1"]["heartbeat_rx"]],
+        )
 
     def test_accepts_reconnect_and_both_up_at_same_rounded_timestamp(self):
         evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)
