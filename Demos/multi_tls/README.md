@@ -69,3 +69,32 @@ RUN_RX72N_MULTI_TLS_TEST=true
 Use `RX72N_TLS_BACKEND=tsip` for the TSIP variant. In that mode the monitor also
 requires `tsip_mt=1`, balanced non-zero lock/unlock callback counts, at least two
 observed tasks, zero owner errors, and `wait_mode=polling`.
+
+## RX72N TSIP multithreading experiment (2026-07-12)
+
+GitLab [pipeline #7679](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/7679)
+tested commit `2bb79cb4` with `TSIP_MULTI_THREADING=1` and the WAIT_LOOP hook
+disabled. Build, flash, provisioning, baseline MQTT, and the multi-TLS hardware
+test all passed. The multi-TLS job was then retried twice against the same
+firmware and provisioned RX72N Envision Kit.
+
+| Job | Evidence duration | Start to both sessions up | Session 2 reconnect | Lock / unlock callbacks | Tasks | Owner errors | Result |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| [#51238](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/51238) | 119.357 s | 12.901 s | 13.970 s | 1218 / 1218 | 3 | 0 | PASS |
+| [#51239](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/51239) | 119.953 s | 11.703 s | 13.981 s | 1214 / 1214 | 3 | 0 | PASS |
+| [#51240](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/51240) | 120.039 s | 11.293 s | 14.530 s | 1218 / 1218 | 3 | 0 | PASS |
+
+All three runs proved distinct TLS contexts and sockets, two bounded overlap
+windows, continued session 1 traffic while session 2 reconnected, balanced
+official FIT callbacks, and no mutex timeout or monitor runtime failure. The
+mean evidence duration was 119.783 seconds with a 0.682-second range.
+
+For reference, the earlier polling baseline in
+[pipeline #7659](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/7659)
+was 125.874 seconds, while the hybrid WAIT_LOOP experiment in
+[pipeline #7663](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/7663)
+was 121.284 seconds. These AWS-connected runs include network variation and the
+baseline conditions have not yet been repeated three times, so the timing
+difference is not treated as proof of a throughput improvement. This experiment
+proves multithreaded correctness; CPU-load reduction still requires a separate
+interrupt/sleep or trace-based measurement.
