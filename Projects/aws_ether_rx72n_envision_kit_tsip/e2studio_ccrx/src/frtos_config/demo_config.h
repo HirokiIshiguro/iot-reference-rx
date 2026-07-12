@@ -88,7 +88,7 @@
 #define ENABLE_OTA_UPDATE_DEMO              (1)
 
 /* Keep runtime disabled until TSIP's shared handshake state is synchronized. */
-#define ENABLE_MULTI_TLS_DEMO               (0)
+#define ENABLE_MULTI_TLS_DEMO               (1)
 
 /**
  * @brief Path of the file containing the provisioning claim certificate. This

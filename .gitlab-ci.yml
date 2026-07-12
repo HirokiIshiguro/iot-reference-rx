@@ -2421,7 +2421,7 @@ test_rx72n_ether_multi_tls:
     - job: test_rx72n_ether_mqtt
       artifacts: false
   rules:
-    - if: '$RUN_RX72N_MULTI_TLS_TEST == "true" && $RX72N_TLS_BACKEND == "software" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
+    - if: '$RUN_RX72N_MULTI_TLS_TEST == "true" && $RX72N_TLS_BACKEND =~ /^(software|tsip)$/ && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(mqtt|ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:

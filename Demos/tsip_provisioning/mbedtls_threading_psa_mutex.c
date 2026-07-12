@@ -24,6 +24,12 @@ mbedtls_threading_mutex_t mbedtls_threading_psa_rngdata_mutex;
 
 #if defined(MBEDTLS_THREADING_C)
 mbedtls_threading_mutex_t mutexUseTsip;
+/*
+ * The TSIP-enabled Mbed TLS tree keeps certificate parsing and handshake
+ * scratch state in process-wide globals.  Serialize TLS setup/handshake while
+ * leaving established record traffic free to use mutexUseTsip independently.
+ */
+mbedtls_threading_mutex_t mutexTsipTlsHandshake;
 #endif
 
 #if defined(MBEDTLS_THREADING_C)
@@ -43,6 +49,7 @@ void vTsipMbedtlsThreadingCompatInit( void )
         mbedtls_platform_mutex_init( &mbedtls_threading_psa_rngdata_mutex );
     #endif
         mbedtls_platform_mutex_init( &mutexUseTsip );
+        mbedtls_platform_mutex_init( &mutexTsipTlsHandshake );
         initialized = 1;
     }
 }
