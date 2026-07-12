@@ -298,6 +298,16 @@ class MultiTlsEvidence:
                 return at
         return None
 
+    @staticmethod
+    def _first_at_or_after(events: list[dict[str, Any]], threshold: float) -> float | None:
+        """Return the first event at or after a rounded UART timestamp."""
+
+        for event in events:
+            at = float(event["at_seconds"])
+            if at >= threshold:
+                return at
+        return None
+
     def build_summary(self, elapsed: float | None = None, timed_out: bool = False) -> dict[str, Any]:
         """Return the complete JSON-serializable verdict."""
 
@@ -316,7 +326,10 @@ class MultiTlsEvidence:
             else None
         )
         second_both = (
-            self._first_after(self.both_up_markers, session2_reconnect)
+            # Firmware emits SESSION_UP and BOTH_UP consecutively.  At UART
+            # millisecond resolution they can legitimately have equal
+            # timestamps even though the markers are ordered correctly.
+            self._first_at_or_after(self.both_up_markers, session2_reconnect)
             if session2_reconnect is not None
             else None
         )

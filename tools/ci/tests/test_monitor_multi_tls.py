@@ -26,6 +26,7 @@ def feed_happy_path(
     session1_down_at=None,
     include_generation=True,
     reconnect_generation=2,
+    reconnect_both_at=36.0,
     complete_at=68.0,
 ):
     tls2 = "0x200" if duplicate_tls_context else "0x201"
@@ -53,7 +54,7 @@ def feed_happy_path(
     events.extend(
         [
             (35.0, marker("SESSION_UP", session=2, client_id="thing-mtls-2", network_ctx="0x101", tls_ctx=tls2, socket=3, **generation_2)),
-            (36.0, marker("BOTH_UP")),
+            (reconnect_both_at, marker("BOTH_UP")),
             (37.0, marker("HEARTBEAT_TX", session=1, seq=3)),
             (37.1, marker("HEARTBEAT_RX", session=1, seq=3)),
             (38.0, marker("HEARTBEAT_TX", session=2, seq=2)),
@@ -68,7 +69,10 @@ def feed_happy_path(
                 marker("SESSION_DOWN", session=1, reason="unexpected"),
             )
         )
-    for elapsed, line in sorted(events):
+    # Preserve firmware marker order when two events share the same rounded
+    # UART timestamp.  Sorting the full tuple would put BOTH_UP before
+    # SESSION_UP lexicographically and create an impossible protocol order.
+    for elapsed, line in sorted(events, key=lambda item: item[0]):
         evidence.consume_line(line, elapsed)
 
 
@@ -112,6 +116,16 @@ class MultiTlsEvidenceTests(unittest.TestCase):
         self.assertEqual(len(summary["identity_checks"]), 2)
         self.assertEqual(summary["timeline"]["session_2_initial_connection_generation"], 1)
         self.assertEqual(summary["timeline"]["session_2_reconnect_connection_generation"], 2)
+
+    def test_accepts_reconnect_and_both_up_at_same_rounded_timestamp(self):
+        evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)
+        feed_happy_path(evidence, reconnect_both_at=35.0)
+
+        summary = evidence.build_summary()
+
+        self.assertTrue(summary["success"])
+        self.assertEqual(summary["timeline"]["second_both_up_seconds"], 35.0)
+        self.assertEqual(summary["timeline"]["post_reconnect_overlap_seconds"], 33.0)
 
     def test_rejects_shared_tls_context(self):
         evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)
