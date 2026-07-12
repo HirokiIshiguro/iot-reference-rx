@@ -17,9 +17,12 @@ Define `ENABLE_MULTI_TLS_DEMO` in the board's `demo_config.h`, add this director
 to the compiler include paths, link `multi_tls_demo.obj`, and call
 `vStartMultiTlsDemo()` immediately after `vStartMQTTAgent()`.
 
-The RX72N Envision Kit software-TLS project enables the demo. The matching TSIP
-project compiles and links the shared source but leaves it disabled until TSIP's
-global provisioning and handshake state has connection-safe synchronization.
+The RX72N Envision Kit software-TLS and TSIP projects both enable the demo. The
+TSIP project enables the FIT driver's official `TSIP_MULTI_THREADING` callbacks,
+maps them to the same recursive mutex used across public Init/Update/Final
+sequences, and reports callback balance, owner errors, and distinct task count
+in `TEST_COMPLETE`. The WAIT_LOOP hook is disabled during this experiment so
+the official callback behavior is measured with the driver's original polling.
 
 Two simultaneous software-TLS handshakes exceed the original single 320 KiB
 FreeRTOS heap. The software-TLS RX72N project therefore uses `heap_5` with its
@@ -62,3 +65,7 @@ RX72N_TEST_SCOPE=mqtt
 RX72N_TLS_BACKEND=software
 RUN_RX72N_MULTI_TLS_TEST=true
 ```
+
+Use `RX72N_TLS_BACKEND=tsip` for the TSIP variant. In that mode the monitor also
+requires `tsip_mt=1`, balanced non-zero lock/unlock callback counts, at least two
+observed tasks, zero owner errors, and `wait_mode=polling`.

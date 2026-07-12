@@ -128,7 +128,7 @@
 #define TSIP_FIRMWARE_UPDATE    (1)
 
 /* For multi threading */
-#define TSIP_MULTI_THREADING                    (0)
+#define TSIP_MULTI_THREADING                    (1)
 #define TSIP_MULTI_THREADING_LOCK_FUNCTION      (user_lock_function)
 #define TSIP_MULTI_THREADING_UNLOCK_FUNCTION    (user_unlock_function)
 
@@ -137,7 +137,7 @@
  * busy. The driver defaults to a no-op when these macros are not supplied,
  * so bare-metal projects retain the original polling behavior.
  */
-#define TSIP_CFG_WAIT_LOOP_HOOK_ENABLE           (1)
+#define TSIP_CFG_WAIT_LOOP_HOOK_ENABLE           (0)
 #define TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION         (vTsipWaitLoopHook)
 
 /* Key update. */

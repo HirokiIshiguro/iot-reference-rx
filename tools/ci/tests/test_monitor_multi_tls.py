@@ -29,6 +29,7 @@ def feed_happy_path(
     reconnect_both_at=36.0,
     complete_at=68.0,
     test_complete_fields=None,
+    runtime_failure_at=None,
 ):
     tls2 = "0x200" if duplicate_tls_context else "0x201"
     generation_1 = {"connection_generation": 1} if include_generation else {}
@@ -69,6 +70,14 @@ def feed_happy_path(
             (
                 session1_down_at,
                 marker("SESSION_DOWN", session=1, reason="unexpected"),
+            )
+        )
+    if runtime_failure_at is not None:
+        events.append(
+            (
+                runtime_failure_at,
+                "MBEDTLS:MUTEX timeout mutex=0x100 handle=0x200 "
+                "holder=MQTTAgent current=MultiTLS-2",
             )
         )
     # Preserve firmware marker order when two events share the same rounded
@@ -175,6 +184,76 @@ class MultiTlsEvidenceTests(unittest.TestCase):
 
         self.assertFalse(summary["success"])
         self.assertIn("tsip_wait_hook_exercised", summary["failures"])
+
+    def test_requires_valid_tsip_multithreading_evidence_when_requested(self):
+        evidence = MultiTlsEvidence(
+            min_overlap_seconds=30,
+            max_duration_seconds=90,
+            require_tsip_multithreading=True,
+        )
+        feed_happy_path(
+            evidence,
+            test_complete_fields={
+                "tsip_mt": 1,
+                "lock_calls": 48,
+                "unlock_calls": 48,
+                "task_count": 2,
+                "owner_errors": 0,
+                "wait_mode": "polling",
+            },
+        )
+
+        summary = evidence.build_summary()
+
+        self.assertTrue(summary["success"])
+        self.assertTrue(summary["checks"]["tsip_multithreading_callbacks_balanced"])
+        self.assertEqual(summary["tsip_multithreading_evidence"]["task_count"], 2)
+
+    def test_rejects_unsafe_tsip_multithreading_evidence_when_requested(self):
+        evidence = MultiTlsEvidence(
+            min_overlap_seconds=30,
+            max_duration_seconds=90,
+            require_tsip_multithreading=True,
+        )
+        feed_happy_path(
+            evidence,
+            test_complete_fields={
+                "tsip_mt": 1,
+                "lock_calls": 48,
+                "unlock_calls": 47,
+                "task_count": 1,
+                "owner_errors": 1,
+                "wait_mode": "hybrid_tick",
+            },
+        )
+
+        summary = evidence.build_summary()
+
+        self.assertFalse(summary["success"])
+        self.assertIn("tsip_multithreading_callbacks_balanced", summary["failures"])
+        self.assertIn("tsip_multithreading_two_tasks", summary["failures"])
+        self.assertIn("tsip_multithreading_owner_safe", summary["failures"])
+        self.assertIn("tsip_wait_mode_polling", summary["failures"])
+
+    def test_rejects_mutex_timeout_after_test_start(self):
+        evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)
+        feed_happy_path(evidence, runtime_failure_at=20.0)
+
+        summary = evidence.build_summary()
+
+        self.assertFalse(summary["success"])
+        self.assertIn("no_runtime_failures", summary["failures"])
+        self.assertEqual(summary["runtime_failures"][0]["signature"], "MBEDTLS:MUTEX timeout")
+
+    def test_ignores_stale_mutex_timeout_before_test_start(self):
+        evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)
+        evidence.consume_line("MBEDTLS:MUTEX timeout stale boot", 0.0)
+        feed_happy_path(evidence)
+
+        summary = evidence.build_summary()
+
+        self.assertTrue(summary["success"])
+        self.assertEqual(summary["runtime_failures"], [])
 
     def test_rejects_shared_tls_context(self):
         evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=90)

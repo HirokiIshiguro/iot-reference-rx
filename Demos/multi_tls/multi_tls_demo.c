@@ -63,7 +63,11 @@
 #define MULTI_TLS_MARKER_SIZE                   (160U)
 
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
-extern void vTsipWaitLoopGetStats(uint32_t *pulCalls, uint32_t *pulDelays);
+extern void vTsipMultithreadingStatsReset(void);
+extern void vTsipMultithreadingGetStats(uint32_t *pulLockCalls,
+                                        uint32_t *pulUnlockCalls,
+                                        uint32_t *pulTaskCount,
+                                        uint32_t *pulOwnerErrors);
 #endif
 
 /* The transport interface intentionally leaves NetworkContext opaque. Every
@@ -235,8 +239,10 @@ static void prvMaybeReportComplete(void)
 {
     TickType_t xNow = xTaskGetTickCount();
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
-    uint32_t ulTsipWaitCalls = 0U;
-    uint32_t ulTsipWaitDelays = 0U;
+    uint32_t ulTsipMtLockCalls = 0U;
+    uint32_t ulTsipMtUnlockCalls = 0U;
+    uint32_t ulTsipMtTaskCount = 0U;
+    uint32_t ulTsipMtOwnerErrors = 0U;
 #endif
 
     prvLockState();
@@ -250,11 +256,17 @@ static void prvMaybeReportComplete(void)
     {
         xTestCompleteReported = pdTRUE;
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
-        vTsipWaitLoopGetStats(&ulTsipWaitCalls, &ulTsipWaitDelays);
-        prvEvidencePrintf("[MULTI_TLS] TEST_COMPLETE tsip_wait_mode=hybrid_tick "
-                          "tsip_wait_calls=%lu tsip_wait_delays=%lu\r\n",
-                          (unsigned long)ulTsipWaitCalls,
-                          (unsigned long)ulTsipWaitDelays);
+        vTsipMultithreadingGetStats(&ulTsipMtLockCalls,
+                                    &ulTsipMtUnlockCalls,
+                                    &ulTsipMtTaskCount,
+                                    &ulTsipMtOwnerErrors);
+        prvEvidencePrintf("[MULTI_TLS] TEST_COMPLETE tsip_mt=1 lock_calls=%lu "
+                          "unlock_calls=%lu task_count=%lu owner_errors=%lu "
+                          "wait_mode=polling\r\n",
+                          (unsigned long)ulTsipMtLockCalls,
+                          (unsigned long)ulTsipMtUnlockCalls,
+                          (unsigned long)ulTsipMtTaskCount,
+                          (unsigned long)ulTsipMtOwnerErrors);
 #else
         prvEvidencePrintf("[MULTI_TLS] TEST_COMPLETE\r\n");
 #endif
@@ -620,6 +632,9 @@ void vStartMultiTlsDemo(void)
 
     /* Establish a boot boundary for the UART monitor. RFP can leave a final
      * heartbeat from the pre-reset image buffered after the port was drained. */
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    vTsipMultithreadingStatsReset();
+#endif
     prvEvidencePrintf("[MULTI_TLS] TEST_START generation=1\r\n");
 
     xResult = xTaskCreate(prvPrimaryHeartbeatTask,

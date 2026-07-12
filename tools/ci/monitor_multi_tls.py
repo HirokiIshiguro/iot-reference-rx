@@ -49,6 +49,7 @@ FIELD_ALIASES = {
     "gen": "connection_generation",
 }
 SESSION_IDS = (1, 2)
+RUNTIME_FAILURE_SIGNATURES = ("MBEDTLS:MUTEX timeout",)
 
 
 def _round(value: float) -> float:
@@ -85,6 +86,7 @@ class MultiTlsEvidence:
         min_overlap_seconds: float = 30.0,
         max_duration_seconds: float = 180.0,
         require_tsip_wait: bool = False,
+        require_tsip_multithreading: bool = False,
     ):
         if min_overlap_seconds < 0:
             raise ValueError("min_overlap_seconds must be non-negative")
@@ -94,8 +96,10 @@ class MultiTlsEvidence:
         self.min_overlap_seconds = float(min_overlap_seconds)
         self.max_duration_seconds = float(max_duration_seconds)
         self.require_tsip_wait = bool(require_tsip_wait)
+        self.require_tsip_multithreading = bool(require_tsip_multithreading)
         self.events: list[dict[str, Any]] = []
         self.protocol_errors: list[str] = []
+        self.runtime_failures: list[dict[str, Any]] = []
         self.up = {session: False for session in SESSION_IDS}
         self.active_identity: dict[int, dict[str, str] | None] = {
             session: None for session in SESSION_IDS
@@ -112,6 +116,7 @@ class MultiTlsEvidence:
         self.test_start_at: float | None = None
         self.complete_at: float | None = None
         self.tsip_wait_evidence: dict[str, Any] | None = None
+        self.tsip_multithreading_evidence: dict[str, Any] | None = None
         self.last_elapsed = 0.0
 
     def consume_line(self, line: str, elapsed: float) -> bool:
@@ -123,6 +128,20 @@ class MultiTlsEvidence:
                 f"non-monotonic timestamp: {elapsed:.3f} after {self.last_elapsed:.3f}"
             )
         self.last_elapsed = max(self.last_elapsed, elapsed)
+
+        if self.test_start_at is not None:
+            for signature in RUNTIME_FAILURE_SIGNATURES:
+                if signature in line:
+                    failure = {
+                        "at_seconds": _round(elapsed),
+                        "signature": signature,
+                        "line": line.rstrip("\r\n"),
+                    }
+                    self.runtime_failures.append(failure)
+                    self.protocol_errors.append(
+                        f"runtime failure signature: {failure['line']}"
+                    )
+                    break
 
         parsed = parse_marker(line)
         if parsed is None:
@@ -164,6 +183,7 @@ class MultiTlsEvidence:
             if self.complete_at is None:
                 self.complete_at = elapsed
                 self._capture_tsip_wait(fields)
+                self._capture_tsip_multithreading(fields)
             else:
                 self.protocol_errors.append("duplicate TEST_COMPLETE marker")
         else:
@@ -194,6 +214,45 @@ class MultiTlsEvidence:
             "mode": mode,
             "calls": calls,
             "delays": delays,
+        }
+
+    def _capture_tsip_multithreading(self, fields: dict[str, str]) -> None:
+        names = (
+            "tsip_mt",
+            "lock_calls",
+            "unlock_calls",
+            "task_count",
+            "owner_errors",
+            "wait_mode",
+        )
+        if not any(name in fields for name in names):
+            return
+
+        try:
+            enabled = int(fields.get("tsip_mt", ""))
+            lock_calls = int(fields.get("lock_calls", ""))
+            unlock_calls = int(fields.get("unlock_calls", ""))
+            task_count = int(fields.get("task_count", ""))
+            owner_errors = int(fields.get("owner_errors", ""))
+            if min(enabled, lock_calls, unlock_calls, task_count, owner_errors) < 0:
+                raise ValueError
+        except ValueError:
+            self.protocol_errors.append(
+                "TEST_COMPLETE: TSIP multithreading counters must be non-negative integers"
+            )
+            enabled = None
+            lock_calls = None
+            unlock_calls = None
+            task_count = None
+            owner_errors = None
+
+        self.tsip_multithreading_evidence = {
+            "enabled": enabled,
+            "lock_calls": lock_calls,
+            "unlock_calls": unlock_calls,
+            "task_count": task_count,
+            "owner_errors": owner_errors,
+            "wait_mode": fields.get("wait_mode", ""),
         }
 
     def _session(self, event: str, fields: dict[str, str]) -> int | None:
@@ -455,6 +514,8 @@ class MultiTlsEvidence:
             )
         )
 
+        tsip_mt = self.tsip_multithreading_evidence or {}
+        tsip_mt_not_required = not self.require_tsip_multithreading
         checks = {
             "test_start_seen": self.test_start_at is not None,
             "test_complete_seen": self.complete_at is not None,
@@ -494,6 +555,33 @@ class MultiTlsEvidence:
                     and bool(self.tsip_wait_evidence["delays"])
                 )
             ),
+            "tsip_multithreading_enabled": (
+                tsip_mt_not_required or tsip_mt.get("enabled") == 1
+            ),
+            "tsip_multithreading_callbacks_exercised": (
+                tsip_mt_not_required or bool(tsip_mt.get("lock_calls"))
+            ),
+            "tsip_multithreading_callbacks_balanced": (
+                tsip_mt_not_required
+                or (
+                    tsip_mt.get("lock_calls") is not None
+                    and tsip_mt.get("lock_calls") == tsip_mt.get("unlock_calls")
+                )
+            ),
+            "tsip_multithreading_two_tasks": (
+                tsip_mt_not_required
+                or (
+                    tsip_mt.get("task_count") is not None
+                    and tsip_mt.get("task_count") >= 2
+                )
+            ),
+            "tsip_multithreading_owner_safe": (
+                tsip_mt_not_required or tsip_mt.get("owner_errors") == 0
+            ),
+            "tsip_wait_mode_polling": (
+                tsip_mt_not_required or tsip_mt.get("wait_mode") == "polling"
+            ),
+            "no_runtime_failures": not self.runtime_failures,
             "no_protocol_errors": not self.protocol_errors,
         }
         failures = [name for name, passed in checks.items() if not passed]
@@ -509,6 +597,7 @@ class MultiTlsEvidence:
             "checks": checks,
             "failures": failures,
             "protocol_errors": list(self.protocol_errors),
+            "runtime_failures": list(self.runtime_failures),
             "timeline": {
                 "test_start_seconds": _round(self.test_start_at)
                 if self.test_start_at is not None
@@ -533,6 +622,7 @@ class MultiTlsEvidence:
                 "post_reconnect_matching_sequences": post_pairs,
             },
             "tsip_wait_evidence": self.tsip_wait_evidence,
+            "tsip_multithreading_evidence": self.tsip_multithreading_evidence,
             "overlap_windows": windows,
             "identity_checks": self.identity_checks,
             "sessions": {
@@ -651,6 +741,7 @@ def monitor_uart(args: argparse.Namespace) -> dict[str, Any]:
         args.min_overlap_seconds,
         args.timeout,
         require_tsip_wait=getattr(args, "require_tsip_wait", False),
+        require_tsip_multithreading=getattr(args, "require_tsip_multithreading", False),
     )
     partial = ""
     total_bytes = 0
@@ -765,6 +856,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--require-tsip-wait",
         action="store_true",
         help="Require non-zero hybrid TSIP wait-hook counters in TEST_COMPLETE",
+    )
+    parser.add_argument(
+        "--require-tsip-multithreading",
+        action="store_true",
+        help="Require balanced official TSIP multithreading callbacks from at least two tasks",
     )
     parser.add_argument("--raw-log", type=Path)
     parser.add_argument("--summary-json", type=Path)
