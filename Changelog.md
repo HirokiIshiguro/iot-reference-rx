@@ -31,6 +31,8 @@
   TX complete IRQの診断counterを有効にできます。通常製品buildへの実行コストを避けるため既定値は`0`です。
 - 現在のpipeline待ちはbusy pollなので、RX72Nの測定CPU busy中央値は100%のままです。
   TX complete IRQでtaskを停止する方式は、throughputを維持できるかを実機確認する次段候補として残します。
+  EDMAC異常でdescriptor所有権が戻らない場合の有限timeoutも未実装で、従来の
+  `R_ETHER_CheckWrite()`と同じ無期限待ち特性を持つため、IRQ待ち化と合わせてfail-safeを検討します。
 
 ### EK-RX671 + Murata Type 1YN Wi-Fi
 
