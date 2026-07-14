@@ -17,6 +17,23 @@
 
 以降は今後のリリース候補です。
 
+### RX Ethernet TX pipeline
+
+- RX向けFreeRTOS+TCP `NetworkInterface.c`に、複数EMAC TX descriptorを使う送信pipelineを追加します。
+  `RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE=1`では、各frame後の`R_ETHER_CheckWrite()`によるring全体の
+  完了待ちを省略し、次descriptorが`ETHER_ERR_TACT`のときだけ待ちます。既定値は従来互換の`0`です。
+- RX72N Envision Kitの10MiB TCP SINK実機比較では、descriptorを1から4へ増やすだけでは
+  47.745Mbpsから変化せず、descriptor 4とpipelineを組み合わせて84.744Mbpsへ改善しました
+  （5回中央値、+77.5%、EMAC error 0）。測定条件と全A/B結果は
+  [tsip_mbedtls benchmark job #51762](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls/-/jobs/51762)
+  を参照してください。
+- `RX_NETWORK_INTERFACE_TX_STATS_ENABLE=1`ではdescriptor wait、busy poll、frame、error、
+  TX complete IRQの診断counterを有効にできます。通常製品buildへの実行コストを避けるため既定値は`0`です。
+- 現在のpipeline待ちはbusy pollなので、RX72Nの測定CPU busy中央値は100%のままです。
+  TX complete IRQでtaskを停止する方式は、throughputを維持できるかを実機確認する次段候補として残します。
+  EDMAC異常でdescriptor所有権が戻らない場合の有限timeoutも未実装で、従来の
+  `R_ETHER_CheckWrite()`と同じ無期限待ち特性を持つため、IRQ待ち化と合わせてfail-safeを検討します。
+
 ### EK-RX671 + Murata Type 1YN Wi-Fi
 
 - `Projects/aws_wifi_rx671_ek/e2studio_ccrx` を EK-RX671 + Type 1YN の AWS Wi-Fi 基準プロジェクトとして整備中です。
