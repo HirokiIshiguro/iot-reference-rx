@@ -67,6 +67,16 @@
     #define RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE    0
 #endif
 
+#ifndef RX_NETWORK_INTERFACE_TX_STATS_ENABLE
+    #define RX_NETWORK_INTERFACE_TX_STATS_ENABLE    0
+#endif
+
+#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 ) && \
+    defined( ETHER_CFG_EMAC_TX_DESCRIPTORS ) && \
+    ( ETHER_CFG_EMAC_TX_DESCRIPTORS < 2 )
+    #error "RX Ethernet TX pipelining requires at least two transmit descriptors"
+#endif
+
 #define RX_NETWORK_INTERFACE_EESR_TC    ( 0x00200000UL )
 
 #if defined( BSP_MCU_RX65N ) || defined( BSP_MCU_RX64M ) || defined( BSP_MCU_RX71M ) || defined( BSP_MCU_RX72M ) || defined( BSP_MCU_RX72N )
@@ -99,13 +109,15 @@ static BaseType_t xPHYLinkStatus;
 static BaseType_t xReportedStatus;
 static eMAC_INIT_STATUS_TYPE xMacInitStatus = eMACInit;
 
-/* Low-overhead counters used by board-level throughput experiments. */
+/* Optional low-overhead counters used by board-level throughput experiments. */
+#if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
 volatile uint32_t gRxNetworkInterfaceTxFrames = 0U;
 volatile uint32_t gRxNetworkInterfaceTxDescriptorWaits = 0U;
 volatile uint32_t gRxNetworkInterfaceTxDescriptorBusyPolls = 0U;
 volatile uint32_t gRxNetworkInterfaceTxMaxBusyPolls = 0U;
 volatile uint32_t gRxNetworkInterfaceTxErrors = 0U;
 volatile uint32_t gRxNetworkInterfaceTxCompleteIrqs = 0U;
+#endif
 
 /* Pointer to the interface object of this NIC */
 static NetworkInterface_t * pxMyInterface = NULL;
@@ -559,14 +571,16 @@ static int16_t SendData( uint8_t * pucBuffer,
     ether_return_t ret;
     uint8_t * pwrite_buffer;
     uint16_t write_buf_size;
+#if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
     uint32_t ulBusyPolls = 0U;
+#endif
 
     /* (1) Retrieve the transmit buffer location controlled by the  descriptor. */
     do
     {
         ret = R_ETHER_Write_ZC2_GetBuf( ETHER_CHANNEL_0, ( void ** ) &pwrite_buffer, &write_buf_size );
 
-#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 )
+#if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
         if( ret == ETHER_ERR_TACT )
         {
             ulBusyPolls++;
@@ -574,6 +588,7 @@ static int16_t SendData( uint8_t * pucBuffer,
 #endif
     } while( ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 ) && ( ret == ETHER_ERR_TACT ) );
 
+#if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
     if( ulBusyPolls != 0U )
     {
         gRxNetworkInterfaceTxDescriptorWaits++;
@@ -583,6 +598,7 @@ static int16_t SendData( uint8_t * pucBuffer,
             gRxNetworkInterfaceTxMaxBusyPolls = ulBusyPolls;
         }
     }
+#endif
 
     if( ETHER_SUCCESS == ret )
     {
@@ -603,7 +619,9 @@ static int16_t SendData( uint8_t * pucBuffer,
             ret = R_ETHER_Write_ZC2_SetBuf( ETHER_CHANNEL_0, ( uint16_t ) length );
             if( ETHER_SUCCESS == ret )
             {
+#if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
                 gRxNetworkInterfaceTxFrames++;
+#endif
 #if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE == 0 )
                 ret = R_ETHER_CheckWrite( ETHER_CHANNEL_0 );
 #endif
@@ -613,7 +631,9 @@ static int16_t SendData( uint8_t * pucBuffer,
 
     if( ETHER_SUCCESS != ret )
     {
+#if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
         gRxNetworkInterfaceTxErrors++;
+#endif
         return -5; /* XXX return meaningful value */
     }
     else
@@ -637,10 +657,12 @@ void EINT_Trig_isr( void * ectrl )
 
     pdecode = ( ether_cb_arg_t * ) ectrl;
 
+#if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
     if( pdecode->status_eesr & RX_NETWORK_INTERFACE_EESR_TC )
     {
         gRxNetworkInterfaceTxCompleteIrqs++;
     }
+#endif
 
     if( pdecode->status_eesr & 0x00040000 ) /* EDMAC FR (Frame Receive Event) interrupt */
     {
