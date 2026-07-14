@@ -65,7 +65,7 @@
     #define ETHER_CFG_EMAC_RX_DESCRIPTORS               (2)
 
 /* The number of Tx descriptors. */
-    #define ETHER_CFG_EMAC_TX_DESCRIPTORS               (2)
+    #define ETHER_CFG_EMAC_TX_DESCRIPTORS               (4)
 
 /* Please define the size of the sending and receiving buffer in the value where one frame can surely be stored 
  because the driver is single-frame/single-buffer processing.  */

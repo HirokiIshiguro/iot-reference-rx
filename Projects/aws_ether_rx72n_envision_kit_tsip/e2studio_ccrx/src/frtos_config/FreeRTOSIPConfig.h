@@ -38,6 +38,8 @@
 #ifndef FREERTOS_IP_CONFIG_H
 #define FREERTOS_IP_CONFIG_H
 
+#define RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE    1
+
 /* Define the byte order of the target MCU (the MCU FreeRTOS+TCP is executing
  * on).  Valid options are pdFREERTOS_BIG_ENDIAN and pdFREERTOS_LITTLE_ENDIAN. */
 #define ipconfigBYTE_ORDER                         pdFREERTOS_LITTLE_ENDIAN
