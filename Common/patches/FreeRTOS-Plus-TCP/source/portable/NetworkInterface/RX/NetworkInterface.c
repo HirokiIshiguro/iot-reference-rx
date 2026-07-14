@@ -53,6 +53,22 @@
  **********************************************************************************************************************/
 #define ETHER_BUFSIZE_MIN    60
 
+/*
+ * The legacy RX network interface waits for the complete descriptor ring after
+ * every frame.  That is safe with one descriptor, but it prevents EDMAC from
+ * overlapping one frame on the wire with preparation of the next frame.
+ *
+ * Keep the legacy behaviour as the portable default.  Projects that provision
+ * two or more TX descriptors may enable the pipelined path in
+ * FreeRTOSIPConfig.h.  The pipelined path waits only when the next descriptor
+ * is still owned by EDMAC; it never drops a frame when the ring is full.
+ */
+#ifndef RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE
+    #define RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE    0
+#endif
+
+#define RX_NETWORK_INTERFACE_EESR_TC    ( 0x00200000UL )
+
 #if defined( BSP_MCU_RX65N ) || defined( BSP_MCU_RX64M ) || defined( BSP_MCU_RX71M ) || defined( BSP_MCU_RX72M ) || defined( BSP_MCU_RX72N )
     #if ETHER_CFG_MODE_SEL == 0
         #define R_ETHER_PinSet_CHANNEL_0()    R_ETHER_PinSet_ETHERC0_MII()
@@ -82,6 +98,14 @@ static TaskHandle_t xTaskToNotify = NULL;
 static BaseType_t xPHYLinkStatus;
 static BaseType_t xReportedStatus;
 static eMAC_INIT_STATUS_TYPE xMacInitStatus = eMACInit;
+
+/* Low-overhead counters used by board-level throughput experiments. */
+volatile uint32_t gRxNetworkInterfaceTxFrames = 0U;
+volatile uint32_t gRxNetworkInterfaceTxDescriptorWaits = 0U;
+volatile uint32_t gRxNetworkInterfaceTxDescriptorBusyPolls = 0U;
+volatile uint32_t gRxNetworkInterfaceTxMaxBusyPolls = 0U;
+volatile uint32_t gRxNetworkInterfaceTxErrors = 0U;
+volatile uint32_t gRxNetworkInterfaceTxCompleteIrqs = 0U;
 
 /* Pointer to the interface object of this NIC */
 static NetworkInterface_t * pxMyInterface = NULL;
@@ -535,29 +559,61 @@ static int16_t SendData( uint8_t * pucBuffer,
     ether_return_t ret;
     uint8_t * pwrite_buffer;
     uint16_t write_buf_size;
+    uint32_t ulBusyPolls = 0U;
 
     /* (1) Retrieve the transmit buffer location controlled by the  descriptor. */
-    ret = R_ETHER_Write_ZC2_GetBuf( ETHER_CHANNEL_0, ( void ** ) &pwrite_buffer, &write_buf_size );
+    do
+    {
+        ret = R_ETHER_Write_ZC2_GetBuf( ETHER_CHANNEL_0, ( void ** ) &pwrite_buffer, &write_buf_size );
+
+#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 )
+        if( ret == ETHER_ERR_TACT )
+        {
+            ulBusyPolls++;
+        }
+#endif
+    } while( ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 ) && ( ret == ETHER_ERR_TACT ) );
+
+    if( ulBusyPolls != 0U )
+    {
+        gRxNetworkInterfaceTxDescriptorWaits++;
+        gRxNetworkInterfaceTxDescriptorBusyPolls += ulBusyPolls;
+        if( ulBusyPolls > gRxNetworkInterfaceTxMaxBusyPolls )
+        {
+            gRxNetworkInterfaceTxMaxBusyPolls = ulBusyPolls;
+        }
+    }
 
     if( ETHER_SUCCESS == ret )
     {
-        if( write_buf_size >= length )
+        if( write_buf_size < length )
+        {
+            ret = ETHER_ERR_TACT;
+        }
+        else
         {
             memcpy( pwrite_buffer, pucBuffer, length );
-        }
 
-        if( length < ETHER_BUFSIZE_MIN )                                             /*under minimum*/
-        {
-            memset( ( pwrite_buffer + length ), 0, ( ETHER_BUFSIZE_MIN - length ) ); /*padding*/
-            length = ETHER_BUFSIZE_MIN;                                              /*resize*/
-        }
+            if( length < ETHER_BUFSIZE_MIN )                                             /*under minimum*/
+            {
+                memset( ( pwrite_buffer + length ), 0, ( ETHER_BUFSIZE_MIN - length ) ); /*padding*/
+                length = ETHER_BUFSIZE_MIN;                                              /*resize*/
+            }
 
-        ret = R_ETHER_Write_ZC2_SetBuf( ETHER_CHANNEL_0, ( uint16_t ) length );
-        ret = R_ETHER_CheckWrite( ETHER_CHANNEL_0 );
+            ret = R_ETHER_Write_ZC2_SetBuf( ETHER_CHANNEL_0, ( uint16_t ) length );
+            if( ETHER_SUCCESS == ret )
+            {
+                gRxNetworkInterfaceTxFrames++;
+#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE == 0 )
+                ret = R_ETHER_CheckWrite( ETHER_CHANNEL_0 );
+#endif
+            }
+        }
     }
 
     if( ETHER_SUCCESS != ret )
     {
+        gRxNetworkInterfaceTxErrors++;
         return -5; /* XXX return meaningful value */
     }
     else
@@ -580,6 +636,11 @@ void EINT_Trig_isr( void * ectrl )
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     pdecode = ( ether_cb_arg_t * ) ectrl;
+
+    if( pdecode->status_eesr & RX_NETWORK_INTERFACE_EESR_TC )
+    {
+        gRxNetworkInterfaceTxCompleteIrqs++;
+    }
 
     if( pdecode->status_eesr & 0x00040000 ) /* EDMAC FR (Frame Receive Event) interrupt */
     {
