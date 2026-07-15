@@ -71,10 +71,12 @@
     #define RX_NETWORK_INTERFACE_TX_STATS_ENABLE    0
 #endif
 
-#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 ) && \
-    defined( ETHER_CFG_EMAC_TX_DESCRIPTORS ) && \
-    ( ETHER_CFG_EMAC_TX_DESCRIPTORS < 2 )
-    #error "RX Ethernet TX pipelining requires at least two transmit descriptors"
+#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 )
+    #if !defined( ETHER_CFG_EMAC_TX_DESCRIPTORS )
+        #error "RX Ethernet TX pipelining requires ETHER_CFG_EMAC_TX_DESCRIPTORS"
+    #elif ( ETHER_CFG_EMAC_TX_DESCRIPTORS < 2 )
+        #error "RX Ethernet TX pipelining requires at least two transmit descriptors"
+    #endif
 #endif
 
 #define RX_NETWORK_INTERFACE_EESR_TC    ( 0x00200000UL )
@@ -108,6 +110,15 @@ static TaskHandle_t xTaskToNotify = NULL;
 static BaseType_t xPHYLinkStatus;
 static BaseType_t xReportedStatus;
 static eMAC_INIT_STATUS_TYPE xMacInitStatus = eMACInit;
+
+#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 )
+/*
+ * SendData() is called by the FreeRTOS+TCP IP task, so this counter is not
+ * shared between callers.  Drain each complete batch before any descriptor in
+ * the ring can be reused while EDMAC is still active.
+ */
+static uint32_t ulTxFramesSinceDrain = 0U;
+#endif
 
 /* Optional low-overhead counters used by board-level throughput experiments. */
 #if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
@@ -616,13 +627,33 @@ static int16_t SendData( uint8_t * pucBuffer,
                 length = ETHER_BUFSIZE_MIN;                                              /*resize*/
             }
 
+#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 )
+            /*
+             * RX72N projects can place the EDMAC buffers in external SDRAM.
+             * Read back the last byte before setting TACT so all preceding
+             * buffer writes are observable by the bus master before ownership
+             * is transferred to EDMAC.
+             */
+            ( void ) *( ( volatile const uint8_t * ) ( pwrite_buffer + length - 1U ) );
+#endif
+
             ret = R_ETHER_Write_ZC2_SetBuf( ETHER_CHANNEL_0, ( uint16_t ) length );
             if( ETHER_SUCCESS == ret )
             {
 #if ( RX_NETWORK_INTERFACE_TX_STATS_ENABLE != 0 )
                 gRxNetworkInterfaceTxFrames++;
 #endif
-#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE == 0 )
+#if ( RX_NETWORK_INTERFACE_TX_PIPELINE_ENABLE != 0 )
+                ulTxFramesSinceDrain++;
+                if( ulTxFramesSinceDrain >= ETHER_CFG_EMAC_TX_DESCRIPTORS )
+                {
+                    ret = R_ETHER_CheckWrite( ETHER_CHANNEL_0 );
+                    if( ETHER_SUCCESS == ret )
+                    {
+                        ulTxFramesSinceDrain = 0U;
+                    }
+                }
+#else
                 ret = R_ETHER_CheckWrite( ETHER_CHANNEL_0 );
 #endif
             }

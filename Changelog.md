@@ -33,6 +33,10 @@
   TX complete IRQでtaskを停止する方式は、throughputを維持できるかを実機確認する次段候補として残します。
   EDMAC異常でdescriptor所有権が戻らない場合の有限timeoutも未実装で、従来の
   `R_ETHER_CheckWrite()`と同じ無期限待ち特性を持つため、IRQ待ち化と合わせてfail-safeを検討します。
+- 複数descriptor pipelineの連続受信試験で、通常のIPv4 ID系列から外れた旧header断片を含むRSTが
+  送出される事象を確認しました。外部SDRAMへのcopy完了をvolatile readbackで確認してからEDMACへ
+  所有権を渡し、descriptor数ごとにring全体をdrainしてから再利用する安全化を追加します。
+  4 descriptorのbatch内ではframe送信と次frame準備のoverlapを維持します。
 
 ### EK-RX671 + Murata Type 1YN Wi-Fi
 
