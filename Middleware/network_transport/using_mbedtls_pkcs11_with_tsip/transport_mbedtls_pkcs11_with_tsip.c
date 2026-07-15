@@ -661,7 +661,8 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 
     /* Set Maximum Fragment Length if enabled. */
     #ifdef MBEDTLS_SSL_MAX_FRAGMENT_LENGTH
-        if( returnStatus == TLS_TRANSPORT_SUCCESS )
+        if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+            ( pNetworkCredentials->disableMaxFragmentLengthExtension == pdFALSE ) )
         {
             /* Enable the max fragment extension. 4096 bytes is currently the largest fragment size permitted.
              * See RFC 8449 https://tools.ietf.org/html/rfc8449 for more information.
