@@ -123,6 +123,15 @@ typedef struct NetworkCredentials
     const int * pCipherSuites;       /**< @brief Optional NULL-terminated mbed TLS cipher suite list. */
     const uint16_t * pSigAlgs;       /**< @brief Optional NULL-terminated TLS signature algorithm list. */
     uint32_t tlsDebugLevel;          /**< @brief Optional mbed TLS debug level. Zero disables debug logs. */
+
+    /**
+     * @brief Disable the 4096-byte TLS Maximum Fragment Length setting for this session.
+     *
+     * Leave this as @c pdFALSE to preserve the existing memory-constrained default.
+     * Set it to @c pdTRUE when the application has enough TLS buffer space and wants
+     * Mbed TLS to use its full configured record size.
+     */
+    BaseType_t disableMaxFragmentLength;
 } NetworkCredentials_t;
 
 /**
