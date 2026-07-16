@@ -27,13 +27,13 @@ variables:
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: "core.longpaths"
   GIT_CONFIG_VALUE_0: "true"
-  # RX72N builds use the current CI-default e2 studio release installed on the
+  # RX builds use the current CI-default e2 studio release installed on the
   # dedicated ishiguro-pc runner. Keep a version-specific workspace so Eclipse
   # metadata from the previous 2025-12 release cannot leak into the build.
   E2STUDIO_CLI: "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studioc.exe"
-  E2STUDIO_CLI_BG96: "C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe"
+  E2STUDIO_CLI_BG96: "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe"
   E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref_rx72n_2026_04_2"
-  E2STUDIO_WORKSPACE_RX65N_BG96: "C:/Temp/e2ws_iot_ref_rx65n_bg96"
+  E2STUDIO_WORKSPACE_RX65N_BG96: "C:/Temp/e2ws_iot_ref_rx65n_bg96_2026_04_2"
   RX72N_E2STUDIO_TIMEOUT_SECONDS: "600"
   RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
   RFP_SPEED: "1500K"
