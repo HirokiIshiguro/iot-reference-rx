@@ -147,6 +147,10 @@ variables:
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_REQUIRE_TLS_VERSION: ""
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-02"
+  # Select the physical RX72N bench independently from the Linux job template.
+  # Focused pipelines may override this together with the matching resource
+  # group and UART path; the default remains the set2 bench on Raspberry Pi #2.
+  RX72N_HW_RUNNER_TAG: "dev-ek-rx72n-set2"
   RX72N_LINUX_RFP_CLI: "./tools/rfp_cli_locked.sh"
   # The restore pipeline is pinned to the RX72N set2 runner on RPi#2.
   # RPi#1 and RPi#2 both expose an RX72N E2 Lite as OBE110008, but the runner
@@ -595,6 +599,7 @@ build_rx72n_ether:
     - when: on_success
   script:
     - Write-Host "=== Build RX72N projects ==="
+    - python tools/ci/check_rx72n_tsip_driver.py
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
@@ -947,7 +952,7 @@ build_rx72n_ether_fleet:
     - os-linux
     - hw-raspi
     - dev-ek-rx72n
-    - dev-ek-rx72n-set2
+    - $RX72N_HW_RUNNER_TAG
   resource_group: $RX72N_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail

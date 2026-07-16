@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,9 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
+ *         : 15.10.2025 1.23     Updated Open/Close API to store the driver status
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -70,19 +60,18 @@
 TSIP_SEC_P_SECURE_BOOT
 
 /***********************************************************************************************************************
-* Function Name: R_TSIP_VerifyFirmwareMacSub
+* Function Name: R_TSIP_VerifyFirmwareMacFinalSub
 *******************************************************************************************************************/ /**
-* @details       RX72M Program integrity check
+* @details       RX65NHU Program integrity check Final
 * @param[in]     InData_Program
+* @param[in]     InData_MAC
 * @param[in]     MAX_CNT
 * @retval        TSIP_SUCCESS
 * @retval        TSIP_ERR_FAIL
-* @retval        TSIP_ERR_RESOURCE_CONFLICT
 * @note          None
 */
-e_tsip_err_t R_TSIP_VerifyFirmwareMacSub(uint32_t *InData_Program, uint32_t MAX_CNT)
+e_tsip_err_t R_TSIP_VerifyFirmwareMacFinalSub(uint32_t *InData_Program, uint32_t *InData_MAC, uint32_t MAX_CNT)
 {
-    uint32_t InData_MAC[4];
     int32_t iLoop = 0u, jLoop = 0u, kLoop = 0u, oLoop1 = 0u, oLoop2 = 0u, iLoop2 = 0u;
     uint32_t KEY_ADR = 0u, OFS_ADR = 0u;
     (void)iLoop;
@@ -93,23 +82,9 @@ e_tsip_err_t R_TSIP_VerifyFirmwareMacSub(uint32_t *InData_Program, uint32_t MAX_
     (void)oLoop2;
     (void)KEY_ADR;
     (void)OFS_ADR;
-
-    if (0x0u != (TSIP.REG_1BCH.WORD & 0x1fu))
-    {
-        return TSIP_ERR_RESOURCE_CONFLICT;
-    }
-    TSIP.REG_84H.WORD = 0x00002601u;
-    TSIP.REG_108H.WORD = 0x00000000u;
-    TSIP.REG_A4H.WORD = 0x200c3b0cu;
-    /* WAIT_LOOP */
-    while (1u != TSIP.REG_104H.BIT.B31)
-    {
-        /* waiting */
-    }
-    TSIP.REG_100H.WORD = change_endian_long(0x500b7478u);
     TSIP.REG_104H.WORD = 0x000000b1u;
-    TSIP.REG_A4H.WORD = 0x02000e1eu;
-    for (iLoop = 0; iLoop < MAX_CNT-8; iLoop = iLoop + 4)
+    TSIP.REG_A4H.WORD = 0x00000e1eu;
+    for (iLoop = 0; iLoop < MAX_CNT-4; iLoop = iLoop + 4)
     {
         /* WAIT_LOOP */
         while (1u != TSIP.REG_104H.BIT.B31)
@@ -164,39 +139,44 @@ e_tsip_err_t R_TSIP_VerifyFirmwareMacSub(uint32_t *InData_Program, uint32_t MAX_
     {
         /* waiting */
     }
-    firm_mac_read(InData_MAC);
     TSIP.REG_100H.WORD = InData_MAC[0];
     TSIP.REG_100H.WORD = InData_MAC[1];
     TSIP.REG_100H.WORD = InData_MAC[2];
     TSIP.REG_100H.WORD = InData_MAC[3];
-    RX72M_RX72N_RX66N_func100(change_endian_long(0x3da98639u), change_endian_long(0x59e8d758u), change_endian_long(0x30603053u), change_endian_long(0xe1c2f61du));
+    RX72M_RX72N_RX66N_func100(change_endian_long(0xab4ebf65u), change_endian_long(0x13b8ce31u), change_endian_long(0xb490c32au), change_endian_long(0x2ed6efefu));
     TSIP.REG_1CH.WORD = 0x00400000u;
     TSIP.REG_1D0H.WORD = 0x00000000u;
     if (1u == (TSIP.REG_1CH.BIT.B22))
     {
         TSIP.REG_13CH.WORD = 0x000002ffu;
-        RX72M_RX72N_RX66N_func102(change_endian_long(0xce9851abu), change_endian_long(0xbb76b4feu), change_endian_long(0x761fc586u), change_endian_long(0x9f446801u));
+        RX72M_RX72N_RX66N_func102(change_endian_long(0xff0b0793u), change_endian_long(0xf7927541u), change_endian_long(0x50f1c6d8u), change_endian_long(0x7366cb06u));
         TSIP.REG_1BCH.WORD = 0x00000040u;
         /* WAIT_LOOP */
         while (0u != TSIP.REG_18H.BIT.B12)
         {
             /* waiting */
         }
+        #if TSIP_MULTI_THREADING == 1
+        TSIP_MULTI_THREADING_UNLOCK_FUNCTION();
+        #endif /* TSIP_MULTI_THREADING == 1 */
         return TSIP_ERR_FAIL;
     }
     else
     {
-        RX72M_RX72N_RX66N_func102(change_endian_long(0xb127854cu), change_endian_long(0x159f8484u), change_endian_long(0x5878dc43u), change_endian_long(0xdd24f76eu));
+        RX72M_RX72N_RX66N_func102(change_endian_long(0x36bdc6f0u), change_endian_long(0x8b019338u), change_endian_long(0xa0bd65a2u), change_endian_long(0xad20cf30u));
         TSIP.REG_1BCH.WORD = 0x00000040u;
         /* WAIT_LOOP */
         while (0u != TSIP.REG_18H.BIT.B12)
         {
             /* waiting */
         }
+        #if TSIP_MULTI_THREADING == 1
+        TSIP_MULTI_THREADING_UNLOCK_FUNCTION();
+        #endif /* TSIP_MULTI_THREADING == 1 */
         return TSIP_SUCCESS;
     }
 }
 /**********************************************************************************************************************
- End of function ./input_dir/RX72M/RX72M_p26.prc
+ End of function ./input_dir/RX72M/RX72M_p26f.prc
  *********************************************************************************************************************/
 TSIP_SEC_DEFAULT

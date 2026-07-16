@@ -1,24 +1,11 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2017-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * File Name    : r_tsip_rx_private.c
- * Version      : 1.21
+ * Version      : 1.22
  * Description  : Interface definition for the TSIP private layer.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
@@ -44,6 +31,8 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -3816,7 +3805,7 @@ e_tsip_err_t R_TSIP_EcdhReadPublicKeyPrivate(uint32_t *InData_Cmd, uint32_t *InD
         uint32_t *InData_Signature, uint32_t *OutData_KeyIndex)
 {
     return R_TSIP_DlmsCosemQeuSignatureVerificationSub(InData_Cmd, InData_KeyIndex, InData_data, InData_Signature,
-            OutData_KeyIndex);
+            DomainParam_NIST_P256, OutData_KeyIndex);
 }
 /**************************************
  End of function R_TSIP_EcdhReadPublicKeyPrivate
@@ -3846,7 +3835,8 @@ e_tsip_err_t R_TSIP_EcdhMakePublicKeyPrivate(uint32_t *InData_Cmd, uint32_t *InD
         uint32_t *OutData_Signature, uint32_t *OutData_KeyIndex)
 {
     return R_TSIP_DlmsCosemQevSignatureGenerationSub(InData_Cmd, InData_KeyType, InData_PubKeyIndex,
-            InData_PrivKeyIndex, InData_key_id, OutData_data, OutData_Signature, OutData_KeyIndex);
+            InData_PrivKeyIndex, InData_key_id, DomainParam_NIST_P256, OutData_data, OutData_Signature,
+            OutData_KeyIndex);
 }
 /**************************************
  End of function R_TSIP_EcdhMakePublicKeyPrivate
@@ -3870,7 +3860,8 @@ e_tsip_err_t R_TSIP_EcdhMakePublicKeyPrivate(uint32_t *InData_Cmd, uint32_t *InD
 e_tsip_err_t R_TSIP_EcdhCalculateSharedSecretIndexPrivate(uint32_t *InData_KeyType, uint32_t *InData_PubKeyIndex,
         uint32_t *InData_PrivKeyIndex, uint32_t *OutData_KeyIndex)
 {
-    return R_TSIP_DlmsCosemCalculateZSub(InData_KeyType, InData_PubKeyIndex, InData_PrivKeyIndex, OutData_KeyIndex);
+    return R_TSIP_DlmsCosemCalculateZSub(InData_KeyType, InData_PubKeyIndex, InData_PrivKeyIndex, DomainParam_NIST_P256,
+            OutData_KeyIndex);
 }
 /**************************************
  End of function R_TSIP_EcdhCalculateSharedSecretIndexPrivate
@@ -3923,7 +3914,7 @@ e_tsip_err_t R_TSIP_EcdhKeyDerivationPrivate(uint32_t *InData_KeyIndexType, uint
 e_tsip_err_t R_TSIP_EcdheP512KeyAgreementPrivate(uint32_t *InData_KeyIndex, uint32_t *InData_PubKey,
         uint32_t *OutData_PubKey)
 {
-    return R_TSIP_EcdheP512KeyAgreementSub(InData_KeyIndex, InData_PubKey, OutData_PubKey);
+    return R_TSIP_EcdheP512KeyAgreementSub(InData_KeyIndex, InData_PubKey, DomainParam_Brainpool_512r1, OutData_PubKey);
 }
 /**************************************
  End of function R_TSIP_EcdheP512KeyAgreementPrivate

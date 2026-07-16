@@ -18,11 +18,23 @@ to the compiler include paths, link `multi_tls_demo.obj`, and call
 `vStartMultiTlsDemo()` immediately after `vStartMQTTAgent()`.
 
 The RX72N Envision Kit software-TLS and TSIP projects both enable the demo. The
-TSIP project enables the FIT driver's official `TSIP_MULTI_THREADING` callbacks,
-maps them to the same recursive mutex used across public Init/Update/Final
-sequences, and reports callback balance, owner errors, and distinct task count
-in `TEST_COMPLETE`. The WAIT_LOOP hook is disabled during this experiment so
-the official callback behavior is measured with the driver's original polling.
+TSIP project uses
+[`r_tsip_rx 1.23.saffti-custom`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_tsip_rx/r_tsip_rx/-/blob/main/README.md)
+and enables the FIT driver's official `TSIP_MULTI_THREADING` callbacks. It maps
+them to the same recursive mutex used across public Init/Update/Final sequences,
+and reports callback balance, owner errors, and distinct task count in
+`TEST_COMPLETE`. `TSIP_MULTI_THREADING` is a Renesas feature; the optional
+`REG_00H.B25` WAIT_LOOP hook is the SAFFTI extension. The hook remains disabled
+in the validated configuration, so procedure-busy completion uses the driver's
+original software polling path.
+
+The Smart Configurator component, generated driver, and checked-in settings are
+pinned to `1.23.saffti-custom`. The generated 273-file tree was imported from
+the verified
+[`tsip_mbedtls` main tree at `31d1bca7`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls/-/commit/31d1bca771c83f386d118b053f85d47b2b216f1b).
+For the RX72N target, all 1,780 `REG_00H.B25` waits have a matching optional
+hook call. A clean local e2 studio 2026-04 build completed with zero errors
+before the refreshed RPi #1 hardware run.
 
 Two simultaneous software-TLS handshakes exceed the original single 320 KiB
 FreeRTOS heap. The software-TLS RX72N project therefore uses `heap_5` with its

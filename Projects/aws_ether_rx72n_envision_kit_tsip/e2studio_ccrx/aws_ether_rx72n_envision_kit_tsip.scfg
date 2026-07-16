@@ -758,10 +758,81 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_tsip_rx">
-            <component description="依存モジュール: r_bsp バージョン 7.30&#10;Support functions: AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA, ECC, Random number generate, Key management, secure boot/secure firmware update." detailDescription="TSIP(Trusted Secure IP) driver." display="r_tsip_rx" id="r_tsip_rx1.21" version="1.21">
+            <component description="依存モジュール: r_bsp バージョン 7.70&#10;Provides the Renesas v1.23 functions and an optional, default-disabled application hook for every REG_00H.B25 procedure-busy wait. Disabled and OS-less configurations retain the original polling behavior." detailDescription="SAFFTI custom derivative of the Renesas TSIP (Trusted Secure IP) driver v1.23." display="r_tsip_rx" id="r_tsip_rx1.23.saffti-custom" version="1.23.saffti-custom">
+                <gridItem id="AES128" selectedIndex="1"/>
+                <gridItem id="AES128-ECB" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_ECB_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_ECB_DECRYPT" selectedIndex="1"/>
+                <gridItem id="AES128-CBC" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CBC_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CBC_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CTR" selectedIndex="1"/>
+                <gridItem id="AES128-GCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_GCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_GCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CMAC" selectedIndex="1"/>
+                <gridItem id="AES128-CCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_KEY_WRAP" selectedIndex="1"/>
+                <gridItem id="AES256" selectedIndex="1"/>
+                <gridItem id="AES256-ECB" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_ECB_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_ECB_DECRYPT" selectedIndex="1"/>
+                <gridItem id="AES256-CBC" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CBC_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CBC_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CTR" selectedIndex="1"/>
+                <gridItem id="AES256-GCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_GCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_GCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CMAC" selectedIndex="1"/>
+                <gridItem id="AES256-CCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_KEY_WRAP" selectedIndex="1"/>
+                <gridItem id="TDES" selectedIndex="1"/>
+                <gridItem id="TDES-ECB" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_ECB_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_ECB_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TDES-CBC" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_CBC_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_CBC_DECRYPT" selectedIndex="1"/>
+                <gridItem id="ARC4" selectedIndex="1"/>
+                <gridItem id="TSIP_ARC4_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_ARC4_DECRYPT" selectedIndex="1"/>
+                <gridItem id="RSAES-PKCS1" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_1024" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_2048" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_3072" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_4096" selectedIndex="1"/>
+                <gridItem id="RSASSA-PKCS1" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_1024" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_2048" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_3072" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_4096" selectedIndex="1"/>
+                <gridItem id="TSIP_RSA_RETRY_COUNT_FOR_RSA_KEY_GENERATION" selectedIndex="5120*2"/>
+                <gridItem id="ECDSA" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P192" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P224" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P256" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P384" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_1" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_256" selectedIndex="1"/>
+                <gridItem id="TSIP_MD5" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_1_HMAC" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_256_HMAC" selectedIndex="1"/>
+                <gridItem id="TSIP_USER_SHA_384_ENABLED" selectedIndex="0"/>
+                <gridItem id="TSIP_USER_SHA_384_FUNCTION" selectedIndex="user_sha384_function"/>
+                <gridItem id="TSIP_ECDH_P256" selectedIndex="1"/>
+                <gridItem id="TSIP_TLS" selectedIndex="1"/>
+                <gridItem id="TSIP_SECURE_BOOT" selectedIndex="0"/>
+                <gridItem id="TSIP_FIRMWARE_UPDATE" selectedIndex="1"/>
                 <gridItem id="TSIP_MULTI_THREADING" selectedIndex="1"/>
                 <gridItem id="TSIP_MULTI_THREADING_LOCK_FUNCTION" selectedIndex="user_lock_function"/>
                 <gridItem id="TSIP_MULTI_THREADING_UNLOCK_FUNCTION" selectedIndex="user_unlock_function"/>
+                <gridItem id="TSIP_CFG_WAIT_LOOP_HOOK_ENABLE" selectedIndex="0"/>
+                <gridItem id="TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION" selectedIndex="vTsipWaitLoopHook"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
