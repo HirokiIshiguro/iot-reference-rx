@@ -17,6 +17,18 @@
 
 以降は今後のリリース候補です。
 
+### TSIP TLS Maximum Fragment Length
+
+- TSIP版network transportの`NetworkCredentials_t`へ、接続単位の
+  `disableMaxFragmentLengthExtension`を追加します。`pdFALSE`は従来どおり4096-byte MFLを設定し、
+  `pdTRUE`ではそのMFLを広告しません。実効record sizeはMbed TLS設定とpeer制約に従います。
+- 設定はglobal overrideではなく資格情報ごとに保持するため、異なる設定のTLS sessionを複数同時に扱っても
+  設定値がsession間で競合しません。公開構造体のサイズが変わるため、利用projectはclean full rebuildが必要です。
+- RX72N Envision Kitの10MiB TLS SINKでは、4KiB recordの2562回から16KiB recordの642回へ削減し、
+  34.393Mbpsから43.305Mbpsへ改善しました。詳細は
+  [tsip_mbedtls benchmark Issue #17](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls/-/issues/17)
+  を参照してください。
+
 ### RX Ethernet TX pipeline
 
 - RX向けFreeRTOS+TCP `NetworkInterface.c`に、複数EMAC TX descriptorを使う送信pipelineを追加します。
