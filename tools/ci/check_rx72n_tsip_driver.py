@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 EXPECTED_VERSION = "1.23.saffti-custom"
-EXPECTED_FILE_COUNT = 273
+EXPECTED_FILE_COUNT = 271
 EXPECTED_B25_WAITS = 1780
 
 
@@ -33,7 +33,14 @@ def check(root: Path) -> dict[str, int | str]:
     scfg_path = project / "aws_ether_rx72n_envision_kit_tsip.scfg"
     qe_path = project / ".settings/com.renesas.smc.e2studio.qe.xml"
 
-    files = sorted(path for path in driver.rglob("*") if path.is_file())
+    # FIT PDF manuals live below doc/ in the source package, but this repository
+    # intentionally ignores generated/bundled PDFs. Verify the checked-in
+    # driver payload that is present in clean CI clones.
+    files = sorted(
+        path
+        for path in driver.rglob("*")
+        if path.is_file() and path.relative_to(driver).parts[0] != "doc"
+    )
     require(
         len(files) == EXPECTED_FILE_COUNT,
         f"driver file count: expected {EXPECTED_FILE_COUNT}, found {len(files)}",

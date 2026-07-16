@@ -29,8 +29,9 @@ in the validated configuration, so procedure-busy completion uses the driver's
 original software polling path.
 
 The Smart Configurator component, generated driver, and checked-in settings are
-pinned to `1.23.saffti-custom`. The generated 273-file tree was imported from
-the verified
+pinned to `1.23.saffti-custom`. The 271 checked-in driver files were imported
+from the verified generated tree (the two FIT PDF manuals remain excluded by
+the repository's PDF ignore rule):
 [`tsip_mbedtls` main tree at `31d1bca7`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls/-/commit/31d1bca771c83f386d118b053f85d47b2b216f1b).
 For the RX72N target, all 1,780 `REG_00H.B25` waits have a matching optional
 hook call. A clean local e2 studio 2026-04 build completed with zero errors
