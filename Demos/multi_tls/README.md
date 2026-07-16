@@ -83,6 +83,41 @@ Use `RX72N_TLS_BACKEND=tsip` for the TSIP variant. In that mode the monitor also
 requires `tsip_mt=1`, balanced non-zero lock/unlock callback counts, at least two
 observed tasks, zero owner errors, and `wait_mode=polling`.
 
+## RX72N custom TSIP 1.23 integration refresh (2026-07-16)
+
+Commit `623d18ed` pins the RX72N TSIP project to `r_tsip_rx
+1.23.saffti-custom`. The build-time integration check verified 271 checked-in
+driver files, 74 Smart Configurator settings, 74 QE settings, and matching
+`REG_00H.B25` wait/hook counts of 1,780. The selected runtime settings were
+`TSIP_MULTI_THREADING=1` and `TSIP_CFG_WAIT_LOOP_HOOK_ENABLE=0`.
+
+The refreshed tests used e2 studio 2026-04 for the clean build and the RX72N
+Envision Kit attached to Raspberry Pi #1 (`ef-saffti-001-rpi-001`, runner tag
+`dev-ek-rx72n-set1`, CN6 FTDI `A904CXV7`, E2 `OBE110008`). The software-TLS
+control [pipeline #8043](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8043)
+passed build, flash, provisioning, baseline MQTT, and the persistent multi-TLS
+test. Its [multi-TLS job #52602](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52602)
+completed in 120.113 seconds with two distinct TLS contexts and sockets, a clean
+session 2 reconnect, and continued session 1 traffic during the outage.
+
+The TSIP [pipeline #8044](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8044)
+also passed every stage. The multi-TLS job was retried twice after the initial
+run, without rebuilding or reflashing, so all three runs exercised the same
+firmware produced by [build job #52603](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52603).
+
+| Job | Evidence duration | Start to both sessions up | Session 2 reconnect | Lock / unlock callbacks | Tasks | Owner errors | Result |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| [#52608](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52608) | 119.733 s | 26.972 s | 83.288 s | 1218 / 1218 | 3 | 0 | PASS |
+| [#52609](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52609) | 117.766 s | 26.779 s | 82.462 s | 1208 / 1208 | 3 | 0 | PASS |
+| [#52610](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52610) | 119.532 s | 26.937 s | 82.874 s | 1218 / 1218 | 3 | 0 | PASS |
+
+Every TSIP run reported `tsip_mt=1`, three participating tasks, zero owner
+errors, and `wait_mode=polling`. Each machine-readable summary also proved
+distinct client IDs, network contexts, TLS contexts, and sockets; both bounded
+overlap windows; session 1 TX/RX during the session 2 outage; and a higher
+session 2 connection generation after reconnect. The mean evidence duration was
+119.010 seconds with a 1.967-second range.
+
 ## RX72N TSIP multithreading experiment (2026-07-12)
 
 GitLab [pipeline #7679](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/7679)
