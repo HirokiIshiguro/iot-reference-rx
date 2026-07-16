@@ -30,6 +30,7 @@
 #define _MQTT_AGENT_TASK_H_
 
 #include <stdint.h>
+#include <stddef.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -57,6 +58,23 @@ typedef enum MQTTAgentState
  */
 typedef void (*IncomingPubCallback_t)(void *pvIncomingPublishCallbackContext,
                                       MQTTPublishInfo_t *pxPublishInfo);
+
+/**
+ * @brief Read-only identifiers for the MQTT agent's live TLS connection.
+ *
+ * The addresses, socket value, and monotonically increasing connection
+ * generation are exposed for diagnostics only. They let hardware tests prove
+ * that another MQTT/TLS worker owns a different network context, TLS context,
+ * and TCP socket, and detect a fast reconnect between polling intervals.
+ */
+typedef struct MQTTAgentConnectionInfo
+{
+    const char *pcClientIdentifier;
+    uintptr_t uxNetworkContext;
+    uintptr_t uxTlsContext;
+    uintptr_t uxSocket;
+    uint32_t ulConnectionGeneration;
+} MQTTAgentConnectionInfo_t;
 
 /**
  * @brief Initialize the MQTT Agent.
@@ -111,6 +129,14 @@ void vStartMQTTAgent(configSTACK_DEPTH_TYPE uxStackSize,
  * Return Value : MQTTAgentState_t - current agent state.
  *********************************************************************************************************************/
 MQTTAgentState_t xGetMQTTAgentState(void);
+
+/**
+ * @brief Get identifiers for the currently connected primary MQTT/TLS session.
+ *
+ * @param[out] pxInfo Destination for the diagnostic identifiers.
+ * @return pdPASS while the primary MQTT agent is connected, otherwise pdFAIL.
+ */
+BaseType_t xGetMQTTAgentConnectionInfo(MQTTAgentConnectionInfo_t *pxInfo);
 
 /**********************************************************************************************************************
  End of function xGetMQTTAgentState

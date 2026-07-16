@@ -217,6 +217,7 @@ Demo selection is controlled by macros in `src/frtos_config/demo_config.h`:
 | r_byteq | 2.10 | 1.37 - 1.46 |
 | r_irq_rx | 4.60 | 1.46 |
 | r_fwup | 2.04 | 1.45 - 1.46 |
+| r_tsip_rx (RX72N TSIP project) | 1.23.saffti-custom | Renesas 1.23 / RX Driver Package 1.49 base + SAFFTI optional wait hook |
 
 ## CI/CD Pipeline
 

@@ -227,6 +227,8 @@ static BaseType_t xMqttSessionEstablished = pdFALSE;
  * it is used to match received Subscribe ACK to the transmitted subscribe.
  */
 static uint16_t globalSubscribePacketIdentifier = 0U;
+static BaseType_t xSubscribeAckReceived = pdFALSE;
+static BaseType_t xSubscribeAccepted = pdFALSE;
 
 /**
  * @brief Packet Identifier generated when Unsubscribe request was sent to the broker;
@@ -647,9 +649,30 @@ void vHandleOtherIncomingPacket(MQTTPacketInfo_t *pxPacketInfo,
     case MQTT_PACKET_TYPE_SUBACK:
         LogInfo(("MQTT_PACKET_TYPE_SUBACK.\n\n"));
 
-        /* Make sure ACK packet identifier matches with Request packet identifier.
-         * Disable assertion check in case ACK is received out of sequence.
-        configASSERT(globalSubscribePacketIdentifier == usPacketIdentifier); */
+        if (globalSubscribePacketIdentifier == usPacketIdentifier)
+        {
+            uint8_t *pSubackCodes = NULL;
+            size_t xSubackCodeCount = 0U;
+            MQTTStatus_t xSubackStatus = MQTT_GetSubAckStatusCodes(pxPacketInfo,
+                                                                   &pSubackCodes,
+                                                                   &xSubackCodeCount);
+            size_t xIndex;
+
+            if ((MQTTSuccess == xSubackStatus) &&
+                (NULL != pSubackCodes) &&
+                (xSubackCodeCount > 0U))
+            {
+                xSubscribeAckReceived = pdTRUE;
+                xSubscribeAccepted = pdTRUE;
+                for (xIndex = 0U; xIndex < xSubackCodeCount; xIndex++)
+                {
+                    if (pSubackCodes[xIndex] >= (uint8_t)MQTTSubAckFailure)
+                    {
+                        xSubscribeAccepted = pdFALSE;
+                    }
+                }
+            }
+        }
         break;
 
     case MQTT_PACKET_TYPE_UNSUBACK:
@@ -764,6 +787,7 @@ BaseType_t xEstablishMqttSession(MQTTContext_t *pxMqttContext,
                                  char *pcClient_identifier)
 {
     BaseType_t xReturnStatus = pdTRUE;
+    BaseType_t xTlsConnected = pdFALSE;
     MQTTStatus_t xMQTTStatus;
     MQTTConnectInfo_t xConnectInfo;
     TransportInterface_t xTransport;
@@ -826,6 +850,7 @@ BaseType_t xEstablishMqttSession(MQTTContext_t *pxMqttContext,
     }
     else
     {
+        xTlsConnected = pdTRUE;
         /* Fill in Transport Interface send and receive function pointers. */
         xTransport.pNetworkContext = pxNetworkContext;
         xTransport.send = TLS_FreeRTOS_send;
@@ -919,6 +944,7 @@ BaseType_t xEstablishMqttSession(MQTTContext_t *pxMqttContext,
                 {
                     /* Close socket connection */
                     TLS_FreeRTOS_Disconnect(pxNetworkContext);
+                    xTlsConnected = pdFALSE;
 
                     xReturnStatus = pdFAIL;
                     LogError(("Connection with MQTT broker failed with status %s.",
@@ -930,7 +956,7 @@ BaseType_t xEstablishMqttSession(MQTTContext_t *pxMqttContext,
                 }
             }
 
-            if (pdFAIL == xReturnStatus)
+            if (pdPASS == xReturnStatus)
             {
                 /* Keep a flag for indicating if MQTT session is established. This
                  * flag will mark that an MQTT DISCONNECT has to be sent at the end
@@ -938,7 +964,7 @@ BaseType_t xEstablishMqttSession(MQTTContext_t *pxMqttContext,
                 xMqttSessionEstablished = true;
             }
 
-            if (pdFAIL == xReturnStatus)
+            if (pdPASS == xReturnStatus)
             {
                 /* Check if session is present and if there are any outgoing publishes
                  * that need to resend. This is only valid if the broker is
@@ -962,6 +988,12 @@ BaseType_t xEstablishMqttSession(MQTTContext_t *pxMqttContext,
                 }
             }
         }
+    }
+
+    if ((pdFAIL == xReturnStatus) && (pdTRUE == xTlsConnected))
+    {
+        TLS_FreeRTOS_Disconnect(pxNetworkContext);
+        xMqttSessionEstablished = pdFALSE;
     }
 
     if (endpointLength > 0)
@@ -1017,6 +1049,7 @@ BaseType_t xDisconnectMqttSession(MQTTContext_t *pxMqttContext,
 
     /* Close the network connection.  */
     TLS_FreeRTOS_Disconnect(pxNetworkContext);
+    xMqttSessionEstablished = pdFALSE;
 
     return xReturnStatus;
 }
@@ -1056,6 +1089,8 @@ BaseType_t xSubscribeToTopic(MQTTContext_t *pxMqttContext,
 
     /* Generate packet identifier for the SUBSCRIBE packet. */
     globalSubscribePacketIdentifier = MQTT_GetPacketId(pxMqttContext);
+    xSubscribeAckReceived = pdFALSE;
+    xSubscribeAccepted = pdFALSE;
 
     /* Send SUBSCRIBE packet. */
     xMQTTStatus = MQTT_Subscribe(pxMqttContext,
@@ -1085,11 +1120,18 @@ BaseType_t xSubscribeToTopic(MQTTContext_t *pxMqttContext,
          * receive packet from network. */
         xMQTTStatus = prvProcessLoopWithTimeout(pxMqttContext, mqttexamplePROCESS_LOOP_TIMEOUT_MS);
 
-        if (MQTTSuccess != xMQTTStatus)
+        if ((MQTTSuccess != xMQTTStatus) &&
+            (MQTTNoDataAvailable != xMQTTStatus))
         {
             xReturnStatus = pdFAIL;
             LogError(("MQTT_ProcessLoop returned with status = %s.",
                       MQTT_Status_strerror(xMQTTStatus)));
+        }
+        else if ((pdTRUE != xSubscribeAckReceived) ||
+                 (pdTRUE != xSubscribeAccepted))
+        {
+            xReturnStatus = pdFAIL;
+            LogError(("SUBACK was not received or the subscription was rejected."));
         }
     }
 

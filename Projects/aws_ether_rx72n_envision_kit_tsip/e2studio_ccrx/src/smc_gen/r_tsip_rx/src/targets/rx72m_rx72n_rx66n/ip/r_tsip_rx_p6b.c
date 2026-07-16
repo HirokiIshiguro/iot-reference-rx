@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,9 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
+ *         : 15.10.2025 1.23     Updated Open/Close API to store the driver status
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -344,7 +334,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
         /* WAIT_LOOP */
         while (0u != TSIP.REG_00H.BIT.B25)
         {
-            /* waiting */
+            TSIP_PRV_WAIT_LOOP_HOOK();
         }
         TSIP.REG_1CH.WORD = 0x00001800u;
         RX72M_RX72N_RX66N_func100(change_endian_long(0x7bbec4eau), change_endian_long(0x3591d6a8u), change_endian_long(0xec85451eu), change_endian_long(0x09d43b87u));
@@ -442,7 +432,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_E0H.WORD = 0x8182001fu;
@@ -450,7 +440,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_E0H.WORD = 0x80040000u;
@@ -458,7 +448,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_ECH.WORD = 0x00003c5fu;
@@ -524,7 +514,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_A4H.WORD = 0x200c3b0du;
@@ -533,7 +523,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_A4H.WORD = 0x000c0b0cu;
@@ -542,7 +532,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_ECH.WORD = 0x0000b7e0u;
@@ -584,7 +574,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                     /* WAIT_LOOP */
                     while (0u != TSIP.REG_00H.BIT.B25)
                     {
-                        /* waiting */
+                        TSIP_PRV_WAIT_LOOP_HOOK();
                     }
                     TSIP.REG_1CH.WORD = 0x00001800u;
                     TSIP.REG_04H.WORD = 0x00000112u;
@@ -619,7 +609,7 @@ e_tsip_err_t R_TSIP_AESKeyUnwrapSub(uint32_t *InData_KeyType, uint32_t *InData_C
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_04H.WORD = 0x00000112u;

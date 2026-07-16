@@ -139,6 +139,11 @@ static const char * pNoLowLevelMbedTlsCodeStr = "<No-Low-Level-Code>";
 static int glTlsServerCertAuthModeOverride = -1;
 static int glTlsDisableTsipTlsAccelOverride = 0;
 
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_THREADING_C)
+    extern mbedtls_threading_mutex_t mutexUseTsip;
+    extern mbedtls_threading_mutex_t mutexTsipTlsHandshake;
+#endif
+
 /*-----------------------------------------------------------*/
 
 /**
@@ -369,7 +374,6 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #endif
 
 #if defined(TSIP_TLS_API_ENABLE)
-    extern mbedtls_threading_mutex_t 						mutexUseTsip;
     extern tsip_tls_ca_certification_public_key_index_t		system_user_rsa2048_ne_key_index;
     extern uint8_t                                         tsip_rootca_rsa_pubkey_scnt;
     extern uint32_t                                        tsip_rootca_rsa_pubkey[5][140];
@@ -616,9 +620,21 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
 #endif
         ( glTlsServerCertAuthModeOverride != MBEDTLS_SSL_VERIFY_NONE ) )
     {
-    tsip_rootca_rsa_pubkey_scnt = 0U;
-    mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
-    mbedtlsError = R_TSIP_TlsRootCertificateVerification(
+        tsip_rootca_rsa_pubkey_scnt = 0U;
+        mbedtls_rsa_context * p_tmprsa = mbedtls_pk_rsa(pTlsTransportParams->sslContext.rootCa.pk);
+
+#if defined(MBEDTLS_THREADING_C)
+        mbedtlsError = mbedtls_mutex_lock( &mutexUseTsip );
+
+        if( mbedtlsError != 0 )
+        {
+            LogError( ( "Failed to lock the TSIP hardware mutex for Root CA verification." ) );
+            returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
+        }
+        else
+#endif
+        {
+            mbedtlsError = R_TSIP_TlsRootCertificateVerification(
                     (uint32_t)R_TSIP_TLS_PUBLIC_KEY_TYPE_RSA2048, // 0 : RSA 2048bit
                     (uint8_t*)pTlsTransportParams->sslContext.rootCa.raw.p, //
                     (uint32_t)pTlsTransportParams->sslContext.rootCa.raw.len, //
@@ -639,19 +655,25 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                     trust_ca_root_rsa_certificate_signature,
 #endif
                     &tsip_rootca_rsa_pubkey[tsip_rootca_rsa_pubkey_scnt][0]);
-    if (TSIP_SUCCESS != mbedtlsError)
-    {
+#if defined(MBEDTLS_THREADING_C)
+            ( void ) mbedtls_mutex_unlock( &mutexUseTsip );
+#endif
+        }
+
+        if( ( returnStatus == TLS_TRANSPORT_SUCCESS ) &&
+            ( TSIP_SUCCESS != mbedtlsError ) )
+        {
         #if ( TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED == 1 )
             LogError(("Failed to RootCA certificate verification"));
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         #else
             LogWarn(("Failed to RootCA certificate verification; continuing with mbed TLS CA verification."));
         #endif
-    }
-    else
-    {
-        tsip_rootca_rsa_pubkey_scnt = 1U;
-    }
+        }
+        else if( returnStatus == TLS_TRANSPORT_SUCCESS )
+        {
+            tsip_rootca_rsa_pubkey_scnt = 1U;
+        }
     }
 #if defined(TSIP_TLS_API_ENABLE) && defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     else if( ( xUseTsipRuntimeKey == pdFALSE ) ||
@@ -1109,7 +1131,25 @@ TlsTransportStatus_t TLS_FreeRTOS_Connect( NetworkContext_t * pNetworkContext,
     {
         isSocketConnected = pdTRUE;
 
+#if defined(TSIP_TLS_API_ENABLE) && defined(MBEDTLS_THREADING_C)
+        if( mbedtls_mutex_lock( &mutexTsipTlsHandshake ) != 0 )
+        {
+            LogError( ( "Failed to lock the TSIP TLS handshake mutex." ) );
+            returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
+        }
+        else
+        {
+            /*
+             * Lock order is handshake -> mutexUseTsip.  Established sessions
+             * never acquire the handshake mutex, so their record traffic can
+             * continue while another connection waits to begin its setup.
+             */
+            returnStatus = tlsSetup( pNetworkContext, pHostName, pNetworkCredentials );
+            ( void ) mbedtls_mutex_unlock( &mutexTsipTlsHandshake );
+        }
+#else
         returnStatus = tlsSetup( pNetworkContext, pHostName, pNetworkCredentials );
+#endif
     }
 
     /* Clean up on failure. */

@@ -1,0 +1,148 @@
+# Persistent multi-TLS demo
+
+This demo keeps two independent MQTT-over-TLS connections active on one MCU:
+
+- session 1 uses the existing MQTT Agent connection;
+- session 2 owns a separate coreMQTT context, network context, TLS context,
+  socket, network buffer, client ID, and FreeRTOS task.
+
+Both sessions publish to and receive from their own heartbeat topic. After an
+initial overlap of at least 35 seconds, session 2 deliberately reconnects while
+session 1 continues exchanging heartbeats. The demo then requires another
+35-second overlap before emitting `TEST_COMPLETE`.
+
+## Integration
+
+Define `ENABLE_MULTI_TLS_DEMO` in the board's `demo_config.h`, add this directory
+to the compiler include paths, link `multi_tls_demo.obj`, and call
+`vStartMultiTlsDemo()` immediately after `vStartMQTTAgent()`.
+
+The RX72N Envision Kit software-TLS and TSIP projects both enable the demo. The
+TSIP project uses
+[`r_tsip_rx 1.23.saffti-custom`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_tsip_rx/r_tsip_rx/-/blob/main/README.md)
+and enables the FIT driver's official `TSIP_MULTI_THREADING` callbacks. It maps
+them to the same recursive mutex used across public Init/Update/Final sequences,
+and reports callback balance, owner errors, and distinct task count in
+`TEST_COMPLETE`. `TSIP_MULTI_THREADING` is a Renesas feature; the optional
+`REG_00H.B25` WAIT_LOOP hook is the SAFFTI extension. The hook remains disabled
+in the validated configuration, so procedure-busy completion uses the driver's
+original software polling path.
+
+The Smart Configurator component, generated driver, and checked-in settings are
+pinned to `1.23.saffti-custom`. The 271 checked-in driver files were imported
+from the verified generated tree (the two FIT PDF manuals remain excluded by
+the repository's PDF ignore rule):
+[`tsip_mbedtls` main tree at `31d1bca7`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls/-/commit/31d1bca771c83f386d118b053f85d47b2b216f1b).
+For the RX72N target, all 1,780 `REG_00H.B25` waits have a matching optional
+hook call. A clean local e2 studio 2026-04 build completed with zero errors
+before the refreshed RPi #1 hardware run.
+
+Two simultaneous software-TLS handshakes exceed the original single 320 KiB
+FreeRTOS heap. The software-TLS RX72N project therefore uses `heap_5` with its
+existing 320 KiB lower-RAM region plus a 248 KiB region in the mapped upper-RAM
+gap. The linker keeps that region below the fixed framebuffer at `0x0085E000`.
+
+## AWS IoT policy requirement
+
+The primary MQTT client ID is the provisioned Thing name and must be at most
+128 bytes. The secondary ID is the first 123 bytes of that ID plus `-tls2`.
+The attached AWS IoT policy must authorize `iot:Connect` for both client IDs and
+must allow publish, subscribe, and receive access to:
+
+```text
+multi_tls/<thing-name>/session/1
+multi_tls/<thing-name>/session/2
+```
+
+The repository's `tools/iot_policy.json` wildcard reference policy satisfies
+this experiment contract. A production policy should grant the two explicit
+client/topic resource patterns instead.
+
+## Hardware evidence
+
+`tools/ci/monitor_multi_tls.py` consumes the machine-readable `[MULTI_TLS]`
+UART markers. Client IDs are represented by compact FNV-1a fingerprints so the
+complete marker stays below the RX72N UART log limit. The monitor verifies
+distinct client-ID fingerprints, network contexts, TLS contexts, and sockets;
+matching TX/RX heartbeat sequences; both overlap windows; session 1 traffic
+during the forced session 2 outage; and a clean session 2 reconnect.
+
+Evidence markers use the synchronous `configPRINT_STRING` path rather than the
+nonblocking general logging queue, preventing one-shot state transitions from
+being silently dropped when normal application logging is busy.
+
+The opt-in GitLab job is enabled with:
+
+```text
+RX72N_TEST_SCOPE=mqtt
+RX72N_TLS_BACKEND=software
+RUN_RX72N_MULTI_TLS_TEST=true
+```
+
+Use `RX72N_TLS_BACKEND=tsip` for the TSIP variant. In that mode the monitor also
+requires `tsip_mt=1`, balanced non-zero lock/unlock callback counts, at least two
+observed tasks, zero owner errors, and `wait_mode=polling`.
+
+## RX72N custom TSIP 1.23 integration refresh (2026-07-16)
+
+Commit `623d18ed` pins the RX72N TSIP project to `r_tsip_rx
+1.23.saffti-custom`. The build-time integration check verified 271 checked-in
+driver files, 74 Smart Configurator settings, 74 QE settings, and matching
+`REG_00H.B25` wait/hook counts of 1,780. The selected runtime settings were
+`TSIP_MULTI_THREADING=1` and `TSIP_CFG_WAIT_LOOP_HOOK_ENABLE=0`.
+
+The refreshed tests used e2 studio 2026-04 for the clean build and the RX72N
+Envision Kit attached to Raspberry Pi #1 (`ef-saffti-001-rpi-001`, runner tag
+`dev-ek-rx72n-set1`, CN6 FTDI `A904CXV7`, E2 `OBE110008`). The software-TLS
+control [pipeline #8043](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8043)
+passed build, flash, provisioning, baseline MQTT, and the persistent multi-TLS
+test. Its [multi-TLS job #52602](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52602)
+completed in 120.113 seconds with two distinct TLS contexts and sockets, a clean
+session 2 reconnect, and continued session 1 traffic during the outage.
+
+The TSIP [pipeline #8044](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8044)
+also passed every stage. The multi-TLS job was retried twice after the initial
+run, without rebuilding or reflashing, so all three runs exercised the same
+firmware produced by [build job #52603](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52603).
+
+| Job | Evidence duration | Start to both sessions up | Session 2 reconnect | Lock / unlock callbacks | Tasks | Owner errors | Result |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| [#52608](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52608) | 119.733 s | 26.972 s | 83.288 s | 1218 / 1218 | 3 | 0 | PASS |
+| [#52609](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52609) | 117.766 s | 26.779 s | 82.462 s | 1208 / 1208 | 3 | 0 | PASS |
+| [#52610](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/52610) | 119.532 s | 26.937 s | 82.874 s | 1218 / 1218 | 3 | 0 | PASS |
+
+Every TSIP run reported `tsip_mt=1`, three participating tasks, zero owner
+errors, and `wait_mode=polling`. Each machine-readable summary also proved
+distinct client IDs, network contexts, TLS contexts, and sockets; both bounded
+overlap windows; session 1 TX/RX during the session 2 outage; and a higher
+session 2 connection generation after reconnect. The mean evidence duration was
+119.010 seconds with a 1.967-second range.
+
+## RX72N TSIP multithreading experiment (2026-07-12)
+
+GitLab [pipeline #7679](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/7679)
+tested commit `2bb79cb4` with `TSIP_MULTI_THREADING=1` and the WAIT_LOOP hook
+disabled. Build, flash, provisioning, baseline MQTT, and the multi-TLS hardware
+test all passed. The multi-TLS job was then retried twice against the same
+firmware and provisioned RX72N Envision Kit.
+
+| Job | Evidence duration | Start to both sessions up | Session 2 reconnect | Lock / unlock callbacks | Tasks | Owner errors | Result |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| [#51238](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/51238) | 119.357 s | 12.901 s | 13.970 s | 1218 / 1218 | 3 | 0 | PASS |
+| [#51239](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/51239) | 119.953 s | 11.703 s | 13.981 s | 1214 / 1214 | 3 | 0 | PASS |
+| [#51240](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/51240) | 120.039 s | 11.293 s | 14.530 s | 1218 / 1218 | 3 | 0 | PASS |
+
+All three runs proved distinct TLS contexts and sockets, two bounded overlap
+windows, continued session 1 traffic while session 2 reconnected, balanced
+official FIT callbacks, and no mutex timeout or monitor runtime failure. The
+mean evidence duration was 119.783 seconds with a 0.682-second range.
+
+For reference, the earlier polling baseline in
+[pipeline #7659](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/7659)
+was 125.874 seconds, while the hybrid WAIT_LOOP experiment in
+[pipeline #7663](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/7663)
+was 121.284 seconds. These AWS-connected runs include network variation and the
+baseline conditions have not yet been repeated three times, so the timing
+difference is not treated as proof of a throughput improvement. This experiment
+proves multithreaded correctness; CPU-load reduction still requires a separate
+interrupt/sleep or trace-based measurement.

@@ -101,7 +101,8 @@
 #include "backoff_algorithm.h"
 
 #include "store.h"
-#if (ENABLE_OTA_UPDATE_DEMO == 1)
+#if (ENABLE_OTA_UPDATE_DEMO == 1) || \
+    (defined(ENABLE_MULTI_TLS_DEMO) && (ENABLE_MULTI_TLS_DEMO == 1))
 #include "mqtt_wrapper.h"
 #endif
 #include "pkcs11_helpers.h"
@@ -417,6 +418,9 @@ static SemaphoreHandle_t xSubscriptionsMutex;
  * @brief Holds the current state of the MQTT agent.
  */
 static MQTTAgentState_t xState = MQTT_AGENT_STATE_NONE;
+
+/* Incremented for every successful transition to a new connected session. */
+static uint32_t ulConnectionGeneration = 0U;
 
 /**
  * @brief Event group used by other tasks to synchronize with the MQTT agent states.
@@ -982,7 +986,8 @@ void prvMQTTAgentTask(void *pvParameters)
              * which the error happened is returned so there is an attempt to
              * clean up and reconnect. */
 
-#if (ENABLE_OTA_UPDATE_DEMO == 1)
+#if (ENABLE_OTA_UPDATE_DEMO == 1) || \
+    (defined(ENABLE_MULTI_TLS_DEMO) && (ENABLE_MULTI_TLS_DEMO == 1))
             /* Set the MQTT context to be used by the MQTT wrapper. */
             mqttWrapper_setCoreMqttContext(&(xGlobalMqttAgentContext.mqttContext));
 #endif
@@ -1220,6 +1225,11 @@ static bool prvMatchTopicFilterSubscriptions(MQTTPublishInfo_t *pxPublishInfo)
  *********************************************************************************************************************/
 static void prvSetMQTTAgentState(MQTTAgentState_t xAgentState)
 {
+    if ((MQTT_AGENT_STATE_CONNECTED == xAgentState) &&
+        (MQTT_AGENT_STATE_CONNECTED != xState))
+    {
+        ulConnectionGeneration++;
+    }
     xState = xAgentState;
     (void)xEventGroupClearBits(xStateEventGrp, mqttexampleEVENT_BITS_ALL);
     (void)xEventGroupSetBits(xStateEventGrp, mqttexampleEVENT_BIT(xAgentState));
@@ -1282,6 +1292,31 @@ MQTTAgentState_t xGetMQTTAgentState(void)
 /**********************************************************************************************************************
  End of function xGetMQTTAgentState
  *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ * Function Name: xGetMQTTAgentConnectionInfo
+ * Description  : Return read-only identifiers for the live primary connection.
+ *********************************************************************************************************************/
+BaseType_t xGetMQTTAgentConnectionInfo(MQTTAgentConnectionInfo_t *pxInfo)
+{
+    BaseType_t xResult = pdFAIL;
+
+    taskENTER_CRITICAL();
+    if ((NULL != pxInfo) &&
+        (MQTT_AGENT_STATE_CONNECTED == xState) &&
+        (NULL != pcThingName))
+    {
+        pxInfo->pcClientIdentifier = pcThingName;
+        pxInfo->uxNetworkContext = (uintptr_t)&xNetworkContext;
+        pxInfo->uxTlsContext = (uintptr_t)&xTlsTransportParams;
+        pxInfo->uxSocket = (uintptr_t)xTlsTransportParams.tcpSocket;
+        pxInfo->ulConnectionGeneration = ulConnectionGeneration;
+        xResult = pdPASS;
+    }
+    taskEXIT_CRITICAL();
+
+    return xResult;
+}
 
 /**********************************************************************************************************************
  * Function Name: xSetMQTTAgentState
@@ -1462,7 +1497,7 @@ static void prvSubscribeRqCallback(MQTTAgentCommandContext_t *pxCommandContext,
 
         if (pxReturnInfo->pSubackCodes)
         {
-            ulNotifyValue += (pxReturnInfo->pSubackCodes[0] << 24);
+            ulNotifyValue |= ((uint32_t)pxReturnInfo->pSubackCodes[0] << 24);
         }
 
         (void)xTaskNotifyIndexed(xTaskHandle,
@@ -1495,7 +1530,7 @@ MQTTStatus_t MqttAgent_SubscribeSync(const char *pcTopicFilter,
                                      void *pvCallbackCtx)
 {
     BaseType_t xMQTTCallbackAdded;
-    MQTTStatus_t xResult;
+    MQTTStatus_t xResult = MQTTBadParameter;
 
     xMQTTCallbackAdded = xAddMQTTTopicFilterCallback(pcTopicFilter,
                                                      uxTopicFilterLength,
@@ -1539,7 +1574,12 @@ MQTTStatus_t MqttAgent_SubscribeSync(const char *pcTopicFilter,
                                        &ulNotifyValue,
                                        portMAX_DELAY))
             {
-                xResult = (ulNotifyValue & 0x00FFFFFF);
+                xResult = (MQTTStatus_t)(ulNotifyValue & 0x00FFFFFFU);
+                if ((MQTTSuccess == xResult) &&
+                    (((ulNotifyValue >> 24) & 0xFFU) >= (uint32_t)MQTTSubAckFailure))
+                {
+                    xResult = MQTTServerRefused;
+                }
             }
             else
             {
@@ -1548,7 +1588,7 @@ MQTTStatus_t MqttAgent_SubscribeSync(const char *pcTopicFilter,
         }
     }
 
-    return 0;
+    return xResult;
 }
 /**********************************************************************************************************************
  End of function MqttAgent_SubscribeSync

@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED  AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
  *
- * Copyright (C) 2015-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 /**********************************************************************************************************************
  * History : DD.MM.YYYY Version  Description
  *         : 27.06.2015 1.00     First Release
@@ -41,6 +28,9 @@
  *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
  *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
  *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
+ *         : 15.10.2025 1.23     Updated Open/Close API to store the driver status
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -77,6 +67,7 @@
 * @param[in]     InData_KeyIndex
 * @param[in]     InData_data
 * @param[in]     InData_Signature
+* @param[in]     InData_DomainParam
 * @param[out]    OutData_KeyIndex
 * @retval        TSIP_SUCCESS
 * @retval        TSIP_ERR_FAIL
@@ -84,7 +75,7 @@
 * @retval        TSIP_ERR_KEY_SET
 * @note          None
 */
-e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, uint32_t *InData_KeyIndex, uint32_t *InData_data, uint32_t *InData_Signature, uint32_t *OutData_KeyIndex)
+e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, uint32_t *InData_KeyIndex, uint32_t *InData_data, uint32_t *InData_Signature, const uint32_t *InData_DomainParam, uint32_t *OutData_KeyIndex)
 {
     int32_t iLoop = 0u, jLoop = 0u, kLoop = 0u, oLoop1 = 0u, oLoop2 = 0u, iLoop2 = 0u;
     uint32_t KEY_ADR = 0u, OFS_ADR = 0u;
@@ -169,7 +160,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     /* WAIT_LOOP */
@@ -203,7 +194,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     TSIP.REG_104H.WORD = 0x00000362u;
@@ -222,7 +213,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
     /* WAIT_LOOP */
     while (0u != TSIP.REG_00H.BIT.B25)
     {
-        /* waiting */
+        TSIP_PRV_WAIT_LOOP_HOOK();
     }
     TSIP.REG_1CH.WORD = 0x00001800u;
     RX72M_RX72N_RX66N_func100(change_endian_long(0x98d13f7cu), change_endian_long(0x2be8a7c2u), change_endian_long(0x49d218cau), change_endian_long(0x32c5f4c7u));
@@ -244,7 +235,6 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
     }
     else
     {
-        RX72M_RX72N_RX66N_func100(change_endian_long(0x19554455u), change_endian_long(0x16df40e7u), change_endian_long(0xe439541fu), change_endian_long(0xeab4e553u));
         TSIP.REG_7CH.WORD = 0x00000011u;
         TSIP.REG_104H.WORD = 0x00000754u;
         TSIP.REG_74H.WORD = 0x00000004u;
@@ -292,26 +282,6 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
         }
         TSIP.REG_1CH.WORD = 0x00001600u;
         TSIP.REG_74H.WORD = 0x00000000u;
-        TSIP.REG_ECH.WORD = 0x30003380u;
-        TSIP.REG_ECH.WORD = 0x00070020u;
-        TSIP.REG_ECH.WORD = 0x0000b400u;
-        TSIP.REG_ECH.WORD = 0x00000080u;
-        TSIP.REG_ECH.WORD = 0x00030040u;
-        TSIP.REG_ECH.WORD = 0x0000b400u;
-        TSIP.REG_ECH.WORD = 0x0000013Cu;
-        TSIP.REG_ECH.WORD = 0x00050040u;
-        TSIP.REG_ECH.WORD = 0x0000b400u;
-        TSIP.REG_ECH.WORD = 0x000001F8u;
-        TSIP.REG_ECH.WORD = 0x00000080u;
-        TSIP.REG_E0H.WORD = 0x81010000u;
-        TSIP.REG_04H.WORD = 0x00000606u;
-        /* WAIT_LOOP */
-        while (1u != TSIP.REG_04H.BIT.B30)
-        {
-            /* waiting */
-        }
-        S_RAM[0] = change_endian_long(TSIP.REG_100H.WORD);
-        OFS_ADR = S_RAM[0];
         TSIP.REG_104H.WORD = 0x00000058u;
         TSIP.REG_E0H.WORD = 0x800103a0u;
         /* WAIT_LOOP */
@@ -320,14 +290,14 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
             /* waiting */
         }
         TSIP.REG_100H.WORD = change_endian_long(0x0000005au);
-        RX72M_RX72N_RX66N_func101(change_endian_long(0xabc680e9u), change_endian_long(0x10ad6e23u), change_endian_long(0xa3474fc0u), change_endian_long(0xf59238d5u));
-        RX72M_RX72N_RX66N_func010(OFS_ADR);
-        RX72M_RX72N_RX66N_func100(change_endian_long(0x7ff5c359u), change_endian_long(0x86d40188u), change_endian_long(0xded6160fu), change_endian_long(0x4b5b043au));
+        RX72M_RX72N_RX66N_func101(change_endian_long(0x16e0323bu), change_endian_long(0xba5dff0du), change_endian_long(0x6b893a0bu), change_endian_long(0xffb2aedbu));
+        RX72M_RX72N_RX66N_func010(InData_DomainParam);
+        RX72M_RX72N_RX66N_func100(change_endian_long(0xbd9595aau), change_endian_long(0x7e462d40u), change_endian_long(0xad6478fdu), change_endian_long(0xc8359a6du));
         TSIP.REG_1CH.WORD = 0x00400000u;
         TSIP.REG_1D0H.WORD = 0x00000000u;
         if (1u == (TSIP.REG_1CH.BIT.B22))
         {
-            RX72M_RX72N_RX66N_func102(change_endian_long(0x0892b493u), change_endian_long(0x78b962e0u), change_endian_long(0xd932d562u), change_endian_long(0x6d774cb4u));
+            RX72M_RX72N_RX66N_func102(change_endian_long(0x03b8f7ccu), change_endian_long(0xba1c89d2u), change_endian_long(0x4f98c045u), change_endian_long(0x23346dc4u));
             TSIP.REG_1BCH.WORD = 0x00000040u;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_18H.BIT.B12)
@@ -355,7 +325,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
             TSIP.REG_ECH.WORD = 0x38000f5au;
             TSIP.REG_E0H.WORD = 0x00000080u;
             TSIP.REG_1CH.WORD = 0x00260000u;
-            RX72M_RX72N_RX66N_func100(change_endian_long(0xaafe8ca1u), change_endian_long(0x2b5b4311u), change_endian_long(0x9dac365au), change_endian_long(0x3b17bfecu));
+            RX72M_RX72N_RX66N_func100(change_endian_long(0x32186564u), change_endian_long(0x35b5270du), change_endian_long(0xabfc765du), change_endian_long(0xcc1f9d1cu));
             TSIP.REG_1CH.WORD = 0x00400000u;
             TSIP.REG_1D0H.WORD = 0x00000000u;
             if (1u == (TSIP.REG_1CH.BIT.B22))
@@ -366,10 +336,10 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
-                RX72M_RX72N_RX66N_func101(change_endian_long(0xc6d2003eu), change_endian_long(0xe938cb2du), change_endian_long(0xf1c198a8u), change_endian_long(0x22bed338u));
+                RX72M_RX72N_RX66N_func101(change_endian_long(0x292fa59cu), change_endian_long(0xccd82116u), change_endian_long(0x8429973cu), change_endian_long(0x42c0d947u));
             }
             else
             {
@@ -378,7 +348,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_00H.WORD = 0x08013803u;
@@ -386,21 +356,21 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
                 TSIP.REG_00H.WORD = 0x0800080fu;
                 /* WAIT_LOOP */
                 while (0u != TSIP.REG_00H.BIT.B25)
                 {
-                    /* waiting */
+                    TSIP_PRV_WAIT_LOOP_HOOK();
                 }
                 TSIP.REG_1CH.WORD = 0x00001800u;
-                RX72M_RX72N_RX66N_func101(change_endian_long(0x97668b4eu), change_endian_long(0xb230f2c8u), change_endian_long(0x2071e126u), change_endian_long(0x2da82513u));
+                RX72M_RX72N_RX66N_func101(change_endian_long(0x2b749bbeu), change_endian_long(0x2f8feec3u), change_endian_long(0xd0f8a51du), change_endian_long(0x20adf418u));
             }
-            RX72M_RX72N_RX66N_func100(change_endian_long(0x601bee6du), change_endian_long(0xec9c3e54u), change_endian_long(0x713c76bdu), change_endian_long(0x66cd494du));
+            RX72M_RX72N_RX66N_func100(change_endian_long(0x08b9c0e5u), change_endian_long(0xd50ca88du), change_endian_long(0x5faf1cb4u), change_endian_long(0x4d1aaf11u));
             RX72M_RX72N_RX66N_func103();
-            RX72M_RX72N_RX66N_func100(change_endian_long(0xfcb03a5au), change_endian_long(0x7099928du), change_endian_long(0x7ce1d232u), change_endian_long(0x5e0e6737u));
+            RX72M_RX72N_RX66N_func100(change_endian_long(0xbae43a12u), change_endian_long(0x8ff58f02u), change_endian_long(0x3924935au), change_endian_long(0x4eb4b391u));
             TSIP.REG_104H.WORD = 0x00000052u;
             TSIP.REG_C4H.WORD = 0x01000c84u;
             /* WAIT_LOOP */
@@ -414,7 +384,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_C4H.WORD = 0x000c2b0du;
@@ -423,7 +393,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_C4H.WORD = 0x000c0b0cu;
@@ -450,7 +420,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
                 OutData_KeyIndex[iLoop + 2] = TSIP.REG_100H.WORD;
                 OutData_KeyIndex[iLoop + 3] = TSIP.REG_100H.WORD;
             }
-            RX72M_RX72N_RX66N_func100(change_endian_long(0xd7b9b0ebu), change_endian_long(0xbf09a996u), change_endian_long(0x6c39f9fdu), change_endian_long(0xe5939fd1u));
+            RX72M_RX72N_RX66N_func100(change_endian_long(0x62284c65u), change_endian_long(0xe4c25677u), change_endian_long(0x5b210d36u), change_endian_long(0x7395a4f7u));
             TSIP.REG_104H.WORD = 0x00000052u;
             TSIP.REG_C4H.WORD = 0x00000c84u;
             /* WAIT_LOOP */
@@ -464,7 +434,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
             /* WAIT_LOOP */
             while (0u != TSIP.REG_00H.BIT.B25)
             {
-                /* waiting */
+                TSIP_PRV_WAIT_LOOP_HOOK();
             }
             TSIP.REG_1CH.WORD = 0x00001800u;
             TSIP.REG_04H.WORD = 0x00000212u;
@@ -477,7 +447,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
             OutData_KeyIndex[iLoop + 1] = TSIP.REG_100H.WORD;
             OutData_KeyIndex[iLoop + 2] = TSIP.REG_100H.WORD;
             OutData_KeyIndex[iLoop + 3] = TSIP.REG_100H.WORD;
-            RX72M_RX72N_RX66N_func100(change_endian_long(0x75a65b7bu), change_endian_long(0xee363e96u), change_endian_long(0x78ab8c53u), change_endian_long(0x2dd1d028u));
+            RX72M_RX72N_RX66N_func100(change_endian_long(0x1ca48260u), change_endian_long(0x40447e03u), change_endian_long(0x87e77f3fu), change_endian_long(0xdfffc88eu));
             TSIP.REG_E0H.WORD = 0x81040000u;
             TSIP.REG_04H.WORD = 0x00000612u;
             /* WAIT_LOOP */
@@ -504,7 +474,7 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
                 /* waiting */
             }
             OutData_KeyIndex[3] = TSIP.REG_100H.WORD;
-            RX72M_RX72N_RX66N_func102(change_endian_long(0x81e47852u), change_endian_long(0xbb187f05u), change_endian_long(0xc66806f8u), change_endian_long(0x665b4934u));
+            RX72M_RX72N_RX66N_func102(change_endian_long(0xda823122u), change_endian_long(0x8f5cb41au), change_endian_long(0x718e50e1u), change_endian_long(0x8da882d7u));
             TSIP.REG_1BCH.WORD = 0x00000040u;
             /* WAIT_LOOP */
             while (0u != TSIP.REG_18H.BIT.B12)
@@ -519,6 +489,6 @@ e_tsip_err_t R_TSIP_DlmsCosemQeuSignatureVerificationSub(uint32_t *InData_Cmd, u
     }
 }
 /**********************************************************************************************************************
- End of function ./input_dir/RX72M/RX72M_p5a_r1.prc
+ End of function ./input_dir/RX72M/RX72M_p5a_r2.prc
  *********************************************************************************************************************/
 #endif /* #if TSIP_ECDH_P256 == 1 */
