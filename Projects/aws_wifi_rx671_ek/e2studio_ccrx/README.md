@@ -70,11 +70,45 @@ local header by itself is not enough; the compiler define is what makes
 `whd_join_config.h` include it. The repository default intentionally leaves
 JOIN disabled.
 
+e2 studio 2026.04.2 regenerates Smart Configurator output while importing this
+project. The helper snapshots every tracked project file except the temporarily
+patched `.cproject`, restores the checked-out bytes after import, and performs a
+parallel forced make. This keeps the CI image on the reviewed source instead of
+silently compiling regenerated defaults such as a different FreeRTOS heap size.
+The CI build fails if any tracked project diff remains afterward.
+
 For AWS IoT smoke testing, pass `-AwsIotConfigDir` or the equivalent
 environment variables consumed by `tools/build_headless_rx671_wifi.ps1`. The
 helper generates ignored `src/frtos_config/aws_iot_config_local.h` and injects
 `AWS_IOT_USE_LOCAL_CONFIG` only for the build. Do not commit local endpoint,
 certificate, or private-key material.
+
+## GitLab hardware CI
+
+The repository pipeline treats the RPi#1 EK-RX671 bench as the `rx671_wifi`
+environment. The jobs are serialized by the
+`ek-rx671-rpi1-hardware` resource group and routed with the
+`dev-ek-rx671` runner tag:
+
+| Job | Host | Purpose |
+|---|---|---|
+| `build_rx671_wifi` | Windows CC-RX runner | Generate ignored Wi-Fi/AWS headers, run the e2 studio headless build, and publish `.mot`, `.abs`, and `.map` artifacts. |
+| `flash_rx671_wifi` | RPi#1 | Verify the exact onboard E2OB and SCI6 devices, then program and verify the image while leaving the target reset for observation. |
+| `test_rx671_wifi` | RPi#1 | Open SCI6 first, release the target with RFP CLI, and evaluate startup markers into raw UART and JUnit artifacts. |
+
+`RX671_WIFI_TEST_SCOPE=network` checks `whd_wifi_join=00000000`,
+`WHD bring-up done`, and `FreeRTOS+TCP network up`. The optional `mqtt` scope
+also checks `AWS TLS=0` and `AWS MQTT=0`. Feature-branch push pipelines remain
+build-only; RX671-related merge requests and `main` use the network hardware
+scope, while the nightly matrix has separate network and conditional MQTT rows.
+
+The hardware identifiers are maintained in
+[hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config): onboard
+E2OB `OBE110024` on J25 USB DEBUG and SCI6 at 921600 bps through
+`/dev/serial/by-id/usb-FTDI_FT230X_Basic_UART_DK0EOSDX-if00-port0`. CI reads
+these values from the non-secret group variables
+`E2L_SERIAL_EK_RX671_E2OB_RPI1` and `UART_PORT_EK_RX671_SCI6_RPI1`; Wi-Fi and
+AWS credentials remain CI/CD inputs and are never committed.
 
 For the current PC-to-board ping baseline, the same helper also temporarily
 injects `PLATFORM_WLAN_ALLOW_BUS_TO_SLEEP_DELAY_MS=600000`. The WHD v1.70.0
