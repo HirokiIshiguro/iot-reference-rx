@@ -57,6 +57,17 @@ payload区間だけをTracealyzerで集計しています。
 | TLS | SINK (RX671 -> RPi#2) | TSIP | **38.633 Mbps** | **98.977 %** | TSIP AES-GCM、16 KiB record |
 | TLS | SOURCE (RPi#2 -> RX671) | TSIP | **33.428 Mbps** | **95.558 %** | in-place decrypt、RX 56 KiB / 39 MSS |
 
+2026-07-18に、正本ベンチマーク commit `5275d3a9` をRPi#1実機Runnerと
+RPi#2有線LAN対向で再実行した結果です。CPU負荷率はこの定期CIでは収集せず、
+上表のTracealyzer正式値を参照します。
+
+| CIプロファイル | 方向 | 再実測スループット | 実機証跡 |
+|---|---|---:|---|
+| TCP | SINK (RX671 -> RPi#2) | **40.194 Mbps** | [pipeline #8154](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8154) / [job #53251](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53251) |
+| TCP | SOURCE (RPi#2 -> RX671) | **34.450 Mbps** | [pipeline #8154](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8154) / [job #53251](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53251) |
+| TLS + TSIP | SINK (RX671 -> RPi#2) | **40.427 Mbps** | [pipeline #8155](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8155) / [job #53253](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53253) |
+| TLS + TSIP | SOURCE (RPi#2 -> RX671) | **34.003 Mbps** | [pipeline #8156](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8156) / [job #53255](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53255) |
+
 #### RX671 / Type 1YN 2セッション同時TLS
 
 | 同時通信 | session 0中央値 | session 1中央値 | 合計中央値 | 合計レンジ | fairness | 結果 |
@@ -64,6 +75,14 @@ payload区間だけをTracealyzerで集計しています。
 | SINK + SINK | 15.044 Mbps | 14.971 Mbps | **29.937 Mbps** | 29.836-30.055 Mbps | 98.7-99.6 % | 3/3 PASS |
 | SOURCE + SOURCE | 14.413 Mbps | 14.293 Mbps | **28.383 Mbps** | 28.296-28.644 Mbps | 98.0-99.3 % | 3/3 PASS |
 | SINK + SOURCE | 11.999 Mbps | 13.070 Mbps | **23.953 Mbps** | 23.422-24.307 Mbps | 89.5-94.7 % | 3/3 PASS |
+
+同じ2026-07-18定期CIでの単回再実測は次の通りです。
+
+| 同時通信 | session 0 | session 1 | 合計 | fairness | heap最小残量 | netbuf最小残数 | 実機証跡 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| SINK + SINK | 18.244 Mbps | 18.168 Mbps | **36.330 Mbps** | 99.5 % | 17,952 bytes | 24 | [pipeline #8157](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8157) / [job #53257](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53257) |
+| SOURCE + SOURCE | 16.858 Mbps | 16.552 Mbps | **33.097 Mbps** | 98.1 % | 41,264 bytes | 27 | [pipeline #8158](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8158) / [job #53259](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53259) |
+| SINK + SOURCE | 13.673 Mbps | 14.405 Mbps | **27.293 Mbps** | 94.9 % | 16,576 bytes | 23 | [pipeline #8159](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8159) / [job #53261](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53261) |
 
 2セッション共通の最小構成は network buffer descriptor 32、TCP segment 32、
 WHD pool 13、FreeRTOS heap 216 KiB、各TLSタスクstack 1024 words、共有16 KiB
@@ -398,6 +417,12 @@ Creating or updating project pipeline schedules requires Maintainer/Owner permis
 |-------|--------------------|----------|
 | RX671/Type 1YN network-up | `main` commit `95312d9b`; RPi#1 E2OB/SCI6、WHD JOIN、DHCP | [pipeline #8113](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8113) / [test job #53125](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53125) |
 | RX671/Type 1YN AWS IoT MQTT | `main` commit `95312d9b`; AWS IoT TLS、MQTT connect | [pipeline #8122](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8122) / [test job #53146](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53146) |
+| RX671/Type 1YN TCP LANBENCH | benchmark commit `5275d3a9`; RPi#2有線、10 MiB、SINK/SOURCE | [pipeline #8154](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8154) / [test job #53251](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53251) |
+| RX671/Type 1YN TSIP TLS SINK | benchmark commit `5275d3a9`; RPi#2有線、10 MiB | [pipeline #8155](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8155) / [test job #53253](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53253) |
+| RX671/Type 1YN TSIP TLS SOURCE | benchmark commit `5275d3a9`; RPi#2有線、10 MiB | [pipeline #8156](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8156) / [test job #53255](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53255) |
+| RX671/Type 1YN dual TLS SINK+SINK | benchmark commit `5275d3a9`; 2セッション同時 | [pipeline #8157](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8157) / [test job #53257](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53257) |
+| RX671/Type 1YN dual TLS SOURCE+SOURCE | benchmark commit `5275d3a9`; 2セッション同時 | [pipeline #8158](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8158) / [test job #53259](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53259) |
+| RX671/Type 1YN dual TLS SINK+SOURCE | benchmark commit `5275d3a9`; 2セッション同時 | [pipeline #8159](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8159) / [test job #53261](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53261) |
 | RX72N TSIP transport include order durability | RX72N TSIP transport include order 修正後 | [#5858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5858) / [#5877](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5877) / [#5896](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5896) / [#5915](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5915) / [#5950](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5950)。#5950 は 17/18 行成功後に RX65N/BG96 TSIP Fleet 行だけキャンセルされたため、[focused #5969](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969) で補完。 |
 | TSIP backend + TLS 1.3 MQTT | main merge commit `7ed373c9` | [#6045](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6045) / [#6046](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6046) / [#6047](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6047) / [#6048](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6048) / [#6049](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049) |
 | TSIP backend + TLS 1.3 OTA | commit `2e687700`; RX65N/BG96 OTA candidate も TLS 1.3 設定でビルド | [#6059](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6059) / [#6060](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6060) / [#6061](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6061) / [#6062](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6062) / [#6063](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6063) |
