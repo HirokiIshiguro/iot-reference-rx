@@ -719,6 +719,7 @@ build_rx72n_ether:
   script:
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
+    - python -m unittest tools.ci.tests.test_test_ota
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
@@ -3686,6 +3687,7 @@ test_rx72n_ether_ota:
     - when: never
   script:
     - echo "=== Verify RX72N OTA over MQTT on Linux runner ==="
+    - echo "NOTE - this observer consumes a one-shot AWS IoT OTA Job. Do not retry this job alone; start a new focused/matrix pipeline so cleanup, create, and test all run with a fresh OTA Job."
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_ota"
       mkdir -p "$artifact_dir"
