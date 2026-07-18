@@ -412,7 +412,7 @@ Scheduler policy and cross-project guidance are documented in [development.md](d
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | 条件を満たすnightly matrix行を1回ずつ実行します。RX671/Type 1YNはnetwork、software MQTT、software TCP/TLS 1.2 SINK/SOURCE、TSIP projectのTCP・単一TLS SINK/SOURCE・2セッション3モードを実行します。RX671 benchmarkは各正本project、RX72N/Ether software/TSIP 0-RTTは `tsip_mbedtls13` downstream bridgeで実行します。 |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | 条件を満たすnightly matrix行を1回ずつ実行します。RX671/Type 1YNはnetwork、software MQTT、software TCP/TLS 1.2 SINK/SOURCE、TSIP projectのTCP・単一TLS SINK/SOURCE・2セッション3モードを実行します。RX671 benchmarkは各正本project、RX72N/Ether software 0-RTTは `tsip_mbedtls13` downstream bridgeで実行します。TSIP 0-RTTの同様の委譲は [MR !163](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/163) で分離して修理します。 |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
@@ -437,7 +437,7 @@ Creating or updating project pipeline schedules requires Maintainer/Owner permis
 | LANBENCH TLS 1.3 Resumption / 0-RTT | RX72N/Ether software / TSIP と RX65N/BG96 software / TSIP の全セルを5回成功確認済み。 |
 | RX671/Type 1YN AWS IoT | softwareはE2OB書き込み、WHD JOIN、DHCP、AWS IoT TLS/MQTTをRPi#1実機Runnerで検証。software OTA/FleetとTSIP AWS MQTTは未実装。 |
 | RX671/Type 1YN LANBENCH | software TCP/TLS 1.2 SINK/SOURCEをsoftware benchmarkのRPi#1実機pipelineで再現。TSIP projectのTCP・単一TLS SINK/SOURCE・2セッション同時TLS 3モードはscheduled downstream pipelineで再現。 |
-| Nightly schedule | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でgateを満たすパタンを夜間に1回ずつ実行。RX72N/Ether 0-RTTは `tsip_mbedtls13`、RX671/Type 1YNはsoftware / TSIP両benchmarkのdownstream bridgeで実行。 |
+| Nightly schedule | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でgateを満たすパタンを夜間に1回ずつ実行。RX72N/Ether software 0-RTTとRX671/Type 1YN software / TSIPは各benchmarkのdownstream bridgeで実行。TSIP 0-RTT委譲はMR !163で分離修理。 |
 | AWS IoT Core resumption / 0-RTT | AWS IoT Core が SessionTicket TLS extension をサポートしていないため、AWS IoT Core 接続表には TLS 1.3 Resumption / 0-RTT 列を置きません。 |
 
 ### Evidence Index
