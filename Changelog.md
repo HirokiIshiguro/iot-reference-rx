@@ -17,6 +17,14 @@
 
 以降は今後のリリース候補です。
 
+### ターゲット横断性能表
+
+- README冒頭の性能情報をRX72N/Ethernet、RX671/Type 1YN Wi-Fi、
+  RX65N/BG96 Cellularの共通表へ再編します。
+- SINK/SOURCEの方向を統一し、絶対CPU負荷率、busy proxy、未測定を区別します。
+- 各値はベンチマーク集約READMEのコミットSHA固定リンクを持ち、参照元更新後も
+  掲載時点の測定条件と数値を再現可能にします。
+
 ### TSIP TLS Maximum Fragment Length
 
 - TSIP版network transportの`NetworkCredentials_t`へ、接続単位の

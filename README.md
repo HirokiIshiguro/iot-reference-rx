@@ -14,10 +14,11 @@
 5回連続成功、`○` は最新ベースラインを1回以上確認済み、`—` は未実装または
 対象外を示します。詳細なCI証跡は
 [Hardware CI Validation / 最新テスト結果](#hardware-ci-validation--最新テスト結果)、
-RX671の測定条件と解析は
-[software mbedTLS benchmark](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls) および
-[TSIP mbedTLS benchmark](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls)
-を正本とします。
+性能値と測定条件は
+[RX72N/Ether集約@840c6451](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md)、
+[RX671/Type 1YN集約@e247d8fe](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md)、
+[RX65N/BG96@1b9ea826](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench/-/blob/1b9ea82608efcd4bffcfb2991d4f507faea200fe/README.md)
+を固定参照とします。
 
 ### AWS IoT Core 接続テスト結果
 
@@ -42,52 +43,39 @@ RX671の測定条件と解析は
 
 <small>この表は AWS IoT Core ではなく、SessionTicket を発行できる LANBENCH / Mbed TLS `ssl_server2` などのTLSエンドポイントに対する基礎実験結果です。</small>
 
-#### RX671 / Type 1YN TCP・TLS性能
+### TCP・TLS性能（ターゲット横断）
 
-EK-RX671 120 MHz、Type 1YN、SDIO 4-bit / 30 MHz、DTC、FreeRTOS+TCP、
-RPi#2有線LAN対向、10 MiB payloadでの正式値です。CPU負荷率は同じ転送実行の
-payload区間だけをTracealyzerで集計しています。
+`SINK`はMCUから対向へ送信、`SOURCE`は対向からMCUが受信する方向です。
+各ターゲットの接続媒体、payload、対向、統計方法が異なるため、表は現在値を同じ形式で
+探すための索引であり、媒体間の直接的な優劣を示すものではありません。
 
-| 通信 | 方向 | TLS加速 | スループット | CPU負荷率 | 備考 |
-|---|---|---|---:|---:|---|
-| TCP | SINK (RX671 -> RPi#2) | — | 42.25 Mbps | 76.6 % | greedy最大45.99 Mbps、40 Mbps paced時59.2 % |
-| TCP | SOURCE (RPi#2 -> RX671) | — | 44.35 Mbps | 75.2 % | greedy最大48.09 Mbps、40 Mbps paced時69.9 % |
-| TLS | SINK (RX671 -> RPi#2) | none | 2.250 Mbps | 100.000 % | software mbedTLS |
-| TLS | SOURCE (RPi#2 -> RX671) | none | 2.110 Mbps | 92.614 % | software mbedTLS |
-| TLS | SINK (RX671 -> RPi#2) | TSIP | **38.633 Mbps** | **98.977 %** | TSIP AES-GCM、16 KiB record |
-| TLS | SOURCE (RPi#2 -> RX671) | TSIP | **33.428 Mbps** | **95.558 %** | in-place decrypt、RX 56 KiB / 39 MSS |
+| MCU環境 | 接続 | 通信 | TLS加速 | SINK | SOURCE | CPU指標 (SINK / SOURCE) | 測定条件 | 固定参照 |
+|---|---|---|---|---:|---:|---|---|---|
+| RX72N Envision Kit | Ethernet | TCP | - | 84.373 [84.330-84.417] Mbps | 94.154 [93.813-95.581] Mbps | busy proxy 100.00 / 83.54 % | 10 MiB、warm-up 1 + measured 5 | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#merged-main-ether-transport) |
+| RX72N Envision Kit | Ethernet | TLS 1.2 | none | 4.189 [4.188-4.189] Mbps | 4.434 [4.337-4.470] Mbps | busy proxy 100.00 / 99.60 % | 10 MiB、warm-up 1 + measured 5 | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#merged-main-ether-transport) |
+| RX72N Envision Kit | Ethernet | TLS 1.2 | TSIP | **43.113 [43.091-43.259] Mbps** | **54.448 [53.654-55.534] Mbps** | busy proxy 100.00 / 93.56 % | 10 MiB、16 KiB record、1 + 5 | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#merged-main-ether-transport) |
+| RX72N Envision Kit | Ethernet | TLS 1.3 | TSIP | **49.991 [49.965-50.002] Mbps** | **70.569 [69.503-71.029] Mbps** | busy proxy 100.00 / 96.47 % | 10 MiB、full TSIP record、1 + 5 | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#merged-main-ether-transport) |
+| EK-RX671 | Type 1YN Wi-Fi | TCP | - | 平均42.5 Mbps (最高45.99) | 平均46.2 Mbps (最高48.09) | 絶対CPU 76.6 % @ 42.2 / 75.2 % @ 44.3 Mbps | 10 MiB、SDIO 4-bit / 30 MHz、DTC | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#単一セッション正式性能) |
+| EK-RX671 | Type 1YN Wi-Fi | TLS 1.2 | none | 2.250 Mbps | 2.110 Mbps | 絶対CPU 100.000 / 92.614 % | 10 MiB、Tracealyzer payload区間 | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#単一セッション正式性能) |
+| EK-RX671 | Type 1YN Wi-Fi | TLS 1.2 | TSIP | **38.633 Mbps** | **33.428 Mbps** | 絶対CPU **98.977 / 95.558 %** | 10 MiB、16 KiB record | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#単一セッション正式性能) |
+| CK-RX65N V1 | BG96 Cellular | TCP | - | **0.124 Mbps** | **0.144 Mbps** | 未測定 / 未測定 | 768 KiB、Cat-M1、AT/QIRD、EC2対向 | [`RX65N@1b9ea826`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench/-/blob/1b9ea82608efcd4bffcfb2991d4f507faea200fe/README.md#最新性能) |
 
-2026-07-18に、正本ベンチマーク commit `5275d3a9` をRPi#1実機Runnerと
-RPi#2有線LAN対向で再実行した結果です。CPU負荷率はこの定期CIでは収集せず、
-上表のTracealyzer正式値を参照します。
+RX72Nのbusy proxyは絶対CPU使用率ではありません。RX671だけがTracealyzerで転送区間の
+絶対CPU負荷率を取得済みです。RX65N/BG96のTLS throughputとCPU負荷率は未測定であり、
+TCP値から推定していません。RX671の2026-07-18定期CI単回値と実機jobは
+[RX671集約READMEの定期CI再測定](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#定期ci再測定)
+に分離しています。
 
-| CIプロファイル | 方向 | 再実測スループット | 実機証跡 |
-|---|---|---:|---|
-| TCP | SINK (RX671 -> RPi#2) | **40.194 Mbps** | [pipeline #8154](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8154) / [job #53251](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53251) |
-| TCP | SOURCE (RPi#2 -> RX671) | **34.450 Mbps** | [pipeline #8154](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8154) / [job #53251](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53251) |
-| TLS + TSIP | SINK (RX671 -> RPi#2) | **40.427 Mbps** | [pipeline #8155](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8155) / [job #53253](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53253) |
-| TLS + TSIP | SOURCE (RPi#2 -> RX671) | **34.003 Mbps** | [pipeline #8156](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8156) / [job #53255](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53255) |
+### 2セッション同時TLS性能（ターゲット横断）
 
-#### RX671 / Type 1YN 2セッション同時TLS
-
-| 同時通信 | session 0中央値 | session 1中央値 | 合計中央値 | 合計レンジ | fairness | 結果 |
-|---|---:|---:|---:|---:|---:|---|
-| SINK + SINK | 15.044 Mbps | 14.971 Mbps | **29.937 Mbps** | 29.836-30.055 Mbps | 98.7-99.6 % | 3/3 PASS |
-| SOURCE + SOURCE | 14.413 Mbps | 14.293 Mbps | **28.383 Mbps** | 28.296-28.644 Mbps | 98.0-99.3 % | 3/3 PASS |
-| SINK + SOURCE | 11.999 Mbps | 13.070 Mbps | **23.953 Mbps** | 23.422-24.307 Mbps | 89.5-94.7 % | 3/3 PASS |
-
-同じ2026-07-18定期CIでの単回再実測は次の通りです。
-
-| 同時通信 | session 0 | session 1 | 合計 | fairness | heap最小残量 | netbuf最小残数 | 実機証跡 |
-|---|---:|---:|---:|---:|---:|---:|---|
-| SINK + SINK | 18.244 Mbps | 18.168 Mbps | **36.330 Mbps** | 99.5 % | 17,952 bytes | 24 | [pipeline #8157](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8157) / [job #53257](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53257) |
-| SOURCE + SOURCE | 16.858 Mbps | 16.552 Mbps | **33.097 Mbps** | 98.1 % | 41,264 bytes | 27 | [pipeline #8158](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8158) / [job #53259](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53259) |
-| SINK + SOURCE | 13.673 Mbps | 14.405 Mbps | **27.293 Mbps** | 94.9 % | 16,576 bytes | 23 | [pipeline #8159](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8159) / [job #53261](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53261) |
-
-2セッション共通の最小構成は network buffer descriptor 32、TCP segment 32、
-WHD pool 13、FreeRTOS heap 216 KiB、各TLSタスクstack 1024 words、共有16 KiB
-AES-GCM scratch bufferです。夜間CIはTCP、単一TLS SINK/SOURCE、上記3種類の
-2セッションを独立プロファイルとして実行します。
+| MCU環境 | 接続 | TLS | 同時通信 | 合計中央値 | 公平性・重複条件 | 測定条件 | 固定参照 |
+|---|---|---|---|---:|---|---|---|
+| RX72N Envision Kit | Ethernet | TLS 1.2 + TSIP | SINK + SINK | **43.251 Mbps** | overlap 99.96 %以上、fairness 99.99 %以上 | 2 session、各方向5回 | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#supporting-packet-evidence) |
+| RX72N Envision Kit | Ethernet | TLS 1.2 + TSIP | SOURCE + SOURCE | **56.584 Mbps** | overlap 99.96 %以上、fairness 99.99 %以上 | 2 session、各方向5回 | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#supporting-packet-evidence) |
+| EK-RX671 | Type 1YN Wi-Fi | TLS 1.2 + TSIP | SINK + SINK | **29.937 Mbps** | fairness 98.7-99.6 % | 3回連続、payload開始同期 | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#2セッション同時tls正式性能) |
+| EK-RX671 | Type 1YN Wi-Fi | TLS 1.2 + TSIP | SOURCE + SOURCE | **28.383 Mbps** | fairness 98.0-99.3 % | 3回連続、payload開始同期 | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#2セッション同時tls正式性能) |
+| EK-RX671 | Type 1YN Wi-Fi | TLS 1.2 + TSIP | SINK + SOURCE | **23.953 Mbps** | fairness 89.5-94.7 % | 3回連続、payload開始同期 | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#2セッション同時tls正式性能) |
+| CK-RX65N V1 | BG96 Cellular | - | 全モード | 未測定 | 未測定 | TLS同時throughput未評価 | [`RX65N@1b9ea826`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench/-/blob/1b9ea82608efcd4bffcfb2991d4f507faea200fe/README.md) |
 
 ## About This Fork / このフォークについて
 
