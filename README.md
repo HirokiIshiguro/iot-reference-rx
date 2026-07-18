@@ -301,16 +301,37 @@ Core hardware jobs:
 | Function | RX72N Ethernet job | RX65N/BG96 job | RX671/Type 1YN job |
 |----------|--------------------|----------------|---------------------|
 | Build boot loader and app | `build_rx72n_ether` | `build_rx65n_bg96` | `build_rx671_wifi` (app only) |
-| Flash boot loader / initial app | `flash_rx72n_ether` | `flash_rx65n_bg96` | `flash_rx671_wifi` (E2OB) |
-| Download app via boot loader | included in `flash_rx72n_ether` | `download_rx65n_bg96_app` | not yet implemented |
+| Flash boot loader / initial app | included in `test_rx72n_ether_mqtt` for MQTT/OTA/full (`flash_rx72n_ether` for legacy 0-RTT) | `flash_rx65n_bg96` | `flash_rx671_wifi` (E2OB) |
+| Download app via boot loader | included in `test_rx72n_ether_mqtt` | `download_rx65n_bg96_app` | not yet implemented |
 | Verify app startup | included in MQTT/OTA observation | `run_rx65n_bg96_app` | `test_rx671_wifi` (`network`) |
-| Provision MQTT credentials | `provision_rx72n_ether_mqtt` | `provision_rx65n_bg96_mqtt` | compile-time CI variables |
+| Provision MQTT credentials | included in `test_rx72n_ether_mqtt` for MQTT/OTA/full (`provision_rx72n_ether_mqtt` for legacy 0-RTT) | `provision_rx65n_bg96_mqtt` | compile-time CI variables |
 | Test MQTT | `test_rx72n_ether_mqtt` | `test_rx65n_bg96_mqtt` | `test_rx671_wifi` (`mqtt`) |
 | Build OTA candidate | `build_rx72n_ether_ota` | `build_rx65n_bg96_ota` | not yet implemented |
 | Create AWS IoT OTA job | `create_rx72n_ether_ota` | `create_rx65n_bg96_ota` | not yet implemented |
 | Test OTA | `test_rx72n_ether_ota` | `test_rx65n_bg96_ota` | not yet implemented |
 | Build Fleet Provisioning image | `build_rx72n_ether_fleet` | `build_rx65n_bg96_fleet` | not yet implemented |
 | Test Fleet Provisioning | `test_rx72n_ether_fleet` | `test_rx65n_bg96_fleet` | not yet implemented |
+
+RX72N の `mqtt` / `ota` / `full` scope では、`test_rx72n_ether_mqtt` が
+正確なpipeline成果物のflash、AWS IoT credential provisioning、MQTT確認を
+1つの実機jobとして連続実行します。このjobを含むRPi#1のRX72N実機jobは
+`RX72N_RPI1_HARDWARE_LOCK_PATH=/tmp/e2lite-rfp-cli.lock.d/rx72n-device-01.lock`
+を `flock` し、
+project内だけで有効な `resource_group` では防げないcross-project書換えを防止します。
+[TLS 1.3 benchmark側の同じlock](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/merge_requests/16)
+も同じpathを使用します。この外側のtransaction lockはvenv/pip準備後、最初の
+RFP/UART操作前に取得します。`tools/rfp_cli_locked.sh` は従来どおり別pathの
+`/tmp/rx72n-e2lite-rfp-cli.lock.d/rfp-cli.lock` を個々のRFP呼び出しに使用するため、
+二層のlockは相互に自己デッドロックしません。
+
+通常のMR pipelineはRX72N MQTTを実機確認しますが、default branch pipelineは
+RX72Nをbuild-onlyとします。post-merge直後の重複実機実行を避け、全実機coverageは
+共通lockを用いるnightly focused matrixで取得します。
+
+この保護範囲はMQTT baselineのflashからMQTT確認までです。任意のmulti-TLS後段、
+OTAの後段job、旧0-RTT分割経路に残るstate gapは
+[Issue #112](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/112)
+で追跡します。
 
 The RX671 hardware lane builds on the Windows CC-RX runner, then flashes the
 application through the EK-RX671 onboard E2OB on RPi#1. The UART monitor opens
