@@ -218,6 +218,11 @@ variables:
   RX671_WIFI_UART_BAUD_RATE: "921600"
   RX671_WIFI_UART_TIMEOUT_SECONDS: "300"
   RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS: "600000"
+  # The RX671 throughput implementation remains in its canonical benchmark
+  # project. Nightly rows below trigger this ref and forward only the Wi-Fi
+  # credentials needed to reproduce the Type 1YN transport conditions.
+  RX671_BENCHMARK_PROJECT_REF: "main"
+  RX671_LANBENCH_HOST: "192.168.10.212"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
   E2STUDIO_WORKSPACE_FLEET: "C:/Temp/e2ws_iot_ref_rx72n_fleet"
   E2STUDIO_WORKSPACE_MQTT: "C:/Temp/e2ws_iot_ref_rx72n_mqtt"
@@ -403,6 +408,57 @@ matrix_rx671_wifi_mqtt:
     - when: never
   variables:
     RX671_WIFI_TEST_SCOPE: "mqtt"
+
+.matrix_rx671_lanbench:
+  stage: nightly_matrix
+  resource_group: nightly-matrix-rx671-wifi
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
+      when: on_success
+    - when: never
+  trigger:
+    project: oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls
+    branch: $RX671_BENCHMARK_PROJECT_REF
+    strategy: depend
+    forward:
+      yaml_variables: true
+      pipeline_variables: false
+  variables:
+    RX671_BENCHMARK_RUN_HARDWARE: "true"
+    RX671_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"
+    RX671_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"
+    RX671_BENCHMARK_WIFI_PASSPHRASE: "$RX671_EK_WIFI_PASSPHRASE"
+    RX671_BENCHMARK_WIFI_PASSWORD: "$RX671_EK_WIFI_PASSWORD"
+
+matrix_rx671_wifi_lanbench_tcp:
+  extends: .matrix_rx671_lanbench
+  variables:
+    RX671_BENCHMARK_PROFILE: "tcp"
+
+matrix_rx671_wifi_lanbench_tls_sink:
+  extends: .matrix_rx671_lanbench
+  variables:
+    RX671_BENCHMARK_PROFILE: "tls-sink"
+
+matrix_rx671_wifi_lanbench_tls_source:
+  extends: .matrix_rx671_lanbench
+  variables:
+    RX671_BENCHMARK_PROFILE: "tls-source"
+
+matrix_rx671_wifi_lanbench_dual_sink_sink:
+  extends: .matrix_rx671_lanbench
+  variables:
+    RX671_BENCHMARK_PROFILE: "dual-sink-sink"
+
+matrix_rx671_wifi_lanbench_dual_source_source:
+  extends: .matrix_rx671_lanbench
+  variables:
+    RX671_BENCHMARK_PROFILE: "dual-source-source"
+
+matrix_rx671_wifi_lanbench_dual_sink_source:
+  extends: .matrix_rx671_lanbench
+  variables:
+    RX671_BENCHMARK_PROFILE: "dual-sink-source"
 
 matrix_rx72n_ether_software_mqtt:
   extends: .nightly_matrix_rx72n

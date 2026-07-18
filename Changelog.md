@@ -48,32 +48,29 @@
 
 ### EK-RX671 + Murata Type 1YN Wi-Fi
 
-- `Projects/aws_wifi_rx671_ek/e2studio_ccrx` を EK-RX671 + Type 1YN の AWS Wi-Fi 基準プロジェクトとして整備中です。
-- 現在はヘッドレスビルド、COM5/SCI6ログ、WHD経由のAP JOIN、FreeRTOS+TCP、AWS IoT MQTT smoke まで確認済みです。
-- SDIO CMD53のDTC転送を安定版として採用し、DMACAは次回以降の比較候補として残しています。
-- Wi-Fi認証情報、AWS IoT認証情報、TCPスループット試験設定はgit管理外のローカルヘッダで注入します。
-- SDCLK 48MHz実験は規格内で動作しましたが、ICLK低下の影響もあり効果が小さいため、現時点の基準は `ICLK=120MHz / PCLKB=60MHz / SDCLK=30MHz` に戻します。
-- Percepio公式TraceRecorderSourceをサブモジュール化し、J-Link RTT経由のTracealyzer CLI取得を確認済みです。
-- RPi#1のオンボードE2OBとSCI6を使う `build_rx671_wifi` / `flash_rx671_wifi` / `test_rx671_wifi` を追加し、AP JOINからFreeRTOS+TCP network-upまでをUART/JUnit証跡付きで実機CI化します。AWS認証変数が揃う環境では同じ試験をTLS/MQTT smokeまで拡張できます。
-- e2 studio 2026.04.2のimport時Smart Configurator再生成から追跡済みRX671ソースを復元し、正本ソースを並列強制再ビルドするようheadless build helperを補強しました。
-- SDHI IRQ本格実装の差分観測用として、`WHD_SDIO_USE_SDHI_IRQ=0`、`WHD_SDIO_SOFTIRQ_POLL_MS=1` のsoftirq-only基準を固定します。
-- 最終目標はSDHI IRQ全面ONの割り込み駆動実装です。softirq-onlyは安定動作と性能差分を測る比較用基準として扱います。
-- 最終的な速度チューニングは、TLS、OTA、TSIPによるTLS加速が安定した後に、SDHIクロック、DTC/DMAC、FreeRTOS+TCPバッファ、WHD結合部をまとめて再評価します。
+- `Projects/aws_wifi_rx671_ek/e2studio_ccrx` をEK-RX671 + Type 1YNのAWS Wi-Fi基準プロジェクトとして整備します。
+- RPi#1のオンボードE2OBとSCI6を使う実機CIで、ヘッドレスビルド、書き込み、WHD経由のAP JOIN、DHCP、AWS IoT TLS/MQTT smokeを検証します。
+- Wi-Fi認証情報とAWS IoT認証情報はGitLab CI/CD Variablesからビルドへ注入し、リポジトリには保存しません。
+- 性能基準はEK-RX671 120 MHz、SDIO 4-bit / 30 MHz、CMD53 DTC転送、FreeRTOS+TCP、RPi#2有線LAN対向、10 MiB payloadとします。
+- Percepio公式TraceRecorderSourceとJ-Link RTTを使い、Tracealyzerでpayload転送区間のCPU負荷率を測定します。
+- 夜間CIから正本の`tsip_mbedtls`ベンチマークを起動し、TCP、単一TLS SINK/SOURCE、2セッション同時TLSの3組合せを独立して再現します。
 
 #### 現在の通信速度
 
-10MiBの平文TCPスモーク試験で確認した代表値です。`RX671 -> Host` はRX671からLANBENCHホストへの送信、`Host -> RX671` はLANBENCHホストからRX671への受信を示します。現在の再現用基準は、mbedTLS benchmarkと同じRPi#2上の共通Go LANBENCHを使い、SOURCE側はRX671でペイロード検証を行わない条件に揃えます。
+| 通信 | 方向 | TLS加速 | スループット | CPU負荷率 |
+|---|---|---|---:|---:|
+| TCP | SINK（RX671 -> RPi#2） | - | 42.25 Mbps | 76.6 % |
+| TCP | SOURCE（RPi#2 -> RX671） | - | 44.35 Mbps | 75.2 % |
+| TLS | SINK（RX671 -> RPi#2） | none | 2.250 Mbps | 100.000 % |
+| TLS | SOURCE（RPi#2 -> RX671） | none | 2.110 Mbps | 92.614 % |
+| TLS | SINK（RX671 -> RPi#2） | TSIP | 38.633 Mbps | 98.977 % |
+| TLS | SOURCE（RPi#2 -> RX671） | TSIP | 33.428 Mbps | 95.558 % |
 
-| 条件 | ホスト | SDCLK | CMD53転送 | 主なTCP/バッファ条件 | RX671 -> Host | Host -> RX671 | 状態 |
-|---|---|---:|---|---|---:|---:|---|
-| 低速基準 | PC | 7.5MHz | CPU copy | 初期比較用 | 14.48Mbps | 15.03Mbps | 参考 |
-| DTC低速 | PC | 7.5MHz | DTC、512byte閾値 | 小転送のCPU fallbackが多い | 14.40Mbps | 14.11Mbps | 参考 |
-| DTC低速改善 | PC | 7.5MHz | DTC、64byte閾値 | Type 1YN Function 2 block sizeに合わせる | 14.47Mbps | 15.43Mbps | 参考 |
-| PC対向最速値 | PC | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window | 38.2-38.5Mbps | 30.2-32.0Mbps | 参考、RPi基準とは混在しない |
-| 48MHz実験 | PC | 48MHz | DTC、64byte閾値 | `PLL=192MHz`、`ICLK=96MHz`、同じTCP条件 | 39.6-39.9Mbps | 31.8-32.3Mbps | 効果限定、未採用 |
-| RPi#2統一基準 | RPi#2 / 共通Go LANBENCH | 30MHz | DTC、64byte閾値 | TX 14600byte / RX 5840byte、socket 64KiB、44-MSS window、SOURCE verifyなし | 32.476Mbps | 19.288Mbps | 採用中、mbedTLS benchmarkと同条件 |
-| softirq-only比較基準 | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファなし | 未測定 | 31.524Mbps | SDHI IRQ実装前の差分観測用 |
-| softirq-only + スニファ | PC | 30MHz | DTC、64byte閾値 | `WHD_SDIO_USE_SDHI_IRQ=0`、softirq 1ms、スニファあり | 未測定 | 31.149Mbps | 波形観測ありの差分観測用 |
+2セッション同時TLSの合計中央値はSINK + SINKが29.937 Mbps、SOURCE + SOURCEが
+28.383 Mbps、SINK + SOURCEが23.953 Mbpsです。測定条件、個別セッション値、
+最小バッファ構成はREADME冒頭と
+[RX671 TSIP mbedTLS benchmark](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls)
+を正本とします。
 
 ### 共通の今後作業
 
