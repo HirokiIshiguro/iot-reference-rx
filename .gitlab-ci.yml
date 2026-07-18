@@ -195,6 +195,29 @@ variables:
   AWS_CLI_RUNNER_TAG: "aws-cli-ishiguro"
   RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  E2STUDIO_WORKSPACE_RX671_WIFI: "C:/Temp/e2ws_iot_ref_rx671_wifi_2026_04_2"
+  RUN_RX671_WIFI_BUILD: "true"
+  # RX671_WIFI_TEST_SCOPE:
+  #   build   - build and publish firmware artifacts only.
+  #   network - flash via E2OB and verify WHD JOIN + FreeRTOS+TCP network up.
+  #   mqtt    - network checks plus AWS IoT TLS/MQTT smoke.
+  RX671_WIFI_TEST_SCOPE: "build"
+  RX671_WIFI_SKIP_HW_TESTS: "false"
+  RX671_WIFI_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  RX671_WIFI_DEVICE_RESOURCE_GROUP: "ek-rx671-rpi1-hardware"
+  RX671_WIFI_RUNNER_TAG: "dev-ek-rx671"
+  RX671_WIFI_RUNNER_HOSTNAME: "ef-saffti-001-rpi-001"
+  RX671_WIFI_LINUX_RFP_CLI: "./tools/rfp_cli_locked.sh"
+  RX671_WIFI_RFP_DEVICE: "RX671"
+  RX671_WIFI_RFP_INTERFACE: "fine"
+  RX671_WIFI_RFP_SPEED: "500K"
+  RX671_WIFI_RFP_AUTH_ID: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+  RX671_WIFI_E2OB_SERIAL: "${E2L_SERIAL_EK_RX671_E2OB_RPI1}"
+  RX671_WIFI_RFP_TOOL: "e2l:${E2L_SERIAL_EK_RX671_E2OB_RPI1}"
+  RX671_WIFI_UART_PORT: "${UART_PORT_EK_RX671_SCI6_RPI1}"
+  RX671_WIFI_UART_BAUD_RATE: "921600"
+  RX671_WIFI_UART_TIMEOUT_SECONDS: "300"
+  RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS: "600000"
   E2STUDIO_WORKSPACE_OTA: "C:/Temp/e2ws_iot_ref_rx72n_ota"
   E2STUDIO_WORKSPACE_FLEET: "C:/Temp/e2ws_iot_ref_rx72n_fleet"
   E2STUDIO_WORKSPACE_MQTT: "C:/Temp/e2ws_iot_ref_rx72n_mqtt"
@@ -208,12 +231,15 @@ workflow:
         PIPELINE_PROFILE: "release"
         RX65N_BG96_TEST_SCOPE: "full"
         RX72N_TEST_SCOPE: "full"
+        RX671_WIFI_TEST_SCOPE: "network"
       when: always
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - Projects/aws_wifi_rx671_ek/**/*
         - tools/build_headless_rx671_wifi.ps1
         - tools/load_rx671_wifi_jlink.ps1
+        - tools/ci/test_rx671_wifi_uart.py
+        - tools/ci/tests/test_rx671_wifi_uart.py
       variables:
         PIPELINE_PROFILE: "mr-rx671"
         # RX671 Wi-Fi work is validated on its own bench for now. Keep legacy
@@ -221,6 +247,7 @@ workflow:
         # does not block RX671-only SDIO/WHD changes.
         RX65N_BG96_TEST_SCOPE: "build"
         RX72N_TEST_SCOPE: "build"
+        RX671_WIFI_TEST_SCOPE: "network"
       when: always
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       variables:
@@ -230,6 +257,7 @@ workflow:
         # the stabilizing gate until repeated schedule evidence is available.
         RX65N_BG96_TEST_SCOPE: "mqtt"
         RX72N_TEST_SCOPE: "mqtt"
+        RX671_WIFI_TEST_SCOPE: "build"
       when: always
     - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $PIPELINE_PROFILE == "nightly_matrix"'
       when: always
@@ -246,8 +274,10 @@ workflow:
         PIPELINE_PROFILE: "nightly_matrix"
         RUN_RX65N_BG96_BUILD: "false"
         RUN_RX72N_BUILD: "false"
+        RUN_RX671_WIFI_BUILD: "false"
         RX65N_BG96_TEST_SCOPE: "build"
         RX72N_TEST_SCOPE: "build"
+        RX671_WIFI_TEST_SCOPE: "build"
       when: always
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
       when: never
@@ -259,6 +289,7 @@ workflow:
         PIPELINE_PROFILE: "branch"
         RX65N_BG96_TEST_SCOPE: "build"
         RX72N_TEST_SCOPE: "build"
+        RX671_WIFI_TEST_SCOPE: "build"
       when: always
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       variables:
@@ -268,6 +299,7 @@ workflow:
         # a second full hardware regression immediately after every merge.
         RX65N_BG96_TEST_SCOPE: "mqtt"
         RX72N_TEST_SCOPE: "mqtt"
+        RX671_WIFI_TEST_SCOPE: "network"
       when: always
     - if: $CI_COMMIT_BRANCH
       when: always
@@ -308,6 +340,20 @@ workflow:
     RUN_RX65N_BG96_BUILD: "true"
     RX65N_BG96_SKIP_HW_TESTS: "false"
 
+.nightly_matrix_rx671_wifi:
+  extends: .nightly_matrix_trigger
+  resource_group: nightly-matrix-rx671-wifi
+  variables:
+    PIPELINE_PROFILE: "focused"
+    RUN_RX671_WIFI_BUILD: "true"
+    RX671_WIFI_SKIP_HW_TESTS: "false"
+    RUN_RX72N_BUILD: "false"
+    RX72N_SKIP_HW_TESTS: "true"
+    RX72N_TEST_SCOPE: "build"
+    RUN_RX65N_BG96_BUILD: "false"
+    RX65N_BG96_SKIP_HW_TESTS: "true"
+    RX65N_BG96_TEST_SCOPE: "build"
+
 .nightly_matrix_stabilizing_trigger:
   stage: nightly_matrix
   rules:
@@ -343,6 +389,20 @@ workflow:
     RX72N_SKIP_HW_TESTS: "true"
     RUN_RX65N_BG96_BUILD: "true"
     RX65N_BG96_SKIP_HW_TESTS: "false"
+
+matrix_rx671_wifi_network:
+  extends: .nightly_matrix_rx671_wifi
+  variables:
+    RX671_WIFI_TEST_SCOPE: "network"
+
+matrix_rx671_wifi_mqtt:
+  extends: .nightly_matrix_rx671_wifi
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_AWS_IOT_THING_NAME && $RX671_EK_AWS_IOT_CERT_PEM && $RX671_EK_AWS_IOT_PRIVATE_KEY_PEM'
+      when: on_success
+    - when: never
+  variables:
+    RX671_WIFI_TEST_SCOPE: "mqtt"
 
 matrix_rx72n_ether_software_mqtt:
   extends: .nightly_matrix_rx72n
@@ -806,6 +866,85 @@ build_rx65n_bg96:
       - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
 
+build_rx671_wifi:
+  stage: build
+  tags:
+    - exec-shell
+    - os-windows
+    - ccrx
+    - $RX671_WIFI_BUILD_RUNNER_TAG
+  resource_group: rx671-wifi-e2studio-build
+  rules:
+    - if: '$RUN_RX671_WIFI_BUILD == "true"'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Build EK-RX671 Type 1YN Wi-Fi project ==="
+    - python -m unittest tools.ci.tests.test_rx671_wifi_uart
+    - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    - |
+      foreach ($name in @("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")) {
+        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+          throw "Required RX671 Wi-Fi CI/CD variable is missing: $name"
+        }
+      }
+
+      $buildArgs = @{
+        ProjectRoot = "$env:CI_PROJECT_DIR"
+        E2Studio = "$env:E2STUDIO_CLI"
+        Workspace = "$env:E2STUDIO_WORKSPACE_RX671_WIFI"
+        LogFile = "$env:CI_PROJECT_DIR\rx671_wifi_e2studio_build.log"
+        UseLocalJoinConfig = $true
+        WlanAllowBusSleepDelayMs = [int]$env:RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS
+      }
+
+      if ($env:RX671_WIFI_TEST_SCOPE -eq "mqtt") {
+        $mqttVariables = @(
+          "RX671_EK_AWS_IOT_THING_NAME",
+          "RX671_EK_AWS_IOT_CERT_PEM",
+          "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM"
+        )
+        foreach ($name in $mqttVariables) {
+          if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+            throw "RX671 MQTT scope requires CI/CD variable: $name"
+          }
+        }
+        if ([string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_ENDPOINT) -and
+            [string]::IsNullOrWhiteSpace($env:AWS_IOT_ENDPOINT)) {
+          throw "RX671 MQTT scope requires RX671_EK_AWS_IOT_ENDPOINT or AWS_IOT_ENDPOINT"
+        }
+        $buildArgs.UseAwsIotLocalConfig = $true
+      } else {
+        $buildArgs.SkipAwsIotConfig = $true
+      }
+
+      & "$env:CI_PROJECT_DIR\tools\build_headless_rx671_wifi.ps1" @buildArgs
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx671_wifi"
+      $outputDir = "$env:CI_PROJECT_DIR\Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      foreach ($extension in @("mot", "abs", "map")) {
+        $source = Join-Path $outputDir "aws_wifi_rx671_ek.$extension"
+        if (-not (Test-Path -LiteralPath $source)) {
+          throw "RX671 build artifact missing: $source"
+        }
+        Copy-Item -LiteralPath $source -Destination $artifactDir
+      }
+      git diff --exit-code -- Projects/aws_wifi_rx671_ek/e2studio_ccrx
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 build helper did not restore the tracked e2 studio project"
+      }
+    - Write-Host "BUILD EK-RX671 WIFI SUCCESS"
+  artifacts:
+    when: always
+    paths:
+      - rx671_wifi_e2studio_build.log
+      - artifacts/build_rx671_wifi/
+      - Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug/*.map
+    expire_in: 7 days
+
 build_rx65n_bg96_fleet:
   stage: build
   tags:
@@ -976,6 +1115,25 @@ build_rx72n_ether_fleet:
     - source .venv-pi/bin/activate
     - python -m pip install --quiet pyserial cryptography
 
+.rx671_wifi_linux_hw_job:
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-raspi
+    - $RX671_WIFI_RUNNER_TAG
+  resource_group: $RX671_WIFI_DEVICE_RESOURCE_GROUP
+  before_script:
+    - set -o pipefail
+    - |
+      actual_host="$(hostname)"
+      if [ -n "${RX671_WIFI_RUNNER_HOSTNAME:-}" ] && [ "$actual_host" != "$RX671_WIFI_RUNNER_HOSTNAME" ]; then
+        echo "This job must run on ${RX671_WIFI_RUNNER_HOSTNAME}, but it was scheduled on ${actual_host}." >&2
+        exit 1
+      fi
+    - python3 -m venv .venv-pi
+    - source .venv-pi/bin/activate
+    - python -m pip install --quiet pyserial
+
 .aws_cli_windows_job:
   tags:
     - exec-shell
@@ -1006,6 +1164,12 @@ build_rx72n_ether_fleet:
 .rx65n_bg96_flash_rules:
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|download|app|provision|mqtt|ota|tls13_0rtt|full)$/'
+      when: on_success
+    - when: never
+
+.rx671_wifi_hardware_rules:
+  rules:
+    - if: '$RX671_WIFI_SKIP_HW_TESTS != "true" && $RX671_WIFI_TEST_SCOPE =~ /^(network|mqtt)$/'
       when: on_success
     - when: never
 
@@ -1076,6 +1240,60 @@ build_rx72n_ether_fleet:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(fleet|full)$/ && ($RX65N_BG96_TLS_BACKEND != "tsip" || $RX65N_BG96_TSIP_FLEET_ENABLE == "true") && $RX65N_BG96_FLEET_CLEANUP_RESOURCES != "false" && $AWS_DEFAULT_REGION && ($AWS_FLEET_PROVISIONING_TEMPLATE_CK_RX65N_01 || $RX65N_BG96_FLEET_PROVISIONING_TEMPLATE || $BG96_FLEET_PROVISIONING_TEMPLATE || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($AWS_FLEET_CLAIM_CERT_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_CERT_PEM || $RX65N_BG96_FLEET_CLAIM_CERT || $BG96_FLEET_CLAIM_CERT_PEM || $BG96_FLEET_CLAIM_CERT || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($AWS_FLEET_CLAIM_PRIVATE_KEY_CK_RX65N_01 || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX65N_BG96_FLEET_CLAIM_PRIVATE_KEY || $BG96_FLEET_CLAIM_PRIVATE_KEY_PEM || $BG96_FLEET_CLAIM_PRIVATE_KEY || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
       when: always
     - when: never
+
+flash_rx671_wifi:
+  stage: flash
+  extends:
+    - .rx671_wifi_linux_hw_job
+    - .rx671_wifi_hardware_rules
+  needs:
+    - job: build_rx671_wifi
+      artifacts: true
+  script:
+    - echo "=== Flash EK-RX671 Wi-Fi firmware through onboard E2OB ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx671_wifi"
+      mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
+      mkdir -p "$artifact_dir"
+
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      "$RX671_WIFI_LINUX_RFP_CLI" -d "$RX671_WIFI_RFP_DEVICE" -lt \
+        2>&1 | tee "$artifact_dir/rfp_tools.txt"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        echo "RFP tool enumeration failed with exit code $status." >&2
+        exit "$status"
+      fi
+
+      if [ -z "${RX671_WIFI_E2OB_SERIAL:-}" ] || ! grep -Fq "$RX671_WIFI_E2OB_SERIAL" "$artifact_dir/rfp_tools.txt"; then
+        echo "Expected EK-RX671 onboard E2OB is not visible: ${RX671_WIFI_E2OB_SERIAL:-<unset>}" >&2
+        exit 1
+      fi
+      if [ ! -e "$RX671_WIFI_UART_PORT" ]; then
+        echo "Expected EK-RX671 SCI6 UART is not visible: $RX671_WIFI_UART_PORT" >&2
+        exit 1
+      fi
+      if [ ! -f "$mot" ]; then
+        echo "RX671 firmware artifact is missing: $mot" >&2
+        exit 1
+      fi
+
+      readlink -f "$RX671_WIFI_UART_PORT" | tee "$artifact_dir/uart_device.txt"
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -p -v -reset -noquery "$mot" \
+        2>&1 | tee "$artifact_dir/flash.log"
+      status="${PIPESTATUS[0]}"
+      exit "$status"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/flash_rx671_wifi/
+    expire_in: 7 days
 
 flash_rx72n_ether:
   stage: flash
@@ -2334,6 +2552,54 @@ cleanup_rx72n_ether_ota_jobs:
     when: always
     paths:
       - artifacts/cleanup_rx72n_ether_ota_jobs/
+    expire_in: 7 days
+
+test_rx671_wifi:
+  stage: test
+  extends:
+    - .rx671_wifi_linux_hw_job
+    - .rx671_wifi_hardware_rules
+  needs:
+    - job: build_rx671_wifi
+      artifacts: true
+    - job: flash_rx671_wifi
+      artifacts: true
+  script:
+    - echo "=== Verify EK-RX671 WHD and FreeRTOS+TCP startup over SCI6 ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi"
+      mkdir -p "$artifact_dir"
+      python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+
+      if [ -z "${RX671_WIFI_E2OB_SERIAL:-}" ]; then
+        echo "E2L_SERIAL_EK_RX671_E2OB_RPI1 is not configured." >&2
+        exit 1
+      fi
+      if [ ! -e "$RX671_WIFI_UART_PORT" ]; then
+        echo "Expected EK-RX671 SCI6 UART is not visible: $RX671_WIFI_UART_PORT" >&2
+        exit 1
+      fi
+
+      mode="network"
+      if [ "$RX671_WIFI_TEST_SCOPE" = "mqtt" ]; then
+        mode="mqtt"
+      fi
+      reset_cmd="$RX671_WIFI_LINUX_RFP_CLI -d $RX671_WIFI_RFP_DEVICE -t $RX671_WIFI_RFP_TOOL -if $RX671_WIFI_RFP_INTERFACE -s $RX671_WIFI_RFP_SPEED -auth id $RX671_WIFI_RFP_AUTH_ID -sig -run -noquery"
+
+      python tools/ci/test_rx671_wifi_uart.py \
+        --port "$RX671_WIFI_UART_PORT" \
+        --baud "$RX671_WIFI_UART_BAUD_RATE" \
+        --timeout "$RX671_WIFI_UART_TIMEOUT_SECONDS" \
+        --mode "$mode" \
+        --reset-cmd "$reset_cmd" \
+        --output-log "$artifact_dir/uart.log" \
+        --junit-output "$artifact_dir/junit.xml"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_rx671_wifi/
+    reports:
+      junit: artifacts/test_rx671_wifi/junit.xml
     expire_in: 7 days
 
 test_rx72n_ether_mqtt:

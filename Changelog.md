@@ -54,6 +54,8 @@
 - Wi-Fi認証情報、AWS IoT認証情報、TCPスループット試験設定はgit管理外のローカルヘッダで注入します。
 - SDCLK 48MHz実験は規格内で動作しましたが、ICLK低下の影響もあり効果が小さいため、現時点の基準は `ICLK=120MHz / PCLKB=60MHz / SDCLK=30MHz` に戻します。
 - Percepio公式TraceRecorderSourceをサブモジュール化し、J-Link RTT経由のTracealyzer CLI取得を確認済みです。
+- RPi#1のオンボードE2OBとSCI6を使う `build_rx671_wifi` / `flash_rx671_wifi` / `test_rx671_wifi` を追加し、AP JOINからFreeRTOS+TCP network-upまでをUART/JUnit証跡付きで実機CI化します。AWS認証変数が揃う環境では同じ試験をTLS/MQTT smokeまで拡張できます。
+- e2 studio 2026.04.2のimport時Smart Configurator再生成から追跡済みRX671ソースを復元し、正本ソースを並列強制再ビルドするようheadless build helperを補強しました。
 - SDHI IRQ本格実装の差分観測用として、`WHD_SDIO_USE_SDHI_IRQ=0`、`WHD_SDIO_SOFTIRQ_POLL_MS=1` のsoftirq-only基準を固定します。
 - 最終目標はSDHI IRQ全面ONの割り込み駆動実装です。softirq-onlyは安定動作と性能差分を測る比較用基準として扱います。
 - 最終的な速度チューニングは、TLS、OTA、TSIPによるTLS加速が安定した後に、SDHIクロック、DTC/DMAC、FreeRTOS+TCPバッファ、WHD結合部をまとめて再評価します。

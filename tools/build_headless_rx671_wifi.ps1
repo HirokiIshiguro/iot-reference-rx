@@ -691,19 +691,74 @@ function Invoke-MakeTarget {
         [Parameter(Mandatory = $true)]
         [string]$BuildDir,
         [Parameter(Mandatory = $true)]
-        [string]$Target
+        [string]$Target,
+        [switch]$Force
     )
 
     Write-Host "Invoking make target: $Target"
     Push-Location $BuildDir
     try {
-        & $script:makeExe -r $Target
+        $parallelJobs = [Math]::Max(1, [Math]::Min(24, [Environment]::ProcessorCount))
+        $makeArguments = @("-r", "--output-sync", "-j$parallelJobs")
+        if ($Force.IsPresent) {
+            $makeArguments += "-B"
+        }
+        $makeArguments += $Target
+        & $script:makeExe @makeArguments
         if ($LASTEXITCODE -ne 0) {
             throw "make target '$Target' failed with exit code $LASTEXITCODE"
         }
     } finally {
         Pop-Location
     }
+}
+
+function Test-ByteArrayEqual {
+    param(
+        [byte[]]$Left,
+        [byte[]]$Right
+    )
+
+    if (($null -eq $Left) -or ($null -eq $Right) -or ($Left.Length -ne $Right.Length)) {
+        return $false
+    }
+
+    for ($i = 0; $i -lt $Left.Length; $i++) {
+        if ($Left[$i] -ne $Right[$i]) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Restore-TrackedProjectSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Snapshot
+    )
+
+    $restored = [System.Collections.Generic.List[string]]::new()
+    foreach ($entry in $Snapshot.GetEnumerator()) {
+        $relativePath = [string]$entry.Key
+        $fullPath = Join-Path $Root ($relativePath -replace '/', '\')
+        $currentBytes = $null
+        if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+            $currentBytes = [System.IO.File]::ReadAllBytes($fullPath)
+        }
+
+        if (-not (Test-ByteArrayEqual -Left $currentBytes -Right ([byte[]]$entry.Value))) {
+            $parent = Split-Path -Parent $fullPath
+            if (-not (Test-Path -LiteralPath $parent)) {
+                [void](New-Item -ItemType Directory -Force -Path $parent)
+            }
+            [System.IO.File]::WriteAllBytes($fullPath, [byte[]]$entry.Value)
+            $restored.Add($relativePath)
+        }
+    }
+
+    return $restored.ToArray()
 }
 
 function Invoke-E2StudioHeadlessBuild {
@@ -834,6 +889,7 @@ $effectiveSdioCmd53DmacaMinBytes = Get-FirstNonEmpty @($SdioCmd53DmacaMinBytes, 
 $effectiveSdioCmd53DmacaBlockMode = Get-FirstNonEmpty @($SdioCmd53DmacaBlockMode, $env:RX671_EK_SDIO_CMD53_DMACA_BLOCK_MODE)
 
 $cprojectBytes = $null
+$trackedProjectSnapshot = @{}
 try {
     $cprojectDefines = @()
 
@@ -956,6 +1012,26 @@ try {
         [System.IO.File]::WriteAllText($cproject, $patchedCProject, [System.Text.UTF8Encoding]::new($false))
     }
 
+    # Importing this Smart Configurator project can regenerate tracked source
+    # files before the build starts. Preserve the checked-out source (including
+    # any caller edits), restore it after import, and force a canonical rebuild.
+    # .cproject is excluded because temporary CI defines must stay active until
+    # the final make invocation; it is restored separately in the finally block.
+    $repoProjectPath = "Projects/$projectName/e2studio_ccrx"
+    $trackedProjectPaths = @(& git -C $projectRoot ls-files -- $repoProjectPath)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not enumerate tracked RX671 project files."
+    }
+    foreach ($relativePath in $trackedProjectPaths) {
+        if ($relativePath -eq "$repoProjectPath/.cproject") {
+            continue
+        }
+        $fullPath = Join-Path $projectRoot ($relativePath -replace '/', '\')
+        if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+            $trackedProjectSnapshot[$relativePath] = [System.IO.File]::ReadAllBytes($fullPath)
+        }
+    }
+
     $buildStart = Get-Date
     $e2StudioExitCode = Invoke-E2StudioHeadlessBuild `
         -Executable $E2Studio `
@@ -965,11 +1041,27 @@ try {
         -OutputLog $logFilePath
     Wait-RxBuildProcesses -Since $buildStart
 
+    $restoredGeneratedFiles = @(Restore-TrackedProjectSnapshot `
+        -Root $projectRoot `
+        -Snapshot $trackedProjectSnapshot)
+
     $motOutput = Join-Path $hardwareDebug "$projectName.mot"
     $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
         ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
+    $canonicalRebuildCompleted = $false
 
-    if (($e2StudioExitCode -ne 0) -or (-not $motWasUpdated)) {
+    if ($restoredGeneratedFiles.Count -gt 0) {
+        Write-Host "Smart Configurator regenerated $($restoredGeneratedFiles.Count) tracked file(s); restoring checked-out source and forcing a canonical rebuild."
+        foreach ($relativePath in $restoredGeneratedFiles) {
+            Write-Host "  restored: $relativePath"
+        }
+        Invoke-MakeTarget -BuildDir $hardwareDebug -Target "$projectName.mot" -Force
+        $canonicalRebuildCompleted = $true
+        $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
+            ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
+    }
+
+    if ((-not $canonicalRebuildCompleted) -and (($e2StudioExitCode -ne 0) -or (-not $motWasUpdated))) {
         Write-Warning "e2 studio build returned exit code $e2StudioExitCode or did not refresh .mot through the default all target."
         Write-Host "Ensuring the loadable image with an explicit .mot make target."
         Invoke-MakeTarget -BuildDir $hardwareDebug -Target "$projectName.mot"
@@ -983,6 +1075,9 @@ try {
         Write-Warning "e2 studio returned exit code $e2StudioExitCode, but .mot/.abs/.map were refreshed by the explicit make target."
     }
 } finally {
+    if ($trackedProjectSnapshot.Count -gt 0) {
+        [void](Restore-TrackedProjectSnapshot -Root $projectRoot -Snapshot $trackedProjectSnapshot)
+    }
     if ($null -ne $cprojectBytes) {
         [System.IO.File]::WriteAllBytes($cproject, $cprojectBytes)
     }

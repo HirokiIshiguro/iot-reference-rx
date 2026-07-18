@@ -154,7 +154,7 @@ For the EK-RX671 + Type 1YN Wi-Fi baseline:
 ```bash
 pwsh -File tools/build_headless_rx671_wifi.ps1 \
   -ProjectRoot <repo_root> \
-  -E2Studio C:/Renesas/e2_studio_2025_12/eclipse/e2studio-cli.exe \
+  -E2Studio C:/Renesas/e2_studio_2026_04_2/eclipse/e2studioc.exe \
   -Workspace <temp_workspace> \
   -WifiConfigFile <local_wifi_config> \
   -AwsIotConfigDir <local_aws_iot_credential_dir>
@@ -162,9 +162,10 @@ pwsh -File tools/build_headless_rx671_wifi.ps1 \
 
 The script imports and builds `Projects/aws_wifi_rx671_ek/e2studio_ccrx`,
 initializes required submodules, applies the project-local WHD patch, and
-generates ignored local headers for Wi-Fi and AWS IoT credentials. The verified
-hardware baseline uses SCI6 on COM5 at 921600 bps and reaches `AWS MQTT=0`
-after WHD JOIN, DHCP, TLS, and MQTT connect/disconnect.
+generates ignored local headers for Wi-Fi and AWS IoT credentials. The local
+Windows baseline uses SCI6 on COM5 at 921600 bps and reaches `AWS MQTT=0`
+after WHD JOIN, DHCP, TLS, and MQTT connect/disconnect. GitLab CI uses the same
+SCI6 stream through RPi#1's stable `/dev/serial/by-id/...` path.
 
 ### Flash / 書き込み方法
 
@@ -228,22 +229,31 @@ The GitLab CI pipeline is organized by MCU environment. Job names use
 |-----------------|----------|--------------|-----------------|
 | `rx72n_ether` | RX72N Envision Kit | Ethernet | RPi #2 / `dev-ek-rx72n-set2` |
 | `rx65n_bg96` | CK-RX65N V1 + Quectel BG96 | Cellular Cat-M1/NB-IoT | RPi #3 / `dev-ck-rx65n-bg96` |
+| `rx671_wifi` | EK-RX671 + Murata Type 1YN | Wi-Fi over SDIO | RPi #1 / `dev-ek-rx671` |
 
 Core hardware jobs:
 
-| Function | RX72N Ethernet job | RX65N/BG96 job |
-|----------|--------------------|----------------|
-| Build boot loader and app | `build_rx72n_ether` | `build_rx65n_bg96` |
-| Flash boot loader / initial app | `flash_rx72n_ether` | `flash_rx65n_bg96` |
-| Download app via boot loader | included in `flash_rx72n_ether` | `download_rx65n_bg96_app` |
-| Verify app startup | included in MQTT/OTA observation | `run_rx65n_bg96_app` |
-| Provision MQTT credentials | `provision_rx72n_ether_mqtt` | `provision_rx65n_bg96_mqtt` |
-| Test MQTT | `test_rx72n_ether_mqtt` | `test_rx65n_bg96_mqtt` |
-| Build OTA candidate | `build_rx72n_ether_ota` | `build_rx65n_bg96_ota` |
-| Create AWS IoT OTA job | `create_rx72n_ether_ota` | `create_rx65n_bg96_ota` |
-| Test OTA | `test_rx72n_ether_ota` | `test_rx65n_bg96_ota` |
-| Build Fleet Provisioning image | `build_rx72n_ether_fleet` | `build_rx65n_bg96_fleet` |
-| Test Fleet Provisioning | `test_rx72n_ether_fleet` | `test_rx65n_bg96_fleet` |
+| Function | RX72N Ethernet job | RX65N/BG96 job | RX671/Type 1YN job |
+|----------|--------------------|----------------|---------------------|
+| Build boot loader and app | `build_rx72n_ether` | `build_rx65n_bg96` | `build_rx671_wifi` (app only) |
+| Flash boot loader / initial app | `flash_rx72n_ether` | `flash_rx65n_bg96` | `flash_rx671_wifi` (E2OB) |
+| Download app via boot loader | included in `flash_rx72n_ether` | `download_rx65n_bg96_app` | not yet implemented |
+| Verify app startup | included in MQTT/OTA observation | `run_rx65n_bg96_app` | `test_rx671_wifi` (`network`) |
+| Provision MQTT credentials | `provision_rx72n_ether_mqtt` | `provision_rx65n_bg96_mqtt` | compile-time CI variables |
+| Test MQTT | `test_rx72n_ether_mqtt` | `test_rx65n_bg96_mqtt` | `test_rx671_wifi` (`mqtt`) |
+| Build OTA candidate | `build_rx72n_ether_ota` | `build_rx65n_bg96_ota` | not yet implemented |
+| Create AWS IoT OTA job | `create_rx72n_ether_ota` | `create_rx65n_bg96_ota` | not yet implemented |
+| Test OTA | `test_rx72n_ether_ota` | `test_rx65n_bg96_ota` | not yet implemented |
+| Build Fleet Provisioning image | `build_rx72n_ether_fleet` | `build_rx65n_bg96_fleet` | not yet implemented |
+| Test Fleet Provisioning | `test_rx72n_ether_fleet` | `test_rx65n_bg96_fleet` | not yet implemented |
+
+The RX671 hardware lane builds on the Windows CC-RX runner, then flashes the
+application through the EK-RX671 onboard E2OB on RPi#1. The UART monitor opens
+SCI6 before issuing `rfp-cli -run`, so the one-shot WHD startup messages are not
+lost. `network` scope requires successful AP JOIN, WHD bring-up, and a
+FreeRTOS+TCP network-up event. `mqtt` additionally requires successful TLS and
+MQTT status markers. Raw UART and RFP logs plus a JUnit report are retained as
+job artifacts.
 
 Current hardware validation status is summarized in
 **Hardware CI Validation / 最新テスト結果** later in this README. As of
@@ -265,9 +275,10 @@ This project is treated as an advanced hardware CI pipeline: the full matrix spa
 |---------|-----------------|---------------|
 | `branch` | Feature branch push | Build only. Hardware jobs are kept out of push pipelines to avoid interleaving board state with MR pipelines. |
 | `mr` | Merge request | `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=mqtt`. This covers both transports while keeping review feedback short; OTA coverage is delegated to the focused matrix. |
-| `focused` | Manual/API | Build only unless the caller sets `RX72N_TEST_SCOPE`, `RX65N_BG96_TEST_SCOPE`, `RX72N_TLS_BACKEND`, `RX65N_BG96_TLS_BACKEND`, or TLS version variables explicitly. |
-| `main` | Default branch push | Same representative scope as `mr`; full matrix coverage is delegated to the schedule. |
-| `release` | Tag | Full software-TLS regression for RX72N and RX65N/BG96. |
+| `mr-rx671` | Merge request changing the RX671 project or its UART test | `RX671_WIFI_TEST_SCOPE=network`; RX72N and RX65N stay build-only so the RX671 hardware result is isolated. |
+| `focused` | Manual/API | Build only unless the caller sets `RX72N_TEST_SCOPE`, `RX65N_BG96_TEST_SCOPE`, `RX671_WIFI_TEST_SCOPE`, TLS backends, or TLS version variables explicitly. |
+| `main` | Default branch push | RX72N/RX65N MQTT plus RX671 network smoke; full matrix coverage is delegated to the schedule. |
+| `release` | Tag | Full software-TLS regression for RX72N and RX65N/BG96 plus RX671 network smoke. |
 | `nightly_matrix` | GitLab pipeline schedule | Parent pipeline that fans out the focused matrix rows. The active nightly schedule keeps `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` so promoted table cells continue to run daily. RX72N/Ether software LANBENCH is covered through a downstream bridge to the benchmark project. |
 
 Focused examples:
@@ -278,6 +289,12 @@ PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=ota RX65N_BG96_TEST_SCOPE=build RX72N_
 
 # RX65N/BG96 TSIP OTA only
 PIPELINE_PROFILE=focused RX65N_BG96_TEST_SCOPE=ota RUN_RX72N_BUILD=false RX72N_SKIP_HW_TESTS=true RX65N_BG96_TLS_BACKEND=tsip
+
+# EK-RX671 + Type 1YN AP JOIN and FreeRTOS+TCP startup
+PIPELINE_PROFILE=focused RX671_WIFI_TEST_SCOPE=network RX72N_TEST_SCOPE=build RX65N_BG96_TEST_SCOPE=build
+
+# EK-RX671 + Type 1YN AWS IoT TLS/MQTT smoke
+PIPELINE_PROFILE=focused RX671_WIFI_TEST_SCOPE=mqtt RX72N_TEST_SCOPE=build RX65N_BG96_TEST_SCOPE=build
 
 # Manual/API software TLS 1.3 MQTT on both boards
 PIPELINE_PROFILE=focused RX72N_TEST_SCOPE=mqtt RX65N_BG96_TEST_SCOPE=mqtt AWS_IOT_ENDPOINT=d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com RX72N_REQUIRE_TLS_VERSION=TLSv1.3 RX65N_BG96_REQUIRE_TLS_VERSION=TLSv1.3
@@ -293,7 +310,7 @@ Scheduler policy and cross-project guidance are documented in [development.md](d
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | Runs every `iot-reference-rx` focused matrix row represented by the AWS IoT Core table and LANBENCH table once per night, including stabilizing TLS 1.3 OTA / Fleet Provisioning rows and RX65N/BG96 software / TSIP LANBENCH rows. RX72N/Ether software LANBENCH lives in the `tsip_mbedtls13` benchmark project, so `matrix_rx72n_ether_software_tls13_resumption_0rtt` triggers that project as a downstream bridge with the validated software-0RTT LANBENCH variables. |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | Runs every `iot-reference-rx` focused matrix row represented by the AWS IoT Core table and LANBENCH table once per night, plus the RX671/Type 1YN network row and its conditional MQTT row. This includes stabilizing TLS 1.3 OTA / Fleet Provisioning rows and RX65N/BG96 software / TSIP LANBENCH rows. RX72N/Ether software LANBENCH lives in the `tsip_mbedtls13` benchmark project, so `matrix_rx72n_ether_software_tls13_resumption_0rtt` triggers that project as a downstream bridge with the validated software-0RTT LANBENCH variables. |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
