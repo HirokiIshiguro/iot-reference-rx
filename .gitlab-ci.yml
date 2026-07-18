@@ -552,14 +552,36 @@ matrix_rx72n_ether_tsip_tls13_fleet:
     AWS_IOT_ENDPOINT: "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
 
 matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
-  extends: .nightly_matrix_rx72n
+  stage: nightly_matrix
+  resource_group: nightly-matrix-rx72n-ether
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: on_success
+    - when: never
+  trigger:
+    project: oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13
+    branch: main
+    strategy: depend
+    forward:
+      yaml_variables: true
+      pipeline_variables: false
   variables:
-    RX72N_TEST_SCOPE: "tls13_0rtt"
-    RX72N_TLS_BACKEND: "tsip"
-    RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
-    RX72N_TLS13_0RTT_ENABLE: "true"
+    GIT_SUBMODULE_STRATEGY: "none"
+    RFP_CLI: "rfp-cli"
+    RFP_TOOL: "e2l:OBE110008"
+    UART_PORT: "${UART_PORT_ENVISION_KIT_RX72N_CN6_RPI1}"
+    DEVICE_LOCK_PATH: "/tmp/e2lite-rfp-cli.lock.d/rx72n-device-01.lock"
     LANBENCH_MBEDTLS_0RTT_HOST: "192.168.10.212"
     LANBENCH_MBEDTLS_0RTT_PORT: "15445"
+    MBEDTLS_BUILD_VARIANT: "tsip-0rtt"
+    RUN_HW_TESTS: "true"
+    RUN_LAN_BENCH: "true"
+    RUN_LANBENCHD_FROM_TREE: "false"
+    RUN_LANBENCH_MBEDTLS_0RTT_SERVER: "true"
+    RUN_LANBENCH_TLS13_0RTT_HOST: "false"
+    RUN_LANBENCH_TLS13_RESUMPTION_HOST: "false"
+    RUN_MQTT_SMOKE: "false"
+    RUN_S3_BENCH: "false"
 
 matrix_rx72n_ether_software_tls13_resumption_0rtt:
   stage: nightly_matrix
