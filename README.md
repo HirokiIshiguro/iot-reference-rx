@@ -28,11 +28,25 @@
 | <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5958)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5963)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5964)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6063)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6076)</small> |
 | <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5952)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5954)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5957)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5960)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5962)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5965)</small> |
 | <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5966)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5967)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6063)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6076)</small> |
-| <small>RX671/Type 1YN<br>software</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8122)</small> | <small>—</small> | <small>—</small> | <small>—</small> | <small>—</small> | <small>—</small> |
+| <small>RX671/Type 1YN<br>software</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8169)</small> | <small>—</small> | <small>—</small> | <small>—</small> | <small>—</small> | <small>—</small> |
+| <small>RX671/Type 1YN<br>TSIP</small> | <small>—</small> | <small>—</small> | <small>—</small> | <small>—</small> | <small>—</small> | <small>—</small> |
 
 <small>AWS IoT Core は [SessionTicket TLS extension をサポートしていません](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)。RX72N/Ether software では [pipeline #6087](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6087) で TLSv1.3 full handshake は2回成功する一方、NewSessionTicket が得られず resumption 不成立であることを確認しています。</small>
 
+<small>RX671/Type 1YN TSIP の AWS IoT MQTT は、device certificate のPKCS #11 provisioningを [benchmark issue #3](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/issues/3) で継続中です。LANBENCHで成功しているTSIP TLSをAWS IoT MQTT成功として流用していません。</small>
+
 ### LANBENCH / TLSエンドポイント基礎テスト結果
+
+#### RX671 TCP / TLS 1.2
+
+| <small>MCU環境</small> | <small>TCP<br>SINK / SOURCE</small> | <small>TLS 1.2<br>SINK</small> | <small>TLS 1.2<br>SOURCE</small> | <small>TLS 1.2<br>2セッション同時</small> |
+|---|:-:|:-:|:-:|:-:|
+| <small>RX671/Type 1YN<br>software</small> | <small>[SINK 44.930<br>SOURCE 42.517 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271)</small> | <small>[2.278 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271)</small> | <small>[2.099 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271)</small> | <small>—</small> |
+| <small>RX671/Type 1YN<br>TSIP</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8174)</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8177)</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8179)</small> | <small>[SINK+SINK](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8182)<br>[SOURCE+SOURCE](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8186)<br>[SINK+SOURCE](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8189)</small> |
+
+TSIPの2セッション行は接続数だけを確認するsmokeではありません。別々のTLS context / socketでhandshakeを完了し、payload転送窓を重複させて各10 MiBを同時通信し、aggregate throughputとfairnessを検証します。
+
+#### TLS 1.3 Resumption / 0-RTT
 
 | <small>MCU環境</small> | <small>TLS1.3 Resumption</small> | <small>TLS1.3 0-RTT</small> |
 |---|:-:|:-:|
@@ -40,6 +54,8 @@
 | <small>RX72N/Ether<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6454)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6454)</small> |
 | <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6488)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6488)</small> |
 | <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6489)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6489)</small> |
+| <small>RX671/Type 1YN<br>software</small> | <small>—</small> | <small>—</small> |
+| <small>RX671/Type 1YN<br>TSIP</small> | <small>—</small> | <small>—</small> |
 
 <small>この表は AWS IoT Core ではなく、SessionTicket を発行できる LANBENCH / Mbed TLS `ssl_server2` などのTLSエンドポイントに対する基礎実験結果です。</small>
 
@@ -324,6 +340,15 @@ RFP/UART操作前に取得します。`tools/rfp_cli_locked.sh` は従来どお�
 `/tmp/rx72n-e2lite-rfp-cli.lock.d/rfp-cli.lock` を個々のRFP呼び出しに使用するため、
 二層のlockは相互に自己デッドロックしません。
 
+RX671/Type 1YN のRPi#1実機jobも、standalone software benchmarkと同じ
+`RX671_RPI1_HARDWARE_LOCK_PATH=/tmp/ek-rx671-rpi1-hardware.lock` を `flock` します。
+`flash_rx671_wifi` と `test_rx671_wifi` の両方がcross-project lockを取得し、後者は
+lock保持中に正確なpipeline成果物を再flashしてからUARTを観測します。これにより、
+分割job間にdownstream benchmarkが実行されても別firmwareを誤って評価しません。
+競合投入したparent [#8276](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8276)
+とsoftware benchmark [#8277](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8277)
+では、software実機jobが78.680秒待って同じlockを取得し、両pipelineが成功しました。
+
 通常のMR pipelineはRX72N MQTTを実機確認しますが、default branch pipelineは
 RX72Nをbuild-onlyとします。post-merge直後の重複実機実行を避け、全実機coverageは
 共通lockを用いるnightly focused matrixで取得します。
@@ -396,11 +421,13 @@ Scheduler policy and cross-project guidance are documented in [development.md](d
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | Runs every `iot-reference-rx` focused matrix row represented by the AWS IoT Core table and LANBENCH table once per night, plus RX671/Type 1YN network/MQTT and six throughput profiles: TCP、単一TLS SINK/SOURCE、2セッション SINK+SINK / SOURCE+SOURCE / SINK+SOURCE。RX671性能は `tsip_mbedtls`、RX72N/Ether software LANBENCHは `tsip_mbedtls13` をdownstream bridgeで実行します。 |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | 条件を満たすnightly matrix行を1回ずつ実行します。RX671/Type 1YNはnetwork、software MQTT、software TCP/TLS 1.2 SINK/SOURCE、TSIP projectのTCP・単一TLS SINK/SOURCE・2セッション3モードを実行します。RX671 benchmarkは各正本project、RX72N/Ether software 0-RTTは `tsip_mbedtls13` downstream bridgeで実行します。TSIP 0-RTTの同様の委譲は [MR !163](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/163) で分離して修理します。 |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
 `test_rx72n_ether_ota` は上流で作成した one-shot の AWS IoT OTA Job を消費するため、observer ジョブ単体では再試行できません。再検証時は新しい focused pipeline または nightly matrix row を開始し、cleanup / create / test を一巡させて新しい OTA Job を作成してください。
+
+「nightly matrix」はリポジトリ内の全jobを無条件に実行する意味ではありません。明示的なopt-inであるRX72N software dual AWS MQTT (`RUN_RX72N_MULTI_TLS_TEST=false`) や、必要なgateを満たさない行は起動しません。2026-07-18の [scheduled parent #8168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8168) は34行を生成し、そのうちRX671の8行はすべて実機成功しました。本変更後はsoftware LANBENCH 1行も追加されます。
 
 ## Hardware CI Validation / 最新テスト結果
 
@@ -417,23 +444,25 @@ Creating or updating project pipeline schedules requires Maintainer/Owner permis
 |------|----------------|
 | AWS IoT Core MQTT / OTA / Fleet | RX72N/Ether と RX65N/BG96 の software / TSIP 全セルを5回成功確認済み。TLS 1.3 full handshake までの 24/24 セルも5回成功済み。 |
 | LANBENCH TLS 1.3 Resumption / 0-RTT | RX72N/Ether software / TSIP と RX65N/BG96 software / TSIP の全セルを5回成功確認済み。 |
-| RX671/Type 1YN AWS IoT | E2OB書き込み、WHD JOIN、DHCP、AWS IoT TLS/MQTTをRPi#1実機Runnerで検証。OTA/Fleetは未実装。 |
-| RX671/Type 1YN LANBENCH | TCP、単一TLS SINK/SOURCE、2セッション同時TLS 3モードを正本ベンチマークのdownstream pipelineで再現。 |
-| Nightly schedule | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` で、昇格済みパタンを夜間に1回ずつ実行。RX72N/Ether software LANBENCH は `tsip_mbedtls13`、RX671/Type 1YN性能は `tsip_mbedtls` downstream bridgeで実行。 |
+| RX671/Type 1YN AWS IoT | softwareはE2OB書き込み、WHD JOIN、DHCP、AWS IoT TLS/MQTTをRPi#1実機Runnerで検証。software OTA/FleetとTSIP AWS MQTTは未実装。 |
+| RX671/Type 1YN LANBENCH | software TCP/TLS 1.2 SINK/SOURCEをsoftware benchmarkのRPi#1実機pipelineで再現。TSIP projectのTCP・単一TLS SINK/SOURCE・2セッション同時TLS 3モードはscheduled downstream pipelineで再現。 |
+| Nightly schedule | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でgateを満たすパタンを夜間に1回ずつ実行。RX72N/Ether software 0-RTTとRX671/Type 1YN software / TSIPは各benchmarkのdownstream bridgeで実行。TSIP 0-RTT委譲はMR !163で分離修理。 |
 | AWS IoT Core resumption / 0-RTT | AWS IoT Core が SessionTicket TLS extension をサポートしていないため、AWS IoT Core 接続表には TLS 1.3 Resumption / 0-RTT 列を置きません。 |
 
 ### Evidence Index
 
 | Scope | Commit / condition | Evidence |
 |-------|--------------------|----------|
-| RX671/Type 1YN network-up | `main` commit `95312d9b`; RPi#1 E2OB/SCI6、WHD JOIN、DHCP | [pipeline #8113](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8113) / [test job #53125](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53125) |
-| RX671/Type 1YN AWS IoT MQTT | `main` commit `95312d9b`; AWS IoT TLS、MQTT connect | [pipeline #8122](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8122) / [test job #53146](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53146) |
-| RX671/Type 1YN TCP LANBENCH | benchmark commit `5275d3a9`; RPi#2有線、10 MiB、SINK/SOURCE | [pipeline #8154](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8154) / [test job #53251](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53251) |
-| RX671/Type 1YN TSIP TLS SINK | benchmark commit `5275d3a9`; RPi#2有線、10 MiB | [pipeline #8155](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8155) / [test job #53253](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53253) |
-| RX671/Type 1YN TSIP TLS SOURCE | benchmark commit `5275d3a9`; RPi#2有線、10 MiB | [pipeline #8156](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8156) / [test job #53255](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53255) |
-| RX671/Type 1YN dual TLS SINK+SINK | benchmark commit `5275d3a9`; 2セッション同時 | [pipeline #8157](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8157) / [test job #53257](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53257) |
-| RX671/Type 1YN dual TLS SOURCE+SOURCE | benchmark commit `5275d3a9`; 2セッション同時 | [pipeline #8158](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8158) / [test job #53259](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53259) |
-| RX671/Type 1YN dual TLS SINK+SOURCE | benchmark commit `5275d3a9`; 2セッション同時 | [pipeline #8159](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8159) / [test job #53261](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53261) |
+| RX671/Type 1YN network-up | scheduled parent `#8168`, `main` `638117f3`; RPi#1 E2OB/SCI6、WHD JOIN、DHCP | [pipeline #8172](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8172) / [test job #53387](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53387) |
+| RX671/Type 1YN software AWS IoT MQTT | scheduled parent `#8168`, `main` `638117f3`; AWS IoT TLS、MQTT connect | [pipeline #8169](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8169) / [test job #53370](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53370) |
+| RX671/Type 1YN software TCP/TLS 1.2 LANBENCH | benchmark main `3a96ef79`; 各10 MiB、TCP SINK 44.930 / SOURCE 42.517 Mbps、TLS SINK 2.278 / SOURCE 2.099 Mbps | [pipeline #8271](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271) / [test job #53886](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/jobs/53886) |
+| RX671/Type 1YN cross-project transaction lock | parent `e8b21197`がflash/testを共通lock内で実行。software main `3a96ef79`を競合投入し、test jobが78.680秒待機後に取得。両pipeline success | parent [#8276 / test #53895](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53895) / software [#8277 / test #53897](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/jobs/53897) |
+| RX671/Type 1YN TSIP project TCP LANBENCH | scheduled parent `#8168`, benchmark `ff3cb85a`; 10 MiB、SINK 41.610 / SOURCE 34.778 Mbps | [pipeline #8174](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8174) / [test job #53395](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53395) |
+| RX671/Type 1YN TSIP TLS SINK | scheduled parent `#8168`, benchmark `ff3cb85a`; 10 MiB、40.407 Mbps、software record 0 | [pipeline #8177](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8177) / [test job #53411](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53411) |
+| RX671/Type 1YN TSIP TLS SOURCE | scheduled parent `#8168`, benchmark `ff3cb85a`; 10 MiB、34.113 Mbps、software record 0 | [pipeline #8179](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8179) / [test job #53416](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53416) |
+| RX671/Type 1YN dual TLS SINK+SINK | scheduled parent `#8168`, benchmark `ff3cb85a`; aggregate 36.687 Mbps、fairness 0.997 | [pipeline #8182](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8182) / [test job #53429](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53429) |
+| RX671/Type 1YN dual TLS SOURCE+SOURCE | scheduled parent `#8168`, benchmark `ff3cb85a`; aggregate 33.209 Mbps、fairness 0.993 | [pipeline #8186](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8186) / [test job #53442](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53442) |
+| RX671/Type 1YN dual TLS SINK+SOURCE | scheduled parent `#8168`, benchmark `ff3cb85a`; aggregate 26.575 Mbps、fairness 0.912、payload overlap約91 % | [pipeline #8189](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8189) / [test job #53454](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53454) |
 | RX72N TSIP transport include order durability | RX72N TSIP transport include order 修正後 | [#5858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5858) / [#5877](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5877) / [#5896](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5896) / [#5915](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5915) / [#5950](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5950)。#5950 は 17/18 行成功後に RX65N/BG96 TSIP Fleet 行だけキャンセルされたため、[focused #5969](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969) で補完。 |
 | TSIP backend + TLS 1.3 MQTT | main merge commit `7ed373c9` | [#6045](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6045) / [#6046](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6046) / [#6047](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6047) / [#6048](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6048) / [#6049](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049) |
 | TSIP backend + TLS 1.3 OTA | commit `2e687700`; RX65N/BG96 OTA candidate も TLS 1.3 設定でビルド | [#6059](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6059) / [#6060](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6060) / [#6061](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6061) / [#6062](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6062) / [#6063](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6063) |
