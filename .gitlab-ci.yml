@@ -210,6 +210,11 @@ variables:
   RX671_WIFI_SKIP_HW_TESTS: "false"
   RX671_WIFI_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   RX671_WIFI_DEVICE_RESOURCE_GROUP: "ek-rx671-rpi1-hardware"
+  # Runner-local lock shared with the standalone RX671 benchmark projects.
+  # GitLab resource_group locks are project-scoped, so they cannot prevent a
+  # downstream benchmark from reflashing the same board during this pipeline.
+  RX671_RPI1_HARDWARE_LOCK_PATH: "/tmp/ek-rx671-rpi1-hardware.lock"
+  RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS: "3600"
   RX671_WIFI_RUNNER_TAG: "dev-ek-rx671"
   RX671_WIFI_RUNNER_HOSTNAME: "ef-saffti-001-rpi-001"
   RX671_WIFI_LINUX_RFP_CLI: "./tools/rfp_cli_locked.sh"
@@ -1273,6 +1278,34 @@ build_rx72n_ether_fleet:
     - python3 -m venv .venv-pi
     - source .venv-pi/bin/activate
     - python -m pip install --quiet pyserial
+    - |
+      if ! command -v flock >/dev/null 2>&1; then
+        echo "flock is required for the shared RX671 runner lock." >&2
+        exit 1
+      fi
+      case "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" in
+        ''|*[!0-9]*)
+          echo "RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS must be a positive integer." >&2
+          exit 1
+          ;;
+      esac
+      if [ "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" -lt 1 ]; then
+        echo "RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS must be a positive integer." >&2
+        exit 1
+      fi
+      lock_dir="$(dirname "${RX671_RPI1_HARDWARE_LOCK_PATH}")"
+      umask 000
+      mkdir -p "${lock_dir}"
+      chmod 1777 "${lock_dir}" 2>/dev/null || true
+      : >> "${RX671_RPI1_HARDWARE_LOCK_PATH}"
+      chmod 666 "${RX671_RPI1_HARDWARE_LOCK_PATH}" 2>/dev/null || true
+      exec 9>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"
+      echo "Waiting for shared RX671 hardware lock: ${RX671_RPI1_HARDWARE_LOCK_PATH}"
+      if ! flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9; then
+        echo "Timed out waiting for shared RX671 hardware lock." >&2
+        exit 1
+      fi
+      echo "Acquired shared RX671 hardware lock for pipeline ${CI_PIPELINE_ID}, job ${CI_JOB_ID}."
 
 .aws_cli_windows_job:
   tags:
@@ -2688,6 +2721,7 @@ test_rx671_wifi:
     - echo "=== Verify EK-RX671 WHD and FreeRTOS+TCP startup over SCI6 ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi"
+      mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
 
@@ -2698,6 +2732,27 @@ test_rx671_wifi:
       if [ ! -e "$RX671_WIFI_UART_PORT" ]; then
         echo "Expected EK-RX671 SCI6 UART is not visible: $RX671_WIFI_UART_PORT" >&2
         exit 1
+      fi
+      if [ ! -f "$mot" ]; then
+        echo "RX671 firmware artifact is missing: $mot" >&2
+        exit 1
+      fi
+
+      # Reflash inside the same cross-project lock that remains held through
+      # UART observation. A standalone benchmark may legitimately run between
+      # the earlier flash job and this test job.
+      echo "=== Atomic RX671 reflash before UART observation ==="
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -p -v -reset -noquery "$mot" \
+        2>&1 | tee "$artifact_dir/atomic_reflash.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
       fi
 
       mode="network"

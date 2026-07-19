@@ -340,6 +340,12 @@ RFP/UART操作前に取得します。`tools/rfp_cli_locked.sh` は従来どお�
 `/tmp/rx72n-e2lite-rfp-cli.lock.d/rfp-cli.lock` を個々のRFP呼び出しに使用するため、
 二層のlockは相互に自己デッドロックしません。
 
+RX671/Type 1YN のRPi#1実機jobも、standalone software/TSIP benchmarkと同じ
+`RX671_RPI1_HARDWARE_LOCK_PATH=/tmp/ek-rx671-rpi1-hardware.lock` を `flock` します。
+`flash_rx671_wifi` と `test_rx671_wifi` の両方がcross-project lockを取得し、後者は
+lock保持中に正確なpipeline成果物を再flashしてからUARTを観測します。これにより、
+分割job間にdownstream benchmarkが実行されても別firmwareを誤って評価しません。
+
 通常のMR pipelineはRX72N MQTTを実機確認しますが、default branch pipelineは
 RX72Nをbuild-onlyとします。post-merge直後の重複実機実行を避け、全実機coverageは
 共通lockを用いるnightly focused matrixで取得します。
