@@ -400,6 +400,8 @@ Scheduler policy and cross-project guidance are documented in [development.md](d
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
+`test_rx72n_ether_ota` は上流で作成した one-shot の AWS IoT OTA Job を消費するため、observer ジョブ単体では再試行できません。再検証時は新しい focused pipeline または nightly matrix row を開始し、cleanup / create / test を一巡させて新しい OTA Job を作成してください。
+
 ## Hardware CI Validation / 最新テスト結果
 
 最終更新: 2026-07-18 JST。

@@ -75,7 +75,12 @@ MARKERS = [
     Marker("close_file", "close_file", r"Close file event Received", False),
     Marker("activate_image", "activate_image", r"Activate Image event Received", False),
     Marker("ota_completed", "activate_image", r"OTA Completed successfully!", False),
-    Marker("software_reset", "reboot", r"software reset\.\.\.", False),
+    Marker(
+        "software_reset",
+        "reboot",
+        r"software reset(?: after install area erase)?\.\.\.",
+        False,
+    ),
     Marker("selfcheck_mode", "self_test", r"OTA image is in selfcheck mode\.", False),
     Marker("image_state_testing", "self_test", r"Testing\.", False),
     Marker("image_self_test_passed", "self_test", r"Image self-test passed!", False),
@@ -311,10 +316,12 @@ class OtaLogAnalyzer:
                 "required": marker.required,
                 "hits": 0,
                 "first_seen_at": None,
+                "first_seen_line_number": None,
                 "first_line": None,
             }
             for marker in MARKERS
         }
+        self.marker_events = {marker.marker_id: [] for marker in MARKERS}
         self.error_state = {}
         self.versions_seen = []
         self.version_events = []
@@ -335,8 +342,15 @@ class OtaLogAnalyzer:
                 continue
             state = self.marker_state[marker.marker_id]
             state["hits"] += 1
+            event = {
+                "seen_at": round(elapsed, 3),
+                "line_number": self.total_lines,
+                "line": stripped,
+            }
+            self.marker_events[marker.marker_id].append(event)
             if state["first_seen_at"] is None:
                 state["first_seen_at"] = round(elapsed, 3)
+                state["first_seen_line_number"] = self.total_lines
                 state["first_line"] = stripped
             if marker.capture_version:
                 version_match = VERSION_RE.search(stripped)
@@ -346,6 +360,7 @@ class OtaLogAnalyzer:
                         {
                             "version": version,
                             "seen_at": round(elapsed, 3),
+                            "line_number": self.total_lines,
                             "line": stripped,
                         }
                     )
@@ -424,7 +439,7 @@ class OtaLogAnalyzer:
             version == self.require_tls_version for version in self.tls_versions_seen
         )
 
-    def is_success(self):
+    def strict_marker_proof_ok(self):
         required_markers = (
             "job_received",
             "download_started",
@@ -434,7 +449,7 @@ class OtaLogAnalyzer:
             "image_accepted",
         )
         required_ok = all(self.has_marker(marker_id) for marker_id in required_markers)
-        if not required_ok or self.first_error() is not None:
+        if not required_ok:
             return False
 
         if self.expected_version:
@@ -443,10 +458,69 @@ class OtaLogAnalyzer:
         elif len(self.versions_seen) < 2:
             return False
 
-        if not self.tls_requirement_ok():
+        return self.observed_reboot_into_new_image()
+
+    def post_reboot_completion_proof_ok(self):
+        """Accept strong end-to-end proof when verbose close/activate lines are lost.
+
+        RX72N can emit enough always-on multi-TLS traffic that individual verbose
+        OTA callback lines are not captured.  This alternate proof still requires
+        download progress and an ordered transition from a different baseline
+        version through the OTA software reset into the expected version, followed
+        by the post-reboot completion message.
+        """
+        if not self.expected_version:
             return False
 
-        return self.observed_reboot_into_new_image()
+        download_marker_ids = ("job_received", "download_started", "block_downloaded")
+        if not all(self.has_marker(marker_id) for marker_id in download_marker_ids):
+            return False
+
+        for reset_event in self.marker_events["software_reset"]:
+            reset_line = reset_event["line_number"]
+            download_precedes_reset = all(
+                any(
+                    event["line_number"] < reset_line
+                    for event in self.marker_events[marker_id]
+                )
+                for marker_id in download_marker_ids
+            )
+            if not download_precedes_reset:
+                continue
+
+            baseline_seen = any(
+                event["line_number"] < reset_line
+                and event["version"] != self.expected_version
+                for event in self.version_events
+            )
+            if not baseline_seen:
+                continue
+
+            for version_event in self.version_events:
+                if (
+                    version_event["version"] != self.expected_version
+                    or version_event["line_number"] <= reset_line
+                ):
+                    continue
+                if any(
+                    event["line_number"] > version_event["line_number"]
+                    for event in self.marker_events["ota_completed"]
+                ):
+                    return True
+
+        return False
+
+    def success_proof(self):
+        if self.first_error() is not None or not self.tls_requirement_ok():
+            return None
+        if self.strict_marker_proof_ok():
+            return "strict_markers"
+        if self.post_reboot_completion_proof_ok():
+            return "post_reboot_version_and_completion"
+        return None
+
+    def is_success(self):
+        return self.success_proof() is not None
 
     def classify_timeout(self, total_bytes):
         if total_bytes == 0 or self.total_lines == 0:
@@ -490,6 +564,7 @@ class OtaLogAnalyzer:
         return {
             "success": success,
             "classification": classification,
+            "success_proof": self.success_proof() if success else None,
             "last_progress_stage": self.last_progress_stage,
             "expected_version": self.expected_version,
             "versions_seen": self.versions_seen,
@@ -686,6 +761,7 @@ def print_summary(summary):
     print("\n--- OTA Summary ---")
     print(f"Success:        {summary['success']}")
     print(f"Classification: {summary['classification']}")
+    print(f"Success proof:  {summary['success_proof'] or '(none)'}")
     print(f"Last stage:     {summary['last_progress_stage']}")
     print(f"Versions seen:  {', '.join(summary['versions_seen']) or '(none)'}")
     print(f"TLS versions:   {', '.join(summary['tls_versions_seen']) or '(none)'}")
