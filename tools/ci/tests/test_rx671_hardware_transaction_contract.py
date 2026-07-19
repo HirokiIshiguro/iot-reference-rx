@@ -56,6 +56,42 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         for job in (flash, test):
             self.assertIn("- .rx671_wifi_linux_hw_job", job)
 
+    def test_nightly_routes_both_rx671_tls13_0rtt_variants(self) -> None:
+        software_template = job_block(
+            self.ci,
+            ".matrix_rx671_software_lanbench",
+            "matrix_rx671_wifi_software_lanbench",
+        )
+        software = job_block(
+            self.ci,
+            "matrix_rx671_wifi_software_tls13_resumption_0rtt",
+            ".matrix_rx671_lanbench",
+        )
+        tsip = job_block(
+            self.ci,
+            "matrix_rx671_wifi_tsip_tls13_resumption_0rtt",
+            "matrix_rx72n_ether_software_mqtt",
+        )
+
+        self.assertIn(
+            'RX671_SOFTWARE_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"',
+            software_template,
+        )
+        self.assertIn(
+            "RX671_SOFTWARE_BENCHMARK_WIFI_PASSPHRASE: "
+            '"$RX671_EK_WIFI_PASSPHRASE"',
+            software_template,
+        )
+        self.assertIn(
+            "RX671_SOFTWARE_BENCHMARK_WIFI_PASSWORD: "
+            '"$RX671_EK_WIFI_PASSWORD"',
+            software_template,
+        )
+        self.assertIn("extends: .matrix_rx671_software_lanbench", software)
+        self.assertIn('RX671_SOFTWARE_BENCHMARK_PROFILE: "tls13-0rtt"', software)
+        self.assertIn("extends: .matrix_rx671_lanbench", tsip)
+        self.assertIn('RX671_BENCHMARK_PROFILE: "tls13-0rtt"', tsip)
+
 
 if __name__ == "__main__":
     unittest.main()
