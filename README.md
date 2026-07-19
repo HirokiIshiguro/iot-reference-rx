@@ -41,7 +41,7 @@
 
 | <small>MCU環境</small> | <small>TCP<br>SINK / SOURCE</small> | <small>TLS 1.2<br>SINK</small> | <small>TLS 1.2<br>SOURCE</small> | <small>TLS 1.2<br>2セッション同時</small> |
 |---|:-:|:-:|:-:|:-:|
-| <small>RX671/Type 1YN<br>software</small> | <small>[SINK 45.368<br>SOURCE 42.409 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8207)</small> | <small>[2.278 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8207)</small> | <small>[2.192 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8207)</small> | <small>—</small> |
+| <small>RX671/Type 1YN<br>software</small> | <small>[SINK 44.930<br>SOURCE 42.517 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271)</small> | <small>[2.278 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271)</small> | <small>[2.099 Mbps](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271)</small> | <small>—</small> |
 | <small>RX671/Type 1YN<br>TSIP</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8174)</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8177)</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8179)</small> | <small>[SINK+SINK](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8182)<br>[SOURCE+SOURCE](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8186)<br>[SINK+SOURCE](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8189)</small> |
 
 TSIPの2セッション行は接続数だけを確認するsmokeではありません。別々のTLS context / socketでhandshakeを完了し、payload転送窓を重複させて各10 MiBを同時通信し、aggregate throughputとfairnessを検証します。
@@ -340,11 +340,14 @@ RFP/UART操作前に取得します。`tools/rfp_cli_locked.sh` は従来どお�
 `/tmp/rx72n-e2lite-rfp-cli.lock.d/rfp-cli.lock` を個々のRFP呼び出しに使用するため、
 二層のlockは相互に自己デッドロックしません。
 
-RX671/Type 1YN のRPi#1実機jobも、standalone software/TSIP benchmarkと同じ
+RX671/Type 1YN のRPi#1実機jobも、standalone software benchmarkと同じ
 `RX671_RPI1_HARDWARE_LOCK_PATH=/tmp/ek-rx671-rpi1-hardware.lock` を `flock` します。
 `flash_rx671_wifi` と `test_rx671_wifi` の両方がcross-project lockを取得し、後者は
 lock保持中に正確なpipeline成果物を再flashしてからUARTを観測します。これにより、
 分割job間にdownstream benchmarkが実行されても別firmwareを誤って評価しません。
+競合投入したparent [#8276](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8276)
+とsoftware benchmark [#8277](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8277)
+では、software実機jobが78.680秒待って同じlockを取得し、両pipelineが成功しました。
 
 通常のMR pipelineはRX72N MQTTを実機確認しますが、default branch pipelineは
 RX72Nをbuild-onlyとします。post-merge直後の重複実機実行を避け、全実機coverageは
@@ -452,7 +455,8 @@ Creating or updating project pipeline schedules requires Maintainer/Owner permis
 |-------|--------------------|----------|
 | RX671/Type 1YN network-up | scheduled parent `#8168`, `main` `638117f3`; RPi#1 E2OB/SCI6、WHD JOIN、DHCP | [pipeline #8172](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8172) / [test job #53387](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53387) |
 | RX671/Type 1YN software AWS IoT MQTT | scheduled parent `#8168`, `main` `638117f3`; AWS IoT TLS、MQTT connect | [pipeline #8169](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8169) / [test job #53370](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53370) |
-| RX671/Type 1YN software TCP/TLS 1.2 LANBENCH | benchmark `f204bd82`; 各10 MiB、TCP SINK 45.368 / SOURCE 42.409 Mbps、TLS SINK 2.278 / SOURCE 2.192 Mbps | [pipeline #8207](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8207) / [test job #53518](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/jobs/53518) |
+| RX671/Type 1YN software TCP/TLS 1.2 LANBENCH | benchmark main `3a96ef79`; 各10 MiB、TCP SINK 44.930 / SOURCE 42.517 Mbps、TLS SINK 2.278 / SOURCE 2.099 Mbps | [pipeline #8271](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/pipelines/8271) / [test job #53886](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/jobs/53886) |
+| RX671/Type 1YN cross-project transaction lock | parent `e8b21197`がflash/testを共通lock内で実行。software main `3a96ef79`を競合投入し、test jobが78.680秒待機後に取得。両pipeline success | parent [#8276 / test #53895](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/53895) / software [#8277 / test #53897](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls/-/jobs/53897) |
 | RX671/Type 1YN TSIP project TCP LANBENCH | scheduled parent `#8168`, benchmark `ff3cb85a`; 10 MiB、SINK 41.610 / SOURCE 34.778 Mbps | [pipeline #8174](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8174) / [test job #53395](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53395) |
 | RX671/Type 1YN TSIP TLS SINK | scheduled parent `#8168`, benchmark `ff3cb85a`; 10 MiB、40.407 Mbps、software record 0 | [pipeline #8177](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8177) / [test job #53411](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53411) |
 | RX671/Type 1YN TSIP TLS SOURCE | scheduled parent `#8168`, benchmark `ff3cb85a`; 10 MiB、34.113 Mbps、software record 0 | [pipeline #8179](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8179) / [test job #53416](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/jobs/53416) |
