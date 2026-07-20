@@ -443,9 +443,17 @@ matrix_rx671_wifi_mqtt:
     RX671_SOFTWARE_BENCHMARK_PROFILE: "software-all"
     RX671_SOFTWARE_BENCHMARK_RUN_HARDWARE: "true"
     RX671_SOFTWARE_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"
+    RX671_SOFTWARE_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"
+    RX671_SOFTWARE_BENCHMARK_WIFI_PASSPHRASE: "$RX671_EK_WIFI_PASSPHRASE"
+    RX671_SOFTWARE_BENCHMARK_WIFI_PASSWORD: "$RX671_EK_WIFI_PASSWORD"
 
 matrix_rx671_wifi_software_lanbench:
   extends: .matrix_rx671_software_lanbench
+
+matrix_rx671_wifi_software_tls13_resumption_0rtt:
+  extends: .matrix_rx671_software_lanbench
+  variables:
+    RX671_SOFTWARE_BENCHMARK_PROFILE: "tls13-0rtt"
 
 .matrix_rx671_lanbench:
   stage: nightly_matrix
@@ -497,6 +505,11 @@ matrix_rx671_wifi_lanbench_dual_sink_source:
   extends: .matrix_rx671_lanbench
   variables:
     RX671_BENCHMARK_PROFILE: "dual-sink-source"
+
+matrix_rx671_wifi_tsip_tls13_resumption_0rtt:
+  extends: .matrix_rx671_lanbench
+  variables:
+    RX671_BENCHMARK_PROFILE: "tls13-0rtt"
 
 matrix_rx72n_ether_software_mqtt:
   extends: .nightly_matrix_rx72n
