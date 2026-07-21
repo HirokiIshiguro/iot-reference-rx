@@ -1156,6 +1156,12 @@ build_rx671_wifi_fleet:
         FleetClaimCertificate = $fleetClaimCert
         FleetClaimPrivateKey = $fleetClaimKey
         WlanAllowBusSleepDelayMs = [int]$env:RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS
+        # The Fleet image has three proven 2304-byte MQTT/CBOR buffers. Reclaim
+        # their linker space from heap_4 while retaining about 1 KiB RAM margin.
+        FreeRtosHeapSizeKb = 250
+        # The default PCLK/2 DTC path was not reliable with this larger Fleet
+        # image. PCLK/8 passed JOIN, DHCP, DNS, and TLS repeatedly on RPi#1.
+        SdioRunClockDiv = "SDHI_DIV_8"
       }
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx671_wifi_fleet"
       $outputDir = "$env:CI_PROJECT_DIR\Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"
@@ -1210,6 +1216,9 @@ build_rx671_wifi_fleet:
           pipeline_id = $env:CI_PIPELINE_ID
           commit_sha = $env:CI_COMMIT_SHA
           encryption_context = $context
+          fleet_network_buffer_size = 2304
+          freertos_heap_size_kb = $buildArgs.FreeRtosHeapSizeKb
+          sdio_run_clock_div = $buildArgs.SdioRunClockDiv
           plaintext_mot_sha256 = (Get-FileHash -LiteralPath $sourceMot -Algorithm SHA256).Hash.ToLowerInvariant()
           encrypted_mot_sha256 = (Get-FileHash -LiteralPath $encryptedMot -Algorithm SHA256).Hash.ToLowerInvariant()
         }
@@ -3120,6 +3129,7 @@ test_rx671_wifi_fleet:
       trap park_board EXIT
 
       echo "=== Erase stale Data Flash and flash exact encrypted-build artifact ==="
+      touch "$artifact_dir/fleet_flash_started.ok"
       "$RX671_WIFI_LINUX_RFP_CLI" \
         -d "$RX671_WIFI_RFP_DEVICE" \
         -t "$RX671_WIFI_RFP_TOOL" \
@@ -3141,6 +3151,7 @@ test_rx671_wifi_fleet:
         2>&1 | tee "$artifact_dir/flash.log"
       status=${PIPESTATUS[0]}
       if [ "$status" -ne 0 ]; then exit "$status"; fi
+      touch "$artifact_dir/fleet_flash_completed.ok"
 
       reset_cmd="$RX671_WIFI_LINUX_RFP_CLI -d $RX671_WIFI_RFP_DEVICE -t $RX671_WIFI_RFP_TOOL -if $RX671_WIFI_RFP_INTERFACE -s $RX671_WIFI_RFP_SPEED -auth id $RX671_WIFI_RFP_AUTH_ID -sig -run -noquery"
       set +e
@@ -3157,6 +3168,57 @@ test_rx671_wifi_fleet:
       test_status=${PIPESTATUS[0]}
       set -e
       exit "$test_status"
+  after_script:
+    - |
+      # GitLab sends cancellation directly to the script shell, so its EXIT
+      # trap is not sufficient by itself. after_script runs in a fresh shell
+      # and provides a second, idempotent claim-credential removal/park path.
+      set +e
+      set -o pipefail
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_fleet"
+      runtime_dir="$CI_PROJECT_DIR/.rx671-fleet-runtime"
+      fleet_mot="$runtime_dir/aws_wifi_rx671_ek_fleet.mot"
+      park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
+      mkdir -p "$artifact_dir"
+      rm -f "$fleet_mot"
+
+      if [ -f "$artifact_dir/parked.ok" ]; then
+        echo "RX671 Fleet after_script: board already parked." | tee "$artifact_dir/after_script_park.log"
+      elif [ -f "$artifact_dir/preflight_parked.ok" ] && [ ! -f "$artifact_dir/fleet_flash_started.ok" ]; then
+        echo "RX671 Fleet after_script: preflight park is still authoritative; Fleet flash never started." | tee "$artifact_dir/after_script_park.log"
+        touch "$artifact_dir/parked.ok"
+      elif [ ! -f "$park_mot" ]; then
+        echo "RX671 Fleet after_script: claim-free park image is unavailable." | tee "$artifact_dir/after_script_park.log" >&2
+        touch "$artifact_dir/after_script_park_failed"
+      else
+        echo "=== after_script: park EK-RX671 on claim-free network image ===" | tee "$artifact_dir/after_script_park.log"
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -erase-chip -noquery \
+          2>&1 | tee -a "$artifact_dir/after_script_park.log"
+        erase_status=${PIPESTATUS[0]}
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -p -v -reset -noquery "$park_mot" \
+          2>&1 | tee -a "$artifact_dir/after_script_park.log"
+        park_status=${PIPESTATUS[0]}
+        if [ "$erase_status" -eq 0 ] && [ "$park_status" -eq 0 ]; then
+          touch "$artifact_dir/parked.ok" "$artifact_dir/after_script_parked.ok"
+        else
+          echo "RX671 Fleet after_script: failed to park the board." | tee -a "$artifact_dir/after_script_park.log" >&2
+          touch "$artifact_dir/after_script_park_failed"
+        fi
+      fi
+      rm -f "$fleet_mot"
+      rmdir "$runtime_dir" 2>/dev/null || true
   artifacts:
     when: always
     paths:

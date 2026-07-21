@@ -45,7 +45,17 @@
 
 #define democonfigDEMO_STACKSIZE            (configMINIMAL_STACK_SIZE * 3)
 #define democonfigDEMO_TASK_PRIORITY        (tskIDLE_PRIORITY + 1)
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+/*
+ * AWS IoT rejects an MQTT 5 CONNECT that advertises less than 512 bytes, and
+ * the accepted CSR response (certificate PEM, certificate ID, and ownership
+ * token) needs substantially more than that minimum.  Match the 2304-byte
+ * buffer used by the proven RX72N/RX65N Fleet configurations.
+ */
+#define democonfigNETWORK_BUFFER_SIZE       (2304U)
+#else
 #define democonfigNETWORK_BUFFER_SIZE       (configMINIMAL_STACK_SIZE * 3)
+#endif
 
 #define democonfigMQTT_LIB                  "core-mqtt@" MQTT_LIBRARY_VERSION
 #define AWS_IOT_MQTT_ALPN                   "\x0ex-amzn-mqtt-ca"
