@@ -41,6 +41,10 @@ PROVENANCE_CONFIG_PATHS = (
     "src/whd_port/whd_port_resource.c",
 )
 PROVENANCE_MANIFEST_NAME = "ota-layout-provenance.json"
+FWUP_HEADER_SIZE = 0x200
+FWUP_DESCRIPTOR_SIZE = 0x100
+FWUP_APPLICATION_OFFSET = FWUP_HEADER_SIZE + FWUP_DESCRIPTOR_SIZE
+LITTLEFS_LINKER_SECTION = "C_LITTLEFS_MANAGEMENT_AREA"
 
 
 @dataclass(frozen=True)
@@ -443,25 +447,7 @@ def _data_flash_non_overlap_gate(
             f"data flash=0x{data_flash_start:08X}-0x{data_flash_end - 1:08X}の範囲外です",
         )
 
-    remaining_bytes = data_flash_size - (littlefs_end - littlefs_start)
-    if remaining_bytes <= 0:
-        return Gate(
-            "data_flash_non_overlap",
-            "FAIL",
-            f"LittleFS=0x{littlefs_start:08X}-0x{littlefs_end - 1:08X}が"
-            f"data flash全{data_flash_size} bytesを占有し、FWUP control/mirror/"
-            "user-app metadataとbootloader key用の独立領域がありません",
-        )
-
     ranges = list(consumer_ranges)
-    if not consumer_layout_complete:
-        return Gate(
-            "data_flash_non_overlap",
-            "UNKNOWN",
-            f"LittleFS外に{remaining_bytes} bytesありますが、FWUP control/mirror/"
-            "user-app metadataとbootloader keyの実測rangeが未確定です",
-        )
-
     consumers = [
         Region("LittleFS", littlefs_start, littlefs_end - littlefs_start),
         *ranges,
@@ -480,9 +466,128 @@ def _data_flash_non_overlap_gate(
         f"{region.name}=0x{region.start:08X}-0x{region.end - 1:08X}"
         for region in consumers
     )
+    if not ranges and littlefs_start == data_flash_start and littlefs_end == data_flash_end:
+        detail += "; LittleFSが全8 KiBを使用"
     if errors:
         detail += "; " + "; ".join(errors)
-    return Gate("data_flash_non_overlap", "FAIL" if errors else "PASS", detail)
+        return Gate("data_flash_non_overlap", "FAIL", detail)
+    if not consumer_layout_complete:
+        detail += (
+            "; LittleFS以外のraw Data Flash consumerについて、"
+            "install/key-store/OTA payloadを含む所有権証跡が未確定"
+        )
+        return Gate("data_flash_non_overlap", "UNKNOWN", detail)
+    detail += "; consumer所有権証跡が完備"
+    return Gate("data_flash_non_overlap", "PASS", detail)
+
+
+def _fwup_partition_gate(
+    *,
+    flash_start: int,
+    flash_size: int,
+    main_start: int,
+    buffer_start: int,
+    area_size: int,
+) -> Gate:
+    if flash_size <= 0 or flash_size % 2 != 0:
+        return Gate("fwup_partition", "FAIL", f"code flash size={flash_size}は2 bankに等分不能")
+
+    bank_size = flash_size // 2
+    expected_buffer_start = flash_start
+    expected_main_start = flash_start + bank_size
+    reserved_tail = bank_size - area_size
+    ok = (
+        0 < area_size <= bank_size
+        and buffer_start == expected_buffer_start
+        and main_start == expected_main_start
+    )
+    detail = (
+        f"bank size={bank_size} bytes; buffer start=0x{buffer_start:08X}"
+        f" (必要値=0x{expected_buffer_start:08X}); main start=0x{main_start:08X}"
+        f" (必要値=0x{expected_main_start:08X}); install area={area_size} bytes"
+    )
+    if ok:
+        detail += f"; 各bank末尾の予約候補={reserved_tail} bytes"
+    else:
+        detail += "; 2 bankの同一offset/同一size配置になっていません"
+    return Gate("fwup_partition", "PASS" if ok else "FAIL", detail)
+
+
+def _fwup_code_flash_layout_gate(
+    *,
+    main_start: int | None,
+    buffer_start: int | None,
+    area_size: int | None,
+    application_anchor: int | None,
+    except_vector_anchor: int | None,
+    reset_vector_anchor: int | None,
+    code_flash_anchors: dict[str, int] | None = None,
+) -> Gate:
+    if main_start is None or buffer_start is None or area_size is None:
+        return Gate(
+            "fwup_code_flash_layout",
+            "UNKNOWN",
+            "FWUP main/buffer/area sizeを導出できません",
+        )
+
+    main_header = Region("main-header", main_start, FWUP_HEADER_SIZE)
+    main_descriptor = Region(
+        "main-descriptor", main_start + FWUP_HEADER_SIZE, FWUP_DESCRIPTOR_SIZE
+    )
+    buffer_header = Region("buffer-header", buffer_start, FWUP_HEADER_SIZE)
+    buffer_descriptor = Region(
+        "buffer-descriptor", buffer_start + FWUP_HEADER_SIZE, FWUP_DESCRIPTOR_SIZE
+    )
+    expected_application = main_start + FWUP_APPLICATION_OFFSET
+    expected_except_vector = main_start + area_size - 0x80
+    expected_reset_vector = main_start + area_size - 0x04
+
+    errors: list[str] = []
+    if area_size <= FWUP_APPLICATION_OFFSET:
+        errors.append(
+            f"FWUP area {area_size} bytesがheader+descriptor {FWUP_APPLICATION_OFFSET} bytes以下"
+        )
+    if application_anchor != expected_application:
+        errors.append(
+            "application anchor="
+            f"{application_anchor if application_anchor is None else f'0x{application_anchor:08X}'}、"
+            f"必要値=0x{expected_application:08X}"
+        )
+    if except_vector_anchor != expected_except_vector:
+        errors.append(
+            "EXCEPTVECT="
+            f"{except_vector_anchor if except_vector_anchor is None else f'0x{except_vector_anchor:08X}'}、"
+            f"必要値=0x{expected_except_vector:08X}"
+        )
+    if reset_vector_anchor != expected_reset_vector:
+        errors.append(
+            "RESETVECT="
+            f"{reset_vector_anchor if reset_vector_anchor is None else f'0x{reset_vector_anchor:08X}'}、"
+            f"必要値=0x{expected_reset_vector:08X}"
+        )
+    reserved_anchors = sorted(
+        f"{name}@0x{address:08X}"
+        for name, address in (code_flash_anchors or {}).items()
+        if main_start <= address < expected_application
+    )
+    if reserved_anchors:
+        errors.append("header/descriptor予約域内anchor=" + ", ".join(reserved_anchors))
+
+    detail = "; ".join(
+        (
+            _hex_region(main_header),
+            _hex_region(main_descriptor),
+            _hex_region(buffer_header),
+            _hex_region(buffer_descriptor),
+            f"application=0x{expected_application:08X}",
+            f"vectors=0x{expected_except_vector:08X}/0x{expected_reset_vector:08X}",
+        )
+    )
+    if errors:
+        detail += "; " + "; ".join(errors)
+    else:
+        detail += "; linker objectsはheader/descriptor予約域外"
+    return Gate("fwup_code_flash_layout", "FAIL" if errors else "PASS", detail)
 
 
 def _strip_c_comments(text: str) -> str:
@@ -779,6 +884,15 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
     littlefs_block_size = _macro(littlefs_text, "LFS_FLASH_BLOCK_SIZE")
     littlefs_block_count = _macro(littlefs_text, "LFS_FLASH_BLOCK_COUNT")
     littlefs_program_size = _macro(littlefs_text, "LFS_FLASH_PROGRAM_SIZE")
+    raw_data_flash_consumers: list[Region] = []
+    if target_df_start is not None and data_flash_size is not None:
+        target_df_end = target_df_start + data_flash_size
+        raw_data_flash_consumers = [
+            Region(f"linker:{name}", address, 1)
+            for name, address in anchors.items()
+            if name != LITTLEFS_LINKER_SECTION
+            and target_df_start <= address < target_df_end
+        ]
     gates.append(
         _fwup_data_flash_geometry_gate(
             bsp_size=data_flash_size,
@@ -809,6 +923,10 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
             littlefs_start=littlefs_start,
             littlefs_block_size=littlefs_block_size,
             littlefs_block_count=littlefs_block_count,
+            consumer_ranges=raw_data_flash_consumers,
+            # Linker anchors alone do not prove that the OTA packer, bootloader,
+            # or runtime code never accesses raw Data Flash.
+            consumer_layout_complete=False,
         )
     )
 
@@ -820,19 +938,13 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
         return gates
     assert main_start is not None and buffer_start is not None and area_size is not None
     regions = [Region("main", main_start, area_size), Region("buffer", buffer_start, area_size)]
-    ordered = sorted(regions, key=lambda region: region.start)
-    partition_ok = (
-        area_size > 0
-        and ordered[0].start == flash_start
-        and ordered[0].end == ordered[1].start
-        and ordered[1].end == ADDRESS_SPACE_END
-    )
     gates.append(
-        Gate(
-            "fwup_partition",
-            "PASS" if partition_ok else "FAIL",
-            "; ".join(_hex_region(region) for region in regions)
-            + ("; 2領域でコードフラッシュ全体を被覆" if partition_ok else "; 連続2分割になっていません"),
+        _fwup_partition_gate(
+            flash_start=flash_start,
+            flash_size=rom_size,
+            main_start=main_start,
+            buffer_start=buffer_start,
+            area_size=area_size,
         )
     )
 
@@ -885,21 +997,15 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
 
     gates.append(_sdio_resource_addressing_gate(sdio_text, resource_text))
 
-    required_fwup_sections = {
-        "C_FIRMWARE_UPDATE_CONTROL_BLOCK",
-        "C_FIRMWARE_UPDATE_CONTROL_BLOCK_MIRROR",
-        "C_USER_APPLICATION_AREA",
-    }
-    missing_fwup_sections = sorted(required_fwup_sections - anchors.keys())
     gates.append(
-        Gate(
-            "fwup_control_sections",
-            "FAIL" if missing_fwup_sections else "PASS",
-            (
-                "linker -startに不足: " + ", ".join(missing_fwup_sections)
-                if missing_fwup_sections
-                else "FWUP管理・ユーザー領域sectionあり"
-            ),
+        _fwup_code_flash_layout_gate(
+            main_start=main_start,
+            buffer_start=buffer_start,
+            area_size=area_size,
+            application_anchor=application_anchor,
+            except_vector_anchor=anchors.get("EXCEPTVECT"),
+            reset_vector_anchor=anchors.get("RESETVECT"),
+            code_flash_anchors=code_flash_anchors,
         )
     )
 

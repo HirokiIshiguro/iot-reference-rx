@@ -72,14 +72,14 @@ class GateTests(unittest.TestCase):
         self.assertEqual("PASS", by_name["rom_capacity"].status)
         self.assertEqual("PASS", by_name["fwup_data_flash_geometry"].status)
         self.assertEqual("PASS", by_name["littlefs_data_flash_geometry"].status)
-        self.assertEqual("FAIL", by_name["data_flash_non_overlap"].status)
+        self.assertEqual("UNKNOWN", by_name["data_flash_non_overlap"].status)
         self.assertEqual("PASS", by_name["fwup_partition"].status)
         self.assertEqual("FAIL", by_name["dual_bank_mode"].status)
         self.assertEqual("FAIL", by_name["application_in_main_area"].status)
         self.assertEqual("FAIL", by_name["static_image_single_area"].status)
         self.assertEqual("FAIL", by_name["whd_resources_follow_application"].status)
         self.assertEqual("FAIL", by_name["sdio_resource_addressing"].status)
-        self.assertEqual("FAIL", by_name["fwup_control_sections"].status)
+        self.assertEqual("FAIL", by_name["fwup_code_flash_layout"].status)
         self.assertEqual("UNKNOWN", by_name["artifact_provenance"].status)
         self.assertEqual("UNKNOWN", by_name["whd_blob_sizes"].status)
         self.assertEqual("UNKNOWN", by_name["map_image_single_area"].status)
@@ -107,16 +107,59 @@ class GateTests(unittest.TestCase):
         )
         self.assertEqual("FAIL", gate.status)
 
-    def test_data_flash_overlap_is_explicit_failure(self):
+    def test_littlefs_can_solely_own_all_data_flash(self):
         gate = layout._data_flash_non_overlap_gate(
             data_flash_start=0x00100000,
             data_flash_size=8192,
             littlefs_start=0x00100000,
             littlefs_block_size=128,
             littlefs_block_count=64,
+            consumer_layout_complete=True,
+        )
+        self.assertEqual("PASS", gate.status)
+        self.assertIn("0x00100000-0x00101FFF", gate.detail)
+        self.assertIn("consumer所有権証跡が完備", gate.detail)
+
+    def test_linker_anchors_alone_do_not_prove_sole_data_flash_ownership(self):
+        gate = layout._data_flash_non_overlap_gate(
+            data_flash_start=0x00100000,
+            data_flash_size=8192,
+            littlefs_start=0x00100000,
+            littlefs_block_size=128,
+            littlefs_block_count=64,
+            consumer_ranges=(),
+            consumer_layout_complete=False,
+        )
+        self.assertEqual("UNKNOWN", gate.status)
+        self.assertIn("所有権証跡が未確定", gate.detail)
+
+    def test_full_littlefs_rejects_raw_data_flash_consumers(self):
+        for name in ("raw-df-install", "bootloader-key-store", "ota-payload"):
+            with self.subTest(name=name):
+                gate = layout._data_flash_non_overlap_gate(
+                    data_flash_start=0x00100000,
+                    data_flash_size=8192,
+                    littlefs_start=0x00100000,
+                    littlefs_block_size=128,
+                    littlefs_block_count=64,
+                    consumer_ranges=(layout.Region(name, 0x00100000, 4),),
+                    consumer_layout_complete=True,
+                )
+                self.assertEqual("FAIL", gate.status)
+                self.assertIn(f"LittleFSと{name}が重複", gate.detail)
+
+    def test_known_data_flash_overlap_fails_even_if_inventory_is_incomplete(self):
+        gate = layout._data_flash_non_overlap_gate(
+            data_flash_start=0x00100000,
+            data_flash_size=8192,
+            littlefs_start=0x00100000,
+            littlefs_block_size=128,
+            littlefs_block_count=64,
+            consumer_ranges=(layout.Region("known-raw-consumer", 0x00100000, 4),),
+            consumer_layout_complete=False,
         )
         self.assertEqual("FAIL", gate.status)
-        self.assertIn("0x00100000-0x00101FFF", gate.detail)
+        self.assertIn("LittleFSとknown-raw-consumerが重複", gate.detail)
 
     def test_partial_littlefs_is_unknown_until_real_consumers_are_measured(self):
         gate = layout._data_flash_non_overlap_gate(
@@ -127,7 +170,7 @@ class GateTests(unittest.TestCase):
             littlefs_block_count=32,
         )
         self.assertEqual("UNKNOWN", gate.status)
-        self.assertIn("実測rangeが未確定", gate.detail)
+        self.assertIn("所有権証跡が未確定", gate.detail)
 
     def test_measured_data_flash_consumers_must_not_overlap(self):
         common = {
@@ -153,6 +196,68 @@ class GateTests(unittest.TestCase):
         self.assertEqual("PASS", passing.status)
         self.assertEqual("FAIL", overlapping.status)
         self.assertIn("LittleFSとcontrolが重複", overlapping.detail)
+
+    def test_fwup_code_flash_layout_uses_real_reserved_addresses(self):
+        passing = layout._fwup_code_flash_layout_gate(
+            main_start=0xFFF00000,
+            buffer_start=0xFFE00000,
+            area_size=0x000C0000,
+            application_anchor=0xFFF00300,
+            except_vector_anchor=0xFFFBFF80,
+            reset_vector_anchor=0xFFFBFFFC,
+        )
+        overlapping = layout._fwup_code_flash_layout_gate(
+            main_start=0xFFF00000,
+            buffer_start=0xFFE00000,
+            area_size=0x000C0000,
+            application_anchor=0xFFF00000,
+            except_vector_anchor=0xFFFFFF80,
+            reset_vector_anchor=0xFFFFFFFC,
+        )
+        self.assertEqual("PASS", passing.status)
+        self.assertIn("main-header=0xFFF00000-0xFFF001FF", passing.detail)
+        self.assertIn("main-descriptor=0xFFF00200-0xFFF002FF", passing.detail)
+        self.assertEqual("FAIL", overlapping.status)
+        self.assertIn("必要値=0xFFF00300", overlapping.detail)
+        self.assertIn("必要値=0xFFFBFF80", overlapping.detail)
+
+    def test_fwup_code_flash_layout_rejects_another_reserved_anchor(self):
+        gate = layout._fwup_code_flash_layout_gate(
+            main_start=0xFFF00000,
+            buffer_start=0xFFE00000,
+            area_size=0x000C0000,
+            application_anchor=0xFFF00300,
+            except_vector_anchor=0xFFFBFF80,
+            reset_vector_anchor=0xFFFBFFFC,
+            code_flash_anchors={
+                "PResetPRG": 0xFFF00300,
+                "C_BAD": 0xFFF00100,
+                "EXCEPTVECT": 0xFFFBFF80,
+                "RESETVECT": 0xFFFBFFFC,
+            },
+        )
+        self.assertEqual("FAIL", gate.status)
+        self.assertIn("C_BAD@0xFFF00100", gate.detail)
+
+    def test_fwup_partition_allows_symmetric_bootloader_tail(self):
+        gate = layout._fwup_partition_gate(
+            flash_start=0xFFE00000,
+            flash_size=0x00200000,
+            main_start=0xFFF00000,
+            buffer_start=0xFFE00000,
+            area_size=0x000C0000,
+        )
+        self.assertEqual("PASS", gate.status)
+        self.assertIn("予約候補=262144 bytes", gate.detail)
+
+        oversized = layout._fwup_partition_gate(
+            flash_start=0xFFE00000,
+            flash_size=0x00200000,
+            main_start=0xFFF00000,
+            buffer_start=0xFFE00000,
+            area_size=0x00100001,
+        )
+        self.assertEqual("FAIL", oversized.status)
 
     def test_sdio_numeric_alias_does_not_false_pass(self):
         sdio_text = """
