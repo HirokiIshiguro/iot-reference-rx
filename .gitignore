@@ -52,3 +52,4 @@ settings/
 Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/whd_join_config_local.h
 Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/aws_iot_config_local.h
 Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/tcp_throughput_config_local.h
+Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/rx671_fleet_config_local.h

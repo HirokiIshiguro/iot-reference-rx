@@ -21,6 +21,8 @@
 #include "whd_join_config.h"
 #include "whd_bringup.h"
 #include "aws_iot_mqtt_smoke.h"
+#include "rx671_fleet_bootstrap.h"
+#include "rx671_fleet_config.h"
 #include "tcp_throughput_smoke.h"
 #include "trcRecorder.h"
 
@@ -127,8 +129,12 @@ static void start_freertos_tcp_after_join(void)
         result = xTaskCreate(diag_ping_task, "DIAG_PING", 1024U, NULL, tskIDLE_PRIORITY + 1, NULL);
         g_diag_ping_task_create_result = (uint32_t)result;
         g_diag_ping_heap_after_create = xPortGetFreeHeapSize();
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+        rx671_fleet_bootstrap_start();
+#else
         aws_iot_mqtt_smoke_start();
         tcp_throughput_smoke_start();
+#endif
     }
 #else
     debug_puts("FreeRTOS+TCP skipped (WHD_JOIN_ENABLE=0)\r\n");

@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "aws_iot_config.h"
+#include "rx671_fleet_config.h"
 #include "core_mqtt.h"
 #include "iot_default_root_certificates.h"
 #include "logging_levels.h"
@@ -19,16 +20,27 @@
 #include "iot_logging_task.h"
 #include "logging_stack.h"
 
-#define ENABLE_FLEET_PROVISIONING_DEMO      (0)
+#define ENABLE_FLEET_PROVISIONING_DEMO      RX671_FLEET_PROVISIONING_ENABLE
 #define ENABLE_OTA_UPDATE_DEMO              (0)
 #define democonfigUSE_AWS_IOT_CORE_BROKER   (1)
 #define democonfigDISABLE_SNI               (0)
 
 #define democonfigFP_DEMO_ID                "RX671Type1YN"
 #define democonfigCLIENT_IDENTIFIER         AWS_IOT_THING_NAME
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+#define democonfigMQTT_BROKER_ENDPOINT      RX671_FLEET_ENDPOINT
+#define democonfigPROVISIONING_TEMPLATE_NAME RX671_FLEET_TEMPLATE_NAME
+/*
+ * The Fleet demo performs CSR generation and TLS operations from its task.
+ * Keep enough stack for the crypto call chain instead of using the small
+ * generic demo default (configMINIMAL_STACK_SIZE * 3).
+ */
+#define democonfigFLEET_PROVISIONING_DEMO_STACKSIZE (6144U)
+#else
 #define democonfigMQTT_BROKER_ENDPOINT      AWS_IOT_ENDPOINT
-#define democonfigMQTT_BROKER_PORT          (AWS_IOT_MQTT_PORT)
 #define democonfigPROVISIONING_TEMPLATE_NAME "...insert here..."
+#endif
+#define democonfigMQTT_BROKER_PORT          (AWS_IOT_MQTT_PORT)
 #define democonfigCSR_SUBJECT_NAME          "CN=" democonfigFP_DEMO_ID
 
 #define democonfigDEMO_STACKSIZE            (configMINIMAL_STACK_SIZE * 3)
