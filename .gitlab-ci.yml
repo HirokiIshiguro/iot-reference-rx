@@ -1187,7 +1187,7 @@ build_rx671_wifi_fleet:
           }
         }
 
-        $context = "rx671-fleet-v1:$env:CI_PIPELINE_ID:$env:CI_COMMIT_SHA"
+        $context = "rx671-fleet-v1:${env:CI_PIPELINE_ID}:${env:CI_COMMIT_SHA}"
         $env:RX671_FLEET_ARTIFACT_SECRET = $fleetClaimKey
         $encryptedMot = Join-Path $artifactDir "aws_wifi_rx671_ek_fleet.mot.enc"
         python "$env:CI_PROJECT_DIR\tools\ci\protect_secret_artifact.py" encrypt `
@@ -3061,7 +3061,12 @@ test_rx671_wifi_fleet:
       # before the Fleet image is flashed.
       trap 'unset RX671_FLEET_ARTIFACT_SECRET claim_key; rm -f "$fleet_mot"' EXIT
       export RX671_FLEET_ARTIFACT_SECRET="$claim_key"
-      context="rx671-fleet-v1:$CI_PIPELINE_ID:$CI_COMMIT_SHA"
+      expected_context="rx671-fleet-v1:$CI_PIPELINE_ID:$CI_COMMIT_SHA"
+      context="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["encryption_context"])' "$manifest")"
+      if [ "$context" != "$expected_context" ]; then
+        echo "RX671 Fleet artifact context does not match this pipeline and commit." >&2
+        exit 1
+      fi
       python tools/ci/protect_secret_artifact.py decrypt \
         --input "$encrypted_mot" \
         --output "$fleet_mot" \
