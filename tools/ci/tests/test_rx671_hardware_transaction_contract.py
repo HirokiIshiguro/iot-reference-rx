@@ -92,6 +92,28 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         self.assertIn("extends: .matrix_rx671_lanbench", tsip)
         self.assertIn('RX671_BENCHMARK_PROFILE: "tls13-0rtt"', tsip)
 
+    def test_nightly_routes_rx671_fleet_as_stabilizing_with_cleanup_inputs(self) -> None:
+        template = job_block(
+            self.ci,
+            ".nightly_matrix_rx671_wifi_stabilizing",
+            "matrix_rx671_wifi_network",
+        )
+        fleet = job_block(
+            self.ci,
+            "matrix_rx671_wifi_fleet",
+            ".matrix_rx671_software_lanbench",
+        )
+
+        self.assertIn("extends: .nightly_matrix_stabilizing_trigger", template)
+        self.assertIn("resource_group: nightly-matrix-rx671-wifi", template)
+        self.assertIn("extends: .nightly_matrix_rx671_wifi_stabilizing", fleet)
+        self.assertIn('RX671_WIFI_TEST_SCOPE: "fleet"', fleet)
+        self.assertIn('$NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true"', fleet)
+        self.assertIn("$AWS_DEFAULT_REGION", fleet)
+        self.assertIn("$RX671_EK_FLEET_TEMPLATE_NAME", fleet)
+        self.assertIn("$RX671_EK_FLEET_CLAIM_CERT_PEM", fleet)
+        self.assertIn("$RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM", fleet)
+
 
 if __name__ == "__main__":
     unittest.main()

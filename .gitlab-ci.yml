@@ -417,6 +417,20 @@ workflow:
     RUN_RX65N_BG96_BUILD: "true"
     RX65N_BG96_SKIP_HW_TESTS: "false"
 
+.nightly_matrix_rx671_wifi_stabilizing:
+  extends: .nightly_matrix_stabilizing_trigger
+  resource_group: nightly-matrix-rx671-wifi
+  variables:
+    PIPELINE_PROFILE: "focused"
+    RUN_RX671_WIFI_BUILD: "true"
+    RX671_WIFI_SKIP_HW_TESTS: "false"
+    RUN_RX72N_BUILD: "false"
+    RX72N_SKIP_HW_TESTS: "true"
+    RX72N_TEST_SCOPE: "build"
+    RUN_RX65N_BG96_BUILD: "false"
+    RX65N_BG96_SKIP_HW_TESTS: "true"
+    RX65N_BG96_TEST_SCOPE: "build"
+
 matrix_rx671_wifi_network:
   extends: .nightly_matrix_rx671_wifi
   variables:
@@ -430,6 +444,15 @@ matrix_rx671_wifi_mqtt:
     - when: never
   variables:
     RX671_WIFI_TEST_SCOPE: "mqtt"
+
+matrix_rx671_wifi_fleet:
+  extends: .nightly_matrix_rx671_wifi_stabilizing
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD) && $AWS_DEFAULT_REGION && ($RX671_EK_FLEET_ENDPOINT || $RX671_EK_AWS_IOT_ENDPOINT || $AWS_IOT_ENDPOINT) && ($RX671_EK_FLEET_TEMPLATE_NAME || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($RX671_EK_FLEET_CLAIM_CERT_PEM || $RX671_EK_FLEET_CLAIM_CERT_PEM_FILE || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+      when: on_success
+    - when: never
+  variables:
+    RX671_WIFI_TEST_SCOPE: "fleet"
 
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
