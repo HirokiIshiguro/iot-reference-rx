@@ -3149,6 +3149,7 @@ test_rx671_wifi_fleet:
         --log-baud "$RX671_WIFI_UART_BAUD_RATE" \
         --timeout "$RX671_WIFI_FLEET_TEST_TIMEOUT_SECONDS" \
         --reset-cmd "$reset_cmd" \
+        --app-reset-retries 2 \
         --label "RX671/Type 1YN software" \
         --summary-json "$artifact_dir/fleet_summary.json" \
         --junit-output "$artifact_dir/junit.xml" \

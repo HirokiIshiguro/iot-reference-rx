@@ -165,8 +165,14 @@ void main_task(void *pvParameters)
                "FreeRTOS logging task NG\r\n");
 
 #if WHD_BRINGUP_ENABLE
-    whd_bringup_run();
-    start_freertos_tcp_after_join();
+    if (whd_bringup_run())
+    {
+        start_freertos_tcp_after_join();
+    }
+    else
+    {
+        debug_puts("FreeRTOS+TCP skipped (WHD bring-up failed)\r\n");
+    }
 #else
     /* Issue #30 (b) increment 1+2: SDHI enumerate on the corrected PORTD SDHI
      * pins - CMD0/CMD5 first contact (expect F=2), then CMD3/CMD7 to read the

@@ -26,6 +26,7 @@ DEFAULT_LOG_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", 
 DEFAULT_LOG_BAUD = int(os.environ.get("UART_BAUD_RATE", "921600"))
 DEFAULT_TIMEOUT = 240
 TLS_VERSION_RE = re.compile(r"TLS handshake successful: version\s+(\S+)")
+WHD_WIFI_ON_RE = re.compile(r"(?:^|\s)whd_wifi_on=([0-9A-Fa-f]{8})(?:\s|$)")
 
 MARKERS = [
     ("claim_mqtt", "Established connection with claim credentials."),
@@ -46,6 +47,35 @@ ERROR_PATTERNS = [
     "All 3 demo iterations failed.",
     "Error:",
 ]
+
+RETRYABLE_STARTUP_ERROR_PATTERNS = (
+    "Cellular init failed",
+    "Cellular Open Failed",
+    "WHD startup failed:",
+)
+
+
+def whd_wifi_on_failed(line):
+    """Return True only for an explicit non-zero WHD bring-up result."""
+    match = WHD_WIFI_ON_RE.search(line)
+    return bool(match and match.group(1).upper() != "00000000")
+
+
+def retryable_startup_failure(errors, results, thing_name, certificate_id):
+    """Allow a reset only before Fleet can have created an AWS resource."""
+    resource_creation_may_have_started = (
+        any(results.values()) or
+        bool(thing_name) or
+        bool(certificate_id)
+    )
+    if resource_creation_may_have_started:
+        return False
+
+    return any(
+        pattern in error
+        for error in errors
+        for pattern in RETRYABLE_STARTUP_ERROR_PATTERNS
+    )
 
 
 def reset_device_via_command(reset_cmd):
@@ -93,7 +123,7 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
     total_bytes = 0
     total_lines = 0
     buffer = ""
-    fatal_cellular_error = False
+    fatal_startup_error = False
 
     ser = serial.Serial(
         port=port,
@@ -158,13 +188,20 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
                         progress_changed = True
                         print(f"[MILESTONE] tls_version: {tls_version}")
 
+                    if whd_wifi_on_failed(line):
+                        error = f"WHD startup failed: {line}"
+                        errors.append(error)
+                        fatal_startup_error = True
+                        progress_changed = True
+                        print(f"[ERROR] {error}")
+
                     for pattern in ERROR_PATTERNS:
                         if pattern in line:
                             errors.append(line)
                             progress_changed = True
                             print(f"[ERROR] {line}")
                             if pattern in ("Cellular init failed", "Cellular Open Failed"):
-                                fatal_cellular_error = True
+                                fatal_startup_error = True
 
                     if progress_changed and progress_callback:
                         progress_callback(
@@ -182,7 +219,7 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
 
                 if all(results.values()):
                     break
-                if fatal_cellular_error:
+                if fatal_startup_error:
                     break
             else:
                 time.sleep(0.05)
@@ -364,7 +401,7 @@ def main():
     persist_partial()
     for attempt in range(1, args.app_reset_retries + 2):
         if attempt > 1:
-            print(f"[RETRY] restarting fleet test after cellular init failure ({attempt}/{args.app_reset_retries + 1})")
+            print(f"[RETRY] restarting fleet test after pre-claim startup failure ({attempt}/{args.app_reset_retries + 1})")
         try:
             results, errors, total_bytes, total_lines, thing_name, certificate_id, tls_versions, tls_events = monitor_uart(
                 args.log_port,
@@ -427,7 +464,12 @@ def main():
         )
         if all(results.values()):
             break
-        retryable = any("Cellular init failed" in error or "Cellular Open Failed" in error for error in errors)
+        retryable = retryable_startup_failure(
+            errors,
+            results,
+            thing_name,
+            certificate_id,
+        )
         if not retryable or attempt > args.app_reset_retries:
             break
 
