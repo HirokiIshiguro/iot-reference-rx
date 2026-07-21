@@ -81,6 +81,43 @@ class FleetStartupRetryTests(unittest.TestCase):
             )
         )
 
+    def test_sensitive_fleet_payload_is_redacted_and_fails_result(self):
+        safe, active, label = test_fleet_rx72n.redact_sensitive_fleet_line(
+            "payload certificateOwnershipToken=temporary-token"
+        )
+        self.assertNotIn("temporary-token", safe)
+        self.assertIsNone(active)
+        self.assertEqual(label, "certificate ownership token")
+        self.assertTrue(
+            test_fleet_rx72n.has_sensitive_log_violation(
+                [f"{test_fleet_rx72n.SENSITIVE_LOG_ERROR_PREFIX} {label}"]
+            )
+        )
+
+    def test_multiline_csr_is_redacted_until_end_marker(self):
+        safe, active, label = test_fleet_rx72n.redact_sensitive_fleet_line(
+            "-----BEGIN CERTIFICATE REQUEST-----"
+        )
+        self.assertIn("REDACTED", safe)
+        self.assertIsNotNone(active)
+        self.assertEqual(label, "certificate request")
+
+        safe, active, label = test_fleet_rx72n.redact_sensitive_fleet_line(
+            "public-but-persistent-base64",
+            active,
+        )
+        self.assertNotIn("public-but-persistent-base64", safe)
+        self.assertIsNotNone(active)
+        self.assertIsNone(label)
+
+        safe, active, label = test_fleet_rx72n.redact_sensitive_fleet_line(
+            "-----END CERTIFICATE REQUEST-----",
+            active,
+        )
+        self.assertIn("REDACTED", safe)
+        self.assertIsNone(active)
+        self.assertIsNone(label)
+
 
 if __name__ == "__main__":
     unittest.main()

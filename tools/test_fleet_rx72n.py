@@ -57,6 +57,41 @@ RETRYABLE_STARTUP_ERROR_PATTERNS = (
     "WHD startup failed:",
 )
 
+SENSITIVE_LOG_ERROR_PREFIX = "Sensitive Fleet credential payload observed:"
+SENSITIVE_LOG_BLOCKS = (
+    ("-----BEGIN CERTIFICATE REQUEST-----", "-----END CERTIFICATE REQUEST-----", "certificate request"),
+    ("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----", "certificate"),
+    ("-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----", "private key"),
+    ("-----BEGIN RSA PRIVATE KEY-----", "-----END RSA PRIVATE KEY-----", "RSA private key"),
+    ("-----BEGIN EC PRIVATE KEY-----", "-----END EC PRIVATE KEY-----", "EC private key"),
+)
+SENSITIVE_LOG_INLINE = (
+    ("certificateOwnershipToken", "certificate ownership token"),
+)
+
+
+def redact_sensitive_fleet_line(line, active_block=None):
+    """Return a safe line, block state, and a newly detected violation label."""
+    if active_block is not None:
+        end_marker, label = active_block
+        next_block = None if end_marker in line else active_block
+        return f"[SECURITY][REDACTED] Fleet {label} payload", next_block, None
+
+    for begin_marker, end_marker, label in SENSITIVE_LOG_BLOCKS:
+        if begin_marker in line:
+            next_block = None if end_marker in line else (end_marker, label)
+            return f"[SECURITY][REDACTED] Fleet {label} payload", next_block, label
+
+    for pattern, label in SENSITIVE_LOG_INLINE:
+        if pattern in line:
+            return f"[SECURITY][REDACTED] Fleet {label} payload", None, label
+
+    return line, None, None
+
+
+def has_sensitive_log_violation(errors):
+    return any(error.startswith(SENSITIVE_LOG_ERROR_PREFIX) for error in errors)
+
 
 def whd_pre_network_result_failed(line):
     """Return True only for an explicit non-zero pre-network WHD result."""
@@ -127,6 +162,7 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
     total_lines = 0
     buffer = ""
     fatal_startup_error = False
+    sensitive_log_block = None
 
     ser = serial.Serial(
         port=port,
@@ -160,7 +196,31 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
                         continue
 
                     total_lines += 1
-                    print(line)
+                    safe_line, sensitive_log_block, sensitive_label = redact_sensitive_fleet_line(
+                        line,
+                        sensitive_log_block,
+                    )
+                    print(safe_line)
+                    if sensitive_label is not None:
+                        safe_error = f"{SENSITIVE_LOG_ERROR_PREFIX} {sensitive_label}"
+                        if safe_error not in errors:
+                            errors.append(safe_error)
+                            print(f"[ERROR] {safe_error}")
+                    if safe_line != line:
+                        if progress_callback:
+                            progress_callback(
+                                {
+                                    "results": dict(results),
+                                    "errors": list(errors),
+                                    "total_bytes": total_bytes,
+                                    "total_lines": total_lines,
+                                    "thing_name": thing_name,
+                                    "certificate_id": certificate_id,
+                                    "tls_versions_seen": list(tls_versions),
+                                    "tls_events": list(tls_events),
+                                }
+                            )
+                        continue
                     progress_changed = False
 
                     for name, pattern in MARKERS:
@@ -476,7 +536,11 @@ def main():
         if not retryable or attempt > args.app_reset_retries:
             break
 
-    completed = all(results.values()) and tls_requirement_ok(require_tls_version, tls_versions)
+    completed = (
+        all(results.values())
+        and tls_requirement_ok(require_tls_version, tls_versions)
+        and not has_sensitive_log_violation(errors)
+    )
     summary = make_summary(
         success=completed,
         results=results,

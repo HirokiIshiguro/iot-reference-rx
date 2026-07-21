@@ -1248,7 +1248,12 @@ BaseType_t xPublishToTopic(MQTTContext_t *pxMqttContext,
     }
     else
     {
-        LogInfo(("the published payload:%.*s \r\n ", payloadLength, pcPayload));
+        /*
+         * Fleet payloads can contain a public CSR or a short-lived certificate
+         * ownership token.  Never copy payload contents into persistent CI/UART
+         * logs; length is sufficient for transport diagnostics.
+         */
+        LogInfo(("Publishing payload: %lu bytes.", (unsigned long)payloadLength));
 
         /* This example publishes to only one topic and uses QOS1. */
         outgoingPublishPackets[ucPublishIndex].pubInfo.qos = MQTTQoS1;
