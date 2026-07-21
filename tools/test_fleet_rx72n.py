@@ -26,7 +26,10 @@ DEFAULT_LOG_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", 
 DEFAULT_LOG_BAUD = int(os.environ.get("UART_BAUD_RATE", "921600"))
 DEFAULT_TIMEOUT = 240
 TLS_VERSION_RE = re.compile(r"TLS handshake successful: version\s+(\S+)")
-WHD_WIFI_ON_RE = re.compile(r"(?:^|\s)whd_wifi_on=([0-9A-Fa-f]{8})(?:\s|$)")
+WHD_PRE_NETWORK_RESULT_RE = re.compile(
+    r"(?:^|\s)(?:whd_wifi_on|whd_wifi_join|whd_wifi_is_ready_to_transceive)="
+    r"([0-9A-Fa-f]{8})(?:\s|$)"
+)
 
 MARKERS = [
     ("claim_mqtt", "Established connection with claim credentials."),
@@ -55,9 +58,9 @@ RETRYABLE_STARTUP_ERROR_PATTERNS = (
 )
 
 
-def whd_wifi_on_failed(line):
-    """Return True only for an explicit non-zero WHD bring-up result."""
-    match = WHD_WIFI_ON_RE.search(line)
+def whd_pre_network_result_failed(line):
+    """Return True only for an explicit non-zero pre-network WHD result."""
+    match = WHD_PRE_NETWORK_RESULT_RE.search(line)
     return bool(match and match.group(1).upper() != "00000000")
 
 
@@ -188,7 +191,7 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
                         progress_changed = True
                         print(f"[MILESTONE] tls_version: {tls_version}")
 
-                    if whd_wifi_on_failed(line):
+                    if whd_pre_network_result_failed(line):
                         error = f"WHD startup failed: {line}"
                         errors.append(error)
                         fatal_startup_error = True

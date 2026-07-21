@@ -9,15 +9,26 @@ class FleetStartupRetryTests(unittest.TestCase):
             name: False for name, _ in test_fleet_rx72n.MARKERS
         }
 
-    def test_nonzero_whd_result_is_failure(self):
+    def test_nonzero_whd_pre_network_result_is_failure(self):
         self.assertTrue(
-            test_fleet_rx72n.whd_wifi_on_failed("whd_wifi_on=060E0000")
+            test_fleet_rx72n.whd_pre_network_result_failed("whd_wifi_on=060E0000")
+        )
+        self.assertTrue(
+            test_fleet_rx72n.whd_pre_network_result_failed("whd_wifi_join=060E0000")
+        )
+        self.assertTrue(
+            test_fleet_rx72n.whd_pre_network_result_failed(
+                "whd_wifi_is_ready_to_transceive=060E0000"
+            )
         )
         self.assertFalse(
-            test_fleet_rx72n.whd_wifi_on_failed("whd_wifi_on=00000000")
+            test_fleet_rx72n.whd_pre_network_result_failed("whd_wifi_on=00000000")
         )
         self.assertFalse(
-            test_fleet_rx72n.whd_wifi_on_failed("whd_wifi_on diag irq=0")
+            test_fleet_rx72n.whd_pre_network_result_failed("whd_wifi_join=00000000")
+        )
+        self.assertFalse(
+            test_fleet_rx72n.whd_pre_network_result_failed("whd_wifi_on diag irq=0")
         )
 
     def test_preclaim_whd_failure_is_retryable(self):
