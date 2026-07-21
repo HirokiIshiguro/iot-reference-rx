@@ -252,6 +252,10 @@ symbols through the WHD resource callback API. The fixed section addresses keep
 the layout compatible with earlier primitive SDIO experiments, but the normal
 J-Link load path now only needs the generated `.mot` file.
 
+These fixed addresses are not safe for dual-bank OTA as-is. See
+[`OTA_FLASH_LAYOUT.md`](OTA_FLASH_LAYOUT.md) for the deterministic
+PASS/FAIL/UNKNOWN gate and the unresolved bootloader/layout conditions.
+
 Example J-Link Commander flow:
 
 ```text
