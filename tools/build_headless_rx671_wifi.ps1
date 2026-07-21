@@ -941,8 +941,9 @@ if ($useFleetConfigForBuild) {
 if ($WlanAllowBusSleepDelayMs -ge 0) {
     Write-Host "WHD WLAN bus sleep delay: ${WlanAllowBusSleepDelayMs} ms"
 }
-if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
-    Write-Host "SDIO run clock divider override: $SdioRunClockDiv"
+$effectiveSdioRunClockDiv = Get-FirstNonEmpty @($SdioRunClockDiv, $env:RX671_EK_SDIO_RUN_CLOCK_DIV)
+if (-not [string]::IsNullOrWhiteSpace($effectiveSdioRunClockDiv)) {
+    Write-Host "SDIO run clock divider override: $effectiveSdioRunClockDiv"
 }
 if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
     Write-Host "SDIO high-speed CCCR/EHS clock path: enabled"
@@ -1052,8 +1053,8 @@ try {
         $cprojectDefines += "RX671_FREERTOS_HEAP_SIZE_KB=$FreeRtosHeapSizeKb"
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($SdioRunClockDiv)) {
-        $cprojectDefines += "SDIO_HOST_CFG_RUN_CLOCK_DIV=$SdioRunClockDiv"
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSdioRunClockDiv)) {
+        $cprojectDefines += "SDIO_HOST_CFG_RUN_CLOCK_DIV=$effectiveSdioRunClockDiv"
     }
 
     if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK)) {
