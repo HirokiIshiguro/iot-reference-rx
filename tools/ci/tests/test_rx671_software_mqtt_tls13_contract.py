@@ -23,7 +23,8 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
     def test_tls13_build_is_pinned_and_runtime_verified(self) -> None:
         self.assertIn("mbedtls_ssl_conf_min_tls_version", self.source)
         self.assertIn("mbedtls_ssl_conf_max_tls_version", self.source)
-        self.assertIn("mbedtls_ssl_get_version(&p_tls->ssl_context)", self.source)
+        self.assertIn("mbedtls_ssl_get_version(p_ssl)", self.source)
+        self.assertIn("log_tls_version(&p_tls->ssl_context)", self.source)
         self.assertIn("mbedtls_ssl_get_version_number", self.source)
         self.assertIn("MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION", self.source)
 
