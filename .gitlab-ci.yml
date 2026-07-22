@@ -202,6 +202,12 @@ variables:
   RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   E2STUDIO_WORKSPACE_RX671_WIFI: "C:/Temp/e2ws_iot_ref_rx671_wifi_2026_04_2"
   E2STUDIO_WORKSPACE_RX671_WIFI_FLEET: "C:/Temp/e2ws_iot_ref_rx671_wifi_fleet_2026_04_2"
+  E2STUDIO_WORKSPACE_RX671_BOOTLOADER: "C:/Temp/e2ws_iot_ref_rx671_bootloader_2026_04_2"
+  RUN_RX671_BOOTLOADER_BUILD: "true"
+  # Standalone flash/UART smoke is intentionally opt-in because it replaces
+  # the application currently running on the shared RPi#1 EK-RX671 bench.
+  RUN_RX671_BOOTLOADER_SMOKE: "false"
+  RX671_BOOTLOADER_EXPECTED_KEY_STATE: "missing-fail-closed"
   RUN_RX671_WIFI_BUILD: "true"
   # RX671_WIFI_TEST_SCOPE:
   #   build   - build and publish firmware artifacts only.
@@ -282,6 +288,19 @@ workflow:
         RX671_WIFI_TEST_SCOPE: "network"
       when: always
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - Projects/boot_loader_rx671_ek/**/*
+        - tools/build_headless_rx671_bootloader.ps1
+        - tools/ci/check_rx671_bootloader_layout.py
+        - tools/ci/test_rx671_bootloader_uart.py
+        - tools/ci/tests/test_rx671_bootloader_contract.py
+      variables:
+        PIPELINE_PROFILE: "mr-rx671-bootloader"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX72N_TEST_SCOPE: "build"
+        RX671_WIFI_TEST_SCOPE: "build"
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       variables:
         PIPELINE_PROFILE: "mr"
         # MR standard keeps daily feedback short while covering both transports.
@@ -307,6 +326,7 @@ workflow:
         RUN_RX65N_BG96_BUILD: "false"
         RUN_RX72N_BUILD: "false"
         RUN_RX671_WIFI_BUILD: "false"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
         RX65N_BG96_TEST_SCOPE: "build"
         RX72N_TEST_SCOPE: "build"
         RX671_WIFI_TEST_SCOPE: "build"
@@ -1326,6 +1346,59 @@ build_rx671_wifi_fleet:
       - artifacts/build_rx671_wifi_fleet/
     expire_in: 1 day
 
+build_rx671_bootloader:
+  stage: build
+  tags:
+    - exec-shell
+    - os-windows
+    - ccrx
+    - $RX671_WIFI_BUILD_RUNNER_TAG
+  resource_group: rx671-bootloader-e2studio-build
+  rules:
+    - if: '$RUN_RX671_BOOTLOADER_BUILD == "true"'
+      when: on_success
+    - when: never
+  script:
+    - Write-Host "=== Build standalone EK-RX671 dual-bank boot loader ==="
+    - python -m unittest tools.ci.tests.test_rx671_bootloader_contract
+    - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    - |
+      & "$env:CI_PROJECT_DIR\tools\build_headless_rx671_bootloader.ps1" `
+        -ProjectRoot "$env:CI_PROJECT_DIR" `
+        -E2Studio "$env:E2STUDIO_CLI" `
+        -Workspace "$env:E2STUDIO_WORKSPACE_RX671_BOOTLOADER" `
+        -LogFile "$env:CI_PROJECT_DIR\rx671_bootloader_e2studio_build.log"
+    - |
+      $outputDir = "$env:CI_PROJECT_DIR\Projects\boot_loader_rx671_ek\e2studio_ccrx\HardwareDebug"
+      python "$env:CI_PROJECT_DIR\tools\ci\check_rx671_bootloader_layout.py" `
+        --mot "$outputDir\boot_loader_rx671_ek.mot" `
+        --map "$outputDir\boot_loader_rx671_ek.map"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx671_bootloader"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      foreach ($extension in @("mot", "abs", "map")) {
+        $source = Join-Path $outputDir "boot_loader_rx671_ek.$extension"
+        if (-not (Test-Path -LiteralPath $source)) {
+          throw "RX671 boot-loader artifact missing: $source"
+        }
+        Copy-Item -LiteralPath $source -Destination $artifactDir
+      }
+      git diff --exit-code -- Projects/boot_loader_rx671_ek/e2studio_ccrx
+      if ($LASTEXITCODE -ne 0) {
+        throw "Smart Configurator changed the tracked RX671 boot-loader project"
+      }
+    - Write-Host "BUILD EK-RX671 BOOTLOADER SUCCESS"
+  artifacts:
+    when: always
+    paths:
+      - rx671_bootloader_e2studio_build.log
+      - artifacts/build_rx671_bootloader/
+      - Projects/boot_loader_rx671_ek/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/boot_loader_rx671_ek/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/boot_loader_rx671_ek/e2studio_ccrx/HardwareDebug/*.map
+    expire_in: 7 days
+
 build_rx65n_bg96_fleet:
   stage: build
   tags:
@@ -1742,6 +1815,57 @@ flash_rx671_wifi:
     when: always
     paths:
       - artifacts/flash_rx671_wifi/
+    expire_in: 7 days
+
+smoke_rx671_bootloader_manual:
+  stage: flash
+  extends: .rx671_wifi_linux_hw_job
+  needs:
+    - job: build_rx671_bootloader
+      artifacts: true
+  rules:
+    - if: '$RUN_RX671_BOOTLOADER_SMOKE == "true"'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - echo "=== Manual standalone EK-RX671 boot-loader flash/UART smoke ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/smoke_rx671_bootloader"
+      mot="$CI_PROJECT_DIR/artifacts/build_rx671_bootloader/boot_loader_rx671_ek.mot"
+      mkdir -p "$artifact_dir"
+
+      "$RX671_WIFI_LINUX_RFP_CLI" -d "$RX671_WIFI_RFP_DEVICE" -lt \
+        2>&1 | tee "$artifact_dir/rfp_tools.txt"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+      if [ -z "${RX671_WIFI_E2OB_SERIAL:-}" ] || ! grep -Fq "$RX671_WIFI_E2OB_SERIAL" "$artifact_dir/rfp_tools.txt"; then
+        echo "Expected EK-RX671 onboard E2OB is not visible: ${RX671_WIFI_E2OB_SERIAL:-<unset>}" >&2
+        exit 1
+      fi
+      if [ ! -e "$RX671_WIFI_UART_PORT" ]; then
+        echo "Expected EK-RX671 SCI6 UART is not visible: $RX671_WIFI_UART_PORT" >&2
+        exit 1
+      fi
+      if [ ! -f "$mot" ]; then
+        echo "RX671 boot-loader artifact is missing: $mot" >&2
+        exit 1
+      fi
+
+      program_cmd="$RX671_WIFI_LINUX_RFP_CLI -d $RX671_WIFI_RFP_DEVICE -t $RX671_WIFI_RFP_TOOL -if $RX671_WIFI_RFP_INTERFACE -s $RX671_WIFI_RFP_SPEED -auth id $RX671_WIFI_RFP_AUTH_ID -p -v -run -noquery $mot"
+      python tools/ci/test_rx671_bootloader_uart.py \
+        --port "$RX671_WIFI_UART_PORT" \
+        --baud "$RX671_WIFI_UART_BAUD_RATE" \
+        --timeout 90 \
+        --program-command "$program_cmd" \
+        --expected-key-state "$RX671_BOOTLOADER_EXPECTED_KEY_STATE" \
+        --output-log "$artifact_dir/uart_smoke.log"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/smoke_rx671_bootloader/
     expire_in: 7 days
 
 flash_rx72n_ether:

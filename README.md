@@ -133,6 +133,7 @@ The following e2 studio projects are maintained under `Projects/`:
 | CK-RX65N BG96 Boot Loader | `Projects/boot_loader_ck_rx65n/e2studio_ccrx/` | RX65N dual-bank boot loader for BG96 OTA |
 | CK-RX65N BG96 AWS Demo | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | FreeRTOS + AWS IoT demo (MQTT PubSub, OTA) over BG96 cellular |
 | CK-RX65N BG96 AWS Demo with TSIP | `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` | BG96 cellular demo using the TSIP-enabled TLS backend; hardware validation requires RX65N-specific TSIP wrapped blobs |
+| EK-RX671 Boot Loader | `Projects/boot_loader_rx671_ek/e2studio_ccrx/` | Standalone RX671 dual-bank secure boot loader; build-only CI with an opt-in RPi#1 flash/UART smoke gate |
 | EK-RX671 Type 1YN Wi-Fi | `Projects/aws_wifi_rx671_ek/e2studio_ccrx/` | WHD/SDIO Wi-Fi bring-up project with FreeRTOS+TCP and AWS IoT MQTT smoke baseline |
 
 ### Boot Loader Architecture / ブートローダ構成
@@ -230,6 +231,21 @@ generates ignored local headers for Wi-Fi and AWS IoT credentials. The local
 Windows baseline uses SCI6 on COM5 at 921600 bps and reaches `AWS MQTT=0`
 after WHD JOIN, DHCP, TLS, and MQTT connect/disconnect. GitLab CI uses the same
 SCI6 stream through RPi#1's stable `/dev/serial/by-id/...` path.
+
+For the standalone EK-RX671 boot loader:
+
+```bash
+pwsh -File tools/build_headless_rx671_bootloader.ps1 \
+  -ProjectRoot <repo_root> \
+  -E2Studio C:/Renesas/e2_studio_2026_04_2/eclipse/e2studioc.exe \
+  -Workspace C:/Temp/e2ws_iot_ref_rx671_bootloader_2026_04_2
+```
+
+The project fixes the boot loader to `0xFFFC0000`-`0xFFFFFFFF`, preserves the
+application's Data Flash, and reads the verification public key from shared
+LittleFS. It has no compiled-in key fallback and rejects hash-only firmware.
+See `Projects/boot_loader_rx671_ek/README.md` for the layout check and
+the explicit `RUN_RX671_BOOTLOADER_SMOKE=true` RPi#1 manual gate.
 
 ### Flash / 書き込み方法
 
@@ -380,6 +396,7 @@ This project is treated as an advanced hardware CI pipeline: the full matrix spa
 | `branch` | Feature branch push | Build only. Hardware jobs are kept out of push pipelines to avoid interleaving board state with MR pipelines. |
 | `mr` | Merge request | `RX72N_TEST_SCOPE=mqtt`, `RX65N_BG96_TEST_SCOPE=mqtt`. This covers both transports while keeping review feedback short; OTA coverage is delegated to the focused matrix. |
 | `mr-rx671` | Merge request changing the RX671 project or its UART test | `RX671_WIFI_TEST_SCOPE=network`; RX72N and RX65N stay build-only so the RX671 hardware result is isolated. |
+| `mr-rx671-bootloader` | Merge request changing only the standalone RX671 boot loader | Runs the RX671 boot-loader CC-RX build/layout contract; all board test scopes stay build-only. |
 | `focused` | Manual/API | Build only unless the caller sets `RX72N_TEST_SCOPE`, `RX65N_BG96_TEST_SCOPE`, `RX671_WIFI_TEST_SCOPE`, TLS backends, or TLS version variables explicitly. |
 | `main` | Default branch push | RX72N/RX65N MQTT plus RX671 network smoke; full matrix coverage is delegated to the schedule. |
 | `release` | Tag | Full software-TLS regression for RX72N and RX65N/BG96 plus RX671 network smoke. |

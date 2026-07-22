@@ -66,12 +66,26 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         )[0]
         merge_request_rules = workflow.split(
             "- if: '$CI_PIPELINE_SOURCE == \"merge_request_event\"'"
+        )[1:]
+        rx671_rule = next(
+            rule
+            for rule in merge_request_rules
+            if 'PIPELINE_PROFILE: "mr-rx671"' in rule
         )
-        rx671_rule = merge_request_rules[1].split("\n    - if:", maxsplit=1)[0]
-        generic_rule = merge_request_rules[2].split("\n    - if:", maxsplit=1)[0]
+        rx671_bootloader_rule = next(
+            rule
+            for rule in merge_request_rules
+            if 'PIPELINE_PROFILE: "mr-rx671-bootloader"' in rule
+        )
+        generic_rule = next(
+            rule for rule in merge_request_rules if 'PIPELINE_PROFILE: "mr"' in rule
+        )
 
         self.assertIn('RX72N_TEST_SCOPE: "build"', rx671_rule)
         self.assertIn('RX671_WIFI_TEST_SCOPE: "network"', rx671_rule)
+        self.assertIn('RX72N_TEST_SCOPE: "build"', rx671_bootloader_rule)
+        self.assertIn('RX671_WIFI_TEST_SCOPE: "build"', rx671_bootloader_rule)
+        self.assertIn("Projects/boot_loader_rx671_ek/**/*", rx671_bootloader_rule)
         self.assertIn('RX72N_TEST_SCOPE: "mqtt"', generic_rule)
         self.assertIn('RX671_WIFI_TEST_SCOPE: "build"', generic_rule)
 
