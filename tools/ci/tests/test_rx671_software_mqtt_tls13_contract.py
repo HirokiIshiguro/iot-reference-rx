@@ -19,6 +19,14 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         cls.build = (ROOT / "tools/build_headless_rx671_wifi.ps1").read_text(
             encoding="utf-8"
         )
+        cls.whd_config = (
+            ROOT
+            / "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/whd_join_config.h"
+        ).read_text(encoding="utf-8")
+        cls.whd_bringup = (
+            ROOT
+            / "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/whd_bringup.c"
+        ).read_text(encoding="utf-8")
 
     def test_tls13_build_is_pinned_and_runtime_verified(self) -> None:
         self.assertIn("mbedtls_ssl_conf_min_tls_version", self.source)
@@ -40,6 +48,14 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         self.assertIn('RX671_WIFI_TEST_SCOPE: "mqtt"', job)
         self.assertIn('RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"', job)
         self.assertIn("RX671_EK_AWS_IOT_PRIVATE_KEY_PEM", job)
+
+    def test_sdio_function2_retry_uses_abort_and_reports_diagnostics(self) -> None:
+        self.assertIn(
+            "#define WHD_SDIO_CMD53_F2_BYTE_READ_ABORT_ON_RETRY (1)",
+            self.whd_config,
+        )
+        self.assertIn('whd_log_sdio_diag("whd_wifi_join diag")', self.whd_bringup)
+        self.assertIn('p = append_text(p, " f2abort=")', self.whd_bringup)
 
 
 if __name__ == "__main__":
