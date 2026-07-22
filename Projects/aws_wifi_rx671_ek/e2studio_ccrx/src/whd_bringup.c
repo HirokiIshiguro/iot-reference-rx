@@ -56,6 +56,7 @@ extern volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
+extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_abort_count;
 extern volatile uint32_t g_sdio_host_run_clock_div;
 extern volatile uint32_t g_sdio_host_run_clock_status;
 extern volatile uint32_t g_sdio_host_cmd53_xfer_engine;

@@ -65,6 +65,11 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         )
         self.assertIn('whd_log_sdio_diag("whd_wifi_join diag")', self.whd_bringup)
         self.assertIn('p = append_text(p, " f2abort=")', self.whd_bringup)
+        self.assertIn(
+            "extern volatile uint32_t "
+            "g_whd_sdio_cmd53_f2_byte_read_retry_abort_count;",
+            self.whd_bringup,
+        )
 
 
 if __name__ == "__main__":
