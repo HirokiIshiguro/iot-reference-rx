@@ -54,7 +54,7 @@ anti-rollback も未実装です。production 化には Code Flash / TSIP の ro
 `e2studio_ccrx/lib/rx_bootloader` は次の submodule commit に固定しています。
 
 ```text
-da8a5c720b5b664cf5ba7fc8cb10ec135593016c
+faf57aee745e2bd849d114b83c10cef3089fdfb3
 ```
 
 clone 後は親リポジトリで `git submodule update --init --recursive` を実行してください。
