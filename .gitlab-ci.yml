@@ -210,6 +210,9 @@ variables:
   #   fleet   - build an encrypted Fleet image, verify it atomically, then park
   #             the board on a Fleet-claim-free network image.
   RX671_WIFI_TEST_SCOPE: "build"
+  # Empty keeps the normal MQTT smoke compatible with the server default.
+  # Set TLSv1.3 to pin both mbedTLS min/max and require the UART version marker.
+  RX671_WIFI_REQUIRE_TLS_VERSION: ""
   RX671_WIFI_SKIP_HW_TESTS: "false"
   RX671_WIFI_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   RX671_WIFI_DEVICE_RESOURCE_GROUP: "ek-rx671-rpi1-hardware"
@@ -267,6 +270,7 @@ workflow:
         - tools/build_headless_rx671_wifi.ps1
         - tools/load_rx671_wifi_jlink.ps1
         - tools/ci/test_rx671_wifi_uart.py
+        - tools/ci/tests/test_rx671_software_mqtt_tls13_contract.py
         - tools/ci/tests/test_rx671_wifi_uart.py
       variables:
         PIPELINE_PROFILE: "mr-rx671"
@@ -454,6 +458,16 @@ matrix_rx671_wifi_fleet:
     - when: never
   variables:
     RX671_WIFI_TEST_SCOPE: "fleet"
+
+matrix_rx671_wifi_mqtt_tls13:
+  extends: .nightly_matrix_rx671_wifi
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_AWS_IOT_THING_NAME && $RX671_EK_AWS_IOT_CERT_PEM && $RX671_EK_AWS_IOT_PRIVATE_KEY_PEM'
+      when: on_success
+    - when: never
+  variables:
+    RX671_WIFI_TEST_SCOPE: "mqtt"
+    RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"
 
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
@@ -1051,7 +1065,7 @@ build_rx671_wifi:
     - when: never
   script:
     - Write-Host "=== Build EK-RX671 Type 1YN Wi-Fi project ==="
-    - python -m unittest tools.ci.tests.test_rx671_wifi_uart
+    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_software_mqtt_tls13_contract
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       foreach ($name in @("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")) {
@@ -1085,6 +1099,9 @@ build_rx671_wifi:
           throw "RX671 MQTT scope requires RX671_EK_AWS_IOT_ENDPOINT or AWS_IOT_ENDPOINT"
         }
         $buildArgs.UseAwsIotLocalConfig = $true
+        if (-not [string]::IsNullOrWhiteSpace($env:RX671_WIFI_REQUIRE_TLS_VERSION)) {
+          $buildArgs.RequireTlsVersion = $env:RX671_WIFI_REQUIRE_TLS_VERSION
+        }
       } else {
         $buildArgs.SkipAwsIotConfig = $true
       }
@@ -3019,12 +3036,17 @@ test_rx671_wifi:
         mode="mqtt"
       fi
       reset_cmd="$RX671_WIFI_LINUX_RFP_CLI -d $RX671_WIFI_RFP_DEVICE -t $RX671_WIFI_RFP_TOOL -if $RX671_WIFI_RFP_INTERFACE -s $RX671_WIFI_RFP_SPEED -auth id $RX671_WIFI_RFP_AUTH_ID -sig -run -noquery"
+      tls_version_args=()
+      if [ -n "${RX671_WIFI_REQUIRE_TLS_VERSION:-}" ]; then
+        tls_version_args=(--require-tls-version "$RX671_WIFI_REQUIRE_TLS_VERSION")
+      fi
 
       python tools/ci/test_rx671_wifi_uart.py \
         --port "$RX671_WIFI_UART_PORT" \
         --baud "$RX671_WIFI_UART_BAUD_RATE" \
         --timeout "$RX671_WIFI_UART_TIMEOUT_SECONDS" \
         --mode "$mode" \
+        "${tls_version_args[@]}" \
         --reset-cmd "$reset_cmd" \
         --output-log "$artifact_dir/uart.log" \
         --junit-output "$artifact_dir/junit.xml"

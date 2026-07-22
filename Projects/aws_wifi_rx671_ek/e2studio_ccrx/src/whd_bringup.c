@@ -56,6 +56,7 @@ extern volatile uint32_t g_whd_sdio_sdhi_irq_deferred_enable_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
 extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
+extern volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_abort_count;
 extern volatile uint32_t g_sdio_host_run_clock_div;
 extern volatile uint32_t g_sdio_host_run_clock_status;
 extern volatile uint32_t g_sdio_host_cmd53_xfer_engine;
@@ -156,6 +157,8 @@ static void whd_log_sdio_diag(const char * label)
     p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_recovered_count);
     p = append_text(p, " f2fail=");
     p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_retry_fail_count);
+    p = append_text(p, " f2abort=");
+    p = append_dec32(p, g_whd_sdio_cmd53_f2_byte_read_retry_abort_count);
     p = append_text(p, "\r\n");
     *p = '\0';
     debug_puts(line);
@@ -428,6 +431,7 @@ bool whd_bringup_run(void)
         g_whd_bringup_join_result = result;
         whd_record_stage(81U, result);
         whd_log_result("whd_wifi_join", result);
+        whd_log_sdio_diag("whd_wifi_join diag");
         if (WHD_SUCCESS == result)
         {
             whd_mac_t bssid;

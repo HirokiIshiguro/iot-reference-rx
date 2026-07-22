@@ -83,6 +83,11 @@ helper generates ignored `src/frtos_config/aws_iot_config_local.h` and injects
 `AWS_IOT_USE_LOCAL_CONFIG` only for the build. Do not commit local endpoint,
 certificate, or private-key material.
 
+Pass `-RequireTlsVersion TLSv1.3` to pin both the mbedTLS minimum and maximum
+protocol version. A successful handshake prints `AWS TLS version=TLSv1.3`; the
+hardware monitor can require that exact marker so a TLS 1.2 fallback cannot be
+reported as a TLS 1.3 pass.
+
 ## GitLab hardware CI
 
 The repository pipeline treats the RPi#1 EK-RX671 bench as the `rx671_wifi`
@@ -98,9 +103,12 @@ environment. The jobs are serialized by the
 
 `RX671_WIFI_TEST_SCOPE=network` checks `whd_wifi_join=00000000`,
 `WHD bring-up done`, and `FreeRTOS+TCP network up`. The optional `mqtt` scope
-also checks `AWS TLS=0` and `AWS MQTT=0`. Feature-branch push pipelines remain
+also checks `AWS TLS=0` and `AWS MQTT=0`. Setting
+`RX671_WIFI_REQUIRE_TLS_VERSION=TLSv1.3` additionally fixes the build to TLS
+1.3 and requires `AWS TLS version=TLSv1.3` from the target. Feature-branch push pipelines remain
 build-only; RX671-related merge requests and `main` use the network hardware
-scope, while the nightly matrix has separate network and conditional MQTT rows.
+scope, while the nightly matrix has separate network, conditional MQTT, and
+conditional TLS 1.3 MQTT rows.
 
 The hardware identifiers are maintained in
 [hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config): onboard

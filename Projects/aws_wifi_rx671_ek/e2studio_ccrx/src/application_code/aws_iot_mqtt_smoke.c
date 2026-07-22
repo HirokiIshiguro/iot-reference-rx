@@ -105,6 +105,18 @@ static void log_step_status(const char * label, int32_t status)
     debug_puts(line);
 }
 
+static void log_tls_version(const mbedtls_ssl_context * p_ssl)
+{
+    char line[64];
+    char * p = line;
+
+    p = append_text(p, "AWS TLS version=");
+    p = append_text(p, mbedtls_ssl_get_version(p_ssl));
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
 static uint32_t mqtt_get_time_ms(void)
 {
     return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
@@ -286,6 +298,14 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
         return ret;
     }
 
+#if AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3
+  #if !defined(MBEDTLS_SSL_PROTO_TLS1_3)
+    #error "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 requires MBEDTLS_SSL_PROTO_TLS1_3"
+  #endif
+    mbedtls_ssl_conf_min_tls_version(&p_tls->ssl_config, MBEDTLS_SSL_VERSION_TLS1_3);
+    mbedtls_ssl_conf_max_tls_version(&p_tls->ssl_config, MBEDTLS_SSL_VERSION_TLS1_3);
+#endif
+
     mbedtls_ssl_conf_authmode(&p_tls->ssl_config, MBEDTLS_SSL_VERIFY_REQUIRED);
     mbedtls_ssl_conf_rng(&p_tls->ssl_config, mbedtls_ctr_drbg_random, &p_tls->ctr_drbg);
     mbedtls_ssl_conf_ca_chain(&p_tls->ssl_config, &p_tls->ca_cert, NULL);
@@ -338,6 +358,18 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
             vTaskDelay(pdMS_TO_TICKS(1U));
         }
     } while ((MBEDTLS_ERR_SSL_WANT_READ == ret) || (MBEDTLS_ERR_SSL_WANT_WRITE == ret));
+
+    if (0 == ret)
+    {
+        log_tls_version(&p_tls->ssl_context);
+
+#if AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3
+        if (MBEDTLS_SSL_VERSION_TLS1_3 != mbedtls_ssl_get_version_number(&p_tls->ssl_context))
+        {
+            ret = MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION;
+        }
+#endif
+    }
 
     return ret;
 }

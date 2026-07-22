@@ -39,16 +39,25 @@ class SmokeResult:
     duration_seconds: float
 
 
-def required_markers(mode: str) -> tuple[str, ...]:
+def required_markers(mode: str, require_tls_version: str = "") -> tuple[str, ...]:
     if mode == "network":
+        if require_tls_version:
+            raise ValueError("TLS version can only be required in mqtt mode")
         return NETWORK_MARKERS
     if mode == "mqtt":
-        return NETWORK_MARKERS + MQTT_MARKERS
+        markers = NETWORK_MARKERS + MQTT_MARKERS
+        if require_tls_version:
+            if require_tls_version != "TLSv1.3":
+                raise ValueError(f"unsupported TLS version: {require_tls_version}")
+            markers += (f"AWS TLS version={require_tls_version}",)
+        return markers
     raise ValueError(f"unsupported mode: {mode}")
 
 
-def evaluate_log(text: str, mode: str) -> tuple[list[str], list[str]]:
-    markers = required_markers(mode)
+def evaluate_log(
+    text: str, mode: str, require_tls_version: str = ""
+) -> tuple[list[str], list[str]]:
+    markers = required_markers(mode, require_tls_version)
     missing = [marker for marker in markers if marker not in text]
     failures: list[str] = []
 
@@ -81,6 +90,7 @@ def monitor_uart(
     baud: int,
     timeout_seconds: float,
     mode: str,
+    require_tls_version: str,
     reset_command: str,
     reset_timeout_seconds: float,
 ) -> SmokeResult:
@@ -129,7 +139,7 @@ def monitor_uart(
                     sys.stdout.flush()
 
                 text = captured.decode("utf-8", errors="replace")
-                missing, failures = evaluate_log(text, mode)
+                missing, failures = evaluate_log(text, mode, require_tls_version)
                 if failures:
                     duration = time.monotonic() - start
                     return SmokeResult(
@@ -148,7 +158,7 @@ def monitor_uart(
                     )
 
             text = captured.decode("utf-8", errors="replace")
-            missing, failures = evaluate_log(text, mode)
+            missing, failures = evaluate_log(text, mode, require_tls_version)
             details = failures or ["missing: " + ", ".join(missing)]
             duration = time.monotonic() - start
             return SmokeResult(
@@ -169,6 +179,7 @@ def write_junit(
     mode: str,
     port: str,
     baud: int,
+    require_tls_version: str = "",
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     suite = ET.Element(
@@ -185,6 +196,11 @@ def write_junit(
     ET.SubElement(properties, "property", {"name": "mode", "value": mode})
     ET.SubElement(properties, "property", {"name": "port", "value": port})
     ET.SubElement(properties, "property", {"name": "baud", "value": str(baud)})
+    ET.SubElement(
+        properties,
+        "property",
+        {"name": "require_tls_version", "value": require_tls_version},
+    )
     case = ET.SubElement(
         suite,
         "testcase",
@@ -208,6 +224,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baud", type=int, default=921600)
     parser.add_argument("--timeout", type=float, default=300.0)
     parser.add_argument("--mode", choices=("network", "mqtt"), default="network")
+    parser.add_argument(
+        "--require-tls-version",
+        choices=("TLSv1.3",),
+        default="",
+        help="Require the negotiated AWS IoT TLS version in mqtt mode.",
+    )
     parser.add_argument("--reset-cmd", required=True)
     parser.add_argument("--reset-timeout", type=float, default=90.0)
     parser.add_argument("--output-log", type=Path, required=True)
@@ -222,13 +244,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         baud=args.baud,
         timeout_seconds=args.timeout,
         mode=args.mode,
+        require_tls_version=args.require_tls_version,
         reset_command=args.reset_cmd,
         reset_timeout_seconds=args.reset_timeout,
     )
 
     args.output_log.parent.mkdir(parents=True, exist_ok=True)
     args.output_log.write_text(result.log, encoding="utf-8")
-    write_junit(args.junit_output, result, args.mode, args.port, args.baud)
+    write_junit(
+        args.junit_output,
+        result,
+        args.mode,
+        args.port,
+        args.baud,
+        args.require_tls_version,
+    )
 
     status = "PASS" if result.passed else "FAIL"
     print(f"RX671 Wi-Fi UART smoke {status}: {result.message}")

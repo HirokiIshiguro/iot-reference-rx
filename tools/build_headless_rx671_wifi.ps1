@@ -1,6 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
+    [int]$E2StudioTimeoutSeconds = 180,
     [string]$Make = "",
     [string]$CcrxBin = "",
     [string]$Workspace = "C:\iotref-rx671-wifi-ws",
@@ -9,6 +10,7 @@ param(
     [string]$AwsIotConfigDir = "",
     [string]$AwsIotEndpoint = "",
     [string]$AwsIotThingName = "",
+    [string]$RequireTlsVersion = "",
     [switch]$UseLocalJoinConfig,
     [switch]$UseAwsIotLocalConfig,
     [switch]$SkipAwsIotConfig,
@@ -458,11 +460,37 @@ function Read-AwsIotConfig {
     )
 
     $resolvedDir = $ConfigDir
-    if ([string]::IsNullOrWhiteSpace($resolvedDir) -and (Test-Path -LiteralPath $defaultAwsIotConfigDir)) {
+    $environmentCredentialsConfigured = $false
+    foreach ($name in @(
+        "RX671_EK_AWS_IOT_CERT_PEM",
+        "RX671_EK_AWS_IOT_CERT_PEM_FILE",
+        "AWS_IOT_CERT_PEM",
+        "AWS_IOT_CERT_FILE",
+        "AWS_IOT_CERT",
+        "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM",
+        "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM_FILE",
+        "AWS_IOT_PRIVATE_KEY_PEM",
+        "AWS_IOT_PRIVATE_KEY_FILE",
+        "AWS_IOT_PRIVATE_KEY",
+        "AWS_IOT_PRIVKEY",
+        "AWS_IOT_PRIVKEY_FILE"
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+            $environmentCredentialsConfigured = $true
+            break
+        }
+    }
+
+    # CI credentials are the source of truth when present. Do not silently
+    # combine them with a runner-local endpoint, certificate, or private key.
+    if ([string]::IsNullOrWhiteSpace($resolvedDir) -and
+        (-not $environmentCredentialsConfigured) -and
+        (Test-Path -LiteralPath $defaultAwsIotConfigDir)) {
         $resolvedDir = $defaultAwsIotConfigDir
     }
 
     if (-not [string]::IsNullOrWhiteSpace($resolvedDir)) {
+        Write-Host "AWS IoT config source: local directory"
         $resolvedDir = (Resolve-Path -LiteralPath $resolvedDir).Path
         $metadata = Read-AwsIotMetadata -Path (Join-Path $resolvedDir "metadata.txt")
         $endpoint = Get-FirstNonEmpty @($EndpointOverride, $metadata["ENDPOINT"])
@@ -485,6 +513,7 @@ function Read-AwsIotConfig {
         }
     }
 
+    Write-Host "AWS IoT config source: environment"
     $endpoint = Get-FirstNonEmpty @($EndpointOverride, $env:RX671_EK_AWS_IOT_ENDPOINT, $env:AWS_IOT_ENDPOINT)
     $thingName = Get-FirstNonEmpty @($ThingNameOverride, $env:RX671_EK_AWS_IOT_THING_NAME, $env:AWS_IOT_THING_NAME)
     $certValue = Get-FirstNonEmpty @(
@@ -874,6 +903,15 @@ function Invoke-E2StudioHeadlessBuild {
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
     $stderrTask = $proc.StandardError.ReadToEndAsync()
+    $timedOut = -not $proc.WaitForExit($E2StudioTimeoutSeconds * 1000)
+    if ($timedOut) {
+        Write-Warning "e2 studio headless build timed out after $E2StudioTimeoutSeconds seconds; terminating it before the explicit make fallback."
+        try {
+            $proc.Kill($true)
+        } catch {
+            Write-Warning "Could not terminate the e2 studio process tree: $($_.Exception.Message)"
+        }
+    }
     $proc.WaitForExit()
     $stdoutTask.Wait()
     $stderrTask.Wait()
@@ -892,6 +930,9 @@ function Invoke-E2StudioHeadlessBuild {
         Write-Host $logText
     }
 
+    if ($timedOut) {
+        return 124
+    }
     return $proc.ExitCode
 }
 
@@ -966,6 +1007,12 @@ $effectiveSdioCmd53DmacaReadEnable = Get-FirstNonEmpty @($SdioCmd53DmacaReadEnab
 $effectiveSdioCmd53DmacaWriteEnable = Get-FirstNonEmpty @($SdioCmd53DmacaWriteEnable, $env:RX671_EK_SDIO_CMD53_DMACA_WRITE_ENABLE)
 $effectiveSdioCmd53DmacaMinBytes = Get-FirstNonEmpty @($SdioCmd53DmacaMinBytes, $env:RX671_EK_SDIO_CMD53_DMACA_MIN_BYTES)
 $effectiveSdioCmd53DmacaBlockMode = Get-FirstNonEmpty @($SdioCmd53DmacaBlockMode, $env:RX671_EK_SDIO_CMD53_DMACA_BLOCK_MODE)
+$effectiveRequireTlsVersion = Get-FirstNonEmpty @($RequireTlsVersion, $env:RX671_WIFI_REQUIRE_TLS_VERSION)
+
+if ((-not [string]::IsNullOrWhiteSpace($effectiveRequireTlsVersion)) -and
+    ($effectiveRequireTlsVersion -ne "TLSv1.3")) {
+    throw "Unsupported RX671 AWS IoT TLS version requirement: $effectiveRequireTlsVersion (expected TLSv1.3)"
+}
 
 $cprojectBytes = $null
 $trackedProjectSnapshot = @{}
@@ -1007,6 +1054,11 @@ try {
 
     if ($UseTsipEntropy.IsPresent) {
         $cprojectDefines += "AWS_IOT_USE_TSIP_ENTROPY"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($effectiveRequireTlsVersion)) {
+        $cprojectDefines += "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1"
+        Write-Host "AWS IoT MQTT TLS version fixed to TLSv1.3"
     }
 
     if ($useTcpThroughputLocalConfigForBuild) {
