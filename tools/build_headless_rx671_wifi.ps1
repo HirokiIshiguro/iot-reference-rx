@@ -1,6 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
+    [int]$E2StudioTimeoutSeconds = 600,
     [string]$Make = "",
     [string]$CcrxBin = "",
     [string]$Workspace = "C:\iotref-rx671-wifi-ws",
@@ -875,6 +876,15 @@ function Invoke-E2StudioHeadlessBuild {
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
     $stderrTask = $proc.StandardError.ReadToEndAsync()
+    $timedOut = -not $proc.WaitForExit($E2StudioTimeoutSeconds * 1000)
+    if ($timedOut) {
+        Write-Warning "e2 studio headless build timed out after $E2StudioTimeoutSeconds seconds; terminating it before the explicit make fallback."
+        try {
+            $proc.Kill($true)
+        } catch {
+            Write-Warning "Could not terminate the e2 studio process tree: $($_.Exception.Message)"
+        }
+    }
     $proc.WaitForExit()
     $stdoutTask.Wait()
     $stderrTask.Wait()
@@ -893,6 +903,9 @@ function Invoke-E2StudioHeadlessBuild {
         Write-Host $logText
     }
 
+    if ($timedOut) {
+        return 124
+    }
     return $proc.ExitCode
 }
 

@@ -41,6 +41,15 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         self.assertIn("expected TLSv1.3", self.build)
         self.assertIn("AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1", self.build)
 
+    def test_e2studio_wait_is_bounded_and_keeps_the_make_fallback(self) -> None:
+        self.assertIn("[int]$E2StudioTimeoutSeconds = 600", self.build)
+        self.assertIn(
+            "$proc.WaitForExit($E2StudioTimeoutSeconds * 1000)", self.build
+        )
+        self.assertIn("$proc.Kill($true)", self.build)
+        self.assertIn("return 124", self.build)
+        self.assertIn("Invoke-MakeTarget", self.build)
+
     def test_nightly_has_a_dedicated_tls13_mqtt_row(self) -> None:
         start = self.ci.index("matrix_rx671_wifi_mqtt_tls13:")
         end = self.ci.index("\n.matrix_rx671_software_lanbench:", start)
