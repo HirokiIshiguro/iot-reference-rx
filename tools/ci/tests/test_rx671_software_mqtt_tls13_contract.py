@@ -41,6 +41,13 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         self.assertIn("expected TLSv1.3", self.build)
         self.assertIn("AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1", self.build)
 
+    def test_ci_credentials_override_runner_local_aws_iot_config(self) -> None:
+        self.assertIn("$environmentCredentialsConfigured = $false", self.build)
+        self.assertIn('"RX671_EK_AWS_IOT_CERT_PEM"', self.build)
+        self.assertIn('"RX671_EK_AWS_IOT_PRIVATE_KEY_PEM"', self.build)
+        self.assertIn("(-not $environmentCredentialsConfigured)", self.build)
+        self.assertIn('AWS IoT config source: environment', self.build)
+
     def test_e2studio_wait_is_bounded_and_keeps_the_make_fallback(self) -> None:
         self.assertIn("[int]$E2StudioTimeoutSeconds = 180", self.build)
         self.assertIn(

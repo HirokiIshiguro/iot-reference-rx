@@ -460,11 +460,37 @@ function Read-AwsIotConfig {
     )
 
     $resolvedDir = $ConfigDir
-    if ([string]::IsNullOrWhiteSpace($resolvedDir) -and (Test-Path -LiteralPath $defaultAwsIotConfigDir)) {
+    $environmentCredentialsConfigured = $false
+    foreach ($name in @(
+        "RX671_EK_AWS_IOT_CERT_PEM",
+        "RX671_EK_AWS_IOT_CERT_PEM_FILE",
+        "AWS_IOT_CERT_PEM",
+        "AWS_IOT_CERT_FILE",
+        "AWS_IOT_CERT",
+        "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM",
+        "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM_FILE",
+        "AWS_IOT_PRIVATE_KEY_PEM",
+        "AWS_IOT_PRIVATE_KEY_FILE",
+        "AWS_IOT_PRIVATE_KEY",
+        "AWS_IOT_PRIVKEY",
+        "AWS_IOT_PRIVKEY_FILE"
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+            $environmentCredentialsConfigured = $true
+            break
+        }
+    }
+
+    # CI credentials are the source of truth when present. Do not silently
+    # combine them with a runner-local endpoint, certificate, or private key.
+    if ([string]::IsNullOrWhiteSpace($resolvedDir) -and
+        (-not $environmentCredentialsConfigured) -and
+        (Test-Path -LiteralPath $defaultAwsIotConfigDir)) {
         $resolvedDir = $defaultAwsIotConfigDir
     }
 
     if (-not [string]::IsNullOrWhiteSpace($resolvedDir)) {
+        Write-Host "AWS IoT config source: local directory"
         $resolvedDir = (Resolve-Path -LiteralPath $resolvedDir).Path
         $metadata = Read-AwsIotMetadata -Path (Join-Path $resolvedDir "metadata.txt")
         $endpoint = Get-FirstNonEmpty @($EndpointOverride, $metadata["ENDPOINT"])
@@ -487,6 +513,7 @@ function Read-AwsIotConfig {
         }
     }
 
+    Write-Host "AWS IoT config source: environment"
     $endpoint = Get-FirstNonEmpty @($EndpointOverride, $env:RX671_EK_AWS_IOT_ENDPOINT, $env:AWS_IOT_ENDPOINT)
     $thingName = Get-FirstNonEmpty @($ThingNameOverride, $env:RX671_EK_AWS_IOT_THING_NAME, $env:AWS_IOT_THING_NAME)
     $certValue = Get-FirstNonEmpty @(
