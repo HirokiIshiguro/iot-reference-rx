@@ -114,6 +114,21 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         self.assertIn("$RX671_EK_FLEET_CLAIM_CERT_PEM", fleet)
         self.assertIn("$RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM", fleet)
 
+    def test_nightly_routes_tsip_aws_mqtt_without_device_private_key(self) -> None:
+        job = job_block(
+            self.ci,
+            "matrix_rx671_wifi_tsip_mqtt",
+            "matrix_rx671_wifi_tsip_tls13_resumption_0rtt",
+        )
+
+        self.assertIn("extends: .matrix_rx671_lanbench", job)
+        self.assertIn('RX671_BENCHMARK_PROFILE: "aws-mqtt"', job)
+        self.assertIn('RUN_RX671_TSIP_AWS_MQTT_TEST: "false"', self.ci)
+        self.assertIn('$RUN_RX671_TSIP_AWS_MQTT_TEST == "true"', job)
+        self.assertNotIn("RX671_TSIP_AWS_IOT_", job)
+        self.assertNotIn("RX671_EK_AWS_IOT_", job)
+        self.assertNotIn("PRIVATE_KEY", job)
+
 
 if __name__ == "__main__":
     unittest.main()
