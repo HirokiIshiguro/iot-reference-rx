@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $projectName = "boot_loader_rx671_ek"
 $relativeProject = "Projects\boot_loader_rx671_ek\e2studio_ccrx"
 $relativeSubmodule = "$relativeProject\lib\rx_bootloader"
-$expectedSubmoduleHead = "c16638a3ee3e3c31d70833ffea196591b33018bf"
+$expectedSubmoduleHead = "da8a5c720b5b664cf5ba7fc8cb10ec135593016c"
 
 function Remove-BuildDirectory {
     param(
