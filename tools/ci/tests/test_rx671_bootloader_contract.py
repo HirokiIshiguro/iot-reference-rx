@@ -15,7 +15,7 @@ from tools.ci.check_rx671_bootloader_layout import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROJECT = REPO_ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx"
 SUBMODULE = PROJECT / "lib" / "rx_bootloader"
-SUBMODULE_SHA = "faf57aee745e2bd849d114b83c10cef3089fdfb3"
+SUBMODULE_SHA = "c31bac703e1406e7a94d398b7bcad108b5e8fdce"
 
 
 def read(relative: str) -> str:
@@ -149,6 +149,9 @@ class Rx671BootloaderContractTests(unittest.TestCase):
 
     def test_bootloader_submodule_contract(self) -> None:
         gitmodules = (REPO_ROOT / ".gitmodules").read_text(encoding="utf-8")
+        helper = (REPO_ROOT / "tools" / "build_headless_rx671_bootloader.ps1").read_text(
+            encoding="utf-8"
+        )
         relative = "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader"
         self.assertIn(f'[submodule "{relative}"]', gitmodules)
         self.assertIn(f"\tpath = {relative}", gitmodules)
@@ -156,6 +159,7 @@ class Rx671BootloaderContractTests(unittest.TestCase):
             "\turl = ../../../../experiment/embedded/mcu/renesas/rx/bootloader/submodule.git",
             gitmodules,
         )
+        self.assertIn(f'$expectedSubmoduleHead = "{SUBMODULE_SHA}"', helper)
         head = subprocess.check_output(
             ["git", "-C", str(SUBMODULE), "rev-parse", "HEAD"], text=True
         ).strip()
