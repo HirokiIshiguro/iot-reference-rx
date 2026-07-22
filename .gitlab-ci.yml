@@ -201,11 +201,14 @@ variables:
   RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   E2STUDIO_WORKSPACE_RX671_WIFI: "C:/Temp/e2ws_iot_ref_rx671_wifi_2026_04_2"
+  E2STUDIO_WORKSPACE_RX671_WIFI_FLEET: "C:/Temp/e2ws_iot_ref_rx671_wifi_fleet_2026_04_2"
   RUN_RX671_WIFI_BUILD: "true"
   # RX671_WIFI_TEST_SCOPE:
   #   build   - build and publish firmware artifacts only.
   #   network - flash via E2OB and verify WHD JOIN + FreeRTOS+TCP network up.
   #   mqtt    - network checks plus AWS IoT TLS/MQTT smoke.
+  #   fleet   - build an encrypted Fleet image, verify it atomically, then park
+  #             the board on a Fleet-claim-free network image.
   RX671_WIFI_TEST_SCOPE: "build"
   RX671_WIFI_SKIP_HW_TESTS: "false"
   RX671_WIFI_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
@@ -227,6 +230,9 @@ variables:
   RX671_WIFI_UART_PORT: "${UART_PORT_EK_RX671_SCI6_RPI1}"
   RX671_WIFI_UART_BAUD_RATE: "921600"
   RX671_WIFI_UART_TIMEOUT_SECONDS: "300"
+  RX671_WIFI_FLEET_TEST_TIMEOUT_SECONDS: "900"
+  RX671_WIFI_FLEET_CLEANUP_RESOURCES: "true"
+  RX671_WIFI_FLEET_POLICY_NAME: "rx72n-envision-kit-policy"
   RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS: "600000"
   # The accelerated RX671 throughput implementation remains in its canonical
   # TSIP benchmark project. Six nightly rows trigger this ref.
@@ -411,6 +417,20 @@ workflow:
     RUN_RX65N_BG96_BUILD: "true"
     RX65N_BG96_SKIP_HW_TESTS: "false"
 
+.nightly_matrix_rx671_wifi_stabilizing:
+  extends: .nightly_matrix_stabilizing_trigger
+  resource_group: nightly-matrix-rx671-wifi
+  variables:
+    PIPELINE_PROFILE: "focused"
+    RUN_RX671_WIFI_BUILD: "true"
+    RX671_WIFI_SKIP_HW_TESTS: "false"
+    RUN_RX72N_BUILD: "false"
+    RX72N_SKIP_HW_TESTS: "true"
+    RX72N_TEST_SCOPE: "build"
+    RUN_RX65N_BG96_BUILD: "false"
+    RX65N_BG96_SKIP_HW_TESTS: "true"
+    RX65N_BG96_TEST_SCOPE: "build"
+
 matrix_rx671_wifi_network:
   extends: .nightly_matrix_rx671_wifi
   variables:
@@ -424,6 +444,15 @@ matrix_rx671_wifi_mqtt:
     - when: never
   variables:
     RX671_WIFI_TEST_SCOPE: "mqtt"
+
+matrix_rx671_wifi_fleet:
+  extends: .nightly_matrix_rx671_wifi_stabilizing
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD) && $AWS_DEFAULT_REGION && ($RX671_EK_FLEET_ENDPOINT || $RX671_EK_AWS_IOT_ENDPOINT || $AWS_IOT_ENDPOINT) && ($RX671_EK_FLEET_TEMPLATE_NAME || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($RX671_EK_FLEET_CLAIM_CERT_PEM || $RX671_EK_FLEET_CLAIM_CERT_PEM_FILE || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+      when: on_success
+    - when: never
+  variables:
+    RX671_WIFI_TEST_SCOPE: "fleet"
 
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
@@ -1075,6 +1104,199 @@ build_rx671_wifi:
       - Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug/*.map
     expire_in: 7 days
 
+build_rx671_wifi_fleet:
+  stage: build
+  tags:
+    - exec-shell
+    - os-windows
+    - ccrx
+    - $RX671_WIFI_BUILD_RUNNER_TAG
+  resource_group: rx671-wifi-e2studio-build
+  extends:
+    - .rx671_wifi_fleet_rules
+  script:
+    - Write-Host "=== Build encrypted EK-RX671 Type 1YN software Fleet image ==="
+    - python -m pip install --user cryptography
+    - python -m unittest tools.ci.tests.test_protect_secret_artifact tools.ci.tests.test_fleet_junit
+    - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    - |
+      function Get-FirstConfiguredValue {
+        param([string[]]$Names)
+        foreach ($name in $Names) {
+          $value = [Environment]::GetEnvironmentVariable($name)
+          if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+          }
+        }
+        return ""
+      }
+
+      foreach ($name in @("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")) {
+        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+          throw "Required RX671 Wi-Fi CI/CD variable is missing: $name"
+        }
+      }
+
+      $fleetEndpoint = Get-FirstConfiguredValue @(
+        "RX671_EK_FLEET_ENDPOINT",
+        "RX671_EK_AWS_IOT_ENDPOINT",
+        "AWS_IOT_ENDPOINT"
+      )
+      $fleetTemplate = Get-FirstConfiguredValue @(
+        "RX671_EK_FLEET_TEMPLATE_NAME",
+        "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+        "AWS_FLEET_PROVISIONING_TEMPLATE"
+      )
+      $fleetClaimCert = Get-FirstConfiguredValue @(
+        "RX671_EK_FLEET_CLAIM_CERT_PEM_FILE",
+        "RX671_EK_FLEET_CLAIM_CERT_PEM",
+        "AWS_FLEET_CLAIM_CERT_RX72N_02",
+        "AWS_FLEET_CLAIM_CERT"
+      )
+      $fleetClaimKey = Get-FirstConfiguredValue @(
+        "RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE",
+        "RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM",
+        "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
+        "AWS_FLEET_CLAIM_PRIVATE_KEY"
+      )
+      if ([string]::IsNullOrWhiteSpace($fleetEndpoint) -or
+          [string]::IsNullOrWhiteSpace($fleetTemplate) -or
+          [string]::IsNullOrWhiteSpace($fleetClaimCert) -or
+          [string]::IsNullOrWhiteSpace($fleetClaimKey)) {
+        throw "RX671 Fleet endpoint, template, claim certificate, and claim private key are required"
+      }
+
+      $buildArgs = @{
+        ProjectRoot = "$env:CI_PROJECT_DIR"
+        E2Studio = "$env:E2STUDIO_CLI"
+        Workspace = "$env:E2STUDIO_WORKSPACE_RX671_WIFI_FLEET"
+        LogFile = "$env:CI_PROJECT_DIR\rx671_wifi_e2studio_build_fleet.log"
+        UseLocalJoinConfig = $true
+        SkipAwsIotConfig = $true
+        FleetProvisioningEnable = $true
+        FleetEndpoint = $fleetEndpoint
+        FleetTemplateName = $fleetTemplate
+        FleetClaimCertificate = $fleetClaimCert
+        FleetClaimPrivateKey = $fleetClaimKey
+        WlanAllowBusSleepDelayMs = [int]$env:RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS
+        # The Fleet image has three proven 2304-byte MQTT/CBOR buffers. Reclaim
+        # their linker space from heap_4 while retaining about 1 KiB RAM margin.
+        FreeRtosHeapSizeKb = 250
+        # The default PCLK/2 DTC path was not reliable with this larger Fleet
+        # image. PCLK/8 passed JOIN, DHCP, DNS, and TLS repeatedly on RPi#1.
+        SdioRunClockDiv = "SDHI_DIV_8"
+      }
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx671_wifi_fleet"
+      $outputDir = "$env:CI_PROJECT_DIR\Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"
+      $localFleetHeader = "$env:CI_PROJECT_DIR\Projects\aws_wifi_rx671_ek\e2studio_ccrx\src\frtos_config\rx671_fleet_config_local.h"
+      $fleetWorkspace = "$env:E2STUDIO_WORKSPACE_RX671_WIFI_FLEET"
+      $fleetWorkspace = [System.IO.Path]::GetFullPath($fleetWorkspace).TrimEnd('\', '/')
+      $allowedWorkspacePrefix = [System.IO.Path]::GetFullPath("C:\Temp\e2ws_iot_ref_rx671_wifi_fleet_")
+      $projectRootFull = [System.IO.Path]::GetFullPath($env:CI_PROJECT_DIR).TrimEnd('\', '/')
+      $driveRoot = [System.IO.Path]::GetPathRoot($fleetWorkspace).TrimEnd('\', '/')
+      if (($fleetWorkspace -eq $driveRoot) -or
+          (-not $fleetWorkspace.StartsWith($allowedWorkspacePrefix, [System.StringComparison]::OrdinalIgnoreCase)) -or
+          ($fleetWorkspace.Equals($projectRootFull, [System.StringComparison]::OrdinalIgnoreCase)) -or
+          ($projectRootFull.StartsWith($fleetWorkspace + "\", [System.StringComparison]::OrdinalIgnoreCase)) -or
+          ($fleetWorkspace.StartsWith($projectRootFull + "\", [System.StringComparison]::OrdinalIgnoreCase))) {
+        throw "Unsafe RX671 Fleet e2 studio workspace path: $fleetWorkspace"
+      }
+      $buildArgs.Workspace = $fleetWorkspace
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      try {
+        & "$env:CI_PROJECT_DIR\tools\build_headless_rx671_wifi.ps1" @buildArgs
+
+        $sourceMot = Join-Path $outputDir "aws_wifi_rx671_ek.mot"
+        $sourceAbs = Join-Path $outputDir "aws_wifi_rx671_ek.abs"
+        $sourceMap = Join-Path $outputDir "aws_wifi_rx671_ek.map"
+        foreach ($path in @($sourceMot, $sourceAbs, $sourceMap)) {
+          if (-not (Test-Path -LiteralPath $path)) {
+            throw "RX671 Fleet build artifact missing: $path"
+          }
+        }
+
+        $context = "rx671-fleet-v1:${env:CI_PIPELINE_ID}:${env:CI_COMMIT_SHA}"
+        $env:RX671_FLEET_ARTIFACT_SECRET = $fleetClaimKey
+        $encryptedMot = Join-Path $artifactDir "aws_wifi_rx671_ek_fleet.mot.enc"
+        python "$env:CI_PROJECT_DIR\tools\ci\protect_secret_artifact.py" encrypt `
+          --input "$sourceMot" `
+          --output "$encryptedMot" `
+          --secret-env RX671_FLEET_ARTIFACT_SECRET `
+          --context "$context"
+        if ($LASTEXITCODE -ne 0) { throw "RX671 Fleet artifact encryption failed" }
+
+        $scanTargets = @(
+          "$env:CI_PROJECT_DIR\rx671_wifi_e2studio_build_fleet.log",
+          $sourceMap
+        )
+        $pemLeak = Select-String -Path $scanTargets -Pattern 'BEGIN (RSA |EC |)PRIVATE KEY|BEGIN CERTIFICATE' -ErrorAction SilentlyContinue
+        if ($pemLeak) { throw "Credential material was detected in a Fleet build output" }
+
+        Copy-Item -LiteralPath $sourceMap -Destination (Join-Path $artifactDir "aws_wifi_rx671_ek_fleet.map")
+        $manifest = [ordered]@{
+          format = "rx671-fleet-encrypted-artifact-v1"
+          pipeline_id = $env:CI_PIPELINE_ID
+          commit_sha = $env:CI_COMMIT_SHA
+          encryption_context = $context
+          fleet_network_buffer_size = 2304
+          freertos_heap_size_kb = $buildArgs.FreeRtosHeapSizeKb
+          sdio_run_clock_div = $buildArgs.SdioRunClockDiv
+          plaintext_mot_sha256 = (Get-FileHash -LiteralPath $sourceMot -Algorithm SHA256).Hash.ToLowerInvariant()
+          encrypted_mot_sha256 = (Get-FileHash -LiteralPath $encryptedMot -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+        $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "manifest.json") -Encoding ascii
+      } finally {
+        $env:RX671_FLEET_ARTIFACT_SECRET = ""
+        $cleanupFailures = @()
+        $buildLog = "$env:CI_PROJECT_DIR\rx671_wifi_e2studio_build_fleet.log"
+        $buildLogRemoved = $false
+        if (Test-Path -LiteralPath $buildLog) {
+          try {
+            Remove-Item -LiteralPath $buildLog -Force -ErrorAction Stop
+            $buildLogRemoved = $true
+          } catch {
+            $cleanupFailures += "build_log"
+          }
+        }
+
+        foreach ($entry in @(
+          @{ Label = "local_fleet_header"; Path = $localFleetHeader },
+          @{ Label = "hardware_debug"; Path = $outputDir },
+          @{ Label = "e2studio_workspace"; Path = $fleetWorkspace }
+        )) {
+          try {
+            if (Test-Path -LiteralPath $entry.Path) {
+              Remove-Item -LiteralPath $entry.Path -Recurse -Force -ErrorAction Stop
+            }
+          } catch {
+            $cleanupFailures += $entry.Label
+          }
+        }
+        $cleanupSummary = [ordered]@{
+          local_fleet_header_removed = -not (Test-Path -LiteralPath $localFleetHeader)
+          hardware_debug_removed = -not (Test-Path -LiteralPath $outputDir)
+          e2studio_workspace_removed = -not (Test-Path -LiteralPath $fleetWorkspace)
+          build_log_removed = $buildLogRemoved -or -not (Test-Path -LiteralPath $buildLog)
+          cleanup_failures = $cleanupFailures
+        }
+        $cleanupSummary | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "secret_cleanup.json") -Encoding ascii
+        if ($cleanupFailures.Count -gt 0) {
+          throw "RX671 Fleet plaintext cleanup failed for: $($cleanupFailures -join ', ')"
+        }
+      }
+
+      git diff --exit-code -- Projects/aws_wifi_rx671_ek/e2studio_ccrx
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 Fleet build helper did not restore the tracked e2 studio project"
+      }
+    - Write-Host "BUILD EK-RX671 WIFI FLEET SUCCESS"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/build_rx671_wifi_fleet/
+    expire_in: 1 day
+
 build_rx65n_bg96_fleet:
   stage: build
   tags:
@@ -1357,6 +1579,18 @@ build_rx72n_ether_fleet:
   rules:
     - if: '$RX671_WIFI_SKIP_HW_TESTS != "true" && $RX671_WIFI_TEST_SCOPE =~ /^(network|mqtt)$/'
       when: on_success
+    - when: never
+
+.rx671_wifi_fleet_rules:
+  rules:
+    - if: '$RUN_RX671_WIFI_BUILD == "true" && $RX671_WIFI_SKIP_HW_TESTS != "true" && $RX671_WIFI_TEST_SCOPE == "fleet" && ($RX671_EK_FLEET_ENDPOINT || $RX671_EK_AWS_IOT_ENDPOINT || $AWS_IOT_ENDPOINT) && ($RX671_EK_FLEET_TEMPLATE_NAME || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($RX671_EK_FLEET_CLAIM_CERT_PEM || $RX671_EK_FLEET_CLAIM_CERT_PEM_FILE || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+      when: on_success
+    - when: never
+
+.rx671_wifi_fleet_cleanup_rules:
+  rules:
+    - if: '$RUN_RX671_WIFI_BUILD == "true" && $RX671_WIFI_SKIP_HW_TESTS != "true" && $RX671_WIFI_TEST_SCOPE == "fleet" && $RX671_WIFI_FLEET_CLEANUP_RESOURCES != "false" && $AWS_DEFAULT_REGION && ($RX671_EK_FLEET_ENDPOINT || $RX671_EK_AWS_IOT_ENDPOINT || $AWS_IOT_ENDPOINT) && ($RX671_EK_FLEET_TEMPLATE_NAME || $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 || $AWS_FLEET_PROVISIONING_TEMPLATE) && ($RX671_EK_FLEET_CLAIM_CERT_PEM || $RX671_EK_FLEET_CLAIM_CERT_PEM_FILE || $AWS_FLEET_CLAIM_CERT_RX72N_02 || $AWS_FLEET_CLAIM_CERT) && ($RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM || $RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE || $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02 || $AWS_FLEET_CLAIM_PRIVATE_KEY)'
+      when: always
     - when: never
 
 .rx65n_bg96_download_rules:
@@ -2788,6 +3022,265 @@ test_rx671_wifi:
       - artifacts/test_rx671_wifi/
     reports:
       junit: artifacts/test_rx671_wifi/junit.xml
+    expire_in: 7 days
+
+test_rx671_wifi_fleet:
+  stage: fleet_test
+  extends:
+    - .rx671_wifi_linux_hw_job
+    - .rx671_wifi_fleet_rules
+  needs:
+    - job: build_rx671_wifi
+      artifacts: true
+    - job: build_rx671_wifi_fleet
+      artifacts: true
+  script:
+    - echo "=== Verify EK-RX671 Type 1YN software Fleet Provisioning atomically ==="
+    - python -m pip install --quiet cryptography
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_fleet"
+      runtime_dir="$CI_PROJECT_DIR/.rx671-fleet-runtime"
+      encrypted_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi_fleet/aws_wifi_rx671_ek_fleet.mot.enc"
+      fleet_mot="$runtime_dir/aws_wifi_rx671_ek_fleet.mot"
+      park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
+      manifest="$CI_PROJECT_DIR/artifacts/build_rx671_wifi_fleet/manifest.json"
+      mkdir -p "$artifact_dir" "$runtime_dir"
+      chmod 700 "$runtime_dir"
+
+      for path in "$encrypted_mot" "$park_mot" "$manifest"; do
+        if [ ! -f "$path" ]; then
+          echo "Required RX671 Fleet artifact is missing: $path" >&2
+          exit 1
+        fi
+      done
+      if [ ! -e "$RX671_WIFI_UART_PORT" ]; then
+        echo "Expected EK-RX671 SCI6 UART is not visible: $RX671_WIFI_UART_PORT" >&2
+        exit 1
+      fi
+
+      # Recover safely from a previously canceled Fleet job before handling
+      # the credential-bearing image. This also clears stale Data Flash.
+      echo "=== Preflight park EK-RX671 on Fleet-claim-free network image ===" | tee "$artifact_dir/preflight_park.log"
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -erase-chip -noquery \
+        2>&1 | tee -a "$artifact_dir/preflight_park.log"
+      status=${PIPESTATUS[0]}
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -p -v -reset -noquery "$park_mot" \
+        2>&1 | tee -a "$artifact_dir/preflight_park.log"
+      status=${PIPESTATUS[0]}
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+      touch "$artifact_dir/preflight_parked.ok"
+
+      claim_key="${RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE:-${RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM:-${AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02:-${AWS_FLEET_CLAIM_PRIVATE_KEY:-}}}}"
+      if [ -z "$claim_key" ]; then
+        echo "RX671 Fleet claim private key variable is unavailable." >&2
+        exit 1
+      fi
+
+      # Replace this removal-only trap with the board-parking trap immediately
+      # before the Fleet image is flashed.
+      trap 'unset RX671_FLEET_ARTIFACT_SECRET claim_key; rm -f "$fleet_mot"' EXIT
+      export RX671_FLEET_ARTIFACT_SECRET="$claim_key"
+      expected_context="rx671-fleet-v1:$CI_PIPELINE_ID:$CI_COMMIT_SHA"
+      context="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["encryption_context"])' "$manifest")"
+      if [ "$context" != "$expected_context" ]; then
+        echo "RX671 Fleet artifact context does not match this pipeline and commit." >&2
+        exit 1
+      fi
+      python tools/ci/protect_secret_artifact.py decrypt \
+        --input "$encrypted_mot" \
+        --output "$fleet_mot" \
+        --secret-env RX671_FLEET_ARTIFACT_SECRET \
+        --context "$context"
+      unset RX671_FLEET_ARTIFACT_SECRET claim_key
+      chmod 600 "$fleet_mot"
+
+      expected_sha="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["plaintext_mot_sha256"])' "$manifest")"
+      actual_sha="$(sha256sum "$fleet_mot" | awk '{print $1}')"
+      if [ "$actual_sha" != "$expected_sha" ]; then
+        echo "Decrypted RX671 Fleet MOT digest does not match the build manifest." >&2
+        exit 1
+      fi
+      printf '%s  %s\n' "$actual_sha" "aws_wifi_rx671_ek_fleet.mot" > "$artifact_dir/decrypted_mot.sha256"
+
+      park_board() {
+        original_status=$?
+        trap - EXIT
+        set +e
+        echo "=== Park EK-RX671 on Fleet-claim-free network image ===" | tee "$artifact_dir/park.log"
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -erase-chip -noquery \
+          2>&1 | tee -a "$artifact_dir/park.log"
+        erase_status=${PIPESTATUS[0]}
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -p -v -reset -noquery "$park_mot" \
+          2>&1 | tee -a "$artifact_dir/park.log"
+        park_status=${PIPESTATUS[0]}
+        rm -f "$fleet_mot"
+        if [ "$erase_status" -ne 0 ] || [ "$park_status" -ne 0 ]; then
+          echo "Failed to park EK-RX671 after Fleet test." >&2
+          if [ "$original_status" -eq 0 ]; then
+            original_status=1
+          fi
+        else
+          touch "$artifact_dir/parked.ok"
+        fi
+        exit "$original_status"
+      }
+      trap park_board EXIT
+
+      echo "=== Erase stale Data Flash and flash exact encrypted-build artifact ==="
+      touch "$artifact_dir/fleet_flash_started.ok"
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -erase-chip -noquery \
+        2>&1 | tee "$artifact_dir/erase.log"
+      status=${PIPESTATUS[0]}
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -p -v -reset -noquery "$fleet_mot" \
+        2>&1 | tee "$artifact_dir/flash.log"
+      status=${PIPESTATUS[0]}
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+      touch "$artifact_dir/fleet_flash_completed.ok"
+
+      reset_cmd="$RX671_WIFI_LINUX_RFP_CLI -d $RX671_WIFI_RFP_DEVICE -t $RX671_WIFI_RFP_TOOL -if $RX671_WIFI_RFP_INTERFACE -s $RX671_WIFI_RFP_SPEED -auth id $RX671_WIFI_RFP_AUTH_ID -sig -run -noquery"
+      set +e
+      python tools/test_fleet_rx72n.py \
+        --log-port "$RX671_WIFI_UART_PORT" \
+        --log-baud "$RX671_WIFI_UART_BAUD_RATE" \
+        --timeout "$RX671_WIFI_FLEET_TEST_TIMEOUT_SECONDS" \
+        --reset-cmd "$reset_cmd" \
+        --app-reset-retries 2 \
+        --label "RX671/Type 1YN software" \
+        --summary-json "$artifact_dir/fleet_summary.json" \
+        --junit-output "$artifact_dir/junit.xml" \
+        2>&1 | tee "$artifact_dir/fleet_uart.log"
+      test_status=${PIPESTATUS[0]}
+      set -e
+      exit "$test_status"
+  after_script:
+    - |
+      # GitLab sends cancellation directly to the script shell, so its EXIT
+      # trap is not sufficient by itself. after_script runs in a fresh shell
+      # and provides a second, idempotent claim-credential removal/park path.
+      set +e
+      set -o pipefail
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_fleet"
+      runtime_dir="$CI_PROJECT_DIR/.rx671-fleet-runtime"
+      fleet_mot="$runtime_dir/aws_wifi_rx671_ek_fleet.mot"
+      park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
+      mkdir -p "$artifact_dir"
+      rm -f "$fleet_mot"
+
+      if [ -f "$artifact_dir/parked.ok" ]; then
+        echo "RX671 Fleet after_script: board already parked." | tee "$artifact_dir/after_script_park.log"
+      elif [ -f "$artifact_dir/preflight_parked.ok" ] && [ ! -f "$artifact_dir/fleet_flash_started.ok" ]; then
+        echo "RX671 Fleet after_script: preflight park is still authoritative; Fleet flash never started." | tee "$artifact_dir/after_script_park.log"
+        touch "$artifact_dir/parked.ok"
+      elif [ ! -f "$park_mot" ]; then
+        echo "RX671 Fleet after_script: claim-free park image is unavailable." | tee "$artifact_dir/after_script_park.log" >&2
+        touch "$artifact_dir/after_script_park_failed"
+      else
+        echo "=== after_script: park EK-RX671 on claim-free network image ===" | tee "$artifact_dir/after_script_park.log"
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -erase-chip -noquery \
+          2>&1 | tee -a "$artifact_dir/after_script_park.log"
+        erase_status=${PIPESTATUS[0]}
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -p -v -reset -noquery "$park_mot" \
+          2>&1 | tee -a "$artifact_dir/after_script_park.log"
+        park_status=${PIPESTATUS[0]}
+        if [ "$erase_status" -eq 0 ] && [ "$park_status" -eq 0 ]; then
+          touch "$artifact_dir/parked.ok" "$artifact_dir/after_script_parked.ok"
+        else
+          echo "RX671 Fleet after_script: failed to park the board." | tee -a "$artifact_dir/after_script_park.log" >&2
+          touch "$artifact_dir/after_script_park_failed"
+        fi
+      fi
+      rm -f "$fleet_mot"
+      rmdir "$runtime_dir" 2>/dev/null || true
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_rx671_wifi_fleet/
+    reports:
+      junit: artifacts/test_rx671_wifi_fleet/junit.xml
+    expire_in: 7 days
+
+cleanup_rx671_wifi_fleet:
+  stage: fleet_cleanup
+  extends:
+    - .aws_cli_windows_job
+    - .rx671_wifi_fleet_cleanup_rules
+  needs:
+    - job: test_rx671_wifi_fleet
+      artifacts: true
+      optional: true
+  script:
+    - Write-Host "=== Cleanup EK-RX671 Fleet Provisioning AWS resources ==="
+    - |
+      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx671_wifi_fleet"
+      $summary = "$env:CI_PROJECT_DIR\artifacts\test_rx671_wifi_fleet\fleet_summary.json"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      if (-not (Test-Path -LiteralPath $summary)) {
+        Set-Content -LiteralPath "$artifactDir\cleanup_summary.json" -Encoding ascii -Value '{"success":false,"reason":"fleet_summary_missing"}'
+        throw "RX671 Fleet summary is absent; AWS resource cleanup cannot be proven."
+      }
+      python tools\cleanup_rx72n_fleet_resources.py `
+        --summary-json "$summary" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --policy-name "$env:RX671_WIFI_FLEET_POLICY_NAME" `
+        --output-json "$artifactDir\cleanup_summary.json" `
+        --verify-absence `
+        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup.log"
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/cleanup_rx671_wifi_fleet/
     expire_in: 7 days
 
 test_rx72n_ether_mqtt:

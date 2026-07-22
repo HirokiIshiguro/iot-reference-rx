@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "aws_iot_config.h"
+#include "rx671_fleet_config.h"
 #include "core_mqtt.h"
 #include "iot_default_root_certificates.h"
 #include "logging_levels.h"
@@ -19,21 +20,42 @@
 #include "iot_logging_task.h"
 #include "logging_stack.h"
 
-#define ENABLE_FLEET_PROVISIONING_DEMO      (0)
+#define ENABLE_FLEET_PROVISIONING_DEMO      RX671_FLEET_PROVISIONING_ENABLE
 #define ENABLE_OTA_UPDATE_DEMO              (0)
 #define democonfigUSE_AWS_IOT_CORE_BROKER   (1)
 #define democonfigDISABLE_SNI               (0)
 
 #define democonfigFP_DEMO_ID                "RX671Type1YN"
 #define democonfigCLIENT_IDENTIFIER         AWS_IOT_THING_NAME
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+#define democonfigMQTT_BROKER_ENDPOINT      RX671_FLEET_ENDPOINT
+#define democonfigPROVISIONING_TEMPLATE_NAME RX671_FLEET_TEMPLATE_NAME
+/*
+ * The Fleet demo performs CSR generation and TLS operations from its task.
+ * Keep enough stack for the crypto call chain instead of using the small
+ * generic demo default (configMINIMAL_STACK_SIZE * 3).
+ */
+#define democonfigFLEET_PROVISIONING_DEMO_STACKSIZE (6144U)
+#else
 #define democonfigMQTT_BROKER_ENDPOINT      AWS_IOT_ENDPOINT
-#define democonfigMQTT_BROKER_PORT          (AWS_IOT_MQTT_PORT)
 #define democonfigPROVISIONING_TEMPLATE_NAME "...insert here..."
+#endif
+#define democonfigMQTT_BROKER_PORT          (AWS_IOT_MQTT_PORT)
 #define democonfigCSR_SUBJECT_NAME          "CN=" democonfigFP_DEMO_ID
 
 #define democonfigDEMO_STACKSIZE            (configMINIMAL_STACK_SIZE * 3)
 #define democonfigDEMO_TASK_PRIORITY        (tskIDLE_PRIORITY + 1)
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+/*
+ * AWS IoT rejects an MQTT 5 CONNECT that advertises less than 512 bytes, and
+ * the accepted CSR response (certificate PEM, certificate ID, and ownership
+ * token) needs substantially more than that minimum.  Match the 2304-byte
+ * buffer used by the proven RX72N/RX65N Fleet configurations.
+ */
+#define democonfigNETWORK_BUFFER_SIZE       (2304U)
+#else
 #define democonfigNETWORK_BUFFER_SIZE       (configMINIMAL_STACK_SIZE * 3)
+#endif
 
 #define democonfigMQTT_LIB                  "core-mqtt@" MQTT_LIBRARY_VERSION
 #define AWS_IOT_MQTT_ALPN                   "\x0ex-amzn-mqtt-ca"

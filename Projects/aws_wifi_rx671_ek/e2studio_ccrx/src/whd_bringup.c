@@ -279,7 +279,7 @@ static void whd_log_scan_result(uint32_t index, const whd_sync_scan_result_t * p
 }
 #endif
 
-void whd_bringup_run(void)
+bool whd_bringup_run(void)
 {
     whd_init_config_t init_config;
     whd_sdio_config_t sdio_config;
@@ -321,7 +321,7 @@ void whd_bringup_run(void)
     whd_log_result("cyhal_sdio_init", result);
     if (CY_RSLT_SUCCESS != result)
     {
-        return;
+        return false;
     }
 
     memset(&hal_sdio_config, 0, sizeof(hal_sdio_config));
@@ -332,7 +332,7 @@ void whd_bringup_run(void)
     whd_log_result("cyhal_sdio_configure", result);
     if (CY_RSLT_SUCCESS != result)
     {
-        return;
+        return false;
     }
 
     result = whd_init(&g_whd_driver, &init_config,
@@ -343,7 +343,7 @@ void whd_bringup_run(void)
     whd_log_result("whd_init", result);
     if (WHD_SUCCESS != result)
     {
-        return;
+        return false;
     }
 
     result = whd_bus_sdio_attach(g_whd_driver, &sdio_config, &g_sdio_obj);
@@ -351,7 +351,7 @@ void whd_bringup_run(void)
     whd_log_result("whd_bus_sdio_attach", result);
     if (WHD_SUCCESS != result)
     {
-        return;
+        return false;
     }
 
     result = whd_wifi_on(g_whd_driver, &g_whd_ifp);
@@ -360,7 +360,7 @@ void whd_bringup_run(void)
     if (WHD_SUCCESS != result)
     {
         whd_log_sdio_diag("whd_wifi_on diag");
-        return;
+        return false;
     }
     whd_log_sdio_diag("whd_wifi_on ok");
 
@@ -494,8 +494,18 @@ void whd_bringup_run(void)
     debug_puts("WHD join skipped (WHD_JOIN_ENABLE=0)\r\n");
 #endif
 
+#if WHD_JOIN_ENABLE
+    if ((WHD_SUCCESS != g_whd_bringup_join_result) ||
+        (WHD_SUCCESS != g_whd_bringup_ready_result))
+    {
+        debug_puts("WHD bring-up failed before network start\r\n");
+        return false;
+    }
+#endif
+
     whd_record_stage(90U, 0U);
     debug_puts("WHD bring-up done\r\n");
+    return true;
 }
 
 whd_interface_t whd_bringup_get_interface(void)

@@ -163,8 +163,9 @@ WLAN MAC/firmware strings are printed.
 | `SDIO_HOST_CMD53_XFER_DMACA` | DMACA transfers between memory and SDHI `SDBUFR` | Experimental, not the default |
 
 The helper exposes the selector through `-SdioCmd53XferEngine` or
-`RX671_EK_SDIO_CMD53_XFER_ENGINE`. Direction and threshold overrides are also
-available for targeted experiments:
+`RX671_EK_SDIO_CMD53_XFER_ENGINE`. The run-clock divider can likewise be set
+with `-SdioRunClockDiv` or `RX671_EK_SDIO_RUN_CLOCK_DIV`. Direction and
+threshold overrides are also available for targeted experiments:
 `-SdioCmd53DtcReadEnable`, `-SdioCmd53DtcWriteEnable`,
 `-SdioCmd53DtcMinBytes`, `-SdioCmd53DmacaReadEnable`,
 `-SdioCmd53DmacaWriteEnable`, `-SdioCmd53DmacaMinBytes`, and
