@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
     [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
-    [int]$E2StudioTimeoutSeconds = 600,
+    [int]$E2StudioTimeoutSeconds = 180,
     [string]$Make = "",
     [string]$CcrxBin = "",
     [string]$Workspace = "C:\iotref-rx671-wifi-ws",

@@ -42,7 +42,7 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         self.assertIn("AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1", self.build)
 
     def test_e2studio_wait_is_bounded_and_keeps_the_make_fallback(self) -> None:
-        self.assertIn("[int]$E2StudioTimeoutSeconds = 600", self.build)
+        self.assertIn("[int]$E2StudioTimeoutSeconds = 180", self.build)
         self.assertIn(
             "$proc.WaitForExit($E2StudioTimeoutSeconds * 1000)", self.build
         )
