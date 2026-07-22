@@ -26,6 +26,22 @@ class EvaluateLogTests(unittest.TestCase):
         self.assertEqual([], missing)
         self.assertEqual([], failures)
 
+    def test_mqtt_tls13_requires_negotiated_version_marker(self):
+        text = "\n".join(NETWORK_MARKERS + MQTT_MARKERS)
+        missing, failures = evaluate_log(text, "mqtt", "TLSv1.3")
+        self.assertEqual(["AWS TLS version=TLSv1.3"], missing)
+        self.assertEqual([], failures)
+
+        missing, failures = evaluate_log(
+            text + "\nAWS TLS version=TLSv1.3", "mqtt", "TLSv1.3"
+        )
+        self.assertEqual([], missing)
+        self.assertEqual([], failures)
+
+    def test_tls_version_requirement_rejects_network_mode(self):
+        with self.assertRaises(ValueError):
+            required_markers("network", "TLSv1.3")
+
     def test_nonzero_join_is_reported(self):
         missing, failures = evaluate_log("whd_wifi_join=00000005\r\n", "network")
         self.assertTrue(missing)

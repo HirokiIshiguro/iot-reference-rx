@@ -9,6 +9,7 @@ param(
     [string]$AwsIotConfigDir = "",
     [string]$AwsIotEndpoint = "",
     [string]$AwsIotThingName = "",
+    [string]$RequireTlsVersion = "",
     [switch]$UseLocalJoinConfig,
     [switch]$UseAwsIotLocalConfig,
     [switch]$SkipAwsIotConfig,
@@ -966,6 +967,12 @@ $effectiveSdioCmd53DmacaReadEnable = Get-FirstNonEmpty @($SdioCmd53DmacaReadEnab
 $effectiveSdioCmd53DmacaWriteEnable = Get-FirstNonEmpty @($SdioCmd53DmacaWriteEnable, $env:RX671_EK_SDIO_CMD53_DMACA_WRITE_ENABLE)
 $effectiveSdioCmd53DmacaMinBytes = Get-FirstNonEmpty @($SdioCmd53DmacaMinBytes, $env:RX671_EK_SDIO_CMD53_DMACA_MIN_BYTES)
 $effectiveSdioCmd53DmacaBlockMode = Get-FirstNonEmpty @($SdioCmd53DmacaBlockMode, $env:RX671_EK_SDIO_CMD53_DMACA_BLOCK_MODE)
+$effectiveRequireTlsVersion = Get-FirstNonEmpty @($RequireTlsVersion, $env:RX671_WIFI_REQUIRE_TLS_VERSION)
+
+if ((-not [string]::IsNullOrWhiteSpace($effectiveRequireTlsVersion)) -and
+    ($effectiveRequireTlsVersion -ne "TLSv1.3")) {
+    throw "Unsupported RX671 AWS IoT TLS version requirement: $effectiveRequireTlsVersion (expected TLSv1.3)"
+}
 
 $cprojectBytes = $null
 $trackedProjectSnapshot = @{}
@@ -1007,6 +1014,11 @@ try {
 
     if ($UseTsipEntropy.IsPresent) {
         $cprojectDefines += "AWS_IOT_USE_TSIP_ENTROPY"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($effectiveRequireTlsVersion)) {
+        $cprojectDefines += "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1"
+        Write-Host "AWS IoT MQTT TLS version fixed to TLSv1.3"
     }
 
     if ($useTcpThroughputLocalConfigForBuild) {

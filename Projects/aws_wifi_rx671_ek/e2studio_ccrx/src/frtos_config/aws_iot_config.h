@@ -21,6 +21,10 @@
 #define AWS_IOT_MQTT_PORT                (8883U)
 #endif
 
+#ifndef AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3
+#define AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3    (0)
+#endif
+
 #ifndef AWS_IOT_PUBLISH_TOPIC
 #define AWS_IOT_PUBLISH_TOPIC            AWS_IOT_THING_NAME "/smoke"
 #endif
