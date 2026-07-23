@@ -490,6 +490,12 @@ matrix_rx671_wifi_mqtt_tls13:
     RX671_WIFI_TEST_SCOPE: "mqtt"
     RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"
 
+matrix_rx671_wifi_fleet_tls13:
+  extends: matrix_rx671_wifi_fleet
+  variables:
+    RX671_WIFI_TEST_SCOPE: "fleet"
+    RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"
+
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
   resource_group: nightly-matrix-rx671-wifi
@@ -1097,7 +1103,7 @@ build_rx671_wifi:
     - when: never
   script:
     - Write-Host "=== Build EK-RX671 Type 1YN Wi-Fi project ==="
-    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_software_mqtt_tls13_contract
+    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       foreach ($name in @("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")) {
@@ -1178,7 +1184,7 @@ build_rx671_wifi_fleet:
   script:
     - Write-Host "=== Build encrypted EK-RX671 Type 1YN software Fleet image ==="
     - python -m pip install --user cryptography
-    - python -m unittest tools.ci.tests.test_protect_secret_artifact tools.ci.tests.test_fleet_junit
+    - python -m unittest tools.ci.tests.test_protect_secret_artifact tools.ci.tests.test_fleet_junit tools.ci.tests.test_rx671_software_fleet_tls13_contract
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       function Get-FirstConfiguredValue {
@@ -1247,6 +1253,9 @@ build_rx671_wifi_fleet:
         # image. PCLK/8 passed JOIN, DHCP, DNS, and TLS repeatedly on RPi#1.
         SdioRunClockDiv = "SDHI_DIV_8"
       }
+      if (-not [string]::IsNullOrWhiteSpace($env:RX671_WIFI_REQUIRE_TLS_VERSION)) {
+        $buildArgs.RequireTlsVersion = $env:RX671_WIFI_REQUIRE_TLS_VERSION
+      }
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\build_rx671_wifi_fleet"
       $outputDir = "$env:CI_PROJECT_DIR\Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"
       $localFleetHeader = "$env:CI_PROJECT_DIR\Projects\aws_wifi_rx671_ek\e2studio_ccrx\src\frtos_config\rx671_fleet_config_local.h"
@@ -1303,6 +1312,7 @@ build_rx671_wifi_fleet:
           fleet_network_buffer_size = 2304
           freertos_heap_size_kb = $buildArgs.FreeRtosHeapSizeKb
           sdio_run_clock_div = $buildArgs.SdioRunClockDiv
+          required_tls_version = $env:RX671_WIFI_REQUIRE_TLS_VERSION
           plaintext_mot_sha256 = (Get-FileHash -LiteralPath $sourceMot -Algorithm SHA256).Hash.ToLowerInvariant()
           encrypted_mot_sha256 = (Get-FileHash -LiteralPath $encryptedMot -Algorithm SHA256).Hash.ToLowerInvariant()
         }
@@ -3347,6 +3357,13 @@ test_rx671_wifi_fleet:
       touch "$artifact_dir/fleet_flash_completed.ok"
 
       reset_cmd="$RX671_WIFI_LINUX_RFP_CLI -d $RX671_WIFI_RFP_DEVICE -t $RX671_WIFI_RFP_TOOL -if $RX671_WIFI_RFP_INTERFACE -s $RX671_WIFI_RFP_SPEED -auth id $RX671_WIFI_RFP_AUTH_ID -sig -run -noquery"
+      tls_version_args=()
+      if [ -n "${RX671_WIFI_REQUIRE_TLS_VERSION:-}" ]; then
+        tls_version_args+=(
+          --require-tls-version "$RX671_WIFI_REQUIRE_TLS_VERSION"
+          --minimum-tls-handshakes 2
+        )
+      fi
       set +e
       python tools/test_fleet_rx72n.py \
         --log-port "$RX671_WIFI_UART_PORT" \
@@ -3357,6 +3374,7 @@ test_rx671_wifi_fleet:
         --label "RX671/Type 1YN software" \
         --summary-json "$artifact_dir/fleet_summary.json" \
         --junit-output "$artifact_dir/junit.xml" \
+        "${tls_version_args[@]}" \
         2>&1 | tee "$artifact_dir/fleet_uart.log"
       test_status=${PIPESTATUS[0]}
       set -e

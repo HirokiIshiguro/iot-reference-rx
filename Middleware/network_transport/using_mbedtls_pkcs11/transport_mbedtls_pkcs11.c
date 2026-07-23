@@ -327,6 +327,23 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         returnStatus = TLS_TRANSPORT_INSUFFICIENT_MEMORY;
     }
 
+    #if defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0 )
+        #if !defined( MBEDTLS_SSL_PROTO_TLS1_3 )
+            #error "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 requires MBEDTLS_SSL_PROTO_TLS1_3"
+        #endif
+
+        if( returnStatus == TLS_TRANSPORT_SUCCESS )
+        {
+            /* Apply the AWS IoT MQTT policy to every connection made through
+             * this transport. Fleet Provisioning uses it first with the claim
+             * credentials and then with the provisioned device credentials. */
+            mbedtls_ssl_conf_min_tls_version( &( pTlsTransportParams->sslContext.config ),
+                                              MBEDTLS_SSL_VERSION_TLS1_3 );
+            mbedtls_ssl_conf_max_tls_version( &( pTlsTransportParams->sslContext.config ),
+                                              MBEDTLS_SSL_VERSION_TLS1_3 );
+        }
+    #endif
+
     #ifdef MBEDTLS_PSA_CRYPTO_C
         mbedtlsError = psa_crypto_init();
 
@@ -561,6 +578,16 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     }
     else
     {
+        #if defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0 )
+            if( mbedtls_ssl_get_version_number( &( pTlsTransportParams->sslContext.context ) ) != MBEDTLS_SSL_VERSION_TLS1_3 )
+            {
+                LogError( ( "TLS version requirement failed: expected TLSv1.3, negotiated %s.",
+                            mbedtls_ssl_get_version( &( pTlsTransportParams->sslContext.context ) ) ) );
+                sslContextFree( &( pTlsTransportParams->sslContext ) );
+                return TLS_TRANSPORT_HANDSHAKE_FAILED;
+            }
+        #endif
+
         LogInfo( ( "(Network connection %p) TLS handshake successful: version %s",
                    pNetworkContext,
                    mbedtls_ssl_get_version( &( pTlsTransportParams->sslContext.context ) ) ) );

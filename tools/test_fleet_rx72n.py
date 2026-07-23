@@ -299,8 +299,15 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
     return results, errors, total_bytes, total_lines, thing_name, certificate_id, tls_versions, tls_events
 
 
-def tls_requirement_ok(require_tls_version, tls_versions):
+def tls_requirement_ok(
+    require_tls_version,
+    tls_versions,
+    tls_handshake_count=0,
+    minimum_tls_handshakes=0,
+):
     require_tls_version = (require_tls_version or "").strip()
+    if tls_handshake_count < minimum_tls_handshakes:
+        return False
     if not require_tls_version:
         return True
     return bool(tls_versions) and all(version == require_tls_version for version in tls_versions)
@@ -316,6 +323,7 @@ def make_summary(
     thing_name,
     certificate_id,
     require_tls_version,
+    minimum_tls_handshakes,
     tls_versions,
     tls_events,
     attempts,
@@ -331,8 +339,15 @@ def make_summary(
         "thing_name": thing_name,
         "certificate_id": certificate_id,
         "require_tls_version": require_tls_version,
+        "minimum_tls_handshakes": minimum_tls_handshakes,
+        "tls_handshake_count": len(tls_events),
         "tls_versions_seen": list(tls_versions),
-        "tls_version_ok": tls_requirement_ok(require_tls_version, tls_versions),
+        "tls_version_ok": tls_requirement_ok(
+            require_tls_version,
+            tls_versions,
+            len(tls_events),
+            minimum_tls_handshakes,
+        ),
         "tls_events": list(tls_events),
         "attempts": list(attempts),
     }
@@ -371,6 +386,18 @@ def write_junit(path, label, summary):
         details = []
         if missing:
             details.append("missing markers: " + ", ".join(missing))
+        minimum_tls_handshakes = int(summary.get("minimum_tls_handshakes") or 0)
+        tls_handshake_count = int(summary.get("tls_handshake_count") or 0)
+        if tls_handshake_count < minimum_tls_handshakes:
+            details.append(
+                "TLS handshakes: "
+                f"observed {tls_handshake_count}, required {minimum_tls_handshakes}"
+            )
+        if summary.get("require_tls_version") and not summary.get("tls_version_ok"):
+            details.append(
+                "TLS version requirement failed: "
+                + str(summary.get("require_tls_version"))
+            )
         if errors:
             details.append("errors: " + " | ".join(errors[:10]))
         ET.SubElement(
@@ -380,7 +407,14 @@ def write_junit(path, label, summary):
         ).text = "\n".join(details) or "Fleet Provisioning verification did not complete"
 
     properties = ET.SubElement(testsuite, "properties")
-    for name in ("thing_name", "certificate_id", "require_tls_version", "tls_version_ok"):
+    for name in (
+        "thing_name",
+        "certificate_id",
+        "require_tls_version",
+        "minimum_tls_handshakes",
+        "tls_handshake_count",
+        "tls_version_ok",
+    ):
         ET.SubElement(
             properties,
             "property",
@@ -403,8 +437,15 @@ def main():
     parser.add_argument("--junit-output", help="Optional path to write a JUnit XML report")
     parser.add_argument("--app-reset-retries", type=int, default=int(os.environ.get("FLEET_APP_RESET_RETRIES", "0")))
     parser.add_argument("--require-tls-version", default=os.environ.get("FLEET_REQUIRE_TLS_VERSION", ""))
+    parser.add_argument(
+        "--minimum-tls-handshakes",
+        type=int,
+        default=int(os.environ.get("FLEET_MINIMUM_TLS_HANDSHAKES", "0")),
+    )
     args = parser.parse_args()
     require_tls_version = args.require_tls_version.strip()
+    if args.minimum_tls_handshakes < 0:
+        parser.error("--minimum-tls-handshakes must be zero or greater")
 
     print("=" * 60)
     print(f"{args.label} Fleet Provisioning Test")
@@ -413,6 +454,7 @@ def main():
     print(f"Log Baud: {args.log_baud}")
     print(f"Timeout:  {args.timeout}s")
     print(f"Required TLS: {require_tls_version or '(not enforced)'}")
+    print(f"Minimum TLS handshakes: {args.minimum_tls_handshakes}")
     print("=" * 60)
 
     attempts = []
@@ -452,6 +494,7 @@ def main():
                     thing_name=current["thing_name"],
                     certificate_id=current["certificate_id"],
                     require_tls_version=require_tls_version,
+                    minimum_tls_handshakes=args.minimum_tls_handshakes,
                     tls_versions=current["tls_versions_seen"],
                     tls_events=current["tls_events"],
                     attempts=attempts,
@@ -504,13 +547,25 @@ def main():
                     "total_lines": total_lines,
                     "thing_name": thing_name,
                     "certificate_id": certificate_id,
+                    "minimum_tls_handshakes": args.minimum_tls_handshakes,
+                    "tls_handshake_count": len(tls_events),
                     "tls_versions_seen": list(tls_versions),
-                    "tls_version_ok": tls_requirement_ok(require_tls_version, tls_versions),
+                    "tls_version_ok": tls_requirement_ok(
+                        require_tls_version,
+                        tls_versions,
+                        len(tls_events),
+                        args.minimum_tls_handshakes,
+                    ),
                     "tls_events": list(tls_events),
                 }
             )
             break
-        tls_ok = tls_requirement_ok(require_tls_version, tls_versions)
+        tls_ok = tls_requirement_ok(
+            require_tls_version,
+            tls_versions,
+            len(tls_events),
+            args.minimum_tls_handshakes,
+        )
         attempts.append(
             {
                 "attempt": attempt,
@@ -520,6 +575,8 @@ def main():
                 "total_lines": total_lines,
                 "thing_name": thing_name,
                 "certificate_id": certificate_id,
+                "minimum_tls_handshakes": args.minimum_tls_handshakes,
+                "tls_handshake_count": len(tls_events),
                 "tls_versions_seen": list(tls_versions),
                 "tls_version_ok": tls_ok,
                 "tls_events": list(tls_events),
@@ -538,7 +595,12 @@ def main():
 
     completed = (
         all(results.values())
-        and tls_requirement_ok(require_tls_version, tls_versions)
+        and tls_requirement_ok(
+            require_tls_version,
+            tls_versions,
+            len(tls_events),
+            args.minimum_tls_handshakes,
+        )
         and not has_sensitive_log_violation(errors)
     )
     summary = make_summary(
@@ -550,6 +612,7 @@ def main():
         thing_name=thing_name,
         certificate_id=certificate_id,
         require_tls_version=require_tls_version,
+        minimum_tls_handshakes=args.minimum_tls_handshakes,
         tls_versions=tls_versions,
         tls_events=tls_events,
         attempts=attempts,
@@ -566,8 +629,14 @@ def main():
     print(f"Thing name: {thing_name or '(not observed)'}")
     print(f"Certificate ID: {certificate_id or '(not observed)'}")
     print(f"TLS versions: {', '.join(tls_versions) or '(none)'}")
-    if require_tls_version:
-        status = "PASS" if tls_requirement_ok(require_tls_version, tls_versions) else "FAIL"
+    print(f"TLS handshakes: {len(tls_events)}")
+    if require_tls_version or args.minimum_tls_handshakes:
+        status = "PASS" if tls_requirement_ok(
+            require_tls_version,
+            tls_versions,
+            len(tls_events),
+            args.minimum_tls_handshakes,
+        ) else "FAIL"
         print(f"[{status}] Required TLS version: {require_tls_version}")
     for name, _ in MARKERS:
         print(f"[{'PASS' if results[name] else 'FAIL'}] {name}")
