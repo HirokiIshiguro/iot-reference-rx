@@ -118,13 +118,28 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         job = job_block(
             self.ci,
             "matrix_rx671_wifi_tsip_mqtt",
-            "matrix_rx671_wifi_tsip_tls13_resumption_0rtt",
+            "matrix_rx671_wifi_tsip_mqtt_tls13",
         )
 
         self.assertIn("extends: .matrix_rx671_lanbench", job)
         self.assertIn('RX671_BENCHMARK_PROFILE: "aws-mqtt"', job)
         self.assertIn('RUN_RX671_TSIP_AWS_MQTT_TEST: "false"', self.ci)
         self.assertIn('$RUN_RX671_TSIP_AWS_MQTT_TEST == "true"', job)
+        self.assertNotIn("RX671_TSIP_AWS_IOT_", job)
+        self.assertNotIn("RX671_EK_AWS_IOT_", job)
+        self.assertNotIn("PRIVATE_KEY", job)
+
+    def test_nightly_routes_tsip_aws_mqtt_tls13_without_device_private_key(self) -> None:
+        job = job_block(
+            self.ci,
+            "matrix_rx671_wifi_tsip_mqtt_tls13",
+            "matrix_rx671_wifi_tsip_tls13_resumption_0rtt",
+        )
+
+        self.assertIn("extends: .matrix_rx671_lanbench", job)
+        self.assertIn('RX671_BENCHMARK_PROFILE: "aws-mqtt-tls13"', job)
+        self.assertIn('RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"', self.ci)
+        self.assertIn('$RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST == "true"', job)
         self.assertNotIn("RX671_TSIP_AWS_IOT_", job)
         self.assertNotIn("RX671_EK_AWS_IOT_", job)
         self.assertNotIn("PRIVATE_KEY", job)
