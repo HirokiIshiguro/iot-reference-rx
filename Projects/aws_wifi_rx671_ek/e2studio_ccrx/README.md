@@ -88,6 +88,11 @@ protocol version. A successful handshake prints `AWS TLS version=TLSv1.3`; the
 hardware monitor can require that exact marker so a TLS 1.2 fallback cannot be
 reported as a TLS 1.3 pass.
 
+The same opt-in setting applies to the PKCS #11 transport used by Fleet
+Provisioning. In that mode both the claim-credential connection and the
+provisioned-device connection are pinned to TLS 1.3. CI requires two handshake
+events and rejects the run if either event reports another protocol version.
+
 ## GitLab hardware CI
 
 The repository pipeline treats the RPi#1 EK-RX671 bench as the `rx671_wifi`
