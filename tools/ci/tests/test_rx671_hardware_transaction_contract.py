@@ -133,7 +133,7 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         job = job_block(
             self.ci,
             "matrix_rx671_wifi_tsip_mqtt_tls13",
-            "matrix_rx671_wifi_tsip_tls13_resumption_0rtt",
+            "matrix_rx671_wifi_tsip_fleet",
         )
 
         self.assertIn("extends: .matrix_rx671_lanbench", job)
@@ -142,6 +142,21 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         self.assertIn('$RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST == "true"', job)
         self.assertNotIn("RX671_TSIP_AWS_IOT_", job)
         self.assertNotIn("RX671_EK_AWS_IOT_", job)
+        self.assertNotIn("PRIVATE_KEY", job)
+
+    def test_nightly_routes_tsip_fleet_as_stabilizing(self) -> None:
+        job = job_block(
+            self.ci,
+            "matrix_rx671_wifi_tsip_fleet",
+            "matrix_rx671_wifi_tsip_tls13_resumption_0rtt",
+        )
+
+        self.assertIn("extends: .matrix_rx671_lanbench", job)
+        self.assertIn('RX671_BENCHMARK_PROFILE: "aws-fleet"', job)
+        self.assertIn('RUN_RX671_TSIP_FLEET_TEST: "false"', self.ci)
+        self.assertIn('$RUN_RX671_TSIP_FLEET_TEST == "true"', job)
+        self.assertIn('$NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true"', job)
+        self.assertIn('RX671_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"', self.ci)
         self.assertNotIn("PRIVATE_KEY", job)
 
 
