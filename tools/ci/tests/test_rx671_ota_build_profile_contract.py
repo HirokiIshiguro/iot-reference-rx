@@ -85,8 +85,35 @@ class Rx671OtaBuildProfileContractTests(unittest.TestCase):
         for macro, value in defaults.items():
             self.assertRegex(
                 self.demo_config,
-                rf"#ifndef {macro}\s+#define {macro}\s+\({value}\)\s+#endif",
+                rf"#ifndef {macro}\s+#define {macro}\s+{value}\s+#endif",
             )
+
+    def test_normal_build_default_matches_marker_expectation(self) -> None:
+        version_tokens = []
+        for macro in (
+            "APP_VERSION_MAJOR",
+            "APP_VERSION_MINOR",
+            "APP_VERSION_BUILD",
+        ):
+            match = re.search(
+                rf"^#define {macro}\s+(\S+)\s*$",
+                self.demo_config,
+                re.MULTILINE,
+            )
+            self.assertIsNotNone(match, f"{macro} default is missing")
+            version_tokens.append(match.group(1))
+
+        normal_version = ".".join(version_tokens)
+        helper_default = re.search(
+            r"\$effectiveOtaImageVersion = if "
+            r"\(\$null -ne \$otaImageVersionParts\) \{.*?\} else \{\s*"
+            r'"([^"]+)"\s*\}',
+            self.build,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(helper_default)
+        self.assertEqual(normal_version, helper_default.group(1))
+        self.assertEqual(normal_version, "0.1.0")
 
     def test_linked_identity_contains_human_readable_marker(self) -> None:
         self.assertIn(
