@@ -69,13 +69,13 @@
 #define appmainPROVISIONING_MODE            (0)
 #define otapalconfigCODE_SIGNING_CERTIFICATE "Insert code signing certificate..."
 #ifndef APP_VERSION_MAJOR
-#define APP_VERSION_MAJOR                   (0)
+#define APP_VERSION_MAJOR                   0
 #endif
 #ifndef APP_VERSION_MINOR
-#define APP_VERSION_MINOR                   (1)
+#define APP_VERSION_MINOR                   1
 #endif
 #ifndef APP_VERSION_BUILD
-#define APP_VERSION_BUILD                   (0)
+#define APP_VERSION_BUILD                   0
 #endif
 
 #define democonfigROOT_CA_PEM               tlsATS1_ROOT_CERTIFICATE_PEM
