@@ -3,7 +3,13 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "analyze_rx671_ota_layout.py"
@@ -12,6 +18,15 @@ assert SPEC is not None and SPEC.loader is not None
 layout = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = layout
 SPEC.loader.exec_module(layout)
+
+RSU_SCRIPT = Path(__file__).resolve().parents[2] / "build_rx671_fwup_v2_rsu.py"
+RSU_SPEC = importlib.util.spec_from_file_location(
+    "build_rx671_fwup_v2_rsu_for_analyzer_tests", RSU_SCRIPT
+)
+assert RSU_SPEC is not None and RSU_SPEC.loader is not None
+rsu_builder = importlib.util.module_from_spec(RSU_SPEC)
+sys.modules[RSU_SPEC.name] = rsu_builder
+RSU_SPEC.loader.exec_module(rsu_builder)
 
 
 def _s3_record(address: int, data: bytes) -> str:
@@ -22,6 +37,14 @@ def _s3_record(address: int, data: bytes) -> str:
 
 
 class ParseTests(unittest.TestCase):
+    def test_parse_project_name_placeholder_from_directory(self):
+        repo_root = Path(__file__).resolve().parents[3]
+        cproject = repo_root / "Projects/boot_loader_rx671_ek/e2studio_ccrx/.cproject"
+        _mode, _build_dir, artifact_name, _anchors, _binaries = layout._parse_cproject(
+            cproject
+        )
+        self.assertEqual("boot_loader_rx671_ek", artifact_name)
+
     def test_parse_start_anchors(self):
         anchors = layout._parse_start_anchors(
             "SU,SI/04,PResetPRG,C,P/0FFF00300,EXCEPTVECT/0FFFFFF80"
@@ -61,7 +84,7 @@ TYPE1YN_FW_BLOB
 
 
 class GateTests(unittest.TestCase):
-    def test_current_source_detects_confirmed_collisions_and_unknown_artifacts(self):
+    def test_runtime_default_stays_linear_until_ota_profile_is_applied(self):
         repo_root = Path(__file__).resolve().parents[3]
         project_dir = repo_root / "Projects/aws_wifi_rx671_ek/e2studio_ccrx"
         with tempfile.TemporaryDirectory() as empty_build:
@@ -72,13 +95,14 @@ class GateTests(unittest.TestCase):
         self.assertEqual("PASS", by_name["rom_capacity"].status)
         self.assertEqual("PASS", by_name["fwup_data_flash_geometry"].status)
         self.assertEqual("PASS", by_name["littlefs_data_flash_geometry"].status)
-        self.assertEqual("UNKNOWN", by_name["data_flash_non_overlap"].status)
+        self.assertEqual("PASS", by_name["data_flash_ownership_contract"].status)
+        self.assertEqual("PASS", by_name["data_flash_non_overlap"].status)
         self.assertEqual("PASS", by_name["fwup_partition"].status)
         self.assertEqual("FAIL", by_name["dual_bank_mode"].status)
         self.assertEqual("FAIL", by_name["application_in_main_area"].status)
         self.assertEqual("FAIL", by_name["static_image_single_area"].status)
         self.assertEqual("FAIL", by_name["whd_resources_follow_application"].status)
-        self.assertEqual("FAIL", by_name["sdio_resource_addressing"].status)
+        self.assertEqual("PASS", by_name["sdio_resource_addressing"].status)
         self.assertEqual("FAIL", by_name["fwup_code_flash_layout"].status)
         self.assertEqual("UNKNOWN", by_name["artifact_provenance"].status)
         self.assertEqual("UNKNOWN", by_name["whd_blob_sizes"].status)
@@ -147,6 +171,39 @@ class GateTests(unittest.TestCase):
                 )
                 self.assertEqual("FAIL", gate.status)
                 self.assertIn(f"LittleFSと{name}が重複", gate.detail)
+
+    def test_data_flash_contract_rejects_bootloader_install(self):
+        contract = {
+            "schema_version": 1,
+            "target": "R5F5671EHxFB",
+            "data_flash": {
+                "start": "0x00100000",
+                "size": 8192,
+                "owner": "LittleFS",
+                "application_raw_consumers": [],
+                "bootloader_install_data_flash": False,
+                "ota_payload_data_flash": False,
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            contract_path = root / "ota-layout-contract.json"
+            bootloader_config = root / "rx671.h"
+            contract_path.write_text(json.dumps(contract), encoding="utf-8")
+            bootloader_config.write_text(
+                "#define RX_BOOTLOADER_INSTALL_DATA_FLASH (1)\n",
+                encoding="utf-8",
+            )
+            gate = layout._data_flash_ownership_contract_gate(
+                contract_path=contract_path,
+                bootloader_config_path=bootloader_config,
+                data_flash_start=0x00100000,
+                data_flash_size=8192,
+                littlefs_start=0x00100000,
+                littlefs_size=8192,
+            )
+        self.assertEqual("FAIL", gate.status)
+        self.assertIn("RX_BOOTLOADER_INSTALL_DATA_FLASH!=0", gate.detail)
 
     def test_known_data_flash_overlap_fails_even_if_inventory_is_incomplete(self):
         gate = layout._data_flash_non_overlap_gate(
@@ -375,6 +432,139 @@ const unsigned char * c = g_type1yn_clm_blob;
             )
             self.assertEqual("FAIL", stale.status)
             self.assertIn("hash不一致", stale.detail)
+
+
+class RsuGateTests(unittest.TestCase):
+    def _fixture(self, root: Path, version: str = "1.2.3"):
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        payload = bytearray(b"\xFF" * rsu_builder.APPLICATION_SIZE)
+        marker = f"RX671_OTA_IMAGE_VERSION={version}".encode("ascii") + b"\x00"
+        payload[0x100 : 0x100 + len(marker)] = marker
+        payload[-4:] = b"\x00\x03\xF0\xFF"
+        image = rsu_builder.build_image(bytes(payload), private_key)
+
+        rsu_path = root / "build/rx671-ota/candidate-1.2.3/aws_wifi_rx671_ek.rsu"
+        certificate_path = rsu_path.parent / "rx671-ota-signer.crt.pem"
+        rsu_path.parent.mkdir(parents=True)
+        rsu_path.write_bytes(image)
+
+        now = datetime.now(timezone.utc)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "RX671 test")])
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(name)
+            .public_key(private_key.public_key())
+            .serial_number(1)
+            .not_valid_before(now - timedelta(minutes=1))
+            .not_valid_after(now + timedelta(days=1))
+            .sign(private_key, hashes.SHA256())
+        )
+        certificate_path.write_bytes(
+            certificate.public_bytes(serialization.Encoding.PEM)
+        )
+        manifest_path = rsu_path.parent / layout.PROVENANCE_MANIFEST_NAME
+        manifest = {
+            "schema_version": 1,
+            "profile": layout.OTA_PROFILE_NAME,
+            "ota_image_version": version,
+            "rsu_path": rsu_path.relative_to(root).as_posix(),
+            "signer_certificate_path": certificate_path.relative_to(root).as_posix(),
+            "sha256": {
+                rsu_path.relative_to(root).as_posix(): layout._sha256(rsu_path),
+                certificate_path.relative_to(root).as_posix(): layout._sha256(
+                    certificate_path
+                ),
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return rsu_path, certificate_path, manifest_path
+
+    def _gate(
+        self,
+        root: Path,
+        rsu_path: Path,
+        certificate_path: Path,
+        manifest_path: Path,
+        version: str = "1.2.3",
+    ):
+        return layout._rsu_image_gate(
+            repo_root=root,
+            rsu_path=rsu_path,
+            signer_certificate_path=certificate_path,
+            expected_version=version,
+            provenance_manifest_path=manifest_path,
+        )
+
+    def test_accepts_strict_signed_single_segment_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rsu_path, certificate_path, manifest_path = self._fixture(root)
+            gate = self._gate(
+                root, rsu_path, certificate_path, manifest_path
+            )
+        self.assertEqual("PASS", gate.status)
+        self.assertIn("Data Flashなし", gate.detail)
+        self.assertIn("version=1.2.3", gate.detail)
+
+    def test_rejects_signed_payload_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rsu_path, certificate_path, manifest_path = self._fixture(root)
+            image = bytearray(rsu_path.read_bytes())
+            image[layout.FWUP_APPLICATION_OFFSET + 4] ^= 1
+            rsu_path.write_bytes(image)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            relative = rsu_path.relative_to(root).as_posix()
+            manifest["sha256"][relative] = layout._sha256(rsu_path)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            gate = self._gate(
+                root, rsu_path, certificate_path, manifest_path
+            )
+        self.assertEqual("FAIL", gate.status)
+        self.assertIn("ECDSA署名不一致", gate.detail)
+
+    def test_rejects_wrong_version_and_data_flash_enable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rsu_path, certificate_path, manifest_path = self._fixture(root)
+            wrong_version = self._gate(
+                root,
+                rsu_path,
+                certificate_path,
+                manifest_path,
+                version="1.2.4",
+            )
+            image = bytearray(rsu_path.read_bytes())
+            image[0x12C:0x130] = (1).to_bytes(4, "little")
+            rsu_path.write_bytes(image)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            relative = rsu_path.relative_to(root).as_posix()
+            manifest["sha256"][relative] = layout._sha256(rsu_path)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            data_flash = self._gate(
+                root, rsu_path, certificate_path, manifest_path
+            )
+        self.assertEqual("FAIL", wrong_version.status)
+        self.assertIn("version marker不一致", wrong_version.detail)
+        self.assertEqual("FAIL", data_flash.status)
+        self.assertIn("Data Flash payload", data_flash.detail)
+
+    def test_rejects_manifest_path_or_hash_mismatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rsu_path, certificate_path, manifest_path = self._fixture(root)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["rsu_path"] = "wrong.rsu"
+            relative = certificate_path.relative_to(root).as_posix()
+            manifest["sha256"][relative] = "0" * 64
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            gate = self._gate(
+                root, rsu_path, certificate_path, manifest_path
+            )
+        self.assertEqual("FAIL", gate.status)
+        self.assertIn("manifest rsu_path不一致", gate.detail)
+        self.assertIn("manifest hash不一致", gate.detail)
 
 
 if __name__ == "__main__":

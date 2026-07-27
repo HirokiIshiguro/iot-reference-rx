@@ -13,7 +13,8 @@
 #define FWUP_CFG_FUNCTION_MODE                      (1)
 
 /* RX671 2 MB code flash, prepared for the future dual-bank OTA layout.
- * Current non-bootloader builds keep OTA disabled at runtime. */
+ * The OTA image build profile temporarily narrows each install area to
+ * 768 KiB while preserving this linear-mode runtime default. */
 #define FWUP_CFG_MAIN_AREA_ADDR_L                   (0xFFF00000U)
 #define FWUP_CFG_BUF_AREA_ADDR_L                    (0xFFE00000U)
 #define FWUP_CFG_AREA_SIZE                          (0x00100000U)

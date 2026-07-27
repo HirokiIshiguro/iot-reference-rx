@@ -331,6 +331,56 @@ pwsh -File tools/load_rx671_wifi_jlink.ps1 -Run
 The loader still accepts `-FirmwareBin`, `-NvramBin`, and `-ClmBlob` for
 manual override/debug runs, but they are not required for the normal build.
 
+## RX671 OTA artifact build
+
+The checked-in e2 studio project remains the normal linear,
+`bank.single` application. A normal build therefore keeps its existing
+1 MiB FWUP area and linker layout; do not save the OTA-only settings into the
+project.
+
+The dedicated artifact helper temporarily applies the following OTA profile:
+
+- `bank.dual` and `BSP_CFG_CODE_FLASH_BANK_MODE=0`;
+- a 768 KiB (`0x000C0000`) install area;
+- the application and all Type 1YN resources at main-bank offset `+0x300`
+  (`0xFFF00300`), after the FWUP header and v2 descriptor;
+- `PFRAM2=RPFRAM2`, with `PFRAM2` in the main image group; and
+- explicit `APP_VERSION_*` defines for baseline `0.1.0` and candidate `0.1.1`.
+
+Run the same command used by the package job:
+
+```powershell
+python tools/build_rx671_ota_images.py `
+  --baseline-version 0.1.0 `
+  --candidate-version 0.1.1 `
+  --e2studio $env:E2STUDIO_CLI `
+  --workspace-root $env:E2STUDIO_WORKSPACE_RX671_OTA
+```
+
+CI sets that workspace to
+`C:/ai/codex/ws/iot-reference-rx-rx671-ota-2026-04-2`. The short,
+repository-independent path keeps generated e2 studio metadata outside
+OneDrive and avoids Windows path-length sensitivity.
+
+The helper snapshots `.cproject`, the FWUP configuration, and both generated
+BSP bank-mode files before applying the profile. It restores every snapshot
+byte-for-byte after success or failure and rejects a formal provenance build
+from a dirty source tree or a dirty/mismatched input submodule. OTA builds
+explicitly disable local Wi-Fi/AWS configuration, remove Wi-Fi credential
+variables from the child build environment, and reject outputs containing a
+configured Wi-Fi credential. Outputs are confined to `build/rx671-ota/` and
+include the boot loader, baseline/candidate MOT, ABS, MAP and signed RSU files,
+the signer certificate, effective configuration snapshots, SHA-256 provenance,
+and layout-analysis reports.
+
+This CI leaf proves artifact generation, flash-layout conformance, provenance,
+and signature self-verification only. It does not prove AWS OTA hardware
+success: no board is flashed, no AWS OTA job is delivered, and no reboot,
+self-test, bank swap, version transition, or rollback is observed. Therefore
+it does not change the AWS IoT Core connection test-results table to ○.
+See [OTA_FLASH_LAYOUT.md](e2studio_ccrx/OTA_FLASH_LAYOUT.md) for the formal
+layout and evidence boundary.
+
 ## FreeRTOS+TCP Integration Plan
 
 The first network goal is DHCP over Wi-Fi after WHD JOIN.

@@ -179,11 +179,12 @@ volatile uint32_t g_sdio_host_portd_dscr2;
 #define BRCM_SOCSRAM_BANKX_INDEX   (BRCM_SOCSRAM_BASE + 0x10UL)
 #define BRCM_SOCSRAM_BANKX_PDA     (BRCM_SOCSRAM_BASE + 0x44UL)
 
-/* Firmware/NVRAM blobs, loaded into MCU flash at runtime via J-Link (kept out
- * of the repo per project policy). The download streams them into SOCRAM. */
-#define SDIO_FW_BLOB_ADDR          (0xFFF00000UL) /* 43439A0.bin in flash       */
+/* Firmware/NVRAM blobs are linked after the application in the active FWUP
+ * bank. Linker symbols keep both normal and bank-swapped images relocatable. */
+extern const uint8_t g_type1yn_firmware_bin[];
+extern const uint8_t g_type1yn_nvram_bin[];
+
 #define SDIO_FW_BLOB_SIZE          (249066UL)
-#define SDIO_NVRAM_IMAGE_ADDR      (0xFFF80000UL) /* nvram_1yn.bin in flash      */
 #define SDIO_NVRAM_IMAGE_SIZE      (816UL)
 #define SDIO_FW_BLOCK_SIZE         (64UL)         /* F1 block size for the stream */
 #define SDIO_BRCM_FUNC1_FRAMECTRL  (0x0001000dUL) /* F1 frame control            */
@@ -2496,8 +2497,8 @@ static bool sdio_fw_verify_region(uint32_t bp_addr, const uint8_t * p_src, uint3
  */
 bool sdio_host_fw_download_and_boot(uint32_t * p_ht_ms, uint32_t * p_ior_ms)
 {
-    const uint8_t * p_fw = (const uint8_t *)SDIO_FW_BLOB_ADDR;
-    const uint8_t * p_nv = (const uint8_t *)SDIO_NVRAM_IMAGE_ADDR;
+    const uint8_t * p_fw = g_type1yn_firmware_bin;
+    const uint8_t * p_nv = g_type1yn_nvram_bin;
     const uint32_t nvram_base = 0x0007FFFCUL - SDIO_NVRAM_IMAGE_SIZE;
     const uint32_t toc = (((~(SDIO_NVRAM_IMAGE_SIZE / 4UL)) & 0xFFFFUL) << 16) |
                          ((SDIO_NVRAM_IMAGE_SIZE / 4UL) & 0xFFFFUL);

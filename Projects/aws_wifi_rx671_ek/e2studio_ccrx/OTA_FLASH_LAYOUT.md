@@ -1,121 +1,176 @@
-# RX671 / Type 1YN OTAフラッシュ配置ゲート
+# RX671 / Type 1YN OTA成果物のフラッシュ配置契約
 
-## 結論
-
-現行配置のままOTAを有効化してはならない。
-
-ソース`8e3363d00da13c5c6095e77cf1559031409c2d5b`では、アプリ本体を`0xFFE00000`側、WHD資材と固定ベクタを`0xFFF00000`側へ配置しており、1個のイメージが2個の1 MiB領域をまたぐ。
-さらに、BSPはLinear mode、CC-RXは`bank.single`であり、`sdio_host.c`はWLAN firmwareとNVRAMを絶対アドレスで参照している。
-data flashでは、FWUP設定の全8 KiBはaddressable geometryであり、FWUP専用領域ではない。LittleFS設定は`0x00100000`–`0x00101FFF`の全域を使用するため、FWUP header/descriptorをcode flash、bootloader署名公開鍵をbootloader code flashへ置く単独所有構成を候補にできる。ただし、linker anchorがないことだけではraw install/key-store/OTA payloadの不在を証明できない。
-
-OTA実装へ進むには、アプリ、WHD資材、ベクタを1個の論理main領域へまとめ、bank swap後も同じlinker symbolでWHD資材を参照できる構成へ変更する必要がある。
-bootloader予約量は実装物がないため未確定であり、数値を推定で埋めない。FWUP header/descriptorについては、存在しないlinker section名ではなく、main/buffer先頭の予約rangeと、その直後にある実linker objectのaddressで検証する。
-
-## 正本から確定できる容量と配置
-
-| 対象 | 値 | 根拠 | 現在の判定 |
-|---|---:|---|---|
-| RX671 code flash | 2,097,152 bytes (`0xFFE00000`–`0xFFFFFFFF`) | `r_bsp_config.h`のmemory code `0xE`と`mcu_info.h`の`BSP_ROM_SIZE_BYTES` | PASS |
-| FWUP main | 1,048,576 bytes (`0xFFF00000`–`0xFFFFFFFF`) | `r_fwup_config.h` | PASS（領域定義のみ） |
-| FWUP buffer | 1,048,576 bytes (`0xFFE00000`–`0xFFEFFFFF`) | `r_fwup_config.h` | PASS（領域定義のみ） |
-| RX671 data flash geometry | 8,192 bytes (`0x00100000`から64 bytes×128 blocks) | BSP、`r_fwup_config.h`、r_flash RX671 FIT定義 | PASS（start/block-size/block-count一致） |
-| FWUP data flash addressable geometry | `0x00100000`–`0x00101FFF` | `r_fwup_config.h` | PASS（専有割当を意味しない） |
-| LittleFS data flash割当 | `0x00100000`–`0x00101FFF`（128 bytes×64 blocks） | `rm_littlefs_flash_config.h` | PASS（geometryのみ。単独owner証跡はUNKNOWN） |
-| WLAN firmware | 249,066 bytes | `whd_port_resource.c`の宣言値 | 実ファイル不在時はUNKNOWN |
-| NVRAM | 816 bytes | `whd_port_resource.c`の宣言値 | 実ファイル不在時はUNKNOWN |
-| CLM | 4,752 bytes | `whd_port_resource.c`の宣言値 | 実ファイル不在時はUNKNOWN |
-| 3資材合計 | 254,634 bytes | 上記宣言値の合計 | 実ファイルで一致確認が必要 |
-| bootloader予約量 | 未確定 | RX671 bootloader project / mapなし | UNKNOWN |
-| FWUP header/descriptor予約 | main/buffer先頭から`0x200`/`0x100` bytes | `Common/ports/ota_pal/ota_pal.c`と`tools/build_fwup_v2_rsu.py` | FAIL（現行app anchorが予約域直後ではない） |
-
-WHDの3サイズはソースに記載された期待値であり、実バイナリの測定値ではない。
-ゲートはstaging済みファイルを`stat`し、期待値と一致し、さらに同一buildのprovenance manifestでSHA-256が一致したときだけ`whd_blob_sizes=PASS`にする。
-
-## 現行衝突
-
-| 要素 | 現行anchor | FWUP領域 | 問題 |
-|---|---:|---|---|
-| `PResetPRG,...,P` | `0xFFE00000` | buffer | main向けアプリとしてリンクされていない |
-| `TYPE1YN_FW_BLOB` | `0xFFF00000` | main | アプリ本体と別領域 |
-| `TYPE1YN_NVRAM_BLOB` | `0xFFF80000` | main | アプリ本体と別領域 |
-| `TYPE1YN_CLM_BLOB` | `0xFFF90000` | main | アプリ本体と別領域 |
-| `EXCEPTVECT` / `RESETVECT` | `0xFFFFFF80` / `0xFFFFFFFC` | main | アプリ本体と別領域 |
-
-`sdio_host.c`は`0xFFF00000`と`0xFFF80000`を直接参照する。
-一方、`whd_port_resource.c`には`g_type1yn_*` linker symbolを使う経路がある。
-OTA対応では直接参照を廃止し、資材の配置と参照をbank相対のlinker symbolへ統一する。
-
-data flashでは、FWUPの64 bytes×128 blocksはアクセス可能な全体geometryであり、FWUPだけの専有範囲ではない。
-LittleFSの128 bytes×64 blocksはRX671 FITのerase unit 64 bytes、program unit 4 bytesと整合し、全8 KiBを単独ownerとして使える候補である。
-`data_flash_non_overlap=PASS`はLittleFS以外のraw consumerがないことを、linker、OTA packer、bootloader、runtime flash writerの全経路で証明した場合に限る。bootloaderのraw Data Flash install、Data Flash/LittleFSから上書き可能なbootloader key-store、OTA payloadのData Flash segment、LittleFS以外のData Flash linker anchorのいずれかがあればFAILとする。現行ゲートはlinker anchorしか列挙できないためUNKNOWNとし、FWUP header/descriptorとuser-app metadataをcode flashへ置く実装と明示的な所有権証跡が揃ってからPASSへ進める。
-
-固定SHAを結び付けられない既存の非追跡map/MOTを参考入力として解析すると、code flash loadは671,618 bytesで、mainとbufferの両方を占有した。
-これは衝突の再現には使えるが、現行mainの容量証跡には採用しない。
-現行mainをビルドしたmap/MOTを同じpipeline artifactとして残し、再度ゲートを通す必要がある。
-
-## 必要なdual-bank構成
-
-次の条件をすべて満たすことを候補レイアウトの成立条件とする。
-
-1. Smart Configurator/BSPをDual mode (`BSP_CFG_CODE_FLASH_BANK_MODE=0`)にし、CC-RX device modeを`bank.dual`にする。
-2. mainとdownload bufferを各1 MiB bankの先頭`0xFFF00000` / `0xFFE00000`へ置き、同じinstall area sizeを使う。各bank末尾のbootloader予約量はRX671 bootloader mapで確定する。
-3. アプリ、WHD firmware、NVRAM、CLM、例外・リセットベクタを、main向けの1個の署名イメージへ含める。
-4. WHD資材をmain内のbank相対sectionへ置き、Cコードは絶対アドレスではなくlinker symbolを参照する。
-5. FWUPが同じイメージをbufferへ書き、bank swap後にmainの論理アドレスから起動・参照できることを実機確認する。
-6. bootloaderの実測sectionと予約範囲をRX671専用mapで確定し、アプリ/WHD/FWUP領域との非重複を確認する。
-7. main/buffer先頭の`0x200` bytesをFWUP header、続く`0x100` bytesをFWUP v2 descriptorとして予約し、実アプリanchorを`main+0x300`へ置く。例外・reset vectorは`main+area_size-0x80` / `main+area_size-0x04`へ置く。
-8. Data FlashはLittleFS単独所有とし、bootloader raw install/key-storeおよびOTA payloadからのraw Data Flash書き込みを無効にする。
-
-bootloaderの開始アドレスや予約量は、RX72N/RX65Nの値を流用しない。
-RX671専用projectの生成、build、map確認が終わるまでは`UNKNOWN`とする。
-
-## 自動ゲート
-
-`tools/ci/analyze_rx671_ota_layout.py`は、設定、実ファイル、map、MOTを別々に判定する。
-
-```powershell
-python tools/ci/analyze_rx671_ota_layout.py
-python tools/ci/analyze_rx671_ota_layout.py `
-  --build-dir Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug
+```mermaid
+flowchart LR
+    A["正規プロジェクト<br/>Linear / bank.single"] -->|"一時profile"| B["baseline / candidate<br/>dual-bank build"]
+    B --> C["FWUP v2 RSU署名<br/>layout / provenance検査"]
+    C --> D["build-only CI artifact<br/>全gate PASS"]
+    D -. "後続leaf" .-> E["実機AWS OTA<br/>swap / self-test / rollback"]
 ```
 
-map/MOTが存在しても、それだけでは現行sourceの証跡にしない。
-build directoryに`ota-layout-provenance.json`を置き、次をすべて現在入力と照合できた場合だけ`artifact_provenance=PASS`とする。
+## 1. 目的と適用範囲
 
-- `schema_version=1`
-- 40桁の`source_sha`が解析時のGit HEADと一致
-- build時の`dirty=false`
-- `project_path=Projects/aws_wifi_rx671_ek/e2studio_ccrx`
-- `sha256` tableに`.cproject`、BSP、FWUP、LittleFS、`sdio_host.c`、`whd_port_resource.c`、map、MOT、WHD 3 blobのSHA-256を記録
+本文書は、EK-RX671 / Type 1YN向けsoftware OTAの「署名済み成果物を再現可能に
+生成できる」段階について、通常ビルドとの差分、固定フラッシュ配置、CI証跡、
+および未証明事項を定義する。
 
-manifestなしは`UNKNOWN`、SHA/source/config不一致は`FAIL`とする。
-したがって、固定SHAと構成を結び付けられない古いmap/MOTは構造解析のdetailには表示できるが、`map_image_single_area`または`mot_image_single_area`をPASSにはしない。
+`Projects/aws_wifi_rx671_ek/e2studio_ccrx`の正規プロジェクトは、引き続きLinear
+mode / `bank.single`の通常アプリケーションである。OTA用設定をSmart
+Configuratorや`.cproject`へ恒久保存しない。OTA成果物生成時だけ
+`tools/build_rx671_ota_images.py`がdual-bank profileを一時適用し、処理の成否に
+かかわらず対象ファイルをバイト列単位（byte-for-byte）で復元する。
 
-| gate | PASS条件 | 現行clean tree |
+このCI leafは、成果物生成、配置、provenance、署名の整合だけを検証する。
+AWS OTAの実機成功を証明しない。したがって、これだけを根拠にREADMEの
+「AWS IoT Core 接続テスト結果」を○へ更新しない。
+
+## 2. 通常profileとOTA成果物profile
+
+| 項目 | 正規プロジェクト / 通常ビルド | OTA成果物生成中だけ |
 |---|---|---|
-| `source_inputs` | 必須設定をすべて解析できる | PASS |
-| `bootloader_layout` | RX671専用bootloader map、明示予約range、source provenanceを確認し、アプリ/WHDと非重複かつ両bankの必要配置を確認 | UNKNOWN |
-| `rom_capacity` | 選択MCUのROM容量をBSP生成物から導出できる | PASS |
-| `fwup_data_flash_geometry` | FWUPのstart/block-size/block-countがBSPとRX671 FITに完全一致する | PASS |
-| `littlefs_data_flash_geometry` | LittleFSのrange/erase/program geometryがBSPとRX671 FITに整合する | PASS |
-| `data_flash_non_overlap` | LittleFSが全8 KiBの唯一のownerで、LittleFS以外のlinker consumer、raw install/key-store/OTA payloadがないことを全経路で証明 | UNKNOWN |
-| `fwup_partition` | 各1 MiB bankの先頭に同じinstall area sizeを置き、bank容量を超えない。末尾予約はbootloader gateで別途検証 | PASS |
-| `dual_bank_mode` | `.cproject=bank.dual`かつBSP=Dual mode | FAIL |
-| `application_in_main_area` | アプリanchorがmain内にある | FAIL |
-| `static_image_single_area` | code-flash anchorが1領域だけにある | FAIL |
-| `whd_resources_follow_application` | WHD 3 section anchorがすべて存在し、アプリanchorと同じ領域にある | FAIL |
-| `sdio_resource_addressing` | primitive pathとWHD providerが`g_type1yn_*` linker symbolを実参照し、code flash固定値を含まない | FAIL |
-| `fwup_code_flash_layout` | main/bufferのheader/descriptor予約range、`main+0x300`の実app anchor、area末尾の実vector anchorが一致 | FAIL |
-| `artifact_provenance` | 現行source/configとmap/MOT/WHD blobをmanifestのSHA-256で結び付ける | UNKNOWN |
-| `whd_blob_sizes` | provenance済み3実ファイルの測定サイズが宣言値と一致する | UNKNOWN |
-| `map_image_single_area` | provenance済みmapの全code-flash sectionが1領域に収まる | UNKNOWN |
-| `mot_image_single_area` | provenance済みMOTの全code-flash load byteが1領域に収まる | UNKNOWN |
+| CC-RX device mode | `bank.single` | `bank.dual` |
+| BSP bank mode | `BSP_CFG_CODE_FLASH_BANK_MODE=1` | `BSP_CFG_CODE_FLASH_BANK_MODE=0` |
+| FWUP area size | `0x00100000`（1 MiB） | `0x000C0000`（768 KiB） |
+| アプリ配置 | 従来のLinear配置 | main `0xFFF00000` + `0x300` = `0xFFF00300` |
+| WHD firmware / NVRAM / CLM | 従来の固定section | アプリに続く同一main image group |
+| RAM初期値section | 従来section | `PFRAM2=RPFRAM2`を追加し、`PFRAM2`をmain image groupへ含める |
+| image version | `demo_config.h`既定値 | `APP_VERSION_*`で`0.1.0` / `0.1.1`を明示 |
 
-終了コードは、全PASSが`0`、1個以上のFAILが`1`、FAILなしでUNKNOWNありの場合が`2`である。
-bootloader、map/MOT、WHD実ファイル、provenance manifestのいずれかがない場合も成功扱いにしない。
+通常プロジェクトがLinear / `bank.single`であることと、OTA成果物がdual-bank
+配置であることは両立させる。前者は開発・ネットワーク試験の既存動作を維持し、
+後者はbootloaderが扱う署名対象の固定配置を作る。
 
-## 次の判断点
+## 3. 固定code flash配置
 
-現在の阻害要因はWHD資材そのものの254,634 bytesではなく、Linear mode、2領域に分散したlinker配置、code flash上のFWUP header/descriptor予約、Data Flash単独所有の全経路証跡、bootloader実装がないことである。
-ただし、選択したmain領域へ収まるという最終判断には、OTA/Fleetを含む現行mainのmap、WHD実ファイル、FWUP v2 packed image、RX671 bootloaderを同じ構成で測定する必要がある。
-これらの証跡が揃うまで、software OTAの実機結合へ進めない。
+正本は`ota-layout-contract.json`である。RX671の2 MiB code flashを1 MiBずつの
+main / buffer bankとして扱い、各bank末尾256 KiBをbootloader予約相当として
+除外する。署名・更新対象となるinstall areaは各768 KiBである。
+
+| 範囲 / anchor | 値 | 用途 |
+|---|---:|---|
+| buffer bank start | `0xFFE00000` | download / swap対象bank |
+| main bank start | `0xFFF00000` | 現在実行する論理main bank |
+| install area size | `0x000C0000` | header、descriptor、applicationを含む768 KiB |
+| FWUP header | main `+0x000`–`+0x1FF` | 512-byte FWUP header |
+| FWUP v2 descriptor | main `+0x200`–`+0x2FF` | 256-byte descriptor |
+| application start | `0xFFF00300` | main `+0x300` |
+| exception vector | `0xFFFBFF80` | install area末尾128-byte window |
+| reset vector | `0xFFFBFFFC` | install area末尾 |
+| bootloader reserved | `0xFFFC0000`–`0xFFFFFFFF` | RX671専用bootloaderと固定vector |
+
+OTA linker profileでは、アプリ、`TYPE1YN_FW_BLOB`、`TYPE1YN_NVRAM_BLOB`、
+`TYPE1YN_CLM_BLOB`を`0xFFF00300`から始まる同一groupに置く。Cコード側は
+`g_type1yn_*` linker symbolを参照するため、bank swap後も同じ論理main address
+としてWHD資材へ到達できる。`PFRAM2=RPFRAM2`も同じ署名imageに含める。
+
+RX671専用bootloaderの配置は、別projectのMOT/MAPと
+`tools/ci/check_rx671_bootloader_layout.py`で確認する。RX72N/RX65Nの予約値は
+流用しない。
+
+## 4. Data Flash所有権
+
+RX671の8 KiB Data Flash（`0x00100000`–`0x00101FFF`）はLittleFSの単独所有と
+する。
+
+- `RX_BOOTLOADER_INSTALL_DATA_FLASH=0`
+- `RX_BOOTLOADER_USE_DATAFLASH_KEY_STORE=0`
+- `RX_BOOTLOADER_USE_LITTLEFS_KEY_STORE=1`
+- OTA RSUのData Flash start/endは`0xFFFFFFFF`（payloadなし）
+
+FWUP header / descriptorはcode flashに置く。bootloader署名公開鍵はLittleFS
+から読み、raw Data Flash install、raw key-store、OTA Data Flash payloadを
+使わない。
+
+## 5. 一時profileと復元契約
+
+`tools/build_rx671_ota_images.py`は開始時に次の4ファイルをbytesとして保存する。
+
+1. `.cproject`
+2. `src/frtos_config/r_fwup_config.h`
+3. `src/smc_gen/r_config/r_bsp_config.h`
+4. `src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h`
+
+各imageを作る直前に保存値からOTA profileを生成するため、baselineからcandidate
+へ設定差分が累積しない。build、署名、解析のいずれかが失敗しても`finally`で
+4ファイルを復元し、開始時のGit source stateと終了時のstateが一致しなければ
+失敗とする。
+
+正式なprovenanceはclean treeだけを受け付ける。`--allow-dirty`はローカルでの
+調査用であり、manifestに`dirty=true`を残すため正式なPASS証跡に採用しない。
+formal buildの入力submoduleは、開始時・各build後・終了時にgitlinkとの一致と
+worktree cleanを確認し、全gitlink SHAをmanifestへ記録する。
+WHD portability patchがgitlinkへ未収録の場合はcleanなWHDへ既知patchだけを一時
+適用し、各buildの成否にかかわらず逆適用する。別のsubmodule差分が残れば失敗する。
+
+OTA成果物へ実機ネットワーク秘密を混入させないため、OTA helperは子buildから
+`RX671_EK_WIFI_SSID` / `RX671_EK_WIFI_PASSPHRASE` /
+`RX671_EK_WIFI_PASSWORD`を除外し、Wi-Fi/AWS local configを明示的に無効化する。
+共有Runnerに残ったignored JOIN headerはbuild中に隔離して終了時に削除し、生成した
+MOT / ABS / MAP / RSUに設定済みWi-Fi credentialが残っていないことも検査する。
+
+## 6. CI package job
+
+OTA固有ファイルを変更したmerge requestは、一般RX671 network ruleより先に
+build-only workflowへ振り分ける。このworkflowでは既存のRX671 Wi-Fi buildと
+flash/UART/AWS/network jobを起動せず、次の順で処理する。
+
+1. `build_rx671_bootloader`が専用projectをビルドし、MOT / ABS / MAPを公開する。
+2. `package_rx671_ota_artifacts`が`needs`でbootloader成果物を受け取る。
+3. Python `cryptography`を導入し、layout、packer、profile、bootloaderのunit
+   testsを実行する。
+4. baseline `0.1.0`とcandidate `0.1.1`を同じ固定コマンドで生成する。
+5. `build/rx671-ota/`をpipeline artifactとして保存する。
+
+```powershell
+python tools/build_rx671_ota_images.py `
+  --baseline-version 0.1.0 `
+  --candidate-version 0.1.1 `
+  --e2studio $env:E2STUDIO_CLI `
+  --workspace-root $env:E2STUDIO_WORKSPACE_RX671_OTA
+```
+
+`build/rx671-ota/`には少なくとも次を含める。
+
+- `bootloader/`のMOT / ABS / MAP
+- `baseline-0.1.0/`と`candidate-0.1.1/`のMOT / ABS / MAP
+- 各versionのECDSA P-256署名済みFWUP v2 RSU
+- signer certificate（秘密鍵はartifactへ収録しない）
+- OTA適用中のeffective configuration snapshot
+- source SHA、submodule gitlink、各入力・出力SHA-256を持つprovenance manifest
+- machine-readable layout analysis report
+
+repositoryのsample signing keyは、CIにおける形式・署名自己検証専用である。
+製品用秘密鍵の保管、発行、rotationはこのleafの範囲外とする。
+
+## 7. 自動検証の合格条件
+
+`tools/ci/analyze_rx671_ota_layout.py`は、単なるファイル存在確認ではなく、同一
+buildのMOT / MAP / RSU / signer certificate / effective config / provenanceを
+結び付ける。主な合格条件は次のとおり。
+
+- `.cproject=bank.dual`かつBSP Dual mode
+- main/buffer、768 KiB install area、`main+0x300`、vector、bootloader予約の一致
+- アプリとWHD 3資材が1個のinstall area内に収まること
+- WHD実blob sizeとmanifest SHA-256の一致
+- RX671専用bootloader map/MOT、設定、submodule SHAの一致
+- Data FlashがLittleFS単独所有で、RSUにData Flash payloadがないこと
+- RSU header / descriptor / image versionの一致
+- ECDSA P-256 raw signatureのcertificate公開鍵による検証成功
+- `source_sha`、`dirty=false`、project path、全必須hashの一致
+
+いずれかが不一致ならpackage jobを失敗させる。古いMOT/MAP、別SHAの成果物、
+manifestなしの成果物は正式証跡として扱わない。
+
+## 8. 実機AWS OTAを○にするための残り
+
+このpackage jobはボードを占有せず、次を実行しない。
+
+- bootloaderとbaseline imageの実機flash
+- AWS IoT Jobs経由のcandidate RSU配信
+- device側の署名受理、download、install、bank swap
+- reboot後の`0.1.0`から`0.1.1`へのversion遷移
+- self-test成功、commit、失敗時rollback
+- AWS Job / Stream / S3 objectの後片付け確認
+
+これらを同一source SHAとpipelineに結び付けて実機確認できた時点で、初めて
+「AWS IoT Core 接続テスト結果」のRX671 software OTA欄を○へ変更できる。

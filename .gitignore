@@ -42,6 +42,9 @@ RemoteSystemsTempFiles/*
 # Ignore top-level build dir
 /build*/
 
+# Ignore GitLab CI dependency and job artifacts
+/artifacts/
+
 # Ignore certificate files (security-sensitive)
 *.pem
 *.crt
