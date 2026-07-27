@@ -17,6 +17,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,6 +33,48 @@ PROVENANCE_MANIFEST_NAME = "ota-layout-provenance.json"
 REPORT_NAME = "ota-layout-report.json"
 SIGNER_CERTIFICATE_NAME = "rx671-ota-signer.crt.pem"
 ARTIFACT_BASENAME = "aws_wifi_rx671_ek"
+LOCAL_JOIN_CONFIG_RELATIVE = Path("src/whd_join_config_local.h")
+WHD_SUBMODULE_RELATIVE = Path(
+    "Projects/aws_wifi_rx671_ek/external/wifi-host-driver"
+)
+WHD_PATCH_RELATIVE = Path(
+    "Projects/aws_wifi_rx671_ek/external/patches/"
+    "whd-v1.70.0-ccrx-portability.patch"
+)
+WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES = (
+    "RX671_EK_WIFI_SSID",
+    "RX671_EK_WIFI_PASSPHRASE",
+    "RX671_EK_WIFI_PASSWORD",
+)
+FORMAL_INPUT_SUBMODULES = (
+    Path("Middleware/3rdparty/littlefs"),
+    Path("Middleware/3rdparty/mbedtls"),
+    Path("Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk"),
+    Path("Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk"),
+    Path("Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c"),
+    Path("Middleware/FreeRTOS/FreeRTOS-Kernel"),
+    Path("Middleware/FreeRTOS/FreeRTOS-Plus-TCP"),
+    Path("Middleware/FreeRTOS/backoffAlgorithm"),
+    Path("Middleware/FreeRTOS/coreJSON"),
+    Path("Middleware/FreeRTOS/coreMQTT"),
+    Path("Middleware/FreeRTOS/coreMQTT-Agent"),
+    Path("Middleware/FreeRTOS/corePKCS11"),
+    Path("Projects/aws_wifi_rx671_ek/external/TraceRecorderSource"),
+    Path(
+        "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/"
+        "sources/cyw-fmac-nvram"
+    ),
+    Path(
+        "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/"
+        "sources/firmware-wifi-host-driver"
+    ),
+    Path(
+        "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/"
+        "sources/wifi-resources"
+    ),
+    Path("Projects/aws_wifi_rx671_ek/external/wifi-host-driver"),
+    BOOTLOADER_SUBMODULE_RELATIVE,
+)
 
 PROFILE_PATHS = (
     Path(".cproject"),
@@ -337,6 +380,61 @@ def tracked_source_is_dirty(repo_root: Path) -> bool:
     return bool(state["unstaged"] or state["staged"] or state["untracked"])
 
 
+def validate_formal_input_submodules(repo_root: Path) -> dict[str, str]:
+    command = [
+        "git",
+        "-C",
+        str(repo_root),
+        "submodule",
+        "status",
+        "--",
+        *(path.as_posix() for path in FORMAL_INPUT_SUBMODULES),
+    ]
+    result = subprocess.run(
+        command,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    gitlinks: dict[str, str] = {}
+    invalid: list[str] = []
+    for line in result.stdout.splitlines():
+        match = re.fullmatch(r" ([0-9a-f]{40}) ([^\s]+)(?: .*)?", line)
+        if match is None:
+            invalid.append(line[:80])
+            continue
+        sha, relative = match.groups()
+        submodule = repo_root / relative
+        status = _git(
+            submodule,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        )
+        if status:
+            invalid.append(f"{relative}: worktree dirty")
+            continue
+        gitlinks[relative] = sha
+
+    missing = [
+        path.as_posix()
+        for path in FORMAL_INPUT_SUBMODULES
+        if path.as_posix() not in gitlinks
+    ]
+    if invalid or missing:
+        details = [*(f"invalid={item}" for item in invalid)]
+        if missing:
+            details.append("missing=" + ",".join(missing))
+        raise RuntimeError(
+            "formal OTA input submodules must match gitlinks and be clean: "
+            + "; ".join(details)
+        )
+    return dict(sorted(gitlinks.items()))
+
+
 def _safe_recreate_output(path: Path, repo_root: Path) -> None:
     allowed_root = (repo_root / "build/rx671-ota").resolve()
     resolved = path.resolve()
@@ -377,7 +475,13 @@ def _validate_workspace_root(path: Path) -> None:
         )
 
 
-def _run(command: list[str], cwd: Path, *, capture: bool = False) -> subprocess.CompletedProcess[str]:
+def _run(
+    command: list[str],
+    cwd: Path,
+    *,
+    capture: bool = False,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     print("+", subprocess.list2cmdline(command), flush=True)
     return subprocess.run(
         command,
@@ -385,7 +489,136 @@ def _run(command: list[str], cwd: Path, *, capture: bool = False) -> subprocess.
         check=True,
         text=True,
         capture_output=capture,
+        env=env,
     )
+
+
+def ota_build_environment(
+    source: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    environment = dict(os.environ if source is None else source)
+    for variable in WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
+        environment.pop(variable, None)
+    return environment
+
+
+def assert_wifi_credentials_absent(
+    paths: list[Path],
+    source: Mapping[str, str] | None = None,
+) -> None:
+    environment = os.environ if source is None else source
+    needles = {
+        variable: value.encode("utf-8") + b"\0"
+        for variable in WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES
+        if (value := environment.get(variable))
+    }
+    for path in paths:
+        content = path.read_bytes()
+        for variable, needle in needles.items():
+            if needle in content:
+                raise RuntimeError(
+                    "Wi-Fi credential material detected in OTA output "
+                    f"{path.name} ({variable})"
+                )
+
+
+class TemporaryWifiCredentialIsolation:
+    """Keep ignored local Wi-Fi credentials out of an OTA artifact build."""
+
+    def __init__(self, path: Path, *, restore_existing: bool):
+        self.path = path
+        self.restore_existing = restore_existing
+        self.original: bytes | None = None
+
+    def __enter__(self) -> "TemporaryWifiCredentialIsolation":
+        if self.path.exists():
+            self.original = self.path.read_bytes()
+            self.path.unlink()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.path.unlink(missing_ok=True)
+        if self.restore_existing and self.original is not None:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_bytes(self.original)
+
+
+class TemporaryWhdPatchIsolation:
+    """Restore the known WHD portability patch after a headless build."""
+
+    def __init__(self, repo_root: Path):
+        self.submodule = repo_root / WHD_SUBMODULE_RELATIVE
+        self.patch = repo_root / WHD_PATCH_RELATIVE
+        self.patch_is_temporary = False
+
+    def _check(self, *, reverse: bool) -> bool:
+        command = ["git", "-C", str(self.submodule), "apply"]
+        if reverse:
+            command.append("--reverse")
+        command.extend(("--check", str(self.patch)))
+        return subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+        ).returncode == 0
+
+    def __enter__(self) -> "TemporaryWhdPatchIsolation":
+        status = _git(
+            self.submodule,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        )
+        if status:
+            raise RuntimeError("WHD submodule must be clean before OTA build")
+        if self._check(reverse=False):
+            self.patch_is_temporary = True
+        elif self._check(reverse=True):
+            self.patch_is_temporary = False
+        else:
+            raise RuntimeError(
+                "WHD portability patch is neither applicable nor committed"
+            )
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        status = _git(
+            self.submodule,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        )
+        if not status:
+            return
+        if not self.patch_is_temporary or not self._check(reverse=True):
+            raise RuntimeError(
+                "WHD submodule contains changes other than the expected "
+                "temporary portability patch"
+            )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.submodule),
+                "apply",
+                "--reverse",
+                str(self.patch),
+            ],
+            check=True,
+        )
+        remaining = _git(
+            self.submodule,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        )
+        if remaining:
+            raise RuntimeError(
+                "WHD submodule did not return to its clean gitlink state"
+            )
 
 
 def _copy_build_outputs(project_dir: Path, artifact_dir: Path) -> dict[str, Path]:
@@ -450,6 +683,7 @@ def _create_manifest(
     certificate_path: Path,
     effective_inputs: list[Path],
     bootloader_artifacts: list[Path],
+    input_gitlinks: dict[str, str],
 ) -> Path:
     required = [
         *(project_dir / relative for relative in PROVENANCE_PROJECT_PATHS),
@@ -474,20 +708,6 @@ def _create_manifest(
         for path in absolute_required
     }
     source_sha = _git(repo_root, "rev-parse", "HEAD")
-    gitlink_line = _git(
-        repo_root,
-        "ls-tree",
-        "HEAD",
-        "--",
-        BOOTLOADER_SUBMODULE_RELATIVE.as_posix(),
-    )
-    match = re.fullmatch(
-        rf"160000\s+commit\s+([0-9a-f]{{40}})\t"
-        rf"{re.escape(BOOTLOADER_SUBMODULE_RELATIVE.as_posix())}",
-        gitlink_line,
-    )
-    if not match:
-        raise RuntimeError("could not resolve the RX671 bootloader gitlink SHA")
     manifest = {
         "schema_version": 1,
         "source_sha": source_sha,
@@ -498,9 +718,7 @@ def _create_manifest(
         "rsu_path": rsu_path.relative_to(repo_root).as_posix(),
         "signer_certificate_path": certificate_path.relative_to(repo_root).as_posix(),
         "sha256": dict(sorted(hashes.items())),
-        "gitlinks": {
-            BOOTLOADER_SUBMODULE_RELATIVE.as_posix(): match.group(1),
-        },
+        "gitlinks": dict(sorted(input_gitlinks.items())),
     }
     manifest_path = artifact_dir / PROVENANCE_MANIFEST_NAME
     manifest_path.write_text(
@@ -556,31 +774,44 @@ def _build_one(
     allow_dirty: bool,
     timeout_seconds: int,
     bootloader_artifacts: list[Path],
+    input_gitlinks: dict[str, str],
 ) -> None:
     _safe_recreate_output(artifact_dir, repo_root)
     build_log = artifact_dir / "e2studio-build.log"
-    _run(
-        [
-            "pwsh",
-            "-NoProfile",
-            "-File",
-            str(repo_root / "tools/build_headless_rx671_wifi.ps1"),
-            "-ProjectRoot",
-            str(repo_root),
-            "-E2Studio",
-            str(e2studio),
-            "-Workspace",
-            str(workspace),
-            "-LogFile",
-            str(build_log),
-            "-E2StudioTimeoutSeconds",
-            str(timeout_seconds),
-            "-OtaImageVersion",
-            version.text,
-            "-SkipAwsIotConfig",
-        ],
-        repo_root,
-    )
+    build_environment = ota_build_environment()
+    restore_local_config = build_environment.get("CI", "").lower() != "true"
+    local_join_config = project_dir / LOCAL_JOIN_CONFIG_RELATIVE
+    with TemporaryWhdPatchIsolation(repo_root):
+        with TemporaryWifiCredentialIsolation(
+            local_join_config,
+            restore_existing=restore_local_config,
+        ):
+            _run(
+                [
+                    "pwsh",
+                    "-NoProfile",
+                    "-File",
+                    str(repo_root / "tools/build_headless_rx671_wifi.ps1"),
+                    "-ProjectRoot",
+                    str(repo_root),
+                    "-E2Studio",
+                    str(e2studio),
+                    "-Workspace",
+                    str(workspace),
+                    "-LogFile",
+                    str(build_log),
+                    "-E2StudioTimeoutSeconds",
+                    str(timeout_seconds),
+                    "-OtaImageVersion",
+                    version.text,
+                    "-SkipWifiConfig",
+                    "-SkipAwsIotConfig",
+                ],
+                repo_root,
+                env=build_environment,
+            )
+    if validate_formal_input_submodules(repo_root) != input_gitlinks:
+        raise RuntimeError("formal OTA input submodule state changed during build")
     outputs = _copy_build_outputs(project_dir, artifact_dir)
     rsu_path = artifact_dir / f"{ARTIFACT_BASENAME}.rsu"
     _run(
@@ -596,6 +827,7 @@ def _build_one(
         ],
         repo_root,
     )
+    assert_wifi_credentials_absent([*outputs.values(), rsu_path])
     certificate_path = artifact_dir / SIGNER_CERTIFICATE_NAME
     shutil.copy2(certificate_source, certificate_path)
     effective_inputs = _copy_effective_inputs(
@@ -612,6 +844,7 @@ def _build_one(
         certificate_path=certificate_path,
         effective_inputs=effective_inputs,
         bootloader_artifacts=bootloader_artifacts,
+        input_gitlinks=input_gitlinks,
     )
     analysis_environment = os.environ.copy()
     analysis_environment["PYTHONIOENCODING"] = "utf-8"
@@ -723,6 +956,7 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"e2 studio executable not found: {args.e2studio}")
     if not signing_key.is_file():
         raise SystemExit(f"OTA signing key not found: {signing_key}")
+    input_gitlinks = validate_formal_input_submodules(repo_root)
     initial_source_state = source_state(repo_root)
     dirty = tracked_source_is_dirty(repo_root)
     if dirty and not args.allow_dirty:
@@ -766,6 +1000,7 @@ def main(argv: list[str] | None = None) -> int:
                     allow_dirty=args.allow_dirty,
                     timeout_seconds=args.e2studio_timeout_seconds,
                     bootloader_artifacts=bootloader_artifacts,
+                    input_gitlinks=input_gitlinks,
                 )
     finally:
         # TemporaryOtaProfile restores the tracked inputs. Keep this explicit
@@ -773,6 +1008,10 @@ def main(argv: list[str] | None = None) -> int:
         if source_state(repo_root) != initial_source_state:
             raise RuntimeError(
                 "RX671 OTA helper did not restore the tracked source state"
+            )
+        if validate_formal_input_submodules(repo_root) != input_gitlinks:
+            raise RuntimeError(
+                "RX671 OTA helper did not restore the formal input submodules"
             )
 
     print(f"RX671 OTA baseline/candidate artifacts: {output_root}")

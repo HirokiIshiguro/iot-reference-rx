@@ -365,7 +365,10 @@ OneDrive and avoids Windows path-length sensitivity.
 The helper snapshots `.cproject`, the FWUP configuration, and both generated
 BSP bank-mode files before applying the profile. It restores every snapshot
 byte-for-byte after success or failure and rejects a formal provenance build
-from a dirty source tree. Outputs are confined to `build/rx671-ota/` and
+from a dirty source tree or a dirty/mismatched input submodule. OTA builds
+explicitly disable local Wi-Fi/AWS configuration, remove Wi-Fi credential
+variables from the child build environment, and reject outputs containing a
+configured Wi-Fi credential. Outputs are confined to `build/rx671-ota/` and
 include the boot loader, baseline/candidate MOT, ABS, MAP and signed RSU files,
 the signer certificate, effective configuration snapshots, SHA-256 provenance,
 and layout-analysis reports.

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import re
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from subprocess import run
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "build_rx671_ota_images.py"
@@ -155,6 +157,141 @@ class OutputSafetyTests(unittest.TestCase):
             builder._validate_workspace_root(Path("C:/Temp/not-approved"))
         with self.assertRaisesRegex(ValueError, "must be a child"):
             builder._validate_workspace_root(Path("C:/ai/codex/ws"))
+
+
+class WifiCredentialIsolationTests(unittest.TestCase):
+    def test_ota_build_environment_removes_wifi_credentials(self) -> None:
+        source = {
+            "PATH": "safe",
+            "CI": "true",
+            "RX671_EK_WIFI_SSID": "secret-ssid",
+            "RX671_EK_WIFI_PASSPHRASE": "secret-passphrase",
+            "RX671_EK_WIFI_PASSWORD": "legacy-secret",
+        }
+        result = builder.ota_build_environment(source)
+        self.assertEqual("safe", result["PATH"])
+        self.assertEqual("true", result["CI"])
+        for variable in builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
+            self.assertNotIn(variable, result)
+
+    def test_local_join_header_is_restored_outside_ci(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            header = Path(temporary) / "whd_join_config_local.h"
+            original = b"local developer configuration"
+            header.write_bytes(original)
+            with builder.TemporaryWifiCredentialIsolation(
+                header, restore_existing=True
+            ):
+                self.assertFalse(header.exists())
+                header.write_bytes(b"unexpected generated credentials")
+            self.assertEqual(original, header.read_bytes())
+
+    def test_local_join_header_is_removed_on_ci_exit_and_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            header = Path(temporary) / "whd_join_config_local.h"
+            header.write_bytes(b"stale shared-runner credentials")
+            with self.assertRaisesRegex(RuntimeError, "synthetic"):
+                with builder.TemporaryWifiCredentialIsolation(
+                    header, restore_existing=False
+                ):
+                    self.assertFalse(header.exists())
+                    header.write_bytes(b"unexpected generated credentials")
+                    raise RuntimeError("synthetic")
+            self.assertFalse(header.exists())
+
+    def test_ota_outputs_reject_null_terminated_wifi_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "image.abs"
+            output.write_bytes(b"binary-prefixsecret-passphrase\0suffix")
+            with self.assertRaisesRegex(
+                RuntimeError,
+                r"image\.abs \(RX671_EK_WIFI_PASSPHRASE\)",
+            ):
+                builder.assert_wifi_credentials_absent(
+                    [output],
+                    {"RX671_EK_WIFI_PASSPHRASE": "secret-passphrase"},
+                )
+            output.write_bytes(b"credential-free image")
+            builder.assert_wifi_credentials_absent(
+                [output],
+                {"RX671_EK_WIFI_PASSPHRASE": "secret-passphrase"},
+            )
+
+
+class SubmoduleProvenanceTests(unittest.TestCase):
+    def test_formal_input_submodules_match_gitlinks_and_are_clean(self) -> None:
+        gitlinks = builder.validate_formal_input_submodules(ROOT)
+        self.assertTrue(
+            {
+                path.as_posix()
+                for path in builder.FORMAL_INPUT_SUBMODULES
+            }.issubset(gitlinks)
+        )
+        self.assertTrue(
+            all(re.fullmatch(r"[0-9a-f]{40}", sha) for sha in gitlinks.values())
+        )
+
+    def test_temporary_whd_patch_is_reversed_after_build(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            submodule = repo / builder.WHD_SUBMODULE_RELATIVE
+            patch = repo / builder.WHD_PATCH_RELATIVE
+            submodule.mkdir(parents=True)
+            patch.parent.mkdir(parents=True, exist_ok=True)
+            run(["git", "init", "--quiet"], cwd=submodule, check=True)
+            run(
+                ["git", "config", "user.name", "OTA test"],
+                cwd=submodule,
+                check=True,
+            )
+            run(
+                ["git", "config", "user.email", "ota-test@example.invalid"],
+                cwd=submodule,
+                check=True,
+            )
+            source = submodule / "source.txt"
+            source.write_text("original\n", encoding="utf-8")
+            run(["git", "add", "source.txt"], cwd=submodule, check=True)
+            run(
+                ["git", "commit", "--quiet", "-m", "fixture"],
+                cwd=submodule,
+                check=True,
+            )
+            patch.write_bytes(
+                b"diff --git a/source.txt b/source.txt\n"
+                b"--- a/source.txt\n"
+                b"+++ b/source.txt\n"
+                b"@@ -1 +1 @@\n"
+                b"-original\n"
+                b"+patched\n"
+            )
+            with builder.TemporaryWhdPatchIsolation(repo):
+                run(
+                    ["git", "apply", str(patch)],
+                    cwd=submodule,
+                    check=True,
+                )
+                self.assertEqual(
+                    "patched\n", source.read_text(encoding="utf-8")
+                )
+            self.assertEqual(
+                "original\n", source.read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                "",
+                run(
+                    [
+                        "git",
+                        "status",
+                        "--porcelain=v1",
+                        "--untracked-files=all",
+                    ],
+                    cwd=submodule,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout,
+            )
 
 
 class DirtyAnalysisTests(unittest.TestCase):

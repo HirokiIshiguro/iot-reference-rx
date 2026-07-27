@@ -97,6 +97,16 @@ FWUP header / descriptorはcode flashに置く。bootloader署名公開鍵はLit
 
 正式なprovenanceはclean treeだけを受け付ける。`--allow-dirty`はローカルでの
 調査用であり、manifestに`dirty=true`を残すため正式なPASS証跡に採用しない。
+formal buildの入力submoduleは、開始時・各build後・終了時にgitlinkとの一致と
+worktree cleanを確認し、全gitlink SHAをmanifestへ記録する。
+WHD portability patchがgitlinkへ未収録の場合はcleanなWHDへ既知patchだけを一時
+適用し、各buildの成否にかかわらず逆適用する。別のsubmodule差分が残れば失敗する。
+
+OTA成果物へ実機ネットワーク秘密を混入させないため、OTA helperは子buildから
+`RX671_EK_WIFI_SSID` / `RX671_EK_WIFI_PASSPHRASE` /
+`RX671_EK_WIFI_PASSWORD`を除外し、Wi-Fi/AWS local configを明示的に無効化する。
+共有Runnerに残ったignored JOIN headerはbuild中に隔離して終了時に削除し、生成した
+MOT / ABS / MAP / RSUに設定済みWi-Fi credentialが残っていないことも検査する。
 
 ## 6. CI package job
 

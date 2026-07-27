@@ -13,6 +13,7 @@ param(
     [string]$AwsIotThingName = "",
     [string]$RequireTlsVersion = "",
     [switch]$UseLocalJoinConfig,
+    [switch]$SkipWifiConfig,
     [switch]$UseAwsIotLocalConfig,
     [switch]$SkipAwsIotConfig,
     [switch]$FleetProvisioningEnable,
@@ -133,11 +134,16 @@ $localTcpThroughputConfig = Join-Path $projectDir "src\frtos_config\tcp_throughp
 $localFleetConfig = Join-Path $projectDir "src\frtos_config\rx671_fleet_config_local.h"
 $defaultAwsIotConfigDir = "C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01"
 $useFleetConfigForBuild = $FleetProvisioningEnable.IsPresent
-$useLocalJoinConfigForBuild = $UseLocalJoinConfig.IsPresent -or
-    (-not [string]::IsNullOrWhiteSpace($WifiConfigFile)) -or
+$explicitWifiConfigRequested = $UseLocalJoinConfig.IsPresent -or
+    (-not [string]::IsNullOrWhiteSpace($WifiConfigFile))
+if ($SkipWifiConfig.IsPresent -and $explicitWifiConfigRequested) {
+    throw "-SkipWifiConfig cannot be combined with -UseLocalJoinConfig or -WifiConfigFile."
+}
+$useLocalJoinConfigForBuild = (-not $SkipWifiConfig.IsPresent) -and (
+    $explicitWifiConfigRequested -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD))
+    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD)))
 $useAwsIotLocalConfigForBuild = (-not $useFleetConfigForBuild) -and
     (-not $SkipAwsIotConfig.IsPresent) -and ($UseAwsIotLocalConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotConfigDir)) -or

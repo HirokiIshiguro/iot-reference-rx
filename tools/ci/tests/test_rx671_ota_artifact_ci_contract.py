@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CI_PATH = REPO_ROOT / ".gitlab-ci.yml"
+GITIGNORE_PATH = REPO_ROOT / ".gitignore"
 README_PATH = REPO_ROOT / "Projects" / "aws_wifi_rx671_ek" / "README.md"
 LAYOUT_PATH = (
     REPO_ROOT
@@ -27,6 +28,7 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
         cls.ci = read(CI_PATH)
         cls.readme = read(README_PATH)
         cls.layout = read(LAYOUT_PATH)
+        cls.gitignore = read(GITIGNORE_PATH)
 
     def test_ota_workspace_and_opt_in_switch_have_safe_defaults(self) -> None:
         self.assertIn(
@@ -132,6 +134,9 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
             "RX671_EK_AWS_IOT_ENDPOINT",
         ):
             self.assertNotIn(hardware_action, job)
+
+    def test_downloaded_ci_artifacts_do_not_dirty_formal_source_provenance(self) -> None:
+        self.assertRegex(self.gitignore, r"(?m)^/artifacts/$")
 
     def test_user_docs_define_temporary_profile_and_scope_boundary(self) -> None:
         combined = self.readme + "\n" + self.layout

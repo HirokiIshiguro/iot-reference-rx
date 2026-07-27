@@ -47,6 +47,18 @@ class Rx671OtaBuildProfileContractTests(unittest.TestCase):
             self.build,
         )
 
+    def test_ota_build_can_explicitly_disable_wifi_credentials(self) -> None:
+        self.assertIn("[switch]$SkipWifiConfig", self.build)
+        self.assertIn(
+            "$useLocalJoinConfigForBuild = (-not $SkipWifiConfig.IsPresent)",
+            self.build,
+        )
+        self.assertIn(
+            "-SkipWifiConfig cannot be combined with "
+            "-UseLocalJoinConfig or -WifiConfigFile.",
+            self.build,
+        )
+
     def test_version_is_passed_as_temporary_cproject_defines(self) -> None:
         self.assertIn('"APP_VERSION_MAJOR=$($otaImageVersionParts.Major)"', self.build)
         self.assertIn('"APP_VERSION_MINOR=$($otaImageVersionParts.Minor)"', self.build)
