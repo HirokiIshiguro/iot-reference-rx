@@ -34,6 +34,9 @@ variables:
   E2STUDIO_CLI_BG96: "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe"
   E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref_rx72n_2026_04_2"
   E2STUDIO_WORKSPACE_RX65N_BG96: "C:/Temp/e2ws_iot_ref_rx65n_bg96_2026_04_2"
+  # CC-RX/e2 studio processes share host-level temporary and tool state.
+  # Serialize every compiler build dispatched to the dedicated Windows runner.
+  WINDOWS_CCRX_BUILD_RESOURCE_GROUP: "ishiguro-pc-ccrx-e2studio-build"
   RX72N_E2STUDIO_TIMEOUT_SECONDS: "600"
   RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
   RFP_SPEED: "1500K"
@@ -922,7 +925,7 @@ build_rx72n_ether:
     - os-windows
     - ccrx
     - $RX72N_BUILD_RUNNER_TAG
-  resource_group: rx72n-e2studio-build-ishiguro
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -930,7 +933,7 @@ build_rx72n_ether:
   script:
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
-    - python -m unittest tools.ci.tests.test_test_ota
+    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_windows_ccrx_build_serialization_contract
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
@@ -1039,7 +1042,7 @@ build_rx65n_bg96:
     - os-windows
     - ccrx
     - $RX65N_BG96_BUILD_RUNNER_TAG
-  resource_group: rx65n-bg96-e2studio-build
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX65N_BG96_BUILD == "true"'
       when: on_success
@@ -1141,7 +1144,7 @@ build_rx671_wifi:
     - os-windows
     - ccrx
     - $RX671_WIFI_BUILD_RUNNER_TAG
-  resource_group: rx671-wifi-e2studio-build
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_WIFI_BUILD == "true"'
       when: on_success
@@ -1223,7 +1226,7 @@ build_rx671_wifi_fleet:
     - os-windows
     - ccrx
     - $RX671_WIFI_BUILD_RUNNER_TAG
-  resource_group: rx671-wifi-e2studio-build
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx671_wifi_fleet_rules
   script:
@@ -1420,7 +1423,7 @@ build_rx671_bootloader:
     - os-windows
     - ccrx
     - $RX671_WIFI_BUILD_RUNNER_TAG
-  resource_group: rx671-bootloader-e2studio-build
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_BOOTLOADER_BUILD == "true"'
       when: on_success
@@ -1473,7 +1476,7 @@ package_rx671_ota_artifacts:
     - os-windows
     - ccrx
     - $RX671_WIFI_BUILD_RUNNER_TAG
-  resource_group: rx671-wifi-e2studio-build
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_OTA_ARTIFACT_BUILD == "true"'
       when: on_success
@@ -1525,7 +1528,7 @@ build_rx65n_bg96_fleet:
     - os-windows
     - ccrx
     - $RX65N_BG96_BUILD_RUNNER_TAG
-  resource_group: rx65n-bg96-e2studio-build
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx65n_bg96_fleet_rules
   script:
@@ -1596,7 +1599,7 @@ build_rx72n_ether_fleet:
     - os-windows
     - ccrx
     - $RX72N_BUILD_RUNNER_TAG
-  resource_group: rx72n-e2studio-build-ishiguro
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -2549,7 +2552,7 @@ build_rx65n_bg96_ota:
     - os-windows
     - ccrx
     - $RX65N_BG96_BUILD_RUNNER_TAG
-  resource_group: rx65n-bg96-e2studio-build
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx65n_bg96_ota_rules
   needs:
@@ -4361,7 +4364,7 @@ build_rx72n_ether_mqtt_candidate:
     - os-windows
     - ccrx
     - $RX72N_BUILD_RUNNER_TAG
-  resource_group: rx72n-e2studio-build-ishiguro
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
@@ -4452,7 +4455,7 @@ build_rx72n_ether_ota:
     - os-windows
     - ccrx
     - $RX72N_BUILD_RUNNER_TAG
-  resource_group: rx72n-e2studio-build-ishiguro
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   needs:
     - test_rx72n_ether_mqtt
   rules:
