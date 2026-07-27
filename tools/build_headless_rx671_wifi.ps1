@@ -1,7 +1,8 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studioc.exe",
     [int]$E2StudioTimeoutSeconds = 180,
+    [string]$OtaImageVersion = "",
     [string]$Make = "",
     [string]$CcrxBin = "",
     [string]$Workspace = "C:\iotref-rx671-wifi-ws",
@@ -58,6 +59,66 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+function ConvertFrom-OtaImageVersion {
+    param([string]$Version)
+
+    if ($Version.Length -eq 0) {
+        return $null
+    }
+
+    $formatError = "Invalid OTA image version '$Version': expected x.y.z with major/minor 0..255 and build 0..65535."
+    $match = [regex]::Match(
+        $Version,
+        '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+    if (-not $match.Success) {
+        throw $formatError
+    }
+
+    $major = [uint64]0
+    $minor = [uint64]0
+    $build = [uint64]0
+    if ((-not [uint64]::TryParse(
+            $match.Groups[1].Value,
+            [System.Globalization.NumberStyles]::None,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [ref]$major)) -or
+        (-not [uint64]::TryParse(
+            $match.Groups[2].Value,
+            [System.Globalization.NumberStyles]::None,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [ref]$minor)) -or
+        (-not [uint64]::TryParse(
+            $match.Groups[3].Value,
+            [System.Globalization.NumberStyles]::None,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [ref]$build))) {
+        throw $formatError
+    }
+
+    $parts = [PSCustomObject]@{
+        Major = $major
+        Minor = $minor
+        Build = $build
+        Text  = $Version
+    }
+    if (($parts.Major -gt 255) -or
+        ($parts.Minor -gt 255) -or
+        ($parts.Build -gt 65535)) {
+        throw $formatError
+    }
+
+    return $parts
+}
+
+$otaImageVersionParts = ConvertFrom-OtaImageVersion -Version $OtaImageVersion
+$effectiveOtaImageVersion = if ($null -ne $otaImageVersionParts) {
+    $otaImageVersionParts.Text
+} else {
+    "0.1.0"
+}
+$expectedOtaImageMarker = "RX671_OTA_IMAGE_VERSION=$effectiveOtaImageVersion"
 
 $projectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $projectName = "aws_wifi_rx671_ek"
@@ -662,6 +723,140 @@ function Add-CProjectDefine {
     return $Text.Replace($needle, $insert)
 }
 
+function Add-CProjectLinkerOption {
+    param(
+        [string]$Text,
+        [string]$Option
+    )
+
+    $encodedOption = $Option.Replace("&", "&amp;").Replace('"', "&quot;")
+    $optionElement = "<listOptionValue builtIn=`"false`" value=`"$encodedOption`"/>"
+    if ($Text.Contains($optionElement)) {
+        return $Text
+    }
+
+    $anchor = 'id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore.'
+    $anchorIndex = $Text.IndexOf($anchor, [System.StringComparison]::Ordinal)
+    if ($anchorIndex -lt 0) {
+        throw "Could not find the CCRX linker userBefore option in .cproject."
+    }
+
+    $emptyOption = '<listOptionValue builtIn="false" value=""/>'
+    $emptyOptionIndex = $Text.IndexOf(
+        $emptyOption,
+        $anchorIndex,
+        [System.StringComparison]::Ordinal)
+    if ($emptyOptionIndex -lt 0) {
+        throw "Could not find the CCRX linker userBefore value anchor in .cproject."
+    }
+
+    $insertIndex = $emptyOptionIndex + $emptyOption.Length
+    $insert = "`r`n`t`t`t`t`t`t`t`t`t$optionElement"
+    return $Text.Insert($insertIndex, $insert)
+}
+
+function Assert-SRecordContainsAsciiMarker {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Marker
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Generated MOT was not found while checking the OTA image marker: $Path"
+    }
+
+    $imageBytes = [System.Collections.Generic.SortedDictionary[uint32, byte]]::new()
+    foreach ($rawLine in [System.IO.File]::ReadLines($Path)) {
+        $line = $rawLine.Trim()
+        if (($line.Length -lt 4) -or
+            (-not $line.StartsWith("S", [System.StringComparison]::Ordinal))) {
+            continue
+        }
+
+        $addressBytes = switch ($line.Substring(0, 2)) {
+            "S1" { 2 }
+            "S2" { 3 }
+            "S3" { 4 }
+            default { 0 }
+        }
+        if ($addressBytes -eq 0) {
+            continue
+        }
+
+        try {
+            $count = [Convert]::ToByte($line.Substring(2, 2), 16)
+        } catch {
+            throw "Malformed Motorola S-record count while checking OTA image marker: $line"
+        }
+        if (($count -lt ($addressBytes + 1)) -or
+            ($line.Length -ne (4 + (2 * $count)))) {
+            throw "Malformed Motorola S-record length while checking OTA image marker: $line"
+        }
+
+        $recordBytes = [byte[]]::new($count)
+        try {
+            for ($index = 0; $index -lt $count; $index++) {
+                $recordBytes[$index] = [Convert]::ToByte(
+                    $line.Substring(4 + (2 * $index), 2),
+                    16)
+            }
+        } catch {
+            throw "Malformed Motorola S-record hex while checking OTA image marker: $line"
+        }
+
+        $checksumSum = [uint32]$count
+        foreach ($value in $recordBytes) {
+            $checksumSum += $value
+        }
+        if (($checksumSum -band 0xFFU) -ne 0xFFU) {
+            throw "Motorola S-record checksum mismatch while checking OTA image marker: $line"
+        }
+
+        $address = [uint32]0
+        for ($index = 0; $index -lt $addressBytes; $index++) {
+            $address = [uint32](($address -shl 8) -bor $recordBytes[$index])
+        }
+
+        $dataLength = $count - $addressBytes - 1
+        for ($index = 0; $index -lt $dataLength; $index++) {
+            $dataAddress = [uint32]($address + $index)
+            $value = $recordBytes[$addressBytes + $index]
+            if ($imageBytes.ContainsKey($dataAddress) -and
+                ($imageBytes[$dataAddress] -ne $value)) {
+                throw ("Conflicting Motorola S-record data at 0x{0:X8} " +
+                    "while checking OTA image marker." -f $dataAddress)
+            }
+            $imageBytes[$dataAddress] = $value
+        }
+    }
+
+    $markerBytes = [System.Text.Encoding]::ASCII.GetBytes($Marker)
+    foreach ($startAddress in $imageBytes.Keys) {
+        if ($imageBytes[$startAddress] -ne $markerBytes[0]) {
+            continue
+        }
+
+        $matches = $true
+        for ($index = 1; $index -lt $markerBytes.Length; $index++) {
+            $address = [uint32]($startAddress + $index)
+            if ((-not $imageBytes.ContainsKey($address)) -or
+                ($imageBytes[$address] -ne $markerBytes[$index])) {
+                $matches = $false
+                break
+            }
+        }
+        if ($matches) {
+            Write-Host ("OTA image marker verified at 0x{0:X8}: {1}" -f
+                $startAddress, $Marker)
+            return
+        }
+    }
+
+    throw "OTA image marker was not found in generated MOT: $Marker"
+}
+
 function Remove-DirectoryBestEffort {
     param(
         [Parameter(Mandatory = $true)]
@@ -967,6 +1162,9 @@ Write-Host "=== RX671 Wi-Fi import + build ==="
 Write-Host "Project:   $projectDir"
 Write-Host "Workspace: $Workspace"
 Write-Host "Log file:  $logFilePath"
+if ($null -ne $otaImageVersionParts) {
+    Write-Host "OTA image version override: $effectiveOtaImageVersion"
+}
 if ($useLocalJoinConfigForBuild) {
     Write-Host "Local AP JOIN config: enabled"
 }
@@ -1019,6 +1217,15 @@ $trackedProjectSnapshot = @{}
 $fleetConfigCleanupFailed = $false
 try {
     $cprojectDefines = @()
+    $cprojectLinkerOptions = @(
+        "-symbol_forbid=_g_rx671_ota_image_version_marker"
+    )
+
+    if ($null -ne $otaImageVersionParts) {
+        $cprojectDefines += "APP_VERSION_MAJOR=$($otaImageVersionParts.Major)"
+        $cprojectDefines += "APP_VERSION_MINOR=$($otaImageVersionParts.Minor)"
+        $cprojectDefines += "APP_VERSION_BUILD=$($otaImageVersionParts.Build)"
+    }
 
     if ($useLocalJoinConfigForBuild) {
         if (-not [string]::IsNullOrWhiteSpace($WifiConfigFile)) {
@@ -1142,11 +1349,16 @@ try {
         $cprojectDefines += "SDIO_HOST_CMD53_DMACA_BLOCK_MODE=$effectiveSdioCmd53DmacaBlockMode"
     }
 
-    if ($cprojectDefines.Count -gt 0) {
+    if (($cprojectDefines.Count -gt 0) -or ($cprojectLinkerOptions.Count -gt 0)) {
         $cprojectBytes = [System.IO.File]::ReadAllBytes($cproject)
         $patchedCProject = [System.IO.File]::ReadAllText($cproject)
         foreach ($define in $cprojectDefines) {
             $patchedCProject = Add-CProjectDefine -Text $patchedCProject -Define $define
+        }
+        foreach ($linkerOption in $cprojectLinkerOptions) {
+            $patchedCProject = Add-CProjectLinkerOption `
+                -Text $patchedCProject `
+                -Option $linkerOption
         }
         [System.IO.File]::WriteAllText($cproject, $patchedCProject, [System.Text.UTF8Encoding]::new($false))
     }
@@ -1213,6 +1425,8 @@ try {
     } elseif ($e2StudioExitCode -ne 0) {
         Write-Warning "e2 studio returned exit code $e2StudioExitCode, but .mot/.abs/.map were refreshed by the explicit make target."
     }
+
+    Assert-SRecordContainsAsciiMarker -Path $motOutput -Marker $expectedOtaImageMarker
 } finally {
     # This generated file contains the Fleet claim private key. Remove it before
     # any other cleanup that could itself fail and prevent later statements.

@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import struct
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -32,19 +33,40 @@ RESOURCE_LINKER_SYMBOLS = {
     "TYPE1YN_NVRAM_BLOB": "g_type1yn_nvram_bin",
     "TYPE1YN_CLM_BLOB": "g_type1yn_clm_blob",
 }
+PROVENANCE_MANIFEST_NAME = "ota-layout-provenance.json"
+LAYOUT_CONTRACT_NAME = "ota-layout-contract.json"
 PROVENANCE_CONFIG_PATHS = (
     ".cproject",
+    LAYOUT_CONTRACT_NAME,
     "src/frtos_config/r_fwup_config.h",
     "src/frtos_config/rm_littlefs_flash_config.h",
     "src/smc_gen/r_config/r_bsp_config.h",
     "src/sdio_host.c",
     "src/whd_port/whd_port_resource.c",
 )
-PROVENANCE_MANIFEST_NAME = "ota-layout-provenance.json"
 FWUP_HEADER_SIZE = 0x200
 FWUP_DESCRIPTOR_SIZE = 0x100
 FWUP_APPLICATION_OFFSET = FWUP_HEADER_SIZE + FWUP_DESCRIPTOR_SIZE
+FWUP_AREA_START = 0xFFF00000
+FWUP_AREA_SIZE = 0x000C0000
+FWUP_APPLICATION_START = FWUP_AREA_START + FWUP_APPLICATION_OFFSET
+FWUP_APPLICATION_SIZE = FWUP_AREA_SIZE - FWUP_APPLICATION_OFFSET
+FWUP_SIGNATURE_TYPE = b"sig-sha256-ecdsa"
+FWUP_RAW_P256_SIGNATURE_SIZE = 64
+OTA_PROFILE_NAME = "rx671-dual-bank-ota-v1"
+OTA_VERSION_MARKER_PREFIX = b"RX671_OTA_IMAGE_VERSION="
 LITTLEFS_LINKER_SECTION = "C_LITTLEFS_MANAGEMENT_AREA"
+BOOTLOADER_PROJECT_RELATIVE = Path("Projects/boot_loader_rx671_ek/e2studio_ccrx")
+BOOTLOADER_SUBMODULE_RELATIVE = (
+    BOOTLOADER_PROJECT_RELATIVE / "lib/rx_bootloader"
+)
+BOOTLOADER_PROVENANCE_PATHS = (
+    BOOTLOADER_PROJECT_RELATIVE / ".cproject",
+    BOOTLOADER_PROJECT_RELATIVE / "src/smc_gen/r_config/r_bsp_config.h",
+    BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
+    BOOTLOADER_PROJECT_RELATIVE / "HardwareDebug/boot_loader_rx671_ek.map",
+    BOOTLOADER_PROJECT_RELATIVE / "HardwareDebug/boot_loader_rx671_ek.mot",
+)
 
 
 @dataclass(frozen=True)
@@ -192,7 +214,9 @@ def _parse_cproject(path: Path) -> tuple[str, Path, str, dict[str, int], dict[st
     build_name = build_path.rsplit("/", 1)[-1] if build_path else "HardwareDebug"
 
     configuration = root.find(".//configuration")
-    artifact_name = "aws_wifi_rx671_ek"
+    # Both tracked RX671 projects use ${ProjName}. The directory immediately
+    # above e2studio_ccrx is the canonical e2 studio project name.
+    artifact_name = path.parent.parent.name
     if configuration is not None:
         configured = configuration.get("artifactName", "")
         if configured and configured != "${ProjName}":
@@ -481,6 +505,90 @@ def _data_flash_non_overlap_gate(
     return Gate("data_flash_non_overlap", "PASS", detail)
 
 
+def _contract_integer(value: object, field: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{field} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value, 0)
+        except ValueError as exc:
+            raise ValueError(f"{field} is not an integer: {value!r}") from exc
+    raise ValueError(f"{field} must be an integer")
+
+
+def _data_flash_ownership_contract_gate(
+    *,
+    contract_path: Path,
+    bootloader_config_path: Path,
+    data_flash_start: int | None,
+    data_flash_size: int | None,
+    littlefs_start: int | None,
+    littlefs_size: int | None,
+) -> Gate:
+    if not contract_path.is_file():
+        return Gate(
+            "data_flash_ownership_contract",
+            "UNKNOWN",
+            f"ownership contractなし: {contract_path}",
+        )
+    if not bootloader_config_path.is_file():
+        return Gate(
+            "data_flash_ownership_contract",
+            "UNKNOWN",
+            f"RX671 bootloader configなし: {bootloader_config_path}",
+        )
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        bootloader_text = bootloader_config_path.read_text(encoding="utf-8")
+        data_flash = contract["data_flash"]
+        contract_start = _contract_integer(data_flash["start"], "data_flash.start")
+        contract_size = _contract_integer(data_flash["size"], "data_flash.size")
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        return Gate("data_flash_ownership_contract", "FAIL", f"contract解析失敗: {exc}")
+
+    errors: list[str] = []
+    if contract.get("schema_version") != 1:
+        errors.append("schema_version!=1")
+    if contract.get("target") != "R5F5671EHxFB":
+        errors.append("target!=R5F5671EHxFB")
+    if data_flash.get("owner") != "LittleFS":
+        errors.append("owner!=LittleFS")
+    if data_flash.get("application_raw_consumers") != []:
+        errors.append("application_raw_consumersが空ではない")
+    if data_flash.get("bootloader_install_data_flash") is not False:
+        errors.append("bootloader_install_data_flash=falseではない")
+    if data_flash.get("ota_payload_data_flash") is not False:
+        errors.append("ota_payload_data_flash=falseではない")
+    if contract_start != data_flash_start or contract_size != data_flash_size:
+        errors.append(
+            "contract/BSP Data Flash不一致 "
+            f"(contract=0x{contract_start:08X}+{contract_size}, "
+            f"BSP={data_flash_start!r}+{data_flash_size!r})"
+        )
+    if littlefs_start != contract_start or littlefs_size != contract_size:
+        errors.append(
+            "LittleFSがcontractの全Data Flashを単独所有していない "
+            f"(LittleFS={littlefs_start!r}+{littlefs_size!r})"
+        )
+    if _macro(bootloader_text, "RX_BOOTLOADER_INSTALL_DATA_FLASH") != 0:
+        errors.append("RX_BOOTLOADER_INSTALL_DATA_FLASH!=0")
+
+    detail = (
+        f"owner=LittleFS 0x{contract_start:08X}-"
+        f"0x{contract_start + contract_size - 1:08X}; "
+        "application raw consumers=0; bootloader install=0; OTA payload Data Flash=0"
+    )
+    if errors:
+        detail += "; " + "; ".join(errors)
+    return Gate(
+        "data_flash_ownership_contract",
+        "FAIL" if errors else "PASS",
+        detail,
+    )
+
+
 def _fwup_partition_gate(
     *,
     flash_start: int,
@@ -678,8 +786,25 @@ def _whd_resources_follow_application_gate(
     return Gate("whd_resources_follow_application", "PASS" if ok else "FAIL", detail)
 
 
-def _bootloader_layout_gate(repo_root: Path) -> Gate:
-    project_dir = repo_root / "Projects/boot_loader_rx671_ek/e2studio_ccrx"
+def _gitlink_sha(repo_root: Path, relative_path: Path) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-tree", "HEAD", "--", relative_path.as_posix()],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    match = re.fullmatch(
+        rf"160000\s+commit\s+([0-9a-f]{{40}})\t{re.escape(relative_path.as_posix())}\s*",
+        result.stdout,
+    )
+    return match.group(1) if match else None
+
+
+def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | None = None) -> Gate:
+    project_dir = repo_root / BOOTLOADER_PROJECT_RELATIVE
     if not project_dir.is_dir():
         return Gate(
             "bootloader_layout",
@@ -696,7 +821,7 @@ def _bootloader_layout_gate(repo_root: Path) -> Gate:
         )
     try:
         bsp_text = bsp_config.read_text(encoding="utf-8")
-        mode, build_dir, artifact_name, _anchors, _binaries = _parse_cproject(cproject)
+        mode, build_dir, artifact_name, anchors, _binaries = _parse_cproject(cproject)
     except (ET.ParseError, OSError, ValueError) as exc:
         return Gate("bootloader_layout", "FAIL", f"RX671 bootloader設定解析失敗: {exc}")
     if _macro(bsp_text, "BSP_CFG_BOOTLOADER_PROJECT") != 1 or mode != "bank.dual":
@@ -705,13 +830,101 @@ def _bootloader_layout_gate(repo_root: Path) -> Gate:
             "FAIL",
             "RX671 bootloaderはBSP_CFG_BOOTLOADER_PROJECT=1かつbank.dualである必要があります",
         )
+    expected_anchors = {
+        "PResetPRG": 0xFFFC0000,
+        "EXCEPTVECT": 0xFFFFFF80,
+        "RESETVECT": 0xFFFFFFFC,
+    }
+    wrong_anchors = [
+        f"{name}={anchors.get(name)!r}"
+        for name, expected in expected_anchors.items()
+        if anchors.get(name) != expected
+    ]
+    if wrong_anchors:
+        return Gate(
+            "bootloader_layout",
+            "FAIL",
+            "RX671 bootloader linker anchor不一致: " + ", ".join(wrong_anchors),
+        )
     map_path = build_dir / f"{artifact_name}.map"
-    if not map_path.is_file():
-        return Gate("bootloader_layout", "UNKNOWN", f"RX671 bootloader mapなし: {map_path}")
+    mot_path = build_dir / f"{artifact_name}.mot"
+    if not map_path.is_file() or not mot_path.is_file():
+        return Gate(
+            "bootloader_layout",
+            "UNKNOWN",
+            f"RX671 bootloader map/MOTなし: {map_path}, {mot_path}",
+        )
+    checker = repo_root / "tools/ci/check_rx671_bootloader_layout.py"
+    try:
+        checked = subprocess.run(
+            [
+                sys.executable,
+                str(checker),
+                "--mot",
+                str(mot_path),
+                "--map",
+                str(map_path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return Gate("bootloader_layout", "FAIL", f"bootloader layout checker実行失敗: {exc}")
+    if checked.returncode != 0:
+        detail = (checked.stderr or checked.stdout).strip()
+        return Gate("bootloader_layout", "FAIL", f"bootloader layout不正: {detail}")
+
+    if provenance_manifest_path is None or not provenance_manifest_path.is_file():
+        return Gate(
+            "bootloader_layout",
+            "UNKNOWN",
+            "bootloader配置はPASSですが、application build provenanceにbootloader証跡がありません",
+        )
+    try:
+        manifest = json.loads(provenance_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return Gate("bootloader_layout", "FAIL", f"provenance manifest解析失敗: {exc}")
+
+    hashes = manifest.get("sha256")
+    gitlinks = manifest.get("gitlinks")
+    errors: list[str] = []
+    if not isinstance(hashes, dict):
+        errors.append("sha256 tableなし")
+        hashes = {}
+    if not isinstance(gitlinks, dict):
+        errors.append("gitlinks tableなし")
+        gitlinks = {}
+    for relative in BOOTLOADER_PROVENANCE_PATHS:
+        path = repo_root / relative
+        expected_hash = hashes.get(relative.as_posix())
+        if not isinstance(expected_hash, str):
+            errors.append(f"hashなし: {relative.as_posix()}")
+        elif not path.is_file() or expected_hash.lower() != _sha256(path):
+            errors.append(f"hash不一致: {relative.as_posix()}")
+    indexed_sha = _gitlink_sha(repo_root, BOOTLOADER_SUBMODULE_RELATIVE)
+    recorded_sha = gitlinks.get(BOOTLOADER_SUBMODULE_RELATIVE.as_posix())
+    try:
+        checkout_sha = subprocess.run(
+            ["git", "-C", str(repo_root / BOOTLOADER_SUBMODULE_RELATIVE), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        checkout_sha = None
+    if indexed_sha is None or recorded_sha != indexed_sha or checkout_sha != indexed_sha:
+        errors.append(
+            "bootloader submodule SHA不一致 "
+            f"(index={indexed_sha}, checkout={checkout_sha}, manifest={recorded_sha})"
+        )
+    if errors:
+        return Gate("bootloader_layout", "FAIL", "; ".join(errors))
     return Gate(
         "bootloader_layout",
-        "UNKNOWN",
-        "bootloader mapはありますが、明示予約range・複製配置・source provenance検証が未実装です",
+        "PASS",
+        checked.stdout.strip()
+        + f"; submodule={indexed_sha}; map/MOT/config SHA-256一致",
     )
 
 
@@ -801,7 +1014,217 @@ def _artifact_provenance_gate(
     )
 
 
-def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[Gate]:
+def _rsu_image_gate(
+    *,
+    repo_root: Path,
+    rsu_path: Path | None,
+    signer_certificate_path: Path | None,
+    expected_version: str | None,
+    provenance_manifest_path: Path,
+) -> Gate:
+    provided = (
+        rsu_path is not None,
+        signer_certificate_path is not None,
+        expected_version is not None,
+    )
+    if not any(provided):
+        return Gate(
+            "rsu_image",
+            "UNKNOWN",
+            "RSU、signer certificate、expected versionが指定されていません",
+        )
+    if not all(provided):
+        return Gate(
+            "rsu_image",
+            "FAIL",
+            "RSU検証には--rsu、--signer-certificate、--expected-versionがすべて必要です",
+        )
+    assert rsu_path is not None
+    assert signer_certificate_path is not None
+    assert expected_version is not None
+    if not re.fullmatch(
+        r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)",
+        expected_version,
+    ):
+        return Gate("rsu_image", "FAIL", f"expected version形式不正: {expected_version!r}")
+    if not rsu_path.is_file() or not signer_certificate_path.is_file():
+        return Gate(
+            "rsu_image",
+            "FAIL",
+            f"RSU/certificateなし: {rsu_path}, {signer_certificate_path}",
+        )
+    if not provenance_manifest_path.is_file():
+        return Gate(
+            "rsu_image",
+            "FAIL",
+            f"RSU provenance manifestなし: {provenance_manifest_path}",
+        )
+
+    errors: list[str] = []
+    try:
+        image = rsu_path.read_bytes()
+        certificate_bytes = signer_certificate_path.read_bytes()
+        manifest = json.loads(provenance_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return Gate("rsu_image", "FAIL", f"RSU入力解析失敗: {exc}")
+
+    if len(image) != FWUP_AREA_SIZE:
+        errors.append(f"size={len(image)} (expected={FWUP_AREA_SIZE})")
+    if len(image) < FWUP_APPLICATION_OFFSET:
+        return Gate(
+            "rsu_image",
+            "FAIL",
+            f"RSUがheader+descriptorより短い: {len(image)} bytes",
+        )
+
+    if image[0:7] != b"Renesas":
+        errors.append("magic!=Renesas")
+    if image[7] != 0xFE:
+        errors.append(f"image_flag=0x{image[7]:02X} (expected=0xFE)")
+    signature_type_field = image[0x08:0x28]
+    expected_signature_type_field = FWUP_SIGNATURE_TYPE.ljust(32, b"\x00")
+    if signature_type_field != expected_signature_type_field:
+        errors.append("signature_type!=sig-sha256-ecdsa")
+    signature_size = struct.unpack_from("<I", image, 0x28)[0]
+    if signature_size != FWUP_RAW_P256_SIGNATURE_SIZE:
+        errors.append(
+            f"signature_size={signature_size} "
+            f"(expected={FWUP_RAW_P256_SIGNATURE_SIZE})"
+        )
+    signature = image[0x2C : 0x2C + FWUP_RAW_P256_SIGNATURE_SIZE]
+    if image[0x2C + FWUP_RAW_P256_SIGNATURE_SIZE : 0x12C] != b"\x00" * (
+        0x100 - FWUP_RAW_P256_SIGNATURE_SIZE
+    ):
+        errors.append("signature reserved fieldがzeroではない")
+    data_flash_flag = struct.unpack_from("<I", image, 0x12C)[0]
+    data_flash_start = struct.unpack_from("<I", image, 0x130)[0]
+    data_flash_end = struct.unpack_from("<I", image, 0x134)[0]
+    if (
+        data_flash_flag != 0
+        or data_flash_start != 0xFFFFFFFF
+        or data_flash_end != 0xFFFFFFFF
+    ):
+        errors.append(
+            "Data Flash payloadが無効化されていない "
+            f"(flag={data_flash_flag}, start=0x{data_flash_start:08X}, "
+            f"end=0x{data_flash_end:08X})"
+        )
+    if image[0x138:FWUP_HEADER_SIZE] != b"\xFF" * (FWUP_HEADER_SIZE - 0x138):
+        errors.append("header reserved tailが0xFFではない")
+
+    descriptor = image[FWUP_HEADER_SIZE:FWUP_APPLICATION_OFFSET]
+    segment_count, segment_start, segment_size = struct.unpack_from(
+        "<III", descriptor, 0
+    )
+    if segment_count != 1:
+        errors.append(f"descriptor segments={segment_count} (expected=1)")
+    if segment_start != FWUP_APPLICATION_START:
+        errors.append(
+            f"segment start=0x{segment_start:08X} "
+            f"(expected=0x{FWUP_APPLICATION_START:08X})"
+        )
+    if segment_size != FWUP_APPLICATION_SIZE:
+        errors.append(
+            f"segment size={segment_size} (expected={FWUP_APPLICATION_SIZE})"
+        )
+    if descriptor[12:] != b"\xFF" * (FWUP_DESCRIPTOR_SIZE - 12):
+        errors.append("descriptorの未使用領域が0xFFではない")
+    segment_end = segment_start + segment_size
+    if (
+        segment_start < FWUP_AREA_START + FWUP_APPLICATION_OFFSET
+        or segment_end > FWUP_AREA_START + FWUP_AREA_SIZE
+    ):
+        errors.append(
+            f"segmentが768 KiB install area外: "
+            f"0x{segment_start:08X}-0x{segment_end - 1:08X}"
+        )
+
+    marker = OTA_VERSION_MARKER_PREFIX + expected_version.encode("ascii") + b"\x00"
+    marker_prefix_count = image.count(OTA_VERSION_MARKER_PREFIX)
+    if marker_prefix_count != 1 or image.count(marker) != 1:
+        errors.append(
+            f"OTA version marker不一致: expected={expected_version}, "
+            f"prefix_count={marker_prefix_count}"
+        )
+
+    try:
+        from cryptography import x509
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec, utils
+
+        certificate = x509.load_pem_x509_certificate(certificate_bytes)
+        public_key = certificate.public_key()
+        if not isinstance(public_key, ec.EllipticCurvePublicKey) or not isinstance(
+            public_key.curve, ec.SECP256R1
+        ):
+            errors.append("signer certificateはECDSA P-256ではない")
+        elif len(signature) != FWUP_RAW_P256_SIGNATURE_SIZE:
+            errors.append("raw P-256 signature長不正")
+        else:
+            r = int.from_bytes(signature[:32], "big")
+            s = int.from_bytes(signature[32:], "big")
+            public_key.verify(
+                utils.encode_dss_signature(r, s),
+                image[FWUP_HEADER_SIZE:],
+                ec.ECDSA(hashes.SHA256()),
+            )
+    except ImportError as exc:
+        errors.append(f"cryptography packageなし: {exc}")
+    except (TypeError, ValueError) as exc:
+        errors.append(f"signer certificate/signature解析失敗: {exc}")
+    except InvalidSignature:
+        errors.append("descriptor+payload ECDSA署名不一致")
+
+    rsu_relative = _relative_to_repo(rsu_path, repo_root)
+    certificate_relative = _relative_to_repo(signer_certificate_path, repo_root)
+    hashes_table = manifest.get("sha256")
+    if manifest.get("schema_version") != 1:
+        errors.append("manifest schema_version!=1")
+    if manifest.get("profile") != OTA_PROFILE_NAME:
+        errors.append(f"manifest profile!={OTA_PROFILE_NAME}")
+    if manifest.get("ota_image_version") != expected_version:
+        errors.append("manifest ota_image_version不一致")
+    if rsu_relative is None or manifest.get("rsu_path") != rsu_relative:
+        errors.append("manifest rsu_path不一致")
+    if (
+        certificate_relative is None
+        or manifest.get("signer_certificate_path") != certificate_relative
+    ):
+        errors.append("manifest signer_certificate_path不一致")
+    if not isinstance(hashes_table, dict):
+        errors.append("manifest sha256 tableなし")
+        hashes_table = {}
+    for relative, path in (
+        (rsu_relative, rsu_path),
+        (certificate_relative, signer_certificate_path),
+    ):
+        if relative is None:
+            continue
+        expected_hash = hashes_table.get(relative)
+        if not isinstance(expected_hash, str):
+            errors.append(f"manifest hashなし: {relative}")
+        elif expected_hash.lower() != _sha256(path):
+            errors.append(f"manifest hash不一致: {relative}")
+
+    if errors:
+        return Gate("rsu_image", "FAIL", "; ".join(errors))
+    return Gate(
+        "rsu_image",
+        "PASS",
+        f"size={len(image)}; segment=0x{segment_start:08X}-"
+        f"0x{segment_end - 1:08X}; Data Flashなし; version={expected_version}; "
+        "descriptor+payload ECDSA P-256署名とprovenance一致",
+    )
+
+
+def analyze(
+    project_dir: Path,
+    build_dir_override: Path | None = None,
+    rsu_path: Path | None = None,
+    signer_certificate_path: Path | None = None,
+    expected_version: str | None = None,
+) -> list[Gate]:
     gates: list[Gate] = []
     repo_root = project_dir.parents[2]
     cproject = project_dir / ".cproject"
@@ -812,6 +1235,11 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
     resource_source = project_dir / "src/whd_port/whd_port_resource.c"
     sdio_host = project_dir / "src/sdio_host.c"
     flash_target = project_dir / "src/smc_gen/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
+    layout_contract = project_dir / LAYOUT_CONTRACT_NAME
+    bootloader_config = (
+        repo_root
+        / "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader/config/rx671.h"
+    )
     littlefs_target = (
         repo_root / "Common/littlefs_common/rm_littlefs_df/targets/rx65n/rm_littlefs_df_rx65n.h"
     )
@@ -825,6 +1253,7 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
         resource_source,
         sdio_host,
         flash_target,
+        layout_contract,
         littlefs_target,
     ]
     missing = [str(path) for path in required if not path.is_file()]
@@ -845,7 +1274,13 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
     except (ET.ParseError, OSError, ValueError) as exc:
         return [Gate("source_inputs", "FAIL", f"設定解析失敗: {exc}")]
     gates.append(Gate("source_inputs", "PASS", "CC-RX/BSP/FWUP/WHD設定を解析しました"))
-    gates.append(_bootloader_layout_gate(repo_root))
+    build_dir = build_dir_override or configured_build_dir
+    gates.append(
+        _bootloader_layout_gate(
+            repo_root,
+            build_dir / PROVENANCE_MANIFEST_NAME,
+        )
+    )
 
     rom_size = _memory_size_for_selected_part(bsp_text, mcu_info_text, "BSP_ROM_SIZE_BYTES")
     if rom_size is None:
@@ -916,6 +1351,20 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
             littlefs_program_size=littlefs_program_size,
         )
     )
+    littlefs_size = (
+        littlefs_block_size * littlefs_block_count
+        if littlefs_block_size is not None and littlefs_block_count is not None
+        else None
+    )
+    ownership_gate = _data_flash_ownership_contract_gate(
+        contract_path=layout_contract,
+        bootloader_config_path=bootloader_config,
+        data_flash_start=target_df_start,
+        data_flash_size=data_flash_size,
+        littlefs_start=littlefs_start,
+        littlefs_size=littlefs_size,
+    )
+    gates.append(ownership_gate)
     gates.append(
         _data_flash_non_overlap_gate(
             data_flash_start=target_df_start,
@@ -924,9 +1373,7 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
             littlefs_block_size=littlefs_block_size,
             littlefs_block_count=littlefs_block_count,
             consumer_ranges=raw_data_flash_consumers,
-            # Linker anchors alone do not prove that the OTA packer, bootloader,
-            # or runtime code never accesses raw Data Flash.
-            consumer_layout_complete=False,
+            consumer_layout_complete=ownership_gate.status == "PASS",
         )
     )
 
@@ -1009,7 +1456,6 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
         )
     )
 
-    build_dir = build_dir_override or configured_build_dir
     blob_details: list[str] = []
     blob_missing: list[str] = []
     blob_mismatch: list[str] = []
@@ -1020,7 +1466,9 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
         if expected is None or raw_path is None:
             blob_missing.append(f"{section}(宣言または-binary設定なし)")
             continue
-        path = (build_dir / Path(raw_path.replace("\\", "/"))).resolve()
+        # -binary paths are relative to the managed-build directory recorded
+        # in .cproject, even when --build-dir redirects map/MOT validation.
+        path = (configured_build_dir / Path(raw_path.replace("\\", "/"))).resolve()
         blob_paths.append(path)
         if not path.is_file():
             blob_missing.append(str(path))
@@ -1039,6 +1487,15 @@ def analyze(project_dir: Path, build_dir_override: Path | None = None) -> list[G
         blob_paths=blob_paths,
     )
     gates.append(provenance_gate)
+    gates.append(
+        _rsu_image_gate(
+            repo_root=repo_root,
+            rsu_path=rsu_path,
+            signer_certificate_path=signer_certificate_path,
+            expected_version=expected_version,
+            provenance_manifest_path=build_dir / PROVENANCE_MANIFEST_NAME,
+        )
+    )
     if blob_mismatch:
         gates.append(Gate("whd_blob_sizes", "FAIL", "; ".join(blob_mismatch)))
     elif blob_missing:
@@ -1139,12 +1596,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--build-dir",
         type=Path,
-        help="map/MOTと-binary相対パスの基準。省略時は.cprojectのbuildPathを使用",
+        help="map/MOT/provenanceの配置先。省略時は.cprojectのbuildPathを使用",
+    )
+    parser.add_argument("--rsu", type=Path, help="検証するRX671 FWUP v2 RSU")
+    parser.add_argument(
+        "--signer-certificate",
+        type=Path,
+        help="RSU署名検証に使うPEM X.509 certificate",
+    )
+    parser.add_argument(
+        "--expected-version",
+        help="RSU内で要求するRX671_OTA_IMAGE_VERSION=x.y.z",
     )
     parser.add_argument("--json", action="store_true", help="機械可読JSONを出力")
     args = parser.parse_args(argv)
 
-    gates = analyze(args.project_dir.resolve(), args.build_dir.resolve() if args.build_dir else None)
+    gates = analyze(
+        args.project_dir.resolve(),
+        args.build_dir.resolve() if args.build_dir else None,
+        args.rsu.resolve() if args.rsu else None,
+        args.signer_certificate.resolve() if args.signer_certificate else None,
+        args.expected_version,
+    )
     code = exit_code(gates)
     if args.json:
         print(json.dumps({"exit_code": code, "gates": [asdict(gate) for gate in gates]}, ensure_ascii=False, indent=2))

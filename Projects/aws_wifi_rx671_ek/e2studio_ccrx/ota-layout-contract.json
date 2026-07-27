@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "target": "R5F5671EHxFB",
+  "code_flash": {
+    "bank_size": 1048576,
+    "main_start": "0xFFF00000",
+    "buffer_start": "0xFFE00000",
+    "install_area_size": 786432,
+    "header_size": 512,
+    "descriptor_size": 256,
+    "application_start": "0xFFF00300",
+    "exception_vector": "0xFFFBFF80",
+    "reset_vector": "0xFFFBFFFC",
+    "bootloader_reserved_start": "0xFFFC0000",
+    "bootloader_reserved_end": "0xFFFFFFFF"
+  },
+  "data_flash": {
+    "start": "0x00100000",
+    "size": 8192,
+    "owner": "LittleFS",
+    "application_raw_consumers": [],
+    "bootloader_install_data_flash": false,
+    "ota_payload_data_flash": false
+  },
+  "bootloader": {
+    "project": "Projects/boot_loader_rx671_ek/e2studio_ccrx",
+    "source_submodule": "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader"
+  }
+}
