@@ -1053,6 +1053,7 @@ build_rx65n_bg96:
       optional: true
   script:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
@@ -1795,7 +1796,7 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_flash_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|download|app|provision|mqtt|ota|tls13_0rtt|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|download|app|provision|ota|tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
@@ -1819,19 +1820,19 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_download_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(download|app|provision|mqtt|ota|tls13_0rtt|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(download|app|provision|ota|tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
 .rx65n_bg96_app_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(app|mqtt|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(app|full)$/'
       when: on_success
     - when: never
 
 .rx65n_bg96_provision_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|tls13_0rtt|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
@@ -1843,7 +1844,7 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_app_reset_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(mqtt|tls13_0rtt|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(tls13_0rtt|full)$/'
       when: on_success
     - when: never
 
@@ -2181,9 +2182,9 @@ prepare_rx65n_bg96_mqtt_credentials:
     - .aws_cli_windows_job
     - .rx65n_bg96_credential_prepare_rules
   resource_group: rx65n-bg96-aws-iot-credentials
-  needs:
-    - job: download_rx65n_bg96_app
-      artifacts: false
+  # Credential creation is host-side AWS work. It must complete before the
+  # atomic hardware transaction without depending on mutable device state.
+  needs: []
   script:
     - $ErrorActionPreference = "Stop"
     - |
@@ -2402,12 +2403,21 @@ test_rx65n_bg96_mqtt:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_mqtt_rules
   needs:
+    - job: build_rx65n_bg96
+      artifacts: true
+    - job: prepare_rx65n_bg96_mqtt_credentials
+      artifacts: true
+    # The split jobs do not exist for mqtt scope. For full scope they remain
+    # part of the OTA/Fleet path, so wait for that chain before reflashing and
+    # running the atomic MQTT transaction.
     - job: download_rx65n_bg96_app
       artifacts: true
+      optional: true
     - job: reset_rx65n_bg96_app
       artifacts: true
+      optional: true
   script:
-    - echo "=== Verify CK-RX65N BG96 MQTT Pub/Sub ==="
+    - echo "=== Flash, provision, and verify CK-RX65N BG96 MQTT atomically ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_mqtt"
       mkdir -p "$artifact_dir"
@@ -2418,15 +2428,127 @@ test_rx65n_bg96_mqtt:
       fi
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+
+      # Keep the complete device transaction in this resource_group job.
+      # Releasing the lock between these steps lets another pipeline erase or
+      # replace the just-provisioned image before MQTT verification starts.
+      echo "=== Atomic step 1/6: flash boot loader ==="
+      python3 tools/bg96_bootloader_integration.py \
+        --action flash-bootloader \
+        --bootloader-mot "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot" \
+        --uart-port "${uart_port:-unused}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/flash_bootloader.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      echo "=== Atomic step 2/6: download application RSU ==="
+      python3 tools/bg96_bootloader_integration.py \
+        --action download-rsu \
+        --bootloader-mot "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot" \
+        --userprog-rsu "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96/aws_bg96_ck_rx65n.rsu" \
+        --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
+        --uart-port "${uart_port}" \
+        --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/download_rsu.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      if [ -z "$uart_port" ] && [ -f "$artifact_dir/selected_uart_port.txt" ]; then
+        uart_port="$(tr -d '\r\n' < "$artifact_dir/selected_uart_port.txt")"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
         exit 1
       fi
 
-      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      credential_dir="$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials"
+      if [ -f "$credential_dir/iot_credentials_meta.json" ]; then
+        export RX65N_BG96_AWS_IOT_THING_NAME="$(tr -d '\r\n' < "$credential_dir/thing_name.txt")"
+        export AWS_IOT_CERT="$credential_dir/certificate.pem"
+        export AWS_IOT_PRIVKEY="$credential_dir/private_key.pem"
+        if [ -z "${AWS_IOT_ENDPOINT:-}" ] && [ -f "$credential_dir/endpoint.txt" ]; then
+          export AWS_IOT_ENDPOINT="$(tr -d '\r\n' < "$credential_dir/endpoint.txt")"
+        fi
+        echo "Using temporary BG96 AWS IoT credentials from $credential_dir"
+      fi
+
+      echo "=== Atomic step 3/6: provision MQTT/APN credentials ==="
+      bg96_provision_args=(
+        --action provision-mqtt
+        --uart-port "${uart_port}"
+        --baud "${RX65N_BG96_UART_BAUD_RATE}"
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}"
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}"
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}"
+        --no-reset-after-provision
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}"
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}"
+        --rfp-tool "${rfp_tool}"
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}"
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}"
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}"
+      )
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        bg96_provision_args+=(--skip-private-key)
+      fi
+      python3 tools/bg96_bootloader_integration.py "${bg96_provision_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_mqtt.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      echo "=== Atomic step 4/6: provision TSIP wrapped keys when selected ==="
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        python3 tools/provision_tsip_over_uart.py \
+          --target rx65n \
+          --port "${uart_port}" \
+          --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+          --chunk-size "${RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+        status="${PIPESTATUS[0]}"
+        if [ "$status" -ne 0 ]; then
+          exit "$status"
+        fi
+      fi
+
+      echo "=== Atomic step 5/6: reset application ==="
+      python3 tools/bg96_bootloader_integration.py \
+        --action reset-app \
+        --uart-port "${uart_port}" \
+        --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/reset_app.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      echo "=== Atomic step 6/6: verify MQTT Pub/Sub ==="
       tls_version_args=()
       if [ -n "${RX65N_BG96_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args+=(--require-tls-version "${RX65N_BG96_REQUIRE_TLS_VERSION}")
