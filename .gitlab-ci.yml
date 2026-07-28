@@ -1838,7 +1838,7 @@ build_rx72n_ether_fleet:
 
 .rx65n_bg96_mqtt_rules:
   rules:
-    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(mqtt|full)$/'
+    - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "mqtt"'
       when: on_success
     - when: never
 
@@ -2407,15 +2407,6 @@ test_rx65n_bg96_mqtt:
       artifacts: true
     - job: prepare_rx65n_bg96_mqtt_credentials
       artifacts: true
-    # The split jobs do not exist for mqtt scope. For full scope they remain
-    # part of the OTA/Fleet path, so wait for that chain before reflashing and
-    # running the atomic MQTT transaction.
-    - job: download_rx65n_bg96_app
-      artifacts: true
-      optional: true
-    - job: reset_rx65n_bg96_app
-      artifacts: true
-      optional: true
   script:
     - echo "=== Flash, provision, and verify CK-RX65N BG96 MQTT atomically ==="
     - |

@@ -47,33 +47,24 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         positions = [job.index(token) for token in ordered_tokens]
         self.assertEqual(positions, sorted(positions))
 
-    def test_full_scope_waits_for_split_chain_but_mqtt_scope_does_not(self) -> None:
+    def test_atomic_job_is_mqtt_only_and_has_no_split_chain_needs(self) -> None:
         job = job_block(
             self.ci, "test_rx65n_bg96_mqtt", "test_rx65n_bg96_tls13_0rtt"
         )
         needs = job.split("\n  script:", maxsplit=1)[0]
 
-        self.assertIn(
-            "- job: download_rx65n_bg96_app\n"
-            "      artifacts: true\n"
-            "      optional: true",
-            needs,
-        )
-        self.assertIn(
-            "- job: reset_rx65n_bg96_app\n"
-            "      artifacts: true\n"
-            "      optional: true",
-            needs,
-        )
+        self.assertNotIn("- job: download_rx65n_bg96_app", needs)
+        self.assertNotIn("- job: reset_rx65n_bg96_app", needs)
         mqtt_rules = job_block(
             self.ci,
             ".rx65n_bg96_mqtt_rules",
             ".rx65n_bg96_app_reset_rules",
         )
         self.assertIn(
-            'RX65N_BG96_TEST_SCOPE =~ /^(mqtt|full)$/',
+            'RX65N_BG96_TEST_SCOPE == "mqtt"',
             mqtt_rules,
         )
+        self.assertNotIn("full", mqtt_rules)
 
     def test_mqtt_credentials_are_prepared_without_device_dependency(self) -> None:
         job = job_block(
