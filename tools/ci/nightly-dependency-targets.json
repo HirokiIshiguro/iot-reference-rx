@@ -3,8 +3,10 @@
   "targets": [
     {
       "name": "rx671-software-mbedtls",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls",
       "repository": "https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls.git",
       "ref_env": "RX671_SOFTWARE_BENCHMARK_PROJECT_REF",
+      "resolved_ref_env": "RX671_SOFTWARE_BENCHMARK_RESOLVED_SHA",
       "default_ref": "main",
       "mode": "vendored_subset",
       "allowed_patches": [
@@ -30,8 +32,10 @@
     },
     {
       "name": "rx671-tsip-mbedtls",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
       "repository": "https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls.git",
       "ref_env": "RX671_BENCHMARK_PROJECT_REF",
+      "resolved_ref_env": "RX671_BENCHMARK_RESOLVED_SHA",
       "default_ref": "main",
       "mode": "vendored_subset",
       "allowed_patches": [
@@ -57,8 +61,10 @@
     },
     {
       "name": "rx72n-tsip-mbedtls13",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13",
       "repository": "https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13.git",
       "ref_env": "RX72N_TSIP_MBEDTLS13_PROJECT_REF",
+      "resolved_ref_env": "RX72N_TSIP_MBEDTLS13_RESOLVED_SHA",
       "default_ref": "main",
       "mode": "parent_gitlinks",
       "iot_reference_gitlink": "external/iot-reference-rx",

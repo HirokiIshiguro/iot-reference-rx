@@ -13,11 +13,19 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 
 SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+GITLAB_PROJECT_RE = re.compile(
+    r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+$"
+)
+SENSITIVE_ENV_NAME_RE = re.compile(
+    r"(?:TOKEN|PASSWORD|PASSPHRASE|SECRET|PRIVATE_KEY|CREDENTIAL)",
+    re.IGNORECASE,
+)
+URL_USERINFO_RE = re.compile(r"(?i)\b(https?://)[^/\s@]+@")
 GITLINK_RE = re.compile(
     r"^160000 commit ([0-9a-f]{40})\t(.+)$"
 )
@@ -30,6 +38,23 @@ SUPPORTED_MODES = {"vendored_subset", "parent_gitlinks"}
 
 class AlignmentError(RuntimeError):
     """A deterministic dependency-alignment failure."""
+
+
+def redact_sensitive_text(value: str) -> str:
+    """Remove URL userinfo and configured secret values from diagnostics."""
+
+    redacted = URL_USERINFO_RE.sub(r"\1[redacted]@", value)
+    secrets: set[str] = set()
+    for name, secret in os.environ.items():
+        if not SENSITIVE_ENV_NAME_RE.search(name) or len(secret) < 4:
+            continue
+        secrets.add(secret)
+        encoded = quote(secret, safe="")
+        if len(encoded) >= 4:
+            secrets.add(encoded)
+    for secret in sorted(secrets, key=len, reverse=True):
+        redacted = redacted.replace(secret, "[redacted]")
+    return redacted
 
 
 def sanitized_repository_url(value: str) -> str:
@@ -74,7 +99,7 @@ def run_git(
         stderr=subprocess.PIPE,
     )
     if completed.returncode != 0:
-        stderr = (completed.stderr or "").strip()
+        stderr = redact_sensitive_text((completed.stderr or "").strip())
         if len(stderr) > 1000:
             stderr = stderr[-1000:]
         raise AlignmentError(
@@ -104,6 +129,7 @@ def load_config(path: Path) -> dict[str, Any]:
         raise AlignmentError("config targets must be a non-empty list")
 
     names: set[str] = set()
+    resolved_ref_envs: set[str] = set()
     for target in targets:
         if not isinstance(target, dict):
             raise AlignmentError("each target must be an object")
@@ -115,9 +141,23 @@ def load_config(path: Path) -> dict[str, Any]:
         names.add(name)
 
         target["repository"] = sanitized_repository_url(target.get("repository", ""))
+        project = target.get("project")
+        if not isinstance(project, str) or not GITLAB_PROJECT_RE.fullmatch(project):
+            raise AlignmentError(f"{name}: invalid GitLab project path")
+        target["project"] = project
         ref_env = target.get("ref_env")
         if not isinstance(ref_env, str) or not ENV_NAME_RE.fullmatch(ref_env):
             raise AlignmentError(f"{name}: invalid ref_env")
+        resolved_ref_env = target.get("resolved_ref_env")
+        if (
+            not isinstance(resolved_ref_env, str)
+            or not ENV_NAME_RE.fullmatch(resolved_ref_env)
+        ):
+            raise AlignmentError(f"{name}: invalid resolved_ref_env")
+        if resolved_ref_env in resolved_ref_envs:
+            raise AlignmentError(f"{name}: duplicate resolved_ref_env")
+        resolved_ref_envs.add(resolved_ref_env)
+        target["resolved_ref_env"] = resolved_ref_env
         if not isinstance(target.get("default_ref"), str) or not target["default_ref"]:
             raise AlignmentError(f"{name}: default_ref is required")
         if target.get("mode") not in SUPPORTED_MODES:
@@ -486,7 +526,7 @@ def evaluate_target(
             else "failed"
         )
     except (AlignmentError, OSError) as exc:
-        result["errors"].append(str(exc))
+        result["errors"].append(redact_sensitive_text(str(exc)))
     return result
 
 
@@ -498,11 +538,37 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
     )
 
 
+def write_dotenv(
+    path: Path,
+    config: dict[str, Any] | None,
+    results: list[dict[str, Any]],
+) -> None:
+    """Export each resolved child SHA for later immutable-SHA assertions."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    commits_by_name = {
+        result["name"]: result.get("commit", "")
+        for result in results
+        if isinstance(result, dict) and isinstance(result.get("name"), str)
+    }
+    lines: list[str] = []
+    if config is not None:
+        for target in config["targets"]:
+            commit = commits_by_name.get(target["name"], "")
+            if commit:
+                lines.append(
+                    f"{target['resolved_ref_env']}="
+                    f"{require_sha40(commit, target['name'] + ' resolved commit')}"
+                )
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--workspace", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--dotenv", required=True, type=Path)
     args = parser.parse_args(argv)
 
     parent_repo = Path.cwd().resolve()
@@ -514,6 +580,7 @@ def main(argv: list[str] | None = None) -> int:
         "targets": [],
         "errors": [],
     }
+    config: dict[str, Any] | None = None
     exit_code = 1
     try:
         config = load_config(args.config.resolve())
@@ -549,9 +616,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         exit_code = 0 if report["status"] == "passed" else 1
     except (AlignmentError, OSError) as exc:
-        report["errors"].append(str(exc))
+        report["errors"].append(redact_sensitive_text(str(exc)))
     finally:
         write_report(args.output.resolve(), report)
+        write_dotenv(args.dotenv.resolve(), config, report["targets"])
 
     for target in report["targets"]:
         print(

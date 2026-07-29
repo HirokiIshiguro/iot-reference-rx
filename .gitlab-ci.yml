@@ -427,10 +427,14 @@ nightly_dependency_alignment:
       --config tools/ci/nightly-dependency-targets.json
       --workspace artifacts/nightly_dependency_workspace
       --output artifacts/nightly_dependency_alignment.json
+      --dotenv artifacts/nightly_dependency_alignment.env
   artifacts:
     when: always
     paths:
       - artifacts/nightly_dependency_alignment.json
+      - artifacts/nightly_dependency_alignment.env
+    reports:
+      dotenv: artifacts/nightly_dependency_alignment.env
     expire_in: 7 days
 
 .nightly_matrix_trigger:
@@ -574,6 +578,9 @@ matrix_rx671_wifi_fleet_tls13:
 
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx671-wifi
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
@@ -587,6 +594,7 @@ matrix_rx671_wifi_fleet_tls13:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX671_SOFTWARE_BENCHMARK_RESOLVED_SHA"
     RX671_SOFTWARE_BENCHMARK_PROFILE: "software-all"
     RX671_SOFTWARE_BENCHMARK_RUN_HARDWARE: "true"
     RX671_SOFTWARE_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"
@@ -604,6 +612,9 @@ matrix_rx671_wifi_software_tls13_resumption_0rtt:
 
 .matrix_rx671_lanbench:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx671-wifi
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
@@ -617,6 +628,7 @@ matrix_rx671_wifi_software_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX671_BENCHMARK_RESOLVED_SHA"
     RX671_BENCHMARK_RUN_HARDWARE: "true"
     RX671_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"
     RX671_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"
@@ -779,6 +791,9 @@ matrix_rx72n_ether_tsip_tls13_fleet:
 
 matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx72n-ether
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
@@ -792,6 +807,7 @@ matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX72N_TSIP_MBEDTLS13_RESOLVED_SHA"
     GIT_SUBMODULE_STRATEGY: "none"
     RFP_CLI: "rfp-cli"
     RFP_TOOL: "e2l:OBE110008"
@@ -811,6 +827,9 @@ matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
 
 matrix_rx72n_ether_software_tls13_resumption_0rtt:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx72n-ether
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
@@ -824,6 +843,7 @@ matrix_rx72n_ether_software_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX72N_TSIP_MBEDTLS13_RESOLVED_SHA"
     GIT_SUBMODULE_STRATEGY: "none"
     RFP_CLI: "rfp-cli"
     RFP_TOOL: "e2l:OBE110008"

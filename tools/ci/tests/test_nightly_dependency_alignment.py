@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -290,6 +291,44 @@ class ConfigurationAndCheckoutTests(unittest.TestCase):
             alignment.parse_gitlink_line(
                 "160000 commit deadbeef\tMiddleware/AWS/lib",
                 "Middleware/AWS/lib",
+            )
+
+    def test_git_errors_redact_url_userinfo_and_secret_values(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "CI_JOB_TOKEN": "token/with-special",
+                "UNRELATED_VALUE": "public-value",
+            },
+            clear=False,
+        ):
+            redacted = alignment.redact_sensitive_text(
+                "fatal: https://oauth2:token%2Fwith-special@gitlab.example/repo "
+                "token/with-special public-value"
+            )
+        self.assertNotIn("oauth2:", redacted)
+        self.assertNotIn("token%2Fwith-special", redacted)
+        self.assertNotIn("token/with-special", redacted)
+        self.assertIn("public-value", redacted)
+
+    def test_resolved_commits_are_exported_as_dotenv(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "resolved.env"
+            alignment.write_dotenv(
+                output,
+                {
+                    "targets": [
+                        {
+                            "name": "benchmark",
+                            "resolved_ref_env": "BENCHMARK_RESOLVED_SHA",
+                        }
+                    ]
+                },
+                [{"name": "benchmark", "commit": "a" * 40}],
+            )
+            self.assertEqual(
+                f"BENCHMARK_RESOLVED_SHA={'a' * 40}\n",
+                output.read_text(encoding="utf-8"),
             )
 
 
