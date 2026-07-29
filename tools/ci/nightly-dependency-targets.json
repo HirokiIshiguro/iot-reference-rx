@@ -8,14 +8,12 @@
       "ref_env": "RX671_SOFTWARE_BENCHMARK_PROJECT_REF",
       "resolved_ref_env": "RX671_SOFTWARE_BENCHMARK_RESOLVED_SHA",
       "default_ref": "main",
-      "mode": "vendored_subset",
-      "allowed_patches": [
-        {
-          "path": "Middleware/FreeRTOS/FreeRTOS-Kernel/include/FreeRTOS.h",
-          "parent_blob": "f31e72abb6dbde75fc90eb880f165f61c3727315",
-          "child_blob": "8f06936974357248a19f683fd4e573b7913f859e",
-          "reason": "RX671 Tracealyzer recorder include hook; all other kernel blobs must match the parent pin"
-        }
+      "mode": "parent_gitlinks",
+      "iot_reference_gitlink": "external/iot-reference-rx",
+      "source_roots": [
+        "Common",
+        "Demos",
+        "Middleware"
       ],
       "dependencies": [
         "Middleware/FreeRTOS/FreeRTOS-Kernel",
@@ -37,14 +35,12 @@
       "ref_env": "RX671_BENCHMARK_PROJECT_REF",
       "resolved_ref_env": "RX671_BENCHMARK_RESOLVED_SHA",
       "default_ref": "main",
-      "mode": "vendored_subset",
-      "allowed_patches": [
-        {
-          "path": "Middleware/FreeRTOS/FreeRTOS-Kernel/include/FreeRTOS.h",
-          "parent_blob": "f31e72abb6dbde75fc90eb880f165f61c3727315",
-          "child_blob": "8f06936974357248a19f683fd4e573b7913f859e",
-          "reason": "RX671 Tracealyzer recorder include hook; all other kernel blobs must match the parent pin"
-        }
+      "mode": "parent_gitlinks",
+      "iot_reference_gitlink": "external/iot-reference-rx",
+      "source_roots": [
+        "Common",
+        "Demos",
+        "Middleware"
       ],
       "dependencies": [
         "Middleware/FreeRTOS/FreeRTOS-Kernel",
@@ -68,6 +64,11 @@
       "default_ref": "main",
       "mode": "parent_gitlinks",
       "iot_reference_gitlink": "external/iot-reference-rx",
+      "source_roots": [
+        "Common",
+        "Demos",
+        "Middleware"
+      ],
       "dependencies": [
         "Middleware/AWS/Device-Defender-for-AWS-IoT-embedded-sdk",
         "Middleware/AWS/Device-Shadow-for-AWS-IoT-embedded-sdk",

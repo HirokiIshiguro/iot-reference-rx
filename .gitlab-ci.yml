@@ -282,6 +282,32 @@ workflow:
         RX72N_TEST_SCOPE: "full"
         RX671_WIFI_TEST_SCOPE: "network"
       when: always
+    # Dependency-gate MRs validate the checker contract without touching any
+    # shared board. The contract job rejects any MR that mixes these files with
+    # board implementation changes, so this lane cannot suppress their normal
+    # build/hardware validation. Live child-repository alignment is exercised
+    # separately by a manual/API nightly_matrix pipeline.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - tools/ci/check_nightly_dependency_alignment.py
+        - tools/ci/nightly-dependency-targets.json
+        - tools/ci/tests/test_nightly_dependency_alignment.py
+        - tools/ci/tests/test_nightly_dependency_ci_contract.py
+        - tools/ci/tests/test_verify_dependency_gate_mr_scope.py
+        - tools/ci/verify_dependency_gate_mr_scope.py
+      variables:
+        PIPELINE_PROFILE: "mr-dependency-gate"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+      when: always
     # Match the OTA artifact leaf before the broad Projects/aws_wifi_rx671_ek
     # rule below. This lane builds and validates signed artifacts only; it must
     # not start the existing network/AWS hardware jobs on the shared RX671 EK.
@@ -395,6 +421,36 @@ workflow:
     - if: $CI_COMMIT_BRANCH
       when: always
 
+nightly_dependency_contract:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - .gitlab-ci.yml
+        - tools/ci/check_nightly_dependency_alignment.py
+        - tools/ci/nightly-dependency-targets.json
+        - tools/ci/tests/test_nightly_dependency_alignment.py
+        - tools/ci/tests/test_nightly_dependency_ci_contract.py
+        - tools/ci/tests/test_verify_dependency_gate_mr_scope.py
+        - tools/ci/verify_dependency_gate_mr_scope.py
+      when: on_success
+    - when: never
+  script:
+    - python3 tools/ci/verify_dependency_gate_mr_scope.py
+    - >-
+      python3 -m unittest
+      tools.ci.tests.test_nightly_dependency_alignment
+      tools.ci.tests.test_nightly_dependency_ci_contract
+      tools.ci.tests.test_verify_dependency_gate_mr_scope
+      -v
+
 nightly_dependency_alignment:
   stage: dependency_check
   tags:
@@ -407,20 +463,13 @@ nightly_dependency_alignment:
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
       when: on_success
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - .gitlab-ci.yml
-        - tools/ci/check_nightly_dependency_alignment.py
-        - tools/ci/nightly-dependency-targets.json
-        - tools/ci/tests/test_nightly_dependency_alignment.py
-        - tools/ci/tests/test_nightly_dependency_ci_contract.py
-      when: on_success
     - when: never
   script:
     - >-
       python3 -m unittest
       tools.ci.tests.test_nightly_dependency_alignment
       tools.ci.tests.test_nightly_dependency_ci_contract
+      tools.ci.tests.test_verify_dependency_gate_mr_scope
       -v
     - >-
       python3 tools/ci/check_nightly_dependency_alignment.py

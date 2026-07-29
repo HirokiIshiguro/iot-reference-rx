@@ -29,11 +29,10 @@ URL_USERINFO_RE = re.compile(r"(?i)\b(https?://)[^/\s@]+@")
 GITLINK_RE = re.compile(
     r"^160000 commit ([0-9a-f]{40})\t(.+)$"
 )
-TREE_ENTRY_RE = re.compile(
-    r"^(?P<mode>[0-7]{6}) (?P<type>blob|tree|commit) "
-    r"(?P<object>[0-9a-f]{40})\t(?P<path>.+)$"
+TREE_RE = re.compile(
+    r"^040000 tree ([0-9a-f]{40})\t(.+)$"
 )
-SUPPORTED_MODES = {"vendored_subset", "parent_gitlinks"}
+SUPPORTED_MODES = {"parent_gitlinks"}
 
 
 class AlignmentError(RuntimeError):
@@ -176,65 +175,32 @@ def load_config(path: Path) -> dict[str, Any]:
             raise AlignmentError(f"{name}: dependencies must be unique paths")
         target["dependencies"] = normalized
 
-        if target["mode"] == "parent_gitlinks":
-            if target.get("allowed_patches"):
-                raise AlignmentError(
-                    f"{name}: allowed_patches is only valid for vendored_subset"
-                )
-            link = target.get("iot_reference_gitlink")
-            if not isinstance(link, str):
-                raise AlignmentError(f"{name}: iot_reference_gitlink is required")
-            target["iot_reference_gitlink"] = safe_relative_path(
-                link, f"{name} iot_reference_gitlink"
+        source_roots = target.get("source_roots")
+        if not isinstance(source_roots, list) or not source_roots:
+            raise AlignmentError(f"{name}: source_roots must be non-empty")
+        normalized_source_roots = [
+            safe_relative_path(item, f"{name} source root")
+            if isinstance(item, str)
+            else ""
+            for item in source_roots
+        ]
+        if (
+            "" in normalized_source_roots
+            or len(normalized_source_roots) != len(set(normalized_source_roots))
+        ):
+            raise AlignmentError(f"{name}: source_roots must be unique paths")
+        target["source_roots"] = normalized_source_roots
+
+        if target.get("allowed_patches"):
+            raise AlignmentError(
+                f"{name}: allowed_patches is not valid for gitlink alignment"
             )
-        else:
-            allowed_patches = target.get("allowed_patches", [])
-            if not isinstance(allowed_patches, list):
-                raise AlignmentError(f"{name}: allowed_patches must be a list")
-            normalized_patches: list[dict[str, str]] = []
-            patch_paths: set[str] = set()
-            for patch in allowed_patches:
-                if not isinstance(patch, dict):
-                    raise AlignmentError(
-                        f"{name}: each allowed patch must be an object"
-                    )
-                patch_path = safe_relative_path(
-                    patch.get("path", ""),
-                    f"{name} allowed patch",
-                )
-                if not any(
-                    patch_path.startswith(f"{dependency}/")
-                    for dependency in normalized
-                ):
-                    raise AlignmentError(
-                        f"{name}: allowed patch is outside dependencies: "
-                        f"{patch_path}"
-                    )
-                if patch_path in patch_paths:
-                    raise AlignmentError(
-                        f"{name}: duplicate allowed patch: {patch_path}"
-                    )
-                patch_paths.add(patch_path)
-                reason = patch.get("reason")
-                if not isinstance(reason, str) or not reason.strip():
-                    raise AlignmentError(
-                        f"{name}: allowed patch reason is required"
-                    )
-                normalized_patches.append(
-                    {
-                        "path": patch_path,
-                        "parent_blob": require_sha40(
-                            patch.get("parent_blob", ""),
-                            f"{name} allowed patch parent blob",
-                        ),
-                        "child_blob": require_sha40(
-                            patch.get("child_blob", ""),
-                            f"{name} allowed patch child blob",
-                        ),
-                        "reason": reason.strip(),
-                    }
-                )
-            target["allowed_patches"] = normalized_patches
+        link = target.get("iot_reference_gitlink")
+        if not isinstance(link, str):
+            raise AlignmentError(f"{name}: iot_reference_gitlink is required")
+        target["iot_reference_gitlink"] = safe_relative_path(
+            link, f"{name} iot_reference_gitlink"
+        )
     return config
 
 
@@ -255,173 +221,17 @@ def read_gitlink(repo: Path, ref: str, path: str) -> str:
     return parse_gitlink_line(line, path)
 
 
-def initialize_parent_submodules(parent_repo: Path, dependencies: list[str]) -> None:
-    run_git(["submodule", "sync", "--", *dependencies], parent_repo, capture=False)
-    update_args = [
-        "submodule",
-        "update",
-        "--init",
-        "--force",
-        "--depth",
-        "1",
-        "--",
-        *dependencies,
-    ]
-    last_error: AlignmentError | None = None
-    for attempt in range(2):
-        try:
-            run_git(update_args, parent_repo, capture=False)
-            return
-        except AlignmentError as exc:
-            last_error = exc
-            if attempt == 0:
-                print(
-                    "[WARN] parent dependency checkout failed once; "
-                    "retrying the same recorded pins",
-                    file=sys.stderr,
-                )
-                run_git(
-                    ["submodule", "sync", "--", *dependencies],
-                    parent_repo,
-                    capture=False,
-                )
-    assert last_error is not None
-    raise last_error
-
-
-def git_blob_manifest(
-    repo: Path,
-    ref: str,
-    prefix: str = "",
-) -> tuple[dict[str, str], list[str]]:
-    """Return tracked blob IDs and nested gitlinks below prefix.
-
-    Git object IDs are used instead of working-tree byte hashes so a Windows
-    checkout's CRLF conversion cannot be misclassified as a library-version
-    change.
-    """
-
+def read_source_tree(repo: Path, ref: str, path: str) -> str:
     require_sha40(ref, "tree ref")
-    args = ["ls-tree", "-r", "-z", ref]
-    normalized_prefix = prefix.rstrip("/")
-    if normalized_prefix:
-        args.extend(["--", normalized_prefix])
-    output = run_git(args, repo)
-
-    blobs: dict[str, str] = {}
-    nested_gitlinks: list[str] = []
-    for raw_entry in output.split("\0"):
-        if not raw_entry:
-            continue
-        match = TREE_ENTRY_RE.fullmatch(raw_entry)
-        if not match:
-            raise AlignmentError(f"cannot parse git tree entry: {raw_entry!r}")
-        path = match.group("path")
-        if normalized_prefix:
-            marker = f"{normalized_prefix}/"
-            if not path.startswith(marker):
-                raise AlignmentError(
-                    f"git tree path escaped requested prefix: {path}"
-                )
-            path = path[len(marker):]
-        if match.group("mode") == "160000":
-            nested_gitlinks.append(path)
-        elif match.group("type") == "blob":
-            blobs[path] = match.group("object")
-    return blobs, sorted(nested_gitlinks)
-
-
-def compare_vendored_dependency(
-    parent_root: Path,
-    child_root: Path,
-    dependency: str,
-    child_ref: str = "HEAD",
-    allowed_patches: list[dict[str, str]] | None = None,
-) -> dict[str, Any]:
-    parent_dependency = parent_root / dependency
-    if not parent_dependency.is_dir():
-        raise AlignmentError(
-            f"parent dependency checkout is missing: {dependency}"
-        )
-    parent_ref = require_sha40(
-        run_git(["rev-parse", "HEAD"], parent_dependency),
-        f"parent dependency {dependency}",
-    )
-    child_ref = require_sha40(
-        run_git(["rev-parse", child_ref], child_root),
-        "child tree ref",
-    )
-    parent_manifest, parent_nested_gitlinks = git_blob_manifest(
-        parent_dependency,
-        parent_ref,
-    )
-    child_manifest, child_nested_gitlinks = git_blob_manifest(
-        child_root,
-        child_ref,
-        dependency,
-    )
-    if not child_manifest:
-        raise AlignmentError(f"vendored dependency is empty: {dependency}")
-
-    # A parent library may contain a separately pinned, transitive submodule.
-    # The RX671 repositories vendor those transitive files as ordinary blobs.
-    # They are excluded here: this gate compares the direct libraries listed in
-    # policy, while their own gitlinks remain pinned by the parent library.
-    ignored_child_files = sorted(
-        path
-        for path in child_manifest
-        if any(
-            path == nested or path.startswith(f"{nested}/")
-            for nested in parent_nested_gitlinks
-        )
-    )
-    for path in ignored_child_files:
-        del child_manifest[path]
-
-    missing_in_parent = sorted(set(child_manifest) - set(parent_manifest))
-    modified_candidates = sorted(
-        path
-        for path in set(child_manifest) & set(parent_manifest)
-        if child_manifest[path] != parent_manifest[path]
-    )
-    allowed_by_path = {
-        patch["path"]: patch
-        for patch in (allowed_patches or [])
-        if patch["path"].startswith(f"{dependency}/")
-    }
-    applied_allowed_patches: list[dict[str, str]] = []
-    modified: list[str] = []
-    for path in modified_candidates:
-        full_path = f"{dependency}/{path}"
-        patch = allowed_by_path.get(full_path)
-        if (
-            patch is not None
-            and patch["parent_blob"] == parent_manifest[path]
-            and patch["child_blob"] == child_manifest[path]
-        ):
-            applied_allowed_patches.append(patch)
-        else:
-            modified.append(path)
-    parent_only = sorted(set(parent_manifest) - set(child_manifest))
-    status = (
-        "passed"
-        if not missing_in_parent and not modified and not child_nested_gitlinks
-        else "failed"
-    )
-    return {
-        "path": dependency,
-        "status": status,
-        "parent_dependency_commit": parent_ref,
-        "child_repository_commit": child_ref,
-        "checked_files": len(child_manifest),
-        "parent_only_files": len(parent_only),
-        "ignored_parent_nested_gitlinks": parent_nested_gitlinks,
-        "ignored_child_files_below_nested_gitlinks": len(ignored_child_files),
-        "child_nested_gitlinks": child_nested_gitlinks,
-        "allowed_patches": applied_allowed_patches,
-        "missing_in_parent": missing_in_parent,
-        "modified": modified,
-    }
+    line = run_git(["ls-tree", ref, "--", path], repo)
+    match = TREE_RE.fullmatch(line.strip())
+    if not match:
+        if not line.strip():
+            raise AlignmentError(f"missing source tree: {path}")
+        raise AlignmentError(f"path is not a mode 040000 source tree: {path}")
+    if match.group(2) != path:
+        raise AlignmentError(f"source tree path mismatch for {path}")
+    return require_sha40(match.group(1), f"source tree {path}")
 
 
 def compare_parent_gitlinks(
@@ -437,6 +247,28 @@ def compare_parent_gitlinks(
         checks.append(
             {
                 "path": dependency,
+                "status": "passed" if expected == actual else "failed",
+                "expected": expected,
+                "actual": actual,
+            }
+        )
+    return checks
+
+
+def compare_parent_source_trees(
+    parent_repo: Path,
+    parent_sha: str,
+    child_parent_sha: str,
+    source_roots: list[str],
+) -> list[dict[str, str]]:
+    checks: list[dict[str, str]] = []
+    for source_root in source_roots:
+        expected = read_source_tree(parent_repo, parent_sha, source_root)
+        actual = read_source_tree(parent_repo, child_parent_sha, source_root)
+        checks.append(
+            {
+                "path": source_root,
+                "kind": "source_tree",
                 "status": "passed" if expected == actual else "failed",
                 "expected": expected,
                 "actual": actual,
@@ -490,35 +322,31 @@ def evaluate_target(
         result["ref"] = ref
         result["commit"] = child_sha
 
-        if target["mode"] == "vendored_subset":
-            result["checks"] = [
-                compare_vendored_dependency(
-                    parent_repo,
-                    child_repo,
-                    dependency,
-                    child_sha,
-                    target.get("allowed_patches", []),
-                )
-                for dependency in target["dependencies"]
-            ]
-        else:
-            child_parent_sha = read_gitlink(
-                child_repo,
-                child_sha,
-                target["iot_reference_gitlink"],
-            )
-            result["iot_reference_rx_commit"] = child_parent_sha
-            run_git(
-                ["fetch", "--quiet", "--depth", "1", "origin", child_parent_sha],
-                parent_repo,
-                capture=False,
-            )
-            result["checks"] = compare_parent_gitlinks(
+        child_parent_sha = read_gitlink(
+            child_repo,
+            child_sha,
+            target["iot_reference_gitlink"],
+        )
+        result["iot_reference_rx_commit"] = child_parent_sha
+        run_git(
+            ["fetch", "--quiet", "--depth", "1", "origin", child_parent_sha],
+            parent_repo,
+            capture=False,
+        )
+        result["checks"] = compare_parent_gitlinks(
+            parent_repo,
+            parent_sha,
+            child_parent_sha,
+            target["dependencies"],
+        )
+        result["checks"].extend(
+            compare_parent_source_trees(
                 parent_repo,
                 parent_sha,
                 child_parent_sha,
-                target["dependencies"],
+                target["source_roots"],
             )
+        )
 
         result["status"] = (
             "passed"
@@ -594,16 +422,6 @@ def main(argv: list[str] | None = None) -> int:
         }
         workspace = args.workspace.resolve()
         workspace.mkdir(parents=True, exist_ok=True)
-        vendored_dependencies = sorted(
-            {
-                dependency
-                for target in config["targets"]
-                if target["mode"] == "vendored_subset"
-                for dependency in target["dependencies"]
-            }
-        )
-        if vendored_dependencies:
-            initialize_parent_submodules(parent_repo, vendored_dependencies)
         report["targets"] = [
             evaluate_target(parent_repo, parent_sha, target, workspace)
             for target in config["targets"]
@@ -628,11 +446,6 @@ def main(argv: list[str] | None = None) -> int:
         )
         for check in target["checks"]:
             print(f"  [{check['status'].upper()}] {check['path']}")
-            for patch in check.get("allowed_patches", []):
-                print(
-                    f"    [ALLOWED PATCH] {patch['path']}: "
-                    f"{patch['reason']}"
-                )
         for error in target["errors"]:
             print(f"  [ERROR] {error}")
     for error in report["errors"]:

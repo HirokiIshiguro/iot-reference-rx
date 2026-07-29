@@ -41,6 +41,76 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
             )
         )
 
+    def test_dependency_gate_mr_is_contract_only_and_hardware_free(self) -> None:
+        workflow = self.ci.split(
+            "\nnightly_dependency_contract:\n",
+            maxsplit=1,
+        )[0]
+        profile = '        PIPELINE_PROFILE: "mr-dependency-gate"'
+        profile_index = workflow.index(profile)
+        rule_start = workflow.rfind(
+            '    - if: \'$CI_PIPELINE_SOURCE == "merge_request_event"\'',
+            0,
+            profile_index,
+        )
+        rule_end = workflow.index("      when: always", profile_index)
+        rule = workflow[rule_start:rule_end]
+        broad_mr_index = workflow.index('        PIPELINE_PROFILE: "mr"')
+        self.assertLess(profile_index, broad_mr_index)
+
+        for path in (
+            "tools/ci/check_nightly_dependency_alignment.py",
+            "tools/ci/nightly-dependency-targets.json",
+            "tools/ci/tests/test_nightly_dependency_alignment.py",
+            "tools/ci/tests/test_nightly_dependency_ci_contract.py",
+            "tools/ci/tests/test_verify_dependency_gate_mr_scope.py",
+            "tools/ci/verify_dependency_gate_mr_scope.py",
+        ):
+            self.assertIn(f"        - {path}", rule)
+        self.assertNotIn("        - .gitlab-ci.yml", rule)
+        for setting in (
+            'RUN_RX65N_BG96_BUILD: "false"',
+            'RX65N_BG96_TEST_SCOPE: "build"',
+            'RX65N_BG96_SKIP_HW_TESTS: "true"',
+            'RUN_RX72N_BUILD: "false"',
+            'RX72N_TEST_SCOPE: "build"',
+            'RX72N_SKIP_HW_TESTS: "true"',
+            'RUN_RX671_WIFI_BUILD: "false"',
+            'RX671_WIFI_TEST_SCOPE: "build"',
+            'RX671_WIFI_SKIP_HW_TESTS: "true"',
+            'RUN_RX671_BOOTLOADER_BUILD: "false"',
+        ):
+            self.assertIn(setting, rule)
+
+        contract = job_block(
+            self.ci,
+            "nightly_dependency_contract",
+            "nightly_dependency_alignment",
+        )
+        self.assertIn("stage: dependency_check", contract)
+        self.assertIn('$CI_PIPELINE_SOURCE == "merge_request_event"', contract)
+        self.assertIn(
+            "tools.ci.tests.test_nightly_dependency_alignment",
+            contract,
+        )
+        self.assertIn(
+            "tools.ci.tests.test_nightly_dependency_ci_contract",
+            contract,
+        )
+        self.assertIn(
+            "tools.ci.tests.test_verify_dependency_gate_mr_scope",
+            contract,
+        )
+        self.assertIn(
+            "python3 tools/ci/verify_dependency_gate_mr_scope.py",
+            contract,
+        )
+        self.assertNotIn(
+            "python3 tools/ci/check_nightly_dependency_alignment.py",
+            contract,
+        )
+        self.assertNotIn("artifacts:", contract)
+
     def test_dependency_stage_precedes_every_nightly_bridge(self) -> None:
         stage_list = self.ci.split("variables:\n", maxsplit=1)[0]
         self.assertLess(
@@ -68,6 +138,10 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         self.assertIn("artifacts/nightly_dependency_alignment.env", job)
         self.assertIn("dotenv: artifacts/nightly_dependency_alignment.env", job)
         self.assertIn('$PIPELINE_PROFILE == "nightly_matrix"', job)
+        self.assertIn('$CI_PIPELINE_SOURCE == "schedule"', job)
+        self.assertIn('$CI_PIPELINE_SOURCE == "api"', job)
+        self.assertIn('$CI_PIPELINE_SOURCE == "web"', job)
+        self.assertNotIn("merge_request_event", job)
 
     def test_external_bridge_project_ref_and_resolved_sha_mapping_is_exact(
         self,
@@ -134,17 +208,63 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         self.assertEqual(configured, actual)
 
     def test_policy_covers_kernel_and_every_used_aws_library(self) -> None:
+        rx671_dependencies = {
+            "Middleware/FreeRTOS/FreeRTOS-Kernel",
+            "Middleware/FreeRTOS/FreeRTOS-Plus-TCP",
+            "Middleware/FreeRTOS/backoffAlgorithm",
+            "Middleware/FreeRTOS/coreJSON",
+            "Middleware/FreeRTOS/coreMQTT",
+            "Middleware/FreeRTOS/coreMQTT-Agent",
+            "Middleware/FreeRTOS/corePKCS11",
+            "Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk",
+            "Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk",
+            "Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c",
+        }
+        expected_dependencies = {
+            "rx671-software-mbedtls": rx671_dependencies,
+            "rx671-tsip-mbedtls": rx671_dependencies,
+            "rx72n-tsip-mbedtls13": {
+                "Middleware/AWS/Device-Defender-for-AWS-IoT-embedded-sdk",
+                "Middleware/AWS/Device-Shadow-for-AWS-IoT-embedded-sdk",
+                "Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk",
+                "Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk",
+                "Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk",
+                "Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c",
+                "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface",
+                "Middleware/FreeRTOS/FreeRTOS-Kernel",
+                "Middleware/FreeRTOS/FreeRTOS-Plus-TCP",
+                "Middleware/FreeRTOS/backoffAlgorithm",
+                "Middleware/FreeRTOS/coreHTTP",
+                "Middleware/FreeRTOS/coreJSON",
+                "Middleware/FreeRTOS/coreMQTT",
+                "Middleware/FreeRTOS/coreMQTT-Agent",
+                "Middleware/FreeRTOS/corePKCS11",
+                "Middleware/FreeRTOS/coreSNTP",
+            },
+        }
+        self.assertEqual(
+            set(expected_dependencies),
+            {target["name"] for target in self.config["targets"]},
+        )
         for target in self.config["targets"]:
             with self.subTest(target=target["name"]):
-                dependencies = target["dependencies"]
-                self.assertIn(
-                    "Middleware/FreeRTOS/FreeRTOS-Kernel",
-                    dependencies,
+                self.assertEqual("parent_gitlinks", target["mode"])
+                self.assertEqual(
+                    "external/iot-reference-rx",
+                    target["iot_reference_gitlink"],
                 )
-                self.assertTrue(
-                    any(path.startswith("Middleware/AWS/") for path in dependencies)
+                self.assertEqual(
+                    {"Common", "Demos", "Middleware"},
+                    set(target["source_roots"]),
                 )
-                self.assertEqual(len(dependencies), len(set(dependencies)))
+                self.assertEqual(
+                    expected_dependencies[target["name"]],
+                    set(target["dependencies"]),
+                )
+                self.assertEqual(
+                    len(target["dependencies"]),
+                    len(set(target["dependencies"])),
+                )
 
 
 if __name__ == "__main__":
