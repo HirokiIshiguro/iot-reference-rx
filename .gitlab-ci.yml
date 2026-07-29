@@ -1,4 +1,5 @@
 stages:
+  - dependency_check
   - nightly_matrix
   - lanbench_prepare
   - build
@@ -394,6 +395,44 @@ workflow:
     - if: $CI_COMMIT_BRANCH
       when: always
 
+nightly_dependency_alignment:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - .gitlab-ci.yml
+        - tools/ci/check_nightly_dependency_alignment.py
+        - tools/ci/nightly-dependency-targets.json
+        - tools/ci/tests/test_nightly_dependency_alignment.py
+        - tools/ci/tests/test_nightly_dependency_ci_contract.py
+      when: on_success
+    - when: never
+  script:
+    - >-
+      python3 -m unittest
+      tools.ci.tests.test_nightly_dependency_alignment
+      tools.ci.tests.test_nightly_dependency_ci_contract
+      -v
+    - >-
+      python3 tools/ci/check_nightly_dependency_alignment.py
+      --config tools/ci/nightly-dependency-targets.json
+      --workspace artifacts/nightly_dependency_workspace
+      --output artifacts/nightly_dependency_alignment.json
+  artifacts:
+    when: always
+    paths:
+      - artifacts/nightly_dependency_alignment.json
+    expire_in: 7 days
+
 .nightly_matrix_trigger:
   stage: nightly_matrix
   rules:
@@ -779,7 +818,7 @@ matrix_rx72n_ether_software_tls13_resumption_0rtt:
     - when: never
   trigger:
     project: oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13
-    branch: main
+    branch: $RX72N_TSIP_MBEDTLS13_PROJECT_REF
     strategy: depend
     forward:
       yaml_variables: true
