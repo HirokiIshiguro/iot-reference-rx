@@ -1,4 +1,5 @@
 stages:
+  - dependency_check
   - nightly_matrix
   - lanbench_prepare
   - build
@@ -281,6 +282,32 @@ workflow:
         RX72N_TEST_SCOPE: "full"
         RX671_WIFI_TEST_SCOPE: "network"
       when: always
+    # Dependency-gate MRs validate the checker contract without touching any
+    # shared board. The contract job rejects any MR that mixes these files with
+    # board implementation changes, so this lane cannot suppress their normal
+    # build/hardware validation. Live child-repository alignment is exercised
+    # separately by a manual/API nightly_matrix pipeline.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - tools/ci/check_nightly_dependency_alignment.py
+        - tools/ci/nightly-dependency-targets.json
+        - tools/ci/tests/test_nightly_dependency_alignment.py
+        - tools/ci/tests/test_nightly_dependency_ci_contract.py
+        - tools/ci/tests/test_verify_dependency_gate_mr_scope.py
+        - tools/ci/verify_dependency_gate_mr_scope.py
+      variables:
+        PIPELINE_PROFILE: "mr-dependency-gate"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+      when: always
     # Match the OTA artifact leaf before the broad Projects/aws_wifi_rx671_ek
     # rule below. This lane builds and validates signed artifacts only; it must
     # not start the existing network/AWS hardware jobs on the shared RX671 EK.
@@ -393,6 +420,71 @@ workflow:
       when: always
     - if: $CI_COMMIT_BRANCH
       when: always
+
+nightly_dependency_contract:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - .gitlab-ci.yml
+        - tools/ci/check_nightly_dependency_alignment.py
+        - tools/ci/nightly-dependency-targets.json
+        - tools/ci/tests/test_nightly_dependency_alignment.py
+        - tools/ci/tests/test_nightly_dependency_ci_contract.py
+        - tools/ci/tests/test_verify_dependency_gate_mr_scope.py
+        - tools/ci/verify_dependency_gate_mr_scope.py
+      when: on_success
+    - when: never
+  script:
+    - python3 tools/ci/verify_dependency_gate_mr_scope.py
+    - >-
+      python3 -m unittest
+      tools.ci.tests.test_nightly_dependency_alignment
+      tools.ci.tests.test_nightly_dependency_ci_contract
+      tools.ci.tests.test_verify_dependency_gate_mr_scope
+      -v
+
+nightly_dependency_alignment:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: on_success
+    - when: never
+  script:
+    - >-
+      python3 -m unittest
+      tools.ci.tests.test_nightly_dependency_alignment
+      tools.ci.tests.test_nightly_dependency_ci_contract
+      tools.ci.tests.test_verify_dependency_gate_mr_scope
+      -v
+    - >-
+      python3 tools/ci/check_nightly_dependency_alignment.py
+      --config tools/ci/nightly-dependency-targets.json
+      --workspace artifacts/nightly_dependency_workspace
+      --output artifacts/nightly_dependency_alignment.json
+      --dotenv artifacts/nightly_dependency_alignment.env
+  artifacts:
+    when: always
+    paths:
+      - artifacts/nightly_dependency_alignment.json
+      - artifacts/nightly_dependency_alignment.env
+    reports:
+      dotenv: artifacts/nightly_dependency_alignment.env
+    expire_in: 7 days
 
 .nightly_matrix_trigger:
   stage: nightly_matrix
@@ -535,6 +627,9 @@ matrix_rx671_wifi_fleet_tls13:
 
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx671-wifi
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
@@ -548,6 +643,7 @@ matrix_rx671_wifi_fleet_tls13:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX671_SOFTWARE_BENCHMARK_RESOLVED_SHA"
     RX671_SOFTWARE_BENCHMARK_PROFILE: "software-all"
     RX671_SOFTWARE_BENCHMARK_RUN_HARDWARE: "true"
     RX671_SOFTWARE_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"
@@ -565,6 +661,9 @@ matrix_rx671_wifi_software_tls13_resumption_0rtt:
 
 .matrix_rx671_lanbench:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx671-wifi
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
@@ -578,6 +677,7 @@ matrix_rx671_wifi_software_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX671_BENCHMARK_RESOLVED_SHA"
     RX671_BENCHMARK_RUN_HARDWARE: "true"
     RX671_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"
     RX671_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"
@@ -740,6 +840,9 @@ matrix_rx72n_ether_tsip_tls13_fleet:
 
 matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx72n-ether
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
@@ -753,6 +856,7 @@ matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX72N_TSIP_MBEDTLS13_RESOLVED_SHA"
     GIT_SUBMODULE_STRATEGY: "none"
     RFP_CLI: "rfp-cli"
     RFP_TOOL: "e2l:OBE110008"
@@ -772,6 +876,9 @@ matrix_rx72n_ether_tsip_tls13_resumption_0rtt:
 
 matrix_rx72n_ether_software_tls13_resumption_0rtt:
   stage: nightly_matrix
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
   resource_group: nightly-matrix-rx72n-ether
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
@@ -779,12 +886,13 @@ matrix_rx72n_ether_software_tls13_resumption_0rtt:
     - when: never
   trigger:
     project: oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13
-    branch: main
+    branch: $RX72N_TSIP_MBEDTLS13_PROJECT_REF
     strategy: depend
     forward:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    EXPECTED_BENCHMARK_COMMIT_SHA: "$RX72N_TSIP_MBEDTLS13_RESOLVED_SHA"
     GIT_SUBMODULE_STRATEGY: "none"
     RFP_CLI: "rfp-cli"
     RFP_TOOL: "e2l:OBE110008"
