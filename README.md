@@ -8,7 +8,7 @@
 
 ## 最新の実機検証・性能
 
-最終更新: 2026-07-27 JST。
+最終更新: 2026-07-29 JST。
 
 この節は本リポジトリで再現する実機テストの要約です。`✓` は同一コミットで
 5回連続成功、`○` は最新ベースラインを1回以上確認済み、`—` は未実装または
@@ -28,7 +28,7 @@
 | <small>RX65N/BG96<br>software</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5952)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5954)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5957)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5960)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5962)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5965)</small> |
 | <small>RX65N/BG96<br>TSIP</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5966)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5967)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/5969)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6049)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6063)</small> | <small>[✓](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6076)</small> |
 | <small>RX671/Type 1YN<br>software</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8169)</small> | <small>—</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8570)</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8647)</small> | <small>—</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8726)</small> |
-| <small>RX671/Type 1YN<br>TSIP</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8619)</small> | <small>—</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/9032)</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8674)</small> | <small>—</small> | <small>—</small> |
+| <small>RX671/Type 1YN<br>TSIP</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8619)</small> | <small>—</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/9032)</small> | <small>[○](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/8674)</small> | <small>—</small> | <small>[○](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/9163)</small> |
 
 <small>AWS IoT Core は [SessionTicket TLS extension をサポートしていません](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)。RX72N/Ether software では [pipeline #6087](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/6087) で TLSv1.3 full handshake は2回成功する一方、NewSessionTicket が得られず resumption 不成立であることを確認しています。</small>
 
@@ -41,6 +41,8 @@
 <small>RX671/Type 1YN software Fleet は [pipeline #8570](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8570) で、claim/provisioned MQTT、証明書とThing作成、TLS 1.2、claim-free imageへのpark、AWS上の生成証明書とThingの削除まで一巡して成功しました。CSR、証明書PEM、ownership token、秘密鍵はUART/job traceへ出さず、Fleet MOTはpipeline/commitに結び付けた暗号化artifactだけを受け渡します。`○`は単発の実機証跡であり、nightly stabilizing行で継続確認します。</small>
 
 <small>RX671/Type 1YN software の TLS 1.3 Fleet は [pipeline #8726](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8726) で、claim/provisioned の2接続がともに `TLSv1.3`、Fleet 5/5 marker、claim-free imageへのpark、AWS上の生成証明書とThingの不存在確認まで成功しました。TLS 1.3 min/max固定に加えて、実際のnegotiated versionとハンドシェイク回数2回をCIで検査します。`○`は単発の実機証跡であり、TLS 1.3専用のnightly stabilizing行で継続確認します。</small>
+
+<small>RX671/Type 1YN TSIP の TLS 1.3 Fleet は、親 [pipeline #9163](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/9163) の [bridge #58821](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/58821) から起動した [benchmark pipeline #9164](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls/-/pipelines/9164) で、claim側のTSIP KeyIndex / TSIP CertificateVerifyとprovisioned側のsoftware PKCS #11を使い、2接続とも `TLSv1.3` で成功しました。Fleet 5/5 marker、claim-free imageへのpark、一時claim policy・生成証明書・Thingの削除まで確認しています。`○`は単発の実機証跡であり、nightly stabilizing行で継続確認します。</small>
 
 ### LANBENCH / TLSエンドポイント基礎テスト結果
 
