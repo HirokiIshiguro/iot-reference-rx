@@ -197,6 +197,7 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
                 self.assertIsNotNone(resolved_match)
                 self.assertIn("job: nightly_dependency_alignment", block)
                 self.assertIn("artifacts: true", block)
+                self.assertIn('GIT_SUBMODULE_STRATEGY: "none"', block)
             if branch_match is not None and resolved_match is not None:
                 actual.add(
                     (

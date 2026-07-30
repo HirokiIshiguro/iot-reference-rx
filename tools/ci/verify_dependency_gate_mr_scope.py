@@ -37,6 +37,13 @@ DEPENDENCY_EXPECTED_SHA_RE = re.compile(
     r'RX671_BENCHMARK_RESOLVED_SHA|'
     r'RX72N_TSIP_MBEDTLS13_RESOLVED_SHA)"\r?\n'
 )
+DEPENDENCY_BRIDGE_SUBMODULE_STRATEGY_RE = re.compile(
+    r'(?m)^    GIT_SUBMODULE_STRATEGY: "none"\r?\n'
+    r'(?=    EXPECTED_BENCHMARK_COMMIT_SHA: '
+    r'"\$(?:RX671_SOFTWARE_BENCHMARK_RESOLVED_SHA|'
+    r'RX671_BENCHMARK_RESOLVED_SHA|'
+    r'RX72N_TSIP_MBEDTLS13_RESOLVED_SHA)"\r?\n)'
+)
 
 
 def require_sha(value: str, label: str) -> str:
@@ -120,6 +127,7 @@ def strip_dependency_ci_regions(text: str) -> str:
         count=1,
     )
     text = text.replace(DEPENDENCY_NEEDS_BLOCK, "")
+    text = DEPENDENCY_BRIDGE_SUBMODULE_STRATEGY_RE.sub("", text)
     text = DEPENDENCY_EXPECTED_SHA_RE.sub("", text)
     text = text.replace(
         "    branch: $RX72N_TSIP_MBEDTLS13_PROJECT_REF\n",
