@@ -160,15 +160,134 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
             create_ota_update.validate_signed_prefix,
         ):
             with self.subTest(validator=validator.__module__):
-                validator("pipeline-thing", "ota/pipeline-thing/signed/")
-                with self.assertRaisesRegex(ValueError, "Thing namespace"):
-                    validator("pipeline-thing", "ota/other-thing/signed/")
-                with self.assertRaisesRegex(ValueError, "Thing namespace"):
-                    validator("pipeline-thing", "ota/pipeline-thing/")
-                with self.assertRaisesRegex(ValueError, "Thing namespace"):
+                validator(
+                    "pipeline-thing",
+                    "ota-id",
+                    "ota/pipeline-thing/signed/ota-id/",
+                )
+                with self.assertRaisesRegex(ValueError, "OTA update"):
                     validator(
                         "pipeline-thing",
-                        "ota/pipeline-thing/signed",
+                        "ota-id",
+                        "ota/other-thing/signed/ota-id/",
+                    )
+                with self.assertRaisesRegex(ValueError, "OTA update"):
+                    validator(
+                        "pipeline-thing",
+                        "ota-id",
+                        "ota/pipeline-thing/signed/other-ota/",
+                    )
+                with self.assertRaisesRegex(ValueError, "OTA update"):
+                    validator(
+                        "pipeline-thing",
+                        "ota-id",
+                        "ota/pipeline-thing/signed/ota-id",
+                    )
+
+    def test_ota_creators_reject_unowned_source_key(self) -> None:
+        for creator in (
+            create_bg96_ota_update,
+            create_ota_update,
+        ):
+            with self.subTest(creator=creator.__name__):
+                with self.assertRaisesRegex(ValueError, "source key"):
+                    creator.validate_source_key(
+                        "pipeline-thing",
+                        "ota-id",
+                        "ota/different-thing/source/candidate.rsu",
+                    )
+                with self.assertRaisesRegex(ValueError, "source key"):
+                    creator.validate_source_key(
+                        "pipeline-thing",
+                        "ota-id",
+                        "ota/pipeline-thing/source/other-ota/candidate.rsu",
+                    )
+                creator.validate_source_key(
+                    "pipeline-thing",
+                    "ota-id",
+                    "ota/pipeline-thing/source/ota-id/candidate.rsu",
+                )
+
+    def test_ota_creator_path_templates_expand_generated_identity(
+        self,
+    ) -> None:
+        for creator in (
+            create_bg96_ota_update,
+            create_ota_update,
+        ):
+            with self.subTest(creator=creator.__name__):
+                self.assertEqual(
+                    "ota/pipeline-thing/source/ota-id/candidate.rsu",
+                    creator.expand_ota_path_template(
+                        "ota/{thing_name}/source/{ota_update_id}/candidate.rsu",
+                        "pipeline-thing",
+                        "ota-id",
+                    ),
+                )
+
+    def test_ota_creator_json_replacement_is_atomic(self) -> None:
+        for creator in (
+            create_bg96_ota_update,
+            create_ota_update,
+        ):
+            with self.subTest(creator=creator.__name__):
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "ota_job_meta.json"
+                    path.write_text('{"state": "old"}\n', encoding="utf-8")
+                    with (
+                        patch.object(
+                            creator.os,
+                            "replace",
+                            side_effect=OSError("simulated replace failure"),
+                        ),
+                        self.assertRaisesRegex(
+                            OSError,
+                            "simulated replace failure",
+                        ),
+                    ):
+                        creator.write_json(path, {"state": "new"})
+
+                    self.assertEqual(
+                        {"state": "old"},
+                        json.loads(path.read_text(encoding="utf-8")),
+                    )
+                    self.assertEqual(
+                        [],
+                        list(path.parent.glob(f".{path.name}.*.tmp")),
+                    )
+                    creator.write_json(path, {"state": "new"})
+                    self.assertTrue(
+                        path.read_text(encoding="utf-8").endswith("\n")
+                    )
+                    self.assertEqual(
+                        {"state": "new"},
+                        json.loads(path.read_text(encoding="utf-8")),
+                    )
+                    with (
+                        patch.object(
+                            creator.os,
+                            "fsync",
+                            side_effect=OSError("simulated fsync failure"),
+                        ),
+                        self.assertRaisesRegex(
+                            OSError,
+                            "simulated fsync failure",
+                        ),
+                    ):
+                        creator.write_json(path, {"state": "not-committed"})
+                    self.assertEqual(
+                        {"state": "new"},
+                        json.loads(path.read_text(encoding="utf-8")),
+                    )
+                    creator.write_meta(path, {"state": "new"}, step=1)
+                    creator.write_meta(path, {"state": "new"}, step=2)
+                    self.assertEqual(
+                        {"state": "new", "step": 2},
+                        json.loads(path.read_text(encoding="utf-8")),
+                    )
+                    self.assertEqual(
+                        [],
+                        list(path.parent.glob(f".{path.name}.*.tmp")),
                     )
 
     def test_ota_creators_journal_signer_id_during_status_poll(self) -> None:
@@ -258,6 +377,10 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
             journal_at_upload["ota_update_id"],
             journal_at_upload["signed_prefix"],
         )
+        self.assertIn(
+            journal_at_upload["ota_update_id"],
+            journal_at_upload["s3_key"],
+        )
 
     def test_bg96_creator_writes_owned_prefix_before_upload(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -321,6 +444,10 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
         self.assertIn(
             journal_at_upload["ota_update_id"],
             journal_at_upload["signed_prefix"],
+        )
+        self.assertIn(
+            journal_at_upload["ota_update_id"],
+            journal_at_upload["s3_key"],
         )
 
     def test_rx72_creator_completes_with_signer_id_in_final_payload(self) -> None:

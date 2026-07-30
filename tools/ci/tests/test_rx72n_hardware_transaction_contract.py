@@ -137,6 +137,9 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         self.assertIn('--thing-name "$ota_thing_name"', job)
         self.assertNotIn("tools/create_ota_update.py", job)
         self.assertNotIn("awscli", job)
+        self.assertIn('status="${PIPESTATUS[0]}"', job)
+        self.assertIn('exit "$status"', job)
+        self.assertNotIn('exit "${PIPESTATUS[0]}"', job)
 
         creator = job_block(
             self.ci, "create_rx72n_ether_ota", "test_rx72n_ether_ota"

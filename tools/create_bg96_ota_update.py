@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import subprocess
 import sys
 import time
@@ -35,7 +36,23 @@ def aws(args: list[str], region: str) -> dict:
 
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, ensure_ascii=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            # Preserve the original write/replace failure. A stale temporary
+            # file is safer than hiding the failure that kept the old journal.
+            pass
 
 
 def write_meta(path: Path, meta: dict, **updates: object) -> None:
@@ -43,17 +60,48 @@ def write_meta(path: Path, meta: dict, **updates: object) -> None:
     write_json(path, meta)
 
 
-def validate_signed_prefix(thing_name: str, signed_prefix: str) -> None:
-    owner_root = f"ota/{thing_name}/"
+def validate_signed_prefix(
+    thing_name: str,
+    ota_update_id: str,
+    signed_prefix: str,
+) -> None:
+    owner_root = f"ota/{thing_name}/signed/{ota_update_id}/"
     if (
         not signed_prefix.startswith(owner_root)
-        or signed_prefix == owner_root
         or not signed_prefix.endswith("/")
     ):
         raise ValueError(
-            "signed prefix must be a child directory of the OTA Thing "
+            "signed prefix must stay below the OTA update "
             f"namespace {owner_root!r}"
         )
+
+
+def validate_source_key(
+    thing_name: str,
+    ota_update_id: str,
+    s3_key: str,
+) -> None:
+    owner_root = f"ota/{thing_name}/source/{ota_update_id}/"
+    if (
+        not s3_key.startswith(owner_root)
+        or s3_key == owner_root
+        or s3_key.endswith("/")
+    ):
+        raise ValueError(
+            "source key must be an object below the OTA update "
+            f"namespace {owner_root!r}"
+        )
+
+
+def expand_ota_path_template(
+    value: str,
+    thing_name: str,
+    ota_update_id: str,
+) -> str:
+    return value.replace("{thing_name}", thing_name).replace(
+        "{ota_update_id}",
+        ota_update_id,
+    )
 
 
 def encode_custom_signature_for_cli(der_signature: bytes) -> str:
@@ -117,8 +165,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--role-arn", required=True)
     parser.add_argument("--region", required=True)
     parser.add_argument("--ota-id-prefix", default="bg96-ota")
-    parser.add_argument("--s3-key", default=None)
-    parser.add_argument("--signed-prefix", default=None)
+    parser.add_argument(
+        "--s3-key",
+        default=None,
+        help=(
+            "Optional S3 object key template below ota/<thing-name>/. "
+            "Use {thing_name} and {ota_update_id} placeholders. "
+            "Default: ota/<thing-name>/source/<ota-update-id>/<input file name>"
+        ),
+    )
+    parser.add_argument(
+        "--signed-prefix",
+        default=None,
+        help=(
+            "Optional S3 prefix template for AWS Signer output below "
+            "ota/<thing-name>/. Use {thing_name} and {ota_update_id} "
+            "placeholders. Default: "
+            "ota/<thing-name>/signed/<ota-update-id>/"
+        ),
+    )
     parser.add_argument("--wait-timeout", type=int, default=180)
     parser.add_argument("--poll-interval", type=int, default=3)
     return parser.parse_args()
@@ -147,14 +212,22 @@ def main() -> int:
     ota_update_id = (
         f"{args.ota_id_prefix}-{int(time.time())}-{uuid.uuid4().hex[:12]}"
     )
-    s3_key = args.s3_key or f"ota/{args.thing_name}/{payload.name}"
-    signed_prefix = (
+    s3_key = expand_ota_path_template(
+        args.s3_key
+        or "ota/{thing_name}/source/{ota_update_id}/" + payload.name,
+        args.thing_name,
+        ota_update_id,
+    )
+    validate_source_key(args.thing_name, ota_update_id, s3_key)
+    signed_prefix = expand_ota_path_template(
         args.signed_prefix
-        or f"ota/{args.thing_name}/signed/{ota_update_id}/"
+        or "ota/{thing_name}/signed/{ota_update_id}/",
+        args.thing_name,
+        ota_update_id,
     )
     code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
     if code_signing_mode == "aws-signer":
-        validate_signed_prefix(args.thing_name, signed_prefix)
+        validate_signed_prefix(args.thing_name, ota_update_id, signed_prefix)
     meta = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "region": args.region,

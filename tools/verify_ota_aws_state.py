@@ -34,6 +34,17 @@ EXECUTION_TERMINAL_STATUSES = {
     "TIMED_OUT",
 }
 SIGNING_JOB_TERMINAL_STATUSES = {"Succeeded", "Failed"}
+OTA_MUTATING_STATUSES = {
+    "CREATE_PENDING",
+    "CREATE_IN_PROGRESS",
+    "DELETE_IN_PROGRESS",
+}
+OTA_KNOWN_STATUSES = OTA_MUTATING_STATUSES | {
+    "CREATE_COMPLETE",
+    "CREATE_FAILED",
+    "DELETE_FAILED",
+}
+OTA_PRECREATE_STATUSES = {"UPLOAD_REQUESTED", "S3_UPLOADED"}
 NOT_FOUND_MARKERS = (
     "ResourceNotFoundException",
     "NotFoundException",
@@ -180,6 +191,8 @@ def load_meta(
             raise ValueError(
                 "OTA cleanup metadata contains no known resource identifiers"
             )
+    validate_source_key(payload)
+    validate_signed_prefix(payload)
     return payload
 
 
@@ -202,7 +215,11 @@ def public_meta(meta: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def s3_head_args(meta: dict[str, Any]) -> list[str]:
+def s3_head_args(
+    meta: dict[str, Any],
+    *,
+    exact_version: bool = True,
+) -> list[str]:
     args = [
         "s3api",
         "head-object",
@@ -211,7 +228,7 @@ def s3_head_args(meta: dict[str, Any]) -> list[str]:
         "--key",
         str(meta["s3_key"]),
     ]
-    if meta.get("s3_version"):
+    if exact_version and meta.get("s3_version"):
         args.extend(["--version-id", str(meta["s3_version"])])
     return args
 
@@ -274,19 +291,49 @@ def validate_signed_prefix(meta: dict[str, Any]) -> str | None:
         raise ValueError("Metadata signed_prefix must be a string")
     bucket = meta.get("s3_bucket")
     thing_name = meta.get("thing_name")
-    if not bucket or not thing_name:
+    ota_update_id = meta.get("ota_update_id")
+    if not bucket or not thing_name or not ota_update_id:
         raise ValueError(
-            "Metadata signed_prefix requires s3_bucket and thing_name"
+            "Metadata signed_prefix requires s3_bucket, thing_name, and "
+            "ota_update_id"
         )
-    owner_root = f"ota/{thing_name}/"
+    owner_root = f"ota/{thing_name}/signed/{ota_update_id}/"
     if (
         not value.startswith(owner_root)
-        or value == owner_root
         or not value.endswith("/")
     ):
         raise ValueError(
-            "Metadata signed_prefix must be a child directory of the "
-            f"pipeline Thing namespace {owner_root!r}"
+            "Metadata signed_prefix must stay below the OTA update "
+            f"namespace {owner_root!r}"
+        )
+    return value
+
+
+def validate_source_key(meta: dict[str, Any]) -> str | None:
+    """Return a safely scoped source key or fail before any mutation."""
+
+    value = meta.get("s3_key")
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Metadata s3_key must be a string")
+    bucket = meta.get("s3_bucket")
+    thing_name = meta.get("thing_name")
+    ota_update_id = meta.get("ota_update_id")
+    if not bucket or not thing_name or not ota_update_id:
+        raise ValueError(
+            "Metadata s3_key requires s3_bucket, thing_name, and "
+            "ota_update_id"
+        )
+    owner_root = f"ota/{thing_name}/source/{ota_update_id}/"
+    if (
+        not value.startswith(owner_root)
+        or value == owner_root
+        or value.endswith("/")
+    ):
+        raise ValueError(
+            "Metadata s3_key must be an object below the OTA update "
+            f"namespace {owner_root!r}"
         )
     return value
 
@@ -442,7 +489,11 @@ def wait_until_s3_key_fully_absent(
     deadline = time.time() + timeout
     while True:
         versions = list_exact_s3_key_versions(meta, region)
-        current = run_aws(s3_head_args(meta), region, absent_ok=True)
+        current = run_aws(
+            s3_head_args(meta, exact_version=False),
+            region,
+            absent_ok=True,
+        )
         if not versions and current is None:
             return True
         if time.time() >= deadline:
@@ -450,11 +501,18 @@ def wait_until_s3_key_fully_absent(
         time.sleep(poll_interval)
 
 
+def ota_resource_may_exist(meta: dict[str, Any]) -> bool:
+    return bool(
+        meta.get("ota_update_id")
+        and meta.get("ota_update_status") not in OTA_PRECREATE_STATUSES
+    )
+
+
 def cleanup_resources(meta: dict[str, Any]) -> list[str]:
     return [
         resource
         for resource, present in (
-            ("ota_update", meta.get("ota_update_id")),
+            ("ota_update", ota_resource_may_exist(meta)),
             ("aws_iot_job", meta.get("aws_iot_job_id")),
             (
                 "s3_source_object",
@@ -519,6 +577,15 @@ def validate_cleanup_metadata_identity(
             metadata_identity_error(
                 "s3_source_object",
                 "Metadata s3_version requires s3_bucket and s3_key",
+            )
+        ]
+    try:
+        validate_source_key(meta)
+    except ValueError as error:
+        return [
+            metadata_identity_error(
+                "s3_source_object",
+                str(error),
             )
         ]
     code_signing_mode = meta.get("code_signing_mode")
@@ -592,15 +659,33 @@ def reconcile_live_ota_identity(
             )
         )
 
+    live_status = ota_info.get("otaUpdateStatus")
+    if live_status not in OTA_KNOWN_STATUSES:
+        errors.append(
+            metadata_identity_error(
+                "ota_update",
+                (
+                    "Live OTA response does not contain a recognized "
+                    f"otaUpdateStatus: {live_status!r}"
+                ),
+            )
+        )
+    else:
+        updates["ota_update_status"] = live_status
+
     live_job_id = ota_info.get("awsIotJobId")
     recorded_job_id = meta.get("aws_iot_job_id")
     if not live_job_id:
-        errors.append(
-            metadata_identity_error(
-                "aws_iot_job",
-                "Live OTA response does not contain awsIotJobId",
+        if live_status != "CREATE_FAILED":
+            errors.append(
+                metadata_identity_error(
+                    "aws_iot_job",
+                    (
+                        "Live OTA response does not contain awsIotJobId "
+                        f"for status {live_status!r}"
+                    ),
+                )
             )
-        )
     elif recorded_job_id and recorded_job_id != live_job_id:
         errors.append(
             metadata_identity_error(
@@ -616,7 +701,11 @@ def reconcile_live_ota_identity(
 
     live_job_arn = ota_info.get("awsIotJobArn")
     recorded_job_arn = meta.get("aws_iot_job_arn")
-    if recorded_job_arn and live_job_arn != recorded_job_arn:
+    if (
+        recorded_job_arn
+        and live_job_arn
+        and live_job_arn != recorded_job_arn
+    ):
         errors.append(
             metadata_identity_error(
                 "aws_iot_job",
@@ -628,6 +717,20 @@ def reconcile_live_ota_identity(
         )
     elif not recorded_job_arn and live_job_arn:
         updates["aws_iot_job_arn"] = live_job_arn
+    elif (
+        recorded_job_arn
+        and not live_job_arn
+        and live_status != "CREATE_FAILED"
+    ):
+        errors.append(
+            metadata_identity_error(
+                "aws_iot_job",
+                (
+                    "Live OTA response does not contain awsIotJobArn "
+                    f"for status {live_status!r}"
+                ),
+            )
+        )
 
     try:
         live_signer_job_id = ota_signing_job_id(ota_info)
@@ -670,19 +773,24 @@ def reconcile_live_ota_identity(
 
     recorded_thing_arn = meta.get("thing_arn")
     live_targets = ota_info.get("targets")
-    if recorded_thing_arn and (
-        not isinstance(live_targets, list)
-        or recorded_thing_arn not in live_targets
-    ):
-        errors.append(
-            metadata_identity_error(
-                "ota_update",
-                (
-                    f"Live OTA targets do not contain metadata thing ARN "
-                    f"{recorded_thing_arn}"
-                ),
-            )
+    if recorded_thing_arn:
+        targets_missing_after_failed_create = (
+            live_status == "CREATE_FAILED" and live_targets is None
         )
+        if not targets_missing_after_failed_create and (
+            not isinstance(live_targets, list)
+            or live_targets != [recorded_thing_arn]
+        ):
+            errors.append(
+                metadata_identity_error(
+                    "ota_update",
+                    (
+                        "Live OTA targets are not exactly the metadata Thing "
+                        f"ARN "
+                        f"{recorded_thing_arn}"
+                    ),
+                )
+            )
 
     recorded_bucket = meta.get("s3_bucket")
     recorded_key = meta.get("s3_key")
@@ -704,6 +812,12 @@ def reconcile_live_ota_identity(
     elif recorded_bucket and recorded_key:
         live_s3_files: list[dict[str, Any]] = []
         ota_files = ota_info.get("otaUpdateFiles")
+        files_missing_after_failed_create = (
+            live_status == "CREATE_FAILED" and ota_files is None
+        )
+        exactly_one_ota_file = (
+            isinstance(ota_files, list) and len(ota_files) == 1
+        )
         if isinstance(ota_files, list):
             for ota_file in ota_files:
                 if not isinstance(ota_file, dict):
@@ -723,13 +837,23 @@ def reconcile_live_ota_identity(
                     }
                 )
 
-        matching_files = [
-            item
-            for item in live_s3_files
-            if item["bucket"] == recorded_bucket
-            and item["key"] == recorded_key
-        ]
-        if len(live_s3_files) != 1 or len(matching_files) != 1:
+        if not files_missing_after_failed_create:
+            matching_files = [
+                item
+                for item in live_s3_files
+                if item["bucket"] == recorded_bucket
+                and item["key"] == recorded_key
+            ]
+        else:
+            matching_files = []
+        if (
+            not files_missing_after_failed_create
+            and (
+                not exactly_one_ota_file
+                or len(live_s3_files) != 1
+                or len(matching_files) != 1
+            )
+        ):
             errors.append(
                 metadata_identity_error(
                     "s3_source_object",
@@ -739,7 +863,7 @@ def reconcile_live_ota_identity(
                     ),
                 )
             )
-        else:
+        elif not files_missing_after_failed_create:
             live_s3_file = matching_files[0]
             live_version = live_s3_file["version"]
             if recorded_version and live_version != recorded_version:
@@ -1070,6 +1194,47 @@ def wait_until_absent(
         time.sleep(poll_interval)
 
 
+def wait_for_ota_cleanup_discovery(
+    meta: dict[str, Any],
+    region: str,
+    *,
+    timeout: int,
+    poll_interval: int,
+) -> dict[str, Any] | None:
+    """Wait until an OTA create/delete mutation is terminal before cleanup."""
+
+    deadline: float | None = None
+    while True:
+        payload = run_aws(
+            [
+                "iot",
+                "get-ota-update",
+                "--ota-update-id",
+                str(meta["ota_update_id"]),
+            ],
+            region,
+            absent_ok=True,
+        )
+        if payload is None:
+            return None
+        ota_info = payload.get("otaUpdateInfo")
+        status = (
+            ota_info.get("otaUpdateStatus")
+            if isinstance(ota_info, dict)
+            else None
+        )
+        if status not in OTA_MUTATING_STATUSES:
+            return payload
+        if deadline is None:
+            deadline = time.time() + timeout
+        if time.time() >= deadline:
+            raise TimeoutError(
+                f"OTA update remained in mutating state {status!r} "
+                "until the cleanup deadline"
+            )
+        time.sleep(poll_interval)
+
+
 def cleanup_state(
     meta: dict[str, Any],
     *,
@@ -1096,19 +1261,17 @@ def cleanup_state(
             )
             return False, None
 
-    if meta.get("ota_update_id"):
+    ota_may_exist = ota_resource_may_exist(meta)
+    ota_discovery_absent = False
+    if ota_may_exist:
         discovery_ok, discovery_payload = attempt(
             "discover",
             "ota_update",
-            lambda: run_aws(
-                [
-                    "iot",
-                    "get-ota-update",
-                    "--ota-update-id",
-                    str(meta["ota_update_id"]),
-                ],
+            lambda: wait_for_ota_cleanup_discovery(
+                meta,
                 region,
-                absent_ok=True,
+                timeout=wait_timeout,
+                poll_interval=poll_interval,
             ),
         )
         if not discovery_ok:
@@ -1117,6 +1280,8 @@ def cleanup_state(
             errors.extend(
                 reconcile_live_ota_identity(meta, discovery_payload)
             )
+        else:
+            ota_discovery_absent = True
         if errors:
             return blocked_cleanup_summary(meta, errors)
 
@@ -1157,7 +1322,9 @@ def cleanup_state(
     )
 
     ota_absent: bool | None = None
-    if meta.get("ota_update_id"):
+    if ota_may_exist and ota_discovery_absent:
+        ota_absent = True
+    elif ota_may_exist:
         ota_delete_ok, ota_delete = attempt(
             "delete",
             "ota_update",
@@ -1258,36 +1425,96 @@ def cleanup_state(
 
     s3_absent: bool | None = None
     if meta.get("s3_bucket") and meta.get("s3_key"):
-        if meta.get("s3_version"):
-            delete_object_args = [
-                "s3api",
-                "delete-object",
-                "--bucket",
-                str(meta["s3_bucket"]),
-                "--key",
-                str(meta["s3_key"]),
-                "--version-id",
-                str(meta["s3_version"]),
-            ]
-            s3_delete_ok, _ = attempt(
-                "delete",
-                "s3_source_object",
-                lambda: run_aws(delete_object_args, region),
-            )
-            actions.append(
-                {
-                    "resource": "s3_source_object",
-                    "bucket": meta["s3_bucket"],
-                    "key": meta["s3_key"],
-                    "version_id": meta["s3_version"],
-                    "delete_succeeded": s3_delete_ok,
-                }
-            )
+        versions_ok, versions = attempt(
+            "discover_versions",
+            "s3_source_object",
+            lambda: list_exact_s3_key_versions(meta, region),
+        )
+        if versions_ok:
+            recorded_version = meta.get("s3_version")
+            if recorded_version and not any(
+                version["version_id"] == recorded_version
+                for version in versions
+            ):
+                # Always attempt the journaled version even if an eventually
+                # consistent listing has not returned it yet.
+                versions.append(
+                    {
+                        "kind": "version",
+                        "key": str(meta["s3_key"]),
+                        "version_id": str(recorded_version),
+                    }
+                )
+
+            if versions:
+                for version in versions:
+                    delete_args = [
+                        "s3api",
+                        "delete-object",
+                        "--bucket",
+                        str(meta["s3_bucket"]),
+                        "--key",
+                        str(meta["s3_key"]),
+                        "--version-id",
+                        version["version_id"],
+                    ]
+                    deleted, _ = attempt(
+                        "delete_version",
+                        "s3_source_object",
+                        lambda delete_args=delete_args: run_aws(
+                            delete_args,
+                            region,
+                        ),
+                    )
+                    actions.append(
+                        {
+                            "resource": "s3_source_object",
+                            "bucket": meta["s3_bucket"],
+                            "key": meta["s3_key"],
+                            "version_id": version["version_id"],
+                            "version_kind": version["kind"],
+                            "delete_succeeded": deleted,
+                        }
+                    )
+            else:
+                head_ok, current = attempt(
+                    "discover_current",
+                    "s3_source_object",
+                    lambda: run_aws(
+                        s3_head_args(meta),
+                        region,
+                        absent_ok=True,
+                    ),
+                )
+                if head_ok and current is not None:
+                    delete_args = [
+                        "s3api",
+                        "delete-object",
+                        "--bucket",
+                        str(meta["s3_bucket"]),
+                        "--key",
+                        str(meta["s3_key"]),
+                    ]
+                    deleted, _ = attempt(
+                        "delete",
+                        "s3_source_object",
+                        lambda: run_aws(delete_args, region),
+                    )
+                    actions.append(
+                        {
+                            "resource": "s3_source_object",
+                            "bucket": meta["s3_bucket"],
+                            "key": meta["s3_key"],
+                            "version_id": None,
+                            "delete_succeeded": deleted,
+                        }
+                    )
+
             s3_check_ok, s3_absent_result = attempt(
-                "verify_absent",
+                "verify_all_versions_absent",
                 "s3_source_object",
-                lambda: wait_until_absent(
-                    s3_head_args(meta),
+                lambda: wait_until_s3_key_fully_absent(
+                    meta,
                     region,
                     timeout=wait_timeout,
                     poll_interval=poll_interval,
@@ -1297,91 +1524,7 @@ def cleanup_state(
                 bool(s3_absent_result) if s3_check_ok else False
             )
         else:
-            versions_ok, versions = attempt(
-                "discover_versions",
-                "s3_source_object",
-                lambda: list_exact_s3_key_versions(meta, region),
-            )
-            if versions_ok:
-                if versions:
-                    for version in versions:
-                        delete_args = [
-                            "s3api",
-                            "delete-object",
-                            "--bucket",
-                            str(meta["s3_bucket"]),
-                            "--key",
-                            str(meta["s3_key"]),
-                            "--version-id",
-                            version["version_id"],
-                        ]
-                        deleted, _ = attempt(
-                            "delete_version",
-                            "s3_source_object",
-                            lambda delete_args=delete_args: run_aws(
-                                delete_args,
-                                region,
-                            ),
-                        )
-                        actions.append(
-                            {
-                                "resource": "s3_source_object",
-                                "bucket": meta["s3_bucket"],
-                                "key": meta["s3_key"],
-                                "version_id": version["version_id"],
-                                "version_kind": version["kind"],
-                                "delete_succeeded": deleted,
-                            }
-                        )
-                else:
-                    head_ok, current = attempt(
-                        "discover_current",
-                        "s3_source_object",
-                        lambda: run_aws(
-                            s3_head_args(meta),
-                            region,
-                            absent_ok=True,
-                        ),
-                    )
-                    if head_ok and current is not None:
-                        delete_args = [
-                            "s3api",
-                            "delete-object",
-                            "--bucket",
-                            str(meta["s3_bucket"]),
-                            "--key",
-                            str(meta["s3_key"]),
-                        ]
-                        deleted, _ = attempt(
-                            "delete",
-                            "s3_source_object",
-                            lambda: run_aws(delete_args, region),
-                        )
-                        actions.append(
-                            {
-                                "resource": "s3_source_object",
-                                "bucket": meta["s3_bucket"],
-                                "key": meta["s3_key"],
-                                "version_id": None,
-                                "delete_succeeded": deleted,
-                            }
-                        )
-
-                s3_check_ok, s3_absent_result = attempt(
-                    "verify_all_versions_absent",
-                    "s3_source_object",
-                    lambda: wait_until_s3_key_fully_absent(
-                        meta,
-                        region,
-                        timeout=wait_timeout,
-                        poll_interval=poll_interval,
-                    ),
-                )
-                s3_absent = (
-                    bool(s3_absent_result) if s3_check_ok else False
-                )
-            else:
-                s3_absent = False
+            s3_absent = False
 
     signed_prefix_absent: bool | None = None
     signed_prefix = validate_signed_prefix(meta)

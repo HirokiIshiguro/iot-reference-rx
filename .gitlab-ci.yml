@@ -5270,9 +5270,8 @@ test_rx72n_ether_ota:
         "${tls_version_args[@]}" \
         2>&1 | tee "$artifact_dir/test_ota_console.log"
 
-      if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-        exit "${PIPESTATUS[0]}"
-      fi
+      status="${PIPESTATUS[0]}"
+      exit "$status"
 
   artifacts:
     when: always
