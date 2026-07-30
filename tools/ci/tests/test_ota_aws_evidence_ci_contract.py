@@ -54,6 +54,15 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
                 )
                 self.assertIn("meta_path=meta_path", source)
 
+    def test_general_ci_changes_do_not_start_dependency_only_contract(self) -> None:
+        contract = job_block(
+            self.ci,
+            "nightly_dependency_contract",
+            "nightly_dependency_alignment",
+        )
+        rules = contract.split("  script:\n", maxsplit=1)[0]
+        self.assertNotIn("        - .gitlab-ci.yml", rules)
+
     def _assert_cleanup_contract(self, job: str, artifact_name: str) -> None:
         self.assertNotIn("allow_failure: true", job)
         snapshot = "tools/verify_ota_aws_state.py snapshot"
