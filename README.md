@@ -333,8 +333,8 @@ Core hardware jobs:
 | Provision MQTT credentials | included in `test_rx72n_ether_mqtt` for MQTT/OTA/full (`provision_rx72n_ether_mqtt` for legacy 0-RTT) | `provision_rx65n_bg96_mqtt` | compile-time CI variables |
 | Test MQTT | `test_rx72n_ether_mqtt` | `test_rx65n_bg96_mqtt` | `test_rx671_wifi` (`mqtt`) |
 | Build OTA candidate | `build_rx72n_ether_ota` | `build_rx65n_bg96_ota` | not yet implemented |
-| Validate OTA creation inputs | `create_rx72n_ether_ota` | `create_rx65n_bg96_ota` | not yet implemented |
-| Create and test AWS IoT OTA job atomically | `test_rx72n_ether_ota` | `test_rx65n_bg96_ota` | not yet implemented |
+| Create pipeline-owned AWS IoT Thing / OTA job | `create_rx72n_ether_ota` | `create_rx65n_bg96_ota` | not yet implemented |
+| Restore, provision, and observe OTA under hardware lock | `test_rx72n_ether_ota` | `test_rx65n_bg96_ota` | not yet implemented |
 | Build Fleet Provisioning image | `build_rx72n_ether_fleet` | `build_rx65n_bg96_fleet` | `build_rx671_wifi_fleet` |
 | Test Fleet Provisioning | `test_rx72n_ether_fleet` | `test_rx65n_bg96_fleet` | `test_rx671_wifi_fleet` + `cleanup_rx671_wifi_fleet` |
 
@@ -363,12 +363,21 @@ lock保持中に正確なpipeline成果物を再flashしてからUARTを観測�
 RX72Nをbuild-onlyとします。post-merge直後の重複実機実行を避け、全実機coverageは
 共通lockを用いるnightly focused matrixで取得します。
 
-OTA経路では各`test_*_ota` jobが実機lockを保持したまま、正確なbaselineの
-再書込み、credential / TSIP key / code signer設定、one-shot AWS IoT OTA Job作成、
-download・activation・commit観測までを連続実行します。上流の`create_*_ota`は
-入力とpark markerのpreflightだけを行い、AWS資源は作成しません。これにより
-分割job間で別pipelineが実機を書き換えるstate gapと、共有Thingがone-shot Jobを
-先に消費する競合を防ぎます。
+OTA経路のAWS操作は、資格情報を持つWindows `aws-cli-ishiguro` Runner上の
+`create_*_ota` / `cleanup_*_ota`だけで実行します。`create_*_ota`は
+`<base Thing>-ota-<pipeline ID>-<job ID>`というpipeline専用Thingを作り、
+base Thingと同じ証明書を追加attachして、そのThingだけを対象とするone-shot
+AWS IoT OTA Jobを作成します（RX65N software TLSは既存のpipeline専用dynamic
+Thingを使用）。RPi RunnerへAWS資格情報は配置しません。
+
+各`test_*_ota`は実機lockを保持したまま、正確なbaselineの再書込み、
+pipeline専用Thing名を含むcredential / TSIP key / code signer設定、
+download・activation・commit観測までを連続実行します。別pipelineは異なる
+Thing名を使うため、先にAWS Jobを作成していてもone-shot Jobを横取りできません。
+作成helperは最初のAWS変更より前にS3/OTA識別子をjournalへ保存します。
+cleanupはOTA update / IoT Job / S3 objectの不在を確認し、さらに専用Thingから
+記録済み証明書だけをdetachしてThingを削除した後、base Thingと証明書attachの
+残存および専用Thingの不在を確認します。
 
 任意のmulti-TLS後段と旧0-RTT分割経路に残るstate gapは
 [Issue #112](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/112)
@@ -467,10 +476,11 @@ Scheduler policy and cross-project guidance are documented in [development.md](d
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
-`test_rx72n_ether_ota` と `test_rx65n_bg96_ota` は実機lock内でone-shotの
-AWS IoT OTA Jobを作成して直ちに消費するため、observerジョブ単体では再試行
-できません。再検証時は新しいfocused pipelineまたはnightly matrix rowを開始し、
-preflight / atomic create-and-test / cleanupを一巡させて新しいOTA Jobを作成してください。
+`test_rx72n_ether_ota` と `test_rx65n_bg96_ota` はpipeline専用Thingを対象とする
+one-shot AWS IoT OTA Jobを消費するため、observerジョブ単体では再試行できません。
+再検証時は新しいfocused pipelineまたはnightly matrix rowを開始し、
+pipeline専用Thing / OTA Job作成、実機lock内のrestore・provision・observe、
+cleanupを一巡させてください。
 
 「nightly matrix」はリポジトリ内の全jobを無条件に実行する意味ではありません。明示的なopt-inであるRX72N software dual AWS MQTT (`RUN_RX72N_MULTI_TLS_TEST=false`) や、必要なgateを満たさない行は起動しません。2026-07-18の [scheduled parent #8168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8168) は34行を生成し、そのうちRX671の8行はすべて実機成功しました。現在はRX671 TSIP AWS MQTT（TLS 1.2 / TLS 1.3）、software / TSIP TLS 1.3 resumption / 0-RTTに加え、必要なWi-Fi/Fleet/AWS cleanup変数が揃う場合だけsoftware FleetのTLS 1.2 / TLS 1.3とTSIP FleetのTLS 1.2 stabilizing行も対象です。
 

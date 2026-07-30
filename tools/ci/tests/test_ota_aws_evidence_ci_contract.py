@@ -130,8 +130,11 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
                 partial_meta = source.index("write_json(meta_path, meta)")
                 create = source.index('"create-ota-update"')
 
-                self.assertLess(upload, partial_meta)
+                self.assertLess(partial_meta, upload)
                 self.assertLess(partial_meta, create)
+                self.assertLess(upload, create)
+                self.assertIn('"ota_update_status": "UPLOAD_REQUESTED"', source)
+                self.assertIn('ota_update_status="S3_UPLOADED"', source)
                 self.assertIn(
                     "write_meta(meta_path, meta, **create_updates)",
                     source,
@@ -156,6 +159,18 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
         self.assertLess(job.index(snapshot), job.index(cleanup))
         self.assertIn("pre_cleanup_state.json", job)
         self.assertIn("post_cleanup_state.json", job)
+        self.assertIn(
+            "tools/manage_ephemeral_iot_thing.py cleanup",
+            job,
+        )
+        self.assertLess(
+            job.index(cleanup),
+            job.index("tools/manage_ephemeral_iot_thing.py cleanup"),
+        )
+        self.assertIn(
+            "independently attempting exact pipeline-owned Thing cleanup",
+            job,
+        )
         self.assertIn(f"artifacts/{artifact_name}/", job)
         self.assertIn('when: always', job)
 

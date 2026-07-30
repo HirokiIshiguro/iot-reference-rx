@@ -125,6 +125,30 @@ def main() -> int:
 
     s3_key = args.s3_key or f"ota/{args.thing_name}/{payload.name}"
     signed_prefix = args.signed_prefix or f"ota/{args.thing_name}/signed/"
+    ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
+    code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
+    meta = {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "region": args.region,
+        "thing_name": args.thing_name,
+        "thing_arn": thing_arn,
+        "ota_update_id": ota_update_id,
+        "ota_update_status": "UPLOAD_REQUESTED",
+        "s3_bucket": args.bucket,
+        "s3_key": s3_key,
+        "s3_version": None,
+        "signing_profile": args.signing_profile,
+        "code_signing_mode": code_signing_mode,
+        "custom_signature_der": str(args.custom_signature_der.resolve()) if args.custom_signature_der else None,
+        "code_signer_cert": str(args.code_signer_cert.resolve()) if args.code_signer_cert else None,
+        "file_version": args.file_version,
+        "input_payload": str(payload),
+    }
+    # Journal every resource identifier before the first AWS mutation.  The
+    # always-running cleanup job can therefore remove an upload even when this
+    # creator exits before create-ota-update is submitted.
+    write_json(meta_path, meta)
+
     put_output = aws(
         [
             "s3api",
@@ -140,30 +164,16 @@ def main() -> int:
     )
     write_json(artifact_dir / "ota_s3_put_output.json", put_output)
 
-    ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
     file_location: dict = {"s3Location": {"bucket": args.bucket, "key": s3_key}}
     if "VersionId" in put_output:
         file_location["s3Location"]["version"] = put_output["VersionId"]
 
-    code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
-    meta = {
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "region": args.region,
-        "thing_name": args.thing_name,
-        "thing_arn": thing_arn,
-        "ota_update_id": ota_update_id,
-        "ota_update_status": "CREATE_REQUESTED",
-        "s3_bucket": args.bucket,
-        "s3_key": s3_key,
-        "s3_version": file_location["s3Location"].get("version"),
-        "signing_profile": args.signing_profile,
-        "code_signing_mode": code_signing_mode,
-        "custom_signature_der": str(args.custom_signature_der.resolve()) if args.custom_signature_der else None,
-        "code_signer_cert": str(args.code_signer_cert.resolve()) if args.code_signer_cert else None,
-        "file_version": args.file_version,
-        "input_payload": str(payload),
-    }
-    write_json(meta_path, meta)
+    write_meta(
+        meta_path,
+        meta,
+        ota_update_status="S3_UPLOADED",
+        s3_version=file_location["s3Location"].get("version"),
+    )
 
     if args.custom_signature_der is not None:
         certificate_name = args.certificate_name
@@ -211,6 +221,7 @@ def main() -> int:
         "roleArn": args.role_arn,
     }
     write_json(artifact_dir / "create_ota_input.json", create_input)
+    write_meta(meta_path, meta, ota_update_status="CREATE_REQUESTED")
 
     create_output = aws(
         ["iot", "create-ota-update", "--cli-input-json", f"file://{artifact_dir / 'create_ota_input.json'}"],

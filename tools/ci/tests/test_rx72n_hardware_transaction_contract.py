@@ -107,7 +107,9 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         positions = [job.index(token) for token in ordered_tokens]
         self.assertEqual(positions, sorted(positions))
 
-    def test_ota_observer_restores_baseline_and_observes_atomically(self) -> None:
+    def test_ota_uses_pipeline_owned_thing_and_atomic_hardware_observer(
+        self,
+    ) -> None:
         job = job_block(
             self.ci, "test_rx72n_ether_ota", "cleanup_rx72n_ether_ota"
         )
@@ -123,21 +125,37 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
             "tools/test_uart_download_rx72n.py",
             "tools/provision_rx72n.py",
             "tools/provision_tsip_over_uart.py",
-            "tools/create_ota_update.py",
             "tools/test_ota.py",
         )
         positions = [job.index(token) for token in ordered_tokens]
         self.assertEqual(positions, sorted(positions))
+        self.assertIn('ota_job_meta.json', job)
+        self.assertIn('--thing-name "$ota_thing_name"', job)
+        self.assertNotIn("tools/create_ota_update.py", job)
+        self.assertNotIn("awscli", job)
 
-        preflight = job_block(
+        creator = job_block(
             self.ci, "create_rx72n_ether_ota", "test_rx72n_ether_ota"
         )
         cleanup = job_block(
             self.ci, "cleanup_rx72n_ether_ota", "build_rx72n_ether_fleet"
         )
-        self.assertNotIn("tools/create_ota_update.py", preflight)
-        self.assertIn("creation_prepared.json", preflight)
+        self.assertIn("extends: .aws_cli_windows_job", creator)
+        self.assertIn("tools/manage_ephemeral_iot_thing.py create", creator)
+        self.assertIn("tools/create_ota_update.py", creator)
+        self.assertIn("$env:CI_PIPELINE_ID-$env:CI_JOB_ID", creator)
+        self.assertLess(
+            creator.index("tools/manage_ephemeral_iot_thing.py create"),
+            creator.index("tools/create_ota_update.py"),
+        )
+        self.assertIn("creation_prepared.json", creator)
+        self.assertIn("- create_rx72n_ether_ota", cleanup)
         self.assertIn("- test_rx72n_ether_ota", cleanup)
+        self.assertIn("tools/manage_ephemeral_iot_thing.py cleanup", cleanup)
+        self.assertLess(
+            cleanup.index("tools/verify_ota_aws_state.py cleanup"),
+            cleanup.index("tools/manage_ephemeral_iot_thing.py cleanup"),
+        )
 
     def test_legacy_split_jobs_are_limited_to_0rtt(self) -> None:
         flash = job_block(self.ci, "flash_rx72n_ether", "flash_rx65n_bg96")

@@ -163,6 +163,25 @@ def main():
 
     s3_key = args.s3_key or f"ota/{args.thing_name}/{input_rsu.name}"
     signed_prefix = args.signed_prefix or f"ota/{args.thing_name}/signed/"
+    ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
+    meta = {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "region": args.region,
+        "thing_name": args.thing_name,
+        "thing_arn": thing_arn,
+        "ota_update_id": ota_update_id,
+        "ota_update_status": "UPLOAD_REQUESTED",
+        "s3_bucket": args.bucket,
+        "s3_key": s3_key,
+        "s3_version": None,
+        "signing_profile": args.signing_profile,
+        "file_version": args.file_version,
+        "input_rsu": str(input_rsu),
+    }
+    # Journal every resource identifier before the first AWS mutation.  The
+    # always-running cleanup job can therefore remove an upload even when this
+    # creator exits before create-ota-update is submitted.
+    write_json(meta_path, meta)
 
     put_result = run_aws(
         [
@@ -180,7 +199,6 @@ def main():
     put_payload = load_json(put_result)
     write_json(artifact_dir / "ota_s3_put_output.json", put_payload)
 
-    ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
     file_location = {
         "s3Location": {
             "bucket": args.bucket,
@@ -190,21 +208,12 @@ def main():
     if "VersionId" in put_payload:
         file_location["s3Location"]["version"] = put_payload["VersionId"]
 
-    meta = {
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "region": args.region,
-        "thing_name": args.thing_name,
-        "thing_arn": thing_arn,
-        "ota_update_id": ota_update_id,
-        "ota_update_status": "CREATE_REQUESTED",
-        "s3_bucket": args.bucket,
-        "s3_key": s3_key,
-        "s3_version": file_location["s3Location"].get("version"),
-        "signing_profile": args.signing_profile,
-        "file_version": args.file_version,
-        "input_rsu": str(input_rsu),
-    }
-    write_json(meta_path, meta)
+    write_meta(
+        meta_path,
+        meta,
+        ota_update_status="S3_UPLOADED",
+        s3_version=file_location["s3Location"].get("version"),
+    )
 
     create_input = {
         "otaUpdateId": ota_update_id,
@@ -233,6 +242,7 @@ def main():
         "roleArn": args.role_arn,
     }
     write_json(artifact_dir / "create_ota_input.json", create_input)
+    write_meta(meta_path, meta, ota_update_status="CREATE_REQUESTED")
 
     create_result = run_aws(
         [
