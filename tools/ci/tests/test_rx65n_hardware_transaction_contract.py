@@ -103,6 +103,14 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
         self.assertIn("ota_job_meta.json", job)
         self.assertIn(
+            "tools/manage_ephemeral_iot_thing.py verify-journal",
+            job,
+        )
+        self.assertIn(
+            "$RX65N_BG96_THING_NAME_PREFIX-$CI_PIPELINE_ID",
+            job,
+        )
+        self.assertIn(
             'export RX65N_BG96_AWS_IOT_THING_NAME="$ota_thing_name"',
             job,
         )

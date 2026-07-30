@@ -135,6 +135,7 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
                 self.assertLess(upload, create)
                 self.assertIn('"ota_update_status": "UPLOAD_REQUESTED"', source)
                 self.assertIn('ota_update_status="S3_UPLOADED"', source)
+                self.assertIn("uuid.uuid4().hex[:12]", source)
                 self.assertIn(
                     "write_meta(meta_path, meta, **create_updates)",
                     source,

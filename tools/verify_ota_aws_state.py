@@ -187,6 +187,72 @@ def s3_head_args(meta: dict[str, Any]) -> list[str]:
     return args
 
 
+def list_exact_s3_key_versions(
+    meta: dict[str, Any],
+    region: str,
+) -> list[dict[str, str]]:
+    payload = run_aws(
+        [
+            "s3api",
+            "list-object-versions",
+            "--bucket",
+            str(meta["s3_bucket"]),
+            "--prefix",
+            str(meta["s3_key"]),
+        ],
+        region,
+    )
+    if not isinstance(payload, dict):
+        raise RuntimeError("S3 version listing returned malformed output")
+
+    exact_key = str(meta["s3_key"])
+    entries: list[dict[str, str]] = []
+    for collection, kind in (
+        ("Versions", "version"),
+        ("DeleteMarkers", "delete-marker"),
+    ):
+        values = payload.get(collection, [])
+        if not isinstance(values, list):
+            raise RuntimeError(
+                f"S3 version listing field {collection} is malformed"
+            )
+        for value in values:
+            if not isinstance(value, dict) or value.get("Key") != exact_key:
+                continue
+            version_id = value.get("VersionId")
+            if not isinstance(version_id, str) or not version_id:
+                raise RuntimeError(
+                    "S3 version listing contains an exact-key entry "
+                    "without VersionId"
+                )
+            entries.append(
+                {
+                    "kind": kind,
+                    "key": exact_key,
+                    "version_id": version_id,
+                }
+            )
+    return entries
+
+
+def wait_until_s3_key_fully_absent(
+    meta: dict[str, Any],
+    region: str,
+    *,
+    timeout: int,
+    poll_interval: int,
+) -> bool:
+    deadline = time.time() + timeout
+    while True:
+        versions = list_exact_s3_key_versions(meta, region)
+        current = run_aws(s3_head_args(meta), region, absent_ok=True)
+        if not versions and current is None:
+            return True
+        if time.time() >= deadline:
+            return False
+        time.sleep(poll_interval)
+
+
 def cleanup_resources(meta: dict[str, Any]) -> list[str]:
     return [
         resource
@@ -745,43 +811,130 @@ def cleanup_state(
 
     s3_absent: bool | None = None
     if meta.get("s3_bucket") and meta.get("s3_key"):
-        delete_object_args = [
-            "s3api",
-            "delete-object",
-            "--bucket",
-            str(meta["s3_bucket"]),
-            "--key",
-            str(meta["s3_key"]),
-        ]
         if meta.get("s3_version"):
-            delete_object_args.extend(
-                ["--version-id", str(meta["s3_version"])]
+            delete_object_args = [
+                "s3api",
+                "delete-object",
+                "--bucket",
+                str(meta["s3_bucket"]),
+                "--key",
+                str(meta["s3_key"]),
+                "--version-id",
+                str(meta["s3_version"]),
+            ]
+            s3_delete_ok, _ = attempt(
+                "delete",
+                "s3_source_object",
+                lambda: run_aws(delete_object_args, region),
             )
-        s3_delete_ok, _ = attempt(
-            "delete",
-            "s3_source_object",
-            lambda: run_aws(delete_object_args, region),
-        )
-        actions.append(
-            {
-                "resource": "s3_source_object",
-                "bucket": meta["s3_bucket"],
-                "key": meta["s3_key"],
-                "version_id": meta.get("s3_version"),
-                "delete_succeeded": s3_delete_ok,
-            }
-        )
-        s3_check_ok, s3_absent_result = attempt(
-            "verify_absent",
-            "s3_source_object",
-            lambda: wait_until_absent(
-                s3_head_args(meta),
-                region,
-                timeout=wait_timeout,
-                poll_interval=poll_interval,
-            ),
-        )
-        s3_absent = bool(s3_absent_result) if s3_check_ok else False
+            actions.append(
+                {
+                    "resource": "s3_source_object",
+                    "bucket": meta["s3_bucket"],
+                    "key": meta["s3_key"],
+                    "version_id": meta["s3_version"],
+                    "delete_succeeded": s3_delete_ok,
+                }
+            )
+            s3_check_ok, s3_absent_result = attempt(
+                "verify_absent",
+                "s3_source_object",
+                lambda: wait_until_absent(
+                    s3_head_args(meta),
+                    region,
+                    timeout=wait_timeout,
+                    poll_interval=poll_interval,
+                ),
+            )
+            s3_absent = (
+                bool(s3_absent_result) if s3_check_ok else False
+            )
+        else:
+            versions_ok, versions = attempt(
+                "discover_versions",
+                "s3_source_object",
+                lambda: list_exact_s3_key_versions(meta, region),
+            )
+            if versions_ok:
+                if versions:
+                    for version in versions:
+                        delete_args = [
+                            "s3api",
+                            "delete-object",
+                            "--bucket",
+                            str(meta["s3_bucket"]),
+                            "--key",
+                            str(meta["s3_key"]),
+                            "--version-id",
+                            version["version_id"],
+                        ]
+                        deleted, _ = attempt(
+                            "delete_version",
+                            "s3_source_object",
+                            lambda delete_args=delete_args: run_aws(
+                                delete_args,
+                                region,
+                            ),
+                        )
+                        actions.append(
+                            {
+                                "resource": "s3_source_object",
+                                "bucket": meta["s3_bucket"],
+                                "key": meta["s3_key"],
+                                "version_id": version["version_id"],
+                                "version_kind": version["kind"],
+                                "delete_succeeded": deleted,
+                            }
+                        )
+                else:
+                    head_ok, current = attempt(
+                        "discover_current",
+                        "s3_source_object",
+                        lambda: run_aws(
+                            s3_head_args(meta),
+                            region,
+                            absent_ok=True,
+                        ),
+                    )
+                    if head_ok and current is not None:
+                        delete_args = [
+                            "s3api",
+                            "delete-object",
+                            "--bucket",
+                            str(meta["s3_bucket"]),
+                            "--key",
+                            str(meta["s3_key"]),
+                        ]
+                        deleted, _ = attempt(
+                            "delete",
+                            "s3_source_object",
+                            lambda: run_aws(delete_args, region),
+                        )
+                        actions.append(
+                            {
+                                "resource": "s3_source_object",
+                                "bucket": meta["s3_bucket"],
+                                "key": meta["s3_key"],
+                                "version_id": None,
+                                "delete_succeeded": deleted,
+                            }
+                        )
+
+                s3_check_ok, s3_absent_result = attempt(
+                    "verify_all_versions_absent",
+                    "s3_source_object",
+                    lambda: wait_until_s3_key_fully_absent(
+                        meta,
+                        region,
+                        timeout=wait_timeout,
+                        poll_interval=poll_interval,
+                    ),
+                )
+                s3_absent = (
+                    bool(s3_absent_result) if s3_check_ok else False
+                )
+            else:
+                s3_absent = False
 
     absence = {
         "ota_update_absent": ota_absent,

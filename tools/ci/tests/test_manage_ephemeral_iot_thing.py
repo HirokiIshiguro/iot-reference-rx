@@ -11,12 +11,26 @@ from tools import manage_ephemeral_iot_thing as manager
 
 
 REGION = "ap-northeast-1"
+PROJECT_ID = "38"
 BASE_THING = "rx72n-02"
 ALIAS_THING = "rx72n-02-ota-9402-60191"
+ALIAS_ARN = (
+    "arn:aws:iot:ap-northeast-1:094025684215:"
+    f"thing/{ALIAS_THING}"
+)
+OWNER_ATTRIBUTES = manager.ownership_attributes(
+    PROJECT_ID,
+    "9402",
+    "60191",
+)
 PRINCIPAL = (
     "arn:aws:iot:ap-northeast-1:094025684215:"
     "cert/0123456789abcdef"
 )
+PRINCIPAL_OBJECT = {
+    "principal": PRINCIPAL,
+    "thingPrincipalType": "NON_EXCLUSIVE_THING",
+}
 
 
 class EphemeralIotThingTests(unittest.TestCase):
@@ -25,6 +39,7 @@ class EphemeralIotThingTests(unittest.TestCase):
         manager.validate_ownership(
             BASE_THING,
             ALIAS_THING,
+            PROJECT_ID,
             "9402",
             "60191",
         )
@@ -39,6 +54,7 @@ class EphemeralIotThingTests(unittest.TestCase):
             manager.validate_ownership(
                 BASE_THING,
                 ALIAS_THING,
+                PROJECT_ID,
                 "9402",
                 "99999",
             )
@@ -46,6 +62,7 @@ class EphemeralIotThingTests(unittest.TestCase):
             manager.validate_ownership(
                 BASE_THING,
                 ALIAS_THING,
+                PROJECT_ID,
                 "pipeline",
                 "60191",
             )
@@ -57,6 +74,7 @@ class EphemeralIotThingTests(unittest.TestCase):
                 base_thing_name=BASE_THING,
                 thing_name=ALIAS_THING,
                 region=REGION,
+                owner_project_id=PROJECT_ID,
                 owner_pipeline_id="9402",
                 owner_job_id="60191",
                 meta_json=meta_path,
@@ -66,14 +84,33 @@ class EphemeralIotThingTests(unittest.TestCase):
                     manager,
                     "describe_thing",
                     side_effect=[
-                        (True, {"thingArn": "arn:base"}),
+                        (
+                            True,
+                            {
+                                "thingArn": (
+                                    "arn:aws:iot:ap-northeast-1:"
+                                    "094025684215:thing/rx72n-02"
+                                )
+                            },
+                        ),
                         (False, {}),
+                        (
+                            True,
+                            {
+                                "thingArn": ALIAS_ARN,
+                                "attributes": OWNER_ATTRIBUTES,
+                            },
+                        ),
                     ],
                 ),
                 mock.patch.object(
                     manager,
-                    "list_principals",
-                    side_effect=[[PRINCIPAL], [PRINCIPAL], [PRINCIPAL]],
+                    "list_principal_objects",
+                    side_effect=[
+                        [PRINCIPAL_OBJECT],
+                        [PRINCIPAL_OBJECT],
+                        [PRINCIPAL_OBJECT],
+                    ],
                 ),
                 mock.patch.object(
                     manager,
@@ -81,7 +118,7 @@ class EphemeralIotThingTests(unittest.TestCase):
                     side_effect=[
                         (
                             mock.Mock(returncode=0),
-                            {"thingArn": "arn:ephemeral"},
+                            {"thingArn": ALIAS_ARN},
                         ),
                         (mock.Mock(returncode=0), {}),
                     ],
@@ -97,7 +134,21 @@ class EphemeralIotThingTests(unittest.TestCase):
                 ["create-thing", "attach-thing-principal"],
             )
             self.assertTrue(meta["verified"])
+            self.assertEqual(meta["expected_thing_arn"], ALIAS_ARN)
+            self.assertEqual(meta["owner_attributes"], OWNER_ATTRIBUTES)
             self.assertEqual(run_aws.call_count, 2)
+            create_arguments = run_aws.call_args_list[0].args[0]
+            self.assertIn("--attribute-payload", create_arguments)
+            attribute_payload = json.loads(
+                create_arguments[create_arguments.index("--attribute-payload") + 1]
+            )
+            self.assertEqual(
+                attribute_payload,
+                {"attributes": OWNER_ATTRIBUTES},
+            )
+            attach_arguments = run_aws.call_args_list[1].args[0]
+            self.assertIn("--thing-principal-type", attach_arguments)
+            self.assertIn("NON_EXCLUSIVE_THING", attach_arguments)
 
     def test_create_refuses_to_adopt_a_colliding_thing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -106,6 +157,7 @@ class EphemeralIotThingTests(unittest.TestCase):
                 base_thing_name=BASE_THING,
                 thing_name=ALIAS_THING,
                 region=REGION,
+                owner_project_id=PROJECT_ID,
                 owner_pipeline_id="9402",
                 owner_job_id="60191",
                 meta_json=meta_path,
@@ -115,12 +167,22 @@ class EphemeralIotThingTests(unittest.TestCase):
                     manager,
                     "describe_thing",
                     side_effect=[
-                        (True, {"thingArn": "arn:base"}),
+                        (
+                            True,
+                            {
+                                "thingArn": (
+                                    "arn:aws:iot:ap-northeast-1:"
+                                    "094025684215:thing/rx72n-02"
+                                )
+                            },
+                        ),
                         (True, {"thingArn": "arn:collision"}),
                     ],
                 ),
                 mock.patch.object(
-                    manager, "list_principals", return_value=[PRINCIPAL]
+                    manager,
+                    "list_principal_objects",
+                    return_value=[PRINCIPAL_OBJECT],
                 ),
                 mock.patch.object(manager, "run_aws") as run_aws,
             ):
@@ -137,12 +199,20 @@ class EphemeralIotThingTests(unittest.TestCase):
                 {
                     "schema_version": 1,
                     "status": "ready",
+                    "verified": True,
                     "region": REGION,
                     "base_thing_name": BASE_THING,
+                    "base_thing_arn": (
+                        "arn:aws:iot:ap-northeast-1:"
+                        "094025684215:thing/rx72n-02"
+                    ),
                     "thing_name": ALIAS_THING,
                     "principal": PRINCIPAL,
+                    "owner_project_id": PROJECT_ID,
                     "owner_pipeline_id": "9402",
                     "owner_job_id": "60191",
+                    "owner_attributes": OWNER_ATTRIBUTES,
+                    "expected_thing_arn": ALIAS_ARN,
                     "operations": [
                         "create-thing",
                         "attach-thing-principal",
@@ -151,6 +221,24 @@ class EphemeralIotThingTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+
+    def test_local_journal_verification_binds_project_pipeline_and_target(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            meta_path = Path(temporary) / "ephemeral.json"
+            self._write_meta(meta_path)
+            args = SimpleNamespace(
+                meta_json=meta_path,
+                expected_thing_name=ALIAS_THING,
+                owner_project_id=PROJECT_ID,
+                owner_pipeline_id="9402",
+            )
+            self.assertEqual(manager.verify_journal(args), 0)
+
+            args.owner_pipeline_id = "different"
+            with self.assertRaisesRegex(RuntimeError, "pipeline ID mismatch"):
+                manager.verify_journal(args)
 
     def test_cleanup_refuses_unowned_collision_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -171,19 +259,25 @@ class EphemeralIotThingTests(unittest.TestCase):
                     "describe_thing",
                     side_effect=[
                         (True, {"thingArn": "arn:base"}),
-                        (True, {"thingArn": "arn:collision"}),
+                        (
+                            True,
+                            {
+                                "thingArn": ALIAS_ARN,
+                                "attributes": {},
+                            },
+                        ),
                     ],
                 ),
                 mock.patch.object(
                     manager,
-                    "list_principals",
-                    return_value=[PRINCIPAL],
+                    "list_principal_objects",
+                    return_value=[PRINCIPAL_OBJECT],
                 ),
                 mock.patch.object(manager, "run_aws") as run_aws,
             ):
                 with self.assertRaisesRegex(
                     RuntimeError,
-                    "does not prove this pipeline created",
+                    "live ephemeral Thing ownership does not match",
                 ):
                     manager.cleanup_alias(args)
 
@@ -191,6 +285,61 @@ class EphemeralIotThingTests(unittest.TestCase):
             result = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "failed")
             self.assertEqual(result["actions"], [])
+
+    def test_cleanup_recovers_atomically_owned_thing_without_operation_journal(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            meta_path = Path(temporary) / "ephemeral.json"
+            output_path = Path(temporary) / "cleanup.json"
+            self._write_meta(meta_path)
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            payload["status"] = "planned"
+            payload["operations"] = []
+            meta_path.write_text(json.dumps(payload), encoding="utf-8")
+            args = SimpleNamespace(
+                meta_json=meta_path,
+                output_json=output_path,
+            )
+            with (
+                mock.patch.object(
+                    manager,
+                    "describe_thing",
+                    side_effect=[
+                        (True, {"thingArn": "arn:base"}),
+                        (
+                            True,
+                            {
+                                "thingArn": ALIAS_ARN,
+                                "attributes": OWNER_ATTRIBUTES,
+                            },
+                        ),
+                        (False, {}),
+                        (True, {"thingArn": "arn:base"}),
+                    ],
+                ),
+                mock.patch.object(
+                    manager,
+                    "list_principal_objects",
+                    side_effect=[
+                        [PRINCIPAL_OBJECT],
+                        [],
+                        [],
+                        [PRINCIPAL_OBJECT],
+                    ],
+                ),
+                mock.patch.object(
+                    manager,
+                    "run_aws",
+                    return_value=(mock.Mock(returncode=0), {}),
+                ) as run_aws,
+            ):
+                self.assertEqual(manager.cleanup_alias(args), 0)
+
+            self.assertEqual(run_aws.call_count, 1)
+            result = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(result["actions"], ["delete-thing"])
 
     def test_cleanup_refuses_unexpected_principal_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -202,19 +351,32 @@ class EphemeralIotThingTests(unittest.TestCase):
                 output_json=output_path,
             )
             unexpected = PRINCIPAL.replace("012345", "fedcba")
+            unexpected_object = {
+                "principal": unexpected,
+                "thingPrincipalType": "NON_EXCLUSIVE_THING",
+            }
             with (
                 mock.patch.object(
                     manager,
                     "describe_thing",
                     side_effect=[
                         (True, {"thingArn": "arn:base"}),
-                        (True, {"thingArn": "arn:ephemeral"}),
+                        (
+                            True,
+                            {
+                                "thingArn": ALIAS_ARN,
+                                "attributes": OWNER_ATTRIBUTES,
+                            },
+                        ),
                     ],
                 ),
                 mock.patch.object(
                     manager,
-                    "list_principals",
-                    side_effect=[[PRINCIPAL], [PRINCIPAL, unexpected]],
+                    "list_principal_objects",
+                    side_effect=[
+                        [PRINCIPAL_OBJECT],
+                        [PRINCIPAL_OBJECT, unexpected_object],
+                    ],
                 ),
                 mock.patch.object(manager, "run_aws") as run_aws,
             ):
@@ -241,19 +403,25 @@ class EphemeralIotThingTests(unittest.TestCase):
                     "describe_thing",
                     side_effect=[
                         (True, {"thingArn": "arn:base"}),
-                        (True, {"thingArn": "arn:ephemeral"}),
+                        (
+                            True,
+                            {
+                                "thingArn": ALIAS_ARN,
+                                "attributes": OWNER_ATTRIBUTES,
+                            },
+                        ),
                         (False, {}),
                         (True, {"thingArn": "arn:base"}),
                     ],
                 ),
                 mock.patch.object(
                     manager,
-                    "list_principals",
+                    "list_principal_objects",
                     side_effect=[
-                        [PRINCIPAL],
-                        [PRINCIPAL],
+                        [PRINCIPAL_OBJECT],
+                        [PRINCIPAL_OBJECT],
                         [],
-                        [PRINCIPAL],
+                        [PRINCIPAL_OBJECT],
                     ],
                 ),
                 mock.patch.object(
@@ -302,7 +470,9 @@ class EphemeralIotThingTests(unittest.TestCase):
                     ],
                 ),
                 mock.patch.object(
-                    manager, "list_principals", return_value=[PRINCIPAL]
+                    manager,
+                    "list_principal_objects",
+                    return_value=[PRINCIPAL_OBJECT],
                 ),
                 mock.patch.object(manager, "run_aws") as run_aws,
             ):

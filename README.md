@@ -366,9 +366,10 @@ RX72Nをbuild-onlyとします。post-merge直後の重複実機実行を避け�
 OTA経路のAWS操作は、資格情報を持つWindows `aws-cli-ishiguro` Runner上の
 `create_*_ota` / `cleanup_*_ota`だけで実行します。`create_*_ota`は
 `<base Thing>-ota-<pipeline ID>-<job ID>`というpipeline専用Thingを作り、
-base Thingと同じ証明書を追加attachして、そのThingだけを対象とするone-shot
-AWS IoT OTA Jobを作成します（RX65N software TLSは既存のpipeline専用dynamic
-Thingを使用）。RPi RunnerへAWS資格情報は配置しません。
+project / pipeline / job IDをThing attributeへ作成と同時に記録します。base Thingと
+同じ証明書を`NON_EXCLUSIVE_THING`として追加attachし、そのThingだけを対象とする
+UUID付きone-shot AWS IoT OTA Jobを作成します（RX65N software TLSは既存の
+pipeline専用dynamic Thingを使用）。RPi RunnerへAWS資格情報は配置しません。
 
 各`test_*_ota`は実機lockを保持したまま、正確なbaselineの再書込み、
 pipeline専用Thing名を含むcredential / TSIP key / code signer設定、
@@ -377,7 +378,9 @@ Thing名を使うため、先にAWS Jobを作成していてもone-shot Jobを�
 作成helperは最初のAWS変更より前にS3/OTA識別子をjournalへ保存します。
 cleanupはOTA update / IoT Job / S3 objectの不在を確認し、さらに専用Thingから
 記録済み証明書だけをdetachしてThingを削除した後、base Thingと証明書attachの
-残存および専用Thingの不在を確認します。
+残存および専用Thingの不在を確認します。S3 VersionIdがjournalへ反映される前に
+作成jobが停止した場合も、pipeline固有keyの全version / delete markerを列挙して
+削除し、current objectと全versionの不在を確認します。
 
 任意のmulti-TLS後段と旧0-RTT分割経路に残るstate gapは
 [Issue #112](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/112)

@@ -130,6 +130,10 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         positions = [job.index(token) for token in ordered_tokens]
         self.assertEqual(positions, sorted(positions))
         self.assertIn('ota_job_meta.json', job)
+        self.assertIn(
+            "tools/manage_ephemeral_iot_thing.py verify-journal",
+            job,
+        )
         self.assertIn('--thing-name "$ota_thing_name"', job)
         self.assertNotIn("tools/create_ota_update.py", job)
         self.assertNotIn("awscli", job)

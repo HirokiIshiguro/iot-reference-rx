@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -163,7 +164,9 @@ def main():
 
     s3_key = args.s3_key or f"ota/{args.thing_name}/{input_rsu.name}"
     signed_prefix = args.signed_prefix or f"ota/{args.thing_name}/signed/"
-    ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
+    ota_update_id = (
+        f"{args.ota_id_prefix}-{int(time.time())}-{uuid.uuid4().hex[:12]}"
+    )
     meta = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "region": args.region,

@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -125,7 +126,9 @@ def main() -> int:
 
     s3_key = args.s3_key or f"ota/{args.thing_name}/{payload.name}"
     signed_prefix = args.signed_prefix or f"ota/{args.thing_name}/signed/"
-    ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
+    ota_update_id = (
+        f"{args.ota_id_prefix}-{int(time.time())}-{uuid.uuid4().hex[:12]}"
+    )
     code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
     meta = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),

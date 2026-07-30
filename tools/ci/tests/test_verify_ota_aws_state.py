@@ -393,6 +393,72 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
             [call[:2] for call in calls],
         )
 
+    def test_cleanup_without_journaled_version_deletes_all_exact_versions(
+        self,
+    ) -> None:
+        partial = {
+            "region": META["region"],
+            "s3_bucket": META["s3_bucket"],
+            "s3_key": META["s3_key"],
+        }
+        calls: list[list[str]] = []
+        list_calls = 0
+
+        def fake_run(args, _region, *, absent_ok=False):
+            nonlocal list_calls
+            calls.append(args)
+            if args[:2] == ["s3api", "list-object-versions"]:
+                list_calls += 1
+                if list_calls == 1:
+                    return {
+                        "Versions": [
+                            {
+                                "Key": META["s3_key"],
+                                "VersionId": "uploaded-version",
+                            },
+                            {
+                                "Key": META["s3_key"] + ".other",
+                                "VersionId": "not-owned",
+                            },
+                        ],
+                        "DeleteMarkers": [
+                            {
+                                "Key": META["s3_key"],
+                                "VersionId": "delete-marker",
+                            }
+                        ],
+                    }
+                return {}
+            if args[:2] == ["s3api", "head-object"]:
+                self.assertTrue(absent_ok)
+                return None
+            if args[:2] == ["s3api", "delete-object"]:
+                return {}
+            self.fail(f"unexpected AWS call: {args}")
+
+        with patch.object(ota_state, "run_aws", side_effect=fake_run):
+            summary = ota_state.cleanup_state(
+                partial,
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        self.assertTrue(summary["absence"]["passed"])
+        deletes = [
+            call
+            for call in calls
+            if call[:2] == ["s3api", "delete-object"]
+        ]
+        self.assertEqual(2, len(deletes))
+        deleted_versions = {
+            call[call.index("--version-id") + 1] for call in deletes
+        }
+        self.assertEqual(
+            {"uploaded-version", "delete-marker"},
+            deleted_versions,
+        )
+        self.assertNotIn("not-owned", deleted_versions)
+
     def test_cleanup_discovers_job_id_from_partial_ota_metadata(self) -> None:
         partial = {
             "region": META["region"],

@@ -22,6 +22,11 @@ from typing import Any
 
 
 THING_NAME_PATTERN = re.compile(r"^[A-Za-z0-9:_-]{1,128}$")
+OWNER_ATTRIBUTE_KEYS = {
+    "project": "safftiOwnerProjectId",
+    "pipeline": "safftiOwnerPipelineId",
+    "job": "safftiOwnerJobId",
+}
 
 
 class AwsCommandError(RuntimeError):
@@ -123,11 +128,13 @@ def validate_names(base_thing_name: str, thing_name: str) -> None:
 def validate_ownership(
     base_thing_name: str,
     thing_name: str,
+    owner_project_id: str,
     owner_pipeline_id: str,
     owner_job_id: str,
 ) -> None:
     validate_names(base_thing_name, thing_name)
     for label, value in (
+        ("owner project ID", owner_project_id),
         ("owner pipeline ID", owner_pipeline_id),
         ("owner job ID", owner_job_id),
     ):
@@ -143,22 +150,58 @@ def validate_ownership(
         )
 
 
+def ownership_attributes(
+    owner_project_id: str,
+    owner_pipeline_id: str,
+    owner_job_id: str,
+) -> dict[str, str]:
+    return {
+        OWNER_ATTRIBUTE_KEYS["project"]: owner_project_id,
+        OWNER_ATTRIBUTE_KEYS["pipeline"]: owner_pipeline_id,
+        OWNER_ATTRIBUTE_KEYS["job"]: owner_job_id,
+    }
+
+
+def expected_alias_arn(base_thing_arn: str, thing_name: str) -> str:
+    if ":thing/" not in base_thing_arn:
+        raise RuntimeError("base Thing ARN is malformed")
+    return base_thing_arn.rsplit("/", 1)[0] + "/" + thing_name
+
+
 def is_not_found(result: subprocess.CompletedProcess[str]) -> bool:
     combined = f"{result.stdout}\n{result.stderr}"
     return "ResourceNotFoundException" in combined
 
 
-def list_principals(thing_name: str, region: str) -> list[str]:
+def list_principal_objects(
+    thing_name: str,
+    region: str,
+) -> list[dict[str, str]]:
     _, payload = run_aws(
-        ["iot", "list-thing-principals", "--thing-name", thing_name],
+        ["iot", "list-thing-principals-v2", "--thing-name", thing_name],
         region=region,
     )
-    principals = payload.get("principals", [])
-    if not isinstance(principals, list) or not all(
-        isinstance(item, str) for item in principals
-    ):
-        raise RuntimeError("AWS IoT principal list is malformed")
-    return principals
+    objects = payload.get("thingPrincipalObjects", [])
+    if not isinstance(objects, list):
+        raise RuntimeError("AWS IoT principal object list is malformed")
+    normalized: list[dict[str, str]] = []
+    for item in objects:
+        if not isinstance(item, dict):
+            raise RuntimeError("AWS IoT principal object is malformed")
+        principal = item.get("principal")
+        attachment_type = item.get("thingPrincipalType")
+        if not isinstance(principal, str) or attachment_type not in {
+            "EXCLUSIVE_THING",
+            "NON_EXCLUSIVE_THING",
+        }:
+            raise RuntimeError("AWS IoT principal object is malformed")
+        normalized.append(
+            {
+                "principal": principal,
+                "thingPrincipalType": attachment_type,
+            }
+        )
+    return normalized
 
 
 def describe_thing(
@@ -189,6 +232,7 @@ def create_alias(args: argparse.Namespace) -> int:
     validate_ownership(
         args.base_thing_name,
         args.thing_name,
+        args.owner_project_id,
         args.owner_pipeline_id,
         args.owner_job_id,
     )
@@ -197,14 +241,32 @@ def create_alias(args: argparse.Namespace) -> int:
     base_exists, base_info = describe_thing(args.base_thing_name, args.region)
     if not base_exists:
         raise RuntimeError(f"base Thing does not exist: {args.base_thing_name}")
-    principals = list_principals(args.base_thing_name, args.region)
-    if len(principals) != 1:
+    principal_objects = list_principal_objects(
+        args.base_thing_name,
+        args.region,
+    )
+    if len(principal_objects) != 1:
         raise RuntimeError(
-            f"base Thing must have exactly one principal; found {len(principals)}"
+            "base Thing must have exactly one principal; "
+            f"found {len(principal_objects)}"
         )
-    principal = principals[0]
+    principal_object = principal_objects[0]
+    principal = principal_object["principal"]
     if ":cert/" not in principal:
         raise RuntimeError("base Thing principal is not an AWS IoT certificate ARN")
+    if principal_object["thingPrincipalType"] != "NON_EXCLUSIVE_THING":
+        raise RuntimeError(
+            "base Thing certificate must use NON_EXCLUSIVE_THING attachment"
+        )
+    base_thing_arn = base_info.get("thingArn")
+    if not isinstance(base_thing_arn, str):
+        raise RuntimeError("base Thing response does not contain a valid ARN")
+    owner_attributes = ownership_attributes(
+        args.owner_project_id,
+        args.owner_pipeline_id,
+        args.owner_job_id,
+    )
+    alias_arn = expected_alias_arn(base_thing_arn, args.thing_name)
 
     meta: dict[str, Any] = {
         "schema_version": 1,
@@ -212,11 +274,14 @@ def create_alias(args: argparse.Namespace) -> int:
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "region": args.region,
         "base_thing_name": args.base_thing_name,
-        "base_thing_arn": base_info.get("thingArn"),
+        "base_thing_arn": base_thing_arn,
         "thing_name": args.thing_name,
+        "expected_thing_arn": alias_arn,
         "principal": principal,
+        "owner_project_id": args.owner_project_id,
         "owner_pipeline_id": args.owner_pipeline_id,
         "owner_job_id": args.owner_job_id,
+        "owner_attributes": owner_attributes,
         "operations": [],
     }
     write_json(meta_path, meta)
@@ -231,11 +296,26 @@ def create_alias(args: argparse.Namespace) -> int:
             )
 
         _, create_payload = run_aws(
-            ["iot", "create-thing", "--thing-name", args.thing_name],
+            [
+                "iot",
+                "create-thing",
+                "--thing-name",
+                args.thing_name,
+                "--attribute-payload",
+                json.dumps(
+                    {"attributes": owner_attributes},
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
+            ],
             region=args.region,
         )
         meta["status"] = "created"
         meta["thing_arn"] = create_payload.get("thingArn")
+        if meta["thing_arn"] != alias_arn:
+            raise RuntimeError(
+                "created Thing ARN does not match the pre-journaled ARN"
+            )
         meta["operations"].append("create-thing")
         write_json(meta_path, meta)
 
@@ -247,6 +327,8 @@ def create_alias(args: argparse.Namespace) -> int:
                 args.thing_name,
                 "--principal",
                 principal,
+                "--thing-principal-type",
+                "NON_EXCLUSIVE_THING",
             ],
             region=args.region,
         )
@@ -254,14 +336,33 @@ def create_alias(args: argparse.Namespace) -> int:
         meta["operations"].append("attach-thing-principal")
         write_json(meta_path, meta)
 
-        alias_principals = list_principals(args.thing_name, args.region)
-        if alias_principals != [principal]:
+        alias_exists, alias_info = describe_thing(args.thing_name, args.region)
+        if (
+            not alias_exists
+            or alias_info.get("thingArn") != alias_arn
+            or alias_info.get("attributes") != owner_attributes
+        ):
+            raise RuntimeError(
+                "ephemeral Thing ARN/ownership attribute verification failed"
+            )
+        expected_principal_object = {
+            "principal": principal,
+            "thingPrincipalType": "NON_EXCLUSIVE_THING",
+        }
+        alias_principal_objects = list_principal_objects(
+            args.thing_name,
+            args.region,
+        )
+        if alias_principal_objects != [expected_principal_object]:
             raise RuntimeError(
                 "ephemeral Thing principal verification failed: "
-                f"{alias_principals!r}"
+                f"{alias_principal_objects!r}"
             )
-        base_principals = list_principals(args.base_thing_name, args.region)
-        if principal not in base_principals:
+        base_principal_objects = list_principal_objects(
+            args.base_thing_name,
+            args.region,
+        )
+        if expected_principal_object not in base_principal_objects:
             raise RuntimeError("base Thing lost its certificate principal")
 
         meta["status"] = "ready"
@@ -275,6 +376,62 @@ def create_alias(args: argparse.Namespace) -> int:
         meta["error"] = str(error)
         write_json(meta_path, meta)
         raise
+
+
+def verify_journal(args: argparse.Namespace) -> int:
+    meta = load_json(args.meta_json.resolve())
+    required = (
+        "status",
+        "verified",
+        "base_thing_name",
+        "base_thing_arn",
+        "thing_name",
+        "expected_thing_arn",
+        "owner_project_id",
+        "owner_pipeline_id",
+        "owner_job_id",
+        "owner_attributes",
+    )
+    missing = [name for name in required if meta.get(name) in (None, "")]
+    if missing:
+        raise RuntimeError(
+            "ephemeral Thing journal is incomplete: " + ", ".join(missing)
+        )
+    if meta["status"] != "ready" or meta["verified"] is not True:
+        raise RuntimeError("ephemeral Thing journal is not verified ready")
+
+    owner_project_id = str(meta["owner_project_id"])
+    owner_pipeline_id = str(meta["owner_pipeline_id"])
+    owner_job_id = str(meta["owner_job_id"])
+    thing_name = str(meta["thing_name"])
+    base_thing_name = str(meta["base_thing_name"])
+    validate_ownership(
+        base_thing_name,
+        thing_name,
+        owner_project_id,
+        owner_pipeline_id,
+        owner_job_id,
+    )
+    if owner_project_id != args.owner_project_id:
+        raise RuntimeError("ephemeral Thing journal project ID mismatch")
+    if owner_pipeline_id != args.owner_pipeline_id:
+        raise RuntimeError("ephemeral Thing journal pipeline ID mismatch")
+    if thing_name != args.expected_thing_name:
+        raise RuntimeError("ephemeral Thing journal target name mismatch")
+
+    expected_attributes = ownership_attributes(
+        owner_project_id,
+        owner_pipeline_id,
+        owner_job_id,
+    )
+    if meta["owner_attributes"] != expected_attributes:
+        raise RuntimeError("ephemeral Thing journal owner attributes mismatch")
+    expected_arn = expected_alias_arn(str(meta["base_thing_arn"]), thing_name)
+    if meta["expected_thing_arn"] != expected_arn:
+        raise RuntimeError("ephemeral Thing journal ARN mismatch")
+
+    print(thing_name)
+    return 0
 
 
 def cleanup_alias(args: argparse.Namespace) -> int:
@@ -296,8 +453,11 @@ def cleanup_alias(args: argparse.Namespace) -> int:
             "base_thing_name",
             "thing_name",
             "principal",
+            "owner_project_id",
             "owner_pipeline_id",
             "owner_job_id",
+            "owner_attributes",
+            "expected_thing_arn",
         )
         missing = [name for name in required if not meta.get(name)]
         if missing:
@@ -309,11 +469,13 @@ def cleanup_alias(args: argparse.Namespace) -> int:
         base_thing_name = str(meta["base_thing_name"])
         thing_name = str(meta["thing_name"])
         principal = str(meta["principal"])
+        owner_project_id = str(meta["owner_project_id"])
         owner_pipeline_id = str(meta["owner_pipeline_id"])
         owner_job_id = str(meta["owner_job_id"])
         validate_ownership(
             base_thing_name,
             thing_name,
+            owner_project_id,
             owner_pipeline_id,
             owner_job_id,
         )
@@ -323,13 +485,20 @@ def cleanup_alias(args: argparse.Namespace) -> int:
         base_exists, _ = describe_thing(base_thing_name, region)
         if not base_exists:
             raise RuntimeError("base Thing disappeared; refusing alias cleanup")
-        base_principals = list_principals(base_thing_name, region)
-        if principal not in base_principals:
+        expected_principal_object = {
+            "principal": principal,
+            "thingPrincipalType": "NON_EXCLUSIVE_THING",
+        }
+        base_principal_objects = list_principal_objects(
+            base_thing_name,
+            region,
+        )
+        if expected_principal_object not in base_principal_objects:
             raise RuntimeError(
                 "expected certificate is no longer attached to the base Thing"
             )
 
-        alias_exists, _ = describe_thing(thing_name, region)
+        alias_exists, alias_info = describe_thing(thing_name, region)
         if not alias_exists:
             result["status"] = "complete"
             result["verification"] = {
@@ -340,22 +509,38 @@ def cleanup_alias(args: argparse.Namespace) -> int:
             write_json(output_path, result)
             return 0
 
-        operations = meta.get("operations")
-        if not isinstance(operations, list) or "create-thing" not in operations:
+        expected_attributes = ownership_attributes(
+            owner_project_id,
+            owner_pipeline_id,
+            owner_job_id,
+        )
+        recorded_attributes = meta.get("owner_attributes")
+        if recorded_attributes != expected_attributes:
             raise RuntimeError(
-                "metadata does not prove this pipeline created the "
-                "ephemeral Thing; refusing mutation"
+                "metadata owner attributes do not match pipeline/job ownership"
+            )
+        live_attributes = alias_info.get("attributes")
+        live_arn = alias_info.get("thingArn")
+        expected_arn = str(meta["expected_thing_arn"])
+        if live_arn != expected_arn or live_attributes != expected_attributes:
+            raise RuntimeError(
+                "live ephemeral Thing ownership does not match the "
+                "pre-journaled ARN and attributes; refusing mutation"
             )
 
-        alias_principals = list_principals(thing_name, region)
-        unexpected = [item for item in alias_principals if item != principal]
+        alias_principal_objects = list_principal_objects(thing_name, region)
+        unexpected = [
+            item
+            for item in alias_principal_objects
+            if item != expected_principal_object
+        ]
         if unexpected:
             raise RuntimeError(
                 "ephemeral Thing has unexpected principals; refusing mutation: "
-                + ", ".join(unexpected)
+                + json.dumps(unexpected, sort_keys=True)
             )
 
-        if principal in alias_principals:
+        if expected_principal_object in alias_principal_objects:
             run_aws(
                 [
                     "iot",
@@ -370,11 +555,11 @@ def cleanup_alias(args: argparse.Namespace) -> int:
             result["actions"].append("detach-thing-principal")
             write_json(output_path, result)
 
-        remaining = list_principals(thing_name, region)
+        remaining = list_principal_objects(thing_name, region)
         if remaining:
             raise RuntimeError(
                 "ephemeral Thing still has principals after detach: "
-                + ", ".join(remaining)
+                + json.dumps(remaining, sort_keys=True)
             )
 
         run_aws(
@@ -385,12 +570,16 @@ def cleanup_alias(args: argparse.Namespace) -> int:
 
         alias_exists, _ = describe_thing(thing_name, region)
         base_exists, _ = describe_thing(base_thing_name, region)
-        base_principals = (
-            list_principals(base_thing_name, region) if base_exists else []
+        base_principal_objects = (
+            list_principal_objects(base_thing_name, region)
+            if base_exists
+            else []
         )
         verification = {
             "base_thing_exists": base_exists,
-            "base_principal_attached": principal in base_principals,
+            "base_principal_attached": (
+                expected_principal_object in base_principal_objects
+            ),
             "ephemeral_thing_absent": not alias_exists,
         }
         result["verification"] = verification
@@ -419,6 +608,7 @@ def parse_args() -> argparse.Namespace:
     create_parser.add_argument("--base-thing-name", required=True)
     create_parser.add_argument("--thing-name", required=True)
     create_parser.add_argument("--region", required=True)
+    create_parser.add_argument("--owner-project-id", required=True)
     create_parser.add_argument("--owner-pipeline-id", required=True)
     create_parser.add_argument("--owner-job-id", required=True)
     create_parser.add_argument("--meta-json", required=True, type=Path)
@@ -428,6 +618,13 @@ def parse_args() -> argparse.Namespace:
     cleanup_parser.add_argument("--meta-json", required=True, type=Path)
     cleanup_parser.add_argument("--output-json", required=True, type=Path)
     cleanup_parser.set_defaults(func=cleanup_alias)
+
+    verify_parser = subparsers.add_parser("verify-journal")
+    verify_parser.add_argument("--meta-json", required=True, type=Path)
+    verify_parser.add_argument("--expected-thing-name", required=True)
+    verify_parser.add_argument("--owner-project-id", required=True)
+    verify_parser.add_argument("--owner-pipeline-id", required=True)
+    verify_parser.set_defaults(func=verify_journal)
 
     return parser.parse_args()
 

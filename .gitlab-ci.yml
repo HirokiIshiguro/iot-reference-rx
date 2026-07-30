@@ -3098,6 +3098,7 @@ create_rx65n_bg96_ota:
           --base-thing-name "$thingName" `
           --thing-name "$otaThingName" `
           --region "$region" `
+          --owner-project-id "$env:CI_PROJECT_ID" `
           --owner-pipeline-id "$env:CI_PIPELINE_ID" `
           --owner-job-id "$env:CI_JOB_ID" `
           --meta-json (Join-Path $artifactDir "ephemeral_thing_meta.json")
@@ -3181,6 +3182,29 @@ test_rx65n_bg96_ota:
       )"
       if [ -z "$ota_thing_name" ]; then
         echo "RX65N BG96 OTA Thing name is missing from create metadata." >&2
+        exit 1
+      fi
+      ephemeral_meta="$CI_PROJECT_DIR/artifacts/create_rx65n_bg96_ota/ephemeral_thing_meta.json"
+      dynamic_meta="$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials/iot_credentials_meta.json"
+      if [ -f "$ephemeral_meta" ]; then
+        python3 tools/manage_ephemeral_iot_thing.py verify-journal \
+          --meta-json "$ephemeral_meta" \
+          --expected-thing-name "$ota_thing_name" \
+          --owner-project-id "$CI_PROJECT_ID" \
+          --owner-pipeline-id "$CI_PIPELINE_ID"
+      elif [ -f "$dynamic_meta" ]; then
+        dynamic_thing_name="$(
+          tr -d '\r\n' \
+            < "$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials/thing_name.txt"
+        )"
+        expected_dynamic_thing="$RX65N_BG96_THING_NAME_PREFIX-$CI_PIPELINE_ID"
+        if [ "$ota_thing_name" != "$dynamic_thing_name" ] || \
+           [ "$ota_thing_name" != "$expected_dynamic_thing" ]; then
+          echo "RX65N BG96 dynamic Thing ownership mismatch." >&2
+          exit 1
+        fi
+      else
+        echo "RX65N BG96 OTA Thing has no ownership journal." >&2
         exit 1
       fi
       actual_host="$(hostname)"
@@ -5075,6 +5099,7 @@ create_rx72n_ether_ota:
         --base-thing-name "$env:RX72N_DEVICE_ID" `
         --thing-name "$otaThingName" `
         --region "$env:AWS_DEFAULT_REGION" `
+        --owner-project-id "$env:CI_PROJECT_ID" `
         --owner-pipeline-id "$env:CI_PIPELINE_ID" `
         --owner-job-id "$env:CI_JOB_ID" `
         --meta-json "$artifactDir\ephemeral_thing_meta.json"
@@ -5148,6 +5173,11 @@ test_rx72n_ether_ota:
         echo "RX72N OTA Thing name is missing from create metadata." >&2
         exit 1
       fi
+      python3 tools/manage_ephemeral_iot_thing.py verify-journal \
+        --meta-json "$CI_PROJECT_DIR/artifacts/create_rx72n_ether_ota/ephemeral_thing_meta.json" \
+        --expected-thing-name "$ota_thing_name" \
+        --owner-project-id "$CI_PROJECT_ID" \
+        --owner-pipeline-id "$CI_PIPELINE_ID"
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
 
