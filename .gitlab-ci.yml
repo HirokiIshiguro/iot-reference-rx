@@ -1040,7 +1040,7 @@ build_rx72n_ether:
   script:
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
-    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_rx72n_fwup_prm_contract
+    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_hardware_transaction_contract tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_rx72n_fwup_prm_contract
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
@@ -1160,7 +1160,7 @@ build_rx65n_bg96:
       optional: true
   script:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
-    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
@@ -3088,23 +3088,20 @@ create_rx65n_bg96_ota:
       $roleArn = Require-Value "AWS OTA service role ARN" (Get-FirstEnv @("AWS_OTA_SERVICE_ROLE_ARN_CK_RX65N_01", "RX65N_BG96_OTA_SERVICE_ROLE_ARN", "BG96_AWS_OTA_SERVICE_ROLE_ARN", "BG96_OTA_SERVICE_ROLE_ARN", "BG96_OTA_ROLE_ARN", "OTA_SERVICE_ROLE_ARN", "OTA_ROLE_ARN"))
       $roleArn = Resolve-IamRoleArn $roleArn
 
-      $targetArgs = @()
-      if (-not [string]::IsNullOrWhiteSpace($targetArn)) {
-        $targetArgs = @("--target-arn", $targetArn)
-      }
-
-      python tools/create_bg96_ota_update.py `
-        --artifact-dir "$artifactDir" `
-        --thing-name "$thingName" `
-        @targetArgs `
-        --input-payload "$payload" `
-        --file-version "$version" `
-        --bucket "$bucket" `
-        --custom-signature-der "$payloadSignature" `
-        --code-signer-cert "$codeSignerCert" `
-        --role-arn "$roleArn" `
-        --region "$region" `
-        --ota-id-prefix "rx65n-bg96-ota"
+      [ordered]@{
+        schema_version = 1
+        status = "prepared"
+        thing_name = $thingName
+        target_arn = $targetArn
+        payload = $payload
+        payload_signature = $payloadSignature
+        code_signer_cert = $codeSignerCert
+        file_version = $version
+        bucket = $bucket
+        role_arn = $roleArn
+        region = $region
+        note = "AWS OTA creation runs atomically inside test_rx65n_bg96_ota while the hardware lock is held."
+      } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "creation_prepared.json") -Encoding utf8
   artifacts:
     when: always
     paths:
@@ -3117,15 +3114,18 @@ test_rx65n_bg96_ota:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_ota_rules
   needs:
-    - job: build_rx65n_bg96_ota
+    - job: build_rx65n_bg96
       artifacts: true
-    - job: download_rx65n_bg96_app
+    - job: prepare_rx65n_bg96_mqtt_credentials
+      artifacts: true
+    - job: build_rx65n_bg96_ota
       artifacts: true
     - job: create_rx65n_bg96_ota
       artifacts: true
   script:
     - echo "=== Verify CK-RX65N BG96 OTA ==="
     - |
+      set -e
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_ota"
       mkdir -p "$artifact_dir"
       version="$(tr -d '\r\n' < artifacts/build_rx65n_bg96_ota/version.txt)"
@@ -3135,16 +3135,145 @@ test_rx65n_bg96_ota:
         exit 1
       fi
 
+      python -m pip install --quiet awscli
+
+      echo "=== Atomic OTA step 1/5: restore the exact bootloader and baseline RSU ==="
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action flash-bootloader \
+        --bootloader-mot artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --uart-port "${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-unused}}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/restore_bootloader.log"
+
+      python3 tools/bg96_bootloader_integration.py \
+        --action download-rsu \
+        --bootloader-mot artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --userprog-rsu artifacts/build_rx65n_bg96/aws_bg96_ck_rx65n.rsu \
+        --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
+        --uart-port "${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}" \
+        --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/restore_baseline_rsu.log"
+
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f "$artifact_dir/selected_uart_port.txt" ]; then
+        uart_port="$(tr -d '\r\n' < "$artifact_dir/selected_uart_port.txt")"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
         exit 1
       fi
 
-      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      echo "=== Atomic OTA step 2/5: provision the exact MQTT and TSIP identity ==="
+      credential_dir="$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials"
+      if [ -f "$credential_dir/iot_credentials_meta.json" ]; then
+        export RX65N_BG96_AWS_IOT_THING_NAME="$(tr -d '\r\n' < "$credential_dir/thing_name.txt")"
+        export AWS_IOT_CERT="$credential_dir/certificate.pem"
+        export AWS_IOT_PRIVKEY="$credential_dir/private_key.pem"
+        if [ -z "${AWS_IOT_ENDPOINT:-}" ] && [ -f "$credential_dir/endpoint.txt" ]; then
+          export AWS_IOT_ENDPOINT="$(tr -d '\r\n' < "$credential_dir/endpoint.txt")"
+        fi
+      fi
+
+      provision_args=(
+        --action provision-mqtt
+        --uart-port "${uart_port}"
+        --baud "${RX65N_BG96_UART_BAUD_RATE}"
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}"
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}"
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}"
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}"
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}"
+        --rfp-tool "${rfp_tool}"
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}"
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}"
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}"
+        --no-reset-after-provision
+      )
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        provision_args+=(--skip-private-key)
+      fi
+      python3 tools/bg96_bootloader_integration.py "${provision_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_mqtt.log"
+
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        python3 tools/provision_tsip_over_uart.py \
+          --target rx65n \
+          --port "${uart_port}" \
+          --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+          --chunk-size "${RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+      fi
+
+      echo "=== Atomic OTA step 3/5: provision the exact OTA signer and stay in CLI ==="
+      code_signer_cert="artifacts/build_rx65n_bg96_ota/bg96_ota_codesign_cert.pem"
+      python3 tools/bg96_ota_prepare.py \
+        --uart-port "${uart_port}" \
+        --code-signer-cert "${code_signer_cert}" \
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}" \
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}" \
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/provision_ota_signer.log"
+
+      echo "=== Atomic OTA step 4/5: create the one-shot AWS IoT OTA job ==="
+      preflight_json="$CI_PROJECT_DIR/artifacts/create_rx65n_bg96_ota/creation_prepared.json"
+      mapfile -t ota_config < <(
+        python3 -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8-sig")); print(d["thing_name"]); print(d.get("target_arn") or ""); print(d["bucket"]); print(d["role_arn"]); print(d["region"])' \
+          "$preflight_json"
+      )
+      if [ "${#ota_config[@]}" -ne 5 ]; then
+        echo "RX65N BG96 OTA preflight data is incomplete." >&2
+        exit 1
+      fi
+      thing_name="${ota_config[0]}"
+      target_arn="${ota_config[1]}"
+      bucket="${ota_config[2]}"
+      role_arn="${ota_config[3]}"
+      region="${ota_config[4]}"
+
+      version_token="${version//./_}"
+      payload="artifacts/build_rx65n_bg96_ota/bg96_${version_token}_ota_payload.bin"
+      payload_signature="artifacts/build_rx65n_bg96_ota/bg96_${version_token}_ota_payload.sig.der"
+      ota_artifact_dir="$CI_PROJECT_DIR/artifacts/create_rx65n_bg96_ota"
+      target_args=()
+      if [ -n "$target_arn" ]; then
+        target_args+=(--target-arn "$target_arn")
+      fi
+
+      python3 tools/create_bg96_ota_update.py \
+        --artifact-dir "$ota_artifact_dir" \
+        --thing-name "$thing_name" \
+        "${target_args[@]}" \
+        --input-payload "$payload" \
+        --file-version "$version" \
+        --bucket "$bucket" \
+        --custom-signature-der "$payload_signature" \
+        --code-signer-cert "$code_signer_cert" \
+        --role-arn "$role_arn" \
+        --region "$region" \
+        --ota-id-prefix "rx65n-bg96-ota" \
+        2>&1 | tee "$ota_artifact_dir/create_ota_console.log"
+
+      echo "=== Atomic OTA step 5/5: observe download, activation, and commit ==="
       tls_version_args=()
       if [ -n "${RX65N_BG96_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args+=(--require-tls-version "${RX65N_BG96_REQUIRE_TLS_VERSION}")
@@ -3170,6 +3299,7 @@ test_rx65n_bg96_ota:
   artifacts:
     when: always
     paths:
+      - artifacts/create_rx65n_bg96_ota/
       - artifacts/test_rx65n_bg96_ota/
     expire_in: 7 days
 
@@ -3181,7 +3311,7 @@ cleanup_rx65n_bg96_ota:
       when: always
     - when: never
   dependencies:
-    - create_rx65n_bg96_ota
+    - test_rx65n_bg96_ota
   script:
     - $ErrorActionPreference = "Continue"
     - |
@@ -3260,6 +3390,8 @@ cleanup_rx65n_bg96_mqtt_credentials:
 
       python tools/cleanup_bg96_iot_credentials.py `
         --meta-json "$metaPath" `
+        --expected-thing-name "$env:RX65N_BG96_THING_NAME_PREFIX-$env:CI_PIPELINE_ID" `
+        --expected-policy-name "$env:RX65N_BG96_IOT_POLICY_NAME" `
         --output-json "$outPath"
       $cleanupStatus = $LASTEXITCODE
       if ($cleanupStatus -ne 0) {
@@ -4864,7 +4996,7 @@ create_rx72n_ether_ota:
       when: on_success
     - when: never
   script:
-    - Write-Host "=== Create RX72N AWS IoT OTA update ==="
+    - Write-Host "=== Validate RX72N AWS IoT OTA creation inputs ==="
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\create_rx72n_ether_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -4875,10 +5007,6 @@ create_rx72n_ether_ota:
           exit 1
         }
       }
-      $otaRoleArn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
-      if ($otaRoleArn -and -not $otaRoleArn.StartsWith("arn:")) {
-        $otaRoleArn = "arn:aws:iam::$otaRoleArn"
-      }
 
       $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
       $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_ota\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
@@ -4886,18 +5014,18 @@ create_rx72n_ether_ota:
       $parkMarker = "$env:CI_PROJECT_DIR\artifacts\park_rx72n_ether_ota_cli\parked.ok"
       if (-not (Test-Path $parkMarker)) { Write-Error "RX72N CLI park marker missing: $parkMarker"; exit 1 }
 
-      python tools/create_ota_update.py `
-        --artifact-dir "$artifactDir" `
-        --thing-name "$env:RX72N_DEVICE_ID" `
-        --input-rsu "$candidateRsu" `
-        --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
-        --bucket "$env:AWS_OTA_S3_BUCKET_RX72N_02" `
-        --signing-profile "$env:AWS_OTA_SIGNING_PROFILE_RX72N_02" `
-        --role-arn "$otaRoleArn" `
-        --region "$env:AWS_DEFAULT_REGION" `
-        --ota-id-prefix "${env:RX72N_DEVICE_ID}-ota" `
-        2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      [ordered]@{
+        schema_version = 1
+        status = "prepared"
+        candidate_rsu = $candidateRsu
+        thing_name = $env:RX72N_DEVICE_ID
+        file_version = $env:RX72N_OTA_CANDIDATE_VERSION
+        bucket = $env:AWS_OTA_S3_BUCKET_RX72N_02
+        signing_profile = $env:AWS_OTA_SIGNING_PROFILE_RX72N_02
+        role_arn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
+        region = $env:AWS_DEFAULT_REGION
+        note = "AWS OTA creation runs atomically inside test_rx72n_ether_ota while the hardware lock is held."
+      } | ConvertTo-Json | Set-Content -LiteralPath "$artifactDir\creation_prepared.json" -Encoding utf8
   artifacts:
     when: always
     paths:
@@ -4908,6 +5036,10 @@ test_rx72n_ether_ota:
   stage: ota_test
   extends: .rx72n_linux_hw_job
   needs:
+    - job: build_rx72n_ether
+      artifacts: true
+    - job: build_rx72n_ether_ota
+      artifacts: true
     - job: create_rx72n_ether_ota
       artifacts: true
   rules:
@@ -4928,11 +5060,112 @@ test_rx72n_ether_ota:
     - echo "=== Verify RX72N OTA over MQTT on Linux runner ==="
     - echo "NOTE - this observer consumes a one-shot AWS IoT OTA Job. Do not retry this job alone; start a new focused/matrix pipeline so cleanup, create, and test all run with a fresh OTA Job."
     - |
+      set -e
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_ota"
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      python -m pip install --quiet awscli
+      export AWS_CLI_USE_PYTHON_MODULE=1
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      # Job-scoped locks cannot protect a split park/create/observe transaction.
+      # Restore and provision the exact baseline, create the one-shot AWS job,
+      # and observe it while this single job owns the RX72N hardware lock.
+      echo "=== Atomic OTA step 1/4: restore exact baseline artifacts ==="
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" -erase-chip -noquery
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" \
+        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot" \
+        -v -noquery
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" \
+        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot" \
+        -v -noquery
+
+      python tools/test_uart_download_rx72n.py \
+        --rsu "$CI_PROJECT_DIR/rx72n_app.rsu" \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout 420 \
+        --post-tx-wait 120 \
+        --diag \
+        --wait-for-ready \
+        --ready-timeout 90 \
+        --reset-cmd "$reset_cmd" \
+        2>&1 | tee "$artifact_dir/restore_rx72n.log"
+
+      echo "=== Atomic OTA step 2/4: provision credentials and stay in CLI ==="
+      shadow_args=()
+      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
+        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
+      fi
+
+      provision_args=(
+        --port "$RX72N_LINUX_UART_PORT"
+        --baud "$RX72N_LINUX_UART_BAUD_RATE"
+        --thing-name "$RX72N_DEVICE_ID"
+        --endpoint "$AWS_IOT_ENDPOINT"
+        --cert "$AWS_CLIENT_CERT_RX72N_02"
+        --key "$AWS_PRIVATE_KEY_RX72N_02"
+        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem"
+        --format
+        --reset-cmd "$reset_cmd"
+        --reset-after-open
+        --boot-wait 12
+        --cli-timeout 25
+        --attempts 3
+        --no-reset
+      )
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        provision_args+=(--skip-private-key)
+      fi
+
+      python tools/provision_rx72n.py "${provision_args[@]}" "${shadow_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_rx72n.log"
+
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        python tools/provision_tsip_over_uart.py \
+          --target rx72n \
+          --port "$RX72N_LINUX_UART_PORT" \
+          --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+          --chunk-size "${RX72N_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX72N_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          --no-reset-after \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+      fi
+
+      echo "=== Atomic OTA step 3/4: create the one-shot AWS IoT OTA job ==="
+      ota_artifact_dir="$CI_PROJECT_DIR/artifacts/create_rx72n_ether_ota"
+      version_underscore="${RX72N_OTA_CANDIDATE_VERSION//./_}"
+      candidate_rsu="$CI_PROJECT_DIR/artifacts/build_rx72n_ether_ota/${RX72N_DEVICE_ID}_${version_underscore}.rsu"
+      ota_role_arn="${AWS_OTA_SERVICE_ROLE_ARN_RX72N_02}"
+      case "$ota_role_arn" in
+        arn:*) ;;
+        *) ota_role_arn="arn:aws:iam::${ota_role_arn}" ;;
+      esac
+
+      python tools/create_ota_update.py \
+        --artifact-dir "$ota_artifact_dir" \
+        --thing-name "$RX72N_DEVICE_ID" \
+        --input-rsu "$candidate_rsu" \
+        --file-version "$RX72N_OTA_CANDIDATE_VERSION" \
+        --bucket "$AWS_OTA_S3_BUCKET_RX72N_02" \
+        --signing-profile "$AWS_OTA_SIGNING_PROFILE_RX72N_02" \
+        --role-arn "$ota_role_arn" \
+        --region "$AWS_DEFAULT_REGION" \
+        --ota-id-prefix "${RX72N_DEVICE_ID}-ota" \
+        2>&1 | tee "$ota_artifact_dir/create_ota_console.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      echo "=== Atomic OTA step 4/4: start and observe the one-shot job ==="
       tls_version_args=()
       if [ -n "${RX72N_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args+=(--require-tls-version "$RX72N_REQUIRE_TLS_VERSION")
@@ -4958,6 +5191,7 @@ test_rx72n_ether_ota:
   artifacts:
     when: always
     paths:
+      - artifacts/create_rx72n_ether_ota/
       - artifacts/test_rx72n_ether_ota/
     expire_in: 7 days
 
@@ -4965,7 +5199,7 @@ cleanup_rx72n_ether_ota:
   stage: ota_cleanup
   extends: .aws_cli_windows_job
   dependencies:
-    - create_rx72n_ether_ota
+    - test_rx72n_ether_ota
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
       when: always

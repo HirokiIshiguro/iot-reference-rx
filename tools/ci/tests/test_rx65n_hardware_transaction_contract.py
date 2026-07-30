@@ -77,6 +77,42 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertNotIn("download_rx65n_bg96_app", job)
         self.assertNotIn(".rx65n_bg96_linux_hw_job", job)
 
+    def test_ota_restore_create_and_observe_are_one_hardware_transaction(self) -> None:
+        job = job_block(
+            self.ci, "test_rx65n_bg96_ota", "cleanup_rx65n_bg96_ota"
+        )
+        needs = job.split("\n  script:", maxsplit=1)[0]
+
+        self.assertIn("- .rx65n_bg96_linux_hw_job", job)
+        self.assertIn("- job: build_rx65n_bg96", needs)
+        self.assertIn("- job: prepare_rx65n_bg96_mqtt_credentials", needs)
+        self.assertIn("- job: build_rx65n_bg96_ota", needs)
+        self.assertNotIn("- job: download_rx65n_bg96_app", needs)
+
+        ordered_tokens = (
+            "--action flash-bootloader",
+            "--action download-rsu",
+            "--action provision-mqtt",
+            "tools/provision_tsip_over_uart.py",
+            "tools/bg96_ota_prepare.py",
+            "tools/create_bg96_ota_update.py",
+            "tools/bg96_ota_monitor.py",
+        )
+        positions = [job.index(token) for token in ordered_tokens]
+        self.assertEqual(positions, sorted(positions))
+
+        preflight = job_block(
+            self.ci, "create_rx65n_bg96_ota", "test_rx65n_bg96_ota"
+        )
+        cleanup = job_block(
+            self.ci,
+            "cleanup_rx65n_bg96_ota",
+            "cleanup_rx65n_bg96_mqtt_credentials",
+        )
+        self.assertNotIn("tools/create_bg96_ota_update.py", preflight)
+        self.assertIn("creation_prepared.json", preflight)
+        self.assertIn("- test_rx65n_bg96_ota", cleanup)
+
     def test_mqtt_is_excluded_from_split_hardware_rules(self) -> None:
         rule_blocks = (
             job_block(
