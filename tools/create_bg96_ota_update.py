@@ -43,6 +43,19 @@ def write_meta(path: Path, meta: dict, **updates: object) -> None:
     write_json(path, meta)
 
 
+def validate_signed_prefix(thing_name: str, signed_prefix: str) -> None:
+    owner_root = f"ota/{thing_name}/"
+    if (
+        not signed_prefix.startswith(owner_root)
+        or signed_prefix == owner_root
+        or not signed_prefix.endswith("/")
+    ):
+        raise ValueError(
+            "signed prefix must be a child directory of the OTA Thing "
+            f"namespace {owner_root!r}"
+        )
+
+
 def encode_custom_signature_for_cli(der_signature: bytes) -> str:
     """Return the double-base64 form needed for AWS CLI blob JSON input."""
     return base64.b64encode(base64.b64encode(der_signature)).decode("ascii")
@@ -50,11 +63,18 @@ def encode_custom_signature_for_cli(der_signature: bytes) -> str:
 
 def ota_meta_updates(payload: dict) -> dict[str, object]:
     info = payload.get("otaUpdateInfo", payload)
+    signing_job_id = None
+    ota_files = info.get("otaUpdateFiles")
+    if isinstance(ota_files, list) and ota_files:
+        code_signing = ota_files[0].get("codeSigning", {})
+        if isinstance(code_signing, dict):
+            signing_job_id = code_signing.get("awsSignerJobId")
     return {
         "ota_update_arn": info.get("otaUpdateArn"),
         "ota_update_status": info.get("otaUpdateStatus"),
         "aws_iot_job_id": info.get("awsIotJobId"),
         "aws_iot_job_arn": info.get("awsIotJobArn"),
+        "signing_job_id": signing_job_id,
     }
 
 
@@ -124,12 +144,17 @@ def main() -> int:
         thing_info = aws(["iot", "describe-thing", "--thing-name", args.thing_name], args.region)
         thing_arn = thing_info["thingArn"]
 
-    s3_key = args.s3_key or f"ota/{args.thing_name}/{payload.name}"
-    signed_prefix = args.signed_prefix or f"ota/{args.thing_name}/signed/"
     ota_update_id = (
         f"{args.ota_id_prefix}-{int(time.time())}-{uuid.uuid4().hex[:12]}"
     )
+    s3_key = args.s3_key or f"ota/{args.thing_name}/{payload.name}"
+    signed_prefix = (
+        args.signed_prefix
+        or f"ota/{args.thing_name}/signed/{ota_update_id}/"
+    )
     code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
+    if code_signing_mode == "aws-signer":
+        validate_signed_prefix(args.thing_name, signed_prefix)
     meta = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "region": args.region,
@@ -140,6 +165,12 @@ def main() -> int:
         "s3_bucket": args.bucket,
         "s3_key": s3_key,
         "s3_version": None,
+        # Custom signing embeds the signature and creates no Signer output.
+        # When AWS Signer is selected, journal its output prefix before the
+        # first mutation so partial-failure cleanup can still recover it.
+        "signed_prefix": (
+            signed_prefix if code_signing_mode == "aws-signer" else None
+        ),
         "signing_profile": args.signing_profile,
         "code_signing_mode": code_signing_mode,
         "custom_signature_der": str(args.custom_signature_der.resolve()) if args.custom_signature_der else None,

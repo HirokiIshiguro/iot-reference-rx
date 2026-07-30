@@ -4,9 +4,10 @@
 The metadata input is the ``ota_job_meta.json`` emitted by
 ``create_ota_update.py`` or ``create_bg96_ota_update.py``.  The ``snapshot``
 command records only non-secret state and requires a successfully completed
-AWS IoT Job and Job execution.  The ``cleanup`` command deletes the OTA update
-and source S3 object, then fails unless the OTA update, generated IoT Job, and
-the exact S3 object/version are all confirmed absent.
+AWS IoT Job and Job execution.  The ``cleanup`` command deletes the OTA update,
+source S3 object, and any AWS Signer output, then fails unless the OTA update,
+generated IoT Job, exact source object/version, and every object/version below
+the pipeline-owned Signer prefix are all confirmed absent.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ EXECUTION_TERMINAL_STATUSES = {
     "SUCCEEDED",
     "TIMED_OUT",
 }
+SIGNING_JOB_TERMINAL_STATUSES = {"Succeeded", "Failed"}
 NOT_FOUND_MARKERS = (
     "ResourceNotFoundException",
     "NotFoundException",
@@ -123,11 +125,27 @@ def load_meta(
             "aws_iot_job_id",
             "s3_bucket",
             "s3_key",
+            "code_signing_mode",
         )
     missing = [name for name in required if not payload.get(name)]
     if missing:
         raise ValueError(
             "OTA metadata is incomplete; missing: " + ", ".join(sorted(missing))
+        )
+    code_signing_mode = payload.get("code_signing_mode")
+    if code_signing_mode not in {"aws-signer", "custom"}:
+        raise ValueError(
+            "OTA metadata code_signing_mode must be aws-signer or custom"
+        )
+    if code_signing_mode == "aws-signer" and not payload.get(
+        "signed_prefix"
+    ):
+        raise ValueError(
+            "OTA metadata for aws-signer requires signed_prefix"
+        )
+    if code_signing_mode == "custom" and payload.get("signed_prefix"):
+        raise ValueError(
+            "OTA metadata for custom signing must not include signed_prefix"
         )
     if not require_complete:
         has_s3_bucket = bool(payload.get("s3_bucket"))
@@ -143,11 +161,19 @@ def load_meta(
                 "OTA cleanup metadata s3_version requires "
                 "s3_bucket and s3_key"
             )
+        if payload.get("signed_prefix") and not (
+            has_s3_bucket and payload.get("thing_name")
+        ):
+            raise ValueError(
+                "OTA cleanup metadata signed_prefix requires "
+                "s3_bucket and thing_name"
+            )
         has_known_resource = any(
             (
                 payload.get("ota_update_id"),
                 payload.get("aws_iot_job_id"),
                 has_s3_bucket and has_s3_key,
+                payload.get("signed_prefix") and has_s3_bucket,
             )
         )
         if not has_known_resource:
@@ -168,6 +194,9 @@ def public_meta(meta: dict[str, Any]) -> dict[str, Any]:
             "s3_bucket",
             "s3_key",
             "s3_version",
+            "signed_prefix",
+            "code_signing_mode",
+            "signing_job_id",
             "file_version",
         )
     }
@@ -235,6 +264,174 @@ def list_exact_s3_key_versions(
     return entries
 
 
+def validate_signed_prefix(meta: dict[str, Any]) -> str | None:
+    """Return a safely scoped Signer prefix or fail before any mutation."""
+
+    value = meta.get("signed_prefix")
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Metadata signed_prefix must be a string")
+    bucket = meta.get("s3_bucket")
+    thing_name = meta.get("thing_name")
+    if not bucket or not thing_name:
+        raise ValueError(
+            "Metadata signed_prefix requires s3_bucket and thing_name"
+        )
+    owner_root = f"ota/{thing_name}/"
+    if (
+        not value.startswith(owner_root)
+        or value == owner_root
+        or not value.endswith("/")
+    ):
+        raise ValueError(
+            "Metadata signed_prefix must be a child directory of the "
+            f"pipeline Thing namespace {owner_root!r}"
+        )
+    return value
+
+
+def list_s3_prefix_versions(
+    meta: dict[str, Any],
+    region: str,
+    prefix: str,
+) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    key_marker: str | None = None
+    version_marker: str | None = None
+    seen_markers: set[tuple[str, str]] = set()
+    while True:
+        arguments = [
+            "s3api",
+            "list-object-versions",
+            "--bucket",
+            str(meta["s3_bucket"]),
+            "--prefix",
+            prefix,
+            "--no-paginate",
+        ]
+        if key_marker is not None:
+            arguments.extend(["--key-marker", key_marker])
+        if version_marker is not None:
+            arguments.extend(["--version-id-marker", version_marker])
+        payload = run_aws(arguments, region)
+        if not isinstance(payload, dict):
+            raise RuntimeError(
+                "S3 prefix version listing returned malformed output"
+            )
+
+        for collection, kind in (
+            ("Versions", "version"),
+            ("DeleteMarkers", "delete-marker"),
+        ):
+            values = payload.get(collection, [])
+            if not isinstance(values, list):
+                raise RuntimeError(
+                    f"S3 prefix version listing field {collection} is "
+                    "malformed"
+                )
+            for value in values:
+                if not isinstance(value, dict):
+                    raise RuntimeError(
+                        "S3 prefix version listing contains a malformed entry"
+                    )
+                key = value.get("Key")
+                if not isinstance(key, str) or not key.startswith(prefix):
+                    raise RuntimeError(
+                        "S3 prefix version listing returned an out-of-prefix "
+                        "entry"
+                    )
+                version_id = value.get("VersionId")
+                if not isinstance(version_id, str) or not version_id:
+                    raise RuntimeError(
+                        "S3 prefix version listing contains an owned entry "
+                        "without VersionId"
+                    )
+                entries.append(
+                    {
+                        "kind": kind,
+                        "key": key,
+                        "version_id": version_id,
+                    }
+                )
+
+        if payload.get("IsTruncated") is not True:
+            break
+        next_key = payload.get("NextKeyMarker")
+        next_version = payload.get("NextVersionIdMarker")
+        if not isinstance(next_key, str) or not next_key:
+            raise RuntimeError(
+                "Truncated S3 version listing has no NextKeyMarker"
+            )
+        if next_version is not None and not isinstance(next_version, str):
+            raise RuntimeError(
+                "Truncated S3 version listing has malformed "
+                "NextVersionIdMarker"
+            )
+        marker = (next_key, next_version or "")
+        if marker in seen_markers:
+            raise RuntimeError("S3 version listing pagination loop detected")
+        seen_markers.add(marker)
+        key_marker = next_key
+        version_marker = next_version or None
+    return entries
+
+
+def list_current_s3_prefix_keys(
+    meta: dict[str, Any],
+    region: str,
+    prefix: str,
+) -> list[str]:
+    keys: list[str] = []
+    continuation_token: str | None = None
+    seen_tokens: set[str] = set()
+    while True:
+        arguments = [
+            "s3api",
+            "list-objects-v2",
+            "--bucket",
+            str(meta["s3_bucket"]),
+            "--prefix",
+            prefix,
+            "--no-paginate",
+        ]
+        if continuation_token is not None:
+            arguments.extend(
+                ["--continuation-token", continuation_token]
+            )
+        payload = run_aws(arguments, region)
+        if not isinstance(payload, dict):
+            raise RuntimeError("S3 prefix listing returned malformed output")
+
+        values = payload.get("Contents", [])
+        if not isinstance(values, list):
+            raise RuntimeError("S3 prefix listing field Contents is malformed")
+        for value in values:
+            if not isinstance(value, dict):
+                raise RuntimeError(
+                    "S3 prefix listing contains a malformed entry"
+                )
+            key = value.get("Key")
+            if not isinstance(key, str) or not key.startswith(prefix):
+                raise RuntimeError(
+                    "S3 prefix listing returned an out-of-prefix entry"
+                )
+            keys.append(key)
+
+        if payload.get("IsTruncated") is not True:
+            break
+        next_token = payload.get("NextContinuationToken")
+        if not isinstance(next_token, str) or not next_token:
+            raise RuntimeError(
+                "Truncated S3 prefix listing has no NextContinuationToken"
+            )
+        if next_token in seen_tokens:
+            raise RuntimeError("S3 prefix listing pagination loop detected")
+        seen_tokens.add(next_token)
+        continuation_token = next_token
+    return keys
+
+
 def wait_until_s3_key_fully_absent(
     meta: dict[str, Any],
     region: str,
@@ -263,6 +460,10 @@ def cleanup_resources(meta: dict[str, Any]) -> list[str]:
                 "s3_source_object",
                 meta.get("s3_bucket") and meta.get("s3_key"),
             ),
+            (
+                "s3_signer_output_prefix",
+                meta.get("s3_bucket") and meta.get("signed_prefix"),
+            ),
         )
         if present
     ]
@@ -278,6 +479,27 @@ def metadata_identity_error(
         "error_type": "MetadataIdentityError",
         "message": message,
     }
+
+
+def ota_signing_job_id(ota_info: dict[str, Any]) -> str | None:
+    signer_ids: set[str] = set()
+    ota_files = ota_info.get("otaUpdateFiles")
+    if not isinstance(ota_files, list):
+        return None
+    for ota_file in ota_files:
+        if not isinstance(ota_file, dict):
+            continue
+        code_signing = ota_file.get("codeSigning")
+        if not isinstance(code_signing, dict):
+            continue
+        signer_id = code_signing.get("awsSignerJobId")
+        if isinstance(signer_id, str) and signer_id:
+            signer_ids.add(signer_id)
+    if len(signer_ids) > 1:
+        raise ValueError(
+            "Live OTA response contains multiple AWS Signer job IDs"
+        )
+    return next(iter(signer_ids), None)
 
 
 def validate_cleanup_metadata_identity(
@@ -297,6 +519,39 @@ def validate_cleanup_metadata_identity(
             metadata_identity_error(
                 "s3_source_object",
                 "Metadata s3_version requires s3_bucket and s3_key",
+            )
+        ]
+    code_signing_mode = meta.get("code_signing_mode")
+    if code_signing_mode not in {"aws-signer", "custom"}:
+        return [
+            metadata_identity_error(
+                "s3_signer_output_prefix",
+                "Metadata code_signing_mode must be aws-signer or custom",
+            )
+        ]
+    if code_signing_mode == "aws-signer" and not meta.get(
+        "signed_prefix"
+    ):
+        return [
+            metadata_identity_error(
+                "s3_signer_output_prefix",
+                "AWS Signer metadata requires signed_prefix",
+            )
+        ]
+    if code_signing_mode == "custom" and meta.get("signed_prefix"):
+        return [
+            metadata_identity_error(
+                "s3_signer_output_prefix",
+                "Custom signing metadata must not include signed_prefix",
+            )
+        ]
+    try:
+        validate_signed_prefix(meta)
+    except ValueError as error:
+        return [
+            metadata_identity_error(
+                "s3_signer_output_prefix",
+                str(error),
             )
         ]
     return []
@@ -373,6 +628,45 @@ def reconcile_live_ota_identity(
         )
     elif not recorded_job_arn and live_job_arn:
         updates["aws_iot_job_arn"] = live_job_arn
+
+    try:
+        live_signer_job_id = ota_signing_job_id(ota_info)
+    except ValueError as error:
+        errors.append(
+            metadata_identity_error(
+                "aws_signer_job",
+                str(error),
+            )
+        )
+        live_signer_job_id = None
+    recorded_signer_job_id = meta.get("signing_job_id")
+    if (
+        recorded_signer_job_id
+        and live_signer_job_id
+        and recorded_signer_job_id != live_signer_job_id
+    ):
+        errors.append(
+            metadata_identity_error(
+                "aws_signer_job",
+                (
+                    f"Live OTA reports AWS Signer job "
+                    f"{live_signer_job_id}, but metadata records "
+                    f"{recorded_signer_job_id}"
+                ),
+            )
+        )
+    elif not recorded_signer_job_id and live_signer_job_id:
+        updates["signing_job_id"] = live_signer_job_id
+    if (
+        meta.get("code_signing_mode") == "custom"
+        and live_signer_job_id
+    ):
+        errors.append(
+            metadata_identity_error(
+                "aws_signer_job",
+                "Custom signing OTA unexpectedly reports an AWS Signer job",
+            )
+        )
 
     recorded_thing_arn = meta.get("thing_arn")
     live_targets = ota_info.get("targets")
@@ -483,6 +777,122 @@ def reconcile_live_ota_identity(
     return errors
 
 
+def signing_job_identity_errors(
+    meta: dict[str, Any],
+    payload: dict[str, Any],
+) -> list[dict[str, str]]:
+    signer_id = meta.get("signing_job_id")
+    prefix = validate_signed_prefix(meta)
+    errors: list[dict[str, str]] = []
+    if payload.get("jobId") != signer_id:
+        errors.append(
+            metadata_identity_error(
+                "aws_signer_job",
+                (
+                    f"Signer response job ID {payload.get('jobId')} does not "
+                    f"match metadata {signer_id}"
+                ),
+            )
+        )
+
+    source = payload.get("source")
+    source_s3 = source.get("s3") if isinstance(source, dict) else None
+    expected_source = (
+        meta.get("s3_bucket"),
+        meta.get("s3_key"),
+        meta.get("s3_version"),
+    )
+    live_source = (
+        source_s3.get("bucketName") if isinstance(source_s3, dict) else None,
+        source_s3.get("key") if isinstance(source_s3, dict) else None,
+        source_s3.get("version") if isinstance(source_s3, dict) else None,
+    )
+    if live_source[:2] != expected_source[:2] or (
+        expected_source[2] and live_source[2] != expected_source[2]
+    ):
+        errors.append(
+            metadata_identity_error(
+                "aws_signer_job",
+                "Signer source object does not match OTA metadata",
+            )
+        )
+
+    status = payload.get("status")
+    if status not in SIGNING_JOB_TERMINAL_STATUSES | {"InProgress"}:
+        errors.append(
+            metadata_identity_error(
+                "aws_signer_job",
+                f"Signer response has unexpected status {status}",
+            )
+        )
+    if status == "Succeeded":
+        signed_object = payload.get("signedObject")
+        signed_s3 = (
+            signed_object.get("s3")
+            if isinstance(signed_object, dict)
+            else None
+        )
+        signed_bucket = (
+            signed_s3.get("bucketName")
+            if isinstance(signed_s3, dict)
+            else None
+        )
+        signed_key = (
+            signed_s3.get("key")
+            if isinstance(signed_s3, dict)
+            else None
+        )
+        if (
+            signed_bucket != meta.get("s3_bucket")
+            or not isinstance(signed_key, str)
+            or prefix is None
+            or not signed_key.startswith(prefix)
+        ):
+            errors.append(
+                metadata_identity_error(
+                    "s3_signer_output_prefix",
+                    "Signer output object is outside the pipeline prefix",
+                )
+            )
+    return errors
+
+
+def wait_for_signing_job_terminal(
+    meta: dict[str, Any],
+    region: str,
+    *,
+    timeout: int,
+    poll_interval: int,
+) -> dict[str, Any]:
+    deadline = time.time() + timeout
+    while True:
+        payload = run_aws(
+            [
+                "signer",
+                "describe-signing-job",
+                "--job-id",
+                str(meta["signing_job_id"]),
+            ],
+            region,
+        )
+        if not isinstance(payload, dict):
+            raise RuntimeError(
+                "AWS Signer job lookup returned malformed output"
+            )
+        identity_errors = signing_job_identity_errors(meta, payload)
+        if identity_errors:
+            raise ValueError(
+                "; ".join(error["message"] for error in identity_errors)
+            )
+        if payload.get("status") in SIGNING_JOB_TERMINAL_STATUSES:
+            return payload
+        if time.time() >= deadline:
+            raise TimeoutError(
+                "AWS Signer job did not reach a terminal state before cleanup"
+            )
+        time.sleep(poll_interval)
+
+
 def blocked_cleanup_summary(
     meta: dict[str, Any],
     errors: list[dict[str, str]],
@@ -498,6 +908,7 @@ def blocked_cleanup_summary(
             "ota_update_absent": None,
             "aws_iot_job_absent": None,
             "s3_source_object_or_version_absent": None,
+            "s3_signer_output_prefix_absent": None,
             "passed": False,
         },
     }
@@ -708,6 +1119,42 @@ def cleanup_state(
             )
         if errors:
             return blocked_cleanup_summary(meta, errors)
+
+    if (
+        meta.get("code_signing_mode") == "aws-signer"
+        and meta.get("signing_job_id")
+    ):
+        try:
+            signer_payload = wait_for_signing_job_terminal(
+                meta,
+                region,
+                timeout=wait_timeout,
+                poll_interval=poll_interval,
+            )
+        except Exception as exc:
+            errors.append(
+                {
+                    "operation": "verify_terminal",
+                    "resource": "aws_signer_job",
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                }
+            )
+            return blocked_cleanup_summary(meta, errors)
+        actions.append(
+            {
+                "resource": "aws_signer_job",
+                "id": meta["signing_job_id"],
+                "terminal_status": signer_payload["status"],
+                "ownership_verified": True,
+            }
+        )
+    unresolved_signer_submission = bool(
+        meta.get("code_signing_mode") == "aws-signer"
+        and not meta.get("signing_job_id")
+        and meta.get("ota_update_status")
+        not in {"UPLOAD_REQUESTED", "S3_UPLOADED"}
+    )
 
     ota_absent: bool | None = None
     if meta.get("ota_update_id"):
@@ -936,11 +1383,143 @@ def cleanup_state(
             else:
                 s3_absent = False
 
+    signed_prefix_absent: bool | None = None
+    signed_prefix = validate_signed_prefix(meta)
+    if signed_prefix is not None:
+        deadline = time.time() + wait_timeout
+        post_deadline_deletion_passes = 0
+        while True:
+            versions_ok, signer_versions = attempt(
+                "discover_versions",
+                "s3_signer_output_prefix",
+                lambda: list_s3_prefix_versions(
+                    meta,
+                    region,
+                    signed_prefix,
+                ),
+            )
+            current_ok, current_keys = attempt(
+                "discover_current",
+                "s3_signer_output_prefix",
+                lambda: list_current_s3_prefix_keys(
+                    meta,
+                    region,
+                    signed_prefix,
+                ),
+            )
+            if not versions_ok or not current_ok:
+                signed_prefix_absent = False
+                break
+            if not signer_versions and not current_keys:
+                # A Signer job submitted immediately before a partial create
+                # failure can publish its output after cleanup starts.  Keep
+                # observing an empty prefix for the configured wait window
+                # instead of accepting the first empty listing.
+                if time.time() >= deadline:
+                    signed_prefix_absent = True
+                    break
+                time.sleep(poll_interval)
+                continue
+            if post_deadline_deletion_passes >= 3:
+                signed_prefix_absent = False
+                break
+
+            delete_failed = False
+            versioned_keys = {
+                version["key"] for version in signer_versions
+            }
+            for version in signer_versions:
+                delete_args = [
+                    "s3api",
+                    "delete-object",
+                    "--bucket",
+                    str(meta["s3_bucket"]),
+                    "--key",
+                    version["key"],
+                    "--version-id",
+                    version["version_id"],
+                ]
+                deleted, _ = attempt(
+                    "delete_version",
+                    "s3_signer_output_prefix",
+                    lambda delete_args=delete_args: run_aws(
+                        delete_args,
+                        region,
+                    ),
+                )
+                actions.append(
+                    {
+                        "resource": "s3_signer_output_prefix",
+                        "bucket": meta["s3_bucket"],
+                        "prefix": signed_prefix,
+                        "key": version["key"],
+                        "version_id": version["version_id"],
+                        "version_kind": version["kind"],
+                        "delete_succeeded": deleted,
+                    }
+                )
+                if not deleted:
+                    delete_failed = True
+
+            for key in current_keys:
+                if key in versioned_keys:
+                    continue
+                delete_args = [
+                    "s3api",
+                    "delete-object",
+                    "--bucket",
+                    str(meta["s3_bucket"]),
+                    "--key",
+                    key,
+                ]
+                deleted, _ = attempt(
+                    "delete",
+                    "s3_signer_output_prefix",
+                    lambda delete_args=delete_args: run_aws(
+                        delete_args,
+                        region,
+                    ),
+                )
+                actions.append(
+                    {
+                        "resource": "s3_signer_output_prefix",
+                        "bucket": meta["s3_bucket"],
+                        "prefix": signed_prefix,
+                        "key": key,
+                        "version_id": None,
+                        "delete_succeeded": deleted,
+                    }
+                )
+                if not deleted:
+                    delete_failed = True
+
+            if delete_failed:
+                signed_prefix_absent = False
+                break
+            if time.time() >= deadline:
+                post_deadline_deletion_passes += 1
+            else:
+                time.sleep(poll_interval)
+
     absence = {
         "ota_update_absent": ota_absent,
         "aws_iot_job_absent": job_absent,
         "s3_source_object_or_version_absent": s3_absent,
+        "s3_signer_output_prefix_absent": signed_prefix_absent,
     }
+    if unresolved_signer_submission:
+        errors.append(
+            {
+                "operation": "verify_terminal",
+                "resource": "aws_signer_job",
+                "error_type": "UnresolvedSignerSubmission",
+                "message": (
+                    "OTA creation may have submitted an AWS Signer job, but "
+                    "no signing_job_id was journaled; terminal state cannot "
+                    "be proven"
+                ),
+            }
+        )
     checked_absence = [
         value for key, value in absence.items() if key != "passed" and value is not None
     ]

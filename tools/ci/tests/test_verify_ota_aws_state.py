@@ -16,6 +16,7 @@ META = {
     "s3_bucket": "test-bucket",
     "s3_key": "ota/test-thing/candidate.rsu",
     "s3_version": "test-version",
+    "code_signing_mode": "custom",
     "file_version": "2.06.0",
 }
 
@@ -30,6 +31,7 @@ def live_ota_payload(
     key: str | None = META["s3_key"],
     version: str | None = META["s3_version"],
     file_version: str | None = META["file_version"],
+    signer_job_id: str | None = None,
     include_s3_file: bool = True,
 ) -> dict:
     ota_info = {
@@ -41,18 +43,21 @@ def live_ota_payload(
     if targets is not None:
         ota_info["targets"] = targets
     if include_s3_file:
-        ota_info["otaUpdateFiles"] = [
-            {
-                "fileVersion": file_version,
-                "fileLocation": {
-                    "s3Location": {
-                        "bucket": bucket,
-                        "key": key,
-                        "version": version,
-                    }
-                },
+        ota_file = {
+            "fileVersion": file_version,
+            "fileLocation": {
+                "s3Location": {
+                    "bucket": bucket,
+                    "key": key,
+                    "version": version,
+                }
+            },
+        }
+        if signer_job_id is not None:
+            ota_file["codeSigning"] = {
+                "awsSignerJobId": signer_job_id,
             }
-        ]
+        ota_info["otaUpdateFiles"] = [ota_file]
     return {"otaUpdateInfo": ota_info}
 
 
@@ -367,6 +372,7 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
             "s3_bucket": META["s3_bucket"],
             "s3_key": META["s3_key"],
             "s3_version": META["s3_version"],
+            "code_signing_mode": "custom",
         }
         calls: list[list[str]] = []
 
@@ -400,6 +406,7 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
             "region": META["region"],
             "s3_bucket": META["s3_bucket"],
             "s3_key": META["s3_key"],
+            "code_signing_mode": "custom",
         }
         calls: list[list[str]] = []
         list_calls = 0
@@ -459,12 +466,622 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
         )
         self.assertNotIn("not-owned", deleted_versions)
 
+    def test_cleanup_deletes_every_signer_prefix_version_and_marker(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        partial = {
+            "region": META["region"],
+            "thing_name": META["thing_name"],
+            "s3_bucket": META["s3_bucket"],
+            "s3_key": META["s3_key"],
+            "signed_prefix": signed_prefix,
+            "code_signing_mode": "aws-signer",
+            "ota_update_status": "S3_UPLOADED",
+        }
+        calls: list[list[str]] = []
+        signer_list_calls = 0
+
+        def fake_run(args, _region, *, absent_ok=False):
+            nonlocal signer_list_calls
+            calls.append(args)
+            if args[:2] == ["s3api", "list-object-versions"]:
+                prefix = args[args.index("--prefix") + 1]
+                if prefix == META["s3_key"]:
+                    return {}
+                self.assertEqual(signed_prefix, prefix)
+                self.assertIn("--no-paginate", args)
+                signer_list_calls += 1
+                if signer_list_calls == 1:
+                    signed_key = signed_prefix + "signing-job-id"
+                    return {
+                        "Versions": [
+                            {
+                                "Key": signed_key,
+                                "VersionId": "signed-version-1",
+                            },
+                            {
+                                "Key": signed_key,
+                                "VersionId": "signed-version-2",
+                            },
+                        ],
+                        "DeleteMarkers": [
+                            {
+                                "Key": signed_key,
+                                "VersionId": "signed-delete-marker",
+                            }
+                        ],
+                    }
+                return {}
+            if args[:2] == ["s3api", "list-objects-v2"]:
+                self.assertEqual(
+                    signed_prefix,
+                    args[args.index("--prefix") + 1],
+                )
+                return {}
+            if args[:2] == ["s3api", "head-object"]:
+                self.assertTrue(absent_ok)
+                return None
+            if args[:2] == ["s3api", "delete-object"]:
+                return {}
+            self.fail(f"unexpected AWS call: {args}")
+
+        with patch.object(ota_state, "run_aws", side_effect=fake_run):
+            summary = ota_state.cleanup_state(
+                partial,
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        self.assertTrue(summary["absence"]["passed"])
+        self.assertTrue(
+            summary["absence"]["s3_signer_output_prefix_absent"]
+        )
+        deletes = [
+            call
+            for call in calls
+            if call[:2] == ["s3api", "delete-object"]
+        ]
+        self.assertEqual(3, len(deletes))
+        self.assertEqual(
+            {
+                "signed-version-1",
+                "signed-version-2",
+                "signed-delete-marker",
+            },
+            {
+                call[call.index("--version-id") + 1]
+                for call in deletes
+            },
+        )
+        self.assertIn(
+            "s3_signer_output_prefix",
+            summary["checked_resources"],
+        )
+
+    def test_signer_prefix_version_listing_paginates_fail_closed(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        responses = [
+            {
+                "IsTruncated": True,
+                "NextKeyMarker": signed_prefix + "job",
+                "NextVersionIdMarker": "version-1",
+                "Versions": [
+                    {
+                        "Key": signed_prefix + "job",
+                        "VersionId": "version-1",
+                    }
+                ],
+            },
+            {
+                "IsTruncated": False,
+                "DeleteMarkers": [
+                    {
+                        "Key": signed_prefix + "job",
+                        "VersionId": "delete-marker",
+                    }
+                ],
+            },
+        ]
+        calls: list[list[str]] = []
+
+        def fake_run(args, _region, *, absent_ok=False):
+            self.assertFalse(absent_ok)
+            calls.append(args)
+            return responses.pop(0)
+
+        with patch.object(ota_state, "run_aws", side_effect=fake_run):
+            entries = ota_state.list_s3_prefix_versions(
+                dict(META),
+                META["region"],
+                signed_prefix,
+            )
+
+        self.assertEqual(2, len(entries))
+        self.assertEqual(2, len(calls))
+        self.assertIn("--no-paginate", calls[0])
+        self.assertIn("--key-marker", calls[1])
+        self.assertIn("--version-id-marker", calls[1])
+
+    def test_cleanup_blocks_unsafe_signer_prefix_before_aws_calls(
+        self,
+    ) -> None:
+        unsafe = dict(META)
+        unsafe["signed_prefix"] = "ota/different-thing/signed/"
+        unsafe["code_signing_mode"] = "aws-signer"
+
+        with patch.object(ota_state, "run_aws") as run_aws:
+            summary = ota_state.cleanup_state(
+                unsafe,
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        run_aws.assert_not_called()
+        self.assertEqual([], summary["actions"])
+        self.assertTrue(summary["errors"])
+        self.assertFalse(summary["absence"]["passed"])
+
+    def test_cleanup_rejects_aws_signer_metadata_without_prefix(
+        self,
+    ) -> None:
+        missing = dict(META)
+        missing["code_signing_mode"] = "aws-signer"
+
+        with patch.object(ota_state, "run_aws") as run_aws:
+            summary = ota_state.cleanup_state(
+                missing,
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        run_aws.assert_not_called()
+        self.assertEqual([], summary["actions"])
+        self.assertIn(
+            "requires signed_prefix",
+            summary["errors"][0]["message"],
+        )
+        self.assertFalse(summary["absence"]["passed"])
+
+    def test_cleanup_catches_signer_output_that_appears_late(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        partial = {
+            "region": META["region"],
+            "thing_name": META["thing_name"],
+            "s3_bucket": META["s3_bucket"],
+            "s3_key": META["s3_key"],
+            "signed_prefix": signed_prefix,
+            "code_signing_mode": "aws-signer",
+            "ota_update_status": "CREATE_REQUESTED",
+        }
+        late_version = {
+            "kind": "version",
+            "key": signed_prefix + "late-signing-job",
+            "version_id": "late-version",
+        }
+
+        with (
+            patch.object(
+                ota_state,
+                "list_exact_s3_key_versions",
+                return_value=[],
+            ),
+            patch.object(
+                ota_state,
+                "wait_until_s3_key_fully_absent",
+                return_value=True,
+            ),
+            patch.object(
+                ota_state,
+                "list_s3_prefix_versions",
+                side_effect=[[], [late_version], []],
+            ),
+            patch.object(
+                ota_state,
+                "list_current_s3_prefix_keys",
+                side_effect=[[], [], []],
+            ),
+            patch.object(
+                ota_state,
+                "run_aws",
+                side_effect=[None, {}],
+            ) as run_aws,
+            patch.object(
+                ota_state.time,
+                "time",
+                side_effect=[0.0, 0.2, 0.5, 1.1],
+            ),
+            patch.object(ota_state.time, "sleep") as sleep,
+        ):
+            summary = ota_state.cleanup_state(
+                partial,
+                wait_timeout=1,
+                poll_interval=0,
+            )
+
+        self.assertTrue(
+            summary["absence"]["s3_signer_output_prefix_absent"]
+        )
+        self.assertFalse(summary["absence"]["passed"])
+        self.assertEqual(
+            "UnresolvedSignerSubmission",
+            summary["errors"][0]["error_type"],
+        )
+        self.assertEqual(
+            "late-version",
+            summary["actions"][-1]["version_id"],
+        )
+        self.assertEqual(2, run_aws.call_count)
+        self.assertEqual(2, sleep.call_count)
+
+    def test_live_ota_enriches_signer_job_id_before_cleanup(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        partial = {
+            **META,
+            "code_signing_mode": "aws-signer",
+            "signed_prefix": signed_prefix,
+        }
+        partial.pop("signing_job_id", None)
+
+        errors = ota_state.reconcile_live_ota_identity(
+            partial,
+            live_ota_payload(signer_job_id="signing-job"),
+        )
+
+        self.assertEqual([], errors)
+        self.assertEqual("signing-job", partial["signing_job_id"])
+
+    def test_signer_job_waits_for_terminal_and_validates_owned_output(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        signer_meta = {
+            **META,
+            "code_signing_mode": "aws-signer",
+            "signed_prefix": signed_prefix,
+            "signing_job_id": "signing-job",
+        }
+        source = {
+            "s3": {
+                "bucketName": META["s3_bucket"],
+                "key": META["s3_key"],
+                "version": META["s3_version"],
+            }
+        }
+        responses = [
+            {
+                "jobId": "signing-job",
+                "status": "InProgress",
+                "source": source,
+            },
+            {
+                "jobId": "signing-job",
+                "status": "Succeeded",
+                "source": source,
+                "signedObject": {
+                    "s3": {
+                        "bucketName": META["s3_bucket"],
+                        "key": signed_prefix + "signing-job",
+                    }
+                },
+            },
+        ]
+
+        with (
+            patch.object(
+                ota_state,
+                "run_aws",
+                side_effect=responses,
+            ),
+            patch.object(
+                ota_state.time,
+                "time",
+                side_effect=[0.0, 0.5],
+            ),
+            patch.object(ota_state.time, "sleep") as sleep,
+        ):
+            result = ota_state.wait_for_signing_job_terminal(
+                signer_meta,
+                META["region"],
+                timeout=1,
+                poll_interval=0,
+            )
+
+        self.assertEqual("Succeeded", result["status"])
+        sleep.assert_called_once_with(0)
+
+    def test_signer_job_rejects_foreign_output_before_cleanup(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        signer_meta = {
+            **META,
+            "code_signing_mode": "aws-signer",
+            "signed_prefix": signed_prefix,
+            "signing_job_id": "signing-job",
+        }
+        response = {
+            "jobId": "signing-job",
+            "status": "Succeeded",
+            "source": {
+                "s3": {
+                    "bucketName": META["s3_bucket"],
+                    "key": META["s3_key"],
+                    "version": META["s3_version"],
+                }
+            },
+            "signedObject": {
+                "s3": {
+                    "bucketName": META["s3_bucket"],
+                    "key": "ota/foreign-thing/signed/signing-job",
+                }
+            },
+        }
+
+        with patch.object(
+            ota_state,
+            "run_aws",
+            return_value=response,
+        ):
+            with self.assertRaisesRegex(ValueError, "outside"):
+                ota_state.wait_for_signing_job_terminal(
+                    signer_meta,
+                    META["region"],
+                    timeout=0,
+                    poll_interval=0,
+                )
+
+    def test_cleanup_waits_for_signer_before_destructive_calls(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        signer_meta = {
+            "region": META["region"],
+            "thing_name": META["thing_name"],
+            "s3_bucket": META["s3_bucket"],
+            "s3_key": META["s3_key"],
+            "code_signing_mode": "aws-signer",
+            "signed_prefix": signed_prefix,
+            "signing_job_id": "signing-job",
+        }
+        events: list[str] = []
+
+        def fake_signer_wait(*_args, **_kwargs):
+            events.append("signer-terminal")
+            return {"status": "Succeeded"}
+
+        def fake_run(args, _region, *, absent_ok=False):
+            if args[:2] == ["s3api", "head-object"]:
+                self.assertTrue(absent_ok)
+                events.append("source-read")
+                return None
+            if args[:2] == ["s3api", "delete-object"]:
+                events.append("signer-delete")
+                return {}
+            self.fail(f"unexpected AWS call: {args}")
+
+        signer_version = {
+            "kind": "version",
+            "key": signed_prefix + "signing-job",
+            "version_id": "signer-version",
+        }
+        with (
+            patch.object(
+                ota_state,
+                "wait_for_signing_job_terminal",
+                side_effect=fake_signer_wait,
+            ),
+            patch.object(
+                ota_state,
+                "list_exact_s3_key_versions",
+                return_value=[],
+            ),
+            patch.object(
+                ota_state,
+                "wait_until_s3_key_fully_absent",
+                return_value=True,
+            ),
+            patch.object(
+                ota_state,
+                "list_s3_prefix_versions",
+                side_effect=[[signer_version], []],
+            ),
+            patch.object(
+                ota_state,
+                "list_current_s3_prefix_keys",
+                side_effect=[[], []],
+            ),
+            patch.object(ota_state, "run_aws", side_effect=fake_run),
+        ):
+            summary = ota_state.cleanup_state(
+                signer_meta,
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        self.assertTrue(summary["absence"]["passed"])
+        self.assertLess(
+            events.index("signer-terminal"),
+            events.index("signer-delete"),
+        )
+
+    def test_cleanup_signer_timeout_blocks_all_aws_mutation(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        signer_meta = {
+            "region": META["region"],
+            "thing_name": META["thing_name"],
+            "s3_bucket": META["s3_bucket"],
+            "s3_key": META["s3_key"],
+            "code_signing_mode": "aws-signer",
+            "signed_prefix": signed_prefix,
+            "signing_job_id": "signing-job",
+        }
+
+        with (
+            patch.object(
+                ota_state,
+                "wait_for_signing_job_terminal",
+                side_effect=TimeoutError("still running"),
+            ),
+            patch.object(ota_state, "run_aws") as run_aws,
+        ):
+            summary = ota_state.cleanup_state(
+                signer_meta,
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        run_aws.assert_not_called()
+        self.assertEqual([], summary["actions"])
+        self.assertEqual(
+            "aws_signer_job",
+            summary["errors"][0]["resource"],
+        )
+        self.assertFalse(summary["absence"]["passed"])
+
+    def test_signer_identity_guards_fail_closed(self) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        signer_meta = {
+            **META,
+            "code_signing_mode": "aws-signer",
+            "signed_prefix": signed_prefix,
+            "signing_job_id": "signing-job",
+        }
+        base = {
+            "jobId": "signing-job",
+            "status": "Succeeded",
+            "source": {
+                "s3": {
+                    "bucketName": META["s3_bucket"],
+                    "key": META["s3_key"],
+                    "version": META["s3_version"],
+                }
+            },
+            "signedObject": {
+                "s3": {
+                    "bucketName": META["s3_bucket"],
+                    "key": signed_prefix + "signing-job",
+                }
+            },
+        }
+        cases = {
+            "job id": {"jobId": "foreign-job"},
+            "source bucket": {
+                "source": {
+                    "s3": {
+                        "bucketName": "foreign-bucket",
+                        "key": META["s3_key"],
+                        "version": META["s3_version"],
+                    }
+                }
+            },
+            "source key": {
+                "source": {
+                    "s3": {
+                        "bucketName": META["s3_bucket"],
+                        "key": "ota/foreign/candidate.rsu",
+                        "version": META["s3_version"],
+                    }
+                }
+            },
+            "source version": {
+                "source": {
+                    "s3": {
+                        "bucketName": META["s3_bucket"],
+                        "key": META["s3_key"],
+                        "version": "foreign-version",
+                    }
+                }
+            },
+        }
+
+        for label, override in cases.items():
+            with self.subTest(label=label):
+                payload = {**base, **override}
+                self.assertTrue(
+                    ota_state.signing_job_identity_errors(
+                        signer_meta,
+                        payload,
+                    )
+                )
+
+    def test_current_signer_prefix_listing_paginates_fail_closed(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        responses = [
+            {
+                "IsTruncated": True,
+                "NextContinuationToken": "next-page",
+                "Contents": [{"Key": signed_prefix + "first"}],
+            },
+            {
+                "IsTruncated": False,
+                "Contents": [{"Key": signed_prefix + "second"}],
+            },
+        ]
+        calls: list[list[str]] = []
+
+        def fake_run(args, _region, *, absent_ok=False):
+            self.assertFalse(absent_ok)
+            calls.append(args)
+            return responses.pop(0)
+
+        with patch.object(ota_state, "run_aws", side_effect=fake_run):
+            keys = ota_state.list_current_s3_prefix_keys(
+                dict(META),
+                META["region"],
+                signed_prefix,
+            )
+
+        self.assertEqual(
+            [signed_prefix + "first", signed_prefix + "second"],
+            keys,
+        )
+        self.assertEqual(2, len(calls))
+        self.assertIn("--no-paginate", calls[0])
+        self.assertIn("--continuation-token", calls[1])
+
+    def test_signer_prefix_listing_rejects_out_of_prefix_entry(
+        self,
+    ) -> None:
+        signed_prefix = f"ota/{META['thing_name']}/signed/"
+        response = {
+            "Versions": [
+                {
+                    "Key": "ota/different-thing/signed/job",
+                    "VersionId": "foreign-version",
+                }
+            ]
+        }
+
+        with patch.object(
+            ota_state,
+            "run_aws",
+            return_value=response,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "out-of-prefix"):
+                ota_state.list_s3_prefix_versions(
+                    dict(META),
+                    META["region"],
+                    signed_prefix,
+                )
+
     def test_cleanup_discovers_job_id_from_partial_ota_metadata(self) -> None:
         partial = {
             "region": META["region"],
             "ota_update_id": META["ota_update_id"],
             "s3_bucket": META["s3_bucket"],
             "s3_key": META["s3_key"],
+            "code_signing_mode": "custom",
         }
         get_calls = 0
 
@@ -673,7 +1290,8 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
             path.write_text(
                 (
                     '{"region": "us-test-1", "s3_bucket": "bucket", '
-                    '"s3_key": "key"}\n'
+                    '"s3_key": "key", '
+                    '"code_signing_mode": "custom"}\n'
                 ),
                 encoding="utf-8",
             )
@@ -684,7 +1302,10 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "meta.json"
             path.write_text(
-                '{"region": "us-test-1", "s3_bucket": "bucket"}\n',
+                (
+                    '{"region": "us-test-1", "s3_bucket": "bucket", '
+                    '"code_signing_mode": "custom"}\n'
+                ),
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "together"):
@@ -696,11 +1317,31 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
             path.write_text(
                 (
                     '{"region": "us-test-1", "ota_update_id": "ota-test", '
-                    '"s3_version": "version"}\n'
+                    '"s3_version": "version", '
+                    '"code_signing_mode": "custom"}\n'
                 ),
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "s3_version requires"):
+                ota_state.load_meta(path, require_complete=False)
+
+    def test_partial_cleanup_metadata_rejects_unscoped_signed_prefix(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "meta.json"
+            path.write_text(
+                (
+                    '{"region": "us-test-1", "s3_bucket": "bucket", '
+                    '"s3_key": "key", "signed_prefix": "ota/x/signed/", '
+                    '"code_signing_mode": "aws-signer"}\n'
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                ValueError,
+                "signed_prefix requires",
+            ):
                 ota_state.load_meta(path, require_complete=False)
 
 

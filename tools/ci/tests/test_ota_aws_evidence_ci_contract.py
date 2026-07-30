@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+import json
+import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from tools import create_bg96_ota_update
+from tools import create_ota_update
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -134,6 +142,10 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
                 self.assertLess(partial_meta, create)
                 self.assertLess(upload, create)
                 self.assertIn('"ota_update_status": "UPLOAD_REQUESTED"', source)
+                self.assertLess(
+                    source.index('"signed_prefix":'),
+                    partial_meta,
+                )
                 self.assertIn('ota_update_status="S3_UPLOADED"', source)
                 self.assertIn("uuid.uuid4().hex[:12]", source)
                 self.assertIn(
@@ -141,6 +153,175 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
                     source,
                 )
                 self.assertIn("meta_path=meta_path", source)
+
+    def test_ota_creators_reject_unowned_signer_prefix(self) -> None:
+        for validator in (
+            create_bg96_ota_update.validate_signed_prefix,
+            create_ota_update.validate_signed_prefix,
+        ):
+            with self.subTest(validator=validator.__module__):
+                validator("pipeline-thing", "ota/pipeline-thing/signed/")
+                with self.assertRaisesRegex(ValueError, "Thing namespace"):
+                    validator("pipeline-thing", "ota/other-thing/signed/")
+                with self.assertRaisesRegex(ValueError, "Thing namespace"):
+                    validator("pipeline-thing", "ota/pipeline-thing/")
+                with self.assertRaisesRegex(ValueError, "Thing namespace"):
+                    validator(
+                        "pipeline-thing",
+                        "ota/pipeline-thing/signed",
+                    )
+
+    def test_ota_creators_journal_signer_id_during_status_poll(self) -> None:
+        payload = {
+            "otaUpdateInfo": {
+                "otaUpdateFiles": [
+                    {
+                        "codeSigning": {
+                            "awsSignerJobId": "signing-job",
+                        }
+                    }
+                ]
+            }
+        }
+        for creator in (
+            create_bg96_ota_update,
+            create_ota_update,
+        ):
+            with self.subTest(creator=creator.__name__):
+                self.assertEqual(
+                    "signing-job",
+                    creator.ota_meta_updates(payload)["signing_job_id"],
+                )
+
+    def test_rx72_creator_writes_owned_prefix_before_upload(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = root / "candidate.rsu"
+            payload.write_bytes(b"candidate")
+            artifact_dir = root / "artifacts"
+            journal_at_upload: dict = {}
+
+            def fake_run(args, region, cwd=None):
+                del region, cwd
+                if args[:2] == ["iot", "describe-thing"]:
+                    return SimpleNamespace(
+                        stdout=json.dumps({"thingArn": "arn:thing"}),
+                    )
+                if args[:2] == ["s3api", "put-object"]:
+                    journal_at_upload.update(
+                        json.loads(
+                            (artifact_dir / "ota_job_meta.json").read_text(
+                                encoding="utf-8"
+                            )
+                        )
+                    )
+                    raise RuntimeError("stop after journal")
+                self.fail(f"unexpected AWS call: {args}")
+
+            argv = [
+                "create_ota_update.py",
+                "--artifact-dir",
+                str(artifact_dir),
+                "--thing-name",
+                "pipeline-thing",
+                "--input-rsu",
+                str(payload),
+                "--file-version",
+                "2.06.0",
+                "--bucket",
+                "bucket",
+                "--signing-profile",
+                "profile",
+                "--role-arn",
+                "arn:role",
+                "--region",
+                "us-test-1",
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    create_ota_update,
+                    "run_aws",
+                    side_effect=fake_run,
+                ),
+                self.assertRaisesRegex(RuntimeError, "after journal"),
+            ):
+                create_ota_update.main()
+
+        self.assertEqual("aws-signer", journal_at_upload["code_signing_mode"])
+        self.assertTrue(
+            journal_at_upload["signed_prefix"].startswith(
+                "ota/pipeline-thing/signed/"
+            )
+        )
+        self.assertIn(
+            journal_at_upload["ota_update_id"],
+            journal_at_upload["signed_prefix"],
+        )
+
+    def test_bg96_creator_writes_owned_prefix_before_upload(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = root / "candidate.rsu"
+            payload.write_bytes(b"candidate")
+            artifact_dir = root / "artifacts"
+            journal_at_upload: dict = {}
+
+            def fake_aws(args, region):
+                del region
+                if args[:2] == ["iot", "describe-thing"]:
+                    return {"thingArn": "arn:thing"}
+                if args[:2] == ["s3api", "put-object"]:
+                    journal_at_upload.update(
+                        json.loads(
+                            (artifact_dir / "ota_job_meta.json").read_text(
+                                encoding="utf-8"
+                            )
+                        )
+                    )
+                    raise RuntimeError("stop after journal")
+                self.fail(f"unexpected AWS call: {args}")
+
+            argv = [
+                "create_bg96_ota_update.py",
+                "--artifact-dir",
+                str(artifact_dir),
+                "--thing-name",
+                "pipeline-thing",
+                "--input-payload",
+                str(payload),
+                "--file-version",
+                "2.06.0",
+                "--bucket",
+                "bucket",
+                "--signing-profile",
+                "profile",
+                "--role-arn",
+                "arn:role",
+                "--region",
+                "us-test-1",
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    create_bg96_ota_update,
+                    "aws",
+                    side_effect=fake_aws,
+                ),
+                self.assertRaisesRegex(RuntimeError, "after journal"),
+            ):
+                create_bg96_ota_update.main()
+
+        self.assertEqual("aws-signer", journal_at_upload["code_signing_mode"])
+        self.assertTrue(
+            journal_at_upload["signed_prefix"].startswith(
+                "ota/pipeline-thing/signed/"
+            )
+        )
+        self.assertIn(
+            journal_at_upload["ota_update_id"],
+            journal_at_upload["signed_prefix"],
+        )
 
     def test_general_ci_changes_do_not_start_dependency_only_contract(self) -> None:
         contract = job_block(

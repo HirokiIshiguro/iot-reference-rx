@@ -376,7 +376,10 @@ pipeline専用Thing名を含むcredential / TSIP key / code signer設定、
 download・activation・commit観測までを連続実行します。別pipelineは異なる
 Thing名を使うため、先にAWS Jobを作成していてもone-shot Jobを横取りできません。
 作成helperは最初のAWS変更より前にS3/OTA識別子をjournalへ保存します。
-cleanupはOTA update / IoT Job / S3 objectの不在を確認し、さらに専用Thingから
+cleanupはOTA update / IoT Job / S3 source objectに加え、OTA ID単位の専用prefixへ
+AWS Signerが生成した全object version / delete markerの不在を確認します。
+Signer出力は遅延生成される場合があるため、既定60秒の監視枠内で再列挙と削除を
+続けます。さらに専用Thingから
 記録済み証明書だけをdetachしてThingを削除した後、base Thingと証明書attachの
 残存および専用Thingの不在を確認します。S3 VersionIdがjournalへ反映される前に
 作成jobが停止した場合も、pipeline固有keyの全version / delete markerを列挙して

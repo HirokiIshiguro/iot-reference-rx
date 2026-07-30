@@ -76,6 +76,19 @@ def write_meta(path, meta, **updates):
     write_json(path, meta)
 
 
+def validate_signed_prefix(thing_name, signed_prefix):
+    owner_root = f"ota/{thing_name}/"
+    if (
+        not signed_prefix.startswith(owner_root)
+        or signed_prefix == owner_root
+        or not signed_prefix.endswith("/")
+    ):
+        raise ValueError(
+            "signed prefix must be a child directory of the OTA Thing "
+            f"namespace {owner_root!r}"
+        )
+
+
 def load_json(result):
     if not result.stdout.strip():
         return {}
@@ -84,11 +97,18 @@ def load_json(result):
 
 def ota_meta_updates(payload):
     info = payload.get("otaUpdateInfo", payload)
+    signing_job_id = None
+    ota_files = info.get("otaUpdateFiles")
+    if isinstance(ota_files, list) and ota_files:
+        code_signing = ota_files[0].get("codeSigning", {})
+        if isinstance(code_signing, dict):
+            signing_job_id = code_signing.get("awsSignerJobId")
     return {
         "ota_update_arn": info.get("otaUpdateArn"),
         "ota_update_status": info.get("otaUpdateStatus"),
         "aws_iot_job_id": info.get("awsIotJobId"),
         "aws_iot_job_arn": info.get("awsIotJobArn"),
+        "signing_job_id": signing_job_id,
     }
 
 
@@ -162,11 +182,15 @@ def main():
     thing_info = load_json(thing_result)
     thing_arn = thing_info["thingArn"]
 
-    s3_key = args.s3_key or f"ota/{args.thing_name}/{input_rsu.name}"
-    signed_prefix = args.signed_prefix or f"ota/{args.thing_name}/signed/"
     ota_update_id = (
         f"{args.ota_id_prefix}-{int(time.time())}-{uuid.uuid4().hex[:12]}"
     )
+    s3_key = args.s3_key or f"ota/{args.thing_name}/{input_rsu.name}"
+    signed_prefix = (
+        args.signed_prefix
+        or f"ota/{args.thing_name}/signed/{ota_update_id}/"
+    )
+    validate_signed_prefix(args.thing_name, signed_prefix)
     meta = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "region": args.region,
@@ -177,6 +201,11 @@ def main():
         "s3_bucket": args.bucket,
         "s3_key": s3_key,
         "s3_version": None,
+        # AWS Signer writes one or more versioned output objects below this
+        # prefix. Journal it before the upload so the always-running cleanup
+        # job can remove signer output even after a partial create failure.
+        "signed_prefix": signed_prefix,
+        "code_signing_mode": "aws-signer",
         "signing_profile": args.signing_profile,
         "file_version": args.file_version,
         "input_rsu": str(input_rsu),
