@@ -431,7 +431,7 @@ nightly_dependency_contract:
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-dependency-gate"'
       changes:
         - .gitlab-ci.yml
         - tools/ci/check_nightly_dependency_alignment.py
