@@ -3216,7 +3216,6 @@ cleanup_rx65n_bg96_mqtt_credentials:
   resource_group: rx65n-bg96-aws-iot-credentials
   dependencies:
     - prepare_rx65n_bg96_mqtt_credentials
-  allow_failure: true
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_DYNAMIC_IOT_CREDENTIALS == "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota|full)$/'
       when: always
@@ -3225,15 +3224,48 @@ cleanup_rx65n_bg96_mqtt_credentials:
     - $ErrorActionPreference = "Continue"
     - |
       $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\prepare_rx65n_bg96_mqtt_credentials"
+      $modePath = Join-Path $artifactDir "mode.txt"
       $metaPath = Join-Path $artifactDir "iot_credentials_meta.json"
       $outPath = Join-Path $artifactDir "cleanup_summary.json"
-      if (-not (Test-Path -LiteralPath $metaPath)) {
-        Write-Host "Temporary BG96 credential metadata missing; cleanup skipped."
+
+      $hasMode = Test-Path -LiteralPath $modePath
+      $hasMeta = Test-Path -LiteralPath $metaPath
+      if ($hasMode) {
+        $mode = (Get-Content -LiteralPath $modePath -Raw).Trim()
+        if ($mode -cnotin @("static", "static-tsip")) {
+          Write-Error "Unknown BG96 credential mode '$mode'; refusing cleanup."
+          exit 1
+        }
+        if ($hasMeta) {
+          Write-Error "Static BG96 credential mode '$mode' unexpectedly includes dynamic metadata; refusing cleanup."
+          exit 1
+        }
+
+        $summary = [ordered]@{
+          schema_version = 1
+          credential_mode = $mode
+          cleanup_action = "no-op"
+          dynamic_metadata_present = $false
+          passed = $true
+        }
+        $summary | ConvertTo-Json | Set-Content -LiteralPath $outPath -Encoding utf8 -ErrorAction Stop
+        Write-Host "Static BG96 credential mode '$mode' requires no AWS cleanup."
         exit 0
       }
+
+      if (-not $hasMeta) {
+        Write-Error "BG96 credential mode and dynamic metadata are both missing; cleanup cannot be verified."
+        exit 1
+      }
+
       python tools/cleanup_bg96_iot_credentials.py `
         --meta-json "$metaPath" `
         --output-json "$outPath"
+      $cleanupStatus = $LASTEXITCODE
+      if ($cleanupStatus -ne 0) {
+        Write-Error "Temporary BG96 credential cleanup failed."
+        exit $cleanupStatus
+      }
   artifacts:
     when: always
     paths:

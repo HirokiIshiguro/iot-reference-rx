@@ -20,6 +20,42 @@ META = {
 }
 
 
+def live_ota_payload(
+    *,
+    ota_id: str | None = META["ota_update_id"],
+    job_id: str | None = META["aws_iot_job_id"],
+    job_arn: str | None = None,
+    targets: list[str] | None = None,
+    bucket: str | None = META["s3_bucket"],
+    key: str | None = META["s3_key"],
+    version: str | None = META["s3_version"],
+    file_version: str | None = META["file_version"],
+    include_s3_file: bool = True,
+) -> dict:
+    ota_info = {
+        "otaUpdateId": ota_id,
+        "awsIotJobId": job_id,
+    }
+    if job_arn is not None:
+        ota_info["awsIotJobArn"] = job_arn
+    if targets is not None:
+        ota_info["targets"] = targets
+    if include_s3_file:
+        ota_info["otaUpdateFiles"] = [
+            {
+                "fileVersion": file_version,
+                "fileLocation": {
+                    "s3Location": {
+                        "bucket": bucket,
+                        "key": key,
+                        "version": version,
+                    }
+                },
+            }
+        ]
+    return {"otaUpdateInfo": ota_info}
+
+
 class VerifyOtaAwsStateTests(unittest.TestCase):
     def test_snapshot_requires_successful_terminal_job_and_execution(self) -> None:
         def fake_run(args, _region, *, absent_ok=False):
@@ -372,12 +408,7 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
                 self.assertTrue(absent_ok)
                 get_calls += 1
                 if get_calls == 1:
-                    return {
-                        "otaUpdateInfo": {
-                            "otaUpdateId": META["ota_update_id"],
-                            "awsIotJobId": META["aws_iot_job_id"],
-                        }
-                    }
+                    return live_ota_payload()
                 return None
             if args[:2] in (
                 ["iot", "describe-job"],
@@ -396,8 +427,172 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
 
         self.assertTrue(summary["absence"]["passed"])
         self.assertEqual(META["aws_iot_job_id"], partial["aws_iot_job_id"])
+        self.assertEqual(META["s3_version"], partial["s3_version"])
         self.assertIn("aws_iot_job", summary["checked_resources"])
         self.assertTrue(summary["absence"]["aws_iot_job_absent"])
+
+    def test_cleanup_blocks_identity_mismatch_before_any_mutation(self) -> None:
+        cases = {
+            "ota_update_id": {"ota_id": "different-ota"},
+            "aws_iot_job_id": {"job_id": "different-job"},
+            "s3_bucket": {"bucket": "different-bucket"},
+            "s3_key": {"key": "different-key"},
+            "s3_version": {"version": "different-version"},
+            "file_version": {"file_version": "different-file-version"},
+        }
+        destructive_calls = {
+            ("iot", "delete-ota-update"),
+            ("iot", "delete-job"),
+            ("s3api", "delete-object"),
+        }
+
+        for field, overrides in cases.items():
+            with self.subTest(field=field):
+                calls: list[list[str]] = []
+
+                def fake_run(args, _region, *, absent_ok=False):
+                    calls.append(args)
+                    self.assertNotIn(tuple(args[:2]), destructive_calls)
+                    self.assertEqual(["iot", "get-ota-update"], args[:2])
+                    self.assertTrue(absent_ok)
+                    return live_ota_payload(**overrides)
+
+                with patch.object(
+                    ota_state,
+                    "run_aws",
+                    side_effect=fake_run,
+                ):
+                    summary = ota_state.cleanup_state(
+                        dict(META),
+                        wait_timeout=0,
+                        poll_interval=0,
+                    )
+
+                self.assertEqual(1, len(calls))
+                self.assertEqual([], summary["actions"])
+                self.assertTrue(summary["errors"])
+                self.assertFalse(summary["absence"]["passed"])
+
+    def test_cleanup_blocks_job_arn_and_thing_target_mismatch(self) -> None:
+        cases = {
+            "aws_iot_job_arn": (
+                {"aws_iot_job_arn": "arn:aws:iot:us-test-1:123:job/expected"},
+                {
+                    "job_arn": "arn:aws:iot:us-test-1:123:job/different",
+                },
+            ),
+            "thing_arn": (
+                {"thing_arn": "arn:aws:iot:us-test-1:123:thing/expected"},
+                {
+                    "targets": [
+                        "arn:aws:iot:us-test-1:123:thing/different"
+                    ],
+                },
+            ),
+        }
+
+        for field, (meta_overrides, live_overrides) in cases.items():
+            with self.subTest(field=field):
+                calls: list[list[str]] = []
+
+                def fake_run(args, _region, *, absent_ok=False):
+                    calls.append(args)
+                    self.assertEqual(["iot", "get-ota-update"], args[:2])
+                    self.assertTrue(absent_ok)
+                    return live_ota_payload(**live_overrides)
+
+                meta = dict(META)
+                meta.update(meta_overrides)
+                with patch.object(
+                    ota_state,
+                    "run_aws",
+                    side_effect=fake_run,
+                ):
+                    summary = ota_state.cleanup_state(
+                        meta,
+                        wait_timeout=0,
+                        poll_interval=0,
+                    )
+
+                self.assertEqual(1, len(calls))
+                self.assertEqual([], summary["actions"])
+                self.assertTrue(summary["errors"])
+                self.assertFalse(summary["absence"]["passed"])
+
+    def test_cleanup_blocks_missing_live_identity_before_mutation(self) -> None:
+        cases = {
+            "missing_job": {"job_id": None},
+            "missing_s3_file": {"include_s3_file": False},
+        }
+        destructive_calls = {
+            ("iot", "delete-ota-update"),
+            ("iot", "delete-job"),
+            ("s3api", "delete-object"),
+        }
+
+        for field, overrides in cases.items():
+            with self.subTest(field=field):
+                calls: list[list[str]] = []
+
+                def fake_run(args, _region, *, absent_ok=False):
+                    calls.append(args)
+                    self.assertNotIn(tuple(args[:2]), destructive_calls)
+                    self.assertEqual(["iot", "get-ota-update"], args[:2])
+                    self.assertTrue(absent_ok)
+                    return live_ota_payload(**overrides)
+
+                with patch.object(
+                    ota_state,
+                    "run_aws",
+                    side_effect=fake_run,
+                ):
+                    summary = ota_state.cleanup_state(
+                        dict(META),
+                        wait_timeout=0,
+                        poll_interval=0,
+                    )
+
+                self.assertEqual(1, len(calls))
+                self.assertEqual([], summary["actions"])
+                self.assertTrue(summary["errors"])
+                self.assertFalse(summary["absence"]["passed"])
+
+    def test_cleanup_blocks_discovery_error_before_mutation(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args, _region, *, absent_ok=False):
+            calls.append(args)
+            self.assertEqual(["iot", "get-ota-update"], args[:2])
+            self.assertTrue(absent_ok)
+            raise ota_state.AwsCommandError("discovery denied")
+
+        with patch.object(ota_state, "run_aws", side_effect=fake_run):
+            summary = ota_state.cleanup_state(
+                dict(META),
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        self.assertEqual(1, len(calls))
+        self.assertEqual([], summary["actions"])
+        self.assertEqual(1, len(summary["errors"]))
+        self.assertFalse(summary["absence"]["passed"])
+
+    def test_cleanup_blocks_incomplete_metadata_before_aws_calls(self) -> None:
+        incomplete = dict(META)
+        incomplete.pop("s3_key")
+
+        with patch.object(ota_state, "run_aws") as run_aws:
+            summary = ota_state.cleanup_state(
+                incomplete,
+                wait_timeout=0,
+                poll_interval=0,
+            )
+
+        run_aws.assert_not_called()
+        self.assertEqual([], summary["actions"])
+        self.assertEqual(1, len(summary["errors"]))
+        self.assertFalse(summary["absence"]["passed"])
 
     def test_incomplete_metadata_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -427,6 +622,19 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "together"):
+                ota_state.load_meta(path, require_complete=False)
+
+    def test_partial_cleanup_metadata_rejects_s3_version_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "meta.json"
+            path.write_text(
+                (
+                    '{"region": "us-test-1", "ota_update_id": "ota-test", '
+                    '"s3_version": "version"}\n'
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "s3_version requires"):
                 ota_state.load_meta(path, require_complete=False)
 
 

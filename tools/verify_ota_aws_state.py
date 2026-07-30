@@ -136,6 +136,13 @@ def load_meta(
             raise ValueError(
                 "OTA cleanup metadata must provide s3_bucket and s3_key together"
             )
+        if payload.get("s3_version") and not (
+            has_s3_bucket and has_s3_key
+        ):
+            raise ValueError(
+                "OTA cleanup metadata s3_version requires "
+                "s3_bucket and s3_key"
+            )
         has_known_resource = any(
             (
                 payload.get("ota_update_id"),
@@ -178,6 +185,256 @@ def s3_head_args(meta: dict[str, Any]) -> list[str]:
     if meta.get("s3_version"):
         args.extend(["--version-id", str(meta["s3_version"])])
     return args
+
+
+def cleanup_resources(meta: dict[str, Any]) -> list[str]:
+    return [
+        resource
+        for resource, present in (
+            ("ota_update", meta.get("ota_update_id")),
+            ("aws_iot_job", meta.get("aws_iot_job_id")),
+            (
+                "s3_source_object",
+                meta.get("s3_bucket") and meta.get("s3_key"),
+            ),
+        )
+        if present
+    ]
+
+
+def metadata_identity_error(
+    resource: str,
+    message: str,
+) -> dict[str, str]:
+    return {
+        "operation": "preflight_identity",
+        "resource": resource,
+        "error_type": "MetadataIdentityError",
+        "message": message,
+    }
+
+
+def validate_cleanup_metadata_identity(
+    meta: dict[str, Any],
+) -> list[dict[str, str]]:
+    has_s3_bucket = bool(meta.get("s3_bucket"))
+    has_s3_key = bool(meta.get("s3_key"))
+    if has_s3_bucket != has_s3_key:
+        return [
+            metadata_identity_error(
+                "s3_source_object",
+                "Metadata must provide s3_bucket and s3_key together",
+            )
+        ]
+    if meta.get("s3_version") and not (has_s3_bucket and has_s3_key):
+        return [
+            metadata_identity_error(
+                "s3_source_object",
+                "Metadata s3_version requires s3_bucket and s3_key",
+            )
+        ]
+    return []
+
+
+def reconcile_live_ota_identity(
+    meta: dict[str, Any],
+    ota_payload: dict[str, Any],
+) -> list[dict[str, str]]:
+    """Validate live OTA identity and safely enrich partial metadata."""
+    errors: list[dict[str, str]] = []
+    updates: dict[str, Any] = {}
+    ota_info = ota_payload.get("otaUpdateInfo")
+    if not isinstance(ota_info, dict):
+        return [
+            metadata_identity_error(
+                "ota_update",
+                "Live OTA response does not contain otaUpdateInfo",
+            )
+        ]
+
+    live_ota_id = ota_info.get("otaUpdateId")
+    if not live_ota_id:
+        errors.append(
+            metadata_identity_error(
+                "ota_update",
+                "Live OTA response does not contain otaUpdateId",
+            )
+        )
+    elif live_ota_id != meta.get("ota_update_id"):
+        errors.append(
+            metadata_identity_error(
+                "ota_update",
+                (
+                    f"Live OTA ID {live_ota_id} does not match metadata "
+                    f"{meta.get('ota_update_id')}"
+                ),
+            )
+        )
+
+    live_job_id = ota_info.get("awsIotJobId")
+    recorded_job_id = meta.get("aws_iot_job_id")
+    if not live_job_id:
+        errors.append(
+            metadata_identity_error(
+                "aws_iot_job",
+                "Live OTA response does not contain awsIotJobId",
+            )
+        )
+    elif recorded_job_id and recorded_job_id != live_job_id:
+        errors.append(
+            metadata_identity_error(
+                "aws_iot_job",
+                (
+                    f"Live OTA reports AWS IoT Job {live_job_id}, but "
+                    f"metadata records {recorded_job_id}"
+                ),
+            )
+        )
+    elif not recorded_job_id:
+        updates["aws_iot_job_id"] = live_job_id
+
+    live_job_arn = ota_info.get("awsIotJobArn")
+    recorded_job_arn = meta.get("aws_iot_job_arn")
+    if recorded_job_arn and live_job_arn != recorded_job_arn:
+        errors.append(
+            metadata_identity_error(
+                "aws_iot_job",
+                (
+                    f"Live OTA reports AWS IoT Job ARN {live_job_arn}, but "
+                    f"metadata records {recorded_job_arn}"
+                ),
+            )
+        )
+    elif not recorded_job_arn and live_job_arn:
+        updates["aws_iot_job_arn"] = live_job_arn
+
+    recorded_thing_arn = meta.get("thing_arn")
+    live_targets = ota_info.get("targets")
+    if recorded_thing_arn and (
+        not isinstance(live_targets, list)
+        or recorded_thing_arn not in live_targets
+    ):
+        errors.append(
+            metadata_identity_error(
+                "ota_update",
+                (
+                    f"Live OTA targets do not contain metadata thing ARN "
+                    f"{recorded_thing_arn}"
+                ),
+            )
+        )
+
+    recorded_bucket = meta.get("s3_bucket")
+    recorded_key = meta.get("s3_key")
+    recorded_version = meta.get("s3_version")
+    if bool(recorded_bucket) != bool(recorded_key):
+        errors.append(
+            metadata_identity_error(
+                "s3_source_object",
+                "Metadata must provide s3_bucket and s3_key together",
+            )
+        )
+    elif recorded_version and not (recorded_bucket and recorded_key):
+        errors.append(
+            metadata_identity_error(
+                "s3_source_object",
+                "Metadata s3_version requires s3_bucket and s3_key",
+            )
+        )
+    elif recorded_bucket and recorded_key:
+        live_s3_files: list[dict[str, Any]] = []
+        ota_files = ota_info.get("otaUpdateFiles")
+        if isinstance(ota_files, list):
+            for ota_file in ota_files:
+                if not isinstance(ota_file, dict):
+                    continue
+                file_location = ota_file.get("fileLocation")
+                if not isinstance(file_location, dict):
+                    continue
+                s3_location = file_location.get("s3Location")
+                if not isinstance(s3_location, dict):
+                    continue
+                live_s3_files.append(
+                    {
+                        "bucket": s3_location.get("bucket"),
+                        "key": s3_location.get("key"),
+                        "version": s3_location.get("version"),
+                        "file_version": ota_file.get("fileVersion"),
+                    }
+                )
+
+        matching_files = [
+            item
+            for item in live_s3_files
+            if item["bucket"] == recorded_bucket
+            and item["key"] == recorded_key
+        ]
+        if len(live_s3_files) != 1 or len(matching_files) != 1:
+            errors.append(
+                metadata_identity_error(
+                    "s3_source_object",
+                    (
+                        "Live OTA does not contain exactly one total S3 file "
+                        f"matching {recorded_bucket}/{recorded_key}"
+                    ),
+                )
+            )
+        else:
+            live_s3_file = matching_files[0]
+            live_version = live_s3_file["version"]
+            if recorded_version and live_version != recorded_version:
+                errors.append(
+                    metadata_identity_error(
+                        "s3_source_object",
+                        (
+                            f"Live OTA reports S3 version {live_version}, but "
+                            f"metadata records {recorded_version}"
+                        ),
+                    )
+                )
+            elif not recorded_version and live_version:
+                updates["s3_version"] = live_version
+
+            recorded_file_version = meta.get("file_version")
+            live_file_version = live_s3_file["file_version"]
+            if (
+                recorded_file_version
+                and live_file_version != recorded_file_version
+            ):
+                errors.append(
+                    metadata_identity_error(
+                        "s3_source_object",
+                        (
+                            f"Live OTA reports file version "
+                            f"{live_file_version}, but metadata records "
+                            f"{recorded_file_version}"
+                        ),
+                    )
+                )
+
+    if not errors:
+        meta.update(updates)
+    return errors
+
+
+def blocked_cleanup_summary(
+    meta: dict[str, Any],
+    errors: list[dict[str, str]],
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "verified_at_utc": utc_now(),
+        "metadata": public_meta(meta),
+        "checked_resources": cleanup_resources(meta),
+        "actions": [],
+        "errors": errors,
+        "absence": {
+            "ota_update_absent": None,
+            "aws_iot_job_absent": None,
+            "s3_source_object_or_version_absent": None,
+            "passed": False,
+        },
+    }
 
 
 def snapshot_state(
@@ -344,7 +601,9 @@ def cleanup_state(
 ) -> dict[str, Any]:
     region = str(meta["region"])
     actions: list[dict[str, Any]] = []
-    errors: list[dict[str, str]] = []
+    errors = validate_cleanup_metadata_identity(meta)
+    if errors:
+        return blocked_cleanup_summary(meta, errors)
 
     def attempt(operation: str, resource: str, callback):
         try:
@@ -360,7 +619,6 @@ def cleanup_state(
             )
             return False, None
 
-    ota_absent: bool | None = None
     if meta.get("ota_update_id"):
         discovery_ok, discovery_payload = attempt(
             "discover",
@@ -376,34 +634,17 @@ def cleanup_state(
                 absent_ok=True,
             ),
         )
-        discovered_job_id = (
-            (discovery_payload or {})
-            .get("otaUpdateInfo", {})
-            .get("awsIotJobId")
-        )
-        if discovery_ok and discovered_job_id:
-            recorded_job_id = meta.get("aws_iot_job_id")
-            if recorded_job_id and recorded_job_id != discovered_job_id:
-                errors.append(
-                    {
-                        "operation": "discover",
-                        "resource": "aws_iot_job",
-                        "error_type": "MetadataIdentityError",
-                        "message": (
-                            "OTA update reports AWS IoT Job "
-                            f"{discovered_job_id}, but metadata records "
-                            f"{recorded_job_id}"
-                        ),
-                    }
-                )
-            elif not recorded_job_id:
-                meta["aws_iot_job_id"] = discovered_job_id
-                meta["aws_iot_job_arn"] = (
-                    (discovery_payload or {})
-                    .get("otaUpdateInfo", {})
-                    .get("awsIotJobArn")
-                )
+        if not discovery_ok:
+            return blocked_cleanup_summary(meta, errors)
+        if discovery_payload is not None:
+            errors.extend(
+                reconcile_live_ota_identity(meta, discovery_payload)
+            )
+        if errors:
+            return blocked_cleanup_summary(meta, errors)
 
+    ota_absent: bool | None = None
+    if meta.get("ota_update_id"):
         ota_delete_ok, ota_delete = attempt(
             "delete",
             "ota_update",
@@ -559,18 +800,7 @@ def cleanup_state(
         "schema_version": 1,
         "verified_at_utc": utc_now(),
         "metadata": public_meta(meta),
-        "checked_resources": [
-            resource
-            for resource, present in (
-                ("ota_update", meta.get("ota_update_id")),
-                ("aws_iot_job", meta.get("aws_iot_job_id")),
-                (
-                    "s3_source_object",
-                    meta.get("s3_bucket") and meta.get("s3_key"),
-                ),
-            )
-            if present
-        ],
+        "checked_resources": cleanup_resources(meta),
         "actions": actions,
         "errors": errors,
         "absence": absence,
