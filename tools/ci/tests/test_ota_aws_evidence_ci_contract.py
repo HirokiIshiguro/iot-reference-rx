@@ -323,6 +323,148 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
             journal_at_upload["signed_prefix"],
         )
 
+    def test_rx72_creator_completes_with_signer_id_in_final_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = root / "candidate.rsu"
+            payload.write_bytes(b"candidate")
+            artifact_dir = root / "artifacts"
+            final_payload = {
+                "otaUpdateInfo": {
+                    "otaUpdateArn": "arn:ota",
+                    "otaUpdateStatus": "CREATE_COMPLETE",
+                    "awsIotJobId": "iot-job",
+                    "awsIotJobArn": "arn:iot-job",
+                    "otaUpdateFiles": [
+                        {
+                            "codeSigning": {
+                                "awsSignerJobId": "signing-job",
+                            }
+                        }
+                    ],
+                }
+            }
+
+            def fake_run(args, region, cwd=None):
+                del region, cwd
+                if args[:2] == ["iot", "describe-thing"]:
+                    payload_out = {"thingArn": "arn:thing"}
+                elif args[:2] == ["s3api", "put-object"]:
+                    payload_out = {"VersionId": "source-version"}
+                elif args[:2] == ["iot", "create-ota-update"]:
+                    payload_out = final_payload
+                elif args[:2] == ["signer", "describe-signing-job"]:
+                    payload_out = {"jobId": "signing-job", "status": "Succeeded"}
+                else:
+                    self.fail(f"unexpected AWS call: {args}")
+                return SimpleNamespace(stdout=json.dumps(payload_out))
+
+            argv = [
+                "create_ota_update.py",
+                "--artifact-dir",
+                str(artifact_dir),
+                "--thing-name",
+                "pipeline-thing",
+                "--input-rsu",
+                str(payload),
+                "--file-version",
+                "2.06.0",
+                "--bucket",
+                "bucket",
+                "--signing-profile",
+                "profile",
+                "--role-arn",
+                "arn:role",
+                "--region",
+                "us-test-1",
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(create_ota_update, "run_aws", side_effect=fake_run),
+                patch.object(
+                    create_ota_update,
+                    "wait_for_ota_status",
+                    return_value=final_payload,
+                ),
+            ):
+                self.assertEqual(0, create_ota_update.main())
+
+            meta = json.loads(
+                (artifact_dir / "ota_job_meta.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("signing-job", meta["signing_job_id"])
+            self.assertEqual("CREATE_COMPLETE", meta["ota_update_status"])
+
+    def test_bg96_creator_completes_with_signer_id_in_final_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = root / "candidate.rsu"
+            payload.write_bytes(b"candidate")
+            artifact_dir = root / "artifacts"
+            final_payload = {
+                "otaUpdateInfo": {
+                    "otaUpdateArn": "arn:ota",
+                    "otaUpdateStatus": "CREATE_COMPLETE",
+                    "awsIotJobId": "iot-job",
+                    "awsIotJobArn": "arn:iot-job",
+                    "otaUpdateFiles": [
+                        {
+                            "codeSigning": {
+                                "awsSignerJobId": "signing-job",
+                            }
+                        }
+                    ],
+                }
+            }
+
+            def fake_aws(args, region):
+                del region
+                if args[:2] == ["iot", "describe-thing"]:
+                    return {"thingArn": "arn:thing"}
+                if args[:2] == ["s3api", "put-object"]:
+                    return {"VersionId": "source-version"}
+                if args[:2] == ["iot", "create-ota-update"]:
+                    return final_payload
+                if args[:2] == ["signer", "describe-signing-job"]:
+                    return {"jobId": "signing-job", "status": "Succeeded"}
+                self.fail(f"unexpected AWS call: {args}")
+
+            argv = [
+                "create_bg96_ota_update.py",
+                "--artifact-dir",
+                str(artifact_dir),
+                "--thing-name",
+                "pipeline-thing",
+                "--input-payload",
+                str(payload),
+                "--file-version",
+                "2.06.0",
+                "--bucket",
+                "bucket",
+                "--signing-profile",
+                "profile",
+                "--role-arn",
+                "arn:role",
+                "--region",
+                "us-test-1",
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(create_bg96_ota_update, "aws", side_effect=fake_aws),
+                patch.object(
+                    create_bg96_ota_update,
+                    "wait_for_ota",
+                    return_value=final_payload,
+                ),
+            ):
+                self.assertEqual(0, create_bg96_ota_update.main())
+
+            meta = json.loads(
+                (artifact_dir / "ota_job_meta.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("signing-job", meta["signing_job_id"])
+            self.assertEqual("CREATE_COMPLETE", meta["ota_update_status"])
+
     def test_general_ci_changes_do_not_start_dependency_only_contract(self) -> None:
         contract = job_block(
             self.ci,

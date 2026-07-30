@@ -317,7 +317,6 @@ def main():
         meta_path,
         meta,
         **ota_meta_updates(final_payload),
-        signing_job_id=signer_job_id,
     )
 
     print("")

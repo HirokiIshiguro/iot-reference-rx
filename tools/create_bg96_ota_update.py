@@ -291,7 +291,6 @@ def main() -> int:
         meta_path,
         meta,
         **ota_meta_updates(final_output),
-        signing_job_id=signer_job_id,
     )
 
     print("OTA update creation complete")
