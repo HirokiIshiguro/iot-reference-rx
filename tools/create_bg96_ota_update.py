@@ -47,12 +47,32 @@ def encode_custom_signature_for_cli(der_signature: bytes) -> str:
     return base64.b64encode(base64.b64encode(der_signature)).decode("ascii")
 
 
-def wait_for_ota(ota_update_id: str, region: str, timeout: int, poll_interval: int) -> dict:
+def ota_meta_updates(payload: dict) -> dict[str, object]:
+    info = payload.get("otaUpdateInfo", payload)
+    return {
+        "ota_update_arn": info.get("otaUpdateArn"),
+        "ota_update_status": info.get("otaUpdateStatus"),
+        "aws_iot_job_id": info.get("awsIotJobId"),
+        "aws_iot_job_arn": info.get("awsIotJobArn"),
+    }
+
+
+def wait_for_ota(
+    ota_update_id: str,
+    region: str,
+    timeout: int,
+    poll_interval: int,
+    *,
+    meta_path: Path | None = None,
+    meta: dict | None = None,
+) -> dict:
     deadline = time.time() + timeout
     last_payload: dict | None = None
     while time.time() < deadline:
         payload = aws(["iot", "get-ota-update", "--ota-update-id", ota_update_id], region)
         last_payload = payload
+        if meta_path is not None and meta is not None:
+            write_meta(meta_path, meta, **ota_meta_updates(payload))
         status = payload["otaUpdateInfo"]["otaUpdateStatus"]
         print(f"OTA update status: {status}")
         if status in TERMINAL_CREATE_STATES:
@@ -197,9 +217,19 @@ def main() -> int:
         args.region,
     )
     write_json(artifact_dir / "create_ota_output.json", create_output)
-    write_meta(meta_path, meta, ota_update_status="CREATE_SUBMITTED")
+    create_updates = ota_meta_updates(create_output)
+    if not create_updates.get("ota_update_status"):
+        create_updates["ota_update_status"] = "CREATE_SUBMITTED"
+    write_meta(meta_path, meta, **create_updates)
 
-    final_output = wait_for_ota(ota_update_id, args.region, args.wait_timeout, args.poll_interval)
+    final_output = wait_for_ota(
+        ota_update_id,
+        args.region,
+        args.wait_timeout,
+        args.poll_interval,
+        meta_path=meta_path,
+        meta=meta,
+    )
     write_json(artifact_dir / "ota_update_status.json", final_output)
 
     ota_info = final_output["otaUpdateInfo"]
@@ -215,10 +245,7 @@ def main() -> int:
     write_meta(
         meta_path,
         meta,
-        ota_update_arn=ota_info.get("otaUpdateArn"),
-        ota_update_status=ota_info.get("otaUpdateStatus"),
-        aws_iot_job_id=ota_info.get("awsIotJobId"),
-        aws_iot_job_arn=ota_info.get("awsIotJobArn"),
+        **ota_meta_updates(final_output),
         signing_job_id=signer_job_id,
     )
 

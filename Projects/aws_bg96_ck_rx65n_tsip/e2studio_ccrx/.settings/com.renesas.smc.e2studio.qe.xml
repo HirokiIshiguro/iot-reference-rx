@@ -186,7 +186,7 @@
             <Setting id="IRQ_CFG_FILT_PLCK_IRQ13" value="IRQ_CFG_PCLK_DIV1"/>
         </Segment>
         <Segment component="r_tsip_rx1.21" id="r_tsip_rx" source="com.renesas.smc.tools.swcomponent.fit.source"/>
-        <Segment component="r_fwup2.04" id="r_fwup" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_fwup2.06" id="r_fwup" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="FWUP_CFG_USER_BANK_SWAP_FUNCTION" value="ota_bank_swap_function"/>
             <Setting id="FWUP_CFG_UPDATE_MODE" value="0"/>
             <Setting id="FWUP_CFG_USER_FLASH_READ_ENABLED" value="1"/>
@@ -450,7 +450,7 @@
             <Setting id="SCI_CFG_CH11_RX_DMACA_CH_NUM" value="1"/>
             <Setting id="SCI_CFG_CH2_TX_SIGNAL_TRANSITION_TIMING_INCLUDED" value="0"/>
         </Segment>
-        <Segment component="r_flash_rx5.21" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_flash_rx5.22" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" value="1"/>

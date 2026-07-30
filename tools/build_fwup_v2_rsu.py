@@ -13,12 +13,11 @@ known-good rx72n-envision-kit pipeline.
 from __future__ import annotations
 
 import argparse
+import csv
 import struct
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 
 RSU_HEADER_SIZE = 0x200
@@ -30,9 +29,109 @@ SIG_TYPE = b"sig-sha256-ecdsa"
 HW_ID = 0x00000009
 USER_PROGRAM_TOP = 0xFFE00300
 USER_PROGRAM_BOTTOM = 0xFFFBFFFF
+BOOTLOADER_TOP = 0xFFFC0000
+BOOTLOADER_BOTTOM = 0xFFFFFFFF
+FLASH_WRITE_SIZE = 128
 USER_CONST_DATA_TOP = 0x00100800
 USER_CONST_DATA_BOTTOM = 0x001077FF
 DATA_FLASH_PAD_SIZE = 32768  # bootloader expects one 32 KB DF block
+
+
+@dataclass(frozen=True)
+class PrmLayout:
+    device_type: str
+    bootloader_start: int
+    bootloader_end: int
+    user_program_start: int
+    user_program_end: int
+    flash_write_size: int
+
+
+def load_prm_layout(prm_path: Path) -> PrmLayout:
+    required_fields = {
+        "device Type",
+        "Bootloader Start Address",
+        "Bootloader End Address",
+        "User Program Start Address",
+        "User Program End Address",
+        "Flash Write Size",
+    }
+    values: dict[str, str] = {}
+
+    with prm_path.open(newline="", encoding="utf-8-sig") as handle:
+        for line_no, row in enumerate(csv.reader(handle), 1):
+            if not row or all(not column.strip() for column in row):
+                continue
+            if len(row) != 2:
+                raise RuntimeError(
+                    f"PRM line {line_no} must contain exactly two columns, got {len(row)}"
+                )
+            key, value = (column.strip() for column in row)
+            if key in values:
+                raise RuntimeError(f"duplicate PRM field on line {line_no}: {key}")
+            values[key] = value
+
+    missing = sorted(required_fields - values.keys())
+    if missing:
+        raise RuntimeError(f"missing required PRM fields: {', '.join(missing)}")
+
+    def parse_integer(field: str) -> int:
+        try:
+            return int(values[field], 0)
+        except ValueError as exc:
+            raise RuntimeError(
+                f"PRM field {field!r} is not an integer: {values[field]!r}"
+            ) from exc
+
+    return PrmLayout(
+        device_type=values["device Type"],
+        bootloader_start=parse_integer("Bootloader Start Address"),
+        bootloader_end=parse_integer("Bootloader End Address"),
+        user_program_start=parse_integer("User Program Start Address"),
+        user_program_end=parse_integer("User Program End Address"),
+        flash_write_size=parse_integer("Flash Write Size"),
+    )
+
+
+def validate_prm_layout(layout: PrmLayout) -> None:
+    expected_user_payload_start = (
+        layout.user_program_start + RSU_HEADER_SIZE + RSU_DESCRIPTOR_SIZE
+    )
+    mismatches: list[str] = []
+
+    if layout.device_type != "Dual Mode":
+        mismatches.append(f"device Type={layout.device_type!r} (expected 'Dual Mode')")
+    if expected_user_payload_start != USER_PROGRAM_TOP:
+        mismatches.append(
+            "User Program Start Address + RSU header/descriptor="
+            f"0x{expected_user_payload_start:08X} (expected 0x{USER_PROGRAM_TOP:08X})"
+        )
+    if layout.user_program_end != USER_PROGRAM_BOTTOM:
+        mismatches.append(
+            f"User Program End Address=0x{layout.user_program_end:08X} "
+            f"(expected 0x{USER_PROGRAM_BOTTOM:08X})"
+        )
+    if layout.bootloader_start != BOOTLOADER_TOP:
+        mismatches.append(
+            f"Bootloader Start Address=0x{layout.bootloader_start:08X} "
+            f"(expected 0x{BOOTLOADER_TOP:08X})"
+        )
+    if layout.bootloader_end != BOOTLOADER_BOTTOM:
+        mismatches.append(
+            f"Bootloader End Address=0x{layout.bootloader_end:08X} "
+            f"(expected 0x{BOOTLOADER_BOTTOM:08X})"
+        )
+    if layout.user_program_end + 1 != layout.bootloader_start:
+        mismatches.append(
+            "User Program End Address and Bootloader Start Address are not contiguous"
+        )
+    if layout.flash_write_size != FLASH_WRITE_SIZE:
+        mismatches.append(
+            f"Flash Write Size={layout.flash_write_size} (expected {FLASH_WRITE_SIZE})"
+        )
+
+    if mismatches:
+        raise RuntimeError("incompatible RX72N PRM layout: " + "; ".join(mismatches))
 
 
 def parse_args() -> argparse.Namespace:
@@ -106,6 +205,9 @@ def parse_mot_file(mot_path: Path) -> tuple[bytearray, bytearray, int, int]:
 
 
 def sign_ecdsa(data: bytes, key_path: Path) -> bytes:
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec, utils
+
     with key_path.open("rb") as handle:
         private_key = serialization.load_pem_private_key(handle.read(), password=None)
 
@@ -115,6 +217,9 @@ def sign_ecdsa(data: bytes, key_path: Path) -> bytes:
 
 
 def verify_ecdsa(data: bytes, signature: bytes, key_path: Path) -> bool:
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec, utils
+
     with key_path.open("rb") as handle:
         private_key = serialization.load_pem_private_key(handle.read(), password=None)
 
@@ -207,6 +312,12 @@ def main() -> int:
     if args.seq_no < 1 or args.seq_no > 0xFFFFFFFF:
         raise SystemExit(f"sequence number must be 1-4294967295, got {args.seq_no}")
 
+    try:
+        prm_layout = load_prm_layout(args.prm)
+        validate_prm_layout(prm_layout)
+    except (OSError, RuntimeError) as exc:
+        raise SystemExit(f"PRM validation failed for {args.prm}: {exc}") from exc
+
     print("=== mot_to_rsu converter ===")
     print(f"  MCU:     RX72N (HW_ID=0x{HW_ID:08X})")
     print(f"  MOT:     {args.mot}")
@@ -214,7 +325,14 @@ def main() -> int:
     print(f"  Output:  {args.output}")
     print(f"  Seq No:  {args.seq_no}")
     print()
-    print(f"  PRM:     {args.prm} (validated for compatibility; legacy full-bank layout is fixed)")
+    print(
+        f"  PRM:     {args.prm} "
+        f"(validated: user=0x{prm_layout.user_program_start:08X}-"
+        f"0x{prm_layout.user_program_end:08X}, "
+        f"boot=0x{prm_layout.bootloader_start:08X}-"
+        f"0x{prm_layout.bootloader_end:08X}, "
+        f"write={prm_layout.flash_write_size})"
+    )
     print()
     print("Parsing MOT file...")
 

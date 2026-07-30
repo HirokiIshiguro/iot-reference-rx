@@ -1,9 +1,9 @@
 device Type,Dual Mode
 Code Flash Size(Dual Mode Only),0x00400000
-Bootloader Start Address,0xFFFC0000
+Bootloader Start Address,0xFFFF0000
 Bootloader End Address,0xFFFFFFFF
 User Program Start Address,0xFFE00000
-User Program End Address,0xFFFBFFFF
+User Program End Address,0xFFFEFFFF
 OFS Data Start Address,0xFE7F5D00
 OFS Data End Address,0xFE7F5D7F
 Data Flash Start Address,0x00100000

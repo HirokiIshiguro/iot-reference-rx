@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
- *
- * Copyright (C) 2023-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+/*
+* Copyright (c) 2023-2025 Renesas Electronics Corporation and/or its affiliates
+*
+* SPDX-License-Identifier: BSD-3-Clause
+*/
 /**********************************************************************************************************************
  * File Name    : r_fwup_wrap_flash.c
  * Description  : Functions for the Firmware update module.
@@ -28,6 +15,8 @@
  *         : 28.03.2024 2.02    Update wrapper functions.
  *         : 09.04.2024 2.03    Fixed wrapper function.
  *         : 15.10.2024 2.04    Fixed wrapper function.
+ *         : 24.10.2025 2.05    V205 Release.
+ *         : 23.01.2025 2.06    V206 Release.
  *********************************************************************************************************************/
 
 /**********************************************************************************************************************
@@ -38,10 +27,21 @@
 #include "r_fwup_wrap_flash.h"
 
 #include "r_flash_rx_if.h"
+#if (FWUP_CFG_UPDATE_MODE == FWUP_SINGLE_BANK_W_BUFFER_EXT)
+#include "r_flash_spi_if.h"
+#endif /* (FWUP_CFG_UPDATE_MODE == FWUP_SINGLE_BANK_W_BUFFER_EXT) */
 
 /**********************************************************************************************************************
  Macro definitions
  *********************************************************************************************************************/
+#if (defined(FLASH_SPI_CFG_USE_FIT) && (FWUP_CFG_UPDATE_MODE == FWUP_SINGLE_BANK_W_BUFFER_EXT))
+/* Sector Erase busy timeout 480*1ms = 0.48s  */
+#define FLASH_SE_BUSY_WAIT      (uint32_t)(480)
+/* Chip Erase busy timeout 630,000*1ms = 630s */
+#define FLASH_CE_BUSY_WAIT      (uint32_t)(630000)
+/* Page Program time out 4*1ms = 4ms */
+#define FLASH_PP_BUSY_WAIT      (uint32_t)(4)
+#endif /* (defined(FLASH_SPI_CFG_USE_FIT) && (FWUP_CFG_UPDATE_MODE == FWUP_SINGLE_BANK_W_BUFFER_EXT)) */
 
 /**********************************************************************************************************************
  Local Typedef definitions
@@ -101,6 +101,10 @@ e_fwup_err_t FWUP_CFG_USER_EXT_FLASH_READ_FUNCTION(uint32_t buf_addr, uint32_t s
 /**********************************************************************************************************************
  Private (static) variables and functions
  *********************************************************************************************************************/
+#if (defined(FLASH_SPI_CFG_USE_FIT) && (FWUP_CFG_UPDATE_MODE == FWUP_SINGLE_BANK_W_BUFFER_EXT))
+static uint8_t s_dev_no = FLASH_SPI_DEV0;
+static uint8_t s_config[4];
+#endif /* (defined(FLASH_SPI_CFG_USE_FIT) && (FWUP_CFG_UPDATE_MODE == FWUP_SINGLE_BANK_W_BUFFER_EXT)) */
 
 /*
  * Internal flash
@@ -295,6 +299,38 @@ e_fwup_err_t r_fwup_wrap_bank_swap(void)
 /*
  * External flash
  */
+#if (defined(FLASH_SPI_CFG_USE_FIT))
+/**********************************************************************************************************************
+ * Function Name: ext_flash_busy_check
+ * Description  : function for confirming completion of writing or erasing.
+ * Arguments    : mode              : device number (0, 1)
+ *              : loop_cnt          : Count in milliseconds
+ * Return Value : FLASH_SPI_SUCCESS : success
+ *                FLASH_SPI_ERR_*** : error
+ *********************************************************************************************************************/
+static flash_spi_status_t ext_flash_busy_check(flash_spi_poll_mode_t mode, uint32_t loop_cnt)
+{
+    flash_spi_status_t ret = FLASH_SPI_SUCCESS_BUSY;
+    do
+    {
+        /* FLASH is busy. */
+        ret = R_FLASH_SPI_Polling(s_dev_no, mode);
+        if (FLASH_SPI_SUCCESS_BUSY != ret)
+        {
+            /* FLASH is ready or error. */
+            break;
+        }
+        loop_cnt--;
+        R_BSP_SoftwareDelay(1, BSP_DELAY_MILLISECS);     /* 1ms */
+    }
+    while (0 != loop_cnt);
+    return ret;
+}
+/**********************************************************************************************************************
+ End of function ext_flash_busy_check
+ *********************************************************************************************************************/
+#endif /* defined(FLASH_SPI_CFG_USE_FIT) */
+
 /**********************************************************************************************************************
  * Function Name: r_fwup_wrap_ext_flash_open
  * Description  : wrapper function for opening external Flash.
@@ -307,7 +343,28 @@ e_fwup_err_t r_fwup_wrap_ext_flash_open(void)
 #if (FWUP_CFG_USER_EXT_FLASH_OPEN_ENABLED == 1)
     return FWUP_CFG_USER_EXT_FLASH_OPEN_FUNCTION();
 #else
-#warning "r_fwup_wrap_get_crypt_context is not implemented yet, so user needs to implement it."
+#if (defined(FLASH_SPI_CFG_USE_FIT))
+    if (FLASH_SPI_SUCCESS > R_FLASH_SPI_Open(s_dev_no))
+    {
+        return (FWUP_ERR_FLASH);
+    }
+    if (FLASH_SPI_SUCCESS != ext_flash_busy_check(FLASH_SPI_MODE_ERASE_POLL, FLASH_CE_BUSY_WAIT))
+    {
+        return (FWUP_ERR_FLASH);
+    }
+    if (FLASH_SPI_SUCCESS > R_FLASH_SPI_Set_4byte_Address_Mode(s_dev_no))
+    {
+        return (FWUP_ERR_FLASH);
+    }
+
+    /* Read configuration register */
+    if (FLASH_SPI_SUCCESS > R_FLASH_SPI_Read_Configuration(s_dev_no, &s_config[0]))
+    {
+        return (FWUP_ERR_FLASH);
+    }
+#else
+#warning "r_fwup_wrap_ext_flash_open is not implemented. Please add Serial Flash memory FIT module."
+#endif /* defined(FLASH_SPI_CFG_USE_FIT) */
     return (FWUP_SUCCESS);
 #endif /* (FWUP_CFG_USER_EXT_FLASH_OPEN_ENABLED == 1) */
 }
@@ -324,9 +381,13 @@ e_fwup_err_t r_fwup_wrap_ext_flash_open(void)
 void r_fwup_wrap_ext_flash_close(void)
 {
 #if (FWUP_CFG_USER_EXT_FLASH_CLOSE_ENABLED == 1)
-    return FWUP_CFG_USER_EXT_FLASH_CLOSE_FUNCTION();
+    FWUP_CFG_USER_EXT_FLASH_CLOSE_FUNCTION();
 #else
-#warning "r_fwup_wrap_get_crypt_context is not implemented yet, so user needs to implement it."
+#if (defined(FLASH_SPI_CFG_USE_FIT))
+    R_FLASH_SPI_Close(s_dev_no);
+#else
+#warning "r_fwup_wrap_ext_flash_close is not implemented. Please add Serial Flash memory FIT module."
+#endif /* defined(FLASH_SPI_CFG_USE_FIT) */
 #endif /* (FWUP_CFG_USER_EXT_FLASH_CLOSE_ENABLED == 1) */
 }
 /**********************************************************************************************************************
@@ -346,7 +407,26 @@ e_fwup_err_t r_fwup_wrap_ext_flash_erase(uint32_t addr, uint32_t num_sectors)
 #if (FWUP_CFG_USER_EXT_FLASH_ERASE_ENABLED == 1)
     return FWUP_CFG_USER_EXT_FLASH_ERASE_FUNCTION(addr, num_sectors);
 #else
-#warning "r_fwup_wrap_get_crypt_context is not implemented yet, so user needs to implement it."
+#if (defined(FLASH_SPI_CFG_USE_FIT))
+    flash_spi_erase_info_t flash_info_e;
+    uint32_t               sector_count;
+
+    for (sector_count = 0; sector_count < num_sectors; sector_count++ )
+    {
+        flash_info_e.addr = addr + (FWUP_CFG_EXT_BUF_AREA_BLK_SIZE * sector_count);
+        flash_info_e.mode = FLASH_SPI_MODE_S_ERASE;
+        if (FLASH_SPI_SUCCESS > R_FLASH_SPI_Erase(s_dev_no, &flash_info_e))
+        {
+            return (FWUP_ERR_FLASH);
+        }
+        if (FLASH_SPI_SUCCESS > ext_flash_busy_check(FLASH_SPI_MODE_ERASE_POLL, FLASH_SE_BUSY_WAIT))
+        {
+            return (FWUP_ERR_FLASH);
+        }
+    }
+#else
+#warning "r_fwup_wrap_ext_flash_erase is not implemented. Please add Serial Flash memory FIT module."
+#endif /* defined(FLASH_SPI_CFG_USE_FIT) */
     return (FWUP_SUCCESS);
 #endif /* (FWUP_CFG_USER_EXT_FLASH_ERASE_ENABLED == 1) */
 }
@@ -368,7 +448,23 @@ e_fwup_err_t r_fwup_wrap_ext_flash_write(uint32_t src_addr, uint32_t dest_addr, 
 #if (FWUP_CFG_USER_EXT_FLASH_WRITE_ENABLED == 1)
     return FWUP_CFG_USER_EXT_FLASH_WRITE_FUNCTION(src_addr, dest_addr, num_bytes);
 #else
-#warning "r_fwup_wrap_get_crypt_context is not implemented yet, so user needs to implement it."
+#if (defined(FLASH_SPI_CFG_USE_FIT))
+    flash_spi_info_t flash_info_w;
+    flash_info_w.addr   = dest_addr;
+    flash_info_w.cnt    = num_bytes;
+    flash_info_w.p_data = (uint8_t *)(src_addr);
+    flash_info_w.op_mode = FLASH_SPI_SINGLE;
+    if (FLASH_SPI_SUCCESS > R_FLASH_SPI_Write_Data_Page(s_dev_no, &flash_info_w))
+    {
+        return (FWUP_ERR_FLASH);
+    }
+    if (FLASH_SPI_SUCCESS > ext_flash_busy_check(FLASH_SPI_MODE_PROG_POLL, FLASH_PP_BUSY_WAIT))
+    {
+        return (FWUP_ERR_FLASH);
+    }
+#else
+#warning "r_fwup_wrap_ext_flash_write is not implemented. Please add Serial Flash memory FIT module."
+#endif /* defined(FLASH_SPI_CFG_USE_FIT) */
     return (FWUP_SUCCESS);
 #endif /* (FWUP_CFG_USER_EXT_FLASH_WRITE_ENABLED == 1) */
 }
@@ -390,7 +486,19 @@ e_fwup_err_t r_fwup_wrap_ext_flash_read(uint32_t buf_addr, uint32_t src_addr, ui
 #if (FWUP_CFG_USER_EXT_FLASH_READ_ENABLED == 1)
     return FWUP_CFG_USER_EXT_FLASH_READ_FUNCTION(buf_addr, src_addr, size);
 #else
-#warning "r_fwup_wrap_get_crypt_context is not implemented yet, so user needs to implement it."
+#if (defined(FLASH_SPI_CFG_USE_FIT))
+    flash_spi_info_t flash_info_r;
+    flash_info_r.addr   = src_addr;
+    flash_info_r.cnt    = size;
+    flash_info_r.p_data = (uint8_t *)(buf_addr);
+    flash_info_r.op_mode = FLASH_SPI_SINGLE;
+    if (FLASH_SPI_SUCCESS > R_FLASH_SPI_Read_Data(s_dev_no, &flash_info_r))
+    {
+        return (FWUP_ERR_FLASH);
+    }
+#else
+#warning "r_fwup_wrap_ext_flash_read is not implemented. Please add Serial Flash memory FIT module."
+#endif /* defined(FLASH_SPI_CFG_USE_FIT) */
     return (FWUP_SUCCESS);
 #endif /* (FWUP_CFG_USER_EXT_FLASH_READ_ENABLED == 1) */
 }

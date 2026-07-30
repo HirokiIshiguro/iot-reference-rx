@@ -19,7 +19,7 @@ Set-StrictMode -Version Latest
 $projectRoot = (Resolve-Path $ProjectRoot).Path
 $bootMot = Join-Path $projectRoot "Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot"
 $appMot = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\aws_ether_rx72n_envision_kit.mot"
-$prm = Join-Path $projectRoot "Projects\aws_ether_rx72n_envision_kit\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
+$prm = Join-Path $projectRoot "tools\fwup\rx72n_envision_kit_dual_bank.prm.csv"
 $signingKey = Join-Path $projectRoot "sample_keys\secp256r1.privatekey"
 $rsu = Join-Path $projectRoot "rx72n_local_baseline.rsu"
 $buildScript = Join-Path $projectRoot "tools\build_headless_rx72n.ps1"

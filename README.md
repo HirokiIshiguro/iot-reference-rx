@@ -290,7 +290,7 @@ Demo selection is controlled by macros in `src/frtos_config/demo_config.h`:
 | AWS IoT MQTT File Streams | 1.2.0 | 2028/06/30 |
 | mbedTLS | 3.6.4 | -- |
 | littlefs | 2.5.1 | -- |
-| r_fwup | 2.04 | -- |
+| r_fwup | 2.06 | -- |
 
 ### FIT Modules (RX Driver Package)
 
@@ -298,13 +298,18 @@ Demo selection is controlled by macros in `src/frtos_config/demo_config.h`:
 |------------|----------|-------------------|
 | r_bsp | 7.52 | 1.46 |
 | r_ether_rx | 1.23 | 1.36 - 1.46 |
-| r_flash_rx | 5.21 | 1.46 |
+| r_flash_rx | 5.22 | [1.47 (`2c85d94a9b8b3e7f7bec94663bce0d79b5a17162`)](https://gitlab.saffti.jp/oss/import/github/renesas/rx-driver-package/-/commit/2c85d94a9b8b3e7f7bec94663bce0d79b5a17162) |
 | r_sci_rx | 5.40 | 1.46 |
 | r_s12ad_rx | 5.40 | 1.45 - 1.46 |
 | r_byteq | 2.10 | 1.37 - 1.46 |
 | r_irq_rx | 4.60 | 1.46 |
-| r_fwup | 2.04 | 1.45 - 1.46 |
+| r_fwup | 2.06 | [1.49 (`14a0b1bdd47b870cee294604eb7d4501d59ed07d`)](https://gitlab.saffti.jp/oss/import/github/renesas/rx-driver-package/-/commit/14a0b1bdd47b870cee294604eb7d4501d59ed07d) |
 | r_tsip_rx (RX72N TSIP project) | 1.23.saffti-custom | Renesas 1.23 / RX Driver Package 1.49 base + SAFFTI optional wait hook |
+
+The generated `r_fwup` trees are kept identical to the Renesas 2.06 module.
+RX72N Envision Kit OTA image generation uses
+`tools/fwup/rx72n_envision_kit_dual_bank.prm.csv` so that the signed RSU layout
+matches the existing boot loader reservation at `0xFFFC0000`–`0xFFFFFFFF`.
 
 ## CI/CD Pipeline
 

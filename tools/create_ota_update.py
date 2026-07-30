@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Create an AWS IoT OTA update for CK-RX65N and save the resulting metadata.
+Create an AWS IoT OTA update for RX72N and save the resulting metadata.
 
-This helper is intended for Step 7-5 manual CI runs. It uploads a prepared
+This helper is used by the RX72N Envision Kit OTA CI path. It uploads a prepared
 OTA candidate to S3, creates an OTA update that targets a single thing, waits
 for the OTA update to reach a terminal create state, and writes JSON artifacts
 for later inspection.
@@ -70,13 +70,36 @@ def write_json(path, payload):
         handle.write("\n")
 
 
+def write_meta(path, meta, **updates):
+    meta.update({key: value for key, value in updates.items() if value is not None})
+    write_json(path, meta)
+
+
 def load_json(result):
     if not result.stdout.strip():
         return {}
     return json.loads(result.stdout)
 
 
-def wait_for_ota_status(ota_update_id, region, timeout_seconds, poll_interval):
+def ota_meta_updates(payload):
+    info = payload.get("otaUpdateInfo", payload)
+    return {
+        "ota_update_arn": info.get("otaUpdateArn"),
+        "ota_update_status": info.get("otaUpdateStatus"),
+        "aws_iot_job_id": info.get("awsIotJobId"),
+        "aws_iot_job_arn": info.get("awsIotJobArn"),
+    }
+
+
+def wait_for_ota_status(
+    ota_update_id,
+    region,
+    timeout_seconds,
+    poll_interval,
+    *,
+    meta_path=None,
+    meta=None,
+):
     deadline = time.time() + timeout_seconds
     last_payload = None
     while time.time() < deadline:
@@ -86,6 +109,8 @@ def wait_for_ota_status(ota_update_id, region, timeout_seconds, poll_interval):
         )
         payload = load_json(result)
         last_payload = payload
+        if meta_path is not None and meta is not None:
+            write_meta(meta_path, meta, **ota_meta_updates(payload))
         status = payload["otaUpdateInfo"]["otaUpdateStatus"]
         print(f"OTA update status: {status}")
         if status in TERMINAL_CREATE_STATES:
@@ -123,6 +148,7 @@ def main():
 
     artifact_dir = Path(args.artifact_dir).resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
+    meta_path = artifact_dir / "ota_job_meta.json"
 
     input_rsu = Path(args.input_rsu).resolve()
     if not input_rsu.exists():
@@ -164,6 +190,22 @@ def main():
     if "VersionId" in put_payload:
         file_location["s3Location"]["version"] = put_payload["VersionId"]
 
+    meta = {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "region": args.region,
+        "thing_name": args.thing_name,
+        "thing_arn": thing_arn,
+        "ota_update_id": ota_update_id,
+        "ota_update_status": "CREATE_REQUESTED",
+        "s3_bucket": args.bucket,
+        "s3_key": s3_key,
+        "s3_version": file_location["s3Location"].get("version"),
+        "signing_profile": args.signing_profile,
+        "file_version": args.file_version,
+        "input_rsu": str(input_rsu),
+    }
+    write_json(meta_path, meta)
+
     create_input = {
         "otaUpdateId": ota_update_id,
         "targets": [thing_arn],
@@ -203,12 +245,18 @@ def main():
     )
     create_payload = load_json(create_result)
     write_json(artifact_dir / "create_ota_output.json", create_payload)
+    create_updates = ota_meta_updates(create_payload)
+    if not create_updates.get("ota_update_status"):
+        create_updates["ota_update_status"] = "CREATE_SUBMITTED"
+    write_meta(meta_path, meta, **create_updates)
 
     final_payload = wait_for_ota_status(
         ota_update_id=ota_update_id,
         region=args.region,
         timeout_seconds=args.wait_timeout,
         poll_interval=args.poll_interval,
+        meta_path=meta_path,
+        meta=meta,
     )
     write_json(artifact_dir / "ota_update_status.json", final_payload)
 
@@ -223,25 +271,12 @@ def main():
         )
         write_json(artifact_dir / "signing_job.json", load_json(signing_job_result))
 
-    meta = {
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "region": args.region,
-        "thing_name": args.thing_name,
-        "thing_arn": thing_arn,
-        "ota_update_id": ota_update_id,
-        "ota_update_arn": ota_info.get("otaUpdateArn"),
-        "ota_update_status": ota_info.get("otaUpdateStatus"),
-        "aws_iot_job_id": ota_info.get("awsIotJobId"),
-        "aws_iot_job_arn": ota_info.get("awsIotJobArn"),
-        "s3_bucket": args.bucket,
-        "s3_key": s3_key,
-        "s3_version": file_location["s3Location"].get("version"),
-        "signing_profile": args.signing_profile,
-        "signing_job_id": signer_job_id,
-        "file_version": args.file_version,
-        "input_rsu": str(input_rsu),
-    }
-    write_json(artifact_dir / "ota_job_meta.json", meta)
+    write_meta(
+        meta_path,
+        meta,
+        **ota_meta_updates(final_payload),
+        signing_job_id=signer_job_id,
+    )
 
     print("")
     print("OTA update creation complete")

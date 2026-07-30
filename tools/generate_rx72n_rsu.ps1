@@ -23,7 +23,7 @@ if ([string]::IsNullOrWhiteSpace($AppMot)) {
     $AppMot = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\HardwareDebug\$appProjectName.mot"
 }
 if ([string]::IsNullOrWhiteSpace($PrmCsv)) {
-    $PrmCsv = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv"
+    $PrmCsv = Join-Path $projectRoot "tools\fwup\rx72n_envision_kit_dual_bank.prm.csv"
 }
 if ([string]::IsNullOrWhiteSpace($SigningKey)) {
     $SigningKey = Join-Path $projectRoot "sample_keys\secp256r1.privatekey"

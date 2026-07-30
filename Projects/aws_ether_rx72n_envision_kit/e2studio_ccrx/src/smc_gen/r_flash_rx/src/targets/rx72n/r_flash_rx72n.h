@@ -1,21 +1,8 @@
-/***********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
-* other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
-* applicable laws, including copyright laws.
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
-* THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
-* EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
-* SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS
-* SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
-* this software. By using this software, you agree to the additional terms and conditions found by accessing the
-* following link:
-* http://www.renesas.com/disclaimer
+/*
+* Copyright (C) 2019-2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2019 Renesas Electronics Corporation. All rights reserved.
-***********************************************************************************************************************/
+* SPDX-License-Identifier: BSD-3-Clause
+*/
 /***********************************************************************************************************************
 * File Name    : r_flash_rx72n.h
 * Description  : This is a private header file used internally by the FLASH API module. It should not be modified or
@@ -24,6 +11,8 @@
 /***********************************************************************************************************************
 * History : DD.MM.YYYY Version Description
 *         : 18.11.2019 4.50    First Release
+*         : 26.06.2020 4.60    Removed unnecessary compile condition.
+*         : 20.03.2025 5.22    Changed the disclaimer in program sources
 ***********************************************************************************************************************/
 
 #ifndef R_FLASH_RX72N_H
@@ -367,7 +356,6 @@ typedef enum _flash_block_address
 #endif // 32 blocks for 4M only
 #endif // DUAL MODE
 
-#if (MCU_DATA_FLASH_SIZE_BYTES != 0)
     FLASH_DF_BLOCK_0       = 0x00100000,    /*   64B: 0x00100000 - 0x0010003F */
     FLASH_DF_BLOCK_1       = 0x00100040,    /*   64B: 0x00100040 - 0x0010007F */
     FLASH_DF_BLOCK_2       = 0x00100080,    /*   64B: 0x00100080 - 0x001000BF */
@@ -881,7 +869,6 @@ typedef enum _flash_block_address
     FLASH_DF_BLOCK_510     = 0x00107F80,    /*   64B: 0x00107F80 - 0x00107FBF */
     FLASH_DF_BLOCK_511     = 0x00107FC0,    /*   64B: 0x00107FC0 - 0x00107FFF */
     FLASH_DF_BLOCK_INVALID = 0x00108000     /*   Block 511 + 64 bytes */
-#endif // MCU_DATA_FLASH_SIZE_BYTES != 0
 } flash_block_address_t;
 
 

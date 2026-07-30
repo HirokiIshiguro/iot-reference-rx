@@ -112,7 +112,7 @@ def main():
     generate_cert = tools_dir / "generate_signer_cert.py"
     rsu_builder = tools_dir / "build_fwup_v2_rsu.py"
     app_mot = app_project / "HardwareDebug" / f"{app_project_name}.mot"
-    prm_csv = app_project / "src" / "smc_gen" / "r_fwup" / "tool" / "RX72N_DualBank_ImageGenerator_PRM.csv"
+    prm_csv = tools_dir / "fwup" / "rx72n_envision_kit_dual_bank.prm.csv"
 
     signing_key = Path(args.signing_key).resolve() if args.signing_key else repo_root / "sample_keys" / "secp256r1.privatekey"
     code_sign_cert_out = Path(args.code_sign_cert_out).resolve() if args.code_sign_cert_out else Path(f"{args.output_prefix}_codesign_cert.pem")

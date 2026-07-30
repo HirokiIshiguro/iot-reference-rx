@@ -1041,7 +1041,7 @@ build_rx72n_ether:
   script:
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
-    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard
+    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_rx72n_fwup_prm_contract
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
@@ -1091,7 +1091,7 @@ build_rx72n_ether:
     - |
       python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
         --mot "$rx72nAppMot" `
-        --prm "$rx72nAppRoot\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --prm "$env:CI_PROJECT_DIR\tools\fwup\rx72n_envision_kit_dual_bank.prm.csv" `
         --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
         --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
@@ -1161,7 +1161,7 @@ build_rx65n_bg96:
       optional: true
   script:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
-    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
@@ -1748,7 +1748,7 @@ build_rx72n_ether_fleet:
     - |
       python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
         --mot "$rx72nAppMot" `
-        --prm "$rx72nAppRoot\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --prm "$env:CI_PROJECT_DIR\tools\fwup\rx72n_envision_kit_dual_bank.prm.csv" `
         --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
         --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
@@ -3177,7 +3177,6 @@ test_rx65n_bg96_ota:
 cleanup_rx65n_bg96_ota:
   stage: ota_cleanup
   extends: .aws_cli_windows_job
-  allow_failure: true
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(ota|full)$/'
       when: always
@@ -3188,25 +3187,28 @@ cleanup_rx65n_bg96_ota:
     - $ErrorActionPreference = "Continue"
     - |
       $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx65n_bg96_ota\ota_job_meta.json"
-      if (-not (Test-Path -LiteralPath $metaPath)) {
-        Write-Host "RX65N BG96 OTA metadata missing; cleanup skipped."
-        exit 0
-      }
-      $meta = Get-Content -LiteralPath $metaPath -Raw | ConvertFrom-Json
-      if ($meta.ota_update_id) {
-        aws iot delete-ota-update --ota-update-id $meta.ota_update_id --delete-stream --force-delete-aws-job --region $meta.region
-      }
-      if ($meta.s3_bucket -and $meta.s3_key) {
-        $deleteObjectArgs = @("s3api", "delete-object", "--bucket", $meta.s3_bucket, "--key", $meta.s3_key, "--region", $meta.region)
-        if ($meta.s3_version) {
-          $deleteObjectArgs += @("--version-id", $meta.s3_version)
-        }
-        aws @deleteObjectArgs
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\cleanup_rx65n_bg96_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      python tools/verify_ota_aws_state.py snapshot `
+        --meta-json "$metaPath" `
+        --output-json (Join-Path $artifactDir "pre_cleanup_state.json")
+      $snapshotStatus = $LASTEXITCODE
+
+      python tools/verify_ota_aws_state.py cleanup `
+        --meta-json "$metaPath" `
+        --output-json (Join-Path $artifactDir "post_cleanup_state.json")
+      $cleanupStatus = $LASTEXITCODE
+
+      if ($snapshotStatus -ne 0 -or $cleanupStatus -ne 0) {
+        Write-Error "RX65N BG96 OTA evidence or fail-closed cleanup verification failed."
+        exit 1
       }
   artifacts:
     when: always
     paths:
       - artifacts/create_rx65n_bg96_ota/
+      - artifacts/cleanup_rx65n_bg96_ota/
     expire_in: 7 days
 
 cleanup_rx65n_bg96_mqtt_credentials:
@@ -4926,4 +4928,51 @@ test_rx72n_ether_ota:
     when: always
     paths:
       - artifacts/test_rx72n_ether_ota/
+    expire_in: 7 days
+
+cleanup_rx72n_ether_ota:
+  stage: ota_cleanup
+  extends: .aws_cli_windows_job
+  dependencies:
+    - create_rx72n_ether_ota
+  rules:
+    - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - when: never
+  script:
+    - $ErrorActionPreference = "Continue"
+    - |
+      $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx72n_ether_ota\ota_job_meta.json"
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\cleanup_rx72n_ether_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      python tools/verify_ota_aws_state.py snapshot `
+        --meta-json "$metaPath" `
+        --output-json (Join-Path $artifactDir "pre_cleanup_state.json")
+      $snapshotStatus = $LASTEXITCODE
+
+      python tools/verify_ota_aws_state.py cleanup `
+        --meta-json "$metaPath" `
+        --output-json (Join-Path $artifactDir "post_cleanup_state.json")
+      $cleanupStatus = $LASTEXITCODE
+
+      if ($snapshotStatus -ne 0 -or $cleanupStatus -ne 0) {
+        Write-Error "RX72N OTA evidence or fail-closed cleanup verification failed."
+        exit 1
+      }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/create_rx72n_ether_ota/
+      - artifacts/cleanup_rx72n_ether_ota/
     expire_in: 7 days
