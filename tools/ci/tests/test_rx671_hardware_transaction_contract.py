@@ -56,17 +56,6 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         for job in (flash, test):
             self.assertIn("- .rx671_wifi_linux_hw_job", job)
 
-    def test_dependency_contract_only_runs_in_dependency_gate_profile(self) -> None:
-        dependency_contract = job_block(
-            self.ci,
-            "nightly_dependency_contract",
-            "nightly_dependency_alignment",
-        )
-        self.assertIn(
-            '$PIPELINE_PROFILE == "mr-dependency-gate"',
-            dependency_contract,
-        )
-
     def test_nightly_routes_both_rx671_tls13_0rtt_variants(self) -> None:
         software_template = job_block(
             self.ci,

@@ -89,6 +89,7 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         )
         self.assertIn("stage: dependency_check", contract)
         self.assertIn('$CI_PIPELINE_SOURCE == "merge_request_event"', contract)
+        self.assertIn('$PIPELINE_PROFILE == "mr-dependency-gate"', contract)
         self.assertIn(
             "tools.ci.tests.test_nightly_dependency_alignment",
             contract,
