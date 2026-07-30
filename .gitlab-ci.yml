@@ -643,6 +643,7 @@ matrix_rx671_wifi_fleet_tls13:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    GIT_SUBMODULE_STRATEGY: "none"
     EXPECTED_BENCHMARK_COMMIT_SHA: "$RX671_SOFTWARE_BENCHMARK_RESOLVED_SHA"
     RX671_SOFTWARE_BENCHMARK_PROFILE: "software-all"
     RX671_SOFTWARE_BENCHMARK_RUN_HARDWARE: "true"
@@ -677,6 +678,7 @@ matrix_rx671_wifi_software_tls13_resumption_0rtt:
       yaml_variables: true
       pipeline_variables: false
   variables:
+    GIT_SUBMODULE_STRATEGY: "none"
     EXPECTED_BENCHMARK_COMMIT_SHA: "$RX671_BENCHMARK_RESOLVED_SHA"
     RX671_BENCHMARK_RUN_HARDWARE: "true"
     RX671_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"

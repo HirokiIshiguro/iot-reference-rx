@@ -67,12 +67,19 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
             "matrix_rx671_wifi_software_tls13_resumption_0rtt",
             ".matrix_rx671_lanbench",
         )
+        tsip_template = job_block(
+            self.ci,
+            ".matrix_rx671_lanbench",
+            "matrix_rx671_wifi_lanbench_tcp",
+        )
         tsip = job_block(
             self.ci,
             "matrix_rx671_wifi_tsip_tls13_resumption_0rtt",
             "matrix_rx72n_ether_software_mqtt",
         )
 
+        self.assertIn('GIT_SUBMODULE_STRATEGY: "none"', software_template)
+        self.assertIn('GIT_SUBMODULE_STRATEGY: "none"', tsip_template)
         self.assertIn(
             'RX671_SOFTWARE_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"',
             software_template,
