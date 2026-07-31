@@ -404,7 +404,16 @@ def provision_cellular_apn(args: argparse.Namespace, port: serial.Serial) -> Non
 def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) -> None:
     endpoint, endpoint_var = env_text(ENDPOINT_VARS)
     if args.skip_private_key:
-        thing_name, thing_name_var = env_text(THING_NAME_VARS)
+        dynamic_thing_name, dynamic_thing_name_var = env_text(
+            DYNAMIC_THING_NAME_VARS
+        )
+        if dynamic_thing_name:
+            thing_name, thing_name_var = (
+                dynamic_thing_name,
+                dynamic_thing_name_var,
+            )
+        else:
+            thing_name, thing_name_var = env_text(THING_NAME_VARS)
         client_cert, cert_var = env_text(CLIENT_CERT_VARS)
         private_key, key_var = None, None
     else:

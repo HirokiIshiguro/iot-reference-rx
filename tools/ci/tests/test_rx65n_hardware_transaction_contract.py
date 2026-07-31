@@ -182,6 +182,31 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertIn('RX65N_BG96_REQUIRE_TLS_VERSION:-', job)
         self.assertIn("--require-tls-version", job)
 
+    def test_tsip_ota_alias_overrides_static_thing_name(self) -> None:
+        source = (
+            ROOT / "tools" / "bg96_bootloader_integration.py"
+        ).read_text(encoding="utf-8")
+        provision = source.split(
+            "def provision_mqtt_credentials(", maxsplit=1
+        )[1].split("\ndef ", maxsplit=1)[0]
+        skip_private_key = provision.split(
+            "if args.skip_private_key:", maxsplit=1
+        )[1].split("\n    else:", maxsplit=1)[0]
+
+        self.assertIn(
+            "env_text(\n            DYNAMIC_THING_NAME_VARS\n        )",
+            skip_private_key,
+        )
+        self.assertIn("if dynamic_thing_name:", skip_private_key)
+        self.assertLess(
+            skip_private_key.index("if dynamic_thing_name:"),
+            skip_private_key.index("env_text(THING_NAME_VARS)"),
+        )
+        self.assertIn(
+            "client_cert, cert_var = env_text(CLIENT_CERT_VARS)",
+            skip_private_key,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
