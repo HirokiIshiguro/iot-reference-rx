@@ -462,6 +462,8 @@ nightly_dependency_alignment:
   rules:
     - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
       when: on_success
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && ($RUN_RX671_TSIP_AWS_MQTT_TEST == "true" || $RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST == "true" || $RUN_RX671_TSIP_FLEET_TEST == "true" || $RUN_RX671_TSIP_FLEET_TLS13_TEST == "true")'
+      when: on_success
     - when: never
   script:
     - >-

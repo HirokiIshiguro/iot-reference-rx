@@ -142,6 +142,14 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         self.assertIn('$CI_PIPELINE_SOURCE == "schedule"', job)
         self.assertIn('$CI_PIPELINE_SOURCE == "api"', job)
         self.assertIn('$CI_PIPELINE_SOURCE == "web"', job)
+        self.assertIn('$PIPELINE_PROFILE == "focused"', job)
+        for focused_flag in (
+            "RUN_RX671_TSIP_AWS_MQTT_TEST",
+            "RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST",
+            "RUN_RX671_TSIP_FLEET_TEST",
+            "RUN_RX671_TSIP_FLEET_TLS13_TEST",
+        ):
+            self.assertIn(f'${focused_flag} == "true"', job)
         self.assertNotIn("merge_request_event", job)
 
     def test_external_bridge_project_ref_and_resolved_sha_mapping_is_exact(
