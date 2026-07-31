@@ -522,11 +522,13 @@ rx671_ota_ci_contract:
         - tools/rx671_ota_host.py
         - tools/test_rx671_ota.py
         - tools/verify_ota_aws_state.py
+        - tools/ci/test_rx671_wifi_uart.py
         - tools/ci/tests/test_plan_rx671_ota.py
         - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
         - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
         - tools/ci/tests/test_rx671_ota_host_tools.py
         - tools/ci/tests/test_rx671_ota_runtime_profile_contract.py
+        - tools/ci/tests/test_rx671_wifi_uart.py
         - tools/ci/tests/test_verify_ota_aws_state.py
       when: on_success
     - when: never
@@ -539,6 +541,7 @@ rx671_ota_ci_contract:
       tools.ci.tests.test_rx671_ota_hardware_ci_contract
       tools.ci.tests.test_rx671_ota_host_tools
       tools.ci.tests.test_rx671_ota_runtime_profile_contract
+      tools.ci.tests.test_rx671_wifi_uart
       tools.ci.tests.test_verify_ota_aws_state
       -v
 

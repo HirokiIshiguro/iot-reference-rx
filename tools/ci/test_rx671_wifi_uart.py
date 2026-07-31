@@ -39,6 +39,27 @@ class SmokeResult:
     duration_seconds: float
 
 
+def sanitize_xml_text(value: str) -> str:
+    """Replace characters forbidden by XML 1.0 with visible escapes."""
+    output: list[str] = []
+    for character in value:
+        codepoint = ord(character)
+        if (
+            codepoint in (0x09, 0x0A, 0x0D)
+            or 0x20 <= codepoint <= 0xD7FF
+            or 0xE000 <= codepoint <= 0xFFFD
+            or 0x10000 <= codepoint <= 0x10FFFF
+        ):
+            output.append(character)
+        elif codepoint <= 0xFF:
+            output.append(f"\\x{codepoint:02X}")
+        elif codepoint <= 0xFFFF:
+            output.append(f"\\u{codepoint:04X}")
+        else:
+            output.append(f"\\U{codepoint:08X}")
+    return "".join(output)
+
+
 def required_markers(mode: str, require_tls_version: str = "") -> tuple[str, ...]:
     if mode == "network":
         if require_tls_version:
@@ -193,28 +214,40 @@ def write_junit(
         },
     )
     properties = ET.SubElement(suite, "properties")
-    ET.SubElement(properties, "property", {"name": "mode", "value": mode})
-    ET.SubElement(properties, "property", {"name": "port", "value": port})
+    ET.SubElement(
+        properties,
+        "property",
+        {"name": "mode", "value": sanitize_xml_text(mode)},
+    )
+    ET.SubElement(
+        properties,
+        "property",
+        {"name": "port", "value": sanitize_xml_text(port)},
+    )
     ET.SubElement(properties, "property", {"name": "baud", "value": str(baud)})
     ET.SubElement(
         properties,
         "property",
-        {"name": "require_tls_version", "value": require_tls_version},
+        {
+            "name": "require_tls_version",
+            "value": sanitize_xml_text(require_tls_version),
+        },
     )
     case = ET.SubElement(
         suite,
         "testcase",
         {
             "classname": "hardware.ek_rx671",
-            "name": f"wifi_{mode}",
+            "name": sanitize_xml_text(f"wifi_{mode}"),
             "time": f"{result.duration_seconds:.3f}",
         },
     )
     if not result.passed:
-        failure = ET.SubElement(case, "failure", {"message": result.message})
-        failure.text = result.message
+        safe_message = sanitize_xml_text(result.message)
+        failure = ET.SubElement(case, "failure", {"message": safe_message})
+        failure.text = safe_message
     system_out = ET.SubElement(case, "system-out")
-    system_out.text = result.log
+    system_out.text = sanitize_xml_text(result.log)
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
 
 
