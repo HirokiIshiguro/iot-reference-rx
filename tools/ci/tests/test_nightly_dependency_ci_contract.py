@@ -89,6 +89,7 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         )
         self.assertIn("stage: dependency_check", contract)
         self.assertIn('$CI_PIPELINE_SOURCE == "merge_request_event"', contract)
+        self.assertIn('$PIPELINE_PROFILE == "mr-dependency-gate"', contract)
         self.assertIn(
             "tools.ci.tests.test_nightly_dependency_alignment",
             contract,
@@ -197,6 +198,7 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
                 self.assertIsNotNone(resolved_match)
                 self.assertIn("job: nightly_dependency_alignment", block)
                 self.assertIn("artifacts: true", block)
+                self.assertIn('GIT_SUBMODULE_STRATEGY: "none"', block)
             if branch_match is not None and resolved_match is not None:
                 actual.add(
                     (

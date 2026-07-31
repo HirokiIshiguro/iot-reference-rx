@@ -169,6 +169,20 @@ other_job:
         head = git(self.repo, "rev-parse", "HEAD")
         self.assertEqual(0, self.run_main(head))
 
+    def test_dependency_bridge_submodule_strategy_override_passes(self) -> None:
+        changed = self.DEPENDENCY_CI.replace(
+            '    EXPECTED_BENCHMARK_COMMIT_SHA: '
+            '"$RX72N_TSIP_MBEDTLS13_RESOLVED_SHA"',
+            '    GIT_SUBMODULE_STRATEGY: "none"\n'
+            '    EXPECTED_BENCHMARK_COMMIT_SHA: '
+            '"$RX72N_TSIP_MBEDTLS13_RESOLVED_SHA"',
+        )
+        (self.repo / ".gitlab-ci.yml").write_text(changed, encoding="utf-8")
+        git(self.repo, "add", ".gitlab-ci.yml")
+        git(self.repo, "commit", "--quiet", "-m", "dependency bridge submodule")
+        head = git(self.repo, "rev-parse", "HEAD")
+        self.assertEqual(0, self.run_main(head))
+
     def test_unrelated_change_in_ci_file_fails(self) -> None:
         changed = self.DEPENDENCY_CI.replace("echo base", "echo unrelated")
         (self.repo / ".gitlab-ci.yml").write_text(changed, encoding="utf-8")
