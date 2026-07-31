@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from tools import verify_ota_aws_state as ota_state
@@ -19,6 +21,14 @@ META = {
     "code_signing_mode": "custom",
     "file_version": "2.06.0",
 }
+THING_ARN = (
+    "arn:aws:iot:us-test-1:000000000000:thing/"
+    f"{META['thing_name']}"
+)
+JOB_ARN = (
+    "arn:aws:iot:us-test-1:000000000000:job/"
+    f"{META['aws_iot_job_id']}"
+)
 
 
 def live_ota_payload(
@@ -281,6 +291,213 @@ class VerifyOtaAwsStateTests(unittest.TestCase):
             summary["acceptance"]["ota_update_id_matches_metadata"]
         )
         self.assertFalse(summary["acceptance"]["passed"])
+
+    def test_recover_partial_snapshot_waits_enriches_and_snapshots(
+        self,
+    ) -> None:
+        partial = {
+            **META,
+            "thing_arn": THING_ARN,
+            "ota_update_status": "CREATE_REQUESTED",
+            "aws_iot_job_id": None,
+            "aws_iot_job_arn": None,
+            "s3_version": None,
+        }
+        complete_ota = live_ota_payload(
+            job_arn=JOB_ARN,
+            targets=[THING_ARN],
+        )
+        get_calls = 0
+
+        def fake_run(args, _region, *, absent_ok=False):
+            nonlocal get_calls
+            if args[:2] == ["iot", "get-ota-update"]:
+                get_calls += 1
+                if get_calls == 1:
+                    self.assertTrue(absent_ok)
+                    return live_ota_payload(
+                        status="CREATE_PENDING",
+                        job_id=None,
+                        include_s3_file=False,
+                    )
+                if get_calls == 2:
+                    self.assertTrue(absent_ok)
+                else:
+                    self.assertFalse(absent_ok)
+                return complete_ota
+            self.assertFalse(absent_ok)
+            if args[:2] == ["iot", "describe-thing"]:
+                return {
+                    "thingName": META["thing_name"],
+                    "thingArn": THING_ARN,
+                }
+            if args[:2] == ["iot", "describe-job"]:
+                return {
+                    "job": {
+                        "jobId": META["aws_iot_job_id"],
+                        "status": "COMPLETED",
+                        "jobProcessDetails": {
+                            "numberOfSucceededThings": 1,
+                            "numberOfCanceledThings": 0,
+                            "numberOfFailedThings": 0,
+                            "numberOfRejectedThings": 0,
+                            "numberOfRemovedThings": 0,
+                            "numberOfTimedOutThings": 0,
+                        },
+                    }
+                }
+            if args[:2] == ["iot", "describe-job-execution"]:
+                return {
+                    "execution": {
+                        "jobId": META["aws_iot_job_id"],
+                        "thingArn": THING_ARN,
+                        "status": "SUCCEEDED",
+                    }
+                }
+            if args[:2] == ["s3api", "head-object"]:
+                return {
+                    "ContentLength": 4096,
+                    "VersionId": META["s3_version"],
+                }
+            self.fail(f"unexpected AWS call: {args}")
+
+        with patch.object(ota_state, "run_aws", side_effect=fake_run):
+            ota_state.recover_partial_snapshot_meta(
+                partial,
+                wait_timeout=1,
+                poll_interval=0,
+            )
+            summary = ota_state.snapshot_state(partial)
+
+        self.assertEqual(3, get_calls)
+        self.assertEqual(META["aws_iot_job_id"], partial["aws_iot_job_id"])
+        self.assertEqual(JOB_ARN, partial["aws_iot_job_arn"])
+        self.assertEqual(META["s3_version"], partial["s3_version"])
+        self.assertEqual(THING_ARN, summary["metadata"]["thing_arn"])
+        self.assertTrue(
+            summary["acceptance"]["thing_arn_matches_metadata"]
+        )
+        self.assertTrue(summary["acceptance"]["passed"])
+
+    def test_recover_partial_snapshot_blocks_target_mismatch(self) -> None:
+        partial = {
+            **META,
+            "thing_arn": THING_ARN,
+            "aws_iot_job_id": None,
+            "aws_iot_job_arn": None,
+            "s3_version": None,
+        }
+        calls: list[list[str]] = []
+
+        def fake_run(args, _region, *, absent_ok=False):
+            calls.append(args)
+            self.assertTrue(absent_ok)
+            return live_ota_payload(
+                job_arn=JOB_ARN,
+                targets=[THING_ARN.replace("test-thing", "other-thing")],
+            )
+
+        with patch.object(ota_state, "run_aws", side_effect=fake_run):
+            with self.assertRaisesRegex(ValueError, "targets"):
+                ota_state.recover_partial_snapshot_meta(
+                    partial,
+                    wait_timeout=0,
+                    poll_interval=0,
+                )
+
+        self.assertEqual(1, len(calls))
+        self.assertIsNone(partial["aws_iot_job_id"])
+        self.assertIsNone(partial["s3_version"])
+
+    def test_recover_partial_snapshot_requires_live_job_arn(self) -> None:
+        partial = {
+            **META,
+            "thing_arn": THING_ARN,
+            "aws_iot_job_id": None,
+            "aws_iot_job_arn": None,
+            "s3_version": None,
+        }
+
+        with patch.object(
+            ota_state,
+            "run_aws",
+            return_value=live_ota_payload(targets=[THING_ARN]),
+        ):
+            with self.assertRaisesRegex(ValueError, "aws_iot_job_arn"):
+                ota_state.recover_partial_snapshot_meta(
+                    partial,
+                    wait_timeout=0,
+                    poll_interval=0,
+                )
+
+    def test_main_recover_partial_loads_partial_before_snapshot(self) -> None:
+        meta = {**META, "thing_arn": THING_ARN}
+        summary = {"acceptance": {"passed": True}}
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "snapshot.json"
+            args = SimpleNamespace(
+                command="snapshot",
+                meta_json=Path(directory) / "meta.json",
+                output_json=output,
+                wait_timeout=7,
+                poll_interval=2,
+                recover_partial=True,
+            )
+            with (
+                patch.object(ota_state, "parse_args", return_value=args),
+                patch.object(
+                    ota_state,
+                    "load_meta",
+                    return_value=meta,
+                ) as load_meta,
+                patch.object(
+                    ota_state,
+                    "recover_partial_snapshot_meta",
+                ) as recover,
+                patch.object(
+                    ota_state,
+                    "snapshot_state",
+                    return_value=summary,
+                ) as snapshot,
+            ):
+                self.assertEqual(0, ota_state.main())
+
+            load_meta.assert_called_once_with(
+                args.meta_json,
+                require_complete=False,
+            )
+            recover.assert_called_once_with(
+                meta,
+                wait_timeout=7,
+                poll_interval=2,
+            )
+            snapshot.assert_called_once_with(
+                meta,
+                wait_timeout=7,
+                poll_interval=2,
+            )
+            self.assertEqual(summary, json.loads(output.read_text()))
+
+    def test_main_rejects_recover_partial_for_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "cleanup.json"
+            args = SimpleNamespace(
+                command="cleanup",
+                meta_json=Path(directory) / "meta.json",
+                output_json=output,
+                wait_timeout=0,
+                poll_interval=0,
+                recover_partial=True,
+            )
+            with (
+                patch.object(ota_state, "parse_args", return_value=args),
+                patch.object(ota_state, "load_meta") as load_meta,
+            ):
+                self.assertEqual(1, ota_state.main())
+
+            load_meta.assert_not_called()
+            result = json.loads(output.read_text())
+            self.assertIn("only valid with snapshot", result["error"]["message"])
 
     def test_cleanup_deletes_and_confirms_exact_version_absent(self) -> None:
         calls: list[list[str]] = []

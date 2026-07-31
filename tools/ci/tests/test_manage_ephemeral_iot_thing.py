@@ -150,6 +150,103 @@ class EphemeralIotThingTests(unittest.TestCase):
             self.assertIn("--thing-principal-type", attach_arguments)
             self.assertIn("NON_EXCLUSIVE_THING", attach_arguments)
 
+    def test_plan_journals_complete_cleanup_identity_without_mutation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            meta_path = Path(temporary) / "planned-ephemeral.json"
+            args = SimpleNamespace(
+                base_thing_name=BASE_THING,
+                thing_name=ALIAS_THING,
+                region=REGION,
+                owner_project_id=PROJECT_ID,
+                owner_pipeline_id="9402",
+                owner_job_id="60191",
+                meta_json=meta_path,
+            )
+            with (
+                mock.patch.object(
+                    manager,
+                    "describe_thing",
+                    side_effect=[
+                        (
+                            True,
+                            {
+                                "thingArn": (
+                                    "arn:aws:iot:ap-northeast-1:"
+                                    "094025684215:thing/rx72n-02"
+                                )
+                            },
+                        ),
+                        (False, {}),
+                    ],
+                ),
+                mock.patch.object(
+                    manager,
+                    "list_principal_objects",
+                    return_value=[PRINCIPAL_OBJECT],
+                ),
+                mock.patch.object(manager, "run_aws") as run_aws,
+            ):
+                self.assertEqual(manager.plan_alias(args), 0)
+
+            self.assertEqual(run_aws.call_count, 0)
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(meta["status"], "planned")
+            self.assertEqual(meta["expected_thing_arn"], ALIAS_ARN)
+            self.assertEqual(meta["principal"], PRINCIPAL)
+            self.assertEqual(meta["owner_attributes"], OWNER_ATTRIBUTES)
+            self.assertEqual(meta["operations"], [])
+
+    def test_create_rejects_a_changed_preflight_plan_before_mutation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            meta_path = Path(temporary) / "created-ephemeral.json"
+            plan_path = Path(temporary) / "planned-ephemeral.json"
+            self._write_meta(plan_path)
+            planned = json.loads(plan_path.read_text(encoding="utf-8"))
+            planned["principal"] = PRINCIPAL.replace("012345", "fedcba")
+            plan_path.write_text(json.dumps(planned), encoding="utf-8")
+            args = SimpleNamespace(
+                base_thing_name=BASE_THING,
+                thing_name=ALIAS_THING,
+                region=REGION,
+                owner_project_id=PROJECT_ID,
+                owner_pipeline_id="9402",
+                owner_job_id="60191",
+                plan_meta_json=plan_path,
+                meta_json=meta_path,
+            )
+            with (
+                mock.patch.object(
+                    manager,
+                    "describe_thing",
+                    return_value=(
+                        True,
+                        {
+                            "thingArn": (
+                                "arn:aws:iot:ap-northeast-1:"
+                                "094025684215:thing/rx72n-02"
+                            )
+                        },
+                    ),
+                ),
+                mock.patch.object(
+                    manager,
+                    "list_principal_objects",
+                    return_value=[PRINCIPAL_OBJECT],
+                ),
+                mock.patch.object(manager, "run_aws") as run_aws,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "preflight journal",
+                ):
+                    manager.create_alias(args)
+
+            self.assertEqual(run_aws.call_count, 0)
+
     def test_create_refuses_to_adopt_a_colliding_thing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             meta_path = Path(temporary) / "ephemeral.json"

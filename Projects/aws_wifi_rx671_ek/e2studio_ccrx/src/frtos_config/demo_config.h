@@ -20,8 +20,18 @@
 #include "iot_logging_task.h"
 #include "logging_stack.h"
 
+#ifndef RX671_OTA_RUNTIME_ENABLE
+#define RX671_OTA_RUNTIME_ENABLE            (0)
+#endif
+#ifndef RX671_OTA_PROVISIONER_ENABLE
+#define RX671_OTA_PROVISIONER_ENABLE        (0)
+#endif
+#if (RX671_OTA_RUNTIME_ENABLE == 1) && (RX671_OTA_PROVISIONER_ENABLE == 1)
+#error "RX671 OTA runtime and provisioner profiles are mutually exclusive"
+#endif
+
 #define ENABLE_FLEET_PROVISIONING_DEMO      RX671_FLEET_PROVISIONING_ENABLE
-#define ENABLE_OTA_UPDATE_DEMO              (0)
+#define ENABLE_OTA_UPDATE_DEMO              RX671_OTA_RUNTIME_ENABLE
 #define democonfigUSE_AWS_IOT_CORE_BROKER   (1)
 #define democonfigDISABLE_SNI               (0)
 
@@ -82,7 +92,15 @@
 #define MQTT_AGENT_COMMAND_QUEUE_LENGTH     (25)
 #define MQTT_AGENT_NETWORK_BUFFER_SIZE      (32768)
 #define MQTT_COMMAND_CONTEXTS_POOL_SIZE     (10)
-#define ENABLE_CREDENTIAL_BY_CLI            (0)
+/*
+ * The bank.single provisioner is the only image that owns SCI6 and enables
+ * the shared credential CLI.  The dual-bank OTA runtime starts unattended
+ * from credentials already committed to LittleFS/KVS.
+ */
+#define ENABLE_CREDENTIAL_BY_CLI            RX671_OTA_PROVISIONER_ENABLE
+#if (RX671_OTA_PROVISIONER_ENABLE == 1)
+#define configCLI_BAUD_RATE                    (921600)
+#endif
 #define SELF_TEST_PASSED                    ((EventBits_t)(1U))
 
 #endif /* DEMO_CONFIG_H */

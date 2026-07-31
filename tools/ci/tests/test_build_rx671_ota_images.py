@@ -9,6 +9,9 @@ import unittest
 from pathlib import Path
 from subprocess import run
 
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, utils
+
 
 SCRIPT = Path(__file__).resolve().parents[2] / "build_rx671_ota_images.py"
 SPEC = importlib.util.spec_from_file_location("build_rx671_ota_images", SCRIPT)
@@ -60,6 +63,9 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('value="-define=APP_VERSION_MAJOR=1"', result)
         self.assertIn('value="-define=APP_VERSION_MINOR=2"', result)
         self.assertIn('value="-define=APP_VERSION_BUILD=3"', result)
+        self.assertIn(
+            'value="-define=RX671_OTA_RUNTIME_ENABLE=1"', result
+        )
         self.assertIn(builder.VERSION_MARKER_LINKER_OPTION, result)
         self.assertIn(
             "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300",
@@ -128,6 +134,73 @@ class ProfileTests(unittest.TestCase):
                 builder.parse_version("1.2.3"),
             )
 
+    def test_provisioner_profile_stays_bank_single_and_restores(self) -> None:
+        result = builder.make_provisioner_cproject(self.cproject)
+        self.assertIn('modes="bank.single"', result)
+        self.assertNotIn('modes="bank.dual"', result)
+        self.assertIn(
+            'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"', result
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            target = project / ".cproject"
+            original = (PROJECT / ".cproject").read_bytes()
+            target.write_bytes(original)
+            with builder.TemporaryProvisionerProfile(project):
+                self.assertIn(
+                    b"RX671_OTA_PROVISIONER_ENABLE=1",
+                    target.read_bytes(),
+                )
+            self.assertEqual(
+                original,
+                target.read_bytes(),
+            )
+
+
+class TransferArtifactTests(unittest.TestCase):
+    def test_candidate_payload_is_rsu_after_header_and_der_signature_verifies(
+        self,
+    ) -> None:
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        payload = b"descriptor-and-application" * 16
+        source_der = private_key.sign(payload, ec.ECDSA(hashes.SHA256()))
+        r, s = utils.decode_dss_signature(source_der)
+        raw = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+        header = bytearray(b"\xFF" * builder.RSU_HEADER_SIZE)
+        header[
+            builder.RSU_RAW_SIGNATURE_OFFSET :
+            builder.RSU_RAW_SIGNATURE_OFFSET + builder.RSU_RAW_SIGNATURE_SIZE
+        ] = raw
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rsu = root / "candidate.rsu"
+            public_key = root / builder.SIGNER_PUBLIC_KEY_NAME
+            output = root / builder.OTA_TRANSFER_PAYLOAD_NAME
+            signature = root / builder.OTA_TRANSFER_SIGNATURE_NAME
+            rsu.write_bytes(bytes(header) + payload)
+            public_key.write_bytes(
+                private_key.public_key().public_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PublicFormat.SubjectPublicKeyInfo,
+                )
+            )
+
+            builder._create_ota_transfer_artifacts(
+                rsu_path=rsu,
+                signer_public_key=public_key,
+                payload_path=output,
+                signature_path=signature,
+            )
+
+            self.assertEqual(payload, output.read_bytes())
+            private_key.public_key().verify(
+                signature.read_bytes(),
+                output.read_bytes(),
+                ec.ECDSA(hashes.SHA256()),
+            )
+
 
 class OutputSafetyTests(unittest.TestCase):
     def test_output_must_be_below_dedicated_repo_build_directory(self) -> None:
@@ -158,6 +231,33 @@ class OutputSafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must be a child"):
             builder._validate_workspace_root(Path("C:/ai/codex/ws"))
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows path contract")
+    def test_runtime_build_products_are_removed_from_project_and_workspace(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(
+            dir="C:/ai/codex/ws",
+            prefix="rx671-ota-cleanup-test-",
+        ) as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            hardware_debug = project / "HardwareDebug"
+            workspace = root / "workspace"
+            hardware_debug.mkdir(parents=True)
+            workspace.mkdir()
+            (hardware_debug / "credential-bearing.abs").write_bytes(
+                b"secret"
+            )
+            (workspace / "credential-bearing.mot").write_bytes(b"secret")
+
+            builder._remove_runtime_plaintext_build_products(
+                project,
+                workspace,
+            )
+
+            self.assertFalse(hardware_debug.exists())
+            self.assertFalse(workspace.exists())
+
 
 class WifiCredentialIsolationTests(unittest.TestCase):
     def test_ota_build_environment_removes_wifi_credentials(self) -> None:
@@ -173,6 +273,34 @@ class WifiCredentialIsolationTests(unittest.TestCase):
         self.assertEqual("true", result["CI"])
         for variable in builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
             self.assertNotIn(variable, result)
+
+    def test_runtime_wifi_mode_is_explicit_and_preserves_required_inputs(
+        self,
+    ) -> None:
+        source = {
+            "PATH": "safe",
+            "RX671_EK_WIFI_SSID": "hardware-ssid",
+            "RX671_EK_WIFI_PASSPHRASE": "hardware-passphrase",
+        }
+        result = builder.runtime_wifi_build_environment(source)
+        self.assertEqual("hardware-ssid", result["RX671_EK_WIFI_SSID"])
+        self.assertEqual(
+            "hardware-passphrase",
+            result["RX671_EK_WIFI_PASSPHRASE"],
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "RX671_EK_WIFI_PASSPHRASE",
+        ):
+            builder.runtime_wifi_build_environment(
+                {"RX671_EK_WIFI_SSID": "hardware-ssid"}
+            )
+
+    def test_runtime_wifi_cli_flag_defaults_off(self) -> None:
+        default = builder.parse_args([])
+        enabled = builder.parse_args(["--runtime-wifi-config"])
+        self.assertFalse(default.runtime_wifi_config)
+        self.assertTrue(enabled.runtime_wifi_config)
 
     def test_local_join_header_is_restored_outside_ci(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -267,7 +395,13 @@ class SubmoduleProvenanceTests(unittest.TestCase):
             )
             with builder.TemporaryWhdPatchIsolation(repo):
                 run(
-                    ["git", "apply", str(patch)],
+                    [
+                        "git",
+                        "apply",
+                        "--ignore-space-change",
+                        "--ignore-whitespace",
+                        str(patch),
+                    ],
                     cwd=submodule,
                     check=True,
                 )

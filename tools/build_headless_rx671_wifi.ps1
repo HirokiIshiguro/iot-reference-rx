@@ -1137,14 +1137,15 @@ function Invoke-E2StudioHeadlessBuild {
     return $proc.ExitCode
 }
 
-$reverseCheckArgs = @("-C", $whdDir, "apply", "--reverse", "--check", $whdPatch)
-$forwardCheckArgs = @("-C", $whdDir, "apply", "--check", $whdPatch)
+$gitApplyWhitespaceArgs = @("--ignore-space-change", "--ignore-whitespace")
+$reverseCheckArgs = @("-C", $whdDir, "apply") + $gitApplyWhitespaceArgs + @("--reverse", "--check", $whdPatch)
+$forwardCheckArgs = @("-C", $whdDir, "apply") + $gitApplyWhitespaceArgs + @("--check", $whdPatch)
 
 if (Test-GitApply $reverseCheckArgs) {
     Write-Host "WHD patch is already applied."
 } elseif (Test-GitApply $forwardCheckArgs) {
     Write-Host "Applying WHD patch..."
-    & git -C $whdDir apply $whdPatch
+    & git -C $whdDir apply @gitApplyWhitespaceArgs $whdPatch
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply WHD patch."
     }

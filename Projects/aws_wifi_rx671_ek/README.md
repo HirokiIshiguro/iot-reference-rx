@@ -340,12 +340,19 @@ project.
 
 The dedicated artifact helper temporarily applies the following OTA profile:
 
+- a credential-only `bank.single` provisioner with
+  `RX671_OTA_PROVISIONER_ENABLE=1`; this image initializes LittleFS/KVS and
+  leaves SCI6 exclusively in the shared `conf set` / `commit` CLI;
 - `bank.dual` and `BSP_CFG_CODE_FLASH_BANK_MODE=0`;
 - a 768 KiB (`0x000C0000`) install area;
 - the application and all Type 1YN resources at main-bank offset `+0x300`
   (`0xFFF00300`), after the FWUP header and v2 descriptor;
 - `PFRAM2=RPFRAM2`, with `PFRAM2` in the main image group; and
-- explicit `APP_VERSION_*` defines for baseline `0.1.0` and candidate `0.1.1`.
+- explicit `APP_VERSION_*` defines for baseline `0.1.0` and candidate `0.1.1`;
+  and
+- `RX671_OTA_RUNTIME_ENABLE=1`, which starts the MQTT Agent and OTA demo after
+  WHD JOIN and FreeRTOS+TCP network-up, using credentials already committed to
+  LittleFS/KVS.
 
 Run the same command used by the package job:
 
@@ -356,6 +363,26 @@ python tools/build_rx671_ota_images.py `
   --e2studio $env:E2STUDIO_CLI `
   --workspace-root $env:E2STUDIO_WORKSPACE_RX671_OTA
 ```
+
+The command above is the formal, credential-free package build. A focused
+hardware job may add `--runtime-wifi-config`; that opt-in requires non-empty
+`RX671_EK_WIFI_SSID` and `RX671_EK_WIFI_PASSPHRASE`, temporarily asks the
+headless builder to generate the ignored local WHD JOIN header, and records
+`formal=false` / `credentials_embedded=true` in each image manifest. Such
+hardware images are ephemeral and must never be published as plaintext CI
+artifacts. Focused jobs transfer them only in an encrypted archive bound to the
+originating pipeline and commit, then delete every plaintext copy.
+
+The focused hardware transaction additionally requires a dedicated masked or
+file-type CI/CD variable named `RX671_OTA_ARTIFACT_KEY` containing at least 32
+bytes. It must not reuse the Wi-Fi passphrase. The preflight job records the
+pipeline-owned Thing ARN, OTA update ID, and exact S3 key before any AWS
+mutation. The final cleanup job downloads only that preflight journal, derives
+missing live Job/S3 metadata from the exact OTA ID, captures the success state,
+and then verifies deletion of the OTA update, IoT Job, S3 object versions, and
+temporary Thing. A force-cancel or runner power loss can still prevent the
+cleanup job itself from running; in that case retry `cleanup_rx671_wifi_ota`
+while the 30-day preflight artifact is retained.
 
 CI sets that workspace to
 `C:/ai/codex/ws/iot-reference-rx-rx671-ota-2026-04-2`. The short,
@@ -370,8 +397,12 @@ explicitly disable local Wi-Fi/AWS configuration, remove Wi-Fi credential
 variables from the child build environment, and reject outputs containing a
 configured Wi-Fi credential. Outputs are confined to `build/rx671-ota/` and
 include the boot loader, baseline/candidate MOT, ABS, MAP and signed RSU files,
-the signer certificate, effective configuration snapshots, SHA-256 provenance,
-and layout-analysis reports.
+the bank.single provisioner MOT/ABS/MAP, signer certificate and public key,
+effective configuration snapshots, SHA-256 provenance, and layout-analysis
+reports. The candidate directory also contains
+`aws_wifi_rx671_ek.ota.bin` (the full RSU after its 0x200-byte header) and
+`aws_wifi_rx671_ek.ota-signature.der`, whose ECDSA P-256 signature is verified
+against that exact OTA transfer payload before publication.
 
 This CI leaf proves artifact generation, flash-layout conformance, provenance,
 and signature self-verification only. It does not prove AWS OTA hardware

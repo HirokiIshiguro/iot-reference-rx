@@ -35,6 +35,12 @@ AWS OTAの実機成功を証明しない。したがって、これだけを根�
 | WHD firmware / NVRAM / CLM | 従来の固定section | アプリに続く同一main image group |
 | RAM初期値section | 従来section | `PFRAM2=RPFRAM2`を追加し、`PFRAM2`をmain image groupへ含める |
 | image version | `demo_config.h`既定値 | `APP_VERSION_*`で`0.1.0` / `0.1.1`を明示 |
+| runtime | MQTT/Fleet/LANBENCHの通常分岐 | `RX671_OTA_RUNTIME_ENABLE=1`でMQTT Agent + OTA demoを自動起動 |
+
+別途、資格情報投入専用のprovisionerを正規`bank.single`配置で生成する。
+`RX671_OTA_PROVISIONER_ENABLE=1`のときはWHD/IPを開始せず、LittleFS/KVS初期化後に
+共通CLIをSCI6へ常駐させる。`cert`、`key`、`thingname`、`endpoint`、
+`codesigncert`、`codesignpubkey`を`conf set` / `commit`で保存できる。
 
 通常プロジェクトがLinear / `bank.single`であることと、OTA成果物がdual-bank
 配置であることは両立させる。前者は開発・ネットワーク試験の既存動作を維持し、
@@ -129,12 +135,21 @@ python tools/build_rx671_ota_images.py `
   --workspace-root $env:E2STUDIO_WORKSPACE_RX671_OTA
 ```
 
+この既定コマンドは資格情報を含まない正式成果物を生成する。focused実機jobだけは
+`--runtime-wifi-config`を追加でき、その場合は
+`RX671_EK_WIFI_SSID` / `RX671_EK_WIFI_PASSPHRASE`を一時JOIN headerへ注入する。
+manifestは`formal=false` / `credentials_embedded=true`となり、この実機用imageを
+CI artifactとして公開してはならない。
+
 `build/rx671-ota/`には少なくとも次を含める。
 
 - `bootloader/`のMOT / ABS / MAP
 - `baseline-0.1.0/`と`candidate-0.1.1/`のMOT / ABS / MAP
 - 各versionのECDSA P-256署名済みFWUP v2 RSU
-- signer certificate（秘密鍵はartifactへ収録しない）
+- bank.single provisionerのMOT / ABS / MAP
+- signer certificateと公開鍵（秘密鍵はartifactへ収録しない）
+- candidateの`aws_wifi_rx671_ek.ota.bin`（full RSUの`0x200` byte以降）と、
+  同payloadに対応するECDSA DER署名
 - OTA適用中のeffective configuration snapshot
 - source SHA、submodule gitlink、各入力・出力SHA-256を持つprovenance manifest
 - machine-readable layout analysis report

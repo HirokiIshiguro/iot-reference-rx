@@ -423,6 +423,8 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
                 "arn:role",
                 "--region",
                 "us-test-1",
+                "--ota-update-id",
+                "preplanned-ota-9402-60191",
             ]
             with (
                 patch.object(sys, "argv", argv),
@@ -436,6 +438,10 @@ class OtaAwsEvidenceCiContractTests(unittest.TestCase):
                 create_bg96_ota_update.main()
 
         self.assertEqual("aws-signer", journal_at_upload["code_signing_mode"])
+        self.assertEqual(
+            "preplanned-ota-9402-60191",
+            journal_at_upload["ota_update_id"],
+        )
         self.assertTrue(
             journal_at_upload["signed_prefix"].startswith(
                 "ota/pipeline-thing/signed/"
