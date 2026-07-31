@@ -433,7 +433,6 @@ nightly_dependency_contract:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-dependency-gate"'
       changes:
-        - .gitlab-ci.yml
         - tools/ci/check_nightly_dependency_alignment.py
         - tools/ci/nightly-dependency-targets.json
         - tools/ci/tests/test_nightly_dependency_alignment.py
@@ -1043,7 +1042,7 @@ build_rx72n_ether:
   script:
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
-    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard
+    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_hardware_transaction_contract tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_rx72n_fwup_prm_contract
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
@@ -1093,7 +1092,7 @@ build_rx72n_ether:
     - |
       python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
         --mot "$rx72nAppMot" `
-        --prm "$rx72nAppRoot\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --prm "$env:CI_PROJECT_DIR\tools\fwup\rx72n_envision_kit_dual_bank.prm.csv" `
         --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
         --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
@@ -1163,7 +1162,7 @@ build_rx65n_bg96:
       optional: true
   script:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
-    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
@@ -1750,7 +1749,7 @@ build_rx72n_ether_fleet:
     - |
       python "$env:CI_PROJECT_DIR\tools\build_fwup_v2_rsu.py" `
         --mot "$rx72nAppMot" `
-        --prm "$rx72nAppRoot\src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv" `
+        --prm "$env:CI_PROJECT_DIR\tools\fwup\rx72n_envision_kit_dual_bank.prm.csv" `
         --key "$env:CI_PROJECT_DIR\$env:RX72N_SIGNING_KEY" `
         --output "$env:CI_PROJECT_DIR\rx72n_app.rsu"
     - if (-not (Test-Path "$env:CI_PROJECT_DIR\rx72n_app.rsu")) { Write-Error "rx72n_app.rsu missing"; exit 1 }
@@ -3091,23 +3090,66 @@ create_rx65n_bg96_ota:
       $roleArn = Require-Value "AWS OTA service role ARN" (Get-FirstEnv @("AWS_OTA_SERVICE_ROLE_ARN_CK_RX65N_01", "RX65N_BG96_OTA_SERVICE_ROLE_ARN", "BG96_AWS_OTA_SERVICE_ROLE_ARN", "BG96_OTA_SERVICE_ROLE_ARN", "BG96_OTA_ROLE_ARN", "OTA_SERVICE_ROLE_ARN", "OTA_ROLE_ARN"))
       $roleArn = Resolve-IamRoleArn $roleArn
 
-      $targetArgs = @()
-      if (-not [string]::IsNullOrWhiteSpace($targetArn)) {
-        $targetArgs = @("--target-arn", $targetArn)
+      $otaThingName = $thingName
+      if (-not $usingDynamicThing) {
+        $otaThingName = "$thingName-ota-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
+        if ($otaThingName.Length -gt 128) {
+          throw "Generated RX65N BG96 OTA Thing name exceeds 128 characters."
+        }
+        python tools/manage_ephemeral_iot_thing.py create `
+          --base-thing-name "$thingName" `
+          --thing-name "$otaThingName" `
+          --region "$region" `
+          --owner-project-id "$env:CI_PROJECT_ID" `
+          --owner-pipeline-id "$env:CI_PIPELINE_ID" `
+          --owner-job-id "$env:CI_JOB_ID" `
+          --meta-json (Join-Path $artifactDir "ephemeral_thing_meta.json")
+        if ($LASTEXITCODE -ne 0) {
+          throw "Failed to create the pipeline-owned RX65N BG96 OTA Thing."
+        }
+        # The configured static target ARN names the base Thing. The OTA update
+        # must target the pipeline-owned alias instead.
+        $targetArn = ""
       }
 
-      python tools/create_bg96_ota_update.py `
-        --artifact-dir "$artifactDir" `
-        --thing-name "$thingName" `
-        @targetArgs `
-        --input-payload "$payload" `
-        --file-version "$version" `
-        --bucket "$bucket" `
-        --custom-signature-der "$payloadSignature" `
-        --code-signer-cert "$codeSignerCert" `
-        --role-arn "$roleArn" `
-        --region "$region" `
-        --ota-id-prefix "rx65n-bg96-ota"
+      [ordered]@{
+        schema_version = 1
+        status = "prepared"
+        base_thing_name = $thingName
+        thing_name = $otaThingName
+        created_ephemeral_alias = (-not $usingDynamicThing)
+        target_arn = $targetArn
+        payload = $payload
+        payload_signature = $payloadSignature
+        code_signer_cert = $codeSignerCert
+        file_version = $version
+        bucket = $bucket
+        role_arn = $roleArn
+        region = $region
+        note = "The OTA target is pipeline-owned so another pipeline cannot consume this one-shot OTA Job."
+      } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "creation_prepared.json") -Encoding utf8
+
+      $createArgs = @(
+        "tools/create_bg96_ota_update.py",
+        "--artifact-dir", $artifactDir,
+        "--thing-name", $otaThingName,
+        "--input-payload", $payload,
+        "--file-version", $version,
+        "--bucket", $bucket,
+        "--custom-signature-der", $payloadSignature,
+        "--code-signer-cert", $codeSignerCert,
+        "--role-arn", $roleArn,
+        "--region", $region,
+        "--ota-id-prefix", "rx65n-bg96-ota"
+      )
+      if (-not [string]::IsNullOrWhiteSpace($targetArn)) {
+        $createArgs += @("--target-arn", $targetArn)
+      }
+      python @createArgs 2>&1 | Tee-Object -FilePath (Join-Path $artifactDir "create_ota_console.log")
+      $createStatus = $LASTEXITCODE
+      if ($createStatus -ne 0) {
+        exit $createStatus
+      }
   artifacts:
     when: always
     paths:
@@ -3120,34 +3162,158 @@ test_rx65n_bg96_ota:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_ota_rules
   needs:
-    - job: build_rx65n_bg96_ota
+    - job: build_rx65n_bg96
       artifacts: true
-    - job: download_rx65n_bg96_app
+    - job: prepare_rx65n_bg96_mqtt_credentials
+      artifacts: true
+    - job: build_rx65n_bg96_ota
       artifacts: true
     - job: create_rx65n_bg96_ota
       artifacts: true
   script:
     - echo "=== Verify CK-RX65N BG96 OTA ==="
     - |
+      set -e
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_ota"
       mkdir -p "$artifact_dir"
       version="$(tr -d '\r\n' < artifacts/build_rx65n_bg96_ota/version.txt)"
+      ota_meta="$CI_PROJECT_DIR/artifacts/create_rx65n_bg96_ota/ota_job_meta.json"
+      ota_thing_name="$(
+        python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8-sig"))["thing_name"])' \
+          "$ota_meta"
+      )"
+      if [ -z "$ota_thing_name" ]; then
+        echo "RX65N BG96 OTA Thing name is missing from create metadata." >&2
+        exit 1
+      fi
+      ephemeral_meta="$CI_PROJECT_DIR/artifacts/create_rx65n_bg96_ota/ephemeral_thing_meta.json"
+      dynamic_meta="$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials/iot_credentials_meta.json"
+      if [ -f "$ephemeral_meta" ]; then
+        python3 tools/manage_ephemeral_iot_thing.py verify-journal \
+          --meta-json "$ephemeral_meta" \
+          --expected-thing-name "$ota_thing_name" \
+          --owner-project-id "$CI_PROJECT_ID" \
+          --owner-pipeline-id "$CI_PIPELINE_ID"
+      elif [ -f "$dynamic_meta" ]; then
+        dynamic_thing_name="$(
+          tr -d '\r\n' \
+            < "$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials/thing_name.txt"
+        )"
+        expected_dynamic_thing="$RX65N_BG96_THING_NAME_PREFIX-$CI_PIPELINE_ID"
+        if [ "$ota_thing_name" != "$dynamic_thing_name" ] || \
+           [ "$ota_thing_name" != "$expected_dynamic_thing" ]; then
+          echo "RX65N BG96 dynamic Thing ownership mismatch." >&2
+          exit 1
+        fi
+      else
+        echo "RX65N BG96 OTA Thing has no ownership journal." >&2
+        exit 1
+      fi
       actual_host="$(hostname)"
       if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
         echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
         exit 1
       fi
 
+      echo "=== Isolated OTA step 1/4: restore the exact bootloader and baseline RSU ==="
+      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      python3 tools/bg96_bootloader_integration.py \
+        --action flash-bootloader \
+        --bootloader-mot artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --uart-port "${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-unused}}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/restore_bootloader.log"
+
+      python3 tools/bg96_bootloader_integration.py \
+        --action download-rsu \
+        --bootloader-mot artifacts/build_rx65n_bg96/boot_loader_ck_rx65n.mot \
+        --userprog-rsu artifacts/build_rx65n_bg96/aws_bg96_ck_rx65n.rsu \
+        --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
+        --uart-port "${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}" \
+        --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/restore_baseline_rsu.log"
+
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
-      if [ -z "$uart_port" ] && [ -f artifacts/download_rx65n_bg96_app/selected_uart_port.txt ]; then
-        uart_port="$(tr -d '\r\n' < artifacts/download_rx65n_bg96_app/selected_uart_port.txt)"
+      if [ -z "$uart_port" ] && [ -f "$artifact_dir/selected_uart_port.txt" ]; then
+        uart_port="$(tr -d '\r\n' < "$artifact_dir/selected_uart_port.txt")"
       fi
       if [ -z "$uart_port" ]; then
         echo "RX65N BG96 UART port was not selected." >&2
         exit 1
       fi
 
-      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
+      echo "=== Isolated OTA step 2/4: provision the pipeline-owned MQTT and TSIP identity ==="
+      credential_dir="$CI_PROJECT_DIR/artifacts/prepare_rx65n_bg96_mqtt_credentials"
+      if [ -f "$credential_dir/iot_credentials_meta.json" ]; then
+        export RX65N_BG96_AWS_IOT_THING_NAME="$(tr -d '\r\n' < "$credential_dir/thing_name.txt")"
+        export AWS_IOT_CERT="$credential_dir/certificate.pem"
+        export AWS_IOT_PRIVKEY="$credential_dir/private_key.pem"
+        if [ -z "${AWS_IOT_ENDPOINT:-}" ] && [ -f "$credential_dir/endpoint.txt" ]; then
+          export AWS_IOT_ENDPOINT="$(tr -d '\r\n' < "$credential_dir/endpoint.txt")"
+        fi
+      fi
+      export RX65N_BG96_AWS_IOT_THING_NAME="$ota_thing_name"
+
+      provision_args=(
+        --action provision-mqtt
+        --uart-port "${uart_port}"
+        --baud "${RX65N_BG96_UART_BAUD_RATE}"
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}"
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}"
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}"
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}"
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}"
+        --rfp-tool "${rfp_tool}"
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}"
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}"
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}"
+        --no-reset-after-provision
+      )
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        provision_args+=(--skip-private-key)
+      fi
+      python3 tools/bg96_bootloader_integration.py "${provision_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_mqtt.log"
+
+      if [ "${RX65N_BG96_TLS_BACKEND}" = "tsip" ]; then
+        python3 tools/provision_tsip_over_uart.py \
+          --target rx65n \
+          --port "${uart_port}" \
+          --baud "${RX65N_BG96_UART_BAUD_RATE}" \
+          --chunk-size "${RX65N_BG96_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX65N_BG96_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+      fi
+
+      echo "=== Isolated OTA step 3/4: provision the exact OTA signer and stay in CLI ==="
+      code_signer_cert="artifacts/build_rx65n_bg96_ota/bg96_ota_codesign_cert.pem"
+      python3 tools/bg96_ota_prepare.py \
+        --uart-port "${uart_port}" \
+        --code-signer-cert "${code_signer_cert}" \
+        --provision-cli-timeout "${RX65N_BG96_MQTT_PROVISION_CLI_TIMEOUT_SECONDS}" \
+        --provision-char-delay "${RX65N_BG96_MQTT_PROVISION_CHAR_DELAY_SECONDS}" \
+        --provision-line-delay "${RX65N_BG96_MQTT_PROVISION_LINE_DELAY_SECONDS}" \
+        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
+        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
+        --rfp-tool "${rfp_tool}" \
+        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
+        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
+        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
+        2>&1 | tee "$artifact_dir/provision_ota_signer.log"
+
+      echo "=== Isolated OTA step 4/4: observe download, activation, and commit ==="
       tls_version_args=()
       if [ -n "${RX65N_BG96_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args+=(--require-tls-version "${RX65N_BG96_REQUIRE_TLS_VERSION}")
@@ -3179,36 +3345,63 @@ test_rx65n_bg96_ota:
 cleanup_rx65n_bg96_ota:
   stage: ota_cleanup
   extends: .aws_cli_windows_job
-  allow_failure: true
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(ota|full)$/'
       when: always
     - when: never
   dependencies:
     - create_rx65n_bg96_ota
+    - test_rx65n_bg96_ota
   script:
     - $ErrorActionPreference = "Continue"
     - |
       $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx65n_bg96_ota\ota_job_meta.json"
-      if (-not (Test-Path -LiteralPath $metaPath)) {
-        Write-Host "RX65N BG96 OTA metadata missing; cleanup skipped."
-        exit 0
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\cleanup_rx65n_bg96_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      if (Test-Path -LiteralPath $metaPath) {
+        python tools/verify_ota_aws_state.py snapshot `
+          --meta-json "$metaPath" `
+          --output-json (Join-Path $artifactDir "pre_cleanup_state.json")
+        $snapshotStatus = $LASTEXITCODE
+
+        python tools/verify_ota_aws_state.py cleanup `
+          --meta-json "$metaPath" `
+          --output-json (Join-Path $artifactDir "post_cleanup_state.json")
+        $cleanupStatus = $LASTEXITCODE
+      } else {
+        Write-Warning "OTA metadata is absent; the pre-mutation journal contract proves that OTA/S3 creation did not start."
+        $snapshotStatus = 1
+        $cleanupStatus = 0
+        [ordered]@{
+          schema_version = 1
+          status = "not-started"
+          reason = "ota_job_meta.json was not created before any AWS OTA/S3 mutation"
+          absence = [ordered]@{ passed = $true }
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $artifactDir "post_cleanup_state.json") -Encoding utf8
       }
-      $meta = Get-Content -LiteralPath $metaPath -Raw | ConvertFrom-Json
-      if ($meta.ota_update_id) {
-        aws iot delete-ota-update --ota-update-id $meta.ota_update_id --delete-stream --force-delete-aws-job --region $meta.region
-      }
-      if ($meta.s3_bucket -and $meta.s3_key) {
-        $deleteObjectArgs = @("s3api", "delete-object", "--bucket", $meta.s3_bucket, "--key", $meta.s3_key, "--region", $meta.region)
-        if ($meta.s3_version) {
-          $deleteObjectArgs += @("--version-id", $meta.s3_version)
+
+      $ephemeralStatus = 0
+      $ephemeralMetaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx65n_bg96_ota\ephemeral_thing_meta.json"
+      if (Test-Path -LiteralPath $ephemeralMetaPath) {
+        if ($cleanupStatus -ne 0) {
+          Write-Warning "OTA cleanup did not complete; independently attempting exact pipeline-owned Thing cleanup."
         }
-        aws @deleteObjectArgs
+        python tools/manage_ephemeral_iot_thing.py cleanup `
+          --meta-json "$ephemeralMetaPath" `
+          --output-json (Join-Path $artifactDir "ephemeral_thing_cleanup.json")
+        $ephemeralStatus = $LASTEXITCODE
+      }
+
+      if ($snapshotStatus -ne 0 -or $cleanupStatus -ne 0 -or $ephemeralStatus -ne 0) {
+        Write-Error "RX65N BG96 OTA evidence or fail-closed cleanup verification failed."
+        exit 1
       }
   artifacts:
     when: always
     paths:
       - artifacts/create_rx65n_bg96_ota/
+      - artifacts/cleanup_rx65n_bg96_ota/
     expire_in: 7 days
 
 cleanup_rx65n_bg96_mqtt_credentials:
@@ -3217,7 +3410,6 @@ cleanup_rx65n_bg96_mqtt_credentials:
   resource_group: rx65n-bg96-aws-iot-credentials
   dependencies:
     - prepare_rx65n_bg96_mqtt_credentials
-  allow_failure: true
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_DYNAMIC_IOT_CREDENTIALS == "true" && $RX65N_BG96_TEST_SCOPE =~ /^(provision|mqtt|ota|full)$/'
       when: always
@@ -3226,15 +3418,50 @@ cleanup_rx65n_bg96_mqtt_credentials:
     - $ErrorActionPreference = "Continue"
     - |
       $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\prepare_rx65n_bg96_mqtt_credentials"
+      $modePath = Join-Path $artifactDir "mode.txt"
       $metaPath = Join-Path $artifactDir "iot_credentials_meta.json"
       $outPath = Join-Path $artifactDir "cleanup_summary.json"
-      if (-not (Test-Path -LiteralPath $metaPath)) {
-        Write-Host "Temporary BG96 credential metadata missing; cleanup skipped."
+
+      $hasMode = Test-Path -LiteralPath $modePath
+      $hasMeta = Test-Path -LiteralPath $metaPath
+      if ($hasMode) {
+        $mode = (Get-Content -LiteralPath $modePath -Raw).Trim()
+        if ($mode -cnotin @("static", "static-tsip")) {
+          Write-Error "Unknown BG96 credential mode '$mode'; refusing cleanup."
+          exit 1
+        }
+        if ($hasMeta) {
+          Write-Error "Static BG96 credential mode '$mode' unexpectedly includes dynamic metadata; refusing cleanup."
+          exit 1
+        }
+
+        $summary = [ordered]@{
+          schema_version = 1
+          credential_mode = $mode
+          cleanup_action = "no-op"
+          dynamic_metadata_present = $false
+          passed = $true
+        }
+        $summary | ConvertTo-Json | Set-Content -LiteralPath $outPath -Encoding utf8 -ErrorAction Stop
+        Write-Host "Static BG96 credential mode '$mode' requires no AWS cleanup."
         exit 0
       }
+
+      if (-not $hasMeta) {
+        Write-Error "BG96 credential mode and dynamic metadata are both missing; cleanup cannot be verified."
+        exit 1
+      }
+
       python tools/cleanup_bg96_iot_credentials.py `
         --meta-json "$metaPath" `
+        --expected-thing-name "$env:RX65N_BG96_THING_NAME_PREFIX-$env:CI_PIPELINE_ID" `
+        --expected-policy-name "$env:RX65N_BG96_IOT_POLICY_NAME" `
         --output-json "$outPath"
+      $cleanupStatus = $LASTEXITCODE
+      if ($cleanupStatus -ne 0) {
+        Write-Error "Temporary BG96 credential cleanup failed."
+        exit $cleanupStatus
+      }
   artifacts:
     when: always
     paths:
@@ -4833,7 +5060,7 @@ create_rx72n_ether_ota:
       when: on_success
     - when: never
   script:
-    - Write-Host "=== Create RX72N AWS IoT OTA update ==="
+    - Write-Host "=== Validate RX72N AWS IoT OTA creation inputs ==="
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\create_rx72n_ether_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -4844,29 +5071,63 @@ create_rx72n_ether_ota:
           exit 1
         }
       }
-      $otaRoleArn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
-      if ($otaRoleArn -and -not $otaRoleArn.StartsWith("arn:")) {
-        $otaRoleArn = "arn:aws:iam::$otaRoleArn"
-      }
 
       $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
       $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_ota\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
       if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
       $parkMarker = "$env:CI_PROJECT_DIR\artifacts\park_rx72n_ether_ota_cli\parked.ok"
       if (-not (Test-Path $parkMarker)) { Write-Error "RX72N CLI park marker missing: $parkMarker"; exit 1 }
+      $otaThingName = "$env:RX72N_DEVICE_ID-ota-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
+      if ($otaThingName.Length -gt 128) {
+        throw "Generated RX72N OTA Thing name exceeds 128 characters."
+      }
 
+      [ordered]@{
+        schema_version = 1
+        status = "prepared"
+        candidate_rsu = $candidateRsu
+        base_thing_name = $env:RX72N_DEVICE_ID
+        thing_name = $otaThingName
+        created_ephemeral_alias = $true
+        file_version = $env:RX72N_OTA_CANDIDATE_VERSION
+        bucket = $env:AWS_OTA_S3_BUCKET_RX72N_02
+        signing_profile = $env:AWS_OTA_SIGNING_PROFILE_RX72N_02
+        role_arn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
+        region = $env:AWS_DEFAULT_REGION
+        note = "A pipeline-owned Thing prevents another pipeline from consuming this one-shot OTA Job."
+      } | ConvertTo-Json | Set-Content -LiteralPath "$artifactDir\creation_prepared.json" -Encoding utf8
+
+      python tools/manage_ephemeral_iot_thing.py create `
+        --base-thing-name "$env:RX72N_DEVICE_ID" `
+        --thing-name "$otaThingName" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --owner-project-id "$env:CI_PROJECT_ID" `
+        --owner-pipeline-id "$env:CI_PIPELINE_ID" `
+        --owner-job-id "$env:CI_JOB_ID" `
+        --meta-json "$artifactDir\ephemeral_thing_meta.json"
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create the pipeline-owned RX72N OTA Thing."
+      }
+
+      $otaRoleArn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
+      if ($otaRoleArn -notmatch '^arn:') {
+        $otaRoleArn = "arn:aws:iam::$otaRoleArn"
+      }
       python tools/create_ota_update.py `
         --artifact-dir "$artifactDir" `
-        --thing-name "$env:RX72N_DEVICE_ID" `
+        --thing-name "$otaThingName" `
         --input-rsu "$candidateRsu" `
         --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
         --bucket "$env:AWS_OTA_S3_BUCKET_RX72N_02" `
         --signing-profile "$env:AWS_OTA_SIGNING_PROFILE_RX72N_02" `
         --role-arn "$otaRoleArn" `
         --region "$env:AWS_DEFAULT_REGION" `
-        --ota-id-prefix "${env:RX72N_DEVICE_ID}-ota" `
+        --ota-id-prefix "$env:RX72N_DEVICE_ID-ota" `
         2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      $createStatus = $LASTEXITCODE
+      if ($createStatus -ne 0) {
+        exit $createStatus
+      }
   artifacts:
     when: always
     paths:
@@ -4877,6 +5138,10 @@ test_rx72n_ether_ota:
   stage: ota_test
   extends: .rx72n_linux_hw_job
   needs:
+    - job: build_rx72n_ether
+      artifacts: true
+    - job: build_rx72n_ether_ota
+      artifacts: true
     - job: create_rx72n_ether_ota
       artifacts: true
   rules:
@@ -4897,11 +5162,98 @@ test_rx72n_ether_ota:
     - echo "=== Verify RX72N OTA over MQTT on Linux runner ==="
     - echo "NOTE - this observer consumes a one-shot AWS IoT OTA Job. Do not retry this job alone; start a new focused/matrix pipeline so cleanup, create, and test all run with a fresh OTA Job."
     - |
+      set -e
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_ota"
       mkdir -p "$artifact_dir"
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
+      ota_meta="$CI_PROJECT_DIR/artifacts/create_rx72n_ether_ota/ota_job_meta.json"
+      ota_thing_name="$(
+        python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8-sig"))["thing_name"])' \
+          "$ota_meta"
+      )"
+      if [ -z "$ota_thing_name" ]; then
+        echo "RX72N OTA Thing name is missing from create metadata." >&2
+        exit 1
+      fi
+      python3 tools/manage_ephemeral_iot_thing.py verify-journal \
+        --meta-json "$CI_PROJECT_DIR/artifacts/create_rx72n_ether_ota/ephemeral_thing_meta.json" \
+        --expected-thing-name "$ota_thing_name" \
+        --owner-project-id "$CI_PROJECT_ID" \
+        --owner-pipeline-id "$CI_PIPELINE_ID"
 
       reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      # The AWS job targets a pipeline-owned Thing. Restore and provision the
+      # exact baseline with that Thing name, then observe the one-shot job while
+      # this single job owns the RX72N hardware lock.
+      echo "=== Isolated OTA step 1/3: restore exact baseline artifacts ==="
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" -erase-chip -noquery
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" \
+        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot" \
+        -v -noquery
+
+      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
+        -auth id "$RFP_AUTH" \
+        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot" \
+        -v -noquery
+
+      python tools/test_uart_download_rx72n.py \
+        --rsu "$CI_PROJECT_DIR/rx72n_app.rsu" \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --timeout 420 \
+        --post-tx-wait 120 \
+        --diag \
+        --wait-for-ready \
+        --ready-timeout 90 \
+        --reset-cmd "$reset_cmd" \
+        2>&1 | tee "$artifact_dir/restore_rx72n.log"
+
+      echo "=== Isolated OTA step 2/3: provision the pipeline-owned identity and stay in CLI ==="
+      shadow_args=()
+      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
+        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
+      fi
+
+      provision_args=(
+        --port "$RX72N_LINUX_UART_PORT"
+        --baud "$RX72N_LINUX_UART_BAUD_RATE"
+        --thing-name "$ota_thing_name"
+        --endpoint "$AWS_IOT_ENDPOINT"
+        --cert "$AWS_CLIENT_CERT_RX72N_02"
+        --key "$AWS_PRIVATE_KEY_RX72N_02"
+        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem"
+        --format
+        --reset-cmd "$reset_cmd"
+        --reset-after-open
+        --boot-wait 12
+        --cli-timeout 25
+        --attempts 3
+        --no-reset
+      )
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        provision_args+=(--skip-private-key)
+      fi
+
+      python tools/provision_rx72n.py "${provision_args[@]}" "${shadow_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_rx72n.log"
+
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        python tools/provision_tsip_over_uart.py \
+          --target rx72n \
+          --port "$RX72N_LINUX_UART_PORT" \
+          --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+          --chunk-size "${RX72N_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX72N_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          --no-reset-after \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+      fi
+
+      echo "=== Isolated OTA step 3/3: start and observe the one-shot job ==="
       tls_version_args=()
       if [ -n "${RX72N_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args+=(--require-tls-version "$RX72N_REQUIRE_TLS_VERSION")
@@ -4920,12 +5272,83 @@ test_rx72n_ether_ota:
         "${tls_version_args[@]}" \
         2>&1 | tee "$artifact_dir/test_ota_console.log"
 
-      if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-        exit "${PIPESTATUS[0]}"
-      fi
+      status="${PIPESTATUS[0]}"
+      exit "$status"
 
   artifacts:
     when: always
     paths:
       - artifacts/test_rx72n_ether_ota/
+    expire_in: 7 days
+
+cleanup_rx72n_ether_ota:
+  stage: ota_cleanup
+  extends: .aws_cli_windows_job
+  dependencies:
+    - create_rx72n_ether_ota
+    - test_rx72n_ether_ota
+  rules:
+    - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE =~ /^(ota|full)$/ && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_COMMIT_BRANCH == "main" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_COMMIT_TAG && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_TEST_SCOPE == "auto" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - if: '$RUN_RX72N_OTA_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_SKIP_OTA_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02 && $AWS_OTA_S3_BUCKET_RX72N_02 && $AWS_OTA_SIGNING_PROFILE_RX72N_02 && $AWS_OTA_SERVICE_ROLE_ARN_RX72N_02'
+      when: always
+    - when: never
+  script:
+    - $ErrorActionPreference = "Continue"
+    - |
+      $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx72n_ether_ota\ota_job_meta.json"
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\cleanup_rx72n_ether_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      if (Test-Path -LiteralPath $metaPath) {
+        python tools/verify_ota_aws_state.py snapshot `
+          --meta-json "$metaPath" `
+          --output-json (Join-Path $artifactDir "pre_cleanup_state.json")
+        $snapshotStatus = $LASTEXITCODE
+
+        python tools/verify_ota_aws_state.py cleanup `
+          --meta-json "$metaPath" `
+          --output-json (Join-Path $artifactDir "post_cleanup_state.json")
+        $cleanupStatus = $LASTEXITCODE
+      } else {
+        Write-Warning "OTA metadata is absent; the pre-mutation journal contract proves that OTA/S3 creation did not start."
+        $snapshotStatus = 1
+        $cleanupStatus = 0
+        [ordered]@{
+          schema_version = 1
+          status = "not-started"
+          reason = "ota_job_meta.json was not created before any AWS OTA/S3 mutation"
+          absence = [ordered]@{ passed = $true }
+        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $artifactDir "post_cleanup_state.json") -Encoding utf8
+      }
+
+      $ephemeralStatus = 0
+      $ephemeralMetaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx72n_ether_ota\ephemeral_thing_meta.json"
+      if (Test-Path -LiteralPath $ephemeralMetaPath) {
+        if ($cleanupStatus -ne 0) {
+          Write-Warning "OTA cleanup did not complete; independently attempting exact pipeline-owned Thing cleanup."
+        }
+        python tools/manage_ephemeral_iot_thing.py cleanup `
+          --meta-json "$ephemeralMetaPath" `
+          --output-json (Join-Path $artifactDir "ephemeral_thing_cleanup.json")
+        $ephemeralStatus = $LASTEXITCODE
+      }
+
+      if ($snapshotStatus -ne 0 -or $cleanupStatus -ne 0 -or $ephemeralStatus -ne 0) {
+        Write-Error "RX72N OTA evidence or fail-closed cleanup verification failed."
+        exit 1
+      }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/create_rx72n_ether_ota/
+      - artifacts/cleanup_rx72n_ether_ota/
     expire_in: 7 days

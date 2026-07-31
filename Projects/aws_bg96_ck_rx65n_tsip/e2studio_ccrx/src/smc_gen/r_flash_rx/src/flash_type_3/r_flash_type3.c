@@ -1,21 +1,8 @@
-/********************************************************************************************************************
-* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
-* other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
-* applicable laws, including copyright laws.
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
-* THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
-* EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
-* SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS
-* SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
-* this software. By using this software, you agree to the additional terms and conditions found by accessing the
-* following link:
-* http://www.renesas.com/disclaimer
+/*
+* Copyright (C) 2014-2025 Renesas Electronics Corporation and/or its affiliates
 *
-* Copyright (C) 2014-2024 Renesas Electronics Corporation. All rights reserved.
-********************************************************************************************************************/
+* SPDX-License-Identifier: BSD-3-Clause
+*/
 /*******************************************************************************************************************
 * File Name : r_flash_type3.c
 * Description  : This module implements functions specific to Flash Type 3 MCUs
@@ -42,6 +29,7 @@
 *           10.12.2021 4.81    Modified the if statement for error judgment of flash type 3 in do_cmdlk_recovery().
 *           24.01.2023 5.00    Modified the condition of PFRAM section definition.
 *           15.11.2024 5.21    Added WAIT_LOOP comment.
+*           20.03.2025 5.22    Changed the disclaimer in program sources
 ********************************************************************************************************************/
 
 /********************************************************************************************************************

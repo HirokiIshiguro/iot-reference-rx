@@ -999,7 +999,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_flash_rx">
-            <component description="依存モジュール: r_bsp バージョン 7.51&#10;This module allows the user to program, erase, write and blankcheck the Code and/or Data flash." detailDescription="Flash API for RX100, RX200, RX600. and RX700." display="r_flash_rx" id="r_flash_rx5.21" version="5.21">
+            <component description="依存モジュール: r_bsp バージョン 7.52&#10;This module allows the user to program, erase, write and blankcheck the Code and/or Data flash." detailDescription="Flash API for RX100, RX200, RX600. and RX700." display="r_flash_rx" id="r_flash_rx5.22" version="5.22">
                 <gridItem id="FLASH_CFG_PARAM_CHECKING_ENABLE" selectedIndex="1"/>
                 <gridItem id="FLASH_CFG_CODE_FLASH_ENABLE" selectedIndex="1"/>
                 <gridItem id="FLASH_CFG_DATA_FLASH_BGO" selectedIndex="1"/>
@@ -1010,7 +1010,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_fwup">
-            <component description="依存モジュール: r_flash_rx バージョン 4.80, 4.91, 5.10, 5.20&#10;This module is a software library for implementing the firmware update function in user applications." detailDescription="FWUP Library" display="r_fwup" id="r_fwup2.04" version="2.04">
+            <component description="依存モジュール: r_flash_rx バージョン 4.80, 4.91, 5.10, 5.20, 5.22&#10;This module is a software library for implementing the firmware update function in user applications." detailDescription="FWUP Library" display="r_fwup" id="r_fwup2.06" version="2.06">
                 <gridItem id="FWUP_CFG_UPDATE_MODE" selectedIndex="0"/>
                 <gridItem id="FWUP_CFG_FUNCTION_MODE" selectedIndex="1"/>
                 <gridItem id="FWUP_CFG_MAIN_AREA_ADDR_L" selectedIndex="0xFFE00000U"/>

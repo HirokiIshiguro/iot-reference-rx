@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,7 +36,23 @@ def aws(args: list[str], region: str) -> dict:
 
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, ensure_ascii=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            # Preserve the original write/replace failure. A stale temporary
+            # file is safer than hiding the failure that kept the old journal.
+            pass
 
 
 def write_meta(path: Path, meta: dict, **updates: object) -> None:
@@ -42,17 +60,88 @@ def write_meta(path: Path, meta: dict, **updates: object) -> None:
     write_json(path, meta)
 
 
+def validate_signed_prefix(
+    thing_name: str,
+    ota_update_id: str,
+    signed_prefix: str,
+) -> None:
+    owner_root = f"ota/{thing_name}/signed/{ota_update_id}/"
+    if (
+        not signed_prefix.startswith(owner_root)
+        or not signed_prefix.endswith("/")
+    ):
+        raise ValueError(
+            "signed prefix must stay below the OTA update "
+            f"namespace {owner_root!r}"
+        )
+
+
+def validate_source_key(
+    thing_name: str,
+    ota_update_id: str,
+    s3_key: str,
+) -> None:
+    owner_root = f"ota/{thing_name}/source/{ota_update_id}/"
+    if (
+        not s3_key.startswith(owner_root)
+        or s3_key == owner_root
+        or s3_key.endswith("/")
+    ):
+        raise ValueError(
+            "source key must be an object below the OTA update "
+            f"namespace {owner_root!r}"
+        )
+
+
+def expand_ota_path_template(
+    value: str,
+    thing_name: str,
+    ota_update_id: str,
+) -> str:
+    return value.replace("{thing_name}", thing_name).replace(
+        "{ota_update_id}",
+        ota_update_id,
+    )
+
+
 def encode_custom_signature_for_cli(der_signature: bytes) -> str:
     """Return the double-base64 form needed for AWS CLI blob JSON input."""
     return base64.b64encode(base64.b64encode(der_signature)).decode("ascii")
 
 
-def wait_for_ota(ota_update_id: str, region: str, timeout: int, poll_interval: int) -> dict:
+def ota_meta_updates(payload: dict) -> dict[str, object]:
+    info = payload.get("otaUpdateInfo", payload)
+    signing_job_id = None
+    ota_files = info.get("otaUpdateFiles")
+    if isinstance(ota_files, list) and ota_files:
+        code_signing = ota_files[0].get("codeSigning", {})
+        if isinstance(code_signing, dict):
+            signing_job_id = code_signing.get("awsSignerJobId")
+    return {
+        "ota_update_arn": info.get("otaUpdateArn"),
+        "ota_update_status": info.get("otaUpdateStatus"),
+        "aws_iot_job_id": info.get("awsIotJobId"),
+        "aws_iot_job_arn": info.get("awsIotJobArn"),
+        "signing_job_id": signing_job_id,
+    }
+
+
+def wait_for_ota(
+    ota_update_id: str,
+    region: str,
+    timeout: int,
+    poll_interval: int,
+    *,
+    meta_path: Path | None = None,
+    meta: dict | None = None,
+) -> dict:
     deadline = time.time() + timeout
     last_payload: dict | None = None
     while time.time() < deadline:
         payload = aws(["iot", "get-ota-update", "--ota-update-id", ota_update_id], region)
         last_payload = payload
+        if meta_path is not None and meta is not None:
+            write_meta(meta_path, meta, **ota_meta_updates(payload))
         status = payload["otaUpdateInfo"]["otaUpdateStatus"]
         print(f"OTA update status: {status}")
         if status in TERMINAL_CREATE_STATES:
@@ -76,8 +165,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--role-arn", required=True)
     parser.add_argument("--region", required=True)
     parser.add_argument("--ota-id-prefix", default="bg96-ota")
-    parser.add_argument("--s3-key", default=None)
-    parser.add_argument("--signed-prefix", default=None)
+    parser.add_argument(
+        "--s3-key",
+        default=None,
+        help=(
+            "Optional S3 object key template below ota/<thing-name>/. "
+            "Use {thing_name} and {ota_update_id} placeholders. "
+            "Default: ota/<thing-name>/source/<ota-update-id>/<input file name>"
+        ),
+    )
+    parser.add_argument(
+        "--signed-prefix",
+        default=None,
+        help=(
+            "Optional S3 prefix template for AWS Signer output below "
+            "ota/<thing-name>/. Use {thing_name} and {ota_update_id} "
+            "placeholders. Default: "
+            "ota/<thing-name>/signed/<ota-update-id>/"
+        ),
+    )
     parser.add_argument("--wait-timeout", type=int, default=180)
     parser.add_argument("--poll-interval", type=int, default=3)
     return parser.parse_args()
@@ -103,8 +209,53 @@ def main() -> int:
         thing_info = aws(["iot", "describe-thing", "--thing-name", args.thing_name], args.region)
         thing_arn = thing_info["thingArn"]
 
-    s3_key = args.s3_key or f"ota/{args.thing_name}/{payload.name}"
-    signed_prefix = args.signed_prefix or f"ota/{args.thing_name}/signed/"
+    ota_update_id = (
+        f"{args.ota_id_prefix}-{int(time.time())}-{uuid.uuid4().hex[:12]}"
+    )
+    s3_key = expand_ota_path_template(
+        args.s3_key
+        or "ota/{thing_name}/source/{ota_update_id}/" + payload.name,
+        args.thing_name,
+        ota_update_id,
+    )
+    validate_source_key(args.thing_name, ota_update_id, s3_key)
+    signed_prefix = expand_ota_path_template(
+        args.signed_prefix
+        or "ota/{thing_name}/signed/{ota_update_id}/",
+        args.thing_name,
+        ota_update_id,
+    )
+    code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
+    if code_signing_mode == "aws-signer":
+        validate_signed_prefix(args.thing_name, ota_update_id, signed_prefix)
+    meta = {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "region": args.region,
+        "thing_name": args.thing_name,
+        "thing_arn": thing_arn,
+        "ota_update_id": ota_update_id,
+        "ota_update_status": "UPLOAD_REQUESTED",
+        "s3_bucket": args.bucket,
+        "s3_key": s3_key,
+        "s3_version": None,
+        # Custom signing embeds the signature and creates no Signer output.
+        # When AWS Signer is selected, journal its output prefix before the
+        # first mutation so partial-failure cleanup can still recover it.
+        "signed_prefix": (
+            signed_prefix if code_signing_mode == "aws-signer" else None
+        ),
+        "signing_profile": args.signing_profile,
+        "code_signing_mode": code_signing_mode,
+        "custom_signature_der": str(args.custom_signature_der.resolve()) if args.custom_signature_der else None,
+        "code_signer_cert": str(args.code_signer_cert.resolve()) if args.code_signer_cert else None,
+        "file_version": args.file_version,
+        "input_payload": str(payload),
+    }
+    # Journal every resource identifier before the first AWS mutation.  The
+    # always-running cleanup job can therefore remove an upload even when this
+    # creator exits before create-ota-update is submitted.
+    write_json(meta_path, meta)
+
     put_output = aws(
         [
             "s3api",
@@ -120,30 +271,16 @@ def main() -> int:
     )
     write_json(artifact_dir / "ota_s3_put_output.json", put_output)
 
-    ota_update_id = f"{args.ota_id_prefix}-{int(time.time())}"
     file_location: dict = {"s3Location": {"bucket": args.bucket, "key": s3_key}}
     if "VersionId" in put_output:
         file_location["s3Location"]["version"] = put_output["VersionId"]
 
-    code_signing_mode = "custom" if args.custom_signature_der is not None else "aws-signer"
-    meta = {
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "region": args.region,
-        "thing_name": args.thing_name,
-        "thing_arn": thing_arn,
-        "ota_update_id": ota_update_id,
-        "ota_update_status": "CREATE_REQUESTED",
-        "s3_bucket": args.bucket,
-        "s3_key": s3_key,
-        "s3_version": file_location["s3Location"].get("version"),
-        "signing_profile": args.signing_profile,
-        "code_signing_mode": code_signing_mode,
-        "custom_signature_der": str(args.custom_signature_der.resolve()) if args.custom_signature_der else None,
-        "code_signer_cert": str(args.code_signer_cert.resolve()) if args.code_signer_cert else None,
-        "file_version": args.file_version,
-        "input_payload": str(payload),
-    }
-    write_json(meta_path, meta)
+    write_meta(
+        meta_path,
+        meta,
+        ota_update_status="S3_UPLOADED",
+        s3_version=file_location["s3Location"].get("version"),
+    )
 
     if args.custom_signature_der is not None:
         certificate_name = args.certificate_name
@@ -191,15 +328,26 @@ def main() -> int:
         "roleArn": args.role_arn,
     }
     write_json(artifact_dir / "create_ota_input.json", create_input)
+    write_meta(meta_path, meta, ota_update_status="CREATE_REQUESTED")
 
     create_output = aws(
         ["iot", "create-ota-update", "--cli-input-json", f"file://{artifact_dir / 'create_ota_input.json'}"],
         args.region,
     )
     write_json(artifact_dir / "create_ota_output.json", create_output)
-    write_meta(meta_path, meta, ota_update_status="CREATE_SUBMITTED")
+    create_updates = ota_meta_updates(create_output)
+    if not create_updates.get("ota_update_status"):
+        create_updates["ota_update_status"] = "CREATE_SUBMITTED"
+    write_meta(meta_path, meta, **create_updates)
 
-    final_output = wait_for_ota(ota_update_id, args.region, args.wait_timeout, args.poll_interval)
+    final_output = wait_for_ota(
+        ota_update_id,
+        args.region,
+        args.wait_timeout,
+        args.poll_interval,
+        meta_path=meta_path,
+        meta=meta,
+    )
     write_json(artifact_dir / "ota_update_status.json", final_output)
 
     ota_info = final_output["otaUpdateInfo"]
@@ -215,11 +363,7 @@ def main() -> int:
     write_meta(
         meta_path,
         meta,
-        ota_update_arn=ota_info.get("otaUpdateArn"),
-        ota_update_status=ota_info.get("otaUpdateStatus"),
-        aws_iot_job_id=ota_info.get("awsIotJobId"),
-        aws_iot_job_arn=ota_info.get("awsIotJobArn"),
-        signing_job_id=signer_job_id,
+        **ota_meta_updates(final_output),
     )
 
     print("OTA update creation complete")

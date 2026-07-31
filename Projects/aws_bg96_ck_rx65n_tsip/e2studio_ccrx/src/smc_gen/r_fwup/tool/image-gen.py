@@ -14,7 +14,7 @@
 #* following link:
 #* http://www.renesas.com/disclaimer
 #*
-#* Copyright (C) 2023 Renesas Electronics Corporation. All rights reserved.
+#* Copyright (C) 2023-2025 Renesas Electronics Corporation. All rights reserved.
 #**********************************************************************************************************************
 #**********************************************************************************************************************
 #* File Name    : image-gen.py
@@ -35,6 +35,9 @@
 #                           for FW Update V2.00.
 #                           Fixed a bug in processing when not including the data flash area in the RSU file.
 #           09.11.2023 3.03 Added "BAREMETAL_FWUP_V2_V1_DATA" to RSU format type.
+#           13.12.2024 3.04 When generating the initial image of an application program that spans the 0x10000 
+#                           address, the bug where S records after 0x10000 were generated as S1 records has been fixed.
+#           27.08.2025 3.05 Added "RL78 Dual Mode" to Device type.
 #**********************************************************************************************************************
 import sys
 import os
@@ -52,6 +55,8 @@ class Person:
 
 # Value when the option is omitted
 OPTION_OMIT = 'None'
+
+LOG_COUNT = 15
 
 def set_cmdline_argparser():
     """Command line argument parsing settings.
@@ -123,7 +128,7 @@ def ecdsa_signature(key_pem,message):
 DEBUG_MODE = False
 
 # Image Generator Version
-IMAGE_GENERATOR_VERSION = "Ver3.03"
+IMAGE_GENERATOR_VERSION = "Ver3.04"
 
 #** Macro ***
 RSU_BAREMETAL = "BareMetal"                                  # Generate RSU file for FW Update 2.00 (bare metal) environment.
@@ -143,7 +148,8 @@ ADDRESS_AREA_TYPE_NEAR_BOOT_LOADER = 5
 HASH_SHA256 = "sha256"                                        # hash-sha256
 SIG_SHA256_ECDSA = "ecdsa"                                    # sig-sha256-ecdsa
 
-DEVICE_TYPE_DUAL_MODE = 1
+DEVICE_TYPE_RX_DUAL_MODE = 1
+DEVICE_TYPE_RL78_DUAL_MODE = 2
 DEVICE_TYPE_LINEAR_MODE = 0
 
 BL_INITIAL_FW_MOT_FILE_SUPPORT = 4
@@ -166,7 +172,8 @@ FLASH_WRITE_SIZE_STR = "Flash Write Size"
 
 # Parameter data String
 # Device type String
-DUAL_MODE_STR = "Dual Mode"
+RL78_DUAL_MODE_STR = "RL78 Dual Mode"
+RX_DUAL_MODE_STR = "Dual Mode"
 LINEAR_MODE_STR = "Linear Mode"
 # Neaer Data Address String or Code Flash Size(RL78) or OFS Data
 NO_USED_STR = "No Used."
@@ -283,8 +290,10 @@ def inputPrmDataSet(prmFile_data):
             data_str = lineData_lsit[1]
             # Device type
             if prm_name_str == DEVICE_TYPE_STR:
-                if data_str == DUAL_MODE_STR:
-                    device_type = DEVICE_TYPE_DUAL_MODE
+                if data_str == RL78_DUAL_MODE_STR:
+                    device_type = DEVICE_TYPE_RL78_DUAL_MODE
+                elif data_str == RX_DUAL_MODE_STR:
+                    device_type = DEVICE_TYPE_RX_DUAL_MODE
                 elif data_str == LINEAR_MODE_STR:
                     device_type = DEVICE_TYPE_LINEAR_MODE
                 else:
@@ -405,6 +414,7 @@ bank1_boot_loader_area_end_address = 0
 
 user_program_start_address = 0
 user_program_end_address = 0
+bank1_near_boot_loader_mot_list = []                                                                                             # Bank1 Near Area Boot Loader mot Data
 bank1_boot_loader_mot_data_list = []                                                                                             # Bank1 Area Boot Loader mot Data
 user_program_block_flg = []                                                                                                      # Boot Loader Buffer
 boot_loader_buf = []
@@ -457,6 +467,25 @@ def get_s_record_type_str(int_address):
         s_record_adr_format = '08X'
     return s_record_type_str, s_record_len_str, s_record_adr_format
 
+def get_s_record_length(in_s_record_str, in_motData):
+    result = divmod(len(in_motData), 2)
+    address_len_int = 2                   # Address Length
+    check_sum_len_int = 1                 # Check SUM Length
+    if result[1] == 0:                    # remainder
+        in_motData_len_int = result[0]
+    else:
+        print("The length of in_motData is odd.")
+        exit()
+    if in_s_record_str == "S1":
+        address_len_int = 2
+    elif in_s_record_str == "S2":
+        address_len_int = 3
+    elif in_s_record_str == "S3":
+        address_len_int = 4
+    out_s_record_len_str = format(address_len_int + in_motData_len_int + check_sum_len_int, '02X')
+#   out_s_record_len_str = str(hex(address_len_int + in_motData_len_int + check_sum_len_int)[2:])
+    return out_s_record_len_str
+
 # User Program Buffer Initialize
 user_program_area_size = user_program_area_end_address - user_program_area_start_address + 1
 result = divmod(user_program_area_size, flash_write_size)
@@ -507,12 +536,18 @@ boot_loader_area_size = bank0_boot_loader_area_end_address - bank0_boot_loader_a
 boot_loader_str = ""
 result = divmod(boot_loader_area_size, flash_write_size)
 if result[1] == 0:                                            # remainder
-    if device_type == DEVICE_TYPE_DUAL_MODE:                  # dual mode
+    if device_type == DEVICE_TYPE_RX_DUAL_MODE:                  # dual mode
         code_flash_result = divmod(code_flash_size, 2)
         if code_flash_result[1] == 0:                         # remainder
             code_flash_half_size  = code_flash_result[0]
             bank1_boot_loader_area_start_address = bank0_boot_loader_area_start_address - code_flash_half_size
             bank1_boot_loader_area_end_address = bank0_boot_loader_area_end_address - code_flash_half_size
+    elif device_type == DEVICE_TYPE_RL78_DUAL_MODE:               # RX
+        code_flash_result = divmod(code_flash_size, 2)
+        if code_flash_result[1] == 0:                         # remainder
+            code_flash_half_size  = code_flash_result[0]
+            bank1_boot_loader_area_start_address = bank0_boot_loader_area_start_address + code_flash_half_size
+            bank1_boot_loader_area_end_address = bank0_boot_loader_area_end_address + code_flash_half_size
     boot_loader_buf_cnt = 0
     while True:
         boot_loader_buf.append('FF')
@@ -563,10 +598,19 @@ if input_bootLoaderFileName_Str != "":
                motData_Len = len(motData) // 2
                motDataLength = len(motData)
                bank0_boot_loader_mot_list.append(motLineData)
-               if device_type == DEVICE_TYPE_DUAL_MODE:                                                                           # dual mode
+               if device_type == DEVICE_TYPE_RX_DUAL_MODE:               # RX
                    bank1_boot_loader_address = adr_hex_int - code_flash_half_size
                    s_record_str, s_record_len_str, s_record_adr_format = get_s_record_type_str(bank1_boot_loader_address)
                    bank1_mot_sum_work_data = byteNum + format(bank1_boot_loader_address, s_record_adr_format).upper() + motData
+                   bank1_mot_sum_str = CalculateMotorolaChecksum(bank1_mot_sum_work_data)
+                   bank1_mot_line_data = s_record_str + bank1_mot_sum_work_data + bank1_mot_sum_str
+                   bank1_mot_line_data += '\n'
+                   bank1_boot_loader_mot_data_list.append(bank1_mot_line_data)
+               elif device_type == DEVICE_TYPE_RL78_DUAL_MODE:                              # dual mode
+                   bank1_boot_loader_address = adr_hex_int + code_flash_half_size
+                   s_record_str, s_record_len_str, s_record_adr_format = get_s_record_type_str(bank1_boot_loader_address)
+                   s_record_len_str = get_s_record_length(s_record_str, motData)
+                   bank1_mot_sum_work_data = s_record_len_str + format(bank1_boot_loader_address, s_record_adr_format).upper() + motData
                    bank1_mot_sum_str = CalculateMotorolaChecksum(bank1_mot_sum_work_data)
                    bank1_mot_line_data = s_record_str + bank1_mot_sum_work_data + bank1_mot_sum_str
                    bank1_mot_line_data += '\n'
@@ -575,6 +619,16 @@ if input_bootLoaderFileName_Str != "":
                ofsm_data_mot_list.append(motLineData)
            elif adr_type == ADDRESS_AREA_TYPE_NEAR_BOOT_LOADER:
                near_boot_loader_mot_list.append(motLineData)
+               if (device_type == DEVICE_TYPE_RL78_DUAL_MODE):                              # dual mode
+                   motData = motLineData[adr_offset:motLineDataLen-2]
+                   bank1_boot_loader_near_address = adr_hex_int + code_flash_half_size
+                   s_record_str, s_record_len_str, s_record_adr_format = get_s_record_type_str(bank1_boot_loader_near_address)
+                   s_record_len_str = get_s_record_length(s_record_str, motData)
+                   bank1_mot_sum_work_data = s_record_len_str + format(bank1_boot_loader_near_address, s_record_adr_format).upper() + motData
+                   bank1_mot_sum_str = CalculateMotorolaChecksum(bank1_mot_sum_work_data)
+                   bank1_mot_line_data = s_record_str + bank1_mot_sum_work_data + bank1_mot_sum_str
+                   bank1_mot_line_data += '\n'
+                   bank1_near_boot_loader_mot_list.append(bank1_mot_line_data)
     block_flag_file_cnt = 0
     # Boot Loader bank0 mot data
     bank0_boot_loader_mot_str = ""
@@ -591,7 +645,7 @@ if input_bootLoaderFileName_Str != "":
     for boot_loader_list_index in range(len(ofsm_data_mot_list)):
         boot_loader_ofsm_mot_str += ofsm_data_mot_list[boot_loader_list_index]
         boot_loader_ofsm_mot_str += '\n'
-    if device_type == DEVICE_TYPE_DUAL_MODE:                                                                                     # dual mode
+    if device_type == DEVICE_TYPE_RX_DUAL_MODE:                                                                                     # dual mode
         # Boot Loader buf bin
         boot_loader_str = ""
         for boot_loader_buf_index in range(len(boot_loader_buf)):
@@ -601,7 +655,20 @@ if input_bootLoaderFileName_Str != "":
         bank1_boot_loader_mot_str = ""
         for boot_loader_list_index in range(len(bank1_boot_loader_mot_data_list)):
             bank1_boot_loader_mot_str += bank1_boot_loader_mot_data_list[boot_loader_list_index]
-
+    elif device_type == DEVICE_TYPE_RL78_DUAL_MODE:                                                                                     # dual mode
+        # Boot Loader buf bin
+        boot_loader_str = ""
+        for boot_loader_buf_index in range(len(boot_loader_buf)):
+            boot_loader_str += boot_loader_buf[boot_loader_buf_index]
+        boot_loader_bin = binascii.unhexlify(boot_loader_str)
+        # Boot Loader bank1 mot data
+        bank1_boot_loader_mot_str = ""
+        for boot_loader_list_index in range(len(bank1_boot_loader_mot_data_list)):
+            bank1_boot_loader_mot_str += bank1_boot_loader_mot_data_list[boot_loader_list_index]
+        # near Boot Loader mot data
+        bank1_near_boot_loader_mot_str = ""
+        for near_boot_loader_list_index in range(len(near_boot_loader_mot_list)):
+            bank1_near_boot_loader_mot_str += bank1_near_boot_loader_mot_list[near_boot_loader_list_index]
 # User Program mot file data Read
 InMotFileData = Input_UserProgram_MotFile.read()
 InMotLineData = InMotFileData.splitlines()
@@ -875,10 +942,11 @@ program_adr_offset = 0x300
 for user_program_count in range(rsu_addr_info.program_num):
     mot_adr = rsu_addr_info.program_start_address[user_program_count]
     data_size = rsu_addr_info.program_data_size[user_program_count]
-    s_record_str, s_record_len_str, s_record_adr_format = get_s_record_type_str(mot_adr)
     user_program_bin = rsu_output_bin[program_adr_offset:program_adr_offset+data_size]
     data_index = 0
     while data_index < len(user_program_bin):
+        mot_adr_int = mot_adr + data_index
+        s_record_str, s_record_len_str, s_record_adr_format = get_s_record_type_str(mot_adr_int)
         mot_data_str = s_record_len_str
         mot_test_adr_str = format(mot_adr+data_index, s_record_adr_format).upper()
         mot_data_str += format(mot_adr+data_index, s_record_adr_format).upper()
@@ -909,7 +977,7 @@ if input_bootLoaderFileName_Str != "":
     if len(boot_loader_ofsm_mot_str) != 0:                                                    # dual mode and OFSM list OFSM data exist.
         out_mot_file_data_str += boot_loader_ofsm_mot_str                                     # Added OFSM mot data to output mot file data.
         #** Add Bank1 Boot Loader ***
-        if (device_type == DEVICE_TYPE_DUAL_MODE) and (len(bank1_boot_loader_mot_str) != 0):  # dual mode and Bank1 list Bank1 data exist.
+        if (device_type == DEVICE_TYPE_RX_DUAL_MODE) and (len(bank1_boot_loader_mot_str) != 0):  # dual mode and Bank1 list Bank1 data exist.
             out_mot_file_data_str += bank1_boot_loader_mot_str
     #** Add UserProgram mot data ***
     user_program_mot_str = ""
@@ -919,6 +987,12 @@ if input_bootLoaderFileName_Str != "":
     #** Add Bank0 Boot Loader mot data ***
     if bank0_boot_loader_mot_str != "":
         out_mot_file_data_str += bank0_boot_loader_mot_str
+    # Add Bank1 Near Boot Loader(RL78 Only)
+    if (device_type == DEVICE_TYPE_RL78_DUAL_MODE) and (bank1_near_boot_loader_mot_str != ""):
+        out_mot_file_data_str += bank1_near_boot_loader_mot_str                               # Added Bank1 near Boot Loader mot data to output mot file data.
+    #** Add Bank1 Boot Loader ***
+    if (device_type == DEVICE_TYPE_RL78_DUAL_MODE) and (len(bank1_boot_loader_mot_str) != 0):      # dual mode and Bank1 list Bank1 data exist.
+        out_mot_file_data_str += bank1_boot_loader_mot_str
     #** Add S Record data ***
     out_mot_file_data_str += s_record_adr_str
     if (rsu_format == RSU_BAREMETAL) or (rsu_format == RSU_RTOS):                        # Generate RSU file for FW Update 2.00 environment.

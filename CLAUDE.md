@@ -80,7 +80,7 @@ RX ファミリ向け FreeRTOS LTS IoT リファレンス実装。
 | Fleet Provisioning | 1.2.2 | 2028/06/30 |
 | mbedTLS | 3.6.4 | -- |
 | littlefs | 2.5.1 | -- |
-| r_fwup | 2.04 | -- |
+| r_fwup | 2.06 | -- |
 
 **注意:** 202604.00-LTS では coreMQTT が v5、Jobs が v2 へ更新されるため、RX72N プロジェクトでは `Common/patches/coreMQTT-Agent/` と `Common/patches/Jobs-for-AWS-IoT-embedded-sdk/` に互換差分を保持する。
 
@@ -558,9 +558,8 @@ Step 8 の完了判定:
   - terminal UART: `SCI7 / 921600`
 - local baseline helper は legacy bootloader banner
   `send "userprog.rsu" via UART.` を待ち受ける
-- RSU 生成時の PRM CSV は bootloader project ではなく
-  `Projects/aws_ether_rx72n_envision_kit/.../RX72N_DualBank_ImageGenerator_PRM.csv`
-  を使う
+- RSU 生成時の PRM CSV は bootloader project や生成済み FIT module 内ではなく
+  `tools/fwup/rx72n_envision_kit_dual_bank.prm.csv` を使う
 - ここでの切り替えは「source / metadata / local helper の整合」までであり、
   local 実機での initial image download -> reset -> app 起動の再確認は引き続き Issue #12 の検証項目
 

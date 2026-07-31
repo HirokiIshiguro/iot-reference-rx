@@ -169,52 +169,62 @@
         </Segment>
         <Segment component="r_tsip_rx1.21" id="r_tsip_rx" source="com.renesas.smc.tools.swcomponent.fit.source"/>
         <Segment component="r_simple_graphic_rx1.00" id="r_simple_graphic_rx" source="com.renesas.smc.tools.swcomponent.fit.source"/>
-        <Segment component="r_fwup2.04" id="r_fwup" source="com.renesas.smc.tools.swcomponent.fit.source">
-            <Setting id="FWUP_CFG_USER_BANK_SWAP_FUNCTION" value="ota_bank_swap_function"/>
-            <Setting id="FWUP_CFG_UPDATE_MODE" value="0"/>
-            <Setting id="FWUP_CFG_USER_FLASH_READ_ENABLED" value="1"/>
+        <Segment component="r_fwup2.06" id="r_fwup" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_CLOSE_ENABLED" value="0"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_ERASE_ENABLED" value="0"/>
             <Setting id="FWUP_CFG_USER_SOFTWARE_RESET_FUNCTION" value="my_software_reset_function"/>
-            <Setting id="FWUP_CFG_EXT_BUF_AREA_BLK_SIZE" value="4096U"/>
-            <Setting id="FWUP_CFG_USER_VERIFY_ECDSA_FUNCTION" value="ota_verify_ecdsa_function"/>
-            <Setting id="FWUP_CFG_USER_FLASH_ERASE_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_FUNCTION_MODE" value="1"/>
             <Setting id="FWUP_CFG_USER_SHA256_INIT_FUNCTION" value="ota_sha256_init_function"/>
-            <Setting id="FWUP_CFG_USER_FLASH_CLOSE_ENABLED" value="1"/>
-            <Setting id="FWUP_CFG_SIGNATURE_VERIFICATION" value="0"/>
             <Setting id="FWUP_CFG_USER_SOFTWARE_DELAY_ENABLED" value="0"/>
-            <Setting id="FWUP_CFG_DF_NUM_BLKS" value="512U"/>
-            <Setting id="FWUP_CFG_FWUPV1_COMPATIBLE" value="0"/>
             <Setting id="FWUP_CFG_USER_VERIFY_ECDSA_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_USER_FLASH_CLOSE_FUNCTION" value="ota_flash_close_function"/>
             <Setting id="FWUP_CFG_USER_SOFTWARE_DELAY_FUNCTION" value="my_software_delay_function"/>
-            <Setting id="FWUP_CFG_USER_SHA256_UPDATE_FUNCTION" value="ota_sha256_update_function"/>
-            <Setting id="FWUP_CFG_USER_SHA256_FINAL_ENABLED" value="1"/>
-            <Setting id="FWUP_CFG_EXT_BUF_AREA_ADDR_L" value="0x00000U"/>
-            <Setting id="FWUP_CFG_BUF_AREA_ADDR_L" value="0xFFC00000U"/>
-            <Setting id="FWUP_CFG_USER_FLASH_OPEN_ENABLED" value="1"/>
-            <Setting id="FWUP_CFG_USER_DISABLE_INTERRUPT_FUNCTION" value="my_disable_interrupt_function"/>
-            <Setting id="FWUP_CFG_USER_SOFTWARE_RESET_ENABLED" value="0"/>
-            <Setting id="FWUP_CFG_USER_BANK_SWAP_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_USER_ENABLE_INTERRUPT_ENABLED" value="0"/>
             <Setting id="FWUP_CFG_USER_FLASH_READ_FUNCTION" value="ota_flash_read_function"/>
-            <Setting id="FWUP_CFG_USER_SHA256_FINAL_FUNCTION" value="ota_sha256_final_function"/>
             <Setting id="FWUP_CFG_USER_SHA256_INIT_ENABLED" value="1"/>
-            <Setting id="FWUP_CFG_USER_FLASH_OPEN_FUNCTION" value="ota_flash_open_function"/>
-            <Setting id="FWUP_CFG_USER_DISABLE_INTERRUPT_ENABLED" value="0"/>
-            <Setting id="FWUP_CFG_DF_BLK_SIZE" value="64U"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_OPEN_FUNCTION" value="my_ext_flash_open_function"/>
             <Setting id="FWUP_CFG_USER_FLASH_WRITE_FUNCTION" value="ota_flash_write_function"/>
-            <Setting id="FWUP_CFG_USER_ENABLE_INTERRUPT_FUNCTION" value="my_enable_interrupt_function"/>
             <Setting id="FWUP_CFG_CF_BLK_SIZE" value="0x8000U"/>
             <Setting id="FWUP_CFG_PRINTF_DISABLE" value="0"/>
             <Setting id="FWUP_CFG_USER_GET_CRYPT_CONTEXT_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_USER_FLASH_WRITE_ENABLED" value="1"/>
-            <Setting id="FWUP_CFG_CF_W_UNIT_SIZE" value="128U"/>
             <Setting id="FWUP_CFG_USER_GET_CRYPT_CONTEXT_FUNCTION" value="ota_get_crypt_context_function"/>
-            <Setting id="FWUP_CFG_MAIN_AREA_ADDR_L" value="0xFFE00000U"/>
             <Setting id="FWUP_CFG_AREA_SIZE" value="0x1C0000U"/>
-            <Setting id="FWUP_CFG_USER_SHA256_UPDATE_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_DF_ADDR_L" value="0x00100000"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_CLOSE_FUNCTION" value="my_ext_flash_close_function"/>
             <Setting id="FWUP_CFG_USER_FLASH_ERASE_FUNCTION" value="ota_flash_erase_function"/>
+            <Setting id="FWUP_CFG_USER_BANK_SWAP_FUNCTION" value="ota_bank_swap_function"/>
+            <Setting id="FWUP_CFG_UPDATE_MODE" value="0"/>
+            <Setting id="FWUP_CFG_USER_FLASH_READ_ENABLED" value="1"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_WRITE_FUNCTION" value="my_ext_flash_write_function"/>
+            <Setting id="FWUP_CFG_EXT_BUF_AREA_BLK_SIZE" value="4096U"/>
+            <Setting id="FWUP_CFG_USER_VERIFY_ECDSA_FUNCTION" value="ota_verify_ecdsa_function"/>
+            <Setting id="FWUP_CFG_USER_FLASH_ERASE_ENABLED" value="1"/>
+            <Setting id="FWUP_CFG_USER_FLASH_CLOSE_ENABLED" value="1"/>
+            <Setting id="FWUP_CFG_SIGNATURE_VERIFICATION" value="0"/>
+            <Setting id="FWUP_CFG_DF_NUM_BLKS" value="512U"/>
+            <Setting id="FWUP_CFG_FWUPV1_COMPATIBLE" value="0"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_OPEN_ENABLED" value="0"/>
+            <Setting id="FWUP_CFG_USER_SHA256_UPDATE_FUNCTION" value="ota_sha256_update_function"/>
+            <Setting id="FWUP_CFG_USER_SHA256_FINAL_ENABLED" value="1"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_READ_ENABLED" value="0"/>
+            <Setting id="FWUP_CFG_EXT_BUF_AREA_ADDR_L" value="0x00000U"/>
+            <Setting id="FWUP_CFG_BUF_AREA_ADDR_L" value="0xFFC00000U"/>
+            <Setting id="FWUP_CFG_USER_FLASH_OPEN_ENABLED" value="1"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_ERASE_FUNCTION" value="my_ext_flash_erase_function"/>
+            <Setting id="FWUP_CFG_USER_DISABLE_INTERRUPT_FUNCTION" value="my_disable_interrupt_function"/>
+            <Setting id="FWUP_CFG_USER_SOFTWARE_RESET_ENABLED" value="0"/>
+            <Setting id="FWUP_CFG_USER_BANK_SWAP_ENABLED" value="1"/>
+            <Setting id="FWUP_CFG_USER_SHA256_FINAL_FUNCTION" value="ota_sha256_final_function"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_READ_FUNCTION" value="my_ext_flash_read_function"/>
+            <Setting id="FWUP_CFG_USER_FLASH_OPEN_FUNCTION" value="ota_flash_open_function"/>
+            <Setting id="FWUP_CFG_USER_DISABLE_INTERRUPT_ENABLED" value="0"/>
+            <Setting id="FWUP_CFG_DF_BLK_SIZE" value="64U"/>
+            <Setting id="FWUP_CFG_USER_ENABLE_INTERRUPT_FUNCTION" value="my_enable_interrupt_function"/>
+            <Setting id="FWUP_CFG_CF_W_UNIT_SIZE" value="128U"/>
+            <Setting id="FWUP_CFG_USER_EXT_FLASH_WRITE_ENABLED" value="0"/>
+            <Setting id="FWUP_CFG_MAIN_AREA_ADDR_L" value="0xFFE00000U"/>
+            <Setting id="FWUP_CFG_USER_SHA256_UPDATE_ENABLED" value="1"/>
         </Segment>
         <Segment component="LittleFS202406.01-LTS-rx-1.1.1" id="LittleFS" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         <Segment component="r_sci_rx5.40" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
@@ -433,9 +443,9 @@
             <Setting id="ETHER_CFG_USE_PHY_ICS1894_32" value="0"/>
             <Setting id="ETHER_CFG_MODE_SEL" value="0"/>
             <Setting id="ETHER_CFG_LINK_PRESENT" value="0"/>
-            <Setting id="ETHER_CFG_EMAC_RX_DESCRIPTORS" value="1"/>
+            <Setting id="ETHER_CFG_EMAC_RX_DESCRIPTORS" value="2"/>
             <Setting id="ETHER_CFG_BUFSIZE" value="1536"/>
-            <Setting id="ETHER_CFG_EMAC_TX_DESCRIPTORS" value="1"/>
+            <Setting id="ETHER_CFG_EMAC_TX_DESCRIPTORS" value="2"/>
             <Setting id="ETHER_CFG_PHY_DELAY_RESET" value="0x00020000L"/>
             <Setting id="ETHER_CFG_CH1_PHY_ACCESS" value="1"/>
             <Setting id="ETHER_CFG_USE_PHY_KSZ8041NL" value="0"/>
@@ -526,7 +536,7 @@
         </Segment>
         <Segment component="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.objectfreertoslts202406.01-LTS-rx-1.1.1" id="FreeRTOS Object" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         <Segment component="FreeRTOS_IP202406.01-LTS-rx-1.1.1" id="FreeRTOS_IP" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
-        <Segment component="r_flash_rx5.21" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_flash_rx5.22" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" value="1"/>

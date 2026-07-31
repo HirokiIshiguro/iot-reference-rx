@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
- *
- * Copyright (C) 2023-2024 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+/*
+* Copyright (c) 2023-2025 Renesas Electronics Corporation and/or its affiliates
+*
+* SPDX-License-Identifier: BSD-3-Clause
+*/
 /**********************************************************************************************************************
  * File Name    : r_fwup.c
  * Description  : Functions for the Firmware update module.
@@ -28,6 +15,8 @@
  *         : 28.03.2024 2.02    Update wrapper functions.
  *         : 09.04.2024 2.03    Fixed wrapper function.
  *         : 15.10.2024 2.04    Fixed wrapper function.
+ *         : 24.10.2025 2.05    V205 Release.
+ *         : 23.01.2025 2.06    V206 Release.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
  Includes   <System Includes> , "Project Includes"
@@ -41,7 +30,7 @@
 /**********************************************************************************************************************
  Macro definitions
  *********************************************************************************************************************/
-#define FWUP_READ_BUF_SIZE                     (4096U)
+#define FWUP_READ_BUF_SIZE                     (128U)
 #define FWUP_COPY_BUF_SIZE                     (FWUP_CFG_CF_W_UNIT_SIZE)
 #define FWUP_VERI_BUF_SIZE                     (128U)
 #define FWUP_WRITE_HEADER_BUF_SIZE             (128U)
@@ -109,16 +98,9 @@ S_C_CH_FAR BOOT_LOADER_MAGIC_CODE[] = "Renesas";
 /* for debug logging */
 S_C_CH_FAR MSG_MAIN[] = "main";
 S_C_CH_FAR MSG_BUFFER[] = "buffer";
-S_C_CH_FAR MSG_DATA[] = "data";
 S_C_CH_FAR MSG_OK[] = "OK\r\n";
 S_C_CH_FAR MSG_NG[] = "NG\r\n";
 S_C_CH_FAR MSG_VERIFY_INSTALL_AREA[] = "verify install area %s [%s]...";
-S_C_CH_FAR MSG_HASH_START[] = "hash_sha256: begin area=%s\r\n";
-S_C_CH_FAR MSG_HASH_DESC[] = "hash_sha256: descriptor n=%u\r\n";
-S_C_CH_FAR MSG_HASH_SEGMENT[] = "hash_sha256: segment=%u area=%s addr=0x%08lX size=%lu\r\n";
-S_C_CH_FAR MSG_HASH_DONE[] = "hash_sha256: done area=%s\r\n";
-S_C_CH_FAR MSG_VERIFY_HASH_READY[] = "verify image: hash ready\r\n";
-S_C_CH_FAR MSG_VERIFY_SIG_ENTER[] = "verify image: entering signature verification\r\n";
 S_C_CH_FAR MSG_WRITE_OK[]    = "W 0x%lX, %d ... OK\r\n";
 #endif /* (FWUP_CFG_PRINTF_DISABLE == 0) */
 
@@ -134,6 +116,11 @@ static uint8_t s_img_prog_write_flg = 0;
 
 /* wrote counter */
 static uint32_t s_wrote_counter = 0;
+
+/* Program data count in the RSU header information (used by the write_image_prog function) */
+static uint8_t s_fw_wip_cnt = 0;
+/* Program data count in the RSU header information (used by the write_image_offset_prog function) */
+static uint8_t s_fw_wiop_cnt = 0;
 
 /*
  * API
@@ -160,6 +147,8 @@ e_fwup_err_t R_FWUP_Open(void)
     s_prg_list_write_flg = 0;
     s_img_prog_write_flg = 0;
     s_wrote_counter = 0;
+    s_fw_wip_cnt = 0;
+    s_fw_wiop_cnt = 0;
 
 #if (FWUP_CFG_UPDATE_MODE == FWUP_SINGLE_BANK_W_BUFFER_EXT)
     /* Open external flash */
@@ -408,8 +397,6 @@ e_fwup_err_t R_FWUP_VerifyImage(e_fwup_area_t area)
     FWUP_LOG_DBG(MSG_VERIFY_INSTALL_AREA, (FWUP_AREA_MAIN == area) ? MSG_MAIN : MSG_BUFFER, p_hdr->sig_type);
 
     p_hash = hash_sha256(area);
-    FWUP_LOG_DBG(MSG_VERIFY_HASH_READY);
-    FWUP_LOG_DBG(MSG_VERIFY_SIG_ENTER);
     if (0 != r_fwup_wrap_verify_ecdsa(p_hash, p_hdr->sig_type, p_hdr->sig, p_hdr->sig_size))
     {
         FWUP_LOG_DBG(MSG_NG);
@@ -433,19 +420,19 @@ e_fwup_err_t R_FWUP_VerifyImage(e_fwup_area_t area)
 e_fwup_err_t R_FWUP_ActivateImage(void)
 {
 #if (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK)
- #if (FWUP_CFG_FWUPV1_COMPATIBLE == 0)
+#if (FWUP_CFG_FWUPV1_COMPATIBLE == 0)
     /* Bank swap. */
     return (r_fwup_wrap_bank_swap());
- #else
-    return (FWUP_SUCCESS);
- #endif /* (FWUP_CFG_FWUPV1_COMPATIBLE == 0) */
 #else
- #if (FWUP_CFG_FUNCTION_MODE == FWUP_FUNC_BOOTLOADER)
+    return (FWUP_SUCCESS);
+#endif /* (FWUP_CFG_FWUPV1_COMPATIBLE == 0) */
+#else
+#if (FWUP_CFG_FUNCTION_MODE == FWUP_FUNC_BOOTLOADER)
     /* Copy buffer area to main area. */
     return (copy_to_main_area());
- #else
+#else
     return (FWUP_SUCCESS);
- #endif
+#endif /* (FWUP_CFG_FUNCTION_MODE == FWUP_FUNC_BOOTLOADER) */
 #endif /* (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK) */
 }
 /**********************************************************************************************************************
@@ -685,7 +672,6 @@ static e_fwup_err_t write_image_prog(e_fwup_area_t area, uint8_t *p_buf, uint32_
     st_fw_desc_t dc;
     e_fwup_area_t area_tmp = area;
     e_fwup_area_t area_tmp_bak;
-    static uint8_t fw_cnt = 0;
     uint32_t area_offset;
 
 #if (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK)
@@ -749,17 +735,17 @@ static e_fwup_err_t write_image_prog(e_fwup_area_t area, uint8_t *p_buf, uint32_
             /* Get N, addr, size */
             area_tmp_bak = area_tmp;
             read_area(area_tmp, (uint32_t *)&dc, sizeof(st_fw_header_t), sizeof(st_fw_desc_t));
-            if ((FWUP_CFG_DF_ADDR_L <= dc.fw[fw_cnt].addr) &&
-                (dc.fw[fw_cnt].addr < (FWUP_CFG_DF_ADDR_L + FWUP_DF_NUM_BYTES)))
+            if ((FWUP_CFG_DF_ADDR_L <= dc.fw[s_fw_wip_cnt].addr) &&
+                (dc.fw[s_fw_wip_cnt].addr < (FWUP_CFG_DF_ADDR_L + FWUP_DF_NUM_BYTES)))
             {
                 /* DF*/
-                area_offset = dc.fw[fw_cnt].addr - FWUP_CFG_DF_ADDR_L;
+                area_offset = dc.fw[s_fw_wip_cnt].addr - FWUP_CFG_DF_ADDR_L;
                 area_tmp = FWUP_AREA_DATA_FLASH;
             }
             else
             {
                 /* CF : Flash address -> install area offset */
-                area_offset = get_offset_from_install_area(dc.fw[fw_cnt].addr);
+                area_offset = get_offset_from_install_area(dc.fw[s_fw_wip_cnt].addr);
 #if (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK)
                 area_tmp = FWUP_AREA_BUFFER;
 #else
@@ -767,14 +753,14 @@ static e_fwup_err_t write_image_prog(e_fwup_area_t area, uint8_t *p_buf, uint32_
 #endif /* (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK) */
             }
 
-            ret_val = write_area(area_tmp, &p_buf_tmp, &buf_sz_tmp, area_offset, dc.fw[fw_cnt].size);
+            ret_val = write_area(area_tmp, &p_buf_tmp, &buf_sz_tmp, area_offset, dc.fw[s_fw_wip_cnt].size);
             if (FWUP_SUCCESS != ret_val)
             {
                 return (ret_val);
             }
 
             /* Next part */
-            if (++fw_cnt >= dc.n)
+            if (++s_fw_wip_cnt >= dc.n)
             {
                 s_img_prog_write_flg = 1;
                 break;
@@ -823,7 +809,6 @@ static e_fwup_err_t write_image_offset_prog(e_fwup_area_t area, uint8_t *p_buf, 
     st_fw_desc_t dc;
     e_fwup_area_t area_tmp = area;
     e_fwup_area_t area_tmp_bak;
-    static uint8_t fw_cnt = 0;
     uint32_t area_offset;
     uint32_t rsu_offset = 0;
     uint32_t write_offset = 0;
@@ -912,8 +897,8 @@ static e_fwup_err_t write_image_offset_prog(e_fwup_area_t area, uint8_t *p_buf, 
         /* Get N, addr, size */
         area_tmp_bak = area_tmp;
         read_area(area_tmp, (uint32_t *)&dc, sizeof(st_fw_header_t), sizeof(st_fw_desc_t));
-        fw_cnt = get_flash_write_addr(area_tmp, buf_sz_tmp, rsu_offset, &write_offset, &write_address, &write_size);
-        if (fw_cnt < FWUP_IMAGE_BLOCKS)
+        s_fw_wiop_cnt = get_flash_write_addr(area_tmp, buf_sz_tmp, rsu_offset, &write_offset, &write_address, &write_size);
+        if (s_fw_wiop_cnt < FWUP_IMAGE_BLOCKS)
         {
             if ((FWUP_CFG_DF_ADDR_L <= write_address) &&
                 (write_address < (FWUP_CFG_DF_ADDR_L + FWUP_DF_NUM_BYTES)))
@@ -932,7 +917,7 @@ static e_fwup_err_t write_image_offset_prog(e_fwup_area_t area, uint8_t *p_buf, 
                 area_tmp = area;
 #endif /* (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK) */
             }
-            ret_val = write_area_offset(area_tmp, &p_buf_tmp, &buf_sz_tmp, area_offset, dc.fw[fw_cnt].size, &write_offset, &write_size);
+            ret_val = write_area_offset(area_tmp, &p_buf_tmp, &buf_sz_tmp, area_offset, dc.fw[s_fw_wiop_cnt].size, &write_offset, &write_size);
             if (FWUP_ERR_FLASH == ret_val)
             {
                 return (ret_val);
@@ -960,7 +945,7 @@ static e_fwup_err_t write_image_offset_prog(e_fwup_area_t area, uint8_t *p_buf, 
                 else
                 {
                     /* Next part */
-                    if (++fw_cnt >= dc.n)
+                    if (++s_fw_wiop_cnt >= dc.n)
                     {
                         return (FWUP_ERR_FAILURE);
                     }
@@ -979,25 +964,25 @@ static e_fwup_err_t write_image_offset_prog(e_fwup_area_t area, uint8_t *p_buf, 
             /* Get N, addr, size */
             area_tmp_bak = area_tmp;
             read_area(area_tmp, (uint32_t *)&dc, sizeof(st_fw_header_t), sizeof(st_fw_desc_t));
-            if ((FWUP_CFG_DF_ADDR_L <= dc.fw[fw_cnt].addr) &&
-                (dc.fw[fw_cnt].addr < (FWUP_CFG_DF_ADDR_L + FWUP_DF_NUM_BYTES)))
+            if ((FWUP_CFG_DF_ADDR_L <= dc.fw[s_fw_wiop_cnt].addr) &&
+                (dc.fw[s_fw_wiop_cnt].addr < (FWUP_CFG_DF_ADDR_L + FWUP_DF_NUM_BYTES)))
             {
                 /* DF*/
-                area_offset = dc.fw[fw_cnt].addr - FWUP_CFG_DF_ADDR_L;
+                area_offset = dc.fw[s_fw_wiop_cnt].addr - FWUP_CFG_DF_ADDR_L;
                 area_tmp = FWUP_AREA_DATA_FLASH;
             }
             else
             {
                 /* CF : Flash address -> install area offset */
-                if (dc.fw[fw_cnt].size >= buf_sz_tmp)
+                if (dc.fw[s_fw_wiop_cnt].size >= buf_sz_tmp)
                 {
                     write_size = buf_sz_tmp;
                 }
                 else
                 {
-                    write_size = dc.fw[fw_cnt].size;
+                    write_size = dc.fw[s_fw_wiop_cnt].size;
                 }
-                write_address = dc.fw[fw_cnt].addr + write_offset;
+                write_address = dc.fw[s_fw_wiop_cnt].addr + write_offset;
                 area_offset = get_offset_from_install_area(write_address);
 #if (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK)
                 area_tmp = FWUP_AREA_BUFFER;
@@ -1005,7 +990,7 @@ static e_fwup_err_t write_image_offset_prog(e_fwup_area_t area, uint8_t *p_buf, 
                 area_tmp = area;
 #endif /* (FWUP_CFG_UPDATE_MODE == FWUP_DUAL_BANK) */
             }
-            ret_val = write_area_offset(area_tmp, &p_buf_tmp, &buf_sz_tmp, area_offset, dc.fw[fw_cnt].size, &write_offset, &write_size);
+            ret_val = write_area_offset(area_tmp, &p_buf_tmp, &buf_sz_tmp, area_offset, dc.fw[s_fw_wiop_cnt].size, &write_offset, &write_size);
             if ((FWUP_SUCCESS == ret_val) || (FWUP_PROGRESS == ret_val))
             {
                 /* IS there buffer to write ? */
@@ -1025,7 +1010,7 @@ static e_fwup_err_t write_image_offset_prog(e_fwup_area_t area, uint8_t *p_buf, 
                 else
                 {
                     /* Next part */
-                    if (++fw_cnt >= dc.n)
+                    if (++s_fw_wiop_cnt >= dc.n)
                     {
                         return (FWUP_ERR_FAILURE);
                     }
@@ -1287,15 +1272,12 @@ static uint8_t * hash_sha256(e_fwup_area_t area)
     uint32_t area_offset;
     st_fw_desc_t dc;
     void * vp_ctx = r_fwup_wrap_get_crypt_context();
-    const char * area_name = (FWUP_AREA_MAIN == area) ? MSG_MAIN : MSG_BUFFER;
 
-    FWUP_LOG_DBG(MSG_HASH_START, area_name);
     r_fwup_wrap_sha256_init(vp_ctx);
 
     /* Read N, addr, size from update list */
     area_offset = sizeof(st_fw_header_t);
     read_area(area, (uint32_t *)&dc, area_offset, sizeof(st_fw_desc_t));
-    FWUP_LOG_DBG(MSG_HASH_DESC, dc.n);
 
     /* update list */
     sha256_update(area, vp_ctx, area_offset, sizeof(st_fw_desc_t));
@@ -1307,19 +1289,16 @@ static uint8_t * hash_sha256(e_fwup_area_t area)
         if ((FWUP_CFG_DF_ADDR_L <= dc.fw[cnt].addr) && (dc.fw[cnt].addr < (FWUP_CFG_DF_ADDR_L + FWUP_DF_NUM_BYTES)))
         {
             /* Data flash */
-            FWUP_LOG_DBG(MSG_HASH_SEGMENT, cnt, MSG_DATA, dc.fw[cnt].addr, dc.fw[cnt].size);
             sha256_update(FWUP_AREA_DATA_FLASH, vp_ctx, dc.fw[cnt].addr, dc.fw[cnt].size);
         }
         else
         {
             /* Code flash */
             area_offset =  get_offset_from_install_area(dc.fw[cnt].addr);
-            FWUP_LOG_DBG(MSG_HASH_SEGMENT, cnt, area_name, dc.fw[cnt].addr, dc.fw[cnt].size);
             sha256_update(area, vp_ctx, area_offset, dc.fw[cnt].size);
         }
     }
     r_fwup_wrap_sha256_final(puc_hash, vp_ctx);
-    FWUP_LOG_DBG(MSG_HASH_DONE, area_name);
     return (puc_hash);
 }
 /**********************************************************************************************************************
