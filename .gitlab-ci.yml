@@ -509,6 +509,8 @@ nightly_dependency_alignment:
     RX65N_BG96_TEST_SCOPE: "build"
     RUN_RX65N_BG96_BUILD: "false"
     RX65N_BG96_SKIP_HW_TESTS: "true"
+    RUN_RX671_WIFI_BUILD: "false"
+    RUN_RX671_BOOTLOADER_BUILD: "false"
 
 .nightly_matrix_rx65n_bg96:
   extends: .nightly_matrix_trigger
@@ -520,6 +522,8 @@ nightly_dependency_alignment:
     RX72N_SKIP_HW_TESTS: "true"
     RUN_RX65N_BG96_BUILD: "true"
     RX65N_BG96_SKIP_HW_TESTS: "false"
+    RUN_RX671_WIFI_BUILD: "false"
+    RUN_RX671_BOOTLOADER_BUILD: "false"
 
 .nightly_matrix_rx671_wifi:
   extends: .nightly_matrix_trigger
@@ -527,6 +531,7 @@ nightly_dependency_alignment:
   variables:
     PIPELINE_PROFILE: "focused"
     RUN_RX671_WIFI_BUILD: "true"
+    RUN_RX671_BOOTLOADER_BUILD: "true"
     RX671_WIFI_SKIP_HW_TESTS: "false"
     RUN_RX72N_BUILD: "false"
     RX72N_SKIP_HW_TESTS: "true"
@@ -559,6 +564,8 @@ nightly_dependency_alignment:
     RX65N_BG96_TEST_SCOPE: "build"
     RUN_RX65N_BG96_BUILD: "false"
     RX65N_BG96_SKIP_HW_TESTS: "true"
+    RUN_RX671_WIFI_BUILD: "false"
+    RUN_RX671_BOOTLOADER_BUILD: "false"
 
 .nightly_matrix_rx65n_bg96_stabilizing:
   extends: .nightly_matrix_stabilizing_trigger
@@ -570,6 +577,8 @@ nightly_dependency_alignment:
     RX72N_SKIP_HW_TESTS: "true"
     RUN_RX65N_BG96_BUILD: "true"
     RX65N_BG96_SKIP_HW_TESTS: "false"
+    RUN_RX671_WIFI_BUILD: "false"
+    RUN_RX671_BOOTLOADER_BUILD: "false"
 
 .nightly_matrix_rx671_wifi_stabilizing:
   extends: .nightly_matrix_stabilizing_trigger
@@ -577,6 +586,7 @@ nightly_dependency_alignment:
   variables:
     PIPELINE_PROFILE: "focused"
     RUN_RX671_WIFI_BUILD: "true"
+    RUN_RX671_BOOTLOADER_BUILD: "true"
     RX671_WIFI_SKIP_HW_TESTS: "false"
     RUN_RX72N_BUILD: "false"
     RX72N_SKIP_HW_TESTS: "true"
@@ -1261,7 +1271,7 @@ build_rx671_wifi:
     - when: never
   script:
     - Write-Host "=== Build EK-RX671 Type 1YN Wi-Fi project ==="
-    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract
+    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_hardware_transaction_contract tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       foreach ($name in @("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")) {

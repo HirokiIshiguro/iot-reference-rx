@@ -56,6 +56,49 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         for job in (flash, test):
             self.assertIn("- .rx671_wifi_linux_hw_job", job)
 
+    def test_nightly_matrix_templates_isolate_rx671_builds(self) -> None:
+        non_rx671_templates = (
+            job_block(
+                self.ci,
+                ".nightly_matrix_rx72n",
+                ".nightly_matrix_rx65n_bg96",
+            ),
+            job_block(
+                self.ci,
+                ".nightly_matrix_rx65n_bg96",
+                ".nightly_matrix_rx671_wifi",
+            ),
+            job_block(
+                self.ci,
+                ".nightly_matrix_rx72n_stabilizing",
+                ".nightly_matrix_rx65n_bg96_stabilizing",
+            ),
+            job_block(
+                self.ci,
+                ".nightly_matrix_rx65n_bg96_stabilizing",
+                ".nightly_matrix_rx671_wifi_stabilizing",
+            ),
+        )
+        rx671_templates = (
+            job_block(
+                self.ci,
+                ".nightly_matrix_rx671_wifi",
+                ".nightly_matrix_stabilizing_trigger",
+            ),
+            job_block(
+                self.ci,
+                ".nightly_matrix_rx671_wifi_stabilizing",
+                "matrix_rx671_wifi_network",
+            ),
+        )
+
+        for template in non_rx671_templates:
+            self.assertIn('RUN_RX671_WIFI_BUILD: "false"', template)
+            self.assertIn('RUN_RX671_BOOTLOADER_BUILD: "false"', template)
+        for template in rx671_templates:
+            self.assertIn('RUN_RX671_WIFI_BUILD: "true"', template)
+            self.assertIn('RUN_RX671_BOOTLOADER_BUILD: "true"', template)
+
     def test_nightly_routes_both_rx671_tls13_0rtt_variants(self) -> None:
         software_template = job_block(
             self.ci,
