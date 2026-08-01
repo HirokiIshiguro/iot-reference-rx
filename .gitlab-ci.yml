@@ -4615,8 +4615,8 @@ cleanup_rx671_wifi_ota:
             "Partial OTA snapshot recovery could not find the planned OTA update " +
             [string]$planPayload.ota_update_id
           $snapshotMissingPlannedOta =
-            $snapshotPayload.error.type -eq "ValueError" -and
-            $snapshotPayload.error.message -eq $expectedMissingMessage
+            $snapshotPayload.error.type -ceq "ValueError" -and
+            $snapshotPayload.error.message -ceq $expectedMissingMessage
         } catch {
           $snapshotMissingPlannedOta = $false
         }

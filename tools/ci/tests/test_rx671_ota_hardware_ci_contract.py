@@ -265,6 +265,11 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
             "Partial OTA snapshot recovery could not find the planned OTA update",
             cleanup,
         )
+        self.assertIn('$snapshotPayload.error.type -ceq "ValueError"', cleanup)
+        self.assertIn(
+            "$snapshotPayload.error.message -ceq $expectedMissingMessage",
+            cleanup,
+        )
         self.assertIn(
             "($snapshotStatus -ne 0 -and -not $snapshotMissingPlannedOta)",
             cleanup,
