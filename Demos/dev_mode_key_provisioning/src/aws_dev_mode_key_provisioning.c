@@ -70,8 +70,15 @@
 #include "store.h"
 #include "serial.h"
 
-/* Default FreeRTOS API for console logging. */
+/* The one-shot RX671 OTA provisioner does not create the asynchronous logging
+ * task.  Its host-side protocol records only redacted milestones, so suppress
+ * these convenience messages instead of routing them through an uninitialized
+ * logging queue.  Normal application profiles retain the established logger. */
+#if defined(RX671_OTA_PROVISIONER_ENABLE) && (RX671_OTA_PROVISIONER_ENABLE == 1)
+#define DEV_MODE_KEY_PROVISIONING_PRINT(X) ((void)0)
+#else
 #define DEV_MODE_KEY_PROVISIONING_PRINT(X) (configPRINTF(X))
+#endif
 
 /* For writing log lines without a prefix. */
 extern void vLoggingPrint (const char *pcFormat);

@@ -28,10 +28,11 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
 PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
-PROVISIONER_LITTLEFS_LOG_DEFINES = (
+PROVISIONER_LOG_SUPPRESSION_DEFINES = (
     "LFS_NO_DEBUG",
     "LFS_NO_WARN",
     "LFS_NO_ERROR",
+    "LIBRARY_LOG_LEVEL=LOG_NONE",
 )
 PROJECT_RELATIVE = Path("Projects/aws_wifi_rx671_ek/e2studio_ccrx")
 BOOTLOADER_PROJECT_RELATIVE = Path("Projects/boot_loader_rx671_ek/e2studio_ccrx")
@@ -268,12 +269,13 @@ def make_provisioner_cproject(text: str) -> str:
         raise ValueError("provisioner requires the checked-in bank.single project")
     if "RX671_OTA_PROVISIONER_ENABLE" in text:
         raise ValueError(".cproject contains a persistent OTA provisioner define")
-    # Blank Data Flash is an expected first-boot state.  LittleFS reports that
-    # state through stdio before the one-shot provisioner creates a logging
-    # task, so keep LittleFS diagnostic output out of this build profile.
+    # The one-shot provisioner deliberately does not create the asynchronous
+    # logging task.  Keep both LittleFS stdio diagnostics and SDK library logs
+    # out of this temporary profile so neither first mount nor PKCS #11 commit
+    # can route through an uninitialized logging queue.
     defines = (
         "RX671_OTA_PROVISIONER_ENABLE=1",
-        *PROVISIONER_LITTLEFS_LOG_DEFINES,
+        *PROVISIONER_LOG_SUPPRESSION_DEFINES,
     )
     insertion = DEFINE_ANCHOR + "".join(
         "\n\t\t\t\t\t\t\t\t\t"

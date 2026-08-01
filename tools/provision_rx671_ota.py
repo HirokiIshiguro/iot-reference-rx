@@ -300,6 +300,7 @@ def provision(args: argparse.Namespace) -> dict:
             completed.append(name)
             event_log.write(f"{name} stored (payload redacted)\n")
 
+        event_log.write("commit LittleFS/KVS changes\n")
         send_ascii_command(
             serial_port,
             "conf commit",

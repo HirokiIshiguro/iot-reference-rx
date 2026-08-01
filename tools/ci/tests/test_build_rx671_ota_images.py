@@ -50,6 +50,10 @@ class ProfileTests(unittest.TestCase):
         cls.fwup = (
             PROJECT / "src/frtos_config/r_fwup_config.h"
         ).read_text(encoding="utf-8")
+        cls.dev_mode_provisioning = (
+            ROOT
+            / "Demos/dev_mode_key_provisioning/src/aws_dev_mode_key_provisioning.c"
+        ).read_text(encoding="utf-8")
 
     def test_cproject_profile_is_dual_bank_and_keeps_every_payload_in_main(self) -> None:
         result = builder.make_ota_cproject(
@@ -164,10 +168,11 @@ class ProfileTests(unittest.TestCase):
         self.assertIn(
             'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"', result
         )
-        for define in builder.PROVISIONER_LITTLEFS_LOG_DEFINES:
+        for define in builder.PROVISIONER_LOG_SUPPRESSION_DEFINES:
             with self.subTest(define=define):
                 self.assertIn(f'value="-define={define}"', result)
                 self.assertNotIn(f'value="-define={define}"', self.cproject)
+        self.assertIn('value="-define=LIBRARY_LOG_LEVEL=LOG_NONE"', result)
 
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
@@ -179,7 +184,7 @@ class ProfileTests(unittest.TestCase):
                     b"RX671_OTA_PROVISIONER_ENABLE=1",
                     target.read_bytes(),
                 )
-                for define in builder.PROVISIONER_LITTLEFS_LOG_DEFINES:
+                for define in builder.PROVISIONER_LOG_SUPPRESSION_DEFINES:
                     self.assertIn(
                         f"-define={define}".encode(),
                         target.read_bytes(),
@@ -188,6 +193,13 @@ class ProfileTests(unittest.TestCase):
                 original,
                 target.read_bytes(),
             )
+
+    def test_provisioner_does_not_use_uninitialized_async_logger(self) -> None:
+        self.assertIn("RX671_OTA_PROVISIONER_ENABLE", self.dev_mode_provisioning)
+        self.assertRegex(
+            self.dev_mode_provisioning,
+            r"#define\s+DEV_MODE_KEY_PROVISIONING_PRINT\(X\)\s+\(\(void\)0\)",
+        )
 
 
 class TransferArtifactTests(unittest.TestCase):
