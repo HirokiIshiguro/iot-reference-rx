@@ -34,7 +34,9 @@
 const char * keys[ KVS_NUM_KEYS ] = KVSTORE_KEYS;
 KeyValueStore_t gKeyValueStore = { 0 };
 extern volatile uint32_t pvwrite;
-extern CK_RV vDevModeKeyPreProvisioning( KeyValueStore_t Keystore, KVStoreKey_t ID, int32_t xvaluelength );
+extern CK_RV vDevModeKeyPreProvisioning( const KeyValueStore_t * pKeystore,
+                                         KVStoreKey_t ID,
+                                         int32_t xvaluelength );
 BaseType_t xPending;
 
 #if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
@@ -390,7 +392,7 @@ BaseType_t KVStore_xCommitChanges( void )
         	 */
         	if ((i  == KVS_DEVICE_CERT_ID ) || (i  == KVS_DEVICE_PRIVKEY_ID )|| (i  == KVS_DEVICE_PUBKEY_ID ))
 			{
-				xSuccess = vDevModeKeyPreProvisioning(gKeyValueStore, (KVStoreKey_t)i,gKeyValueStore.table[ i ].valueLength);
+				xSuccess = vDevModeKeyPreProvisioning(&gKeyValueStore, (KVStoreKey_t)i,gKeyValueStore.table[ i ].valueLength);
 				if (xSuccess == pdFALSE)
 				{
 					return xSuccess;

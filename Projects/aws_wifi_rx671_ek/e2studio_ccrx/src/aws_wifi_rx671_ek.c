@@ -46,7 +46,10 @@ extern void abort(void);
 #define OTA_START_TASK_PRIORITY             (tskIDLE_PRIORITY + 1U)
 #define OTA_MQTT_AGENT_STACK_SIZE           (6144U)
 #define OTA_MQTT_AGENT_PRIORITY             (tskIDLE_PRIORITY + 2U)
-#define OTA_PROVISIONER_CLI_STACK_SIZE      (configMINIMAL_STACK_SIZE * 6U)
+/* Stack depth is expressed in StackType_t words.  Private-key import reaches
+ * mbedTLS entropy/DRBG frames, so keep this explicit rather than scaling the
+ * target-specific idle-task minimum.  2048 words are 8192 bytes on RX600v2. */
+#define OTA_PROVISIONER_CLI_STACK_DEPTH     (2048U)
 #define OTA_PROVISIONER_CLI_PRIORITY        (tskIDLE_PRIORITY + 1U)
 
 extern volatile uint32_t g_freertos_tcp_network_up;
@@ -162,7 +165,7 @@ static void ota_provisioner_run(void)
     }
 
     vRegisterSampleCLICommands();
-    vUARTCommandConsoleStart(OTA_PROVISIONER_CLI_STACK_SIZE,
+    vUARTCommandConsoleStart(OTA_PROVISIONER_CLI_STACK_DEPTH,
                              OTA_PROVISIONER_CLI_PRIORITY);
     if ((0 == littlefs_result) && (0 == kvs_result))
     {

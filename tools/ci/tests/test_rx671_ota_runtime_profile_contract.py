@@ -29,6 +29,10 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.store = (ROOT / "Demos/cli/store.c").read_text(
             encoding="utf-8"
         )
+        cls.dev_mode_provisioning = (
+            ROOT
+            / "Demos/dev_mode_key_provisioning/src/aws_dev_mode_key_provisioning.c"
+        ).read_text(encoding="utf-8")
         cls.cli = (ROOT / "Demos/cli/CLIcommands.c").read_text(
             encoding="utf-8"
         )
@@ -86,6 +90,47 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         self.assertIn(
             "SCI6 belongs exclusively to the common CLI",
             self.main,
+        )
+
+    def test_provisioner_cli_has_private_key_import_stack_headroom(self) -> None:
+        self.assertIn(
+            "#define OTA_PROVISIONER_CLI_STACK_DEPTH     (2048U)",
+            self.main,
+        )
+        self.assertNotIn(
+            "OTA_PROVISIONER_CLI_STACK_SIZE      "
+            "(configMINIMAL_STACK_SIZE * 6U)",
+            self.main,
+        )
+        self.assertIn(
+            "vUARTCommandConsoleStart(OTA_PROVISIONER_CLI_STACK_DEPTH,",
+            self.main,
+        )
+
+    def test_dev_mode_keystore_is_not_copied_onto_cli_stack(self) -> None:
+        self.assertIn(
+            "vDevModeKeyPreProvisioning( const KeyValueStore_t * pKeystore,",
+            self.store,
+        )
+        self.assertIn(
+            "vDevModeKeyPreProvisioning(&gKeyValueStore,",
+            self.store,
+        )
+        self.assertIn(
+            "vDevModeKeyPreProvisioning(const KeyValueStore_t * pKeystore,",
+            self.dev_mode_provisioning,
+        )
+        self.assertIn(
+            "pKeystore->table[ID].valueLength",
+            self.dev_mode_provisioning,
+        )
+        self.assertNotIn(
+            "vDevModeKeyPreProvisioning(KeyValueStore_t Keystore,",
+            self.dev_mode_provisioning,
+        )
+        self.assertNotIn(
+            "vDevModeKeyPreProvisioning (KeyValueStore_t Keystore,",
+            self.dev_mode_provisioning,
         )
 
     def test_ota_runtime_uses_persistent_kvs_and_starts_automatically(self) -> None:

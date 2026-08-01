@@ -145,7 +145,9 @@ typedef struct PreProvisioningParams_t
     uint32_t ulClientCredentialLength; /**< Length of the Credential data, in bytes. */
 } PreProvisioningParams_t;
 
-CK_RV vDevModeKeyPreProvisioning (KeyValueStore_t Keystore, KVStoreKey_t ID, int32_t xvaluelength);
+CK_RV vDevModeKeyPreProvisioning (const KeyValueStore_t * pKeystore,
+                                  KVStoreKey_t ID,
+                                  int32_t xvaluelength);
 CK_RV xDestroyDefaultPrivatekeyObjects (CK_SESSION_HANDLE xSession);
 CK_RV xDestroyDefaultCertificateObjects (CK_SESSION_HANDLE xSession);
 CK_RV xDestroyDefaultObjects (KVStoreKey_t ID, CK_SESSION_HANDLE xSession);
@@ -1115,18 +1117,21 @@ CK_RV xDestroyDefaultObjects(KVStoreKey_t ID, CK_SESSION_HANDLE xSession)
 /**********************************************************************************************************************
  * Function Name: vDevModeKeyPreProvisioning
  * Description  : .
- * Arguments    : Keystore
+ * Arguments    : pKeystore
  *              : ID
  *              : xvaluelength
  * Return Value : .
  *********************************************************************************************************************/
-CK_RV vDevModeKeyPreProvisioning(KeyValueStore_t Keystore, KVStoreKey_t ID, int32_t xvaluelength)
+CK_RV vDevModeKeyPreProvisioning(const KeyValueStore_t * pKeystore,
+                                 KVStoreKey_t ID,
+                                 int32_t xvaluelength)
 {
     size_t valueLength = 0;
     char *pcBuffer = NULL;
     char *temp = NULL;
     PreProvisioningParams_t xParams;
 
+    configASSERT(NULL != pKeystore);
     pcBuffer = pvPortMalloc(xvaluelength+1);
     configASSERT(pcBuffer);
     xReadEntry(ID, pcBuffer, xvaluelength);
@@ -1143,7 +1148,7 @@ CK_RV vDevModeKeyPreProvisioning(KeyValueStore_t Keystore, KVStoreKey_t ID, int3
     {
         /* We want the NULL terminator to be written to storage, so include it
          * in the length calculation. */
-        xParams.ulClientCredentialLength = sizeof(char) + Keystore.table[ID].valueLength;
+        xParams.ulClientCredentialLength = sizeof(char) + pKeystore->table[ID].valueLength;
     }
     else
     {
