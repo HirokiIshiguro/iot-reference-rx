@@ -37,6 +37,7 @@ extern volatile uint32_t pvwrite;
 extern CK_RV vDevModeKeyPreProvisioning( KeyValueStore_t Keystore, KVStoreKey_t ID, int32_t xvaluelength );
 BaseType_t xPending;
 
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 static inline void vClearDataBuffer( KVStoreKey_t key );
 
 static void prvSecureZero( void * pvData, size_t xLength )
@@ -50,6 +51,7 @@ static void prvSecureZero( void * pvData, size_t xLength )
 		xLength--;
 	}
 }
+#endif
 /*
  * @brief Write a value for a given key to Data Flash.
  * @param[in] KVStoreKey_t Key to store the given value in.
@@ -185,11 +187,13 @@ int32_t xprvWriteCacheEntry(size_t KeyLength,
 		return xKey;
 	}
 
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 	if (((KVS_WIFI_SSID == xKey) && ((0U == ValueLength) || (32U < ValueLength))) ||
 	    ((KVS_WIFI_PASSPHRASE == xKey) && ((8U > ValueLength) || (63U < ValueLength))))
 	{
 		return KVS_INVALID_KEY;
 	}
+#endif
 
 	if ((KVS_TSIP_ROOTCA_PUBKEY_ID == xKey) ||
 	    (KVS_TSIP_CLIENT_PUBKEY_ID == xKey) ||
@@ -233,6 +237,7 @@ int32_t xprvWriteCacheEntry(size_t KeyLength,
 	{
 		void * pvDataWrite = pvGetDataWritePtr( xKey );
 
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 		if( NULL == pvDataWrite )
 		{
 			/* Never acknowledge a credential update that could not be held in
@@ -247,6 +252,11 @@ int32_t xprvWriteCacheEntry(size_t KeyLength,
 		else
 		{
 			( void ) memcpy( pvDataWrite, pvNewValue, ValueLength );
+#else
+		if( pvDataWrite != NULL )
+		{
+			( void ) memcpy( pvGetDataWritePtr( xKey ), pvNewValue, ValueLength );
+#endif
 			if((xKey == KVS_CLAIM_CERT_ID) || (xKey == KVS_CLAIM_PRIVKEY_ID) || (xKey == KVS_ROOT_CA_ID))
             {
                 //Set string ending \0
@@ -275,6 +285,7 @@ static inline void vAllocateDataBuffer( uint32_t key,
 
 static inline void vClearDataBuffer( KVStoreKey_t key )
 {
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
     /* Check if data is heap allocated > 0 */
     if( ( gKeyValueStore.table[ key ].valueLength > 0 ) &&
         ( NULL != gKeyValueStore.table[ key ].value ) )
@@ -288,26 +299,60 @@ static inline void vClearDataBuffer( KVStoreKey_t key )
 	 * failed allocation state. */
 	gKeyValueStore.table[ key ].value = NULL;
 	gKeyValueStore.table[ key ].valueLength = 0;
+#else
+    /* Check if data is heap allocated > 0 */
+    if( gKeyValueStore.table[ key ].valueLength > 0 )
+    {
+        vPortFree( gKeyValueStore.table[ key ].value );
+        gKeyValueStore.table[ key ].value = NULL;
+        gKeyValueStore.table[ key ].valueLength = 0;
+    }
+    else /* Statically allocated */
+    {
+		gKeyValueStore.table[ key ].value = 0;
+		gKeyValueStore.table[ key ].valueLength = 0;
+    }
+#endif
 }
 static inline void vReallocDataBuffer( KVStoreKey_t key,
                                        size_t xNewLength )
 {
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 	/* Allocate a fresh buffer so shortening a secret cannot leave stale tail
 	 * bytes in the old heap allocation. */
 	vClearDataBuffer( key );
 	vAllocateDataBuffer( key, xNewLength);
+#else
+    if( xNewLength > gKeyValueStore.table[ key ].valueLength )
+    {
+        /* Need to allocate a bigger buffer */
+        vClearDataBuffer( key );
+        vAllocateDataBuffer( key, xNewLength);
+    }
+    else /* New value is same size or smaller. Re-use already allocated buffer */
+    {
+		gKeyValueStore.table[ key ].valueLength = xNewLength;
+    }
+#endif
 }
 
 int32_t Filename2Handle( char * pcFileName,size_t KeyLength)
 {
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 0
+	(void) KeyLength; /* String comparison to use the length of KVStore key */
+#endif
 	int32_t xHandle = -1;
 	char * CLIcmdkeys[ KVS_NUM_KEYS ] = CLICMDKEYS;
     if( pcFileName != NULL )
     {
         for (uint32_t i = 0; i < KVS_NUM_KEYS; i++)
         {
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
             if ((KeyLength == strlen(CLIcmdkeys[i])) &&
                 (strncmp( pcFileName, CLIcmdkeys[i], KeyLength ) == 0))
+#else
+			if (strncmp( pcFileName, CLIcmdkeys[i], strlen(CLIcmdkeys[i]) ) == 0)
+#endif
             {
                 xHandle = i;
                 break;
@@ -826,6 +871,7 @@ size_t prvGetCacheEntryLength( KVStoreKey_t xKey )
 	return gKeyValueStore.table[ xKey ].valueLength;
 }
 
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 void KVStore_vClearCachedValue( KVStoreKey_t xKey )
 {
 	configASSERT( xKey < KVS_NUM_KEYS );
@@ -834,4 +880,5 @@ void KVStore_vClearCachedValue( KVStoreKey_t xKey )
 	gKeyValueStore.table[ xKey ].xChangePending = pdFALSE;
 	memset( gKeyValueStore.table[ xKey ].key, 0, sizeof(gKeyValueStore.table[ xKey ].key) );
 }
+#endif
 

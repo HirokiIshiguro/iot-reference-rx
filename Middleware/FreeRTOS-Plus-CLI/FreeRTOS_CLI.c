@@ -38,6 +38,10 @@
 /* Utils includes. */
 #include "FreeRTOS_CLI.h"
 
+#ifndef RX671_OTA_PROVISIONER_ENABLE
+#define RX671_OTA_PROVISIONER_ENABLE (0)
+#endif
+
 /* If the application writer needs to place the buffer used by the CLI at a
 fixed address then set configAPPLICATION_PROVIDES_cOutputBuffer to 1 in
 FreeRTOSConfig.h, then declare an array with the following name and size in
@@ -357,6 +361,7 @@ static BaseType_t prvHelpCommand(char *pcWriteBuffer, size_t xWriteBufferLen, co
 
     /* Return the next command help string, before moving the pointer on to
     the next command in the list. */
+#if RX671_OTA_PROVISIONER_ENABLE == 1
     if (xWriteBufferLen > 0U)
     {
         strncpy(pcWriteBuffer,
@@ -364,6 +369,9 @@ static BaseType_t prvHelpCommand(char *pcWriteBuffer, size_t xWriteBufferLen, co
                 xWriteBufferLen - 1U);
         pcWriteBuffer[xWriteBufferLen - 1U] = '\0';
     }
+#else
+    strncpy(pcWriteBuffer, pxCommand->pxCommandLineDefinition->pcHelpString, xWriteBufferLen);
+#endif
     pxCommand = pxCommand->pxNext;
 
     if (NULL == pxCommand)

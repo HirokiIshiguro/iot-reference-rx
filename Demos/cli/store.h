@@ -37,6 +37,22 @@
 #include "FreeRTOS.h"
 #include "lfs.h"
 
+#ifndef WHD_JOIN_USE_KVS
+#define WHD_JOIN_USE_KVS                  (0)
+#endif
+
+#ifndef RX671_OTA_PROVISIONER_ENABLE
+#define RX671_OTA_PROVISIONER_ENABLE      (0)
+#endif
+
+/* Keep the shared CLI/KVS implementation bit-for-bit on its established path
+ * unless an RX671 OTA image actually needs persistent Wi-Fi credentials. */
+#if (WHD_JOIN_USE_KVS == 1) || (RX671_OTA_PROVISIONER_ENABLE == 1)
+#define RX671_WIFI_CREDENTIAL_KVS_ENABLE  (1)
+#else
+#define RX671_WIFI_CREDENTIAL_KVS_ENABLE  (0)
+#endif
+
 
 extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
 
@@ -63,8 +79,10 @@ typedef enum KVStoreKey
 	KVS_TSIP_ROOTCA_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PRIKEY_ID,
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
     KVS_WIFI_SSID,
     KVS_WIFI_PASSPHRASE,
+#endif
     KVS_NUM_KEYS
 } KVStoreKey_t;
 
@@ -82,6 +100,18 @@ typedef struct KeyValueStore
 {
     KVStoreEntry_t table[ KVS_NUM_KEYS ];
 } KeyValueStore_t;
+
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
+#define RX671_WIFI_KVSTORE_ENTRIES                          \
+        [ KVS_WIFI_SSID ] = "wifi_ssid",                  \
+        [ KVS_WIFI_PASSPHRASE ] = "wifi_passphrase",
+#define RX671_WIFI_CLICMD_ENTRIES                           \
+        [ KVS_WIFI_SSID ] = "wifissid",                   \
+        [ KVS_WIFI_PASSPHRASE ] = "wifipass",
+#else
+#define RX671_WIFI_KVSTORE_ENTRIES
+#define RX671_WIFI_CLICMD_ENTRIES
+#endif
 
 /* Array to map between strings and KVStoreKey_t IDs */
 #define KVSTORE_KEYS                                       \
@@ -101,8 +131,7 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsip_rootca_pub_id",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsip_client_pub_id",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsip_client_pri_id",         \
-        [ KVS_WIFI_SSID ] = "wifi_ssid",         \
-        [ KVS_WIFI_PASSPHRASE ] = "wifi_passphrase",         \
+        RX671_WIFI_KVSTORE_ENTRIES                          \
 }
 #define CLICMDKEYS                                       \
     {                                                      \
@@ -121,8 +150,7 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsiprootkey",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsippubkey",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsipprikey",         \
-        [ KVS_WIFI_SSID ] = "wifissid",         \
-        [ KVS_WIFI_PASSPHRASE ] = "wifipass",         \
+        RX671_WIFI_CLICMD_ENTRIES                           \
     }
 typedef enum KVStoreKeytype
 {
@@ -167,5 +195,7 @@ char *GetStringValue( KVStoreKey_t key,
 char *xprvGetCacheEntry(char * Key, size_t pxLength );
 BaseType_t KVStore_xCommitChanges( void );
 size_t prvGetCacheEntryLength( KVStoreKey_t xKey );
+#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 void KVStore_vClearCachedValue( KVStoreKey_t xKey );
+#endif
 #endif /* APPLICATION_CODE_STORE_H_ */

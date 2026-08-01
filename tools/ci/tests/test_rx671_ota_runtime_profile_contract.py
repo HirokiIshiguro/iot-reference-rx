@@ -26,6 +26,9 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.store_header = (ROOT / "Demos/cli/store.h").read_text(
             encoding="utf-8"
         )
+        cls.store = (ROOT / "Demos/cli/store.c").read_text(
+            encoding="utf-8"
+        )
         cls.cli = (ROOT / "Demos/cli/CLIcommands.c").read_text(
             encoding="utf-8"
         )
@@ -38,6 +41,7 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.builder = (ROOT / "tools/build_headless_rx671_wifi.ps1").read_text(
             encoding="utf-8"
         )
+        cls.cproject = (PROJECT / ".cproject").read_text(encoding="utf-8")
 
     def test_checked_in_defaults_preserve_normal_runtime(self) -> None:
         self.assertIn(
@@ -133,6 +137,47 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         self.assertLess(
             self.main.index("ota_runtime_prepare()"),
             self.main.index("whd_bringup_run()"),
+        )
+
+    def test_wifi_credential_code_is_isolated_from_normal_network_profile(
+        self,
+    ) -> None:
+        self.assertNotIn("-define=RX671_OTA_PROVISIONER_ENABLE=1", self.cproject)
+        self.assertNotIn("-define=WHD_JOIN_USE_KVS=1", self.cproject)
+        self.assertIn("#define WHD_JOIN_USE_KVS                  (0)", self.store_header)
+        self.assertIn(
+            "#define RX671_OTA_PROVISIONER_ENABLE      (0)",
+            self.store_header,
+        )
+        self.assertIn(
+            "#if (WHD_JOIN_USE_KVS == 1) || "
+            "(RX671_OTA_PROVISIONER_ENABLE == 1)",
+            self.store_header,
+        )
+        self.assertIn(
+            "#define RX671_WIFI_CREDENTIAL_KVS_ENABLE  (1)",
+            self.store_header,
+        )
+        self.assertIn(
+            "#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1\n"
+            "    KVS_WIFI_SSID,",
+            self.store_header,
+        )
+        self.assertIn(
+            "#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1",
+            self.store,
+        )
+        self.assertIn(
+            "#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1",
+            self.cli,
+        )
+        self.assertIn(
+            "#if RX671_OTA_PROVISIONER_ENABLE == 1",
+            self.console,
+        )
+        self.assertIn(
+            "#if RX671_OTA_PROVISIONER_ENABLE == 1",
+            self.freertos_cli,
         )
 
 
