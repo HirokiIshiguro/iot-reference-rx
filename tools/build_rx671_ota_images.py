@@ -28,6 +28,11 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
 PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
+PROVISIONER_LITTLEFS_LOG_DEFINES = (
+    "LFS_NO_DEBUG",
+    "LFS_NO_WARN",
+    "LFS_NO_ERROR",
+)
 PROJECT_RELATIVE = Path("Projects/aws_wifi_rx671_ek/e2studio_ccrx")
 BOOTLOADER_PROJECT_RELATIVE = Path("Projects/boot_loader_rx671_ek/e2studio_ccrx")
 BOOTLOADER_SUBMODULE_RELATIVE = (
@@ -263,14 +268,24 @@ def make_provisioner_cproject(text: str) -> str:
         raise ValueError("provisioner requires the checked-in bank.single project")
     if "RX671_OTA_PROVISIONER_ENABLE" in text:
         raise ValueError(".cproject contains a persistent OTA provisioner define")
-    define = (
-        '<listOptionValue builtIn="false" '
-        'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"/>'
+    # Blank Data Flash is an expected first-boot state.  LittleFS reports that
+    # state through stdio before the one-shot provisioner creates a logging
+    # task, so keep LittleFS diagnostic output out of this build profile.
+    defines = (
+        "RX671_OTA_PROVISIONER_ENABLE=1",
+        *PROVISIONER_LITTLEFS_LOG_DEFINES,
+    )
+    insertion = DEFINE_ANCHOR + "".join(
+        "\n\t\t\t\t\t\t\t\t\t"
+        + '<listOptionValue builtIn="false" value="-define='
+        + define
+        + '"/>'
+        for define in defines
     )
     return _replace_once(
         text,
         DEFINE_ANCHOR,
-        DEFINE_ANCHOR + "\n\t\t\t\t\t\t\t\t\t" + define,
+        insertion,
         ".cproject provisioner define anchor",
     )
 

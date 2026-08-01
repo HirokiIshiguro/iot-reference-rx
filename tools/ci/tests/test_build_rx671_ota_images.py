@@ -164,6 +164,10 @@ class ProfileTests(unittest.TestCase):
         self.assertIn(
             'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"', result
         )
+        for define in builder.PROVISIONER_LITTLEFS_LOG_DEFINES:
+            with self.subTest(define=define):
+                self.assertIn(f'value="-define={define}"', result)
+                self.assertNotIn(f'value="-define={define}"', self.cproject)
 
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
@@ -175,6 +179,11 @@ class ProfileTests(unittest.TestCase):
                     b"RX671_OTA_PROVISIONER_ENABLE=1",
                     target.read_bytes(),
                 )
+                for define in builder.PROVISIONER_LITTLEFS_LOG_DEFINES:
+                    self.assertIn(
+                        f"-define={define}".encode(),
+                        target.read_bytes(),
+                    )
             self.assertEqual(
                 original,
                 target.read_bytes(),
