@@ -30,6 +30,7 @@
 #include "store.h"
 #include "mqtt_agent_task.h"
 #include "serial.h"
+#include "r_sci_rx_pinset.h"
 #include "trcRecorder.h"
 
 #if BSP_CFG_CPLUSPLUS == 1
@@ -150,6 +151,9 @@ static void ota_provisioner_run(void)
     UserInitialization();
     xStartDemoEventGroup = xEventGroupCreate();
     CLI_Support_Settings();
+    /* Pin.c intentionally leaves TXD6 PMR clear until SCI6.TE is enabled.
+     * CLI_Support_Settings() opens SCI6 first; route P00 only afterwards. */
+    R_SCI_PinSet_SCI6();
 
     littlefs_result = littlFs_init();
     if (0 == littlefs_result)

@@ -69,6 +69,12 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             self.main,
         )
         self.assertIn("CLI_Support_Settings();", self.main)
+        self.assertIn('#include "r_sci_rx_pinset.h"', self.main)
+        self.assertIn("R_SCI_PinSet_SCI6();", self.main)
+        self.assertLess(
+            self.main.index("CLI_Support_Settings();"),
+            self.main.index("R_SCI_PinSet_SCI6();"),
+        )
         self.assertIn("littlFs_init()", self.main)
         self.assertIn("vprvCacheInit()", self.main)
         self.assertIn("vRegisterSampleCLICommands();", self.main)
