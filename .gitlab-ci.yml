@@ -254,11 +254,12 @@ variables:
   RX671_WIFI_FLEET_POLICY_NAME: "rx72n-envision-kit-policy"
   RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS: "600000"
   # The accelerated RX671 throughput implementation remains in its canonical
-  # TSIP benchmark project. Nine nightly rows trigger this ref.
+  # TSIP benchmark project. Ten nightly rows trigger this ref.
   RX671_BENCHMARK_PROJECT_REF: "main"
   RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
   RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
   RUN_RX671_TSIP_FLEET_TEST: "false"
+  RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
   # Keep the downstream ref overridable so this bridge can be exercised
   # against its leaf MR before that MR is merged. The nightly default remains
   # the canonical benchmark main branch.
@@ -759,6 +760,17 @@ matrix_rx671_wifi_tsip_fleet:
     - when: never
   variables:
     RX671_BENCHMARK_PROFILE: "aws-fleet"
+
+matrix_rx671_wifi_tsip_fleet_tls13:
+  extends: .matrix_rx671_lanbench
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
+      when: on_success
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_TSIP_FLEET_TLS13_TEST == "true" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
+      when: on_success
+    - when: never
+  variables:
+    RX671_BENCHMARK_PROFILE: "aws-fleet-tls13"
 
 matrix_rx671_wifi_tsip_tls13_resumption_0rtt:
   extends: .matrix_rx671_lanbench
