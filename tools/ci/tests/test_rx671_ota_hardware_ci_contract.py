@@ -80,6 +80,13 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
             preflight,
         )
         self.assertIn(
+            "RX671_OTA_RESOLVED_SERVICE_ROLE_ARN=",
+            preflight,
+        )
+        self.assertIn("^arn:aws:iam::\\d{12}:role/.+$", preflight)
+        self.assertIn("^\\d{12}:role/.+$", preflight)
+        self.assertIn('"arn:aws:iam::$configuredRoleArn"', preflight)
+        self.assertIn(
             "dotenv: artifacts/preflight_rx671_wifi_ota/plan.env",
             preflight,
         )
@@ -151,6 +158,14 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertIn("--plan-meta-json \"$aliasPlanJson\"", creator)
         self.assertIn(
             "--owner-job-id \"$env:RX671_OTA_PLAN_JOB_ID\"",
+            creator,
+        )
+        self.assertIn(
+            '--role-arn "$env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN"',
+            creator,
+        )
+        self.assertNotIn(
+            '--role-arn "$env:RX671_OTA_SERVICE_ROLE_ARN"',
             creator,
         )
         self.assertIn("tools/plan_rx671_ota.py verify", creator)
@@ -245,6 +260,15 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertNotIn("RX671_OTA_PLAN_JOB_ID", cleanup)
         self.assertIn("post_cleanup_state.json", cleanup)
         self.assertIn("ephemeral_thing_cleanup.json", cleanup)
+        self.assertIn("$snapshotMissingPlannedOta = $false", cleanup)
+        self.assertIn(
+            "Partial OTA snapshot recovery could not find the planned OTA update",
+            cleanup,
+        )
+        self.assertIn(
+            "($snapshotStatus -ne 0 -and -not $snapshotMissingPlannedOta)",
+            cleanup,
+        )
 
 
 if __name__ == "__main__":

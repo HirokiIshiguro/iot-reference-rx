@@ -1884,6 +1884,10 @@ create_rx671_wifi_ota:
       if ([string]::IsNullOrWhiteSpace($env:RX671_OTA_PLAN_JOB_ID)) {
         throw "RX671 OTA preflight dotenv identity is missing."
       }
+      if ($env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN -notmatch
+          '^arn:aws:iam::\d{12}:role/.+$') {
+        throw "RX671 OTA preflight resolved service role ARN is missing or invalid."
+      }
       python tools/plan_rx671_ota.py verify `
         --project-id "$env:CI_PROJECT_ID" `
         --pipeline-id "$env:CI_PIPELINE_ID" `
@@ -1950,7 +1954,7 @@ create_rx671_wifi_ota:
         --custom-signature-der "$signature" `
         --code-signer-cert "$signerCertificate" `
         --certificate-name "rx671-ota-signer.crt.pem" `
-        --role-arn "$env:RX671_OTA_SERVICE_ROLE_ARN" `
+        --role-arn "$env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN" `
         --region "$env:AWS_DEFAULT_REGION" `
         --ota-update-id "$otaUpdateId" `
         --s3-key "$otaS3Key"
@@ -2297,6 +2301,18 @@ preflight_rx671_wifi_ota:
       if ($env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2") {
         throw "RX671 OTA proof is pinned to TLSv1.2"
       }
+      $configuredRoleArn = $env:RX671_OTA_SERVICE_ROLE_ARN.Trim()
+      if ($configuredRoleArn -match '^arn:aws:iam::\d{12}:role/.+$') {
+        $env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN = $configuredRoleArn
+      } elseif ($configuredRoleArn -match '^\d{12}:role/.+$') {
+        $env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN =
+          "arn:aws:iam::$configuredRoleArn"
+      } else {
+        throw (
+          "RX671 OTA service role must be a full IAM role ARN or " +
+          "ACCOUNT_ID:role/NAME shorthand"
+        )
+      }
     - |
       $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\preflight_rx671_wifi_ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -2320,7 +2336,10 @@ preflight_rx671_wifi_ota:
       }
       Set-Content `
         -LiteralPath (Join-Path $artifactDir "plan.env") `
-        -Value "RX671_OTA_PLAN_JOB_ID=$env:CI_JOB_ID" `
+        -Value @(
+          "RX671_OTA_PLAN_JOB_ID=$env:CI_JOB_ID",
+          "RX671_OTA_RESOLVED_SERVICE_ROLE_ARN=$env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN"
+        ) `
         -Encoding ascii
     - Write-Host "RX671 OTA PREFLIGHT SUCCESS"
   artifacts:
@@ -4580,11 +4599,34 @@ cleanup_rx671_wifi_ota:
         exit 1
       }
 
+      $preCleanupState = Join-Path $artifactDir "pre_cleanup_state.json"
       python tools/verify_ota_aws_state.py snapshot `
         --recover-partial `
         --meta-json "$otaCleanupMeta" `
-        --output-json (Join-Path $artifactDir "pre_cleanup_state.json")
+        --output-json "$preCleanupState"
       $snapshotStatus = $LASTEXITCODE
+      $snapshotMissingPlannedOta = $false
+      if ($snapshotStatus -ne 0 -and
+          (Test-Path -LiteralPath $preCleanupState)) {
+        try {
+          $snapshotPayload = Get-Content -LiteralPath $preCleanupState -Raw |
+            ConvertFrom-Json
+          $expectedMissingMessage =
+            "Partial OTA snapshot recovery could not find the planned OTA update " +
+            [string]$planPayload.ota_update_id
+          $snapshotMissingPlannedOta =
+            $snapshotPayload.error.type -eq "ValueError" -and
+            $snapshotPayload.error.message -eq $expectedMissingMessage
+        } catch {
+          $snapshotMissingPlannedOta = $false
+        }
+      }
+      if ($snapshotMissingPlannedOta) {
+        Write-Warning (
+          "The planned RX671 OTA update was never created; continuing the " +
+          "independent fail-closed cleanup. The create job remains failed."
+        )
+      }
 
       python tools/verify_ota_aws_state.py cleanup `
         --meta-json "$otaCleanupMeta" `
@@ -4596,7 +4638,7 @@ cleanup_rx671_wifi_ota:
         --output-json (Join-Path $artifactDir "ephemeral_thing_cleanup.json")
       $aliasCleanupStatus = $LASTEXITCODE
 
-      if ($snapshotStatus -ne 0 -or
+      if (($snapshotStatus -ne 0 -and -not $snapshotMissingPlannedOta) -or
           $otaCleanupStatus -ne 0 -or
           $aliasCleanupStatus -ne 0) {
         Write-Error "RX671 OTA evidence or fail-closed AWS cleanup verification failed."
