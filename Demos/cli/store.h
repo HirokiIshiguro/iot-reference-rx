@@ -63,6 +63,8 @@ typedef enum KVStoreKey
 	KVS_TSIP_ROOTCA_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PUBKEY_ID,
 	KVS_TSIP_CLIENT_PRIKEY_ID,
+    KVS_WIFI_SSID,
+    KVS_WIFI_PASSPHRASE,
     KVS_NUM_KEYS
 } KVStoreKey_t;
 
@@ -99,6 +101,8 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsip_rootca_pub_id",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsip_client_pub_id",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsip_client_pri_id",         \
+        [ KVS_WIFI_SSID ] = "wifi_ssid",         \
+        [ KVS_WIFI_PASSPHRASE ] = "wifi_passphrase",         \
 }
 #define CLICMDKEYS                                       \
     {                                                      \
@@ -117,6 +121,8 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_ROOTCA_PUBKEY_ID ] = "tsiprootkey",         \
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsippubkey",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsipprikey",         \
+        [ KVS_WIFI_SSID ] = "wifissid",         \
+        [ KVS_WIFI_PASSPHRASE ] = "wifipass",         \
     }
 typedef enum KVStoreKeytype
 {
@@ -161,4 +167,5 @@ char *GetStringValue( KVStoreKey_t key,
 char *xprvGetCacheEntry(char * Key, size_t pxLength );
 BaseType_t KVStore_xCommitChanges( void );
 size_t prvGetCacheEntryLength( KVStoreKey_t xKey );
+void KVStore_vClearCachedValue( KVStoreKey_t xKey );
 #endif /* APPLICATION_CODE_STORE_H_ */

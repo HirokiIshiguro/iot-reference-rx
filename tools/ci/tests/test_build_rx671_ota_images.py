@@ -66,6 +66,29 @@ class ProfileTests(unittest.TestCase):
         self.assertIn(
             'value="-define=RX671_OTA_RUNTIME_ENABLE=1"', result
         )
+        self.assertIn(
+            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=128"', result
+        )
+        self.assertIn(
+            'value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"', result
+        )
+        self.assertIn(
+            'value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=8192"', result
+        )
+        self.assertIn(
+            'value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"', result
+        )
+        self.assertIn(
+            'value="-define=WHD_PORT_BUFFER_COUNT=8"', result
+        )
+        self.assertIn('value="-define=WHD_SCAN_ENABLE=0"', result)
+        self.assertIn(
+            'value="-define=WHD_JOIN_USE_SCAN_RESULT=0"', result
+        )
+        self.assertIn(
+            'value="-define=CONFIG_USE_PERCEPIO_TRACE_RECORDER=0"', result
+        )
+        self.assertIn('value="-define=MBEDTLS_ERROR_C"', result)
         self.assertIn(builder.VERSION_MARKER_LINKER_OPTION, result)
         self.assertIn(
             "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300",
@@ -232,7 +255,7 @@ class OutputSafetyTests(unittest.TestCase):
             builder._validate_workspace_root(Path("C:/ai/codex/ws"))
 
     @unittest.skipUnless(sys.platform == "win32", "Windows path contract")
-    def test_runtime_build_products_are_removed_from_project_and_workspace(
+    def test_transient_build_products_are_removed_from_project_and_workspace(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory(
@@ -250,7 +273,7 @@ class OutputSafetyTests(unittest.TestCase):
             )
             (workspace / "credential-bearing.mot").write_bytes(b"secret")
 
-            builder._remove_runtime_plaintext_build_products(
+            builder._remove_transient_build_products(
                 project,
                 workspace,
             )
@@ -274,33 +297,14 @@ class WifiCredentialIsolationTests(unittest.TestCase):
         for variable in builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
             self.assertNotIn(variable, result)
 
-    def test_runtime_wifi_mode_is_explicit_and_preserves_required_inputs(
-        self,
-    ) -> None:
-        source = {
-            "PATH": "safe",
-            "RX671_EK_WIFI_SSID": "hardware-ssid",
-            "RX671_EK_WIFI_PASSPHRASE": "hardware-passphrase",
-        }
-        result = builder.runtime_wifi_build_environment(source)
-        self.assertEqual("hardware-ssid", result["RX671_EK_WIFI_SSID"])
-        self.assertEqual(
-            "hardware-passphrase",
-            result["RX671_EK_WIFI_PASSPHRASE"],
-        )
-        with self.assertRaisesRegex(
-            ValueError,
-            "RX671_EK_WIFI_PASSPHRASE",
-        ):
-            builder.runtime_wifi_build_environment(
-                {"RX671_EK_WIFI_SSID": "hardware-ssid"}
-            )
-
-    def test_runtime_wifi_cli_flag_defaults_off(self) -> None:
-        default = builder.parse_args([])
-        enabled = builder.parse_args(["--runtime-wifi-config"])
-        self.assertFalse(default.runtime_wifi_config)
-        self.assertTrue(enabled.runtime_wifi_config)
+    def test_ota_build_always_enables_littlefs_kvs_join(self) -> None:
+        profile_source = inspect.getsource(builder.make_ota_cproject)
+        build_source = inspect.getsource(builder._build_one)
+        self.assertIn('-define=WHD_JOIN_ENABLE=1', profile_source)
+        self.assertIn('-define=WHD_JOIN_USE_KVS=1', profile_source)
+        self.assertIn('build_command.append("-SkipWifiConfig")', build_source)
+        self.assertNotIn("UseLocalJoinConfig", build_source)
+        self.assertNotIn("runtime_wifi", build_source)
 
     def test_local_join_header_is_restored_outside_ci(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -429,6 +433,10 @@ class SubmoduleProvenanceTests(unittest.TestCase):
 
 
 class DirtyAnalysisTests(unittest.TestCase):
+    def test_dirty_manifest_is_not_marked_formal(self) -> None:
+        source = inspect.getsource(builder._create_manifest)
+        self.assertIn('"formal": not dirty', source)
+
     def test_allows_only_dirty_provenance_and_its_dependent_unknowns(self) -> None:
         report = {
             "gates": [

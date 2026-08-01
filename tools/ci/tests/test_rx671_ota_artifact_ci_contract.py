@@ -145,7 +145,7 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
         self.assertIn('RX671_WIFI_TEST_SCOPE: "build"', ota_variables)
         self.assertIn('RX671_WIFI_SKIP_HW_TESTS: "true"', ota_variables)
 
-    def test_package_job_has_formal_default_and_encrypted_runtime_opt_in(self) -> None:
+    def test_package_job_always_exports_formal_credential_free_firmware(self) -> None:
         start = self.ci.index("package_rx671_ota_artifacts:")
         body_start = self.ci.index("\n", start) + 1
         next_job = re.search(
@@ -198,32 +198,33 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
             '"--workspace-root", "$env:E2STUDIO_WORKSPACE_RX671_OTA"',
             job,
         )
-        self.assertIn('$env:RX671_WIFI_TEST_SCOPE -eq "ota"', job)
-        self.assertIn('$otaBuildArgs += "--runtime-wifi-config"', job)
-        self.assertIn("tools/ci/protect_secret_artifact.py", job)
-        self.assertIn("rx671-ota-runtime.tar.enc", job)
-        self.assertIn("--secret-env RX671_OTA_ARTIFACT_KEY", job)
-        self.assertNotIn("RX671_OTA_ARTIFACT_SECRET", job)
-        self.assertNotRegex(
-            job,
-            r"RX671_OTA_ARTIFACT_KEY\s*=\s*"
-            r"\$env:RX671_EK_WIFI_PASSPHRASE",
-        )
+        self.assertIn("$manifest.formal -ne $true", job)
+        self.assertIn("$manifest.credentials_embedded -ne $false", job)
+        self.assertIn("$manifest.dirty -ne $false", job)
+        self.assertIn("$manifest.source_sha -ne $env:CI_COMMIT_SHA", job)
         self.assertIn(
-            'Remove-Item -LiteralPath "$env:CI_PROJECT_DIR\\build\\rx671-ota" '
-            "-Recurse -Force",
+            '$manifest.wifi_credentials_source -ne '
+            '"littlefs_kvs_runtime_provisioning"',
             job,
         )
+        for forbidden in (
+            "--runtime-wifi-config",
+            "tools/ci/protect_secret_artifact.py",
+            "rx671-ota-runtime.tar.enc",
+            "RX671_OTA_ARTIFACT_KEY",
+            "RX671_OTA_ARTIFACT_SECRET",
+            "rx671-ota-secure",
+        ):
+            self.assertNotIn(forbidden, job)
         self.assertNotIn("RX671_OTA_PACKAGE_ARTIFACT_PATH", job)
         artifacts = job.split("\n  artifacts:", 1)[1]
         self.assertIn("- build/rx671-ota/", artifacts)
-        self.assertIn("- build/rx671-ota-secure/", artifacts)
+        self.assertNotIn("rx671-ota-secure", artifacts)
         self.assertIn("after_script:", job)
         for cleanup_marker in (
-            "RX671 OTA stale plaintext pre-clean failed",
+            "RX671 OTA stale build-state pre-clean failed",
             "Projects\\aws_wifi_rx671_ek\\e2studio_ccrx\\HardwareDebug",
             "E2STUDIO_WORKSPACE_RX671_OTA",
-            "build\\rx671-ota-runtime.tar",
             "RX671 OTA after_script cleanup postcondition failed",
         ):
             self.assertIn(cleanup_marker, job)

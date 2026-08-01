@@ -54,8 +54,8 @@ class Rx671OtaBuildProfileContractTests(unittest.TestCase):
             self.build,
         )
         self.assertIn(
-            "-SkipWifiConfig cannot be combined with "
-            "-UseLocalJoinConfig or -WifiConfigFile.",
+            "-SkipWifiConfig cannot be combined with -UseLocalJoinConfig, "
+            "-UseKvsJoinConfig, or -WifiConfigFile.",
             self.build,
         )
 

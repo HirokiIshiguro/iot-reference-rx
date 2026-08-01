@@ -397,7 +397,9 @@
  * the additional information from the structures. Defaults to 0 if left
  * undefined. */
 #define configUSE_TRACE_FACILITY                1
+#ifndef CONFIG_USE_PERCEPIO_TRACE_RECORDER
 #define CONFIG_USE_PERCEPIO_TRACE_RECORDER     1
+#endif
 
 /* Set to 1 to include the vTaskList() and vTaskGetRunTimeStats() functions in
  * the build.  Set to 0 to exclude these functions from the build.  These two

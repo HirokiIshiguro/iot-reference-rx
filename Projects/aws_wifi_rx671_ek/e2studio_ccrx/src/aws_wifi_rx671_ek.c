@@ -14,6 +14,7 @@
 #include "event_groups.h"
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_Sockets.h"
+#include "NetworkBufferManagement.h"
 #include "iot_logging_task.h"
 #include "r_smc_entry.h"
 #include "debug_uart.h"
@@ -48,6 +49,10 @@ extern void abort(void);
 #define OTA_PROVISIONER_CLI_PRIORITY        (tskIDLE_PRIORITY + 1U)
 
 extern volatile uint32_t g_freertos_tcp_network_up;
+extern volatile uint32_t g_whd_port_buffer_max_in_use;
+extern volatile uint32_t g_whd_port_buffer_alloc_temp_fail_count;
+extern volatile uint32_t g_whd_port_buffer_alloc_perm_fail_count;
+extern volatile uint32_t g_whd_port_buffer_wait_loop_count;
 extern void UserInitialization(void);
 #if (RX671_OTA_RUNTIME_ENABLE == 1)
 extern void vStartOtaDemo(void);
@@ -71,6 +76,30 @@ volatile uint32_t g_diag_ping_task_condition_count;
 volatile uint32_t g_diag_ping_heap_before_create;
 volatile uint32_t g_diag_ping_heap_after_create;
 EventGroupHandle_t xStartDemoEventGroup = NULL;
+
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+static void ota_log_capacity(void)
+{
+    char line[192];
+    char * p = line;
+
+    p = append_text(p, "[RX671_OTA_CAPACITY] minheap=");
+    p = append_dec32(p, (uint32_t)xPortGetMinimumEverFreeHeapSize());
+    p = append_text(p, " minnbuf=");
+    p = append_dec32(p, (uint32_t)uxGetMinimumFreeNetworkBuffers());
+    p = append_text(p, " whdmax=");
+    p = append_dec32(p, g_whd_port_buffer_max_in_use);
+    p = append_text(p, " tempfail=");
+    p = append_dec32(p, g_whd_port_buffer_alloc_temp_fail_count);
+    p = append_text(p, " permfail=");
+    p = append_dec32(p, g_whd_port_buffer_alloc_perm_fail_count);
+    p = append_text(p, " waitloop=");
+    p = append_dec32(p, g_whd_port_buffer_wait_loop_count);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+#endif
 
 #if (RX671_OTA_RUNTIME_ENABLE == 1)
 static BaseType_t ota_runtime_prepare(void)
@@ -630,6 +659,12 @@ void main_task(void *pvParameters)
 
 BaseType_t OtaSelfTest(void)
 {
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+    /* This runs in the newly activated image before it is accepted.  Keep the
+     * existing OTA markers unchanged and add one machine-readable capacity
+     * snapshot for the focused hardware gate. */
+    ota_log_capacity();
+#endif
     return pdTRUE;
 }
 

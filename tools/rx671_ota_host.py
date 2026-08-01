@@ -217,13 +217,33 @@ def send_ascii_command(
         encoded_command = command.encode("ascii")
     except UnicodeEncodeError:
         raise ValueError("CLI command must contain ASCII only") from None
-    if len(encoded_command) >= CLI_INPUT_BUFFER_BYTES:
+    return send_ascii_bytes_command(
+        serial_port,
+        encoded_command,
+        timeout=timeout,
+        char_delay=char_delay,
+        success_tokens=success_tokens,
+    )
+
+
+def send_ascii_bytes_command(
+    serial_port,
+    command: bytes | bytearray,
+    *,
+    timeout: float,
+    char_delay: float,
+    success_tokens: Iterable[bytes] = CLI_SET_SUCCESS_TOKENS,
+) -> bytes:
+    """Send mutable ASCII command bytes without logging or string conversion."""
+    if any(byte > 0x7F for byte in command):
+        raise ValueError("CLI command must contain ASCII only")
+    if len(command) >= CLI_INPUT_BUFFER_BYTES:
         raise ValueError(
             "CLI command is too long for the target input buffer: "
-            f"{len(encoded_command)}/{CLI_INPUT_BUFFER_BYTES} bytes"
+            f"{len(command)}/{CLI_INPUT_BUFFER_BYTES} bytes"
         )
     serial_port.reset_input_buffer()
-    for byte in encoded_command:
+    for byte in command:
         serial_port.write(bytes((byte,)))
         if char_delay:
             time.sleep(char_delay)

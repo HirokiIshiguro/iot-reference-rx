@@ -104,6 +104,8 @@ PROVENANCE_PROJECT_PATHS = (
 )
 BOOTLOADER_PROVENANCE_PATHS = (
     BOOTLOADER_PROJECT_RELATIVE / ".cproject",
+    BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
+    BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/smc_gen/r_config/r_bsp_config.h",
     BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
     BOOTLOADER_PROJECT_RELATIVE / "HardwareDebug/boot_loader_rx671_ek.map",
@@ -210,6 +212,16 @@ def make_ota_cproject(text: str, version: Version) -> str:
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MINOR={version.minor}"/>',
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_BUILD={version.build}"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_OTA_RUNTIME_ENABLE=1"/>',
+        '<listOptionValue builtIn="false" value="-define=RX671_FREERTOS_HEAP_SIZE_KB=128"/>',
+        '<listOptionValue builtIn="false" value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"/>',
+        '<listOptionValue builtIn="false" value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=8192"/>',
+        '<listOptionValue builtIn="false" value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_PORT_BUFFER_COUNT=8"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_SCAN_ENABLE=0"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_JOIN_USE_SCAN_RESULT=0"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_JOIN_ENABLE=1"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_JOIN_USE_KVS=1"/>',
+        '<listOptionValue builtIn="false" value="-define=CONFIG_USE_PERCEPIO_TRACE_RECORDER=0"/>',
     )
     insertion = DEFINE_ANCHOR + "".join(
         "\n\t\t\t\t\t\t\t\t\t" + define for define in defines
@@ -522,11 +534,11 @@ def _validate_workspace_root(path: Path) -> None:
         )
 
 
-def _remove_runtime_plaintext_build_products(
+def _remove_transient_build_products(
     project_dir: Path,
     workspace: Path,
 ) -> None:
-    """Remove compiler/workspace outputs that may embed runtime credentials."""
+    """Remove compiler/workspace outputs after copying formal artifacts."""
     resolved_project = project_dir.resolve()
     hardware_debug = (resolved_project / "HardwareDebug").resolve()
     resolved_workspace = workspace.resolve()
@@ -548,7 +560,7 @@ def _remove_runtime_plaintext_build_products(
     ]
     if remaining:
         raise RuntimeError(
-            "RX671 runtime plaintext build cleanup failed: "
+            "RX671 transient build cleanup failed: "
             + ", ".join(remaining)
         )
 
@@ -577,26 +589,6 @@ def ota_build_environment(
     environment = dict(os.environ if source is None else source)
     for variable in WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
         environment.pop(variable, None)
-    return environment
-
-
-def runtime_wifi_build_environment(
-    source: Mapping[str, str] | None = None,
-) -> dict[str, str]:
-    """Return an opt-in hardware environment with required Wi-Fi inputs."""
-
-    environment = dict(os.environ if source is None else source)
-    required = ("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")
-    missing = [
-        name
-        for name in required
-        if not environment.get(name, "").strip()
-    ]
-    if missing:
-        raise ValueError(
-            "--runtime-wifi-config requires non-empty environment variables: "
-            + ", ".join(missing)
-        )
     return environment
 
 
@@ -899,6 +891,26 @@ def _copy_bootloader_outputs(repo_root: Path, output_root: Path) -> list[Path]:
     return copied
 
 
+def _copy_failed_build_diagnostics(project_dir: Path, artifact_dir: Path) -> None:
+    """Preserve linker/make diagnostics before the outer cleanup removes them."""
+    hardware_debug = project_dir / "HardwareDebug"
+    diagnostic_dir = artifact_dir / "failed-build-diagnostics"
+    copied = False
+    for name in (
+        f"{ARTIFACT_BASENAME}.map",
+        "LinkerSubCommand.tmp",
+        f"Linker{ARTIFACT_BASENAME}.tmp",
+        "makefile",
+    ):
+        source = hardware_debug / name
+        if source.is_file():
+            diagnostic_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, diagnostic_dir / name)
+            copied = True
+    if copied:
+        print(f"RX671 OTA failed-build diagnostics: {diagnostic_dir}")
+
+
 def _copy_effective_inputs(
     repo_root: Path, project_dir: Path, artifact_dir: Path
 ) -> list[Path]:
@@ -932,7 +944,6 @@ def _create_manifest(
     public_key_path: Path,
     transfer_payload_path: Path | None,
     transfer_signature_path: Path | None,
-    runtime_wifi_config: bool,
     effective_inputs: list[Path],
     bootloader_artifacts: list[Path],
     input_gitlinks: dict[str, str],
@@ -973,8 +984,9 @@ def _create_manifest(
         "dirty": dirty,
         "project_path": PROJECT_RELATIVE.as_posix(),
         "profile": PROFILE_NAME,
-        "formal": not runtime_wifi_config,
-        "credentials_embedded": runtime_wifi_config,
+        "formal": not dirty,
+        "credentials_embedded": False,
+        "wifi_credentials_source": "littlefs_kvs_runtime_provisioning",
         "ota_image_version": version.text,
         "rsu_path": rsu_path.relative_to(repo_root).as_posix(),
         "signer_certificate_path": certificate_path.relative_to(repo_root).as_posix(),
@@ -1004,6 +1016,7 @@ def _dirty_analysis_is_structurally_safe(report: dict[str, object]) -> bool:
     allowed_non_pass = {
         "artifact_provenance",
         "whd_blob_sizes",
+        "ram_capacity",
         "map_image_single_area",
         "mot_image_single_area",
     }
@@ -1041,7 +1054,6 @@ def _build_one(
     certificate_source: Path,
     public_key_source: Path,
     create_transfer_payload: bool,
-    runtime_wifi_config: bool,
     dirty: bool,
     allow_dirty: bool,
     timeout_seconds: int,
@@ -1050,11 +1062,7 @@ def _build_one(
 ) -> None:
     _safe_recreate_output(artifact_dir, repo_root)
     build_log = artifact_dir / "e2studio-build.log"
-    build_environment = (
-        runtime_wifi_build_environment()
-        if runtime_wifi_config
-        else ota_build_environment()
-    )
+    build_environment = ota_build_environment()
     restore_local_config = build_environment.get("CI", "").lower() != "true"
     local_join_config = project_dir / LOCAL_JOIN_CONFIG_RELATIVE
     with TemporaryWhdPatchIsolation(repo_root):
@@ -1081,16 +1089,20 @@ def _build_one(
                 version.text,
                 "-SkipAwsIotConfig",
             ]
-            build_command.append(
-                "-UseLocalJoinConfig"
-                if runtime_wifi_config
-                else "-SkipWifiConfig"
-            )
-            _run(
-                build_command,
-                repo_root,
-                env=build_environment,
-            )
+            # The KVS JOIN defines are part of the temporary .cproject above,
+            # so the copied effective configuration and its hash describe the
+            # exact compiler input.  The child builder only has to suppress
+            # every legacy credential-bearing local JOIN path.
+            build_command.append("-SkipWifiConfig")
+            try:
+                _run(
+                    build_command,
+                    repo_root,
+                    env=build_environment,
+                )
+            except subprocess.CalledProcessError:
+                _copy_failed_build_diagnostics(project_dir, artifact_dir)
+                raise
     if validate_formal_input_submodules(repo_root) != input_gitlinks:
         raise RuntimeError("formal OTA input submodule state changed during build")
     outputs = _copy_build_outputs(project_dir, artifact_dir)
@@ -1108,8 +1120,7 @@ def _build_one(
         ],
         repo_root,
     )
-    if not runtime_wifi_config:
-        assert_wifi_credentials_absent([*outputs.values(), rsu_path])
+    assert_wifi_credentials_absent([*outputs.values(), rsu_path])
     certificate_path = artifact_dir / SIGNER_CERTIFICATE_NAME
     shutil.copy2(certificate_source, certificate_path)
     public_key_path = artifact_dir / SIGNER_PUBLIC_KEY_NAME
@@ -1125,10 +1136,9 @@ def _build_one(
             payload_path=transfer_payload_path,
             signature_path=transfer_signature_path,
         )
-        if not runtime_wifi_config:
-            assert_wifi_credentials_absent(
-                [transfer_payload_path, transfer_signature_path]
-            )
+        assert_wifi_credentials_absent(
+            [transfer_payload_path, transfer_signature_path]
+        )
     effective_inputs = _copy_effective_inputs(
         repo_root, project_dir, artifact_dir
     )
@@ -1144,7 +1154,6 @@ def _build_one(
         public_key_path=public_key_path,
         transfer_payload_path=transfer_payload_path,
         transfer_signature_path=transfer_signature_path,
-        runtime_wifi_config=runtime_wifi_config,
         effective_inputs=effective_inputs,
         bootloader_artifacts=bootloader_artifacts,
         input_gitlinks=input_gitlinks,
@@ -1231,15 +1240,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--e2studio-timeout-seconds", type=int, default=600)
     parser.add_argument(
-        "--runtime-wifi-config",
-        action="store_true",
-        help=(
-            "Build ephemeral hardware-test baseline/candidate images using "
-            "RX671_EK_WIFI_SSID and RX671_EK_WIFI_PASSPHRASE. The default "
-            "formal artifact build strips these credentials."
-        ),
-    )
-    parser.add_argument(
         "--allow-dirty",
         action="store_true",
         help=(
@@ -1321,7 +1321,6 @@ def main(argv: list[str] | None = None) -> int:
                     certificate_source=certificate_source,
                     public_key_source=public_key_source,
                     create_transfer_payload=(label == "candidate"),
-                    runtime_wifi_config=args.runtime_wifi_config,
                     dirty=dirty,
                     allow_dirty=args.allow_dirty,
                     timeout_seconds=args.e2studio_timeout_seconds,
@@ -1330,14 +1329,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
     finally:
         cleanup_errors: list[str] = []
-        if args.runtime_wifi_config:
-            try:
-                _remove_runtime_plaintext_build_products(
-                    project_dir,
-                    args.workspace_root,
-                )
-            except Exception as error:
-                cleanup_errors.append(str(error))
+        try:
+            _remove_transient_build_products(
+                project_dir,
+                args.workspace_root,
+            )
+        except Exception as error:
+            cleanup_errors.append(str(error))
         # TemporaryOtaProfile restores the tracked inputs. Keep this explicit
         # postcondition so an accidental future profile-path omission fails.
         if source_state(repo_root) != initial_source_state:

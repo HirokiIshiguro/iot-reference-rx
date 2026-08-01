@@ -62,11 +62,16 @@ BOOTLOADER_SUBMODULE_RELATIVE = (
 )
 BOOTLOADER_PROVENANCE_PATHS = (
     BOOTLOADER_PROJECT_RELATIVE / ".cproject",
+    BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
+    BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/smc_gen/r_config/r_bsp_config.h",
     BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
     BOOTLOADER_PROJECT_RELATIVE / "HardwareDebug/boot_loader_rx671_ek.map",
     BOOTLOADER_PROJECT_RELATIVE / "HardwareDebug/boot_loader_rx671_ek.mot",
 )
+OTA_MQTT_FILE_BLOCK_SIZE = 4096
+OTA_MQTT_NETWORK_BUFFER_SIZE = 8192
+OTA_MQTT_JSON_AND_PROTOCOL_OVERHEAD = 1024
 
 
 @dataclass(frozen=True)
@@ -145,6 +150,12 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _same_text_lines(left: Path, right: Path) -> bool:
+    return left.read_text(encoding="utf-8").splitlines() == right.read_text(
+        encoding="utf-8"
+    ).splitlines()
 
 
 def _git_head(repo_root: Path) -> str | None:
@@ -283,6 +294,87 @@ def _parse_map_sections(path: Path) -> dict[str, Section]:
     if not sections:
         raise ValueError("map の Mapping List を解析できません")
     return sections
+
+
+def _cproject_integer_define(text: str, name: str) -> int | None:
+    values = {
+        _parse_c_integer(match.group(1))
+        for match in re.finditer(
+            rf'value="-define={re.escape(name)}='
+            r'\(?\s*(0[xX][0-9A-Fa-f]+|[0-9]+)[uUlL]*\s*\)?"',
+            text,
+        )
+    }
+    return next(iter(values)) if len(values) == 1 else None
+
+
+def _ram_capacity_gate(
+    *,
+    sections: dict[str, Section] | None,
+    ram_size: int | None,
+    data_flash_start: int | None,
+) -> Gate:
+    if ram_size is None or data_flash_start is None:
+        return Gate(
+            "ram_capacity",
+            "UNKNOWN",
+            "選択MCUのBSP_RAM_SIZE_BYTESまたはData Flash開始addressを導出できません",
+        )
+    if sections is None:
+        return Gate("ram_capacity", "UNKNOWN", "mapがないためRAM使用量を検証できません")
+
+    ram_sections = [
+        section
+        for section in sections.values()
+        if section.size and section.start < data_flash_start
+    ]
+    if not ram_sections:
+        return Gate("ram_capacity", "FAIL", "mapにRAM sectionがありません")
+
+    outside = [section for section in ram_sections if section.end > ram_size]
+    high_water = max(section.end for section in ram_sections)
+    allocated = sum(section.size for section in ram_sections)
+    detail = (
+        f"BSP_RAM_SIZE_BYTES={ram_size}; high-water=0x{high_water - 1:08X}; "
+        f"mapped={allocated} bytes; headroom={ram_size - high_water} bytes"
+    )
+    if outside:
+        detail += "; RAM外section=" + ", ".join(
+            f"{section.name}@0x{section.start:08X}-0x{section.end - 1:08X}"
+            for section in outside
+        )
+    return Gate("ram_capacity", "FAIL" if outside else "PASS", detail)
+
+
+def _mqtt_ota_buffer_gate(
+    *, block_size: int | None, network_buffer_size: int | None
+) -> Gate:
+    if block_size is None or network_buffer_size is None:
+        return Gate(
+            "mqtt_ota_buffer_fit",
+            "FAIL",
+            "OTA profileのmqttFileDownloader_CONFIG_BLOCK_SIZEまたは"
+            "MQTT_AGENT_NETWORK_BUFFER_SIZEを一意に導出できません",
+        )
+
+    base64_size = 4 * ((block_size + 2) // 3)
+    required_size = base64_size + OTA_MQTT_JSON_AND_PROTOCOL_OVERHEAD
+    profile_ok = (
+        block_size == OTA_MQTT_FILE_BLOCK_SIZE
+        and network_buffer_size == OTA_MQTT_NETWORK_BUFFER_SIZE
+    )
+    fit_ok = required_size <= network_buffer_size
+    detail = (
+        f"block={block_size}; base64={base64_size}; "
+        f"JSON/MQTT overhead allowance={OTA_MQTT_JSON_AND_PROTOCOL_OVERHEAD}; "
+        f"required={required_size}; network buffer={network_buffer_size}; "
+        f"required profile={OTA_MQTT_FILE_BLOCK_SIZE}/{OTA_MQTT_NETWORK_BUFFER_SIZE}"
+    )
+    return Gate(
+        "mqtt_ota_buffer_fit",
+        "PASS" if profile_ok and fit_ok else "FAIL",
+        detail,
+    )
 
 
 def _parse_srecord_ranges(path: Path) -> list[tuple[int, int]]:
@@ -813,7 +905,14 @@ def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | No
         )
     bsp_config = project_dir / "src/smc_gen/r_config/r_bsp_config.h"
     cproject = project_dir / ".cproject"
-    if not bsp_config.is_file() or not cproject.is_file():
+    compiled_target_config = project_dir / "src/rx671.h"
+    canonical_target_config = repo_root / BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h"
+    if (
+        not bsp_config.is_file()
+        or not cproject.is_file()
+        or not compiled_target_config.is_file()
+        or not canonical_target_config.is_file()
+    ):
         return Gate(
             "bootloader_layout",
             "FAIL",
@@ -821,9 +920,22 @@ def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | No
         )
     try:
         bsp_text = bsp_config.read_text(encoding="utf-8")
+        compiled_target_lines = compiled_target_config.read_text(
+            encoding="utf-8"
+        ).splitlines()
+        canonical_target_lines = canonical_target_config.read_text(
+            encoding="utf-8"
+        ).splitlines()
         mode, build_dir, artifact_name, anchors, _binaries = _parse_cproject(cproject)
     except (ET.ParseError, OSError, ValueError) as exc:
         return Gate("bootloader_layout", "FAIL", f"RX671 bootloader設定解析失敗: {exc}")
+    if compiled_target_lines != canonical_target_lines:
+        return Gate(
+            "bootloader_layout",
+            "FAIL",
+            "実際にcompileするsrc/rx671.hがbootloader submoduleの"
+            "config/rx671.hと一致しません",
+        )
     if _macro(bsp_text, "BSP_CFG_BOOTLOADER_PROJECT") != 1 or mode != "bank.dual":
         return Gate(
             "bootloader_layout",
@@ -902,6 +1014,13 @@ def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | No
             errors.append(f"hashなし: {relative.as_posix()}")
         elif not path.is_file() or expected_hash.lower() != _sha256(path):
             errors.append(f"hash不一致: {relative.as_posix()}")
+    parent_rx671 = repo_root / BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h"
+    canonical_rx671 = repo_root / BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h"
+    try:
+        if not _same_text_lines(parent_rx671, canonical_rx671):
+            errors.append("bootloader src/rx671.hとsubmodule config/rx671.hの内容不一致")
+    except (OSError, UnicodeError) as exc:
+        errors.append(f"bootloader rx671.h同期確認失敗: {exc}")
     indexed_sha = _gitlink_sha(repo_root, BOOTLOADER_SUBMODULE_RELATIVE)
     recorded_sha = gitlinks.get(BOOTLOADER_SUBMODULE_RELATIVE.as_posix())
     try:
@@ -1262,6 +1381,7 @@ def analyze(
 
     try:
         mode, configured_build_dir, artifact_name, anchors, binaries = _parse_cproject(cproject)
+        cproject_text = cproject.read_text(encoding="utf-8")
         fwup_text = fwup_config.read_text(encoding="utf-8")
         littlefs_text = littlefs_config.read_text(encoding="utf-8")
         bsp_text = bsp_config.read_text(encoding="utf-8")
@@ -1274,6 +1394,16 @@ def analyze(
     except (ET.ParseError, OSError, ValueError) as exc:
         return [Gate("source_inputs", "FAIL", f"設定解析失敗: {exc}")]
     gates.append(Gate("source_inputs", "PASS", "CC-RX/BSP/FWUP/WHD設定を解析しました"))
+    gates.append(
+        _mqtt_ota_buffer_gate(
+            block_size=_cproject_integer_define(
+                cproject_text, "mqttFileDownloader_CONFIG_BLOCK_SIZE"
+            ),
+            network_buffer_size=_cproject_integer_define(
+                cproject_text, "MQTT_AGENT_NETWORK_BUFFER_SIZE"
+            ),
+        )
+    )
     build_dir = build_dir_override or configured_build_dir
     gates.append(
         _bootloader_layout_gate(
@@ -1283,6 +1413,7 @@ def analyze(
     )
 
     rom_size = _memory_size_for_selected_part(bsp_text, mcu_info_text, "BSP_ROM_SIZE_BYTES")
+    ram_size = _memory_size_for_selected_part(bsp_text, mcu_info_text, "BSP_RAM_SIZE_BYTES")
     if rom_size is None:
         gates.append(Gate("rom_capacity", "UNKNOWN", "選択MCUのBSP_ROM_SIZE_BYTESを導出できません"))
         return gates
@@ -1521,10 +1652,30 @@ def analyze(
         )
 
     if not map_path.is_file():
+        gates.append(
+            _ram_capacity_gate(
+                sections=None,
+                ram_size=ram_size,
+                data_flash_start=target_df_start,
+            )
+        )
         gates.append(Gate("map_image_single_area", "UNKNOWN", f"mapなし: {map_path}"))
     else:
         try:
             map_sections = _parse_map_sections(map_path)
+            ram_gate = _ram_capacity_gate(
+                sections=map_sections,
+                ram_size=ram_size,
+                data_flash_start=target_df_start,
+            )
+            if ram_gate.status == "PASS" and provenance_gate.status != "PASS":
+                ram_gate = Gate(
+                    ram_gate.name,
+                    "UNKNOWN",
+                    ram_gate.detail
+                    + f"; artifact_provenance={provenance_gate.status}のため現行source証跡にしません",
+                )
+            gates.append(ram_gate)
             map_ranges = [(section.start, section.end) for section in map_sections.values() if section.size]
             areas, byte_count, outside = _classify_ranges(map_ranges, regions, flash_start)
             map_size_errors = [
@@ -1550,6 +1701,7 @@ def analyze(
                 )
             gates.append(Gate("map_image_single_area", status, detail))
         except (OSError, ValueError) as exc:
+            gates.append(Gate("ram_capacity", "FAIL", f"map解析失敗: {exc}"))
             gates.append(Gate("map_image_single_area", "FAIL", f"map解析失敗: {exc}"))
 
     if not mot_path.is_file():

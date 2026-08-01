@@ -160,29 +160,84 @@ static BaseType_t prvConfigCommandHandler ( char * pcWriteBuffer,
                                            size_t xWriteBufferLen,
                                            const char * pcCommandString );
 
+#define WIFI_PASSPHRASE_MAX_LENGTH    (63U)
+
+static int32_t prvHexNibble( char c )
+{
+    if( ( c >= '0' ) && ( c <= '9' ) )
+    {
+        return (int32_t)( c - '0' );
+    }
+    if( ( c >= 'a' ) && ( c <= 'f' ) )
+    {
+        return (int32_t)( c - 'a' ) + 10;
+    }
+    if( ( c >= 'A' ) && ( c <= 'F' ) )
+    {
+        return (int32_t)( c - 'A' ) + 10;
+    }
+    return -1;
+}
+
+static BaseType_t prvDecodeHex( const char * pcHex,
+                                size_t xHexLength,
+                                uint8_t * pucOutput,
+                                size_t xOutputSize,
+                                size_t * pxOutputLength )
+{
+    size_t xIndex;
+
+    if( ( NULL == pcHex ) || ( NULL == pucOutput ) ||
+        ( NULL == pxOutputLength ) || ( 0U == xHexLength ) ||
+        ( 0U != ( xHexLength & 1U ) ) ||
+        ( ( xHexLength / 2U ) > xOutputSize ) )
+    {
+        return pdFALSE;
+    }
+
+    for( xIndex = 0U; xIndex < ( xHexLength / 2U ); xIndex++ )
+    {
+        int32_t xHigh = prvHexNibble( pcHex[ xIndex * 2U ] );
+        int32_t xLow = prvHexNibble( pcHex[ ( xIndex * 2U ) + 1U ] );
+
+        if( ( xHigh < 0 ) || ( xLow < 0 ) )
+        {
+            return pdFALSE;
+        }
+        pucOutput[ xIndex ] = (uint8_t)( ( (uint32_t)xHigh << 4 ) |
+                                        (uint32_t)xLow );
+    }
+
+    *pxOutputLength = xHexLength / 2U;
+    return pdTRUE;
+}
+
+static void prvSecureZero( void * pvData, size_t xLength )
+{
+    volatile uint8_t * pucData = (volatile uint8_t *)pvData;
+
+    while( xLength > 0U )
+    {
+        *pucData = 0U;
+        pucData++;
+        xLength--;
+    }
+}
+
 static CLI_Command_Definition_t xCommandConfig =
 {
     .pcCommand                   = "conf",
     .pcHelpString                = "\r\n"
                                    "conf:\r\n"
-                                   "    Command to change or retrieve configuration for the device.\r\n"
-                                   "    Usage: conf get {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert|codesignpubkey}\r\n"
-                                   "    Usage: conf set {cert|key|thingname|endpoint|claimcert|claimkey|template|rootca|codesigncert|codesignpubkey} VALUE\r\n"
-                                   "           get     : to retrieve configuration from Data Flash Memory\r\n"
-                                   "           set     : to change configuration for the device\r\n"
-                                   "           {cert}     : select client certificate as input target element\r\n"
-                                   "           {key}      : select client private key as input target element\r\n"
-                                   "           {thingname}: select AWS thing name as input target element\r\n"
-                                   "           {endpoint} : select AWS MQTT endpoint as input target element\r\n"
-                                   "           {claimcert}: select claim certificate as input target element\r\n"
-                                   "           {claimkey} : select claim key as input target element\r\n"
-                                   "           {template} : select template name as input target element\r\n"
-                                   "           {rootca}   : select root CA certificate as input target element\r\n"
-                                   "           {codesigncert} : select code signer certificate as input target element\r\n"
-                                   "           {codesignpubkey}: select bootloader code signer public key as input target element\r\n"
-                                   "           VALUE : the value of input target element, this is only required for 'conf set' command\r\n"
-                                   "    Usage: conf commit\r\n"
-                                   "           commit   : to write the configured value to Internal Data Flash Memory\r\n",
+                                   " conf get KEY\r\n"
+                                   " conf set KEY VALUE\r\n"
+                                   " conf sethex {wifissid|wifipass} HEX_VALUE\r\n"
+                                   " conf commit\r\n"
+                                   " Keys: cert,key,thingname,endpoint,claimcert,claimkey,\r\n"
+                                   "       template,rootca,codesigncert,codesignpubkey,\r\n"
+                                   "       wifissid,wifipass\r\n"
+                                   " Wi-Fi: SSID=1..32 octets, passphrase=8..63 octets.\r\n"
+                                   " Wi-Fi values use hex transfer and cannot be read back.\r\n",
     .pxCommandInterpreter        = prvConfigCommandHandler,
     .cExpectedNumberOfParameters = -1
 };
@@ -479,44 +534,78 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
     BaseType_t   requestLength = 0;
     BaseType_t   keyLength     = 0;
     BaseType_t   valueLength   = 0;
+    KVStoreKey_t xKey          = KVS_INVALID_KEY;
 
     pRequest        = FreeRTOS_CLIGetParameter( pcCommandString, 1U, &requestLength );
     *pcWriteBuffer = '\0';
     if ( NULL != pRequest)
     {
-        if ( 0 == strncmp( pRequest, "get", requestLength ) )
+        if ( ( requestLength == (BaseType_t)( sizeof("get") - 1U ) ) &&
+             ( 0 == strncmp( pRequest, "get", (size_t)requestLength ) ) )
         {
             pKey = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
-
-            /* Cast to type "const char *" to be compatible with parameter type */
-            getValue = (const char *)xprvGetCacheEntry((char *)pKey, keyLength);
-            if (NULL == getValue)
-            {
-                sprintf(pcWriteBuffer, "No %s in Data Flash!\r\n", pKey);
-            }
-            else
-            {
-                sprintf(pcWriteBuffer, "%s\r\n", getValue);
-                getValue = NULL;
-            }
-
-        }
-        else if ( 0 == strncmp( pRequest, "set", requestLength ) )
-        {
-            pKey   = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
-            pValue = FreeRTOS_CLIGetParameter( pcCommandString, 3U, &valueLength );
-
-            /* Cast to type "char *" to be compatible with parameter type */
-            if (xprvWriteCacheEntry(keyLength, (char *)pKey, valueLength, (char *)pValue) < 0)
+            if( NULL == pKey )
             {
                 result = pdFALSE;
             }
             else
             {
-                KVStoreKey_t xKey;
+                xKey = (KVStoreKey_t)Filename2Handle( (char *)pKey, (size_t)keyLength );
+                if( ( KVS_WIFI_SSID == xKey ) ||
+                    ( KVS_WIFI_PASSPHRASE == xKey ) )
+                {
+                    const char * pcWifiLabel = ( KVS_WIFI_SSID == xKey ) ?
+                                               "Wi-Fi SSID" :
+                                               "Wi-Fi passphrase";
+                    if( ( 0U < prvGetCacheEntryLength( xKey ) ) ||
+                        ( 0 < xprvGetValueLengthFromImpl( xKey ) ) )
+                    {
+                        sprintf(pcWriteBuffer, "%s configured; readback disabled.\r\n",
+                                pcWifiLabel);
+                    }
+                    else
+                    {
+                        sprintf(pcWriteBuffer, "%s not configured.\r\n",
+                                pcWifiLabel);
+                    }
+                }
+                else
+                {
+                    /* Cast to type "const char *" to be compatible with parameter type */
+                    getValue = (const char *)xprvGetCacheEntry((char *)pKey, (size_t)keyLength);
+                    if (NULL == getValue)
+                    {
+                        sprintf(pcWriteBuffer, "Configuration value not found in Data Flash.\r\n");
+                    }
+                    else
+                    {
+                        sprintf(pcWriteBuffer, "%s\r\n", getValue);
+                        getValue = NULL;
+                    }
+                }
+            }
+        }
+        else if ( ( requestLength == (BaseType_t)( sizeof("set") - 1U ) ) &&
+                  ( 0 == strncmp( pRequest, "set", (size_t)requestLength ) ) )
+        {
+            pKey   = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
+            pValue = FreeRTOS_CLIGetParameter( pcCommandString, 3U, &valueLength );
+            if( NULL != pKey )
+            {
+                xKey = (KVStoreKey_t)Filename2Handle( (char *)pKey,
+                                                      (size_t)keyLength );
+            }
 
-                /* Cast to type "char *" to be compatible with parameter type */
-                xKey = (KVStoreKey_t)Filename2Handle((char *)pKey, keyLength);
+            if ((NULL == pKey) || (NULL == pValue) ||
+                (KVS_WIFI_SSID == xKey) ||
+                (KVS_WIFI_PASSPHRASE == xKey) ||
+                (xprvWriteCacheEntry((size_t)keyLength, (char *)pKey,
+                                     (size_t)valueLength, (char *)pValue) < 0))
+            {
+                result = pdFALSE;
+            }
+            else
+            {
                 if ((KVS_TSIP_ROOTCA_PUBKEY_ID == xKey) ||
                     (KVS_TSIP_CLIENT_PUBKEY_ID == xKey) ||
                     (KVS_TSIP_CLIENT_PRIKEY_ID == xKey))
@@ -529,7 +618,36 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                 }
             }
         }
-        else  if ( 0 == strncmp( pRequest, "commit", requestLength ) )
+        else if ( ( requestLength == (BaseType_t)( sizeof("sethex") - 1U ) ) &&
+                  ( 0 == strncmp( pRequest, "sethex", (size_t)requestLength ) ) )
+        {
+            uint8_t pucDecoded[ WIFI_PASSPHRASE_MAX_LENGTH ];
+            size_t xDecodedLength = 0U;
+
+            pKey   = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
+            pValue = FreeRTOS_CLIGetParameter( pcCommandString, 3U, &valueLength );
+            if( NULL != pKey )
+            {
+                xKey = (KVStoreKey_t)Filename2Handle( (char *)pKey, (size_t)keyLength );
+            }
+
+            if( ( ( KVS_WIFI_SSID != xKey ) && ( KVS_WIFI_PASSPHRASE != xKey ) ) ||
+                ( pdTRUE != prvDecodeHex( pValue, (size_t)valueLength,
+                                          pucDecoded, sizeof(pucDecoded),
+                                          &xDecodedLength ) ) ||
+                ( xprvWriteCacheEntry( (size_t)keyLength, (char *)pKey,
+                                       xDecodedLength, (char *)pucDecoded ) < 0 ) )
+            {
+                result = pdFALSE;
+            }
+            else
+            {
+                sprintf(pcWriteBuffer, "OK.\r\n" );
+            }
+            prvSecureZero( pucDecoded, sizeof(pucDecoded) );
+        }
+        else if ( ( requestLength == (BaseType_t)( sizeof("commit") - 1U ) ) &&
+                  ( 0 == strncmp( pRequest, "commit", (size_t)requestLength ) ) )
         {
             BaseType_t xResult = KVStore_xCommitChanges();
             if ( pdTRUE == xResult)

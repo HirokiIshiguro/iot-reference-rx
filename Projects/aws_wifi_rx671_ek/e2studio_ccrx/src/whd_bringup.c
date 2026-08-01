@@ -17,10 +17,16 @@
 
 #include "debug_uart.h"
 #include "whd_join_config.h"
+#if WHD_JOIN_USE_KVS
+#include "store.h"
+#endif
 #include "whd_port.h"
 #include "whd_bringup.h"
 
 #define WHD_THREAD_STACK_BYTES          (8192UL)
+#define WHD_JOIN_SSID_MAX_BYTES         (32U)
+#define WHD_JOIN_PASSPHRASE_MIN_BYTES   (8U)
+#define WHD_JOIN_PASSPHRASE_MAX_BYTES   (63U)
 
 static uint32_t g_whd_thread_stack[WHD_THREAD_STACK_BYTES / sizeof(uint32_t)];
 #if WHD_SCAN_ENABLE
@@ -30,6 +36,10 @@ static whd_scan_result_t g_target_ap;
 static whd_driver_t g_whd_driver;
 static whd_interface_t g_whd_ifp;
 static cyhal_sdio_t g_sdio_obj;
+static uint8_t g_whd_join_ssid[WHD_JOIN_SSID_MAX_BYTES];
+static uint8_t g_whd_join_passphrase[WHD_JOIN_PASSPHRASE_MAX_BYTES];
+static uint32_t g_whd_join_ssid_length;
+static uint32_t g_whd_join_passphrase_length;
 
 volatile uint32_t g_whd_bringup_stage;
 volatile uint32_t g_whd_bringup_last_result;
@@ -62,6 +72,85 @@ extern volatile uint32_t g_sdio_host_run_clock_status;
 extern volatile uint32_t g_sdio_host_cmd53_xfer_engine;
 extern volatile uint32_t g_sdio_host_portd_dscr;
 extern volatile uint32_t g_sdio_host_portd_dscr2;
+
+static void whd_secure_zero(void * p_data, uint32_t length)
+{
+    volatile uint8_t * p = (volatile uint8_t *)p_data;
+
+    while (length > 0U)
+    {
+        *p = 0U;
+        p++;
+        length--;
+    }
+}
+
+static bool whd_load_join_credentials(void)
+{
+    size_t ssid_length;
+    size_t passphrase_length;
+
+    memset(g_whd_join_ssid, 0, sizeof(g_whd_join_ssid));
+    whd_secure_zero(g_whd_join_passphrase, sizeof(g_whd_join_passphrase));
+    g_whd_join_ssid_length = 0U;
+    g_whd_join_passphrase_length = 0U;
+
+#if WHD_JOIN_USE_KVS
+    ssid_length = xReadEntry(KVS_WIFI_SSID,
+                             g_whd_join_ssid,
+                             sizeof(g_whd_join_ssid));
+    passphrase_length = xReadEntry(KVS_WIFI_PASSPHRASE,
+                                   g_whd_join_passphrase,
+                                   sizeof(g_whd_join_passphrase));
+#else
+    {
+        const uint8_t ssid[] = WHD_JOIN_SSID;
+        const uint8_t passphrase[] = WHD_JOIN_PASSPHRASE;
+
+        ssid_length = sizeof(ssid) - 1U;
+        passphrase_length = sizeof(passphrase) - 1U;
+        if (ssid_length <= sizeof(g_whd_join_ssid))
+        {
+            memcpy(g_whd_join_ssid, ssid, ssid_length);
+        }
+        if (passphrase_length <= sizeof(g_whd_join_passphrase))
+        {
+            memcpy(g_whd_join_passphrase, passphrase, passphrase_length);
+        }
+    }
+#endif
+
+    if ((0U == ssid_length) ||
+        (ssid_length > sizeof(g_whd_join_ssid)) ||
+        (passphrase_length < WHD_JOIN_PASSPHRASE_MIN_BYTES) ||
+        (passphrase_length > sizeof(g_whd_join_passphrase)))
+    {
+        debug_puts("WHD join credentials unavailable or invalid\r\n");
+        whd_secure_zero(g_whd_join_passphrase, sizeof(g_whd_join_passphrase));
+        return false;
+    }
+
+    g_whd_join_ssid_length = (uint32_t)ssid_length;
+    g_whd_join_passphrase_length = (uint32_t)passphrase_length;
+#if WHD_JOIN_USE_KVS
+    debug_puts("WHD join credentials loaded from LittleFS KVS\r\n");
+#else
+    debug_puts("WHD join credentials loaded from build configuration\r\n");
+#endif
+    return true;
+}
+
+static void whd_forget_join_credentials(void)
+{
+    whd_secure_zero(g_whd_join_ssid, sizeof(g_whd_join_ssid));
+    whd_secure_zero(g_whd_join_passphrase, sizeof(g_whd_join_passphrase));
+    g_whd_join_ssid_length = 0U;
+    g_whd_join_passphrase_length = 0U;
+#if WHD_JOIN_USE_KVS
+    KVStore_vClearCachedValue(KVS_WIFI_SSID);
+    KVStore_vClearCachedValue(KVS_WIFI_PASSPHRASE);
+#endif
+}
 
 static void whd_record_stage(uint32_t stage, uint32_t result)
 {
@@ -188,15 +277,13 @@ static void whd_log_mac(const char * label, const whd_mac_t * p_mac)
 #if WHD_SCAN_ENABLE
 static uint32_t whd_ssid_matches_join_target(const whd_ssid_t * p_ssid)
 {
-    const char join_ssid[] = WHD_JOIN_SSID;
-    uint32_t target_len = (uint32_t)(sizeof(join_ssid) - 1U);
-
-    if (p_ssid->length != target_len)
+    if (p_ssid->length != g_whd_join_ssid_length)
     {
         return 0U;
     }
 
-    if (0 != memcmp(p_ssid->value, join_ssid, target_len))
+    if (0 != memcmp(p_ssid->value, g_whd_join_ssid,
+                    g_whd_join_ssid_length))
     {
         return 0U;
     }
@@ -282,7 +369,7 @@ static void whd_log_scan_result(uint32_t index, const whd_sync_scan_result_t * p
 }
 #endif
 
-bool whd_bringup_run(void)
+static bool whd_bringup_run_internal(void)
 {
     whd_init_config_t init_config;
     whd_sdio_config_t sdio_config;
@@ -305,6 +392,13 @@ bool whd_bringup_run(void)
 
     debug_puts("WHD bring-up start\r\n");
     debug_puts("WHD resources linked: fw=TYPE1YN_FW_BLOB nvram=TYPE1YN_NVRAM_BLOB clm=TYPE1YN_CLM_BLOB\r\n");
+
+#if WHD_JOIN_ENABLE
+    if (!whd_load_join_credentials())
+    {
+        return false;
+    }
+#endif
 
     memset(&init_config, 0, sizeof(init_config));
     init_config.thread_stack_start = g_whd_thread_stack;
@@ -406,11 +500,10 @@ bool whd_bringup_run(void)
 #if WHD_JOIN_ENABLE
     {
         whd_ssid_t ssid;
-        const uint8_t passphrase[] = WHD_JOIN_PASSPHRASE;
 
         memset(&ssid, 0, sizeof(ssid));
-        ssid.length = (uint8_t)(sizeof(WHD_JOIN_SSID) - 1U);
-        memcpy(ssid.value, WHD_JOIN_SSID, ssid.length);
+        ssid.length = (uint8_t)g_whd_join_ssid_length;
+        memcpy(ssid.value, g_whd_join_ssid, ssid.length);
 
         whd_record_stage(80U, 0U);
         debug_puts("WHD join start\r\n");
@@ -419,14 +512,16 @@ bool whd_bringup_run(void)
         {
             g_whd_bringup_join_mode = 2U;
             result = whd_wifi_join_specific(g_whd_ifp, &g_target_ap,
-                                            passphrase, (uint8_t)(sizeof(passphrase) - 1U));
+                                            g_whd_join_passphrase,
+                                            (uint8_t)g_whd_join_passphrase_length);
         }
         else
 #endif
         {
             g_whd_bringup_join_mode = 1U;
             result = whd_wifi_join(g_whd_ifp, &ssid, WHD_JOIN_SECURITY,
-                                   passphrase, (uint8_t)(sizeof(passphrase) - 1U));
+                                   g_whd_join_passphrase,
+                                   (uint8_t)g_whd_join_passphrase_length);
         }
         g_whd_bringup_join_result = result;
         whd_record_stage(81U, result);
@@ -510,6 +605,16 @@ bool whd_bringup_run(void)
     whd_record_stage(90U, 0U);
     debug_puts("WHD bring-up done\r\n");
     return true;
+}
+
+bool whd_bringup_run(void)
+{
+    bool result = whd_bringup_run_internal();
+
+#if WHD_JOIN_ENABLE
+    whd_forget_join_credentials();
+#endif
+    return result;
 }
 
 whd_interface_t whd_bringup_get_interface(void)

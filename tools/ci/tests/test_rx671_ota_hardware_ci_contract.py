@@ -64,7 +64,6 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
             "RX671_EK_WIFI_PASSPHRASE",
             "RX671_EK_AWS_IOT_CERT_PEM",
             "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM",
-            "RX671_OTA_ARTIFACT_KEY",
             "RX671_EK_AWS_IOT_ENDPOINT",
             "AWS_IOT_ENDPOINT",
         ):
@@ -72,8 +71,7 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertIn('$env:RX671_OTA_BASELINE_VERSION -ne "0.1.0"', preflight)
         self.assertIn('$env:RX671_OTA_CANDIDATE_VERSION -ne "0.1.1"', preflight)
         self.assertIn('$env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2"', preflight)
-        self.assertIn("$keyBytes -lt 32", preflight)
-        self.assertNotIn("Write-Host $env:RX671_OTA_ARTIFACT_KEY", preflight)
+        self.assertNotIn("RX671_OTA_ARTIFACT_KEY", preflight)
         self.assertIn("tools/plan_rx671_ota.py create", preflight)
         self.assertIn("--plan-job-id \"$env:CI_JOB_ID\"", preflight)
         self.assertIn("ephemeral_thing_plan.json", preflight)
@@ -115,34 +113,30 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
             build.index("$buildArgs.SkipWifiConfig = $true"),
         )
 
-    def test_runtime_bundle_is_pipeline_bound_encrypted_and_plaintext_removed(
+    def test_ota_bundle_is_direct_formal_and_credential_free(
         self,
     ) -> None:
         package = job("package_rx671_ota_artifacts")
-        ordered = (
+        self.assertIn("$manifest.formal -ne $true", package)
+        self.assertIn("$manifest.credentials_embedded -ne $false", package)
+        self.assertIn("littlefs_kvs_runtime_provisioning", package)
+        self.assertNotIn("RX671_EK_WIFI_PASSPHRASE", package)
+        for forbidden in (
             "--runtime-wifi-config",
             "rx671-ota-runtime.tar.enc",
-            "tar -cf",
             "protect_secret_artifact.py",
-            'Remove-Item -LiteralPath "$env:CI_PROJECT_DIR\\build\\rx671-ota"',
-        )
-        positions = [package.index(token) for token in ordered]
-        self.assertEqual(positions, sorted(positions))
-        self.assertIn(
-            '"rx671-ota-runtime-v1:$env:CI_PIPELINE_ID:$env:CI_COMMIT_SHA"',
-            package,
-        )
-        self.assertIn("--secret-env RX671_OTA_ARTIFACT_KEY", package)
-        self.assertNotIn("RX671_EK_WIFI_PASSPHRASE", package)
+            "RX671_OTA_ARTIFACT_KEY",
+            "rx671-ota-secure",
+        ):
+            self.assertNotIn(forbidden, package)
         artifacts = package.split("\n  artifacts:", 1)[1]
         self.assertNotIn("RX671_OTA_PACKAGE_ARTIFACT_PATH", package)
         self.assertIn("- build/rx671-ota/", artifacts)
-        self.assertIn("- build/rx671-ota-secure/", artifacts)
+        self.assertNotIn("rx671-ota-secure", artifacts)
 
     def test_creator_uses_transfer_payload_and_pipeline_owned_alias(self) -> None:
         creator = job("create_rx671_wifi_ota")
         ordered = (
-            "protect_secret_artifact.py decrypt",
             "aws_wifi_rx671_ek.ota.bin",
             "aws_wifi_rx671_ek.ota-signature.der",
             "manage_ephemeral_iot_thing.py create",
@@ -164,18 +158,14 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
             "--created-alias-meta-json \"$ephemeralMeta\"",
             creator,
         )
-        self.assertIn("--secret-env RX671_OTA_ARTIFACT_KEY", creator)
+        self.assertNotIn("RX671_OTA_ARTIFACT_KEY", creator)
+        self.assertNotIn("protect_secret_artifact.py", creator)
+        self.assertIn(
+            '$bundleRoot = Join-Path $env:CI_PROJECT_DIR "build\\rx671-ota"',
+            creator,
+        )
         self.assertNotIn("RX671_EK_WIFI_PASSPHRASE", creator)
-        self.assertIn("Remove-Item -LiteralPath $runtimeDir -Recurse -Force", creator)
-        self.assertIn("icacls.exe $runtimeDir /inheritance:r /grant:r", creator)
-        self.assertIn(
-            "RX671 OTA create plaintext cleanup postcondition failed",
-            creator,
-        )
-        self.assertIn(
-            "RX671 OTA create after_script cleanup postcondition failed",
-            creator,
-        )
+        self.assertNotIn("$runtimeDir", creator)
 
     def test_one_locked_job_owns_provision_baseline_ota_and_park(self) -> None:
         hardware = job("test_rx671_wifi_ota_atomic")
@@ -202,14 +192,21 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertIn("trap park_board EXIT", hardware)
         self.assertIn("after_script:", hardware)
         self.assertIn("after_script_parked.ok", hardware)
-        self.assertIn('rm -rf -- "$runtime_dir"', hardware)
-        self.assertIn('install -d -m 700 "$runtime_dir"', hardware)
-        self.assertIn("runtime_cleanup_failed", hardware)
+        self.assertIn('rm -rf -- "$secret_dir"', hardware)
+        self.assertIn('install -d -m 700 "$secret_dir"', hardware)
+        self.assertIn("secret_cleanup_failed", hardware)
         self.assertIn("after_script_cleanup_failed", hardware)
         self.assertIn("--require-tls-version \"$RX671_OTA_REQUIRE_TLS_VERSION\"", hardware)
         self.assertIn("--baseline-version \"$RX671_OTA_BASELINE_VERSION\"", hardware)
         self.assertIn("--candidate-version \"$RX671_OTA_CANDIDATE_VERSION\"", hardware)
-        self.assertIn("--secret-env RX671_OTA_ARTIFACT_KEY", hardware)
+        self.assertIn("--wifi-ssid-env RX671_EK_WIFI_SSID", hardware)
+        self.assertIn(
+            "--wifi-passphrase-env RX671_EK_WIFI_PASSPHRASE",
+            hardware,
+        )
+        self.assertIn('bundle_root="$CI_PROJECT_DIR/build/rx671-ota"', hardware)
+        self.assertNotIn("RX671_OTA_ARTIFACT_KEY", hardware)
+        self.assertNotIn("protect_secret_artifact.py", hardware)
         self.assertIn("tools/plan_rx671_ota.py verify", hardware)
         self.assertIn("ota_hardware_success.ok", hardware)
         self.assertNotIn(

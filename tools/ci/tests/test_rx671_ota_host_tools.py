@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import inspect
 import re
 import subprocess
 import tempfile
@@ -120,6 +121,17 @@ class RfpContractTests(unittest.TestCase):
             )
         self.assertEqual([], rejected.writes)
 
+    def test_mutable_ascii_command_is_sent_without_string_conversion(self):
+        command = bytearray(b"conf sethex wifipass 0011")
+        serial = FakeSerial()
+        host.send_ascii_bytes_command(
+            serial,
+            command,
+            timeout=1,
+            char_delay=0,
+        )
+        self.assertEqual(bytes(command) + b"\r\n", b"".join(serial.writes))
+
     def test_rfp_timeout_does_not_disclose_command_or_auth_id(self):
         secret = "DO_NOT_DISCLOSE_AUTH_ID"
 
@@ -201,6 +213,71 @@ class RfpContractTests(unittest.TestCase):
 
 
 class ProvisioningContractTests(unittest.TestCase):
+    def test_wifi_environment_validation_uses_utf8_octet_limits(self):
+        ssid, passphrase = provision._wifi_credentials_from_environment(
+            "SSID",
+            "PASS",
+            {"SSID": "あ" * 10, "PASS": "password"},
+        )
+        self.assertEqual(30, len(ssid))
+        self.assertEqual(8, len(passphrase))
+        with self.assertRaisesRegex(ValueError, "1..32"):
+            provision._wifi_credentials_from_environment(
+                "SSID",
+                "PASS",
+                {"SSID": "あ" * 11, "PASS": "password"},
+            )
+        with self.assertRaisesRegex(ValueError, "8..63"):
+            provision._wifi_credentials_from_environment(
+                "SSID",
+                "PASS",
+                {"SSID": "ssid", "PASS": "short"},
+            )
+
+    def test_invalid_wifi_bytearrays_are_zeroized_before_error(self):
+        zeroized = []
+
+        def capture(value):
+            zeroized.append(bytes(value))
+            for index in range(len(value)):
+                value[index] = 0
+
+        with mock.patch.object(provision, "_zeroize", side_effect=capture):
+            with self.assertRaisesRegex(ValueError, "1..32"):
+                provision._wifi_credentials_from_environment(
+                    "SSID",
+                    "PASS",
+                    {"SSID": "x" * 33, "PASS": "password"},
+                )
+        self.assertEqual([b"x" * 33, b"password"], zeroized)
+
+    def test_wifi_hex_command_buffers_are_zeroized_after_send(self):
+        command_references = []
+
+        def capture(_serial, command, **_kwargs):
+            command_references.append(command)
+            return b"OK"
+
+        with mock.patch.dict(
+            provision.os.environ,
+            {"SSID": "access-point", "PASS": "secret-passphrase"},
+        ), mock.patch.object(
+            provision,
+            "send_ascii_bytes_command",
+            side_effect=capture,
+        ):
+            provision._set_wifi_credentials(
+                object(),
+                ssid_variable="SSID",
+                passphrase_variable="PASS",
+                char_delay=0,
+                timeout=1,
+            )
+
+        self.assertEqual(2, len(command_references))
+        self.assertTrue(all(not any(command) for command in command_references))
+        self.assertNotIn(".hex()", inspect.getsource(provision._set_wifi_credentials))
+
     def test_enter_cli_terminates_command_with_crlf(self):
         serial = FakeSerial()
         with mock.patch.object(
@@ -265,21 +342,40 @@ class ProvisioningContractTests(unittest.TestCase):
                 private_key=files["device.key"],
                 codesigner_certificate=files["signer.crt"],
                 codesigner_public_key=files["signer.pub"],
+                wifi_ssid_env="TEST_WIFI_SSID",
+                wifi_passphrase_env="TEST_WIFI_PASSPHRASE",
             )
             serial = FakeSerial()
             commands = []
+            wifi_commands = []
+            wifi_ssid = "test-access-point"
+            wifi_passphrase = "do-not-log-this-passphrase"
 
             def capture(command, **_kwargs):
                 commands.append(command)
                 return mock.Mock(returncode=0)
 
-            with mock.patch.object(
+            def capture_wifi(_serial, command, **_kwargs):
+                wifi_commands.append(bytes(command))
+                return b"OK"
+
+            with mock.patch.dict(
+                provision.os.environ,
+                {
+                    "TEST_WIFI_SSID": wifi_ssid,
+                    "TEST_WIFI_PASSPHRASE": wifi_passphrase,
+                },
+            ), mock.patch.object(
                 provision, "run_checked", side_effect=capture
             ) as run_command, mock.patch.object(
                 provision, "open_serial", return_value=serial
             ), mock.patch.object(provision, "enter_cli"), mock.patch.object(
                 provision, "send_ascii_command", return_value=b"OK"
-            ) as send_command:
+            ) as send_command, mock.patch.object(
+                provision,
+                "send_ascii_bytes_command",
+                side_effect=capture_wifi,
+            ):
                 summary = provision.provision(args)
             self.assertTrue(summary["success"])
             self.assertEqual(3, len(commands))
@@ -299,7 +395,30 @@ class ProvisioningContractTests(unittest.TestCase):
                 ["conf get endpoint", "conf get thingname"],
                 get_commands,
             )
+            self.assertIn(
+                b"conf sethex wifissid " + wifi_ssid.encode("utf-8").hex().encode(),
+                wifi_commands,
+            )
+            self.assertIn(
+                b"conf sethex wifipass "
+                + wifi_passphrase.encode("utf-8").hex().encode(),
+                wifi_commands,
+            )
+            self.assertFalse(
+                any(wifi_passphrase.encode() in command for command in wifi_commands)
+            )
+            self.assertFalse(
+                any(
+                    call.args[1] == "conf get wifipass"
+                    for call in send_command.call_args_list
+                )
+            )
             self.assertFalse(summary["pem_readback_performed"])
+            self.assertFalse(summary["wifi_passphrase_readback_performed"])
+            self.assertEqual(
+                "environment_to_sci6_to_littlefs",
+                summary["wifi_credentials_source"],
+            )
             self.assertEqual(
                 "delegated_to_bootloader_tls_and_ota_signature",
                 summary["pem_verification"],
@@ -316,6 +435,27 @@ class ProvisioningContractTests(unittest.TestCase):
 
 
 class OtaTransactionContractTests(unittest.TestCase):
+    def test_capacity_cli_defaults_are_explicit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rsu = root / "baseline.rsu"
+            rsu.write_bytes(b"x")
+            args = ota_test.parse_args(
+                [
+                    "--baseline-rsu",
+                    str(rsu),
+                    "--raw-log",
+                    str(root / "raw.log"),
+                    "--summary-json",
+                    str(root / "summary.json"),
+                    "--junit-output",
+                    str(root / "junit.xml"),
+                ]
+            )
+            self.assertEqual(16384, args.min_capacity_heap_bytes)
+            self.assertEqual(4, args.min_capacity_network_buffers)
+            self.assertEqual(8, args.expected_whd_buffer_count)
+
     def test_requires_exact_raw_rsu_size(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -369,6 +509,58 @@ class OtaTransactionContractTests(unittest.TestCase):
                 transaction._consume(line.encode("ascii"))
             self.assertTrue(transaction.ota.has_marker("image_committed"))
             self.assertIn("TLSv1.2", transaction.ota.tls_versions_seen)
+
+    def test_requires_capacity_headroom_after_activation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                min_capacity_heap_bytes=16384,
+                min_capacity_network_buffers=4,
+                expected_whd_buffer_count=8,
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            transaction._consume(b"Activate Image event Received\r\n")
+            transaction._consume(
+                b"[RX671_OTA_CAPACITY] minheap=16384 minnbuf=4 whdmax=7 "
+                b"tempfail=0 permfail=0 waitloop=0\r\n"
+            )
+            proof = transaction._capacity_proof()
+            self.assertTrue(proof["success"])
+            self.assertEqual(16384, proof["metrics"]["min_heap_bytes"])
+            self.assertEqual(8, proof["thresholds"]["whd_buffer_count"])
+
+    def test_rejects_missing_or_exhausted_capacity_headroom(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                min_capacity_heap_bytes=16384,
+                min_capacity_network_buffers=4,
+                expected_whd_buffer_count=8,
+            )
+            missing = ota_test.Rx671OtaTransaction(args)
+            missing._consume(b"Activate Image event Received\r\n")
+            self.assertFalse(missing._capacity_proof()["success"])
+
+            exhausted = ota_test.Rx671OtaTransaction(args)
+            exhausted._consume(b"Activate Image event Received\r\n")
+            exhausted._consume(
+                b"[RX671_OTA_CAPACITY] minheap=0 minnbuf=0 whdmax=8 "
+                b"tempfail=1 permfail=1 waitloop=1\r\n"
+            )
+            proof = exhausted._capacity_proof()
+            self.assertFalse(proof["success"])
+            self.assertFalse(proof["checks"]["minimum_heap_met"])
+            self.assertFalse(proof["checks"]["minimum_network_buffers_met"])
+            self.assertFalse(proof["checks"]["whd_pool_not_exhausted"])
+            self.assertFalse(proof["checks"]["whd_temporary_failures_zero"])
+            self.assertFalse(proof["checks"]["whd_permanent_failures_zero"])
+            self.assertFalse(proof["checks"]["whd_wait_loops_zero"])
 
 
 if __name__ == "__main__":

@@ -37,6 +37,10 @@
 #define WHD_JOIN_PASSPHRASE            ""
 #endif
 
+#ifndef WHD_JOIN_USE_KVS
+#define WHD_JOIN_USE_KVS               (0)
+#endif
+
 #ifndef WHD_JOIN_SECURITY
 #define WHD_JOIN_SECURITY              WHD_SECURITY_WPA2_AES_PSK
 #endif

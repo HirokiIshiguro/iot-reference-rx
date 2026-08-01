@@ -90,7 +90,9 @@
 
 #define democonfigROOT_CA_PEM               tlsATS1_ROOT_CERTIFICATE_PEM
 #define MQTT_AGENT_COMMAND_QUEUE_LENGTH     (25)
+#ifndef MQTT_AGENT_NETWORK_BUFFER_SIZE
 #define MQTT_AGENT_NETWORK_BUFFER_SIZE      (32768)
+#endif
 #define MQTT_COMMAND_CONTEXTS_POOL_SIZE     (10)
 /*
  * The bank.single provisioner is the only image that owns SCI6 and enables

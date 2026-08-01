@@ -17,6 +17,27 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.demo = (PROJECT / "src/frtos_config/demo_config.h").read_text(
             encoding="utf-8"
         )
+        cls.whd = (PROJECT / "src/whd_bringup.c").read_text(
+            encoding="utf-8"
+        )
+        cls.whd_config = (PROJECT / "src/whd_join_config.h").read_text(
+            encoding="utf-8"
+        )
+        cls.store_header = (ROOT / "Demos/cli/store.h").read_text(
+            encoding="utf-8"
+        )
+        cls.cli = (ROOT / "Demos/cli/CLIcommands.c").read_text(
+            encoding="utf-8"
+        )
+        cls.console = (ROOT / "Demos/cli/UARTCommandConsole.c").read_text(
+            encoding="utf-8"
+        )
+        cls.freertos_cli = (
+            ROOT / "Middleware/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c"
+        ).read_text(encoding="utf-8")
+        cls.builder = (ROOT / "tools/build_headless_rx671_wifi.ps1").read_text(
+            encoding="utf-8"
+        )
 
     def test_checked_in_defaults_preserve_normal_runtime(self) -> None:
         self.assertIn(
@@ -70,6 +91,48 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             "#if (RX671_OTA_RUNTIME_ENABLE == 1)\n"
             "        result = xTaskCreate(ota_start_task,",
             self.main,
+        )
+
+    def test_wifi_credentials_are_runtime_provisioned_and_passphrase_is_forgotten(
+        self,
+    ) -> None:
+        self.assertIn("KVS_WIFI_SSID", self.store_header)
+        self.assertIn("KVS_WIFI_PASSPHRASE", self.store_header)
+        self.assertIn("conf sethex {wifissid|wifipass}", self.cli)
+        self.assertIn('"Wi-Fi SSID"', self.cli)
+        self.assertIn('"Wi-Fi passphrase"', self.cli)
+        self.assertIn("configured; readback disabled", self.cli)
+        self.assertIn('"conf sethex wifissid "', self.console)
+        self.assertIn('"conf sethex wifipass "', self.console)
+        self.assertIn("A blank line must never repeat a credential command", self.console)
+        self.assertIn("prvSecureZero(cInputString", self.console)
+        self.assertIn("xWriteBufferLen - 1U", self.freertos_cli)
+        self.assertIn("pcWriteBuffer[xWriteBufferLen - 1U] = '\\0'", self.freertos_cli)
+        self.assertIn("WHD_JOIN_USE_KVS", self.whd_config)
+        self.assertIn("xReadEntry(KVS_WIFI_SSID", self.whd)
+        self.assertIn("xReadEntry(KVS_WIFI_PASSPHRASE", self.whd)
+        self.assertIn("KVStore_vClearCachedValue(KVS_WIFI_SSID)", self.whd)
+        self.assertIn("KVStore_vClearCachedValue(KVS_WIFI_PASSPHRASE)", self.whd)
+        self.assertIn("whd_secure_zero(g_whd_join_ssid", self.whd)
+        self.assertIn("whd_secure_zero(g_whd_join_passphrase", self.whd)
+        self.assertIn("-UseKvsJoinConfig", self.builder)
+        self.assertIn("$generatedLocalJoinConfig = $true", self.builder)
+        self.assertIn("$generatedLocalAwsIotConfig = $true", self.builder)
+        self.assertLess(
+            self.builder.index("$generatedLocalJoinConfig = $true"),
+            self.builder.index("Write-LocalJoinConfig -Path"),
+        )
+        self.assertLess(
+            self.builder.index("$generatedLocalAwsIotConfig = $true"),
+            self.builder.index("Write-LocalAwsIotConfig -Path"),
+        )
+        self.assertIn(
+            "Failed to restore or remove a generated local credential header",
+            self.builder,
+        )
+        self.assertLess(
+            self.main.index("ota_runtime_prepare()"),
+            self.main.index("whd_bringup_run()"),
         )
 
 

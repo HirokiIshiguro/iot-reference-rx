@@ -36,11 +36,13 @@ AWS OTAの実機成功を証明しない。したがって、これだけを根�
 | RAM初期値section | 従来section | `PFRAM2=RPFRAM2`を追加し、`PFRAM2`をmain image groupへ含める |
 | image version | `demo_config.h`既定値 | `APP_VERSION_*`で`0.1.0` / `0.1.1`を明示 |
 | runtime | MQTT/Fleet/LANBENCHの通常分岐 | `RX671_OTA_RUNTIME_ENABLE=1`でMQTT Agent + OTA demoを自動起動 |
+| OTA download block | library既定値 | `4096` byte（8 KiB MQTT受信bufferにJSON/Base64応答も収容） |
 
 別途、資格情報投入専用のprovisionerを正規`bank.single`配置で生成する。
 `RX671_OTA_PROVISIONER_ENABLE=1`のときはWHD/IPを開始せず、LittleFS/KVS初期化後に
 共通CLIをSCI6へ常駐させる。`cert`、`key`、`thingname`、`endpoint`、
-`codesigncert`、`codesignpubkey`を`conf set` / `commit`で保存できる。
+`codesigncert`、`codesignpubkey`を`conf set` / `commit`で保存できる。Wi-Fiは
+`wifissid`と`wifipass`を`conf sethex`で保存し、両方のreadbackを禁止する。
 
 通常プロジェクトがLinear / `bank.single`であることと、OTA成果物がdual-bank
 配置であることは両立させる。前者は開発・ネットワーク試験の既存動作を維持し、
@@ -85,7 +87,10 @@ RX671の8 KiB Data Flash（`0x00100000`–`0x00101FFF`）はLittleFSの単独所
 
 FWUP header / descriptorはcode flashに置く。bootloader署名公開鍵はLittleFS
 から読み、raw Data Flash install、raw key-store、OTA Data Flash payloadを
-使わない。
+使わない。Wi-Fi SSID/passphraseも同じLittleFSへSCI6から実行時に
+provisioningする。code flash書換えとbank swapではData Flashを保持するため、
+baselineとcandidateは資格情報を含まない同一形式のfirmwareのまま、保存済み値を
+利用できる。
 
 ## 5. 一時profileと復元契約
 
@@ -102,7 +107,7 @@ FWUP header / descriptorはcode flashに置く。bootloader署名公開鍵はLit
 失敗とする。
 
 正式なprovenanceはclean treeだけを受け付ける。`--allow-dirty`はローカルでの
-調査用であり、manifestに`dirty=true`を残すため正式なPASS証跡に採用しない。
+調査用であり、manifestに`dirty=true` / `formal=false`を残すため正式なPASS証跡に採用しない。
 formal buildの入力submoduleは、開始時・各build後・終了時にgitlinkとの一致と
 worktree cleanを確認し、全gitlink SHAをmanifestへ記録する。
 WHD portability patchがgitlinkへ未収録の場合はcleanなWHDへ既知patchだけを一時
@@ -111,6 +116,8 @@ WHD portability patchがgitlinkへ未収録の場合はcleanなWHDへ既知patch
 OTA成果物へ実機ネットワーク秘密を混入させないため、OTA helperは子buildから
 `RX671_EK_WIFI_SSID` / `RX671_EK_WIFI_PASSPHRASE` /
 `RX671_EK_WIFI_PASSWORD`を除外し、Wi-Fi/AWS local configを明示的に無効化する。
+一方で`WHD_JOIN_USE_KVS=1`を一時設定し、値をcompileせずLittleFSから読むruntime
+経路をbaseline/candidateの双方へ入れる。
 共有Runnerに残ったignored JOIN headerはbuild中に隔離して終了時に削除し、生成した
 MOT / ABS / MAP / RSUに設定済みWi-Fi credentialが残っていないことも検査する。
 
@@ -135,11 +142,13 @@ python tools/build_rx671_ota_images.py `
   --workspace-root $env:E2STUDIO_WORKSPACE_RX671_OTA
 ```
 
-この既定コマンドは資格情報を含まない正式成果物を生成する。focused実機jobだけは
-`--runtime-wifi-config`を追加でき、その場合は
-`RX671_EK_WIFI_SSID` / `RX671_EK_WIFI_PASSPHRASE`を一時JOIN headerへ注入する。
-manifestは`formal=false` / `credentials_embedded=true`となり、この実機用imageを
-CI artifactとして公開してはならない。
+このコマンドは常に資格情報を含まない正式成果物を生成する。manifestは
+`formal=true` / `credentials_embedded=false` /
+`wifi_credentials_source=littlefs_kvs_runtime_provisioning`を記録する。focused実機
+jobは同じ`build/rx671-ota/`を直接受け取り、firmwareのbuild後にSSID/passphraseを
+内容をログへ出さないmutable bufferでhex化し、SCI6からLittleFSへ保存する。host側
+の値・command bufferは送信後にzeroizeする。したがってOTA専用AES-GCM搬送鍵
+`RX671_OTA_ARTIFACT_KEY`は不要である。
 
 `build/rx671-ota/`には少なくとも次を含める。
 
@@ -165,6 +174,8 @@ buildのMOT / MAP / RSU / signer certificate / effective config / provenanceを
 
 - `.cproject=bank.dual`かつBSP Dual mode
 - main/buffer、768 KiB install area、`main+0x300`、vector、bootloader予約の一致
+- CC-RX map上のRAM終端がRX671の384 KiB上限以内であること
+- OTA download blockのJSON/Base64最大応答がMQTT Agent受信buffer以内であること
 - アプリとWHD 3資材が1個のinstall area内に収まること
 - WHD実blob sizeとmanifest SHA-256の一致
 - RX671専用bootloader map/MOT、設定、submodule SHAの一致

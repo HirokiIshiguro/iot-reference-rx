@@ -1737,27 +1737,25 @@ package_rx671_ota_artifacts:
     - Write-Host "=== Build RX671 OTA baseline/candidate signed artifacts ==="
     - |
       # A killed previous job cannot run finally/after_script. Remove every
-      # known plaintext location before the compiler sees credentials again.
-      $stalePlaintext = @(
+      # known transient build location before creating a new formal bundle.
+      $staleBuildState = @(
         (Join-Path $env:CI_PROJECT_DIR "build\rx671-ota"),
-        (Join-Path $env:CI_PROJECT_DIR "build\rx671-ota-secure"),
-        (Join-Path $env:CI_PROJECT_DIR "build\rx671-ota-runtime.tar"),
         (Join-Path $env:CI_PROJECT_DIR "Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"),
         $env:E2STUDIO_WORKSPACE_RX671_OTA
       )
-      foreach ($path in $stalePlaintext) {
+      foreach ($path in $staleBuildState) {
         if (-not [string]::IsNullOrWhiteSpace($path) -and
             (Test-Path -LiteralPath $path)) {
           Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
         }
       }
-      $residualPlaintext = $stalePlaintext |
+      $residualBuildState = $staleBuildState |
         Where-Object {
           -not [string]::IsNullOrWhiteSpace($_) -and
           (Test-Path -LiteralPath $_)
         }
-      if ($residualPlaintext.Count -ne 0) {
-        throw "RX671 OTA stale plaintext pre-clean failed"
+      if ($residualBuildState.Count -ne 0) {
+        throw "RX671 OTA stale build-state pre-clean failed"
       }
     - python -m pip install --user cryptography
     - |
@@ -1792,53 +1790,29 @@ package_rx671_ota_artifacts:
         "--e2studio", "$env:E2STUDIO_CLI",
         "--workspace-root", "$env:E2STUDIO_WORKSPACE_RX671_OTA"
       )
-      if ($env:RUN_RX671_OTA_TEST -eq "true" -and
-          $env:RX671_WIFI_TEST_SCOPE -eq "ota") {
-        $otaBuildArgs += "--runtime-wifi-config"
-      }
       python @otaBuildArgs
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       if (-not (Test-Path -LiteralPath "$env:CI_PROJECT_DIR\build\rx671-ota")) {
         throw "RX671 OTA artifact directory missing"
       }
-      $runtimeOtaBuild = (
-        $env:RUN_RX671_OTA_TEST -eq "true" -and
-        $env:RX671_WIFI_TEST_SCOPE -eq "ota"
-      )
       $hardwareDebug = Join-Path $env:CI_PROJECT_DIR "Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"
       $otaWorkspace = $env:E2STUDIO_WORKSPACE_RX671_OTA
-      if ($runtimeOtaBuild) {
-        $secureDir = "$env:CI_PROJECT_DIR\build\rx671-ota-secure"
-        $archive = "$env:CI_PROJECT_DIR\build\rx671-ota-runtime.tar"
-        $encrypted = Join-Path $secureDir "rx671-ota-runtime.tar.enc"
-        $context = "rx671-ota-runtime-v1:$env:CI_PIPELINE_ID:$env:CI_COMMIT_SHA"
-        New-Item -ItemType Directory -Force -Path $secureDir | Out-Null
-        try {
-          tar -cf "$archive" -C "$env:CI_PROJECT_DIR\build" "rx671-ota"
-          if ($LASTEXITCODE -ne 0) { throw "RX671 OTA runtime archive creation failed" }
-          python tools/ci/protect_secret_artifact.py encrypt `
-            --input "$archive" `
-            --output "$encrypted" `
-            --secret-env RX671_OTA_ARTIFACT_KEY `
-            --context "$context"
-          if ($LASTEXITCODE -ne 0) { throw "RX671 OTA runtime artifact encryption failed" }
-          [ordered]@{
-            format = "rx671-ota-encrypted-runtime-v1"
-            pipeline_id = $env:CI_PIPELINE_ID
-            commit_sha = $env:CI_COMMIT_SHA
-            encryption_context = $context
-            plaintext_archive_sha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-            encrypted_archive_sha256 = (Get-FileHash -LiteralPath $encrypted -Algorithm SHA256).Hash.ToLowerInvariant()
-          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $secureDir "manifest.json") -Encoding ascii
-        } finally {
-          Remove-Item -LiteralPath "$env:CI_PROJECT_DIR\build\rx671-ota" -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item -LiteralPath "$archive" -Force -ErrorAction SilentlyContinue
-        }
-        if ((Test-Path -LiteralPath "$env:CI_PROJECT_DIR\build\rx671-ota") -or
-            (Test-Path -LiteralPath "$archive") -or
-            (-not (Test-Path -LiteralPath "$encrypted"))) {
-          throw "RX671 OTA runtime plaintext cleanup or encrypted artifact verification failed"
+      $provenanceManifests = @(
+        Get-ChildItem -LiteralPath "$env:CI_PROJECT_DIR\build\rx671-ota" `
+          -Filter "ota-layout-provenance.json" -File -Recurse
+      )
+      if ($provenanceManifests.Count -ne 2) {
+        throw "RX671 OTA baseline/candidate provenance manifests are missing"
+      }
+      foreach ($manifestPath in $provenanceManifests) {
+        $manifest = Get-Content -LiteralPath $manifestPath.FullName -Raw | ConvertFrom-Json
+        if (($manifest.formal -ne $true) -or
+            ($manifest.dirty -ne $false) -or
+            ($manifest.source_sha -ne $env:CI_COMMIT_SHA) -or
+            ($manifest.credentials_embedded -ne $false) -or
+            ($manifest.wifi_credentials_source -ne "littlefs_kvs_runtime_provisioning")) {
+          throw "RX671 OTA artifact is not credential-free formal firmware: $($manifestPath.FullName)"
         }
       }
       foreach ($path in @($hardwareDebug, $otaWorkspace)) {
@@ -1858,20 +1832,10 @@ package_rx671_ota_artifacts:
     - Write-Host "PACKAGE RX671 OTA ARTIFACTS SUCCESS"
   after_script:
     - |
-      $runtimeOtaBuild = (
-        $env:RUN_RX671_OTA_TEST -eq "true" -and
-        $env:RX671_WIFI_TEST_SCOPE -eq "ota"
-      )
       $cleanupTargets = @(
         (Join-Path $env:CI_PROJECT_DIR "Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"),
         $env:E2STUDIO_WORKSPACE_RX671_OTA
       )
-      if ($runtimeOtaBuild) {
-        $cleanupTargets += @(
-          (Join-Path $env:CI_PROJECT_DIR "build\rx671-ota"),
-          (Join-Path $env:CI_PROJECT_DIR "build\rx671-ota-runtime.tar")
-        )
-      }
       foreach ($path in $cleanupTargets) {
         if (-not [string]::IsNullOrWhiteSpace($path) -and
             (Test-Path -LiteralPath $path)) {
@@ -1890,8 +1854,7 @@ package_rx671_ota_artifacts:
     when: always
     paths:
       - build/rx671-ota/
-      - build/rx671-ota-secure/
-    expire_in: 1 day
+    expire_in: 7 days
 
 create_rx671_wifi_ota:
   stage: ota_create
@@ -1916,22 +1879,8 @@ create_rx671_wifi_ota:
       $planDir = Join-Path $env:CI_PROJECT_DIR "artifacts\preflight_rx671_wifi_ota"
       $planJson = Join-Path $planDir "ota_plan.json"
       $aliasPlanJson = Join-Path $planDir "ephemeral_thing_plan.json"
-      $runtimeDir = Join-Path $env:CI_PROJECT_DIR ".rx671-ota-create"
-      $secureDir = Join-Path $env:CI_PROJECT_DIR "build\rx671-ota-secure"
-      $secureManifestPath = Join-Path $secureDir "manifest.json"
-      $encryptedArchive = Join-Path $secureDir "rx671-ota-runtime.tar.enc"
-      $plaintextArchive = Join-Path $runtimeDir "rx671-ota-runtime.tar"
+      $bundleRoot = Join-Path $env:CI_PROJECT_DIR "build\rx671-ota"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-      if (Test-Path -LiteralPath $runtimeDir) {
-        Remove-Item -LiteralPath $runtimeDir -Recurse -Force -ErrorAction Stop
-      }
-      New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
-      $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-      & icacls.exe $runtimeDir /inheritance:r /grant:r "${currentIdentity}:(OI)(CI)F" | Out-Null
-      if ($LASTEXITCODE -ne 0) {
-        throw "RX671 OTA create runtime directory ACL restriction failed"
-      }
-      try {
       if ([string]::IsNullOrWhiteSpace($env:RX671_OTA_PLAN_JOB_ID)) {
         throw "RX671 OTA preflight dotenv identity is missing."
       }
@@ -1952,33 +1901,7 @@ create_rx671_wifi_ota:
         throw "RX671 OTA preflight journal does not belong to this pipeline."
       }
       $otaPlan = Get-Content -LiteralPath $planJson -Raw | ConvertFrom-Json
-      if (-not (Test-Path -LiteralPath $secureManifestPath) -or
-          -not (Test-Path -LiteralPath $encryptedArchive)) {
-        throw "Encrypted RX671 OTA runtime bundle is missing."
-      }
-      $secureManifest = Get-Content -LiteralPath $secureManifestPath -Raw | ConvertFrom-Json
-      $expectedContext = "rx671-ota-runtime-v1:$env:CI_PIPELINE_ID:$env:CI_COMMIT_SHA"
-      if ($secureManifest.format -ne "rx671-ota-encrypted-runtime-v1" -or
-          $secureManifest.pipeline_id -ne $env:CI_PIPELINE_ID -or
-          $secureManifest.commit_sha -ne $env:CI_COMMIT_SHA -or
-          $secureManifest.encryption_context -ne $expectedContext) {
-        throw "Encrypted RX671 OTA runtime bundle does not belong to this pipeline/commit."
-      }
-      python tools/ci/protect_secret_artifact.py decrypt `
-        --input "$encryptedArchive" `
-        --output "$plaintextArchive" `
-        --secret-env RX671_OTA_ARTIFACT_KEY `
-        --context "$expectedContext"
-      if ($LASTEXITCODE -ne 0) { throw "RX671 OTA runtime artifact decryption failed" }
-      $actualArchiveSha = (Get-FileHash -LiteralPath $plaintextArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-      if ($actualArchiveSha -ne $secureManifest.plaintext_archive_sha256) {
-        throw "Decrypted RX671 OTA runtime archive digest mismatch."
-      }
-      tar -xf "$plaintextArchive" -C "$runtimeDir"
-      if ($LASTEXITCODE -ne 0) { throw "RX671 OTA runtime archive extraction failed" }
-      Remove-Item -LiteralPath "$plaintextArchive" -Force
-
-      $candidateDir = Join-Path $runtimeDir "rx671-ota\candidate-$env:RX671_OTA_CANDIDATE_VERSION"
+      $candidateDir = Join-Path $bundleRoot "candidate-$env:RX671_OTA_CANDIDATE_VERSION"
       $payload = Join-Path $candidateDir "aws_wifi_rx671_ek.ota.bin"
       $signature = Join-Path $candidateDir "aws_wifi_rx671_ek.ota-signature.der"
       $signerCertificate = Join-Path $candidateDir "rx671-ota-signer.crt.pem"
@@ -2053,29 +1976,11 @@ create_rx671_wifi_ota:
       if ($LASTEXITCODE -ne 0) {
         throw "RX671 OTA create journal does not match the preflight identity."
       }
-      } finally {
-        if (Test-Path -LiteralPath $runtimeDir) {
-          Remove-Item -LiteralPath $runtimeDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        if (Test-Path -LiteralPath $runtimeDir) {
-          throw "RX671 OTA create plaintext cleanup postcondition failed"
-        }
-      }
   artifacts:
     when: always
     paths:
       - artifacts/create_rx671_wifi_ota/
     expire_in: 7 days
-  after_script:
-    - |
-      $runtimeDir = Join-Path $env:CI_PROJECT_DIR ".rx671-ota-create"
-      if (Test-Path -LiteralPath $runtimeDir) {
-        Remove-Item -LiteralPath $runtimeDir -Recurse -Force -ErrorAction SilentlyContinue
-      }
-      if (Test-Path -LiteralPath $runtimeDir) {
-        throw "RX671 OTA create after_script cleanup postcondition failed"
-      }
-
 build_rx65n_bg96_fleet:
   stage: build
   tags:
@@ -2365,8 +2270,7 @@ preflight_rx671_wifi_ota:
         "RX671_EK_WIFI_SSID",
         "RX671_EK_WIFI_PASSPHRASE",
         "RX671_EK_AWS_IOT_CERT_PEM",
-        "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM",
-        "RX671_OTA_ARTIFACT_KEY"
+        "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM"
       )
       $missing = @(
         $requiredVariables |
@@ -2392,15 +2296,6 @@ preflight_rx671_wifi_ota:
       }
       if ($env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2") {
         throw "RX671 OTA proof is pinned to TLSv1.2"
-      }
-      $keyReference = $env:RX671_OTA_ARTIFACT_KEY
-      $keyBytes = if (Test-Path -LiteralPath $keyReference -PathType Leaf) {
-        (Get-Item -LiteralPath $keyReference).Length
-      } else {
-        [Text.Encoding]::UTF8.GetByteCount($keyReference)
-      }
-      if ($keyBytes -lt 32) {
-        throw "RX671_OTA_ARTIFACT_KEY must contain at least 32 bytes"
       }
     - |
       $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\preflight_rx671_wifi_ota"
@@ -4318,13 +4213,9 @@ test_rx671_wifi_ota_atomic:
     - |
       set -e
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_ota_atomic"
-      runtime_dir="$CI_PROJECT_DIR/.rx671-ota-runtime"
-      secure_dir="$CI_PROJECT_DIR/build/rx671-ota-secure"
-      secure_manifest="$secure_dir/manifest.json"
-      encrypted_archive="$secure_dir/rx671-ota-runtime.tar.enc"
-      plaintext_archive="$runtime_dir/rx671-ota-runtime.tar"
+      secret_dir="$CI_PROJECT_DIR/.rx671-ota-secrets"
       park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
-      bundle_root="$runtime_dir/rx671-ota"
+      bundle_root="$CI_PROJECT_DIR/build/rx671-ota"
       provisioner_mot="$bundle_root/provisioner/aws_wifi_rx671_ek.mot"
       bootloader_mot="$bundle_root/bootloader/boot_loader_rx671_ek.mot"
       baseline_dir="$bundle_root/baseline-$RX671_OTA_BASELINE_VERSION"
@@ -4337,40 +4228,40 @@ test_rx671_wifi_ota_atomic:
       alias_plan="$plan_dir/ephemeral_thing_plan.json"
       alias_meta="$create_dir/ephemeral_thing_meta.json"
       ota_meta="$create_dir/ota_job_meta.json"
-      device_cert="$runtime_dir/device-certificate.pem"
-      device_key="$runtime_dir/device-private-key.pem"
-      case "$runtime_dir" in
-        "$CI_PROJECT_DIR"/.rx671-ota-runtime) ;;
+      device_cert="$secret_dir/device-certificate.pem"
+      device_key="$secret_dir/device-private-key.pem"
+      case "$secret_dir" in
+        "$CI_PROJECT_DIR"/.rx671-ota-secrets) ;;
         *)
-          echo "Refusing unexpected RX671 OTA runtime path: $runtime_dir" >&2
+          echo "Refusing unexpected RX671 OTA secret path: $secret_dir" >&2
           exit 1
           ;;
       esac
-      rm -rf -- "$runtime_dir"
-      if [ -e "$runtime_dir" ] || [ -L "$runtime_dir" ]; then
-        echo "RX671 OTA stale plaintext pre-clean failed." >&2
+      rm -rf -- "$secret_dir"
+      if [ -e "$secret_dir" ] || [ -L "$secret_dir" ]; then
+        echo "RX671 OTA stale secret pre-clean failed." >&2
         exit 1
       fi
       mkdir -p "$artifact_dir"
-      install -d -m 700 "$runtime_dir"
+      install -d -m 700 "$secret_dir"
 
       park_board() {
         original_status=$?
         trap - EXIT
         set +e
-        rm -rf -- "$runtime_dir"
-        runtime_cleanup_status=$?
-        if [ -e "$runtime_dir" ] || [ -L "$runtime_dir" ]; then
-          runtime_cleanup_status=1
+        rm -rf -- "$secret_dir"
+        secret_cleanup_status=$?
+        if [ -e "$secret_dir" ] || [ -L "$secret_dir" ]; then
+          secret_cleanup_status=1
         fi
-        if [ "$runtime_cleanup_status" -ne 0 ]; then
-          echo "Failed to remove RX671 OTA runtime plaintext." >&2
-          touch "$artifact_dir/runtime_cleanup_failed"
+        if [ "$secret_cleanup_status" -ne 0 ]; then
+          echo "Failed to remove RX671 OTA materialized secrets." >&2
+          touch "$artifact_dir/secret_cleanup_failed"
           if [ "$original_status" -eq 0 ]; then
             original_status=1
           fi
         else
-          touch "$artifact_dir/runtime_cleanup.ok"
+          touch "$artifact_dir/secret_cleanup.ok"
         fi
         echo "=== Park EK-RX671 on the normal claim-free Wi-Fi image ===" | tee "$artifact_dir/park.log"
         "$RX671_WIFI_LINUX_RFP_CLI" \
@@ -4403,45 +4294,6 @@ test_rx671_wifi_ota_atomic:
         exit "$original_status"
       }
       trap park_board EXIT
-
-      for path in "$secure_manifest" "$encrypted_archive"; do
-        if [ ! -f "$path" ]; then
-          echo "Encrypted RX671 OTA runtime artifact is missing: $path" >&2
-          exit 1
-        fi
-      done
-      expected_context="rx671-ota-runtime-v1:$CI_PIPELINE_ID:$CI_COMMIT_SHA"
-      expected_archive_sha="$(
-        python3 - "$secure_manifest" "$CI_PIPELINE_ID" "$CI_COMMIT_SHA" "$expected_context" <<'PY'
-      import json
-      import sys
-
-      path, pipeline_id, commit_sha, context = sys.argv[1:]
-      data = json.load(open(path, encoding="utf-8-sig"))
-      expected = {
-          "format": "rx671-ota-encrypted-runtime-v1",
-          "pipeline_id": pipeline_id,
-          "commit_sha": commit_sha,
-          "encryption_context": context,
-      }
-      for key, value in expected.items():
-          if str(data.get(key, "")) != value:
-              raise SystemExit(f"RX671 OTA secure manifest mismatch: {key}")
-      print(data["plaintext_archive_sha256"])
-      PY
-      )"
-      python tools/ci/protect_secret_artifact.py decrypt \
-        --input "$encrypted_archive" \
-        --output "$plaintext_archive" \
-        --secret-env RX671_OTA_ARTIFACT_KEY \
-        --context "$expected_context"
-      actual_archive_sha="$(sha256sum "$plaintext_archive" | awk '{print $1}')"
-      if [ "$actual_archive_sha" != "$expected_archive_sha" ]; then
-        echo "Decrypted RX671 OTA runtime archive digest mismatch." >&2
-        exit 1
-      fi
-      tar -xf "$plaintext_archive" -C "$runtime_dir"
-      rm -f "$plaintext_archive"
 
       for path in \
         "$park_mot" \
@@ -4552,6 +4404,8 @@ test_rx671_wifi_ota_atomic:
         --private-key "$device_key" \
         --codesigner-certificate "$signer_cert" \
         --codesigner-public-key "$signer_public_key" \
+        --wifi-ssid-env RX671_EK_WIFI_SSID \
+        --wifi-passphrase-env RX671_EK_WIFI_PASSPHRASE \
         --port "$RX671_WIFI_UART_PORT" \
         --baud "$RX671_WIFI_UART_BAUD_RATE" \
         --rfp-cli "$RX671_WIFI_LINUX_RFP_CLI" \
@@ -4587,16 +4441,16 @@ test_rx671_wifi_ota_atomic:
     - |
       set +e
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_ota_atomic"
-      runtime_dir="$CI_PROJECT_DIR/.rx671-ota-runtime"
+      secret_dir="$CI_PROJECT_DIR/.rx671-ota-secrets"
       park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
       mkdir -p "$artifact_dir"
-      rm -rf -- "$runtime_dir"
-      runtime_cleanup_status=$?
-      if [ -e "$runtime_dir" ] || [ -L "$runtime_dir" ]; then
-        runtime_cleanup_status=1
+      rm -rf -- "$secret_dir"
+      secret_cleanup_status=$?
+      if [ -e "$secret_dir" ] || [ -L "$secret_dir" ]; then
+        secret_cleanup_status=1
       fi
-      if [ "$runtime_cleanup_status" -ne 0 ]; then
-        echo "RX671 OTA after_script: plaintext cleanup failed." | tee "$artifact_dir/after_script_cleanup.log" >&2
+      if [ "$secret_cleanup_status" -ne 0 ]; then
+        echo "RX671 OTA after_script: materialized secret cleanup failed." | tee "$artifact_dir/after_script_cleanup.log" >&2
         touch "$artifact_dir/after_script_cleanup_failed"
       else
         touch "$artifact_dir/after_script_cleanup.ok"
@@ -4638,7 +4492,7 @@ test_rx671_wifi_ota_atomic:
         echo "RX671 OTA after_script: park image is unavailable." | tee "$artifact_dir/after_script_park.log" >&2
         touch "$artifact_dir/after_script_park_failed"
       fi
-      if [ "$runtime_cleanup_status" -ne 0 ] ||
+      if [ "$secret_cleanup_status" -ne 0 ] ||
          [ -f "$artifact_dir/after_script_park_failed" ]; then
         exit 1
       fi

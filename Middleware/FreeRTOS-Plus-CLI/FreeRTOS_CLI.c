@@ -357,7 +357,13 @@ static BaseType_t prvHelpCommand(char *pcWriteBuffer, size_t xWriteBufferLen, co
 
     /* Return the next command help string, before moving the pointer on to
     the next command in the list. */
-    strncpy(pcWriteBuffer, pxCommand->pxCommandLineDefinition->pcHelpString, xWriteBufferLen);
+    if (xWriteBufferLen > 0U)
+    {
+        strncpy(pcWriteBuffer,
+                pxCommand->pxCommandLineDefinition->pcHelpString,
+                xWriteBufferLen - 1U);
+        pcWriteBuffer[xWriteBufferLen - 1U] = '\0';
+    }
     pxCommand = pxCommand->pxNext;
 
     if (NULL == pxCommand)

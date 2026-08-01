@@ -9,6 +9,7 @@ activation, reboot, self-test, acceptance, and commit.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import time
 from pathlib import Path
@@ -48,6 +49,16 @@ BOOT_REQUIRED = {
     "jump": "jump to user program",
 }
 
+OTA_CAPACITY_RE = re.compile(
+    r"\[RX671_OTA_CAPACITY\]\s+"
+    r"minheap=(?P<min_heap_bytes>\d+)\s+"
+    r"minnbuf=(?P<min_network_buffers>\d+)\s+"
+    r"whdmax=(?P<whd_max_in_use>\d+)\s+"
+    r"tempfail=(?P<whd_temp_fail_count>\d+)\s+"
+    r"permfail=(?P<whd_perm_fail_count>\d+)\s+"
+    r"waitloop=(?P<whd_wait_loop_count>\d+)"
+)
+
 
 def _required_file(value: str) -> Path:
     path = Path(value).resolve()
@@ -71,6 +82,7 @@ class Rx671OtaTransaction:
         self.text = ""
         self.pending = ""
         self.total_uart_bytes = 0
+        self.capacity_events = []
 
     def _consume(self, chunk: bytes) -> None:
         decoded = chunk.decode("ascii", errors="replace")
@@ -92,6 +104,81 @@ class Rx671OtaTransaction:
         elapsed = time.monotonic() - self.started
         for line in lines:
             self.ota.consume_line(line, elapsed)
+            capacity_match = OTA_CAPACITY_RE.search(line)
+            if capacity_match:
+                self.capacity_events.append(
+                    {
+                        **{
+                            name: int(value)
+                            for name, value in capacity_match.groupdict().items()
+                        },
+                        "seen_at": round(elapsed, 3),
+                        "line_number": self.ota.total_lines,
+                    }
+                )
+
+    def _post_ota_capacity(self) -> dict | None:
+        activate_line = self.ota.marker_state["activate_image"][
+            "first_seen_line_number"
+        ]
+        if activate_line is None:
+            return None
+        return next(
+            (
+                event
+                for event in self.capacity_events
+                if event["line_number"] > activate_line
+            ),
+            None,
+        )
+
+    def _capacity_proof(self) -> dict:
+        capacity = self._post_ota_capacity()
+        thresholds = {
+            "min_heap_bytes": int(
+                getattr(self.args, "min_capacity_heap_bytes", 16384)
+            ),
+            "min_network_buffers": int(
+                getattr(self.args, "min_capacity_network_buffers", 4)
+            ),
+            "whd_buffer_count": int(
+                getattr(self.args, "expected_whd_buffer_count", 8)
+            ),
+        }
+        checks = {
+            "post_ota_line_observed": capacity is not None,
+            "minimum_heap_met": bool(
+                capacity is not None
+                and capacity["min_heap_bytes"] >= thresholds["min_heap_bytes"]
+            ),
+            "minimum_network_buffers_met": bool(
+                capacity is not None
+                and capacity["min_network_buffers"]
+                >= thresholds["min_network_buffers"]
+            ),
+            "whd_pool_not_exhausted": bool(
+                capacity is not None
+                and capacity["whd_max_in_use"] < thresholds["whd_buffer_count"]
+            ),
+            "whd_temporary_failures_zero": bool(
+                capacity is not None
+                and capacity["whd_temp_fail_count"] == 0
+            ),
+            "whd_permanent_failures_zero": bool(
+                capacity is not None
+                and capacity["whd_perm_fail_count"] == 0
+            ),
+            "whd_wait_loops_zero": bool(
+                capacity is not None
+                and capacity["whd_wait_loop_count"] == 0
+            ),
+        }
+        return {
+            "success": all(checks.values()),
+            "metrics": capacity,
+            "thresholds": thresholds,
+            "checks": checks,
+        }
 
     def _read(self, serial_port) -> bool:
         waiting = getattr(serial_port, "in_waiting", 0)
@@ -175,14 +262,27 @@ class Rx671OtaTransaction:
                 for event in self.ota.tls_events
             )
         )
+        capacity_proof = self._capacity_proof()
         success = (
             not missing_boot
             and ota_summary["success"]
             and self.ota.has_marker("image_committed")
             and ota_summary["tls_version_ok"]
             and candidate_tls_after_activate
+            and capacity_proof["success"]
         )
-        classification = "pass" if success else "required_marker_missing"
+        if success:
+            classification = "pass"
+        elif (
+            missing_boot
+            or not ota_summary["success"]
+            or not self.ota.has_marker("image_committed")
+            or not ota_summary["tls_version_ok"]
+            or not candidate_tls_after_activate
+        ):
+            classification = "required_marker_missing"
+        else:
+            classification = "post_ota_capacity_check_failed"
         return {
             "success": success,
             "classification": classification,
@@ -200,6 +300,7 @@ class Rx671OtaTransaction:
             "ota": ota_summary,
             "image_commit_observed": self.ota.has_marker("image_committed"),
             "candidate_tls_after_activate": candidate_tls_after_activate,
+            "post_ota_capacity": capacity_proof,
             "duration_seconds": round(time.monotonic() - self.started, 3),
         }
 
@@ -210,6 +311,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baseline-version", default="0.1.0")
     parser.add_argument("--candidate-version", default="0.1.1")
     parser.add_argument("--require-tls-version", default="TLSv1.2")
+    parser.add_argument("--min-capacity-heap-bytes", type=int, default=16384)
+    parser.add_argument("--min-capacity-network-buffers", type=int, default=4)
+    parser.add_argument("--expected-whd-buffer-count", type=int, default=8)
     parser.add_argument("--port", default=DEFAULT_PORT)
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD)
     parser.add_argument("--rfp-cli", default="./tools/rfp_cli_locked.sh")
@@ -233,6 +337,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.chunk_size <= 0:
         parser.error("--chunk-size must be positive")
+    if args.min_capacity_heap_bytes <= 0:
+        parser.error("--min-capacity-heap-bytes must be positive")
+    if args.min_capacity_network_buffers <= 0:
+        parser.error("--min-capacity-network-buffers must be positive")
+    if args.expected_whd_buffer_count <= 0:
+        parser.error("--expected-whd-buffer-count must be positive")
     if args.cleanup_plaintext and args.cleanup_root is None:
         parser.error("--cleanup-root is required with --cleanup-plaintext")
     return args

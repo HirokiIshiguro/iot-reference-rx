@@ -13,6 +13,7 @@ from cryptography.x509.oid import NameOID
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "analyze_rx671_ota_layout.py"
+ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location("analyze_rx671_ota_layout", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 layout = importlib.util.module_from_spec(SPEC)
@@ -72,6 +73,32 @@ TYPE1YN_FW_BLOB
         self.assertEqual(layout.Section("P", 0xFFF00100, 0x10), sections["P"])
         self.assertEqual(3, sections["TYPE1YN_FW_BLOB"].size)
 
+    def test_parse_unique_ota_integer_defines(self):
+        text = """
+<listOptionValue value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"/>
+<listOptionValue value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=(8192U)"/>
+"""
+        self.assertEqual(
+            4096,
+            layout._cproject_integer_define(
+                text, "mqttFileDownloader_CONFIG_BLOCK_SIZE"
+            ),
+        )
+        self.assertEqual(
+            8192,
+            layout._cproject_integer_define(text, "MQTT_AGENT_NETWORK_BUFFER_SIZE"),
+        )
+        self.assertIsNone(layout._cproject_integer_define(text, "MISSING"))
+
+        ambiguous = text + (
+            '<listOptionValue value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=16384"/>'
+        )
+        self.assertIsNone(
+            layout._cproject_integer_define(
+                ambiguous, "MQTT_AGENT_NETWORK_BUFFER_SIZE"
+            )
+        )
+
     def test_parse_srecord_ranges_and_validate_checksum(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sample.mot"
@@ -81,6 +108,18 @@ TYPE1YN_FW_BLOB
             path.write_text("S308FFF0000061626300\n", encoding="ascii")
             with self.assertRaisesRegex(ValueError, "checksum"):
                 layout._parse_srecord_ranges(path)
+
+    def test_bootloader_config_comparison_ignores_only_line_endings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parent = root / "parent.h"
+            canonical = root / "canonical.h"
+            parent.write_bytes(b"#define A 1\r\n#define B 2\r\n")
+            canonical.write_bytes(b"#define A 1\n#define B 2\n")
+            self.assertTrue(layout._same_text_lines(parent, canonical))
+
+            canonical.write_bytes(b"#define A 1\n#define B 3\n")
+            self.assertFalse(layout._same_text_lines(parent, canonical))
 
 
 class GateTests(unittest.TestCase):
@@ -92,6 +131,7 @@ class GateTests(unittest.TestCase):
         by_name = {gate.name: gate for gate in gates}
 
         self.assertEqual("UNKNOWN", by_name["bootloader_layout"].status)
+        self.assertEqual("FAIL", by_name["mqtt_ota_buffer_fit"].status)
         self.assertEqual("PASS", by_name["rom_capacity"].status)
         self.assertEqual("PASS", by_name["fwup_data_flash_geometry"].status)
         self.assertEqual("PASS", by_name["littlefs_data_flash_geometry"].status)
@@ -106,6 +146,7 @@ class GateTests(unittest.TestCase):
         self.assertEqual("FAIL", by_name["fwup_code_flash_layout"].status)
         self.assertEqual("UNKNOWN", by_name["artifact_provenance"].status)
         self.assertEqual("UNKNOWN", by_name["whd_blob_sizes"].status)
+        self.assertEqual("UNKNOWN", by_name["ram_capacity"].status)
         self.assertEqual("UNKNOWN", by_name["map_image_single_area"].status)
         self.assertEqual("UNKNOWN", by_name["mot_image_single_area"].status)
 
@@ -118,6 +159,85 @@ class GateTests(unittest.TestCase):
                 [layout.Gate("a", "UNKNOWN", ""), layout.Gate("b", "FAIL", "")]
             ),
         )
+
+    def test_ram_capacity_uses_selected_bsp_limit_and_rejects_gap_overflow(self):
+        passing = layout._ram_capacity_gate(
+            sections={
+                "SU": layout.Section("SU", 0x00000004, 0x1000),
+                "B": layout.Section("B", 0x0005F000, 0x1000),
+                "P": layout.Section("P", 0xFFF00300, 0x1000),
+            },
+            ram_size=393216,
+            data_flash_start=0x00100000,
+        )
+        overflowing = layout._ram_capacity_gate(
+            sections={
+                "B": layout.Section("B", 0x0005FF00, 0x200),
+                "P": layout.Section("P", 0xFFF00300, 0x1000),
+            },
+            ram_size=393216,
+            data_flash_start=0x00100000,
+        )
+        gap_overflow = layout._ram_capacity_gate(
+            sections={
+                "BAD": layout.Section("BAD", 0x00070000, 0x10),
+            },
+            ram_size=393216,
+            data_flash_start=0x00100000,
+        )
+
+        self.assertEqual("PASS", passing.status)
+        self.assertIn("headroom=0 bytes", passing.detail)
+        self.assertEqual("FAIL", overflowing.status)
+        self.assertIn("B@0x0005FF00-0x000600FF", overflowing.detail)
+        self.assertEqual("FAIL", gap_overflow.status)
+        self.assertIn("BAD@0x00070000", gap_overflow.detail)
+
+    def test_mqtt_ota_block_base64_and_overhead_must_fit_exact_profile(self):
+        passing = layout._mqtt_ota_buffer_gate(
+            block_size=4096,
+            network_buffer_size=8192,
+        )
+        too_small = layout._mqtt_ota_buffer_gate(
+            block_size=4096,
+            network_buffer_size=6000,
+        )
+        drifted = layout._mqtt_ota_buffer_gate(
+            block_size=2048,
+            network_buffer_size=8192,
+        )
+        missing = layout._mqtt_ota_buffer_gate(
+            block_size=None,
+            network_buffer_size=8192,
+        )
+
+        self.assertEqual("PASS", passing.status)
+        self.assertIn("base64=5464", passing.detail)
+        self.assertIn("required=6488", passing.detail)
+        self.assertEqual("FAIL", too_small.status)
+        self.assertEqual("FAIL", drifted.status)
+        self.assertEqual("FAIL", missing.status)
+
+    def test_parent_bootloader_headers_are_required_provenance_inputs(self):
+        self.assertIn(
+            layout.BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
+            layout.BOOTLOADER_PROVENANCE_PATHS,
+        )
+        self.assertIn(
+            layout.BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
+            layout.BOOTLOADER_PROVENANCE_PATHS,
+        )
+        parent = (
+            ROOT
+            / layout.BOOTLOADER_PROJECT_RELATIVE
+            / "src/rx671.h"
+        ).read_text(encoding="utf-8").splitlines()
+        canonical = (
+            ROOT
+            / layout.BOOTLOADER_SUBMODULE_RELATIVE
+            / "config/rx671.h"
+        ).read_text(encoding="utf-8").splitlines()
+        self.assertEqual(canonical, parent)
 
     def test_fwup_geometry_rejects_equal_total_with_wrong_fit_blocks(self):
         gate = layout._fwup_data_flash_geometry_gate(
