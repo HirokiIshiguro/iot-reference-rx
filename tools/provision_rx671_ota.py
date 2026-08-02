@@ -2,10 +2,11 @@
 """Provision EK-RX671 OTA credentials and install only the boot-loader MOT.
 
 The provisioner image is programmed without chip erase, its short-lived CLI is
-used to format and populate LittleFS, and the boot-loader MOT is then programmed
-without touching Data Flash.  The boot loader is deliberately left in reset;
-``test_rx671_ota.py`` opens SCI6 before releasing it so no one-shot marker is
-lost and keeps that same UART open through the complete OTA transaction.
+used to format and populate LittleFS, the two OTA install areas are erased with
+address-range operations that preserve Data Flash and both boot-loader regions,
+and the boot-loader MOT is then programmed.  The boot loader is deliberately
+left in reset; ``test_rx671_ota.py`` opens SCI6 before releasing it so no
+one-shot marker is lost and keeps that same UART open through the transaction.
 """
 
 from __future__ import annotations
@@ -326,6 +327,21 @@ def provision(args: argparse.Namespace) -> dict:
     finally:
         serial_port.close()
 
+    event_log.write(
+        "erase RX671 OTA install ranges 0xFFE00000-0xFFEBFFFF and "
+        "0xFFF00000-0xFFFBFFFF; preserve Data Flash, flash options, "
+        "and both boot-loader regions\n"
+    )
+    run_checked(
+        rfp.erase_ota_install_areas_command(),
+        label="post-provisioning OTA install-area erase",
+        timeout=args.rfp_timeout,
+    )
+    completed.append("ota_install_areas_erased_after_provisioning")
+    event_log.write(
+        "OTA install-area erase OK; Data Flash and boot-loader regions preserved\n"
+    )
+
     event_log.write("program boot-loader MOT without chip erase; preserve Data Flash and leave reset\n")
     run_checked(
         rfp.program_command(args.bootloader_mot, leave_reset=True),
@@ -339,6 +355,12 @@ def provision(args: argparse.Namespace) -> dict:
         "classification": "provisioned_and_bootloader_left_reset",
         "completed_steps": completed,
         "data_flash_preserved_during_rfp_programming": True,
+        "data_flash_preserved_during_rfp_operations": True,
+        "ota_install_areas_erased_after_provisioning": True,
+        "ota_install_area_erase_ranges": [
+            "0xFFE00000-0xFFEBFFFF",
+            "0xFFF00000-0xFFFBFFFF",
+        ],
         "pem_readback_performed": False,
         "wifi_passphrase_readback_performed": False,
         "wifi_credentials_source": "environment_to_sci6_to_littlefs",

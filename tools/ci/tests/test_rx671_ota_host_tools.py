@@ -76,6 +76,22 @@ class RfpContractTests(unittest.TestCase):
         self.assertNotIn("-erase-chip", command)
         self.assertEqual("e2l:OBE110024", command[command.index("-t") + 1])
 
+    def test_install_area_erase_uses_exact_ranges_and_preserves_boundaries(self):
+        command = host.RfpConfig().erase_ota_install_areas_command()
+        self.assertIn("-erase", command)
+        self.assertEqual(
+            ["FFE00000,FFEBFFFF", "FFF00000,FFFBFFFF"],
+            [
+                command[index + 1]
+                for index, token in enumerate(command)
+                if token == "-range"
+            ],
+        )
+        self.assertNotIn("-erase-chip", command)
+        self.assertNotIn("-run", command)
+        self.assertNotIn("FFEC0000,FFEFFFFF", command)
+        self.assertNotIn("FFFC0000,FFFFFFFF", command)
+
     def test_cli_echo_containing_ng_is_not_a_false_error(self):
         serial = FakeSerial(
             b"conf set key BASE64NGVALUE\r\n\r\nOK.\r\n\r\n>"
@@ -304,7 +320,7 @@ class ProvisioningContractTests(unittest.TestCase):
             self.assertIn(b"conf set key -----BEGIN PRIVATE KEY-----", payload)
             self.assertIn(b"SENSITIVE", payload)
 
-    def test_provision_programs_both_images_without_chip_erase(self):
+    def test_provision_erases_only_install_areas_between_images(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             files = {}
@@ -378,8 +394,20 @@ class ProvisioningContractTests(unittest.TestCase):
             ):
                 summary = provision.provision(args)
             self.assertTrue(summary["success"])
-            self.assertEqual(3, len(commands))
+            self.assertEqual(4, len(commands))
             self.assertTrue(all("-erase-chip" not in command for command in commands))
+            self.assertIn("-p", commands[0])
+            self.assertIn("-run", commands[1])
+            self.assertEqual(
+                ["FFE00000,FFEBFFFF", "FFF00000,FFFBFFFF"],
+                [
+                    commands[2][index + 1]
+                    for index, token in enumerate(commands[2])
+                    if token == "-range"
+                ],
+            )
+            self.assertIn("-erase", commands[2])
+            self.assertIn("-p", commands[3])
             self.assertTrue(
                 all(
                     call.kwargs["timeout"] == 123
@@ -422,6 +450,16 @@ class ProvisioningContractTests(unittest.TestCase):
             self.assertEqual(
                 "delegated_to_bootloader_tls_and_ota_signature",
                 summary["pem_verification"],
+            )
+            self.assertTrue(summary["ota_install_areas_erased_after_provisioning"])
+            self.assertTrue(summary["data_flash_preserved_during_rfp_operations"])
+            self.assertEqual(
+                ["0xFFE00000-0xFFEBFFFF", "0xFFF00000-0xFFFBFFFF"],
+                summary["ota_install_area_erase_ranges"],
+            )
+            self.assertIn(
+                "ota_install_areas_erased_after_provisioning",
+                summary["completed_steps"],
             )
             format_call = next(
                 call

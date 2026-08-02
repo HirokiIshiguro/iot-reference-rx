@@ -27,6 +27,10 @@ DEFAULT_PORT = os.environ.get(
 DEFAULT_BAUD = 921600
 DEFAULT_RFP_CLI = os.environ.get("RX671_WIFI_LINUX_RFP_CLI", "./tools/rfp_cli_locked.sh")
 DEFAULT_RFP_TIMEOUT = 120.0
+RX671_TEMPORARY_INSTALL_START = 0xFFE00000
+RX671_TEMPORARY_INSTALL_END = 0xFFEBFFFF
+RX671_EXECUTE_INSTALL_START = 0xFFF00000
+RX671_EXECUTE_INSTALL_END = 0xFFFBFFFF
 CLI_INPUT_BUFFER_BYTES = 4096
 CLI_PROMPT_TOKENS = (b"\r\n>", b"\n>")
 CLI_SET_SUCCESS_TOKENS = (
@@ -71,6 +75,25 @@ class RfpConfig:
         command.extend(["-noquery", str(mot)])
         if "-erase-chip" in command:
             raise AssertionError("RX671 OTA programming must preserve Data Flash")
+        return command
+
+    def erase_ota_install_areas_command(self) -> list[str]:
+        """Erase both RX671 OTA install areas while preserving both boot loaders."""
+        command = self.common_command()
+        command.extend(
+            [
+                "-range",
+                f"{RX671_TEMPORARY_INSTALL_START:08X},"
+                f"{RX671_TEMPORARY_INSTALL_END:08X}",
+                "-range",
+                f"{RX671_EXECUTE_INSTALL_START:08X},"
+                f"{RX671_EXECUTE_INSTALL_END:08X}",
+                "-erase",
+                "-noquery",
+            ]
+        )
+        if "-erase-chip" in command:
+            raise AssertionError("RX671 OTA handoff must preserve non-install areas")
         return command
 
     def run_command(self) -> list[str]:
