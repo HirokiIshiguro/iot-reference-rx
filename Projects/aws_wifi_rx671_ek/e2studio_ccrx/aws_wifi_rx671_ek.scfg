@@ -783,7 +783,7 @@
                 <gridItem id="configTICK_VECTOR" selectedIndex="0"/>
                 <gridItem id="configTICK_TYPE_WIDTH_IN_BITS" selectedIndex="1"/>
                 <gridItem id="configIDLE_SHOULD_YIELD" selectedIndex="1"/>
-                <gridItem id="configTASK_NOTIFICATION_ARRAY_ENTRIES" selectedIndex="1"/>
+                <gridItem id="configTASK_NOTIFICATION_ARRAY_ENTRIES" selectedIndex="4"/>
                 <gridItem id="configQUEUE_REGISTRY_SIZE" selectedIndex="0"/>
                 <gridItem id="configENABLE_BACKWARD_COMPATIBILITY" selectedIndex="1"/>
                 <gridItem id="configNUM_THREAD_LOCAL_STORAGE_POINTERS" selectedIndex="0"/>

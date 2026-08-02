@@ -20,6 +20,12 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.aws_iot_config = (
             PROJECT / "src/frtos_config/aws_iot_config.h"
         ).read_text(encoding="utf-8")
+        cls.freertos_config = (
+            PROJECT / "src/frtos_config/FreeRTOSConfig.h"
+        ).read_text(encoding="utf-8")
+        cls.scfg = (PROJECT / "aws_wifi_rx671_ek.scfg").read_text(
+            encoding="utf-8"
+        )
         cls.whd = (PROJECT / "src/whd_bringup.c").read_text(
             encoding="utf-8"
         )
@@ -54,6 +60,12 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.software_tls_transport = (
             ROOT
             / "Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c"
+        ).read_text(encoding="utf-8")
+        cls.mqtt_wrapper = (
+            ROOT / "Demos/common/mqtt-wrapper/mqtt_wrapper.c"
+        ).read_text(encoding="utf-8")
+        cls.mqtt_agent_task = (
+            ROOT / "Demos/mqtt_agent/mqtt_agent_task.c"
         ).read_text(encoding="utf-8")
         cls.builder = (ROOT / "tools/build_headless_rx671_wifi.ps1").read_text(
             encoding="utf-8"
@@ -187,6 +199,39 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         self.assertIn(
             "expected TLSv1.2",
             self.software_tls_transport,
+        )
+
+    def test_mqtt_agent_notification_index_exists_in_every_task_tcb(self) -> None:
+        self.assertIn(
+            "#define MQTT_AGENT_NOTIFY_IDX    (2)",
+            self.mqtt_wrapper,
+        )
+        self.assertIn(
+            "xTaskNotifyStateClearIndexed(NULL, MQTT_AGENT_NOTIFY_IDX)",
+            self.mqtt_wrapper,
+        )
+        self.assertIn(
+            "#define configTASK_NOTIFICATION_ARRAY_ENTRIES      4",
+            self.freertos_config,
+        )
+        self.assertIn(
+            '<gridItem id="configTASK_NOTIFICATION_ARRAY_ENTRIES" '
+            'selectedIndex="4"/>',
+            self.scfg,
+        )
+        self.assertIn(
+            "configTASK_NOTIFICATION_ARRAY_ENTRIES <= "
+            "MQTT_AGENT_NOTIFY_IDX",
+            self.mqtt_wrapper,
+        )
+        self.assertIn(
+            "#define MQTT_AGENT_NOTIFY_IDX (3U)",
+            self.mqtt_agent_task,
+        )
+        self.assertIn(
+            "configTASK_NOTIFICATION_ARRAY_ENTRIES <= "
+            "MQTT_AGENT_NOTIFY_IDX",
+            self.mqtt_agent_task,
         )
 
     def test_wifi_credentials_are_runtime_provisioned_and_passphrase_is_forgotten(

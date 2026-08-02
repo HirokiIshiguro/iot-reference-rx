@@ -245,6 +245,10 @@
  */
 #define MQTT_AGENT_NOTIFY_IDX (3U)
 
+#if ( configTASK_NOTIFICATION_ARRAY_ENTRIES <= MQTT_AGENT_NOTIFY_IDX )
+    #error "MQTT Agent synchronous subscribe requires configTASK_NOTIFICATION_ARRAY_ENTRIES >= 4"
+#endif
+
 /**
  * @brief ThingName which is used as the client identifier for MQTT connection.
  * Thing name is retrieved  at runtime from a key value store.

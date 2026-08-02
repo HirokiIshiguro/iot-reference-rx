@@ -16,6 +16,10 @@
 
 #define MQTT_AGENT_NOTIFY_IDX    (2)
 
+#if ( configTASK_NOTIFICATION_ARRAY_ENTRIES <= MQTT_AGENT_NOTIFY_IDX )
+    #error "MQTT wrapper notification index requires configTASK_NOTIFICATION_ARRAY_ENTRIES >= 3"
+#endif
+
 static MQTTContext_t * globalCoreMqttContext = NULL;
 
 /**
