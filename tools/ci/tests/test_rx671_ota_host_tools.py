@@ -522,6 +522,23 @@ class OtaTransactionContractTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "fail-close"):
                 transaction._consume(b"Loading user code signer public key from LittleFS: not found; refusing to boot.\r\n")
 
+    def test_littlefs_debug_can_split_key_found_marker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            transaction._consume(
+                b"Loading user code signer public key from LittleFS: "
+                b"lfs.c:4558:debug: Found older minor version\r\n"
+                b"found.\r\n"
+            )
+            self.assertEqual(1, transaction.boot_hits["key_load_started"])
+            self.assertEqual(1, transaction.boot_hits["key_found"])
+
     def test_uses_existing_ota_analyzer_for_tls_and_commit(self):
         with tempfile.TemporaryDirectory() as temporary:
             args = argparse.Namespace(

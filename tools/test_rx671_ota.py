@@ -31,6 +31,8 @@ from test_ota import OtaLogAnalyzer
 
 RSU_SIZE = 0x000C0000
 READY_MARKER = 'send "userprog.rsu" via UART.'
+KEY_LOAD_MARKER = "Loading user code signer public key from LittleFS:"
+KEY_FOUND_MARKER = "found."
 BOOT_ERROR_MARKERS = (
     "fatal error occurred.",
     "not found; refusing to boot.",
@@ -38,7 +40,8 @@ BOOT_ERROR_MARKERS = (
     "Code flash is completely broken.",
 )
 BOOT_REQUIRED = {
-    "key_found": "Loading user code signer public key from LittleFS: found.",
+    "key_load_started": KEY_LOAD_MARKER,
+    "key_found": KEY_FOUND_MARKER,
     "install_started": "start installing user program.",
     "ready": READY_MARKER,
     "install_completed": "completed installing firmware.",
@@ -217,7 +220,11 @@ class Rx671OtaTransaction:
             serial_port.reset_input_buffer()
             serial_port.reset_output_buffer()
             run_checked(rfp.run_command(), label="boot-loader release")
-            self.wait_for(serial_port, BOOT_REQUIRED["key_found"], self.args.boot_timeout)
+            # LittleFS diagnostics can be emitted between the boot loader's
+            # prefix and trailing "found." text.  Require both in order so the
+            # proof remains strict without assuming one atomic UART line.
+            self.wait_for(serial_port, KEY_LOAD_MARKER, self.args.boot_timeout)
+            self.wait_for(serial_port, KEY_FOUND_MARKER, self.args.boot_timeout)
             self.wait_for(serial_port, READY_MARKER, self.args.boot_timeout)
             sent, digest = stream_file(
                 serial_port,
