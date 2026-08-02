@@ -28,6 +28,10 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
 PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
+TLS_VERSION_DEFINES = {
+    "TLSv1.2": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1",
+    "TLSv1.3": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1",
+}
 PROVISIONER_LOG_SUPPRESSION_DEFINES = (
     "LFS_NO_DEBUG",
     "LFS_NO_WARN",
@@ -177,6 +181,15 @@ def parse_version(value: str) -> Version:
     return version
 
 
+def parse_tls_version(value: str) -> str:
+    if value not in TLS_VERSION_DEFINES:
+        allowed = ", ".join(TLS_VERSION_DEFINES)
+        raise ValueError(
+            f"unsupported TLS version {value!r}: expected one of {allowed}"
+        )
+    return value
+
+
 def _replace_once(text: str, old: str, new: str, label: str) -> str:
     count = text.count(old)
     if count != 1:
@@ -184,7 +197,10 @@ def _replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
-def make_ota_cproject(text: str, version: Version) -> str:
+def make_ota_cproject(
+    text: str, version: Version, tls_version: str = "TLSv1.2"
+) -> str:
+    tls_version = parse_tls_version(tls_version)
     existing_version_defines = re.findall(
         r'-define=APP_VERSION_(?:MAJOR|MINOR|BUILD)=[^"]+', text
     )
@@ -218,7 +234,9 @@ def make_ota_cproject(text: str, version: Version) -> str:
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MINOR={version.minor}"/>',
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_BUILD={version.build}"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_OTA_RUNTIME_ENABLE=1"/>',
-        '<listOptionValue builtIn="false" value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1"/>',
+        '<listOptionValue builtIn="false" value="-define='
+        + TLS_VERSION_DEFINES[tls_version]
+        + '"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"/>',
         '<listOptionValue builtIn="false" value="-define=FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH=32768"/>',
@@ -325,7 +343,7 @@ class TemporaryOtaProfile:
             for relative in PROFILE_PATHS
         }
 
-    def apply(self, version: Version) -> None:
+    def apply(self, version: Version, tls_version: str = "TLSv1.2") -> None:
         cproject = self.snapshots[Path(".cproject")].decode("utf-8")
         fwup = self.snapshots[Path("src/frtos_config/r_fwup_config.h")].decode(
             "utf-8"
@@ -337,7 +355,9 @@ class TemporaryOtaProfile:
             Path("src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h")
         ].decode("utf-8")
         (self.project_dir / ".cproject").write_text(
-            make_ota_cproject(cproject, version), encoding="utf-8", newline=""
+            make_ota_cproject(cproject, version, tls_version),
+            encoding="utf-8",
+            newline="",
         )
         (self.project_dir / "src/frtos_config/r_fwup_config.h").write_text(
             make_ota_fwup_config(fwup), encoding="utf-8", newline=""
@@ -959,6 +979,7 @@ def _create_manifest(
     project_dir: Path,
     artifact_dir: Path,
     version: Version,
+    tls_version: str,
     dirty: bool,
     outputs: dict[str, Path],
     rsu_path: Path,
@@ -1010,6 +1031,7 @@ def _create_manifest(
         "credentials_embedded": False,
         "wifi_credentials_source": "littlefs_kvs_runtime_provisioning",
         "ota_image_version": version.text,
+        "tls_version": tls_version,
         "rsu_path": rsu_path.relative_to(repo_root).as_posix(),
         "signer_certificate_path": certificate_path.relative_to(repo_root).as_posix(),
         "signer_public_key_path": public_key_path.relative_to(repo_root).as_posix(),
@@ -1070,6 +1092,7 @@ def _build_one(
     project_dir: Path,
     artifact_dir: Path,
     version: Version,
+    tls_version: str,
     e2studio: Path,
     workspace: Path,
     signing_key: Path,
@@ -1169,6 +1192,7 @@ def _build_one(
         project_dir=project_dir,
         artifact_dir=artifact_dir,
         version=version,
+        tls_version=tls_version,
         dirty=dirty,
         outputs=outputs,
         rsu_path=rsu_path,
@@ -1237,6 +1261,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baseline-version", default="0.1.0")
     parser.add_argument("--candidate-version", default="0.1.1")
     parser.add_argument(
+        "--tls-version",
+        choices=tuple(TLS_VERSION_DEFINES),
+        default="TLSv1.2",
+        help="Pin both OTA MQTT handshakes to TLSv1.2 or TLSv1.3.",
+    )
+    parser.add_argument(
         "--output-root",
         type=Path,
         default=default_root / "build/rx671-ota",
@@ -1284,6 +1314,7 @@ def main(argv: list[str] | None = None) -> int:
         ("baseline", parse_version(args.baseline_version)),
         ("candidate", parse_version(args.candidate_version)),
     )
+    tls_version = parse_tls_version(args.tls_version)
     if versions[0][1] == versions[1][1]:
         raise SystemExit("baseline and candidate versions must differ")
     if not args.e2studio.is_file():
@@ -1330,13 +1361,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         with TemporaryOtaProfile(project_dir) as profile:
             for label, version in versions:
-                profile.apply(version)
+                profile.apply(version, tls_version)
                 artifact_dir = output_root / f"{label}-{version.text}"
                 _build_one(
                     repo_root=repo_root,
                     project_dir=project_dir,
                     artifact_dir=artifact_dir,
                     version=version,
+                    tls_version=tls_version,
                     e2studio=args.e2studio.resolve(),
                     workspace=args.workspace_root.resolve(),
                     signing_key=signing_key,

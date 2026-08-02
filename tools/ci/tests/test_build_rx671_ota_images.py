@@ -57,7 +57,7 @@ class ProfileTests(unittest.TestCase):
 
     def test_cproject_profile_is_dual_bank_and_keeps_every_payload_in_main(self) -> None:
         result = builder.make_ota_cproject(
-            self.cproject, builder.parse_version("1.2.3")
+            self.cproject, builder.parse_version("1.2.3"), "TLSv1.2"
         )
         self.assertIn('modes="bank.dual"', result)
         self.assertNotIn('modes="bank.single"', result)
@@ -121,6 +121,27 @@ class ProfileTests(unittest.TestCase):
             result,
         )
         self.assertIn("EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC", result)
+
+    def test_tls13_profile_selects_only_the_tls13_define(self) -> None:
+        result = builder.make_ota_cproject(
+            self.cproject, builder.parse_version("1.2.3"), "TLSv1.3"
+        )
+        self.assertIn(
+            'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1"',
+            result,
+        )
+        self.assertNotIn(
+            'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1"',
+            result,
+        )
+
+    def test_tls_profile_rejects_every_unapproved_version(self) -> None:
+        for value in ("", "TLS1.3", "TLSv1.1", "TLSv1.4"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "unsupported TLS version"):
+                    builder.make_ota_cproject(
+                        self.cproject, builder.parse_version("1.2.3"), value
+                    )
 
     def test_bsp_and_fwup_profile_values_are_exact(self) -> None:
         for label, source in (
@@ -479,6 +500,7 @@ class DirtyAnalysisTests(unittest.TestCase):
     def test_dirty_manifest_is_not_marked_formal(self) -> None:
         source = inspect.getsource(builder._create_manifest)
         self.assertIn('"formal": not dirty', source)
+        self.assertIn('"tls_version": tls_version', source)
 
     def test_allows_only_dirty_provenance_and_its_dependent_unknowns(self) -> None:
         report = {

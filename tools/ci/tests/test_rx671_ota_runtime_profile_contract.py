@@ -278,9 +278,15 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             "messageLength > sizeof(dataBuffers[0].data)", self.ota_demo
         )
 
-    def test_software_transport_can_pin_the_ota_proof_to_tls_1_2(self) -> None:
+    def test_software_transport_can_pin_the_ota_proof_to_tls_1_2_or_1_3(
+        self,
+    ) -> None:
         self.assertIn(
             "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2",
+            self.aws_iot_config,
+        )
+        self.assertIn(
+            "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3",
             self.aws_iot_config,
         )
         self.assertIn(
@@ -288,7 +294,15 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             self.software_tls_transport,
         )
         self.assertIn(
+            "MBEDTLS_SSL_VERSION_TLS1_3",
+            self.software_tls_transport,
+        )
+        self.assertIn(
             "expected TLSv1.2",
+            self.software_tls_transport,
+        )
+        self.assertIn(
+            "expected TLSv1.3",
             self.software_tls_transport,
         )
 
