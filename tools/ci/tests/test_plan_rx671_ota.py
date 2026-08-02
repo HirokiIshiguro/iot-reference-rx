@@ -18,6 +18,8 @@ COMMIT_SHA = "a" * 40
 BASE_THING = "rx671-ek-type1yn-01"
 THING_NAME = f"{BASE_THING}-ota-{PIPELINE_ID}-{PLAN_JOB_ID}"
 OTA_UPDATE_ID = f"rx671-software-ota-{PIPELINE_ID}-{PLAN_JOB_ID}"
+AWS_IOT_JOB_ID = f"AFR_OTA-{OTA_UPDATE_ID}"
+EVENT_POLICY_NAME = f"rx671-ota-event-{PIPELINE_ID}-{PLAN_JOB_ID}"
 REGION = "ap-northeast-1"
 BUCKET = "ota-bucket"
 BASE_ARN = f"arn:aws:iot:{REGION}:123456789012:thing/{BASE_THING}"
@@ -60,6 +62,8 @@ class Rx671OtaPlanTests(unittest.TestCase):
         )
         self.assertEqual(THING_NAME, identity["thing_name"])
         self.assertEqual(OTA_UPDATE_ID, identity["ota_update_id"])
+        self.assertEqual(AWS_IOT_JOB_ID, identity["aws_iot_job_id"])
+        self.assertEqual(EVENT_POLICY_NAME, identity["event_policy_name"])
         self.assertEqual(
             (
                 f"ota/{THING_NAME}/source/{OTA_UPDATE_ID}/"
@@ -174,6 +178,7 @@ class Rx671OtaPlanTests(unittest.TestCase):
             "thing_name": THING_NAME,
             "thing_arn": THING_ARN,
             "ota_update_id": OTA_UPDATE_ID,
+            "aws_iot_job_id": AWS_IOT_JOB_ID,
             "s3_bucket": BUCKET,
             "s3_key": plan["s3_key"],
             "code_signing_mode": "custom",
@@ -183,6 +188,35 @@ class Rx671OtaPlanTests(unittest.TestCase):
         planner.validate_created_meta(plan, alias_plan, ota_meta)
         ota_meta["thing_arn"] = THING_ARN.replace(THING_NAME, "other")
         with self.assertRaisesRegex(ValueError, "thing_arn"):
+            planner.validate_created_meta(plan, alias_plan, ota_meta)
+
+    def test_created_meta_must_match_the_deterministic_job_id(self) -> None:
+        plan = planner.expected_identity(
+            project_id=PROJECT_ID,
+            pipeline_id=PIPELINE_ID,
+            plan_job_id=PLAN_JOB_ID,
+            commit_sha=COMMIT_SHA,
+            base_thing_name=BASE_THING,
+            region=REGION,
+            bucket=BUCKET,
+            baseline_version="0.1.0",
+            candidate_version="0.1.1",
+            tls_version="TLSv1.2",
+        )
+        alias_plan = {"expected_thing_arn": THING_ARN}
+        ota_meta = {
+            "region": REGION,
+            "thing_name": THING_NAME,
+            "thing_arn": THING_ARN,
+            "ota_update_id": OTA_UPDATE_ID,
+            "aws_iot_job_id": "AFR_OTA-other",
+            "s3_bucket": BUCKET,
+            "s3_key": plan["s3_key"],
+            "code_signing_mode": "custom",
+            "signed_prefix": None,
+            "file_version": "0.1.1",
+        }
+        with self.assertRaisesRegex(ValueError, "aws_iot_job_id"):
             planner.validate_created_meta(plan, alias_plan, ota_meta)
 
 

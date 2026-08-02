@@ -221,6 +221,9 @@ variables:
   RX671_OTA_BASELINE_VERSION: "0.1.0"
   RX671_OTA_CANDIDATE_VERSION: "0.1.1"
   RX671_OTA_REQUIRE_TLS_VERSION: "TLSv1.2"
+  # AWS documents an eventual-consistency window for policy changes. Keep the
+  # focused proof deterministic by waiting the full upper bound before HIL.
+  RX671_OTA_POLICY_PROPAGATION_SECONDS: "480"
   RX671_OTA_OBSERVE_TIMEOUT_SECONDS: "900"
   RX671_OTA_READY_TIMEOUT_SECONDS: "180"
   RX671_OTA_S3_BUCKET: "${AWS_OTA_S3_BUCKET_RX72N_02}"
@@ -360,6 +363,7 @@ workflow:
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/ota-layout-contract.json
         - tools/build_rx671_fwup_v2_rsu.py
         - tools/build_rx671_ota_images.py
+        - tools/manage_rx671_ota_event_policy.py
         - tools/plan_rx671_ota.py
         - tools/provision_rx671_ota.py
         - tools/rx671_ota_host.py
@@ -368,6 +372,7 @@ workflow:
         - tools/ci/tests/test_analyze_rx671_ota_layout.py
         - tools/ci/tests/test_build_rx671_fwup_v2_rsu.py
         - tools/ci/tests/test_build_rx671_ota_images.py
+        - tools/ci/tests/test_manage_rx671_ota_event_policy.py
         - tools/ci/tests/test_plan_rx671_ota.py
         - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
         - tools/ci/tests/test_rx671_ota_build_profile_contract.py
@@ -517,12 +522,14 @@ rx671_ota_ci_contract:
         - tools/build_rx671_ota_images.py
         - tools/create_bg96_ota_update.py
         - tools/manage_ephemeral_iot_thing.py
+        - tools/manage_rx671_ota_event_policy.py
         - tools/plan_rx671_ota.py
         - tools/provision_rx671_ota.py
         - tools/rx671_ota_host.py
         - tools/test_rx671_ota.py
         - tools/verify_ota_aws_state.py
         - tools/ci/test_rx671_wifi_uart.py
+        - tools/ci/tests/test_manage_rx671_ota_event_policy.py
         - tools/ci/tests/test_plan_rx671_ota.py
         - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
         - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
@@ -537,6 +544,7 @@ rx671_ota_ci_contract:
       python3 -m unittest
       tools.ci.tests.test_plan_rx671_ota
       tools.ci.tests.test_manage_ephemeral_iot_thing
+      tools.ci.tests.test_manage_rx671_ota_event_policy
       tools.ci.tests.test_rx671_ota_artifact_ci_contract
       tools.ci.tests.test_rx671_ota_hardware_ci_contract
       tools.ci.tests.test_rx671_ota_host_tools
@@ -1765,6 +1773,7 @@ package_rx671_ota_artifacts:
         tools.ci.tests.test_build_rx671_ota_images `
         tools.ci.tests.test_plan_rx671_ota `
         tools.ci.tests.test_manage_ephemeral_iot_thing `
+        tools.ci.tests.test_manage_rx671_ota_event_policy `
         tools.ci.tests.test_rx671_ota_build_profile_contract `
         tools.ci.tests.test_rx671_ota_artifact_ci_contract `
         tools.ci.tests.test_rx671_ota_hardware_ci_contract `
@@ -1980,6 +1989,35 @@ create_rx671_wifi_ota:
       if ($LASTEXITCODE -ne 0) {
         throw "RX671 OTA create journal does not match the preflight identity."
       }
+      $eventPolicyMeta = Join-Path $artifactDir "event_policy_meta.json"
+      python tools/manage_rx671_ota_event_policy.py create `
+        --plan-json "$planJson" `
+        --alias-meta-json "$ephemeralMeta" `
+        --meta-json "$eventPolicyMeta"
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 OTA Job event policy creation or verification failed."
+      }
+      if ($env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480") {
+        throw "RX671 OTA policy propagation wait must remain pinned to 480 seconds."
+      }
+      $remainingPropagationSeconds =
+        [int]$env:RX671_OTA_POLICY_PROPAGATION_SECONDS
+      while ($remainingPropagationSeconds -gt 0) {
+        $waitStepSeconds = [Math]::Min(30, $remainingPropagationSeconds)
+        Write-Host (
+          "Waiting for AWS IoT policy propagation: " +
+          "$remainingPropagationSeconds seconds remain."
+        )
+        Start-Sleep -Seconds $waitStepSeconds
+        $remainingPropagationSeconds -= $waitStepSeconds
+      }
+      [ordered]@{
+        schema_version = 1
+        waited_seconds = [int]$env:RX671_OTA_POLICY_PROPAGATION_SECONDS
+        status = "complete"
+      } | ConvertTo-Json | Set-Content -LiteralPath (
+        Join-Path $artifactDir "event_policy_propagation_wait.json"
+      ) -Encoding utf8
   artifacts:
     when: always
     paths:
@@ -2300,6 +2338,9 @@ preflight_rx671_wifi_ota:
       }
       if ($env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2") {
         throw "RX671 OTA proof is pinned to TLSv1.2"
+      }
+      if ($env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480") {
+        throw "RX671 OTA policy propagation wait must remain pinned to 480 seconds"
       }
       $configuredRoleArn = $env:RX671_OTA_SERVICE_ROLE_ARN.Trim()
       if ($configuredRoleArn -match '^arn:aws:iam::\d{12}:role/.+$') {
@@ -4247,6 +4288,7 @@ test_rx671_wifi_ota_atomic:
       alias_plan="$plan_dir/ephemeral_thing_plan.json"
       alias_meta="$create_dir/ephemeral_thing_meta.json"
       ota_meta="$create_dir/ota_job_meta.json"
+      event_policy_meta="$create_dir/event_policy_meta.json"
       device_cert="$secret_dir/device-certificate.pem"
       device_key="$secret_dir/device-private-key.pem"
       case "$secret_dir" in
@@ -4324,7 +4366,8 @@ test_rx671_wifi_ota_atomic:
         "$plan_json" \
         "$alias_plan" \
         "$alias_meta" \
-        "$ota_meta"; do
+        "$ota_meta" \
+        "$event_policy_meta"; do
         if [ ! -f "$path" ]; then
           echo "Required RX671 OTA transaction artifact is missing: $path" >&2
           exit 1
@@ -4633,6 +4676,12 @@ cleanup_rx671_wifi_ota:
         --output-json (Join-Path $artifactDir "post_cleanup_state.json")
       $otaCleanupStatus = $LASTEXITCODE
 
+      python tools/manage_rx671_ota_event_policy.py cleanup `
+        --plan-json "$planJson" `
+        --alias-meta-json "$aliasPlan" `
+        --output-json (Join-Path $artifactDir "event_policy_cleanup.json")
+      $eventPolicyCleanupStatus = $LASTEXITCODE
+
       python tools/manage_ephemeral_iot_thing.py cleanup `
         --meta-json "$aliasPlan" `
         --output-json (Join-Path $artifactDir "ephemeral_thing_cleanup.json")
@@ -4640,6 +4689,7 @@ cleanup_rx671_wifi_ota:
 
       if (($snapshotStatus -ne 0 -and -not $snapshotMissingPlannedOta) -or
           $otaCleanupStatus -ne 0 -or
+          $eventPolicyCleanupStatus -ne 0 -or
           $aliasCleanupStatus -ne 0) {
         Write-Error "RX671 OTA evidence or fail-closed AWS cleanup verification failed."
         exit 1

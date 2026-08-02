@@ -24,6 +24,10 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertIn('RX671_OTA_BASELINE_VERSION: "0.1.0"', CI)
         self.assertIn('RX671_OTA_CANDIDATE_VERSION: "0.1.1"', CI)
         self.assertIn('RX671_OTA_REQUIRE_TLS_VERSION: "TLSv1.2"', CI)
+        self.assertIn(
+            'RX671_OTA_POLICY_PROPAGATION_SECONDS: "480"',
+            CI,
+        )
         rules = job(".rx671_wifi_ota_rules")
         activation = (
             'RUN_RX671_OTA_TEST == "true" && '
@@ -71,6 +75,10 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertIn('$env:RX671_OTA_BASELINE_VERSION -ne "0.1.0"', preflight)
         self.assertIn('$env:RX671_OTA_CANDIDATE_VERSION -ne "0.1.1"', preflight)
         self.assertIn('$env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2"', preflight)
+        self.assertIn(
+            '$env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480"',
+            preflight,
+        )
         self.assertNotIn("RX671_OTA_ARTIFACT_KEY", preflight)
         self.assertIn("tools/plan_rx671_ota.py create", preflight)
         self.assertIn("--plan-job-id \"$env:CI_JOB_ID\"", preflight)
@@ -182,6 +190,24 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertNotIn("RX671_EK_WIFI_PASSPHRASE", creator)
         self.assertNotIn("$runtimeDir", creator)
 
+    def test_creator_attaches_only_the_planned_job_event_policy(self) -> None:
+        creator = job("create_rx671_wifi_ota")
+        policy_create = "tools/manage_rx671_ota_event_policy.py create"
+        self.assertIn(policy_create, creator)
+        self.assertLess(
+            creator.index('--ota-meta-json "$otaMeta"'),
+            creator.index(policy_create),
+        )
+        self.assertIn('--plan-json "$planJson"', creator)
+        self.assertIn('--alias-meta-json "$ephemeralMeta"', creator)
+        self.assertIn('--meta-json "$eventPolicyMeta"', creator)
+        self.assertIn("event_policy_propagation_wait.json", creator)
+        self.assertIn("Start-Sleep -Seconds $waitStepSeconds", creator)
+        self.assertIn(
+            '$env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480"',
+            creator,
+        )
+
     def test_one_locked_job_owns_provision_baseline_ota_and_park(self) -> None:
         hardware = job("test_rx671_wifi_ota_atomic")
         self.assertIn("- .rx671_wifi_linux_hw_job", hardware)
@@ -234,6 +260,7 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         ordered = (
             "verify_ota_aws_state.py snapshot",
             "verify_ota_aws_state.py cleanup",
+            "manage_rx671_ota_event_policy.py cleanup",
             "manage_ephemeral_iot_thing.py cleanup",
         )
         positions = [cleanup.index(token) for token in ordered]
@@ -259,6 +286,7 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         )
         self.assertNotIn("RX671_OTA_PLAN_JOB_ID", cleanup)
         self.assertIn("post_cleanup_state.json", cleanup)
+        self.assertIn("event_policy_cleanup.json", cleanup)
         self.assertIn("ephemeral_thing_cleanup.json", cleanup)
         self.assertIn("$snapshotMissingPlannedOta = $false", cleanup)
         self.assertIn(
@@ -274,6 +302,9 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
             "($snapshotStatus -ne 0 -and -not $snapshotMissingPlannedOta)",
             cleanup,
         )
+        self.assertIn("$eventPolicyCleanupStatus -ne 0", cleanup)
+        self.assertIn('--plan-json "$planJson"', cleanup)
+        self.assertIn('--alias-meta-json "$aliasPlan"', cleanup)
 
 
 if __name__ == "__main__":

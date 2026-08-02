@@ -19,6 +19,8 @@ except ModuleNotFoundError:  # Direct execution: python tools/plan_rx671_ota.py
 
 COMMIT_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 OTA_UPDATE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+AWS_IOT_JOB_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+IOT_POLICY_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_+=,.@-]{1,128}$")
 SOURCE_FILE_NAME = "aws_wifi_rx671_ek.ota.bin"
 
 
@@ -73,6 +75,12 @@ def expected_identity(
     ota_update_id = f"rx671-software-ota-{pipeline_id}-{plan_job_id}"
     if not OTA_UPDATE_ID_PATTERN.fullmatch(ota_update_id):
         raise ValueError("derived OTA update ID is invalid")
+    aws_iot_job_id = f"AFR_OTA-{ota_update_id}"
+    if not AWS_IOT_JOB_ID_PATTERN.fullmatch(aws_iot_job_id):
+        raise ValueError("derived AWS IoT job ID is invalid")
+    event_policy_name = f"rx671-ota-event-{pipeline_id}-{plan_job_id}"
+    if not IOT_POLICY_NAME_PATTERN.fullmatch(event_policy_name):
+        raise ValueError("derived AWS IoT event policy name is invalid")
     s3_key = (
         f"ota/{thing_name}/source/{ota_update_id}/{SOURCE_FILE_NAME}"
     )
@@ -86,6 +94,8 @@ def expected_identity(
         "base_thing_name": base_thing_name,
         "thing_name": thing_name,
         "ota_update_id": ota_update_id,
+        "aws_iot_job_id": aws_iot_job_id,
+        "event_policy_name": event_policy_name,
         "s3_bucket": bucket,
         "s3_key": s3_key,
         "code_signing_mode": "custom",
@@ -142,6 +152,7 @@ def validate_created_meta(
         "thing_name": plan["thing_name"],
         "thing_arn": alias_plan["expected_thing_arn"],
         "ota_update_id": plan["ota_update_id"],
+        "aws_iot_job_id": plan["aws_iot_job_id"],
         "s3_bucket": plan["s3_bucket"],
         "s3_key": plan["s3_key"],
         "code_signing_mode": "custom",
