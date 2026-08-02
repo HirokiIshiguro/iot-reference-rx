@@ -37,6 +37,7 @@
 #include "r_smc_entry.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "debug_uart.h"
 
 #if (BSP_CFG_RTOS_USED == 1)
 
@@ -165,6 +166,11 @@ void vApplicationGetTimerTaskMemory( StaticTask_t ** ppxTimerTaskTCBBuffer,
  *********************************************************************************************************************/
 void vApplicationMallocFailedHook( void )
 {
+#if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
+    /* Keep the hardware gate fail-fast instead of becoming a silent TLS/OTA
+     * timeout after the allocator disables scheduling. */
+    debug_puts("RX671 OTA fatal: FreeRTOS malloc failed\r\n");
+#endif
     taskDISABLE_INTERRUPTS();
 
     /* Loop forever */
@@ -186,6 +192,9 @@ void vApplicationMallocFailedHook( void )
  *********************************************************************************************************************/
 void vApplicationStackOverflowHook( TaskHandle_t xTask, char * pcTaskName )
 {
+#if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
+    debug_puts("RX671 OTA fatal: FreeRTOS stack overflow\r\n");
+#endif
     portDISABLE_INTERRUPTS();
 
     /* Unused Parameters */

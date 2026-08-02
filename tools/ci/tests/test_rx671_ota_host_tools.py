@@ -550,6 +550,37 @@ class OtaTransactionContractTests(unittest.TestCase):
             self.assertEqual(["(32/64KB).", "(64/64KB)."], acknowledged)
             self.assertTrue(all(len(chunk) <= 4096 for chunk in serial.writes))
 
+    def test_baseline_stream_does_not_send_next_block_without_progress(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rsu = root / "baseline.rsu"
+            rsu.write_bytes(b"x" * (2 * ota_test.BOOTLOADER_FLASH_BLOCK_SIZE))
+            args = argparse.Namespace(
+                raw_log=root / "raw.log",
+                baseline_rsu=rsu,
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                transfer_timeout=1.0,
+                chunk_size=4096,
+                inter_chunk_delay=0.0,
+            )
+            serial = FakeSerial(b"")
+            transaction = ota_test.Rx671OtaTransaction(args)
+
+            with mock.patch.object(
+                transaction,
+                "wait_for",
+                side_effect=TimeoutError("progress missing"),
+            ):
+                with self.assertRaisesRegex(TimeoutError, "progress missing"):
+                    transaction.stream_baseline_rsu(serial)
+
+            self.assertEqual(
+                ota_test.BOOTLOADER_FLASH_BLOCK_SIZE,
+                sum(map(len, serial.writes)),
+            )
+
     def test_bootloader_fail_close_marker_raises(self):
         with tempfile.TemporaryDirectory() as temporary:
             args = argparse.Namespace(
@@ -561,6 +592,20 @@ class OtaTransactionContractTests(unittest.TestCase):
             transaction = ota_test.Rx671OtaTransaction(args)
             with self.assertRaisesRegex(RuntimeError, "fail-close"):
                 transaction._consume(b"Loading user code signer public key from LittleFS: not found; refusing to boot.\r\n")
+
+    def test_runtime_fatal_marker_raises_without_waiting_for_ota_timeout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            with self.assertRaisesRegex(RuntimeError, "fail-close"):
+                transaction._consume(
+                    b"RX671 OTA fatal: FreeRTOS malloc failed\r\n"
+                )
 
     def test_littlefs_debug_can_split_key_found_marker(self):
         with tempfile.TemporaryDirectory() as temporary:

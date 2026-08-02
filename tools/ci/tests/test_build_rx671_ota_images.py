@@ -71,10 +71,22 @@ class ProfileTests(unittest.TestCase):
             'value="-define=RX671_OTA_RUNTIME_ENABLE=1"', result
         )
         self.assertIn(
-            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=128"', result
+            'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1"',
+            result,
+        )
+        self.assertNotIn(
+            'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1"',
+            result,
+        )
+        self.assertIn(
+            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=192"', result
         )
         self.assertIn(
             'value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"', result
+        )
+        self.assertIn(
+            'value="-define=FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH=32768"',
+            result,
         )
         self.assertIn(
             'value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=8192"', result

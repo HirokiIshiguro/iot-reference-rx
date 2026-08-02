@@ -39,6 +39,7 @@ BOOT_ERROR_MARKERS = (
     "not found; refusing to boot.",
     "integrity check...NG",
     "Code flash is completely broken.",
+    "RX671 OTA fatal:",
 )
 BOOT_REQUIRED = {
     "key_load_started": KEY_LOAD_MARKER,

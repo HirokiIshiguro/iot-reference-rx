@@ -17,6 +17,9 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.demo = (PROJECT / "src/frtos_config/demo_config.h").read_text(
             encoding="utf-8"
         )
+        cls.aws_iot_config = (
+            PROJECT / "src/frtos_config/aws_iot_config.h"
+        ).read_text(encoding="utf-8")
         cls.whd = (PROJECT / "src/whd_bringup.c").read_text(
             encoding="utf-8"
         )
@@ -41,6 +44,16 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         )
         cls.freertos_cli = (
             ROOT / "Middleware/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c"
+        ).read_text(encoding="utf-8")
+        cls.freertos_helper = (
+            PROJECT / "src/application/startup/freertos_helper.c"
+        ).read_text(encoding="utf-8")
+        cls.freertos_user_port = (
+            PROJECT / "src/application/startup/freertos_user_port.c"
+        ).read_text(encoding="utf-8")
+        cls.software_tls_transport = (
+            ROOT
+            / "Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c"
         ).read_text(encoding="utf-8")
         cls.builder = (ROOT / "tools/build_headless_rx671_wifi.ps1").read_text(
             encoding="utf-8"
@@ -146,6 +159,34 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             "#if (RX671_OTA_RUNTIME_ENABLE == 1)\n"
             "        result = xTaskCreate(ota_start_task,",
             self.main,
+        )
+
+    def test_ota_runtime_reports_scheduler_fatal_hooks(self) -> None:
+        self.assertIn(
+            "RX671 OTA fatal: FreeRTOS malloc failed",
+            self.freertos_helper,
+        )
+        self.assertIn(
+            "RX671 OTA fatal: FreeRTOS stack overflow",
+            self.freertos_helper,
+        )
+        self.assertIn(
+            "RX671 OTA fatal: FreeRTOS assert failed",
+            self.freertos_user_port,
+        )
+
+    def test_software_transport_can_pin_the_ota_proof_to_tls_1_2(self) -> None:
+        self.assertIn(
+            "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2",
+            self.aws_iot_config,
+        )
+        self.assertIn(
+            "MBEDTLS_SSL_VERSION_TLS1_2",
+            self.software_tls_transport,
+        )
+        self.assertIn(
+            "expected TLSv1.2",
+            self.software_tls_transport,
         )
 
     def test_wifi_credentials_are_runtime_provisioned_and_passphrase_is_forgotten(
