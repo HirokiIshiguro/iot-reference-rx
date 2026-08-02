@@ -9,6 +9,7 @@ activation, reboot, self-test, acceptance, and commit.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import sys
 import time
@@ -22,7 +23,6 @@ from rx671_ota_host import (
     cleanup_plaintext,
     open_serial,
     run_checked,
-    stream_file,
     write_json,
     write_junit,
 )
@@ -30,6 +30,7 @@ from test_ota import OtaLogAnalyzer
 
 
 RSU_SIZE = 0x000C0000
+BOOTLOADER_FLASH_BLOCK_SIZE = 0x00008000
 READY_MARKER = 'send "userprog.rsu" via UART.'
 KEY_LOAD_MARKER = "Loading user code signer public key from LittleFS:"
 KEY_FOUND_MARKER = "found."
@@ -199,6 +200,60 @@ class Rx671OtaTransaction:
             self._read(serial_port)
         raise TimeoutError(f"timed out waiting for target marker: {marker}")
 
+    def stream_baseline_rsu(self, serial_port) -> tuple[int, str]:
+        """Send one flash block at a time and wait for its progress ACK.
+
+        The RX boot loader owns two 32 KiB SCI buffers and programs Code Flash
+        in the same 32 KiB unit.  An unrestricted 921600-bps host stream can
+        lap the flash state machine and leave the final receive buffer partial.
+        The existing progress line is emitted only after the corresponding
+        flash write completes, so it is the natural flow-control boundary.
+        """
+        path = self.args.baseline_rsu
+        expected_size = path.stat().st_size
+        if expected_size % BOOTLOADER_FLASH_BLOCK_SIZE:
+            raise ValueError(
+                "baseline RSU size must be a multiple of the boot-loader flash block"
+            )
+
+        sent = 0
+        digest = hashlib.sha256()
+        deadline = time.monotonic() + self.args.transfer_timeout
+        with path.open("rb") as source:
+            while sent < expected_size:
+                block = source.read(BOOTLOADER_FLASH_BLOCK_SIZE)
+                if len(block) != BOOTLOADER_FLASH_BLOCK_SIZE:
+                    raise IOError(
+                        f"short baseline RSU block: {len(block)}/"
+                        f"{BOOTLOADER_FLASH_BLOCK_SIZE} bytes"
+                    )
+                for offset in range(0, len(block), self.args.chunk_size):
+                    chunk = block[offset : offset + self.args.chunk_size]
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError(
+                            f"timed out after sending {sent}/{expected_size} bytes"
+                        )
+                    written = serial_port.write(chunk)
+                    if written != len(chunk):
+                        raise IOError(f"short UART write: {written}/{len(chunk)} bytes")
+                    if self.args.inter_chunk_delay:
+                        time.sleep(self.args.inter_chunk_delay)
+
+                serial_port.flush()
+                digest.update(block)
+                sent += len(block)
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"timed out waiting for flash progress after {sent}/{expected_size} bytes"
+                    )
+                progress_marker = f"({sent // 1024}/{expected_size // 1024}KB)."
+                self.wait_for(serial_port, progress_marker, remaining)
+
+        if sent != expected_size:
+            raise IOError(f"RSU transfer size mismatch: {sent}/{expected_size}")
+        return sent, digest.hexdigest()
+
     def run(self) -> dict:
         if self.args.baseline_rsu.stat().st_size != RSU_SIZE:
             raise ValueError(
@@ -226,13 +281,7 @@ class Rx671OtaTransaction:
             self.wait_for(serial_port, KEY_LOAD_MARKER, self.args.boot_timeout)
             self.wait_for(serial_port, KEY_FOUND_MARKER, self.args.boot_timeout)
             self.wait_for(serial_port, READY_MARKER, self.args.boot_timeout)
-            sent, digest = stream_file(
-                serial_port,
-                self.args.baseline_rsu,
-                chunk_size=self.args.chunk_size,
-                inter_chunk_delay=self.args.inter_chunk_delay,
-                timeout=self.args.transfer_timeout,
-            )
+            sent, digest = self.stream_baseline_rsu(serial_port)
             self.wait_for(serial_port, BOOT_REQUIRED["install_completed"], self.args.install_timeout)
             self.wait_for(serial_port, BOOT_REQUIRED["jump"], self.args.install_timeout)
             self.wait_for(

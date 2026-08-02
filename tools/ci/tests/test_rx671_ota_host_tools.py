@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import inspect
 import re
@@ -509,6 +510,45 @@ class OtaTransactionContractTests(unittest.TestCase):
             transaction = ota_test.Rx671OtaTransaction(args)
             with self.assertRaisesRegex(ValueError, "exactly 0xC0000"):
                 transaction.run()
+
+    def test_baseline_stream_waits_for_each_flash_block_progress(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rsu = root / "baseline.rsu"
+            payload = bytes(range(256)) * 256
+            self.assertEqual(2 * ota_test.BOOTLOADER_FLASH_BLOCK_SIZE, len(payload))
+            rsu.write_bytes(payload)
+            args = argparse.Namespace(
+                raw_log=root / "raw.log",
+                baseline_rsu=rsu,
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                transfer_timeout=1.0,
+                chunk_size=4096,
+                inter_chunk_delay=0.0,
+            )
+            serial = FakeSerial(b"")
+            transaction = ota_test.Rx671OtaTransaction(args)
+            acknowledged = []
+
+            def acknowledge(_serial, marker, timeout):
+                expected_sent = (
+                    len(acknowledged) + 1
+                ) * ota_test.BOOTLOADER_FLASH_BLOCK_SIZE
+                self.assertEqual(expected_sent, sum(map(len, serial.writes)))
+                self.assertGreater(timeout, 0)
+                acknowledged.append(marker)
+
+            with mock.patch.object(
+                transaction, "wait_for", side_effect=acknowledge
+            ):
+                sent, digest = transaction.stream_baseline_rsu(serial)
+
+            self.assertEqual(len(payload), sent)
+            self.assertEqual(hashlib.sha256(payload).hexdigest(), digest)
+            self.assertEqual(["(32/64KB).", "(64/64KB)."], acknowledged)
+            self.assertTrue(all(len(chunk) <= 4096 for chunk in serial.writes))
 
     def test_bootloader_fail_close_marker_raises(self):
         with tempfile.TemporaryDirectory() as temporary:
