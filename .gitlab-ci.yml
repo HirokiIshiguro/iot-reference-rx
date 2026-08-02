@@ -214,6 +214,22 @@ variables:
   # The signed baseline/candidate OTA bundle is opt-in. Its MR workflow is a
   # build-only proof and must not reserve or reflash the shared RX671 bench.
   RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+  # RX671 software OTA is a focused, fail-closed hardware transaction.  The
+  # normal branch/MR lanes keep it disabled until an operator (or a dedicated
+  # nightly matrix row) selects RX671_WIFI_TEST_SCOPE=ota and opts in.
+  RUN_RX671_OTA_TEST: "false"
+  RX671_OTA_BASELINE_VERSION: "0.1.0"
+  RX671_OTA_CANDIDATE_VERSION: "0.1.1"
+  RX671_OTA_REQUIRE_TLS_VERSION: "TLSv1.2"
+  # AWS documents an eventual-consistency window for policy changes. Keep the
+  # focused proof deterministic by waiting the full upper bound before HIL.
+  RX671_OTA_POLICY_PROPAGATION_SECONDS: "480"
+  RX671_OTA_OBSERVE_TIMEOUT_SECONDS: "900"
+  RX671_OTA_READY_TIMEOUT_SECONDS: "180"
+  RX671_OTA_STARTUP_RESET_RETRIES: "2"
+  RX671_OTA_S3_BUCKET: "${AWS_OTA_S3_BUCKET_RX72N_02}"
+  RX671_OTA_SERVICE_ROLE_ARN: "${AWS_OTA_SERVICE_ROLE_ARN_RX72N_02}"
+  RX671_OTA_BASE_THING_NAME: "${RX671_EK_AWS_IOT_THING_NAME}"
   # Standalone flash/UART smoke is intentionally opt-in because it replaces
   # the application currently running on the shared RPi#1 EK-RX671 bench.
   RUN_RX671_BOOTLOADER_SMOKE: "false"
@@ -223,6 +239,7 @@ variables:
   #   build   - build and publish firmware artifacts only.
   #   network - flash via E2OB and verify WHD JOIN + FreeRTOS+TCP network up.
   #   mqtt    - network checks plus AWS IoT TLS/MQTT smoke.
+  #   ota     - pipeline-owned Thing alias, signed 0.1.0 -> 0.1.1 OTA, cleanup.
   #   fleet   - build an encrypted Fleet image, verify it atomically, then park
   #             the board on a Fleet-claim-free network image.
   RX671_WIFI_TEST_SCOPE: "build"
@@ -309,23 +326,60 @@ workflow:
         RX671_WIFI_SKIP_HW_TESTS: "true"
         RUN_RX671_BOOTLOADER_BUILD: "false"
       when: always
-    # Match the OTA artifact leaf before the broad Projects/aws_wifi_rx671_ek
-    # rule below. This lane builds and validates signed artifacts only; it must
-    # not start the existing network/AWS hardware jobs on the shared RX671 EK.
+    # Shared RX671 application/build inputs affect both the normal network image
+    # and the signed OTA images. GitLab workflow rules are first-match, so keep a
+    # combined lane ahead of both narrower rules instead of letting either
+    # validation path suppress the other.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/.cproject
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/aws_wifi_rx671_ek.c
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.c
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.h
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/demo_config.h
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/r_fwup_config.h
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/rm_littlefs_flash_config.h
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/sdio_host.c
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/whd_port/whd_port_resource.c
+        - Projects/aws_wifi_rx671_ek/external/patches/whd-v1.70.0-ccrx-portability.patch
+        - tools/build_headless_rx671_wifi.ps1
+      variables:
+        PIPELINE_PROFILE: "mr-rx671-ota-and-network"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX72N_TEST_SCOPE: "build"
+        RX671_WIFI_TEST_SCOPE: "network"
+        RX671_WIFI_SKIP_HW_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "true"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "true"
+      when: always
+    # Match OTA-only inputs before the broad Projects/aws_wifi_rx671_ek rule
+    # below. This lane builds and validates signed artifacts only; it must not
+    # start the existing network/AWS hardware jobs on the shared RX671 EK.
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/OTA_FLASH_LAYOUT.md
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/ota-layout-contract.json
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.c
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.h
         - tools/build_rx671_fwup_v2_rsu.py
         - tools/build_rx671_ota_images.py
+        - tools/manage_rx671_ota_event_policy.py
+        - tools/plan_rx671_ota.py
+        - tools/provision_rx671_ota.py
+        - tools/rx671_ota_host.py
+        - tools/test_rx671_ota.py
         - tools/ci/analyze_rx671_ota_layout.py
         - tools/ci/tests/test_analyze_rx671_ota_layout.py
         - tools/ci/tests/test_build_rx671_fwup_v2_rsu.py
         - tools/ci/tests/test_build_rx671_ota_images.py
+        - tools/ci/tests/test_manage_rx671_ota_event_policy.py
+        - tools/ci/tests/test_plan_rx671_ota.py
         - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
         - tools/ci/tests/test_rx671_ota_build_profile_contract.py
+        - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
+        - tools/ci/tests/test_rx671_ota_host_tools.py
+        - tools/ci/tests/test_rx671_ota_runtime_profile_contract.py
       variables:
         PIPELINE_PROFILE: "mr-rx671-ota-artifacts"
         RX65N_BG96_TEST_SCOPE: "build"
@@ -449,6 +503,55 @@ nightly_dependency_contract:
       tools.ci.tests.test_nightly_dependency_alignment
       tools.ci.tests.test_nightly_dependency_ci_contract
       tools.ci.tests.test_verify_dependency_gate_mr_scope
+      -v
+
+rx671_ota_ci_contract:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - .gitlab-ci.yml
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/aws_wifi_rx671_ek.c
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/demo_config.h
+        - tools/build_rx671_ota_images.py
+        - tools/create_bg96_ota_update.py
+        - tools/manage_ephemeral_iot_thing.py
+        - tools/manage_rx671_ota_event_policy.py
+        - tools/plan_rx671_ota.py
+        - tools/provision_rx671_ota.py
+        - tools/rx671_ota_host.py
+        - tools/test_rx671_ota.py
+        - tools/verify_ota_aws_state.py
+        - tools/ci/test_rx671_wifi_uart.py
+        - tools/ci/tests/test_manage_rx671_ota_event_policy.py
+        - tools/ci/tests/test_plan_rx671_ota.py
+        - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
+        - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
+        - tools/ci/tests/test_rx671_ota_host_tools.py
+        - tools/ci/tests/test_rx671_ota_runtime_profile_contract.py
+        - tools/ci/tests/test_rx671_wifi_uart.py
+        - tools/ci/tests/test_verify_ota_aws_state.py
+      when: on_success
+    - when: never
+  script:
+    - >-
+      python3 -m unittest
+      tools.ci.tests.test_plan_rx671_ota
+      tools.ci.tests.test_manage_ephemeral_iot_thing
+      tools.ci.tests.test_manage_rx671_ota_event_policy
+      tools.ci.tests.test_rx671_ota_artifact_ci_contract
+      tools.ci.tests.test_rx671_ota_hardware_ci_contract
+      tools.ci.tests.test_rx671_ota_host_tools
+      tools.ci.tests.test_rx671_ota_runtime_profile_contract
+      tools.ci.tests.test_rx671_wifi_uart
+      tools.ci.tests.test_verify_ota_aws_state
       -v
 
 nightly_dependency_alignment:
@@ -1280,6 +1383,8 @@ build_rx671_wifi:
     - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
+    - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
+      when: on_success
     - if: '$RUN_RX671_WIFI_BUILD == "true"'
       when: on_success
     - when: never
@@ -1288,9 +1393,15 @@ build_rx671_wifi:
     - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_hardware_transaction_contract tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
-      foreach ($name in @("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")) {
-        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
-          throw "Required RX671 Wi-Fi CI/CD variable is missing: $name"
+      $otaParkBuild = (
+        $env:RUN_RX671_OTA_TEST -eq "true" -and
+        $env:RX671_WIFI_TEST_SCOPE -eq "ota"
+      )
+      if (-not $otaParkBuild) {
+        foreach ($name in @("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE")) {
+          if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+            throw "Required RX671 Wi-Fi CI/CD variable is missing: $name"
+          }
         }
       }
 
@@ -1299,8 +1410,14 @@ build_rx671_wifi:
         E2Studio = "$env:E2STUDIO_CLI"
         Workspace = "$env:E2STUDIO_WORKSPACE_RX671_WIFI"
         LogFile = "$env:CI_PROJECT_DIR\rx671_wifi_e2studio_build.log"
-        UseLocalJoinConfig = $true
         WlanAllowBusSleepDelayMs = [int]$env:RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS
+      }
+      if ($otaParkBuild) {
+        # This image is retained only as a safe post-test parking image. It must
+        # never contain the Wi-Fi credentials used by the encrypted OTA bundle.
+        $buildArgs.SkipWifiConfig = $true
+      } else {
+        $buildArgs.UseLocalJoinConfig = $true
       }
 
       if ($env:RX671_WIFI_TEST_SCOPE -eq "mqtt") {
@@ -1559,6 +1676,8 @@ build_rx671_bootloader:
     - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
+    - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
+      when: on_success
     - if: '$RUN_RX671_BOOTLOADER_BUILD == "true"'
       when: on_success
     - when: never
@@ -1612,22 +1731,58 @@ package_rx671_ota_artifacts:
     - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
+    - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
+      when: on_success
     - if: '$RUN_RX671_OTA_ARTIFACT_BUILD == "true"'
       when: on_success
     - when: never
   needs:
+    - job: preflight_rx671_wifi_ota
+      artifacts: false
+      optional: true
     - job: build_rx671_bootloader
       artifacts: true
   script:
     - Write-Host "=== Build RX671 OTA baseline/candidate signed artifacts ==="
+    - |
+      # A killed previous job cannot run finally/after_script. Remove every
+      # known transient build location before creating a new formal bundle.
+      $staleBuildState = @(
+        (Join-Path $env:CI_PROJECT_DIR "build\rx671-ota"),
+        (Join-Path $env:CI_PROJECT_DIR "Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"),
+        $env:E2STUDIO_WORKSPACE_RX671_OTA
+      )
+      foreach ($path in $staleBuildState) {
+        if (-not [string]::IsNullOrWhiteSpace($path) -and
+            (Test-Path -LiteralPath $path)) {
+          Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+        }
+      }
+      $residualBuildState = $staleBuildState |
+        Where-Object {
+          -not [string]::IsNullOrWhiteSpace($_) -and
+          (Test-Path -LiteralPath $_)
+        }
+      if ($residualBuildState.Count -ne 0) {
+        throw "RX671 OTA stale build-state pre-clean failed"
+      }
     - python -m pip install --user cryptography
     - |
       python -m unittest `
         tools.ci.tests.test_analyze_rx671_ota_layout `
         tools.ci.tests.test_build_rx671_fwup_v2_rsu `
         tools.ci.tests.test_build_rx671_ota_images `
+        tools.ci.tests.test_plan_rx671_ota `
+        tools.ci.tests.test_manage_ephemeral_iot_thing `
+        tools.ci.tests.test_manage_rx671_ota_event_policy `
         tools.ci.tests.test_rx671_ota_build_profile_contract `
         tools.ci.tests.test_rx671_ota_artifact_ci_contract `
+        tools.ci.tests.test_rx671_ota_hardware_ci_contract `
+        tools.ci.tests.test_rx671_ota_runtime_profile_contract `
+        tools.ci.tests.test_rx671_ota_host_tools `
+        tools.ci.tests.test_verify_ota_aws_state `
+        tools.ci.tests.test_ota_aws_evidence_ci_contract `
+        tools.ci.tests.test_protect_secret_artifact `
         tools.ci.tests.test_rx671_bootloader_contract
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
@@ -1638,23 +1793,237 @@ package_rx671_ota_artifacts:
         }
       }
     - |
-      python tools/build_rx671_ota_images.py `
-        --baseline-version 0.1.0 `
-        --candidate-version 0.1.1 `
-        --e2studio "$env:E2STUDIO_CLI" `
-        --workspace-root "$env:E2STUDIO_WORKSPACE_RX671_OTA"
+      $otaBuildArgs = @(
+        "tools/build_rx671_ota_images.py",
+        "--baseline-version", "$env:RX671_OTA_BASELINE_VERSION",
+        "--candidate-version", "$env:RX671_OTA_CANDIDATE_VERSION",
+        "--e2studio", "$env:E2STUDIO_CLI",
+        "--workspace-root", "$env:E2STUDIO_WORKSPACE_RX671_OTA"
+      )
+      python @otaBuildArgs
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       if (-not (Test-Path -LiteralPath "$env:CI_PROJECT_DIR\build\rx671-ota")) {
         throw "RX671 OTA artifact directory missing"
       }
+      $hardwareDebug = Join-Path $env:CI_PROJECT_DIR "Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"
+      $otaWorkspace = $env:E2STUDIO_WORKSPACE_RX671_OTA
+      $provenanceManifests = @(
+        Get-ChildItem -LiteralPath "$env:CI_PROJECT_DIR\build\rx671-ota" `
+          -Filter "ota-layout-provenance.json" -File -Recurse
+      )
+      if ($provenanceManifests.Count -ne 2) {
+        throw "RX671 OTA baseline/candidate provenance manifests are missing"
+      }
+      foreach ($manifestPath in $provenanceManifests) {
+        $manifest = Get-Content -LiteralPath $manifestPath.FullName -Raw | ConvertFrom-Json
+        if (($manifest.formal -ne $true) -or
+            ($manifest.dirty -ne $false) -or
+            ($manifest.source_sha -ne $env:CI_COMMIT_SHA) -or
+            ($manifest.credentials_embedded -ne $false) -or
+            ($manifest.wifi_credentials_source -ne "littlefs_kvs_runtime_provisioning")) {
+          throw "RX671 OTA artifact is not credential-free formal firmware: $($manifestPath.FullName)"
+        }
+      }
+      foreach ($path in @($hardwareDebug, $otaWorkspace)) {
+        if (-not [string]::IsNullOrWhiteSpace($path) -and
+            (Test-Path -LiteralPath $path)) {
+          Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+        }
+      }
+      $residualBuildState = @($hardwareDebug, $otaWorkspace) |
+        Where-Object {
+          -not [string]::IsNullOrWhiteSpace($_) -and
+          (Test-Path -LiteralPath $_)
+        }
+      if ($residualBuildState.Count -ne 0) {
+        throw "RX671 OTA HardwareDebug/workspace cleanup postcondition failed"
+      }
     - Write-Host "PACKAGE RX671 OTA ARTIFACTS SUCCESS"
+  after_script:
+    - |
+      $cleanupTargets = @(
+        (Join-Path $env:CI_PROJECT_DIR "Projects\aws_wifi_rx671_ek\e2studio_ccrx\HardwareDebug"),
+        $env:E2STUDIO_WORKSPACE_RX671_OTA
+      )
+      foreach ($path in $cleanupTargets) {
+        if (-not [string]::IsNullOrWhiteSpace($path) -and
+            (Test-Path -LiteralPath $path)) {
+          Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
+        }
+      }
+      $residualPaths = $cleanupTargets |
+        Where-Object {
+          -not [string]::IsNullOrWhiteSpace($_) -and
+          (Test-Path -LiteralPath $_)
+        }
+      if ($residualPaths.Count -ne 0) {
+        throw "RX671 OTA after_script cleanup postcondition failed"
+      }
   artifacts:
     when: always
     paths:
       - build/rx671-ota/
     expire_in: 7 days
 
+create_rx671_wifi_ota:
+  stage: ota_create
+  extends:
+    - .aws_cli_windows_job
+    - .rx671_wifi_ota_rules
+  needs:
+    - job: preflight_rx671_wifi_ota
+      artifacts: true
+    - job: package_rx671_ota_artifacts
+      artifacts: true
+  script:
+    - $ErrorActionPreference = "Stop"
+    - Write-Host "=== Create pipeline-owned EK-RX671 software OTA update ==="
+    - python -m pip install --user cryptography
+    - |
+      if ($env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2") {
+        throw "The first RX671 software OTA proof is intentionally pinned to TLSv1.2."
+      }
+
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx671_wifi_ota"
+      $planDir = Join-Path $env:CI_PROJECT_DIR "artifacts\preflight_rx671_wifi_ota"
+      $planJson = Join-Path $planDir "ota_plan.json"
+      $aliasPlanJson = Join-Path $planDir "ephemeral_thing_plan.json"
+      $bundleRoot = Join-Path $env:CI_PROJECT_DIR "build\rx671-ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      if ([string]::IsNullOrWhiteSpace($env:RX671_OTA_PLAN_JOB_ID)) {
+        throw "RX671 OTA preflight dotenv identity is missing."
+      }
+      if ($env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN -notmatch
+          '^arn:aws:iam::\d{12}:role/.+$') {
+        throw "RX671 OTA preflight resolved service role ARN is missing or invalid."
+      }
+      python tools/plan_rx671_ota.py verify `
+        --project-id "$env:CI_PROJECT_ID" `
+        --pipeline-id "$env:CI_PIPELINE_ID" `
+        --plan-job-id "$env:RX671_OTA_PLAN_JOB_ID" `
+        --commit-sha "$env:CI_COMMIT_SHA" `
+        --base-thing-name "$env:RX671_OTA_BASE_THING_NAME" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --bucket "$env:RX671_OTA_S3_BUCKET" `
+        --baseline-version "$env:RX671_OTA_BASELINE_VERSION" `
+        --candidate-version "$env:RX671_OTA_CANDIDATE_VERSION" `
+        --tls-version "$env:RX671_OTA_REQUIRE_TLS_VERSION" `
+        --plan-json "$planJson" `
+        --alias-plan-json "$aliasPlanJson"
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 OTA preflight journal does not belong to this pipeline."
+      }
+      $otaPlan = Get-Content -LiteralPath $planJson -Raw | ConvertFrom-Json
+      $candidateDir = Join-Path $bundleRoot "candidate-$env:RX671_OTA_CANDIDATE_VERSION"
+      $payload = Join-Path $candidateDir "aws_wifi_rx671_ek.ota.bin"
+      $signature = Join-Path $candidateDir "aws_wifi_rx671_ek.ota-signature.der"
+      $signerCertificate = Join-Path $candidateDir "rx671-ota-signer.crt.pem"
+      foreach ($path in @($payload, $signature, $signerCertificate)) {
+        if (-not (Test-Path -LiteralPath $path)) {
+          throw "Required RX671 OTA creation artifact is missing: $path"
+        }
+      }
+
+      $baseThing = $otaPlan.base_thing_name
+      $otaThing = $otaPlan.thing_name
+      $otaUpdateId = $otaPlan.ota_update_id
+      $otaS3Key = $otaPlan.s3_key
+      $ephemeralMeta = Join-Path $artifactDir "ephemeral_thing_meta.json"
+      python tools/manage_ephemeral_iot_thing.py create `
+        --base-thing-name "$baseThing" `
+        --thing-name "$otaThing" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --owner-project-id "$env:CI_PROJECT_ID" `
+        --owner-pipeline-id "$env:CI_PIPELINE_ID" `
+        --owner-job-id "$env:RX671_OTA_PLAN_JOB_ID" `
+        --plan-meta-json "$aliasPlanJson" `
+        --meta-json "$ephemeralMeta"
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create the pipeline-owned RX671 OTA Thing alias."
+      }
+
+      [ordered]@{
+        schema_version = 1
+        status = "prepared"
+        thing_name = $otaThing
+        payload = $payload
+        custom_signature = $signature
+        signer_certificate = $signerCertificate
+        file_version = $env:RX671_OTA_CANDIDATE_VERSION
+        region = $env:AWS_DEFAULT_REGION
+        note = "The target alias and OTA update are owned by this pipeline."
+      } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "creation_prepared.json") -Encoding utf8
+
+      python tools/create_bg96_ota_update.py `
+        --artifact-dir "$artifactDir" `
+        --thing-name "$otaThing" `
+        --input-payload "$payload" `
+        --file-version "$env:RX671_OTA_CANDIDATE_VERSION" `
+        --bucket "$env:RX671_OTA_S3_BUCKET" `
+        --custom-signature-der "$signature" `
+        --code-signer-cert "$signerCertificate" `
+        --certificate-name "rx671-ota-signer.crt.pem" `
+        --role-arn "$env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --ota-update-id "$otaUpdateId" `
+        --s3-key "$otaS3Key"
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 software OTA update creation failed."
+      }
+      $otaMeta = Join-Path $artifactDir "ota_job_meta.json"
+      python tools/plan_rx671_ota.py verify `
+        --project-id "$env:CI_PROJECT_ID" `
+        --pipeline-id "$env:CI_PIPELINE_ID" `
+        --plan-job-id "$env:RX671_OTA_PLAN_JOB_ID" `
+        --commit-sha "$env:CI_COMMIT_SHA" `
+        --base-thing-name "$env:RX671_OTA_BASE_THING_NAME" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --bucket "$env:RX671_OTA_S3_BUCKET" `
+        --baseline-version "$env:RX671_OTA_BASELINE_VERSION" `
+        --candidate-version "$env:RX671_OTA_CANDIDATE_VERSION" `
+        --tls-version "$env:RX671_OTA_REQUIRE_TLS_VERSION" `
+        --plan-json "$planJson" `
+        --alias-plan-json "$aliasPlanJson" `
+        --created-alias-meta-json "$ephemeralMeta" `
+        --ota-meta-json "$otaMeta"
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 OTA create journal does not match the preflight identity."
+      }
+      $eventPolicyMeta = Join-Path $artifactDir "event_policy_meta.json"
+      python tools/manage_rx671_ota_event_policy.py create `
+        --plan-json "$planJson" `
+        --alias-meta-json "$ephemeralMeta" `
+        --meta-json "$eventPolicyMeta"
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 OTA Job event policy creation or verification failed."
+      }
+      if ($env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480") {
+        throw "RX671 OTA policy propagation wait must remain pinned to 480 seconds."
+      }
+      $remainingPropagationSeconds =
+        [int]$env:RX671_OTA_POLICY_PROPAGATION_SECONDS
+      while ($remainingPropagationSeconds -gt 0) {
+        $waitStepSeconds = [Math]::Min(30, $remainingPropagationSeconds)
+        Write-Host (
+          "Waiting for AWS IoT policy propagation: " +
+          "$remainingPropagationSeconds seconds remain."
+        )
+        Start-Sleep -Seconds $waitStepSeconds
+        $remainingPropagationSeconds -= $waitStepSeconds
+      }
+      [ordered]@{
+        schema_version = 1
+        waited_seconds = [int]$env:RX671_OTA_POLICY_PROPAGATION_SECONDS
+        status = "complete"
+      } | ConvertTo-Json | Set-Content -LiteralPath (
+        Join-Path $artifactDir "event_policy_propagation_wait.json"
+      ) -Encoding utf8
+  artifacts:
+    when: always
+    paths:
+      - artifacts/create_rx671_wifi_ota/
+    expire_in: 7 days
 build_rx65n_bg96_fleet:
   stage: build
   tags:
@@ -1927,6 +2296,101 @@ build_rx72n_ether_fleet:
       }
       aws --version
 
+preflight_rx671_wifi_ota:
+  stage: dependency_check
+  extends:
+    - .aws_cli_windows_job
+    - .rx671_wifi_ota_rules
+  script:
+    - $ErrorActionPreference = "Stop"
+    - Write-Host "=== Fail-closed EK-RX671 software OTA preflight ==="
+    - |
+      $requiredVariables = @(
+        "AWS_DEFAULT_REGION",
+        "RX671_OTA_S3_BUCKET",
+        "RX671_OTA_SERVICE_ROLE_ARN",
+        "RX671_OTA_BASE_THING_NAME",
+        "RX671_EK_WIFI_SSID",
+        "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_EK_AWS_IOT_CERT_PEM",
+        "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM"
+      )
+      $missing = @(
+        $requiredVariables |
+          Where-Object {
+            [string]::IsNullOrWhiteSpace(
+              [Environment]::GetEnvironmentVariable($_)
+            )
+          }
+      )
+      if ($missing.Count -ne 0) {
+        throw "RX671 OTA required CI/CD variables are missing: $($missing -join ', ')"
+      }
+      if ([string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_ENDPOINT) -and
+          [string]::IsNullOrWhiteSpace($env:AWS_IOT_ENDPOINT)) {
+        throw "RX671 OTA requires RX671_EK_AWS_IOT_ENDPOINT or AWS_IOT_ENDPOINT"
+      }
+      if ($env:RX671_WIFI_SKIP_HW_TESTS -eq "true") {
+        throw "RX671 OTA hardware proof cannot run with RX671_WIFI_SKIP_HW_TESTS=true"
+      }
+      if ($env:RX671_OTA_BASELINE_VERSION -ne "0.1.0" -or
+          $env:RX671_OTA_CANDIDATE_VERSION -ne "0.1.1") {
+        throw "RX671 OTA proof is pinned to the exact 0.1.0 -> 0.1.1 transition"
+      }
+      if ($env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2") {
+        throw "RX671 OTA proof is pinned to TLSv1.2"
+      }
+      if ($env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480") {
+        throw "RX671 OTA policy propagation wait must remain pinned to 480 seconds"
+      }
+      $configuredRoleArn = $env:RX671_OTA_SERVICE_ROLE_ARN.Trim()
+      if ($configuredRoleArn -match '^arn:aws:iam::\d{12}:role/.+$') {
+        $env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN = $configuredRoleArn
+      } elseif ($configuredRoleArn -match '^\d{12}:role/.+$') {
+        $env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN =
+          "arn:aws:iam::$configuredRoleArn"
+      } else {
+        throw (
+          "RX671 OTA service role must be a full IAM role ARN or " +
+          "ACCOUNT_ID:role/NAME shorthand"
+        )
+      }
+    - |
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\preflight_rx671_wifi_ota"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      $planJson = Join-Path $artifactDir "ota_plan.json"
+      $aliasPlanJson = Join-Path $artifactDir "ephemeral_thing_plan.json"
+      python tools/plan_rx671_ota.py create `
+        --project-id "$env:CI_PROJECT_ID" `
+        --pipeline-id "$env:CI_PIPELINE_ID" `
+        --plan-job-id "$env:CI_JOB_ID" `
+        --commit-sha "$env:CI_COMMIT_SHA" `
+        --base-thing-name "$env:RX671_OTA_BASE_THING_NAME" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --bucket "$env:RX671_OTA_S3_BUCKET" `
+        --baseline-version "$env:RX671_OTA_BASELINE_VERSION" `
+        --candidate-version "$env:RX671_OTA_CANDIDATE_VERSION" `
+        --tls-version "$env:RX671_OTA_REQUIRE_TLS_VERSION" `
+        --plan-json "$planJson" `
+        --alias-plan-json "$aliasPlanJson"
+      if ($LASTEXITCODE -ne 0) {
+        throw "RX671 OTA deterministic preflight journal creation failed"
+      }
+      Set-Content `
+        -LiteralPath (Join-Path $artifactDir "plan.env") `
+        -Value @(
+          "RX671_OTA_PLAN_JOB_ID=$env:CI_JOB_ID",
+          "RX671_OTA_RESOLVED_SERVICE_ROLE_ARN=$env:RX671_OTA_RESOLVED_SERVICE_ROLE_ARN"
+        ) `
+        -Encoding ascii
+    - Write-Host "RX671 OTA PREFLIGHT SUCCESS"
+  artifacts:
+    paths:
+      - artifacts/preflight_rx671_wifi_ota/
+    reports:
+      dotenv: artifacts/preflight_rx671_wifi_ota/plan.env
+    expire_in: 30 days
+
 .rx65n_bg96_flash_rules:
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE =~ /^(flash|download|app|provision|ota|tls13_0rtt|full)$/'
@@ -1937,6 +2401,18 @@ build_rx72n_ether_fleet:
   rules:
     - if: '$RX671_WIFI_SKIP_HW_TESTS != "true" && $RX671_WIFI_TEST_SCOPE =~ /^(network|mqtt)$/'
       when: on_success
+    - when: never
+
+.rx671_wifi_ota_rules:
+  rules:
+    - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
+      when: on_success
+    - when: never
+
+.rx671_wifi_ota_cleanup_rules:
+  rules:
+    - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
+      when: always
     - when: never
 
 .rx671_wifi_fleet_rules:
@@ -3776,6 +4252,454 @@ test_rx671_wifi:
       - artifacts/test_rx671_wifi/
     reports:
       junit: artifacts/test_rx671_wifi/junit.xml
+    expire_in: 7 days
+
+test_rx671_wifi_ota_atomic:
+  stage: ota_test
+  extends:
+    - .rx671_wifi_linux_hw_job
+    - .rx671_wifi_ota_rules
+  needs:
+    - job: preflight_rx671_wifi_ota
+      artifacts: true
+    - job: build_rx671_wifi
+      artifacts: true
+    - job: package_rx671_ota_artifacts
+      artifacts: true
+    - job: create_rx671_wifi_ota
+      artifacts: true
+  script:
+    - echo "=== Verify EK-RX671 Type 1YN software OTA atomically ==="
+    - python -m pip install --quiet cryptography
+    - |
+      set -e
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_ota_atomic"
+      secret_dir="$CI_PROJECT_DIR/.rx671-ota-secrets"
+      park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
+      bundle_root="$CI_PROJECT_DIR/build/rx671-ota"
+      provisioner_mot="$bundle_root/provisioner/aws_wifi_rx671_ek.mot"
+      bootloader_mot="$bundle_root/bootloader/boot_loader_rx671_ek.mot"
+      baseline_dir="$bundle_root/baseline-$RX671_OTA_BASELINE_VERSION"
+      baseline_rsu="$baseline_dir/aws_wifi_rx671_ek.rsu"
+      signer_cert="$baseline_dir/rx671-ota-signer.crt.pem"
+      signer_public_key="$baseline_dir/rx671-ota-signer.pub.pem"
+      create_dir="$CI_PROJECT_DIR/artifacts/create_rx671_wifi_ota"
+      plan_dir="$CI_PROJECT_DIR/artifacts/preflight_rx671_wifi_ota"
+      plan_json="$plan_dir/ota_plan.json"
+      alias_plan="$plan_dir/ephemeral_thing_plan.json"
+      alias_meta="$create_dir/ephemeral_thing_meta.json"
+      ota_meta="$create_dir/ota_job_meta.json"
+      event_policy_meta="$create_dir/event_policy_meta.json"
+      device_cert="$secret_dir/device-certificate.pem"
+      device_key="$secret_dir/device-private-key.pem"
+      case "$secret_dir" in
+        "$CI_PROJECT_DIR"/.rx671-ota-secrets) ;;
+        *)
+          echo "Refusing unexpected RX671 OTA secret path: $secret_dir" >&2
+          exit 1
+          ;;
+      esac
+      rm -rf -- "$secret_dir"
+      if [ -e "$secret_dir" ] || [ -L "$secret_dir" ]; then
+        echo "RX671 OTA stale secret pre-clean failed." >&2
+        exit 1
+      fi
+      mkdir -p "$artifact_dir"
+      install -d -m 700 "$secret_dir"
+
+      park_board() {
+        original_status=$?
+        trap - EXIT
+        set +e
+        rm -rf -- "$secret_dir"
+        secret_cleanup_status=$?
+        if [ -e "$secret_dir" ] || [ -L "$secret_dir" ]; then
+          secret_cleanup_status=1
+        fi
+        if [ "$secret_cleanup_status" -ne 0 ]; then
+          echo "Failed to remove RX671 OTA materialized secrets." >&2
+          touch "$artifact_dir/secret_cleanup_failed"
+          if [ "$original_status" -eq 0 ]; then
+            original_status=1
+          fi
+        else
+          touch "$artifact_dir/secret_cleanup.ok"
+        fi
+        echo "=== Park EK-RX671 on the normal claim-free Wi-Fi image ===" | tee "$artifact_dir/park.log"
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -erase-chip -noquery \
+          2>&1 | tee -a "$artifact_dir/park.log"
+        erase_status=${PIPESTATUS[0]}
+        "$RX671_WIFI_LINUX_RFP_CLI" \
+          -d "$RX671_WIFI_RFP_DEVICE" \
+          -t "$RX671_WIFI_RFP_TOOL" \
+          -if "$RX671_WIFI_RFP_INTERFACE" \
+          -s "$RX671_WIFI_RFP_SPEED" \
+          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+          -p -v -reset -noquery "$park_mot" \
+          2>&1 | tee -a "$artifact_dir/park.log"
+        park_status=${PIPESTATUS[0]}
+        if [ "$erase_status" -eq 0 ] && [ "$park_status" -eq 0 ]; then
+          touch "$artifact_dir/parked.ok"
+        else
+          echo "Failed to park EK-RX671 after OTA transaction." >&2
+          touch "$artifact_dir/park_failed"
+          if [ "$original_status" -eq 0 ]; then
+            original_status=1
+          fi
+        fi
+        exit "$original_status"
+      }
+      trap park_board EXIT
+
+      for path in \
+        "$park_mot" \
+        "$provisioner_mot" \
+        "$bootloader_mot" \
+        "$baseline_rsu" \
+        "$signer_cert" \
+        "$signer_public_key" \
+        "$plan_json" \
+        "$alias_plan" \
+        "$alias_meta" \
+        "$ota_meta" \
+        "$event_policy_meta"; do
+        if [ ! -f "$path" ]; then
+          echo "Required RX671 OTA transaction artifact is missing: $path" >&2
+          exit 1
+        fi
+      done
+      if [ ! -e "$RX671_WIFI_UART_PORT" ]; then
+        echo "Expected EK-RX671 SCI6 UART is not visible: $RX671_WIFI_UART_PORT" >&2
+        exit 1
+      fi
+      "$RX671_WIFI_LINUX_RFP_CLI" -d "$RX671_WIFI_RFP_DEVICE" -lt \
+        2>&1 | tee "$artifact_dir/rfp_tools.txt"
+      status=${PIPESTATUS[0]}
+      if [ "$status" -ne 0 ] || ! grep -Fq "$RX671_WIFI_E2OB_SERIAL" "$artifact_dir/rfp_tools.txt"; then
+        echo "Expected EK-RX671 onboard E2OB is not visible: $RX671_WIFI_E2OB_SERIAL" >&2
+        exit 1
+      fi
+
+      if [ -z "${RX671_OTA_PLAN_JOB_ID:-}" ]; then
+        echo "RX671 OTA preflight dotenv identity is missing." >&2
+        exit 1
+      fi
+      python3 tools/plan_rx671_ota.py verify \
+        --project-id "$CI_PROJECT_ID" \
+        --pipeline-id "$CI_PIPELINE_ID" \
+        --plan-job-id "$RX671_OTA_PLAN_JOB_ID" \
+        --commit-sha "$CI_COMMIT_SHA" \
+        --base-thing-name "$RX671_OTA_BASE_THING_NAME" \
+        --region "$AWS_DEFAULT_REGION" \
+        --bucket "$RX671_OTA_S3_BUCKET" \
+        --baseline-version "$RX671_OTA_BASELINE_VERSION" \
+        --candidate-version "$RX671_OTA_CANDIDATE_VERSION" \
+        --tls-version "$RX671_OTA_REQUIRE_TLS_VERSION" \
+        --plan-json "$plan_json" \
+        --alias-plan-json "$alias_plan" \
+        --created-alias-meta-json "$alias_meta" \
+        --ota-meta-json "$ota_meta"
+
+      ota_thing="$(
+        python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8-sig"))["thing_name"])' \
+          "$ota_meta"
+      )"
+      python3 tools/manage_ephemeral_iot_thing.py verify-journal \
+        --meta-json "$alias_meta" \
+        --expected-thing-name "$ota_thing" \
+        --owner-project-id "$CI_PROJECT_ID" \
+        --owner-pipeline-id "$CI_PIPELINE_ID"
+
+      materialize_secret() {
+        value="$1"
+        destination="$2"
+        if [ -f "$value" ]; then
+          cp "$value" "$destination"
+        else
+          printf '%s\n' "$value" > "$destination"
+        fi
+        chmod 600 "$destination"
+      }
+      materialize_secret "$RX671_EK_AWS_IOT_CERT_PEM" "$device_cert"
+      materialize_secret "$RX671_EK_AWS_IOT_PRIVATE_KEY_PEM" "$device_key"
+      endpoint="${RX671_EK_AWS_IOT_ENDPOINT:-${AWS_IOT_ENDPOINT:-}}"
+      if [ -z "$endpoint" ]; then
+        echo "RX671 OTA endpoint is unavailable." >&2
+        exit 1
+      fi
+
+      echo "=== Preflight erase and park before handling persistent credentials ===" | tee "$artifact_dir/preflight_park.log"
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -erase-chip -noquery \
+        2>&1 | tee -a "$artifact_dir/preflight_park.log"
+      status=${PIPESTATUS[0]}
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -p -v -reset -noquery "$park_mot" \
+        2>&1 | tee -a "$artifact_dir/preflight_park.log"
+      status=${PIPESTATUS[0]}
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+      touch "$artifact_dir/preflight_parked.ok"
+
+      echo "=== Atomic OTA step 1/2: provision LittleFS and install baseline ==="
+      python3 tools/provision_rx671_ota.py \
+        --provisioner-mot "$provisioner_mot" \
+        --bootloader-mot "$bootloader_mot" \
+        --endpoint "$endpoint" \
+        --thing-name "$ota_thing" \
+        --certificate "$device_cert" \
+        --private-key "$device_key" \
+        --codesigner-certificate "$signer_cert" \
+        --codesigner-public-key "$signer_public_key" \
+        --wifi-ssid-env RX671_EK_WIFI_SSID \
+        --wifi-passphrase-env RX671_EK_WIFI_PASSPHRASE \
+        --port "$RX671_WIFI_UART_PORT" \
+        --baud "$RX671_WIFI_UART_BAUD_RATE" \
+        --rfp-cli "$RX671_WIFI_LINUX_RFP_CLI" \
+        --rfp-device "$RX671_WIFI_RFP_DEVICE" \
+        --rfp-tool "$RX671_WIFI_RFP_TOOL" \
+        --rfp-interface "$RX671_WIFI_RFP_INTERFACE" \
+        --rfp-speed "$RX671_WIFI_RFP_SPEED" \
+        --rfp-auth-id "$RX671_WIFI_RFP_AUTH_ID" \
+        --boot-timeout "$RX671_OTA_READY_TIMEOUT_SECONDS" \
+        --artifact-dir "$artifact_dir/provision"
+
+      echo "=== Atomic OTA step 2/2: 0.1.0 baseline to signed 0.1.1 commit ==="
+      python3 tools/test_rx671_ota.py \
+        --baseline-rsu "$baseline_rsu" \
+        --baseline-version "$RX671_OTA_BASELINE_VERSION" \
+        --candidate-version "$RX671_OTA_CANDIDATE_VERSION" \
+        --require-tls-version "$RX671_OTA_REQUIRE_TLS_VERSION" \
+        --port "$RX671_WIFI_UART_PORT" \
+        --baud "$RX671_WIFI_UART_BAUD_RATE" \
+        --rfp-cli "$RX671_WIFI_LINUX_RFP_CLI" \
+        --rfp-device "$RX671_WIFI_RFP_DEVICE" \
+        --rfp-tool "$RX671_WIFI_RFP_TOOL" \
+        --rfp-interface "$RX671_WIFI_RFP_INTERFACE" \
+        --rfp-speed "$RX671_WIFI_RFP_SPEED" \
+        --rfp-auth-id "$RX671_WIFI_RFP_AUTH_ID" \
+        --boot-timeout "$RX671_OTA_READY_TIMEOUT_SECONDS" \
+        --startup-reset-retries "$RX671_OTA_STARTUP_RESET_RETRIES" \
+        --ota-timeout "$RX671_OTA_OBSERVE_TIMEOUT_SECONDS" \
+        --raw-log "$artifact_dir/ota_uart_raw.log" \
+        --summary-json "$artifact_dir/ota_summary.json" \
+        --junit-output "$artifact_dir/junit.xml"
+      touch "$artifact_dir/ota_hardware_success.ok"
+  after_script:
+    - |
+      set +e
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_ota_atomic"
+      secret_dir="$CI_PROJECT_DIR/.rx671-ota-secrets"
+      park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
+      mkdir -p "$artifact_dir"
+      rm -rf -- "$secret_dir"
+      secret_cleanup_status=$?
+      if [ -e "$secret_dir" ] || [ -L "$secret_dir" ]; then
+        secret_cleanup_status=1
+      fi
+      if [ "$secret_cleanup_status" -ne 0 ]; then
+        echo "RX671 OTA after_script: materialized secret cleanup failed." | tee "$artifact_dir/after_script_cleanup.log" >&2
+        touch "$artifact_dir/after_script_cleanup_failed"
+      else
+        touch "$artifact_dir/after_script_cleanup.ok"
+      fi
+      if [ -f "$artifact_dir/parked.ok" ]; then
+        echo "RX671 OTA after_script: board already parked." | tee "$artifact_dir/after_script_park.log"
+      elif [ -f "$park_mot" ]; then
+        exec 8>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"
+        if flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 8; then
+          echo "=== after_script: park EK-RX671 after interrupted OTA ===" | tee "$artifact_dir/after_script_park.log"
+          "$RX671_WIFI_LINUX_RFP_CLI" \
+            -d "$RX671_WIFI_RFP_DEVICE" \
+            -t "$RX671_WIFI_RFP_TOOL" \
+            -if "$RX671_WIFI_RFP_INTERFACE" \
+            -s "$RX671_WIFI_RFP_SPEED" \
+            -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+            -erase-chip -noquery \
+            2>&1 | tee -a "$artifact_dir/after_script_park.log"
+          erase_status=${PIPESTATUS[0]}
+          "$RX671_WIFI_LINUX_RFP_CLI" \
+            -d "$RX671_WIFI_RFP_DEVICE" \
+            -t "$RX671_WIFI_RFP_TOOL" \
+            -if "$RX671_WIFI_RFP_INTERFACE" \
+            -s "$RX671_WIFI_RFP_SPEED" \
+            -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+            -p -v -reset -noquery "$park_mot" \
+            2>&1 | tee -a "$artifact_dir/after_script_park.log"
+          park_status=${PIPESTATUS[0]}
+          if [ "$erase_status" -eq 0 ] && [ "$park_status" -eq 0 ]; then
+            touch "$artifact_dir/parked.ok" "$artifact_dir/after_script_parked.ok"
+          else
+            touch "$artifact_dir/after_script_park_failed"
+          fi
+        else
+          echo "RX671 OTA after_script: timed out waiting for hardware lock." | tee "$artifact_dir/after_script_park.log" >&2
+          touch "$artifact_dir/after_script_park_failed"
+        fi
+      else
+        echo "RX671 OTA after_script: park image is unavailable." | tee "$artifact_dir/after_script_park.log" >&2
+        touch "$artifact_dir/after_script_park_failed"
+      fi
+      if [ "$secret_cleanup_status" -ne 0 ] ||
+         [ -f "$artifact_dir/after_script_park_failed" ]; then
+        exit 1
+      fi
+  artifacts:
+    when: always
+    paths:
+      - artifacts/test_rx671_wifi_ota_atomic/
+    reports:
+      junit:
+        - artifacts/test_rx671_wifi_ota_atomic/provision/junit.xml
+        - artifacts/test_rx671_wifi_ota_atomic/junit.xml
+    expire_in: 7 days
+
+cleanup_rx671_wifi_ota:
+  stage: ota_cleanup
+  extends:
+    - .aws_cli_windows_job
+    - .rx671_wifi_ota_cleanup_rules
+  allow_failure: false
+  dependencies:
+    - preflight_rx671_wifi_ota
+  script:
+    - $ErrorActionPreference = "Continue"
+    - Write-Host "=== Verify and clean pipeline-owned EK-RX671 OTA resources ==="
+    - |
+      $planDir = Join-Path $env:CI_PROJECT_DIR "artifacts\preflight_rx671_wifi_ota"
+      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\cleanup_rx671_wifi_ota"
+      $planJson = Join-Path $planDir "ota_plan.json"
+      $aliasPlan = Join-Path $planDir "ephemeral_thing_plan.json"
+      $otaCleanupMeta = Join-Path $artifactDir "recovered_ota_job_meta.json"
+      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+      if (-not (Test-Path -LiteralPath $planJson) -or
+          -not (Test-Path -LiteralPath $aliasPlan)) {
+        Write-Error "RX671 OTA preflight cleanup journals are missing."
+        exit 1
+      }
+      try {
+        $planPayload = Get-Content -LiteralPath $planJson -Raw |
+          ConvertFrom-Json
+        $planJobId = [string]$planPayload.plan_job_id
+      } catch {
+        Write-Error "RX671 OTA preflight plan cannot be parsed."
+        exit 1
+      }
+      if ($planJobId -notmatch '^[0-9]+$') {
+        Write-Error "RX671 OTA preflight plan job identity is invalid."
+        exit 1
+      }
+
+      python tools/plan_rx671_ota.py verify `
+        --project-id "$env:CI_PROJECT_ID" `
+        --pipeline-id "$env:CI_PIPELINE_ID" `
+        --plan-job-id "$planJobId" `
+        --commit-sha "$env:CI_COMMIT_SHA" `
+        --base-thing-name "$env:RX671_OTA_BASE_THING_NAME" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --bucket "$env:RX671_OTA_S3_BUCKET" `
+        --baseline-version "$env:RX671_OTA_BASELINE_VERSION" `
+        --candidate-version "$env:RX671_OTA_CANDIDATE_VERSION" `
+        --tls-version "$env:RX671_OTA_REQUIRE_TLS_VERSION" `
+        --plan-json "$planJson" `
+        --alias-plan-json "$aliasPlan"
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "RX671 OTA cleanup identity does not match the preflight journal."
+        exit 1
+      }
+
+      python tools/plan_rx671_ota.py write-recovery-meta `
+        --project-id "$env:CI_PROJECT_ID" `
+        --pipeline-id "$env:CI_PIPELINE_ID" `
+        --plan-job-id "$planJobId" `
+        --commit-sha "$env:CI_COMMIT_SHA" `
+        --base-thing-name "$env:RX671_OTA_BASE_THING_NAME" `
+        --region "$env:AWS_DEFAULT_REGION" `
+        --bucket "$env:RX671_OTA_S3_BUCKET" `
+        --baseline-version "$env:RX671_OTA_BASELINE_VERSION" `
+        --candidate-version "$env:RX671_OTA_CANDIDATE_VERSION" `
+        --tls-version "$env:RX671_OTA_REQUIRE_TLS_VERSION" `
+        --plan-json "$planJson" `
+        --alias-plan-json "$aliasPlan" `
+        --output-json "$otaCleanupMeta"
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "RX671 OTA recovery cleanup metadata creation failed."
+        exit 1
+      }
+
+      $preCleanupState = Join-Path $artifactDir "pre_cleanup_state.json"
+      python tools/verify_ota_aws_state.py snapshot `
+        --recover-partial `
+        --meta-json "$otaCleanupMeta" `
+        --output-json "$preCleanupState"
+      $snapshotStatus = $LASTEXITCODE
+      $snapshotMissingPlannedOta = $false
+      if ($snapshotStatus -ne 0 -and
+          (Test-Path -LiteralPath $preCleanupState)) {
+        try {
+          $snapshotPayload = Get-Content -LiteralPath $preCleanupState -Raw |
+            ConvertFrom-Json
+          $expectedMissingMessage =
+            "Partial OTA snapshot recovery could not find the planned OTA update " +
+            [string]$planPayload.ota_update_id
+          $snapshotMissingPlannedOta =
+            $snapshotPayload.error.type -ceq "ValueError" -and
+            $snapshotPayload.error.message -ceq $expectedMissingMessage
+        } catch {
+          $snapshotMissingPlannedOta = $false
+        }
+      }
+      if ($snapshotMissingPlannedOta) {
+        Write-Warning (
+          "The planned RX671 OTA update was never created; continuing the " +
+          "independent fail-closed cleanup. The create job remains failed."
+        )
+      }
+
+      python tools/verify_ota_aws_state.py cleanup `
+        --meta-json "$otaCleanupMeta" `
+        --output-json (Join-Path $artifactDir "post_cleanup_state.json")
+      $otaCleanupStatus = $LASTEXITCODE
+
+      python tools/manage_rx671_ota_event_policy.py cleanup `
+        --plan-json "$planJson" `
+        --alias-meta-json "$aliasPlan" `
+        --output-json (Join-Path $artifactDir "event_policy_cleanup.json")
+      $eventPolicyCleanupStatus = $LASTEXITCODE
+
+      python tools/manage_ephemeral_iot_thing.py cleanup `
+        --meta-json "$aliasPlan" `
+        --output-json (Join-Path $artifactDir "ephemeral_thing_cleanup.json")
+      $aliasCleanupStatus = $LASTEXITCODE
+
+      if (($snapshotStatus -ne 0 -and -not $snapshotMissingPlannedOta) -or
+          $otaCleanupStatus -ne 0 -or
+          $eventPolicyCleanupStatus -ne 0 -or
+          $aliasCleanupStatus -ne 0) {
+        Write-Error "RX671 OTA evidence or fail-closed AWS cleanup verification failed."
+        exit 1
+      }
+  artifacts:
+    when: always
+    paths:
+      - artifacts/cleanup_rx671_wifi_ota/
     expire_in: 7 days
 
 test_rx671_wifi_fleet:

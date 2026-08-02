@@ -21,8 +21,19 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, utils
+
 
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
+PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
+PROVISIONER_LOG_SUPPRESSION_DEFINES = (
+    "LFS_NO_DEBUG",
+    "LFS_NO_WARN",
+    "LFS_NO_ERROR",
+    "LIBRARY_LOG_LEVEL=LOG_NONE",
+)
 PROJECT_RELATIVE = Path("Projects/aws_wifi_rx671_ek/e2studio_ccrx")
 BOOTLOADER_PROJECT_RELATIVE = Path("Projects/boot_loader_rx671_ek/e2studio_ccrx")
 BOOTLOADER_SUBMODULE_RELATIVE = (
@@ -32,7 +43,13 @@ LAYOUT_CONTRACT_NAME = "ota-layout-contract.json"
 PROVENANCE_MANIFEST_NAME = "ota-layout-provenance.json"
 REPORT_NAME = "ota-layout-report.json"
 SIGNER_CERTIFICATE_NAME = "rx671-ota-signer.crt.pem"
+SIGNER_PUBLIC_KEY_NAME = "rx671-ota-signer.pub.pem"
 ARTIFACT_BASENAME = "aws_wifi_rx671_ek"
+OTA_TRANSFER_PAYLOAD_NAME = f"{ARTIFACT_BASENAME}.ota.bin"
+OTA_TRANSFER_SIGNATURE_NAME = f"{ARTIFACT_BASENAME}.ota-signature.der"
+RSU_HEADER_SIZE = 0x200
+RSU_RAW_SIGNATURE_OFFSET = 0x2C
+RSU_RAW_SIGNATURE_SIZE = 64
 LOCAL_JOIN_CONFIG_RELATIVE = Path("src/whd_join_config_local.h")
 WHD_SUBMODULE_RELATIVE = Path(
     "Projects/aws_wifi_rx671_ek/external/wifi-host-driver"
@@ -93,6 +110,8 @@ PROVENANCE_PROJECT_PATHS = (
 )
 BOOTLOADER_PROVENANCE_PATHS = (
     BOOTLOADER_PROJECT_RELATIVE / ".cproject",
+    BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
+    BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/smc_gen/r_config/r_bsp_config.h",
     BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
     BOOTLOADER_PROJECT_RELATIVE / "HardwareDebug/boot_loader_rx671_ek.map",
@@ -198,6 +217,22 @@ def make_ota_cproject(text: str, version: Version) -> str:
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MAJOR={version.major}"/>',
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MINOR={version.minor}"/>',
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_BUILD={version.build}"/>',
+        '<listOptionValue builtIn="false" value="-define=RX671_OTA_RUNTIME_ENABLE=1"/>',
+        '<listOptionValue builtIn="false" value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1"/>',
+        '<listOptionValue builtIn="false" value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"/>',
+        '<listOptionValue builtIn="false" value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"/>',
+        '<listOptionValue builtIn="false" value="-define=FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH=32768"/>',
+        '<listOptionValue builtIn="false" value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=8192"/>',
+        '<listOptionValue builtIn="false" value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"/>',
+        '<listOptionValue builtIn="false" value="-define=mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST=1"/>',
+        '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_DATA_BUFFERS=2"/>',
+        '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_FILE_BLOCKS=192"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_PORT_BUFFER_COUNT=8"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_SCAN_ENABLE=0"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_JOIN_USE_SCAN_RESULT=0"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_JOIN_ENABLE=1"/>',
+        '<listOptionValue builtIn="false" value="-define=WHD_JOIN_USE_KVS=1"/>',
+        '<listOptionValue builtIn="false" value="-define=CONFIG_USE_PERCEPIO_TRACE_RECORDER=0"/>',
     )
     insertion = DEFINE_ANCHOR + "".join(
         "\n\t\t\t\t\t\t\t\t\t" + define for define in defines
@@ -231,6 +266,34 @@ def make_ota_cproject(text: str, version: Version) -> str:
         text[: linker_option.start(2)]
         + updated_body
         + text[linker_option.end(2) :]
+    )
+
+
+def make_provisioner_cproject(text: str) -> str:
+    if 'modes="bank.single"' not in text or 'modes="bank.dual"' in text:
+        raise ValueError("provisioner requires the checked-in bank.single project")
+    if "RX671_OTA_PROVISIONER_ENABLE" in text:
+        raise ValueError(".cproject contains a persistent OTA provisioner define")
+    # The one-shot provisioner deliberately does not create the asynchronous
+    # logging task.  Keep both LittleFS stdio diagnostics and SDK library logs
+    # out of this temporary profile so neither first mount nor PKCS #11 commit
+    # can route through an uninitialized logging queue.
+    defines = (
+        "RX671_OTA_PROVISIONER_ENABLE=1",
+        *PROVISIONER_LOG_SUPPRESSION_DEFINES,
+    )
+    insertion = DEFINE_ANCHOR + "".join(
+        "\n\t\t\t\t\t\t\t\t\t"
+        + '<listOptionValue builtIn="false" value="-define='
+        + define
+        + '"/>'
+        for define in defines
+    )
+    return _replace_once(
+        text,
+        DEFINE_ANCHOR,
+        insertion,
+        ".cproject provisioner define anchor",
     )
 
 
@@ -302,6 +365,24 @@ class TemporaryOtaProfile:
 
     def __exit__(self, _exc_type, _exc, _traceback) -> None:
         self.restore()
+
+
+class TemporaryProvisionerProfile:
+    """Apply the credential-only bank.single profile and restore .cproject."""
+
+    def __init__(self, project_dir: Path):
+        self.path = project_dir / ".cproject"
+        self.snapshot = self.path.read_bytes()
+
+    def __enter__(self) -> TemporaryProvisionerProfile:
+        source = self.snapshot.decode("utf-8")
+        self.path.write_text(
+            make_provisioner_cproject(source), encoding="utf-8", newline=""
+        )
+        return self
+
+    def __exit__(self, _exc_type, _exc, _traceback) -> None:
+        self.path.write_bytes(self.snapshot)
 
 
 def sha256(path: Path) -> str:
@@ -475,6 +556,37 @@ def _validate_workspace_root(path: Path) -> None:
         )
 
 
+def _remove_transient_build_products(
+    project_dir: Path,
+    workspace: Path,
+) -> None:
+    """Remove compiler/workspace outputs after copying formal artifacts."""
+    resolved_project = project_dir.resolve()
+    hardware_debug = (resolved_project / "HardwareDebug").resolve()
+    resolved_workspace = workspace.resolve()
+    _validate_workspace_root(resolved_workspace)
+    try:
+        hardware_debug.relative_to(resolved_project)
+    except ValueError as exc:
+        raise ValueError(
+            "RX671 HardwareDebug cleanup escaped the project directory"
+        ) from exc
+
+    for path in (hardware_debug, resolved_workspace):
+        if path.exists():
+            shutil.rmtree(path)
+    remaining = [
+        str(path)
+        for path in (hardware_debug, resolved_workspace)
+        if path.exists()
+    ]
+    if remaining:
+        raise RuntimeError(
+            "RX671 transient build cleanup failed: "
+            + ", ".join(remaining)
+        )
+
+
 def _run(
     command: list[str],
     cwd: Path,
@@ -550,9 +662,17 @@ class TemporaryWhdPatchIsolation:
         self.submodule = repo_root / WHD_SUBMODULE_RELATIVE
         self.patch = repo_root / WHD_PATCH_RELATIVE
         self.patch_is_temporary = False
+        self.snapshots: dict[Path, bytes] = {}
 
     def _check(self, *, reverse: bool) -> bool:
-        command = ["git", "-C", str(self.submodule), "apply"]
+        command = [
+            "git",
+            "-C",
+            str(self.submodule),
+            "apply",
+            "--ignore-space-change",
+            "--ignore-whitespace",
+        ]
         if reverse:
             command.append("--reverse")
         command.extend(("--check", str(self.patch)))
@@ -574,6 +694,27 @@ class TemporaryWhdPatchIsolation:
             raise RuntimeError("WHD submodule must be clean before OTA build")
         if self._check(reverse=False):
             self.patch_is_temporary = True
+            patch_text = self.patch.read_text(encoding="utf-8")
+            relative_paths = sorted(
+                {
+                    Path(match)
+                    for match in re.findall(
+                        r"^\+\+\+ b/(.+)$",
+                        patch_text,
+                        flags=re.MULTILINE,
+                    )
+                    if match != "/dev/null"
+                }
+            )
+            if not relative_paths:
+                raise RuntimeError("WHD portability patch contains no files")
+            for relative in relative_paths:
+                target = self.submodule / relative
+                if not target.is_file():
+                    raise RuntimeError(
+                        f"WHD portability patch input is missing: {relative}"
+                    )
+                self.snapshots[relative] = target.read_bytes()
         elif self._check(reverse=True):
             self.patch_is_temporary = False
         else:
@@ -592,22 +733,13 @@ class TemporaryWhdPatchIsolation:
         )
         if not status:
             return
-        if not self.patch_is_temporary or not self._check(reverse=True):
+        if not self.patch_is_temporary or not self.snapshots:
             raise RuntimeError(
                 "WHD submodule contains changes other than the expected "
                 "temporary portability patch"
             )
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(self.submodule),
-                "apply",
-                "--reverse",
-                str(self.patch),
-            ],
-            check=True,
-        )
+        for relative, content in self.snapshots.items():
+            (self.submodule / relative).write_bytes(content)
         remaining = _git(
             self.submodule,
             "status",
@@ -634,6 +766,136 @@ def _copy_build_outputs(project_dir: Path, artifact_dir: Path) -> dict[str, Path
     return outputs
 
 
+def _write_signer_public_key(signing_key: Path, destination: Path) -> None:
+    encoded = signing_key.read_bytes()
+    private_key = serialization.load_pem_private_key(encoded, password=None)
+    if (
+        not isinstance(private_key, ec.EllipticCurvePrivateKey)
+        or not isinstance(private_key.curve, ec.SECP256R1)
+    ):
+        raise ValueError("OTA signing key must be an ECDSA P-256 private key")
+    destination.write_bytes(
+        private_key.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+
+
+def _create_ota_transfer_artifacts(
+    *,
+    rsu_path: Path,
+    signer_public_key: Path,
+    payload_path: Path,
+    signature_path: Path,
+) -> None:
+    """Write the OTA PAL payload and matching DER ECDSA signature."""
+
+    rsu = rsu_path.read_bytes()
+    if len(rsu) <= RSU_HEADER_SIZE:
+        raise ValueError("RX671 RSU is too short to contain an OTA payload")
+    raw_signature = rsu[
+        RSU_RAW_SIGNATURE_OFFSET :
+        RSU_RAW_SIGNATURE_OFFSET + RSU_RAW_SIGNATURE_SIZE
+    ]
+    if len(raw_signature) != RSU_RAW_SIGNATURE_SIZE:
+        raise ValueError("RX671 RSU does not contain a complete P-256 signature")
+
+    payload = rsu[RSU_HEADER_SIZE:]
+    r = int.from_bytes(raw_signature[:32], "big")
+    s = int.from_bytes(raw_signature[32:], "big")
+    der_signature = utils.encode_dss_signature(r, s)
+    public_key = serialization.load_pem_public_key(
+        signer_public_key.read_bytes()
+    )
+    if (
+        not isinstance(public_key, ec.EllipticCurvePublicKey)
+        or not isinstance(public_key.curve, ec.SECP256R1)
+    ):
+        raise ValueError("OTA signer public key must be ECDSA P-256")
+    try:
+        public_key.verify(
+            der_signature,
+            payload,
+            ec.ECDSA(hashes.SHA256()),
+        )
+    except InvalidSignature as exc:
+        raise RuntimeError(
+            "candidate OTA transfer signature does not verify"
+        ) from exc
+
+    payload_path.write_bytes(payload)
+    signature_path.write_bytes(der_signature)
+
+
+def _build_provisioner(
+    *,
+    repo_root: Path,
+    project_dir: Path,
+    output_root: Path,
+    e2studio: Path,
+    workspace: Path,
+    timeout_seconds: int,
+    input_gitlinks: dict[str, str],
+) -> None:
+    artifact_dir = output_root / "provisioner"
+    _safe_recreate_output(artifact_dir, repo_root)
+    build_log = artifact_dir / "e2studio-build.log"
+    build_environment = ota_build_environment()
+    local_join_config = project_dir / LOCAL_JOIN_CONFIG_RELATIVE
+    restore_local_config = build_environment.get("CI", "").lower() != "true"
+
+    with TemporaryProvisionerProfile(project_dir):
+        with TemporaryWhdPatchIsolation(repo_root):
+            with TemporaryWifiCredentialIsolation(
+                local_join_config,
+                restore_existing=restore_local_config,
+            ):
+                _run(
+                    [
+                        "pwsh",
+                        "-NoProfile",
+                        "-File",
+                        str(repo_root / "tools/build_headless_rx671_wifi.ps1"),
+                        "-ProjectRoot",
+                        str(repo_root),
+                        "-E2Studio",
+                        str(e2studio),
+                        "-Workspace",
+                        str(workspace),
+                        "-LogFile",
+                        str(build_log),
+                        "-E2StudioTimeoutSeconds",
+                        str(timeout_seconds),
+                        "-SkipWifiConfig",
+                        "-SkipAwsIotConfig",
+                    ],
+                    repo_root,
+                    env=build_environment,
+                )
+        if validate_formal_input_submodules(repo_root) != input_gitlinks:
+            raise RuntimeError(
+                "formal OTA input submodule state changed during provisioner build"
+            )
+        outputs = _copy_build_outputs(project_dir, artifact_dir)
+        assert_wifi_credentials_absent(outputs.values())
+        metadata = {
+            "schema_version": 1,
+            "profile": PROVISIONER_PROFILE_NAME,
+            "source_sha": _git(repo_root, "rev-parse", "HEAD"),
+            "bank_mode": "bank.single",
+            "credentials_embedded": False,
+            "sha256": {
+                path.name: sha256(path)
+                for path in outputs.values()
+            },
+        }
+        (artifact_dir / "provisioner-manifest.json").write_text(
+            json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+
 def _copy_bootloader_outputs(repo_root: Path, output_root: Path) -> list[Path]:
     artifact_dir = output_root / "bootloader"
     _safe_recreate_output(artifact_dir, repo_root)
@@ -649,6 +911,26 @@ def _copy_bootloader_outputs(repo_root: Path, output_root: Path) -> list[Path]:
         shutil.copy2(source, destination)
         copied.append(destination)
     return copied
+
+
+def _copy_failed_build_diagnostics(project_dir: Path, artifact_dir: Path) -> None:
+    """Preserve linker/make diagnostics before the outer cleanup removes them."""
+    hardware_debug = project_dir / "HardwareDebug"
+    diagnostic_dir = artifact_dir / "failed-build-diagnostics"
+    copied = False
+    for name in (
+        f"{ARTIFACT_BASENAME}.map",
+        "LinkerSubCommand.tmp",
+        f"Linker{ARTIFACT_BASENAME}.tmp",
+        "makefile",
+    ):
+        source = hardware_debug / name
+        if source.is_file():
+            diagnostic_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, diagnostic_dir / name)
+            copied = True
+    if copied:
+        print(f"RX671 OTA failed-build diagnostics: {diagnostic_dir}")
 
 
 def _copy_effective_inputs(
@@ -681,6 +963,9 @@ def _create_manifest(
     outputs: dict[str, Path],
     rsu_path: Path,
     certificate_path: Path,
+    public_key_path: Path,
+    transfer_payload_path: Path | None,
+    transfer_signature_path: Path | None,
     effective_inputs: list[Path],
     bootloader_artifacts: list[Path],
     input_gitlinks: dict[str, str],
@@ -692,6 +977,13 @@ def _create_manifest(
         *BOOTLOADER_PROVENANCE_PATHS,
         rsu_path,
         certificate_path,
+        public_key_path,
+        *(
+            [transfer_payload_path, transfer_signature_path]
+            if transfer_payload_path is not None
+            and transfer_signature_path is not None
+            else []
+        ),
         *effective_inputs,
         *bootloader_artifacts,
     ]
@@ -714,12 +1006,23 @@ def _create_manifest(
         "dirty": dirty,
         "project_path": PROJECT_RELATIVE.as_posix(),
         "profile": PROFILE_NAME,
+        "formal": not dirty,
+        "credentials_embedded": False,
+        "wifi_credentials_source": "littlefs_kvs_runtime_provisioning",
         "ota_image_version": version.text,
         "rsu_path": rsu_path.relative_to(repo_root).as_posix(),
         "signer_certificate_path": certificate_path.relative_to(repo_root).as_posix(),
+        "signer_public_key_path": public_key_path.relative_to(repo_root).as_posix(),
         "sha256": dict(sorted(hashes.items())),
         "gitlinks": dict(sorted(input_gitlinks.items())),
     }
+    if transfer_payload_path is not None and transfer_signature_path is not None:
+        manifest["ota_transfer_payload_path"] = (
+            transfer_payload_path.relative_to(repo_root).as_posix()
+        )
+        manifest["ota_transfer_signature_der_path"] = (
+            transfer_signature_path.relative_to(repo_root).as_posix()
+        )
     manifest_path = artifact_dir / PROVENANCE_MANIFEST_NAME
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -735,6 +1038,7 @@ def _dirty_analysis_is_structurally_safe(report: dict[str, object]) -> bool:
     allowed_non_pass = {
         "artifact_provenance",
         "whd_blob_sizes",
+        "ram_capacity",
         "map_image_single_area",
         "mot_image_single_area",
     }
@@ -770,6 +1074,8 @@ def _build_one(
     workspace: Path,
     signing_key: Path,
     certificate_source: Path,
+    public_key_source: Path,
+    create_transfer_payload: bool,
     dirty: bool,
     allow_dirty: bool,
     timeout_seconds: int,
@@ -786,30 +1092,39 @@ def _build_one(
             local_join_config,
             restore_existing=restore_local_config,
         ):
-            _run(
-                [
-                    "pwsh",
-                    "-NoProfile",
-                    "-File",
-                    str(repo_root / "tools/build_headless_rx671_wifi.ps1"),
-                    "-ProjectRoot",
-                    str(repo_root),
-                    "-E2Studio",
-                    str(e2studio),
-                    "-Workspace",
-                    str(workspace),
-                    "-LogFile",
-                    str(build_log),
-                    "-E2StudioTimeoutSeconds",
-                    str(timeout_seconds),
-                    "-OtaImageVersion",
-                    version.text,
-                    "-SkipWifiConfig",
-                    "-SkipAwsIotConfig",
-                ],
-                repo_root,
-                env=build_environment,
-            )
+            build_command = [
+                "pwsh",
+                "-NoProfile",
+                "-File",
+                str(repo_root / "tools/build_headless_rx671_wifi.ps1"),
+                "-ProjectRoot",
+                str(repo_root),
+                "-E2Studio",
+                str(e2studio),
+                "-Workspace",
+                str(workspace),
+                "-LogFile",
+                str(build_log),
+                "-E2StudioTimeoutSeconds",
+                str(timeout_seconds),
+                "-OtaImageVersion",
+                version.text,
+                "-SkipAwsIotConfig",
+            ]
+            # The KVS JOIN defines are part of the temporary .cproject above,
+            # so the copied effective configuration and its hash describe the
+            # exact compiler input.  The child builder only has to suppress
+            # every legacy credential-bearing local JOIN path.
+            build_command.append("-SkipWifiConfig")
+            try:
+                _run(
+                    build_command,
+                    repo_root,
+                    env=build_environment,
+                )
+            except subprocess.CalledProcessError:
+                _copy_failed_build_diagnostics(project_dir, artifact_dir)
+                raise
     if validate_formal_input_submodules(repo_root) != input_gitlinks:
         raise RuntimeError("formal OTA input submodule state changed during build")
     outputs = _copy_build_outputs(project_dir, artifact_dir)
@@ -830,6 +1145,22 @@ def _build_one(
     assert_wifi_credentials_absent([*outputs.values(), rsu_path])
     certificate_path = artifact_dir / SIGNER_CERTIFICATE_NAME
     shutil.copy2(certificate_source, certificate_path)
+    public_key_path = artifact_dir / SIGNER_PUBLIC_KEY_NAME
+    shutil.copy2(public_key_source, public_key_path)
+    transfer_payload_path: Path | None = None
+    transfer_signature_path: Path | None = None
+    if create_transfer_payload:
+        transfer_payload_path = artifact_dir / OTA_TRANSFER_PAYLOAD_NAME
+        transfer_signature_path = artifact_dir / OTA_TRANSFER_SIGNATURE_NAME
+        _create_ota_transfer_artifacts(
+            rsu_path=rsu_path,
+            signer_public_key=public_key_path,
+            payload_path=transfer_payload_path,
+            signature_path=transfer_signature_path,
+        )
+        assert_wifi_credentials_absent(
+            [transfer_payload_path, transfer_signature_path]
+        )
     effective_inputs = _copy_effective_inputs(
         repo_root, project_dir, artifact_dir
     )
@@ -842,6 +1173,9 @@ def _build_one(
         outputs=outputs,
         rsu_path=rsu_path,
         certificate_path=certificate_path,
+        public_key_path=public_key_path,
+        transfer_payload_path=transfer_payload_path,
+        transfer_signature_path=transfer_signature_path,
         effective_inputs=effective_inputs,
         bootloader_artifacts=bootloader_artifacts,
         input_gitlinks=input_gitlinks,
@@ -966,6 +1300,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     certificate_source = output_root / SIGNER_CERTIFICATE_NAME
+    public_key_source = output_root / SIGNER_PUBLIC_KEY_NAME
     output_root.mkdir(parents=True, exist_ok=True)
     bootloader_artifacts = _copy_bootloader_outputs(repo_root, output_root)
     _run(
@@ -981,8 +1316,18 @@ def main(argv: list[str] | None = None) -> int:
         ],
         repo_root,
     )
+    _write_signer_public_key(signing_key, public_key_source)
 
     try:
+        _build_provisioner(
+            repo_root=repo_root,
+            project_dir=project_dir,
+            output_root=output_root,
+            e2studio=args.e2studio.resolve(),
+            workspace=args.workspace_root.resolve(),
+            timeout_seconds=args.e2studio_timeout_seconds,
+            input_gitlinks=input_gitlinks,
+        )
         with TemporaryOtaProfile(project_dir) as profile:
             for label, version in versions:
                 profile.apply(version)
@@ -996,6 +1341,8 @@ def main(argv: list[str] | None = None) -> int:
                     workspace=args.workspace_root.resolve(),
                     signing_key=signing_key,
                     certificate_source=certificate_source,
+                    public_key_source=public_key_source,
+                    create_transfer_payload=(label == "candidate"),
                     dirty=dirty,
                     allow_dirty=args.allow_dirty,
                     timeout_seconds=args.e2studio_timeout_seconds,
@@ -1003,16 +1350,26 @@ def main(argv: list[str] | None = None) -> int:
                     input_gitlinks=input_gitlinks,
                 )
     finally:
+        cleanup_errors: list[str] = []
+        try:
+            _remove_transient_build_products(
+                project_dir,
+                args.workspace_root,
+            )
+        except Exception as error:
+            cleanup_errors.append(str(error))
         # TemporaryOtaProfile restores the tracked inputs. Keep this explicit
         # postcondition so an accidental future profile-path omission fails.
         if source_state(repo_root) != initial_source_state:
-            raise RuntimeError(
+            cleanup_errors.append(
                 "RX671 OTA helper did not restore the tracked source state"
             )
         if validate_formal_input_submodules(repo_root) != input_gitlinks:
-            raise RuntimeError(
+            cleanup_errors.append(
                 "RX671 OTA helper did not restore the formal input submodules"
             )
+        if cleanup_errors:
+            raise RuntimeError("; ".join(cleanup_errors))
 
     print(f"RX671 OTA baseline/candidate artifacts: {output_root}")
     return 0

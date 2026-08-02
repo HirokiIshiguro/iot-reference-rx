@@ -37,6 +37,7 @@
 #include "r_smc_entry.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "debug_uart.h"
 
 #if (BSP_CFG_RTOS_USED == 1)
 
@@ -56,6 +57,24 @@ External functions
 Private global variables and functions
 **********************************************************************************************************************/
 /************* semaphore initialization *****************/
+
+#if ( configUSE_MALLOC_FAILED_HOOK == 1 ) && \
+    defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
+static void ota_debug_put_size(size_t value)
+{
+    char digits[(sizeof(size_t) * 3U) + 1U];
+    size_t index = sizeof(digits);
+
+    digits[--index] = '\0';
+    do
+    {
+        digits[--index] = (char)('0' + (value % 10U));
+        value /= 10U;
+    } while (value > 0U);
+
+    debug_puts(&digits[index]);
+}
+#endif
 
 #if ( configUSE_IDLE_HOOK == 1 )
 /**********************************************************************************************************************
@@ -165,6 +184,16 @@ void vApplicationGetTimerTaskMemory( StaticTask_t ** ppxTimerTaskTCBBuffer,
  *********************************************************************************************************************/
 void vApplicationMallocFailedHook( void )
 {
+#if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
+    /* Keep the hardware gate fail-fast instead of becoming a silent TLS/OTA
+     * timeout after the allocator disables scheduling. */
+    debug_puts("RX671 OTA fatal: FreeRTOS malloc failed\r\n");
+    debug_puts("RX671 OTA heap at malloc failure: free=");
+    ota_debug_put_size(xPortGetFreeHeapSize());
+    debug_puts(" min=");
+    ota_debug_put_size(xPortGetMinimumEverFreeHeapSize());
+    debug_puts("\r\n");
+#endif
     taskDISABLE_INTERRUPTS();
 
     /* Loop forever */
@@ -186,6 +215,9 @@ void vApplicationMallocFailedHook( void )
  *********************************************************************************************************************/
 void vApplicationStackOverflowHook( TaskHandle_t xTask, char * pcTaskName )
 {
+#if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
+    debug_puts("RX671 OTA fatal: FreeRTOS stack overflow\r\n");
+#endif
     portDISABLE_INTERRUPTS();
 
     /* Unused Parameters */

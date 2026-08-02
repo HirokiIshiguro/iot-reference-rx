@@ -70,8 +70,15 @@
 #include "store.h"
 #include "serial.h"
 
-/* Default FreeRTOS API for console logging. */
+/* The one-shot RX671 OTA provisioner does not create the asynchronous logging
+ * task.  Its host-side protocol records only redacted milestones, so suppress
+ * these convenience messages instead of routing them through an uninitialized
+ * logging queue.  Normal application profiles retain the established logger. */
+#if defined(RX671_OTA_PROVISIONER_ENABLE) && (RX671_OTA_PROVISIONER_ENABLE == 1)
+#define DEV_MODE_KEY_PROVISIONING_PRINT(X) ((void)0)
+#else
 #define DEV_MODE_KEY_PROVISIONING_PRINT(X) (configPRINTF(X))
+#endif
 
 /* For writing log lines without a prefix. */
 extern void vLoggingPrint (const char *pcFormat);
@@ -138,7 +145,9 @@ typedef struct PreProvisioningParams_t
     uint32_t ulClientCredentialLength; /**< Length of the Credential data, in bytes. */
 } PreProvisioningParams_t;
 
-CK_RV vDevModeKeyPreProvisioning (KeyValueStore_t Keystore, KVStoreKey_t ID, int32_t xvaluelength);
+CK_RV vDevModeKeyPreProvisioning (const KeyValueStore_t * pKeystore,
+                                  KVStoreKey_t ID,
+                                  int32_t xvaluelength);
 CK_RV xDestroyDefaultPrivatekeyObjects (CK_SESSION_HANDLE xSession);
 CK_RV xDestroyDefaultCertificateObjects (CK_SESSION_HANDLE xSession);
 CK_RV xDestroyDefaultObjects (KVStoreKey_t ID, CK_SESSION_HANDLE xSession);
@@ -1108,18 +1117,21 @@ CK_RV xDestroyDefaultObjects(KVStoreKey_t ID, CK_SESSION_HANDLE xSession)
 /**********************************************************************************************************************
  * Function Name: vDevModeKeyPreProvisioning
  * Description  : .
- * Arguments    : Keystore
+ * Arguments    : pKeystore
  *              : ID
  *              : xvaluelength
  * Return Value : .
  *********************************************************************************************************************/
-CK_RV vDevModeKeyPreProvisioning(KeyValueStore_t Keystore, KVStoreKey_t ID, int32_t xvaluelength)
+CK_RV vDevModeKeyPreProvisioning(const KeyValueStore_t * pKeystore,
+                                 KVStoreKey_t ID,
+                                 int32_t xvaluelength)
 {
     size_t valueLength = 0;
     char *pcBuffer = NULL;
     char *temp = NULL;
     PreProvisioningParams_t xParams;
 
+    configASSERT(NULL != pKeystore);
     pcBuffer = pvPortMalloc(xvaluelength+1);
     configASSERT(pcBuffer);
     xReadEntry(ID, pcBuffer, xvaluelength);
@@ -1136,7 +1148,7 @@ CK_RV vDevModeKeyPreProvisioning(KeyValueStore_t Keystore, KVStoreKey_t ID, int3
     {
         /* We want the NULL terminator to be written to storage, so include it
          * in the length calculation. */
-        xParams.ulClientCredentialLength = sizeof(char) + Keystore.table[ID].valueLength;
+        xParams.ulClientCredentialLength = sizeof(char) + pKeystore->table[ID].valueLength;
     }
     else
     {

@@ -13,6 +13,7 @@ param(
     [string]$AwsIotThingName = "",
     [string]$RequireTlsVersion = "",
     [switch]$UseLocalJoinConfig,
+    [switch]$UseKvsJoinConfig,
     [switch]$SkipWifiConfig,
     [switch]$UseAwsIotLocalConfig,
     [switch]$SkipAwsIotConfig,
@@ -136,10 +137,15 @@ $defaultAwsIotConfigDir = "C:\ai\codex\secrets\aws-iot\rx671-ek-type1yn-01"
 $useFleetConfigForBuild = $FleetProvisioningEnable.IsPresent
 $explicitWifiConfigRequested = $UseLocalJoinConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($WifiConfigFile))
-if ($SkipWifiConfig.IsPresent -and $explicitWifiConfigRequested) {
-    throw "-SkipWifiConfig cannot be combined with -UseLocalJoinConfig or -WifiConfigFile."
+if ($SkipWifiConfig.IsPresent -and
+    ($explicitWifiConfigRequested -or $UseKvsJoinConfig.IsPresent)) {
+    throw "-SkipWifiConfig cannot be combined with -UseLocalJoinConfig, -UseKvsJoinConfig, or -WifiConfigFile."
 }
-$useLocalJoinConfigForBuild = (-not $SkipWifiConfig.IsPresent) -and (
+if ($UseKvsJoinConfig.IsPresent -and $explicitWifiConfigRequested) {
+    throw "-UseKvsJoinConfig cannot be combined with -UseLocalJoinConfig or -WifiConfigFile."
+}
+$useLocalJoinConfigForBuild = (-not $SkipWifiConfig.IsPresent) -and
+    (-not $UseKvsJoinConfig.IsPresent) -and (
     $explicitWifiConfigRequested -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
@@ -1137,14 +1143,15 @@ function Invoke-E2StudioHeadlessBuild {
     return $proc.ExitCode
 }
 
-$reverseCheckArgs = @("-C", $whdDir, "apply", "--reverse", "--check", $whdPatch)
-$forwardCheckArgs = @("-C", $whdDir, "apply", "--check", $whdPatch)
+$gitApplyWhitespaceArgs = @("--ignore-space-change", "--ignore-whitespace")
+$reverseCheckArgs = @("-C", $whdDir, "apply") + $gitApplyWhitespaceArgs + @("--reverse", "--check", $whdPatch)
+$forwardCheckArgs = @("-C", $whdDir, "apply") + $gitApplyWhitespaceArgs + @("--check", $whdPatch)
 
 if (Test-GitApply $reverseCheckArgs) {
     Write-Host "WHD patch is already applied."
 } elseif (Test-GitApply $forwardCheckArgs) {
     Write-Host "Applying WHD patch..."
-    & git -C $whdDir apply $whdPatch
+    & git -C $whdDir apply @gitApplyWhitespaceArgs $whdPatch
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply WHD patch."
     }
@@ -1173,6 +1180,9 @@ if ($null -ne $otaImageVersionParts) {
 }
 if ($useLocalJoinConfigForBuild) {
     Write-Host "Local AP JOIN config: enabled"
+}
+if ($UseKvsJoinConfig.IsPresent) {
+    Write-Host "LittleFS KVS AP JOIN config: enabled"
 }
 if ($useAwsIotLocalConfigForBuild) {
     Write-Host "Local AWS IoT config: enabled"
@@ -1221,6 +1231,19 @@ if ((-not [string]::IsNullOrWhiteSpace($effectiveRequireTlsVersion)) -and
 $cprojectBytes = $null
 $trackedProjectSnapshot = @{}
 $fleetConfigCleanupFailed = $false
+$generatedLocalJoinConfig = $false
+$generatedLocalAwsIotConfig = $false
+$secretHeaderCleanupFailed = $false
+$localJoinConfigOriginalBytes = if (Test-Path -LiteralPath $localJoinConfig) {
+    [System.IO.File]::ReadAllBytes($localJoinConfig)
+} else {
+    $null
+}
+$localAwsIotConfigOriginalBytes = if (Test-Path -LiteralPath $localAwsIotConfig) {
+    [System.IO.File]::ReadAllBytes($localAwsIotConfig)
+} else {
+    $null
+}
 try {
     $cprojectDefines = @()
     $cprojectLinkerOptions = @(
@@ -1236,12 +1259,14 @@ try {
     if ($useLocalJoinConfigForBuild) {
         if (-not [string]::IsNullOrWhiteSpace($WifiConfigFile)) {
             $wifi = Read-WifiConfig -Path $WifiConfigFile
+            $generatedLocalJoinConfig = $true
             Write-LocalJoinConfig -Path $localJoinConfig -Ssid $wifi["Ssid"] -Passphrase $wifi["Passphrase"] -PollMs $SoftIrqPollMs
             Write-Host "Generated ignored local JOIN header: $localJoinConfig"
         } elseif ((-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
                   (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
                   (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD))) {
             $wifi = Read-WifiConfigFromEnvironment
+            $generatedLocalJoinConfig = $true
             Write-LocalJoinConfig -Path $localJoinConfig -Ssid $wifi["Ssid"] -Passphrase $wifi["Passphrase"] -PollMs $SoftIrqPollMs
             Write-Host "Generated ignored local JOIN header from environment: $localJoinConfig"
         } elseif (-not (Test-Path -LiteralPath $localJoinConfig)) {
@@ -1251,8 +1276,14 @@ try {
         $cprojectDefines += "WHD_JOIN_USE_LOCAL_CONFIG"
     }
 
+    if ($UseKvsJoinConfig.IsPresent) {
+        $cprojectDefines += "WHD_JOIN_ENABLE=1"
+        $cprojectDefines += "WHD_JOIN_USE_KVS=1"
+    }
+
     if ($useAwsIotLocalConfigForBuild) {
         $awsIotConfig = Read-AwsIotConfig -ConfigDir $AwsIotConfigDir -EndpointOverride $AwsIotEndpoint -ThingNameOverride $AwsIotThingName
+        $generatedLocalAwsIotConfig = $true
         Write-LocalAwsIotConfig -Path $localAwsIotConfig -Config $awsIotConfig
         Write-Host "Generated ignored local AWS IoT header: $localAwsIotConfig"
         $cprojectDefines += "AWS_IOT_USE_LOCAL_CONFIG"
@@ -1434,8 +1465,42 @@ try {
 
     Assert-SRecordContainsAsciiMarker -Path $motOutput -Marker $expectedOtaImageMarker
 } finally {
-    # This generated file contains the Fleet claim private key. Remove it before
-    # any other cleanup that could itself fail and prevent later statements.
+    # Restore a developer-owned ignored header, or remove a header generated
+    # from CI variables. This must happen even when e2 studio or make fails.
+    try {
+        if ($generatedLocalJoinConfig) {
+            if ($null -eq $localJoinConfigOriginalBytes) {
+                Remove-Item -LiteralPath $localJoinConfig -Force -ErrorAction SilentlyContinue
+                if (Test-Path -LiteralPath $localJoinConfig) {
+                    $secretHeaderCleanupFailed = $true
+                }
+            } else {
+                [System.IO.File]::WriteAllBytes($localJoinConfig, $localJoinConfigOriginalBytes)
+                $restored = [System.IO.File]::ReadAllBytes($localJoinConfig)
+                if (-not (Test-ByteArrayEqual -Left $localJoinConfigOriginalBytes -Right $restored)) {
+                    $secretHeaderCleanupFailed = $true
+                }
+            }
+        }
+        if ($generatedLocalAwsIotConfig) {
+            if ($null -eq $localAwsIotConfigOriginalBytes) {
+                Remove-Item -LiteralPath $localAwsIotConfig -Force -ErrorAction SilentlyContinue
+                if (Test-Path -LiteralPath $localAwsIotConfig) {
+                    $secretHeaderCleanupFailed = $true
+                }
+            } else {
+                [System.IO.File]::WriteAllBytes($localAwsIotConfig, $localAwsIotConfigOriginalBytes)
+                $restored = [System.IO.File]::ReadAllBytes($localAwsIotConfig)
+                if (-not (Test-ByteArrayEqual -Left $localAwsIotConfigOriginalBytes -Right $restored)) {
+                    $secretHeaderCleanupFailed = $true
+                }
+            }
+        }
+    } catch {
+        $secretHeaderCleanupFailed = $true
+    }
+    # This generated file contains the Fleet claim private key. Remove it in an
+    # independent fail-closed check after the guarded local-header cleanup.
     if ($useFleetConfigForBuild) {
         Remove-Item -LiteralPath $localFleetConfig -Force -ErrorAction SilentlyContinue
         if (Test-Path -LiteralPath $localFleetConfig) {
@@ -1450,6 +1515,9 @@ try {
     }
     if ($fleetConfigCleanupFailed) {
         throw "Failed to remove the generated Fleet Provisioning credential header: $localFleetConfig"
+    }
+    if ($secretHeaderCleanupFailed) {
+        throw "Failed to restore or remove a generated local credential header."
     }
 }
 

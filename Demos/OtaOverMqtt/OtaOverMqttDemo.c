@@ -109,9 +109,15 @@
 #define MAX_THING_NAME_SIZE                      (128U)
 #define MAX_JOB_ID_LENGTH                        (64U)
 #define JOB_MSG_LENGTH                           (128U)
-#define MAX_NUM_OF_OTA_DATA_BUFFERS              (3)
+#ifndef OTA_MAX_NUM_DATA_BUFFERS
+#define OTA_MAX_NUM_DATA_BUFFERS                  (3U)
+#endif
+#define MAX_NUM_OF_OTA_DATA_BUFFERS              (OTA_MAX_NUM_DATA_BUFFERS)
 #define MAX_RETRY_ERASE_AREA                     (3)
-#define MAX_NUM_OF_OTA_FILE_BLOCKS               (128U)
+#ifndef OTA_MAX_NUM_FILE_BLOCKS
+#define OTA_MAX_NUM_FILE_BLOCKS                  (128U)
+#endif
+#define MAX_NUM_OF_OTA_FILE_BLOCKS               (OTA_MAX_NUM_FILE_BLOCKS)
 #define SECONDARY_OTA_RA0E2_FILEPATH_PREFIX      "/secondary/ra0e2"
 
 /* Max bytes supported for a file signature (3072 bit RSA is 384 bytes). */
@@ -150,6 +156,14 @@ static uint8_t OtaImageSingatureDecoded[OTA_MAX_SIGNATURE_SIZE] = {0};
 static SemaphoreHandle_t bufferSemaphore;
 
 static OtaState_t otaAgentState = OtaAgentStateInit;
+
+#if OTA_MAX_NUM_DATA_BUFFERS == 0
+#error "OTA_MAX_NUM_DATA_BUFFERS must be greater than zero."
+#endif
+
+#if OTA_MAX_NUM_FILE_BLOCKS == 0
+#error "OTA_MAX_NUM_FILE_BLOCKS must be greater than zero."
+#endif
 
 /**
  * @brief Create the task that demonstrates the OTA demo.
@@ -914,6 +928,13 @@ bool otaDemo_handleIncomingMQTTMessage(char *topic,
     if (MQTTFileDownloaderSuccess == ret)
     {
         LogInfo(("Data block is receiving from topic: %.*s\n", topicLength, topic));
+
+        if (messageLength > sizeof(dataBuffers[0].data))
+        {
+            LogError(("MQTT stream response exceeds the OTA data buffer.\n"));
+            return false;
+        }
+
         OtaDataEvent_t *dataBuf = getOtaDataEventBuffer();
 
         if (NULL != dataBuf)

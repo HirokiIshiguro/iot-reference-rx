@@ -185,7 +185,10 @@
  * configTASK_NOTIFICATION_ARRAY_ENTRIES sets the number of indexes in the array.
  * See https://www.freertos.org/RTOS-task-notifications.html  Defaults to 1 if
  * left undefined. */
-#define configTASK_NOTIFICATION_ARRAY_ENTRIES      1
+/* The shared MQTT wrapper reserves notification index 2 for synchronous
+ * MQTT Agent commands.  Keep this aligned with the RX65N/RX72N profiles so
+ * the first OTA Jobs publish cannot trip the kernel's indexed-notify assert. */
+#define configTASK_NOTIFICATION_ARRAY_ENTRIES      4
 
 /* configQUEUE_REGISTRY_SIZE sets the maximum number of queues and semaphores
  * that can be referenced from the queue registry.  Only required when using a
@@ -397,7 +400,9 @@
  * the additional information from the structures. Defaults to 0 if left
  * undefined. */
 #define configUSE_TRACE_FACILITY                1
+#ifndef CONFIG_USE_PERCEPIO_TRACE_RECORDER
 #define CONFIG_USE_PERCEPIO_TRACE_RECORDER     1
+#endif
 
 /* Set to 1 to include the vTaskList() and vTaskGetRunTimeStats() functions in
  * the build.  Set to 0 to exclude these functions from the build.  These two

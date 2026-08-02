@@ -7,6 +7,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -16,6 +17,7 @@ from pathlib import Path
 
 
 TERMINAL_CREATE_STATES = {"CREATE_COMPLETE", "CREATE_FAILED", "DELETE_FAILED"}
+OTA_UPDATE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 
 def run(command: list[str]) -> dict:
@@ -166,6 +168,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--region", required=True)
     parser.add_argument("--ota-id-prefix", default="bg96-ota")
     parser.add_argument(
+        "--ota-update-id",
+        default=None,
+        help=(
+            "Optional pre-journaled OTA update ID. When omitted, a unique ID "
+            "is generated from --ota-id-prefix."
+        ),
+    )
+    parser.add_argument(
         "--s3-key",
         default=None,
         help=(
@@ -209,9 +219,13 @@ def main() -> int:
         thing_info = aws(["iot", "describe-thing", "--thing-name", args.thing_name], args.region)
         thing_arn = thing_info["thingArn"]
 
-    ota_update_id = (
+    ota_update_id = getattr(args, "ota_update_id", None) or (
         f"{args.ota_id_prefix}-{int(time.time())}-{uuid.uuid4().hex[:12]}"
     )
+    if not OTA_UPDATE_ID_PATTERN.fullmatch(ota_update_id):
+        raise SystemExit(
+            "OTA update ID must be 1-128 ASCII letters, digits, '_' or '-'"
+        )
     s3_key = expand_ota_path_template(
         args.s3_key
         or "ota/{thing_name}/source/{ota_update_id}/" + payload.name,

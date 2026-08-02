@@ -38,6 +38,7 @@ Includes   <System Includes> , "Project Includes"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "trcRecorder.h"
+#include "debug_uart.h"
 
 #if (BSP_CFG_RTOS_USED == 1)
 
@@ -231,6 +232,9 @@ void vAssertCalled(void)
 {
     volatile unsigned long ul = 0;
 
+#if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
+    debug_puts("RX671 OTA fatal: FreeRTOS assert failed\r\n");
+#endif
     taskENTER_CRITICAL();
     {
         /* Use the debugger to set ul to a non-zero value in order to step out

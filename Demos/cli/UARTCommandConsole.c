@@ -123,6 +123,50 @@ signed char cRxedChar;
 
 /*-----------------------------------------------------------*/
 
+#if RX671_OTA_PROVISIONER_ENABLE == 1
+static BaseType_t prvCommandHasSensitiveValue(const char * pcCommand)
+{
+    static const char * const ppcSensitivePrefixes[] =
+    {
+        "conf set key ",
+        "conf set claimkey ",
+        "conf set tsipprikey ",
+        "conf sethex wifissid ",
+        "conf sethex wifipass "
+    };
+    size_t xIndex;
+
+    for (xIndex = 0U;
+         xIndex < (sizeof(ppcSensitivePrefixes) / sizeof(ppcSensitivePrefixes[0]));
+         xIndex++)
+    {
+        size_t xPrefixLength = strlen(ppcSensitivePrefixes[xIndex]);
+
+        if (0 == strncmp(pcCommand,
+                         ppcSensitivePrefixes[xIndex],
+                         xPrefixLength))
+        {
+            return pdTRUE;
+        }
+    }
+    return pdFALSE;
+}
+
+static void prvSecureZero(void * pvData, size_t xLength)
+{
+    volatile unsigned char * pucData = (volatile unsigned char *)pvData;
+
+    while ((NULL != pucData) && (xLength > 0U))
+    {
+        *pucData = 0U;
+        pucData++;
+        xLength--;
+    }
+}
+
+/*-----------------------------------------------------------*/
+#endif
+
 /**********************************************************************************************************************
  * Function Name: vUARTCommandConsoleStart
  * Description  : .
@@ -194,8 +238,17 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
         /* Ensure exclusive access to the UART Tx. */
         if (xSemaphoreTake(xTxMutex, cmdMAX_MUTEX_WAIT) == pdPASS)
         {
+#if RX671_OTA_PROVISIONER_ENABLE == 1
+            /* Echo only the command prefix. Once a private value begins, keep
+             * the payload out of UART captures and terminal scrollback. */
+            if (pdFALSE == prvCommandHasSensitiveValue(cInputString))
+            {
+                xSerialPutChar(xPort, cRxedChar, portMAX_DELAY);
+            }
+#else
             /* Echo the character back. */
             xSerialPutChar(xPort, cRxedChar, portMAX_DELAY);
+#endif
 
             /* Was it the end of the line? */
             if (('\n' == cRxedChar) && ('\r' == cPrevChar))
@@ -230,9 +283,23 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
                 sent.  Clear the input string ready to receive the next command.
                 Remember the command that was just processed first in case it is
                 to be processed again. */
+#if RX671_OTA_PROVISIONER_ENABLE == 1
+                if (pdTRUE == prvCommandHasSensitiveValue(cInputString))
+                {
+                    /* A blank line must never repeat a credential command. */
+                    prvSecureZero(cLastInputString, sizeof(cLastInputString));
+                }
+                else
+                {
+                    strcpy(cLastInputString, cInputString);
+                }
+                ucInputIndex = 0;
+                prvSecureZero(cInputString, sizeof(cInputString));
+#else
                 strcpy(cLastInputString, cInputString);
                 ucInputIndex = 0;
                 memset(cInputString, 0x00, cmdMAX_INPUT_SIZE);
+#endif
 
                 /* Cast to type "signed char *" and "unsigned short" to be compatible with parameter type */
                 vSerialPutString((signed char *)pcEndOfOutputMessage, (unsigned short)strlen(pcEndOfOutputMessage));

@@ -228,7 +228,7 @@ def describe_thing(
     )
 
 
-def create_alias(args: argparse.Namespace) -> int:
+def build_alias_plan(args: argparse.Namespace) -> dict[str, Any]:
     validate_ownership(
         args.base_thing_name,
         args.thing_name,
@@ -236,8 +236,6 @@ def create_alias(args: argparse.Namespace) -> int:
         args.owner_pipeline_id,
         args.owner_job_id,
     )
-    meta_path = args.meta_json.resolve()
-
     base_exists, base_info = describe_thing(args.base_thing_name, args.region)
     if not base_exists:
         raise RuntimeError(f"base Thing does not exist: {args.base_thing_name}")
@@ -268,7 +266,7 @@ def create_alias(args: argparse.Namespace) -> int:
     )
     alias_arn = expected_alias_arn(base_thing_arn, args.thing_name)
 
-    meta: dict[str, Any] = {
+    return {
         "schema_version": 1,
         "status": "planned",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -284,17 +282,65 @@ def create_alias(args: argparse.Namespace) -> int:
         "owner_attributes": owner_attributes,
         "operations": [],
     }
-    write_json(meta_path, meta)
 
-    try:
-        alias_exists, _ = describe_thing(args.thing_name, args.region)
-        if alias_exists:
-            meta["status"] = "collision"
-            write_json(meta_path, meta)
+
+def plan_alias(args: argparse.Namespace) -> int:
+    meta = build_alias_plan(args)
+    meta_path = args.meta_json.resolve()
+    write_json(meta_path, meta)
+    alias_exists, _ = describe_thing(args.thing_name, args.region)
+    if alias_exists:
+        meta["status"] = "collision"
+        write_json(meta_path, meta)
+        raise RuntimeError(
+            f"refusing to adopt an existing Thing: {args.thing_name}"
+        )
+    print(args.thing_name)
+    return 0
+
+
+def create_alias(args: argparse.Namespace) -> int:
+    meta_path = args.meta_json.resolve()
+    meta = build_alias_plan(args)
+
+    plan_meta_path = getattr(args, "plan_meta_json", None)
+    if plan_meta_path is not None:
+        planned = load_json(plan_meta_path.resolve())
+        plan_keys = (
+            "schema_version",
+            "region",
+            "base_thing_name",
+            "base_thing_arn",
+            "thing_name",
+            "expected_thing_arn",
+            "principal",
+            "owner_project_id",
+            "owner_pipeline_id",
+            "owner_job_id",
+            "owner_attributes",
+        )
+        mismatches = [
+            key for key in plan_keys if planned.get(key) != meta.get(key)
+        ]
+        if mismatches:
             raise RuntimeError(
-                f"refusing to adopt an existing Thing: {args.thing_name}"
+                "live alias plan does not match the preflight journal: "
+                + ", ".join(mismatches)
             )
 
+    write_json(meta_path, meta)
+    alias_exists, _ = describe_thing(args.thing_name, args.region)
+    if alias_exists:
+        meta["status"] = "collision"
+        write_json(meta_path, meta)
+        raise RuntimeError(
+            f"refusing to adopt an existing Thing: {args.thing_name}"
+        )
+
+    owner_attributes = meta["owner_attributes"]
+    alias_arn = str(meta["expected_thing_arn"])
+    principal = str(meta["principal"])
+    try:
         _, create_payload = run_aws(
             [
                 "iot",
@@ -611,8 +657,19 @@ def parse_args() -> argparse.Namespace:
     create_parser.add_argument("--owner-project-id", required=True)
     create_parser.add_argument("--owner-pipeline-id", required=True)
     create_parser.add_argument("--owner-job-id", required=True)
+    create_parser.add_argument("--plan-meta-json", type=Path)
     create_parser.add_argument("--meta-json", required=True, type=Path)
     create_parser.set_defaults(func=create_alias)
+
+    plan_parser = subparsers.add_parser("plan")
+    plan_parser.add_argument("--base-thing-name", required=True)
+    plan_parser.add_argument("--thing-name", required=True)
+    plan_parser.add_argument("--region", required=True)
+    plan_parser.add_argument("--owner-project-id", required=True)
+    plan_parser.add_argument("--owner-pipeline-id", required=True)
+    plan_parser.add_argument("--owner-job-id", required=True)
+    plan_parser.add_argument("--meta-json", required=True, type=Path)
+    plan_parser.set_defaults(func=plan_alias)
 
     cleanup_parser = subparsers.add_parser("cleanup")
     cleanup_parser.add_argument("--meta-json", required=True, type=Path)

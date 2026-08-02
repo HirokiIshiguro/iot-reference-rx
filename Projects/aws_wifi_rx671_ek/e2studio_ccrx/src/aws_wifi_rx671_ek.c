@@ -14,6 +14,7 @@
 #include "event_groups.h"
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_Sockets.h"
+#include "NetworkBufferManagement.h"
 #include "iot_logging_task.h"
 #include "r_smc_entry.h"
 #include "debug_uart.h"
@@ -24,6 +25,12 @@
 #include "rx671_fleet_bootstrap.h"
 #include "rx671_fleet_config.h"
 #include "tcp_throughput_smoke.h"
+#include "demo_config.h"
+#include "lfs_common_data.h"
+#include "store.h"
+#include "mqtt_agent_task.h"
+#include "serial.h"
+#include "r_sci_rx_pinset.h"
 #include "trcRecorder.h"
 
 #if BSP_CFG_CPLUSPLUS == 1
@@ -35,9 +42,33 @@ extern void abort(void);
 #define DIAG_PING_PAYLOAD_BYTES     (32U)
 #define MAIN_LOGGING_TASK_STACK_SIZE       (configMINIMAL_STACK_SIZE * 6U)
 #define MAIN_LOGGING_MESSAGE_QUEUE_LENGTH  (15U)
+#define OTA_START_TASK_STACK_SIZE           (configMINIMAL_STACK_SIZE * 2U)
+#define OTA_START_TASK_PRIORITY             (tskIDLE_PRIORITY + 1U)
+#define OTA_MQTT_AGENT_STACK_SIZE           (6144U)
+#define OTA_MQTT_AGENT_PRIORITY             (tskIDLE_PRIORITY + 2U)
+#define OTA_DHCP_LEASE_TIMEOUT_TICKS        pdMS_TO_TICKS(60000U)
+/* Stack depth is expressed in StackType_t words.  Private-key import reaches
+ * mbedTLS entropy/DRBG frames, so keep this explicit rather than scaling the
+ * target-specific idle-task minimum.  2048 words are 8192 bytes on RX600v2. */
+#define OTA_PROVISIONER_CLI_STACK_DEPTH     (2048U)
+#define OTA_PROVISIONER_CLI_PRIORITY        (tskIDLE_PRIORITY + 1U)
 
 extern volatile uint32_t g_freertos_tcp_network_up;
+extern volatile uint32_t g_freertos_tcp_dhcp_lease_acquired;
+extern volatile uint32_t g_freertos_tcp_dhcp_static_fallback;
+extern volatile uint32_t g_whd_port_buffer_max_in_use;
+extern volatile uint32_t g_whd_port_buffer_alloc_temp_fail_count;
+extern volatile uint32_t g_whd_port_buffer_alloc_perm_fail_count;
+extern volatile uint32_t g_whd_port_buffer_wait_loop_count;
 extern void UserInitialization(void);
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+extern void vStartOtaDemo(void);
+#endif
+#if (RX671_OTA_PROVISIONER_ENABLE == 1)
+extern void CLI_Support_Settings(void);
+extern void vRegisterSampleCLICommands(void);
+extern void vUARTCommandConsoleStart(uint16_t usStackSize, UBaseType_t uxPriority);
+#endif
 
 volatile uint32_t g_logging_task_init_result;
 volatile uint32_t g_diag_ping_enable = 0U;
@@ -52,6 +83,128 @@ volatile uint32_t g_diag_ping_task_condition_count;
 volatile uint32_t g_diag_ping_heap_before_create;
 volatile uint32_t g_diag_ping_heap_after_create;
 EventGroupHandle_t xStartDemoEventGroup = NULL;
+
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+static void ota_log_capacity(void)
+{
+    char line[192];
+    char * p = line;
+
+    p = append_text(p, "[RX671_OTA_CAPACITY] minheap=");
+    p = append_dec32(p, (uint32_t)xPortGetMinimumEverFreeHeapSize());
+    p = append_text(p, " minnbuf=");
+    p = append_dec32(p, (uint32_t)uxGetMinimumFreeNetworkBuffers());
+    p = append_text(p, " whdmax=");
+    p = append_dec32(p, g_whd_port_buffer_max_in_use);
+    p = append_text(p, " tempfail=");
+    p = append_dec32(p, g_whd_port_buffer_alloc_temp_fail_count);
+    p = append_text(p, " permfail=");
+    p = append_dec32(p, g_whd_port_buffer_alloc_perm_fail_count);
+    p = append_text(p, " waitloop=");
+    p = append_dec32(p, g_whd_port_buffer_wait_loop_count);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+#endif
+
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+static BaseType_t ota_runtime_prepare(void)
+{
+    if (0 != littlFs_init())
+    {
+        debug_puts("OTA LittleFS init NG\r\n");
+        return pdFAIL;
+    }
+    if (0 != vprvCacheInit())
+    {
+        debug_puts("OTA KVS init NG\r\n");
+        return pdFAIL;
+    }
+
+    if (pdPASS != xMQTTAgentInit())
+    {
+        debug_puts("OTA MQTT agent init NG\r\n");
+        return pdFAIL;
+    }
+    debug_puts("OTA LittleFS/KVS/MQTT agent init OK\r\n");
+    return pdPASS;
+}
+
+static void ota_start_task(void * pvParameters)
+{
+    TickType_t started = xTaskGetTickCount();
+
+    (void)pvParameters;
+
+    while ((pdFALSE == FreeRTOS_IsNetworkUp()) ||
+           (0U == g_freertos_tcp_dhcp_lease_acquired))
+    {
+        if ((0U != g_freertos_tcp_dhcp_static_fallback) ||
+            ((xTaskGetTickCount() - started) >= OTA_DHCP_LEASE_TIMEOUT_TICKS))
+        {
+            debug_puts("RX671 OTA startup retry: DHCP lease not acquired\r\n");
+            vTaskDelete(NULL);
+            return;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100U));
+    }
+
+    debug_puts("RX671 OTA startup ready: WHD and DHCP lease verified\r\n");
+    xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
+    vStartMQTTAgent(OTA_MQTT_AGENT_STACK_SIZE, OTA_MQTT_AGENT_PRIORITY);
+    vStartOtaDemo();
+    debug_puts("RX671 OTA runtime started\r\n");
+    vTaskDelete(NULL);
+}
+#endif
+
+#if (RX671_OTA_PROVISIONER_ENABLE == 1)
+static void ota_provisioner_run(void)
+{
+    int32_t littlefs_result;
+    int32_t kvs_result = -1;
+
+    UserInitialization();
+    xStartDemoEventGroup = xEventGroupCreate();
+    CLI_Support_Settings();
+    /* Pin.c intentionally leaves TXD6 PMR clear until SCI6.TE is enabled.
+     * CLI_Support_Settings() opens SCI6 first; route P00 only afterwards. */
+    R_SCI_PinSet_SCI6();
+
+    littlefs_result = littlFs_init();
+    if (0 == littlefs_result)
+    {
+        kvs_result = vprvCacheInit();
+    }
+
+    vRegisterSampleCLICommands();
+    vUARTCommandConsoleStart(OTA_PROVISIONER_CLI_STACK_DEPTH,
+                             OTA_PROVISIONER_CLI_PRIORITY);
+    if ((0 == littlefs_result) && (0 == kvs_result))
+    {
+        vSerialPutString((const signed char *)
+                         "\r\nRX671 OTA provisioner ready: "
+                         "LittleFS/KVS OK; use conf set/commit.\r\n",
+                         sizeof("\r\nRX671 OTA provisioner ready: "
+                                "LittleFS/KVS OK; use conf set/commit.\r\n") - 1U);
+    }
+    else
+    {
+        vSerialPutString((const signed char *)
+                         "\r\nRX671 OTA provisioner ERROR: "
+                         "LittleFS/KVS initialization failed.\r\n",
+                         sizeof("\r\nRX671 OTA provisioner ERROR: "
+                                "LittleFS/KVS initialization failed.\r\n") - 1U);
+    }
+
+    /* SCI6 belongs exclusively to the common CLI in this profile. */
+    for (;;)
+    {
+        vTaskSuspend(NULL);
+    }
+}
+#endif
 
 static bool mac_is_zero(const uint8_t mac[6])
 {
@@ -106,19 +259,17 @@ static void start_freertos_tcp_after_join(void)
     static const uint8_t netmask[4]          = { 255U, 255U, 255U, 0U };
     static const uint8_t gateway[4]          = { 192U, 168U, 10U, 1U };
     static const uint8_t dns[4]              = { 192U, 168U, 10U, 1U };
-    static const uint8_t local_admin_mac[6]  = { 0x02U, 0x67U, 0x1EU, 0x00U, 0x00U, 0x01U };
     uint8_t mac[6];
     BaseType_t result;
 
     whd_bringup_get_sta_mac(mac);
     if (mac_is_zero(mac))
     {
-        uint32_t i;
-
-        for (i = 0U; i < 6U; i++)
-        {
-            mac[i] = local_admin_mac[i];
-        }
+        debug_puts("FreeRTOS+TCP skipped (WHD station MAC unavailable)\r\n");
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+        debug_puts("RX671 OTA startup retry: WHD station MAC unavailable\r\n");
+#endif
+        return;
     }
 
     result = FreeRTOS_IPInit(fallback_ip, netmask, gateway, dns, mac);
@@ -129,7 +280,17 @@ static void start_freertos_tcp_after_join(void)
         result = xTaskCreate(diag_ping_task, "DIAG_PING", 1024U, NULL, tskIDLE_PRIORITY + 1, NULL);
         g_diag_ping_task_create_result = (uint32_t)result;
         g_diag_ping_heap_after_create = xPortGetFreeHeapSize();
-#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+        result = xTaskCreate(ota_start_task,
+                             "OTA_START",
+                             OTA_START_TASK_STACK_SIZE,
+                             NULL,
+                             OTA_START_TASK_PRIORITY,
+                             NULL);
+        debug_puts((pdPASS == result) ?
+                   "OTA start task OK\r\n" :
+                   "OTA start task NG\r\n");
+#elif (RX671_FLEET_PROVISIONING_ENABLE == 1)
         rx671_fleet_bootstrap_start();
 #else
         aws_iot_mqtt_smoke_start();
@@ -143,6 +304,10 @@ static void start_freertos_tcp_after_join(void)
 
 void main_task(void *pvParameters)
 {
+#if (RX671_OTA_PROVISIONER_ENABLE == 1)
+    (void)pvParameters;
+    ota_provisioner_run();
+#else
     char line[64];
     char * p;
     uint32_t tick = 0U;
@@ -164,6 +329,17 @@ void main_task(void *pvParameters)
                "FreeRTOS logging task OK\r\n" :
                "FreeRTOS logging task NG\r\n");
 
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+    if (pdPASS != ota_runtime_prepare())
+    {
+        debug_puts("OTA runtime blocked: persistent credential store unavailable\r\n");
+        for (;;)
+        {
+            vTaskDelay(pdMS_TO_TICKS(1000U));
+        }
+    }
+#endif
+
 #if WHD_BRINGUP_ENABLE
     if (whd_bringup_run())
     {
@@ -172,6 +348,9 @@ void main_task(void *pvParameters)
     else
     {
         debug_puts("FreeRTOS+TCP skipped (WHD bring-up failed)\r\n");
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+        debug_puts("RX671 OTA startup retry: WHD bring-up failed\r\n");
+#endif
     }
 #else
     /* Issue #30 (b) increment 1+2: SDHI enumerate on the corrected PORTD SDHI
@@ -497,10 +676,17 @@ void main_task(void *pvParameters)
 
     vTaskDelete(NULL);
 
+#endif /* RX671_OTA_PROVISIONER_ENABLE */
 }
 
 BaseType_t OtaSelfTest(void)
 {
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+    /* This runs in the newly activated image before it is accepted.  Keep the
+     * existing OTA markers unchanged and add one machine-readable capacity
+     * snapshot for the focused hardware gate. */
+    ota_log_capacity();
+#endif
     return pdTRUE;
 }
 

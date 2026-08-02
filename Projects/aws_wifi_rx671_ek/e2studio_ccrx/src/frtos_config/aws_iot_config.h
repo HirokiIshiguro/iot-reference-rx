@@ -25,6 +25,15 @@
 #define AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3    (0)
 #endif
 
+#ifndef AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2
+#define AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2    (0)
+#endif
+
+#if (AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 != 0) && \
+    (AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0)
+#error "AWS IoT MQTT cannot require TLS 1.2 and TLS 1.3 simultaneously"
+#endif
+
 #ifndef AWS_IOT_PUBLISH_TOPIC
 #define AWS_IOT_PUBLISH_TOPIC            AWS_IOT_THING_NAME "/smoke"
 #endif

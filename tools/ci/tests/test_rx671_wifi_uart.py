@@ -70,6 +70,34 @@ class JunitTests(unittest.TestCase):
         self.assertEqual("missing network", root.find("./testcase/failure").attrib["message"])
         self.assertEqual("uart output", root.findtext("./testcase/system-out"))
 
+    def test_junit_escapes_xml_1_0_invalid_characters(self):
+        result = SmokeResult(
+            False,
+            "missing\x00network\ud800",
+            "\x00\nuart\x01 output\udfff",
+            1.25,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "result.xml"
+            write_junit(path, result, "network", "/dev/tty\x08USB0", 921600)
+            raw_xml = path.read_bytes()
+            root = ET.parse(path).getroot()
+
+        self.assertNotIn(b"\x00", raw_xml)
+        self.assertEqual(
+            "missing\\x00network\\uD800",
+            root.find("./testcase/failure").attrib["message"],
+        )
+        self.assertEqual(
+            "\\x00\nuart\\x01 output\\uDFFF",
+            root.findtext("./testcase/system-out"),
+        )
+        properties = {
+            item.attrib["name"]: item.attrib["value"]
+            for item in root.findall("./properties/property")
+        }
+        self.assertEqual("/dev/tty\\x08USB0", properties["port"])
+
 
 if __name__ == "__main__":
     unittest.main()

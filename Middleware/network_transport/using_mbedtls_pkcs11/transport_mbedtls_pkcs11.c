@@ -327,7 +327,22 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         returnStatus = TLS_TRANSPORT_INSUFFICIENT_MEMORY;
     }
 
-    #if defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0 )
+    #if defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 != 0 ) && \
+        defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0 )
+        #error "AWS IoT MQTT cannot require TLS 1.2 and TLS 1.3 simultaneously"
+    #elif defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 != 0 )
+        #if !defined( MBEDTLS_SSL_PROTO_TLS1_2 )
+            #error "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 requires MBEDTLS_SSL_PROTO_TLS1_2"
+        #endif
+
+        if( returnStatus == TLS_TRANSPORT_SUCCESS )
+        {
+            mbedtls_ssl_conf_min_tls_version( &( pTlsTransportParams->sslContext.config ),
+                                              MBEDTLS_SSL_VERSION_TLS1_2 );
+            mbedtls_ssl_conf_max_tls_version( &( pTlsTransportParams->sslContext.config ),
+                                              MBEDTLS_SSL_VERSION_TLS1_2 );
+        }
+    #elif defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0 )
         #if !defined( MBEDTLS_SSL_PROTO_TLS1_3 )
             #error "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 requires MBEDTLS_SSL_PROTO_TLS1_3"
         #endif
@@ -578,7 +593,15 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
     }
     else
     {
-        #if defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0 )
+        #if defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2 != 0 )
+            if( mbedtls_ssl_get_version_number( &( pTlsTransportParams->sslContext.context ) ) != MBEDTLS_SSL_VERSION_TLS1_2 )
+            {
+                LogError( ( "TLS version requirement failed: expected TLSv1.2, negotiated %s.",
+                            mbedtls_ssl_get_version( &( pTlsTransportParams->sslContext.context ) ) ) );
+                sslContextFree( &( pTlsTransportParams->sslContext ) );
+                return TLS_TRANSPORT_HANDSHAKE_FAILED;
+            }
+        #elif defined( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 ) && ( AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3 != 0 )
             if( mbedtls_ssl_get_version_number( &( pTlsTransportParams->sslContext.context ) ) != MBEDTLS_SSL_VERSION_TLS1_3 )
             {
                 LogError( ( "TLS version requirement failed: expected TLSv1.3, negotiated %s.",

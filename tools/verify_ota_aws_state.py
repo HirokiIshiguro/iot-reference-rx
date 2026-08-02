@@ -202,6 +202,7 @@ def public_meta(meta: dict[str, Any]) -> dict[str, Any]:
         for key in (
             "region",
             "thing_name",
+            "thing_arn",
             "ota_update_id",
             "aws_iot_job_id",
             "s3_bucket",
@@ -1128,6 +1129,10 @@ def snapshot_state(
             execution.get("thingArn") == thing.get("thingArn")
             and thing.get("thingName") == meta["thing_name"]
         ),
+        "thing_arn_matches_metadata": (
+            not meta.get("thing_arn")
+            or thing.get("thingArn") == meta["thing_arn"]
+        ),
         "source_object_present": s3_payload is not None,
     }
     acceptance["passed"] = all(acceptance.values())
@@ -1233,6 +1238,91 @@ def wait_for_ota_cleanup_discovery(
                 "until the cleanup deadline"
             )
         time.sleep(poll_interval)
+
+
+def recover_partial_snapshot_meta(
+    meta: dict[str, Any],
+    *,
+    wait_timeout: int,
+    poll_interval: int,
+) -> None:
+    """Recover a complete snapshot identity from fail-closed plan metadata."""
+
+    required_before_discovery = (
+        "region",
+        "thing_name",
+        "thing_arn",
+        "ota_update_id",
+        "s3_bucket",
+        "s3_key",
+        "code_signing_mode",
+        "file_version",
+    )
+    missing = [
+        key for key in required_before_discovery if not meta.get(key)
+    ]
+    if missing:
+        raise ValueError(
+            "Partial OTA snapshot metadata is incomplete; missing: "
+            + ", ".join(sorted(missing))
+        )
+
+    metadata_errors = validate_cleanup_metadata_identity(meta)
+    if metadata_errors:
+        raise ValueError(
+            "Partial OTA snapshot metadata identity is invalid: "
+            + "; ".join(error["message"] for error in metadata_errors)
+        )
+
+    region = str(meta["region"])
+    ota_payload = wait_for_ota_cleanup_discovery(
+        meta,
+        region,
+        timeout=wait_timeout,
+        poll_interval=poll_interval,
+    )
+    if ota_payload is None:
+        raise ValueError(
+            "Partial OTA snapshot recovery could not find the planned OTA "
+            f"update {meta['ota_update_id']}"
+        )
+
+    identity_errors = reconcile_live_ota_identity(meta, ota_payload)
+    if identity_errors:
+        raise ValueError(
+            "Partial OTA snapshot live identity does not match the plan: "
+            + "; ".join(error["message"] for error in identity_errors)
+        )
+
+    required_after_discovery = (
+        "ota_update_status",
+        "aws_iot_job_id",
+        "aws_iot_job_arn",
+        "s3_version",
+    )
+    if meta.get("code_signing_mode") == "aws-signer":
+        required_after_discovery += ("signing_job_id",)
+    missing = [
+        key for key in required_after_discovery if not meta.get(key)
+    ]
+    if missing:
+        raise ValueError(
+            "Live OTA response could not complete snapshot metadata; missing: "
+            + ", ".join(sorted(missing))
+        )
+    if meta["ota_update_status"] != "CREATE_COMPLETE":
+        raise ValueError(
+            "Live OTA update is not ready for a successful snapshot: "
+            f"{meta['ota_update_status']}"
+        )
+
+    job_id = str(meta["aws_iot_job_id"])
+    job_arn = str(meta["aws_iot_job_arn"])
+    if not job_arn.endswith(f":job/{job_id}"):
+        raise ValueError(
+            "Live AWS IoT Job ARN does not identify the recovered Job ID: "
+            f"{job_arn} versus {job_id}"
+        )
 
 
 def cleanup_state(
@@ -1689,6 +1779,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-json", required=True, type=Path)
     parser.add_argument("--wait-timeout", type=int, default=60)
     parser.add_argument("--poll-interval", type=int, default=3)
+    parser.add_argument(
+        "--recover-partial",
+        action="store_true",
+        help=(
+            "snapshot only: recover missing live identity fields from the "
+            "planned OTA update before taking the normal snapshot"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1696,11 +1794,21 @@ def main() -> int:
     args = parse_args()
     meta: dict[str, Any] | None = None
     try:
+        if args.recover_partial and args.command != "snapshot":
+            raise ValueError("--recover-partial is only valid with snapshot")
         meta = load_meta(
             args.meta_json,
-            require_complete=args.command == "snapshot",
+            require_complete=(
+                args.command == "snapshot" and not args.recover_partial
+            ),
         )
         if args.command == "snapshot":
+            if args.recover_partial:
+                recover_partial_snapshot_meta(
+                    meta,
+                    wait_timeout=args.wait_timeout,
+                    poll_interval=args.poll_interval,
+                )
             summary = snapshot_state(
                 meta,
                 wait_timeout=args.wait_timeout,

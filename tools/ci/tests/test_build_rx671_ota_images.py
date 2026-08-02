@@ -9,6 +9,9 @@ import unittest
 from pathlib import Path
 from subprocess import run
 
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, utils
+
 
 SCRIPT = Path(__file__).resolve().parents[2] / "build_rx671_ota_images.py"
 SPEC = importlib.util.spec_from_file_location("build_rx671_ota_images", SCRIPT)
@@ -47,6 +50,10 @@ class ProfileTests(unittest.TestCase):
         cls.fwup = (
             PROJECT / "src/frtos_config/r_fwup_config.h"
         ).read_text(encoding="utf-8")
+        cls.dev_mode_provisioning = (
+            ROOT
+            / "Demos/dev_mode_key_provisioning/src/aws_dev_mode_key_provisioning.c"
+        ).read_text(encoding="utf-8")
 
     def test_cproject_profile_is_dual_bank_and_keeps_every_payload_in_main(self) -> None:
         result = builder.make_ota_cproject(
@@ -60,6 +67,54 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('value="-define=APP_VERSION_MAJOR=1"', result)
         self.assertIn('value="-define=APP_VERSION_MINOR=2"', result)
         self.assertIn('value="-define=APP_VERSION_BUILD=3"', result)
+        self.assertIn(
+            'value="-define=RX671_OTA_RUNTIME_ENABLE=1"', result
+        )
+        self.assertIn(
+            'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1"',
+            result,
+        )
+        self.assertNotIn(
+            'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1"',
+            result,
+        )
+        self.assertIn(
+            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"', result
+        )
+        self.assertIn(
+            'value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"', result
+        )
+        self.assertIn(
+            'value="-define=FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH=32768"',
+            result,
+        )
+        self.assertIn(
+            'value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=8192"', result
+        )
+        self.assertIn(
+            'value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"', result
+        )
+        self.assertIn(
+            'value="-define=mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST=1"',
+            result,
+        )
+        self.assertIn(
+            'value="-define=OTA_MAX_NUM_DATA_BUFFERS=2"', result
+        )
+        self.assertIn(
+            'value="-define=OTA_MAX_NUM_FILE_BLOCKS=192"', result
+        )
+        self.assertIn(
+            'value="-define=WHD_PORT_BUFFER_COUNT=8"', result
+        )
+        self.assertIn('value="-define=WHD_SCAN_ENABLE=0"', result)
+        self.assertIn(
+            'value="-define=WHD_JOIN_USE_SCAN_RESULT=0"', result
+        )
+        self.assertIn(
+            'value="-define=CONFIG_USE_PERCEPIO_TRACE_RECORDER=0"', result
+        )
+        self.assertIn('value="-define=MBEDTLS_ERROR_C"', result)
         self.assertIn(builder.VERSION_MARKER_LINKER_OPTION, result)
         self.assertIn(
             "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300",
@@ -128,6 +183,90 @@ class ProfileTests(unittest.TestCase):
                 builder.parse_version("1.2.3"),
             )
 
+    def test_provisioner_profile_stays_bank_single_and_restores(self) -> None:
+        result = builder.make_provisioner_cproject(self.cproject)
+        self.assertIn('modes="bank.single"', result)
+        self.assertNotIn('modes="bank.dual"', result)
+        self.assertIn(
+            'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"', result
+        )
+        for define in builder.PROVISIONER_LOG_SUPPRESSION_DEFINES:
+            with self.subTest(define=define):
+                self.assertIn(f'value="-define={define}"', result)
+                self.assertNotIn(f'value="-define={define}"', self.cproject)
+        self.assertIn('value="-define=LIBRARY_LOG_LEVEL=LOG_NONE"', result)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            target = project / ".cproject"
+            original = (PROJECT / ".cproject").read_bytes()
+            target.write_bytes(original)
+            with builder.TemporaryProvisionerProfile(project):
+                self.assertIn(
+                    b"RX671_OTA_PROVISIONER_ENABLE=1",
+                    target.read_bytes(),
+                )
+                for define in builder.PROVISIONER_LOG_SUPPRESSION_DEFINES:
+                    self.assertIn(
+                        f"-define={define}".encode(),
+                        target.read_bytes(),
+                    )
+            self.assertEqual(
+                original,
+                target.read_bytes(),
+            )
+
+    def test_provisioner_does_not_use_uninitialized_async_logger(self) -> None:
+        self.assertIn("RX671_OTA_PROVISIONER_ENABLE", self.dev_mode_provisioning)
+        self.assertRegex(
+            self.dev_mode_provisioning,
+            r"#define\s+DEV_MODE_KEY_PROVISIONING_PRINT\(X\)\s+\(\(void\)0\)",
+        )
+
+
+class TransferArtifactTests(unittest.TestCase):
+    def test_candidate_payload_is_rsu_after_header_and_der_signature_verifies(
+        self,
+    ) -> None:
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        payload = b"descriptor-and-application" * 16
+        source_der = private_key.sign(payload, ec.ECDSA(hashes.SHA256()))
+        r, s = utils.decode_dss_signature(source_der)
+        raw = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+        header = bytearray(b"\xFF" * builder.RSU_HEADER_SIZE)
+        header[
+            builder.RSU_RAW_SIGNATURE_OFFSET :
+            builder.RSU_RAW_SIGNATURE_OFFSET + builder.RSU_RAW_SIGNATURE_SIZE
+        ] = raw
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rsu = root / "candidate.rsu"
+            public_key = root / builder.SIGNER_PUBLIC_KEY_NAME
+            output = root / builder.OTA_TRANSFER_PAYLOAD_NAME
+            signature = root / builder.OTA_TRANSFER_SIGNATURE_NAME
+            rsu.write_bytes(bytes(header) + payload)
+            public_key.write_bytes(
+                private_key.public_key().public_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PublicFormat.SubjectPublicKeyInfo,
+                )
+            )
+
+            builder._create_ota_transfer_artifacts(
+                rsu_path=rsu,
+                signer_public_key=public_key,
+                payload_path=output,
+                signature_path=signature,
+            )
+
+            self.assertEqual(payload, output.read_bytes())
+            private_key.public_key().verify(
+                signature.read_bytes(),
+                output.read_bytes(),
+                ec.ECDSA(hashes.SHA256()),
+            )
+
 
 class OutputSafetyTests(unittest.TestCase):
     def test_output_must_be_below_dedicated_repo_build_directory(self) -> None:
@@ -158,6 +297,33 @@ class OutputSafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must be a child"):
             builder._validate_workspace_root(Path("C:/ai/codex/ws"))
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows path contract")
+    def test_transient_build_products_are_removed_from_project_and_workspace(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(
+            dir="C:/ai/codex/ws",
+            prefix="rx671-ota-cleanup-test-",
+        ) as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            hardware_debug = project / "HardwareDebug"
+            workspace = root / "workspace"
+            hardware_debug.mkdir(parents=True)
+            workspace.mkdir()
+            (hardware_debug / "credential-bearing.abs").write_bytes(
+                b"secret"
+            )
+            (workspace / "credential-bearing.mot").write_bytes(b"secret")
+
+            builder._remove_transient_build_products(
+                project,
+                workspace,
+            )
+
+            self.assertFalse(hardware_debug.exists())
+            self.assertFalse(workspace.exists())
+
 
 class WifiCredentialIsolationTests(unittest.TestCase):
     def test_ota_build_environment_removes_wifi_credentials(self) -> None:
@@ -173,6 +339,15 @@ class WifiCredentialIsolationTests(unittest.TestCase):
         self.assertEqual("true", result["CI"])
         for variable in builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
             self.assertNotIn(variable, result)
+
+    def test_ota_build_always_enables_littlefs_kvs_join(self) -> None:
+        profile_source = inspect.getsource(builder.make_ota_cproject)
+        build_source = inspect.getsource(builder._build_one)
+        self.assertIn('-define=WHD_JOIN_ENABLE=1', profile_source)
+        self.assertIn('-define=WHD_JOIN_USE_KVS=1', profile_source)
+        self.assertIn('build_command.append("-SkipWifiConfig")', build_source)
+        self.assertNotIn("UseLocalJoinConfig", build_source)
+        self.assertNotIn("runtime_wifi", build_source)
 
     def test_local_join_header_is_restored_outside_ci(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -267,7 +442,13 @@ class SubmoduleProvenanceTests(unittest.TestCase):
             )
             with builder.TemporaryWhdPatchIsolation(repo):
                 run(
-                    ["git", "apply", str(patch)],
+                    [
+                        "git",
+                        "apply",
+                        "--ignore-space-change",
+                        "--ignore-whitespace",
+                        str(patch),
+                    ],
                     cwd=submodule,
                     check=True,
                 )
@@ -295,6 +476,10 @@ class SubmoduleProvenanceTests(unittest.TestCase):
 
 
 class DirtyAnalysisTests(unittest.TestCase):
+    def test_dirty_manifest_is_not_marked_formal(self) -> None:
+        source = inspect.getsource(builder._create_manifest)
+        self.assertIn('"formal": not dirty', source)
+
     def test_allows_only_dirty_provenance_and_its_dependent_unknowns(self) -> None:
         report = {
             "gates": [
