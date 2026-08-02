@@ -3,7 +3,7 @@
 
 SCI6 is opened before the boot loader is released and is held continuously
 through baseline RSU installation, application startup, candidate download,
-activation, reboot, self-test, acceptance, and commit.
+activation, reboot, self-test, image acceptance, and OTA success reporting.
 """
 
 from __future__ import annotations
@@ -191,6 +191,34 @@ class Rx671OtaTransaction:
             "thresholds": thresholds,
             "checks": checks,
         }
+
+    def _candidate_tls_after_activate(self) -> bool:
+        activate_at = self.ota.marker_seen_at("activate_image")
+        return bool(
+            activate_at is not None
+            and any(
+                event["seen_at"] >= activate_at
+                and event["version"] == self.args.require_tls_version
+                for event in self.ota.tls_events
+            )
+        )
+
+    def _runtime_success_ready(self) -> bool:
+        """Return true after the RX671 happy path has fully reported success.
+
+        The primary-image ``OtaPalNewImageBooted`` path accepts the image,
+        deletes the staging area, and reports the AWS IoT Job as succeeded.  It
+        does not call ``otaPal_SetPlatformImageState( OtaImageStateAccepted )``,
+        so the optional ``Accepted and committed final image.`` PAL log is not
+        emitted on this path.  Requiring that optional log would turn a proven
+        successful OTA into a 15-minute host-side timeout.
+        """
+        return bool(
+            self.ota.is_success()
+            and self.ota.has_marker("ota_completed")
+            and self._candidate_tls_after_activate()
+            and self._capacity_proof()["success"]
+        )
 
     def _read(self, serial_port) -> bool:
         waiting = getattr(serial_port, "in_waiting", 0)
@@ -386,10 +414,12 @@ class Rx671OtaTransaction:
                 if self.ota.first_error() is not None:
                     error = self.ota.first_error()
                     raise RuntimeError(f"OTA fail-close marker: {error['classification']}")
-                if self.ota.is_success() and self.ota.has_marker("image_committed"):
+                if self._runtime_success_ready():
                     break
             else:
-                raise TimeoutError("candidate OTA did not reach accepted-and-committed state")
+                raise TimeoutError(
+                    "candidate OTA did not reach accepted-and-reported-success state"
+                )
         finally:
             serial_port.close()
 
@@ -399,30 +429,18 @@ class Rx671OtaTransaction:
             elapsed=time.monotonic() - self.started,
             success=self.ota.is_success(),
         )
-        activate_at = self.ota.marker_seen_at("activate_image")
-        candidate_tls_after_activate = bool(
-            activate_at is not None
-            and any(
-                event["seen_at"] >= activate_at
-                and event["version"] == self.args.require_tls_version
-                for event in self.ota.tls_events
-            )
-        )
+        candidate_tls_after_activate = self._candidate_tls_after_activate()
         capacity_proof = self._capacity_proof()
         success = (
             not missing_boot
-            and ota_summary["success"]
-            and self.ota.has_marker("image_committed")
-            and ota_summary["tls_version_ok"]
-            and candidate_tls_after_activate
-            and capacity_proof["success"]
+            and self._runtime_success_ready()
         )
         if success:
             classification = "pass"
         elif (
             missing_boot
             or not ota_summary["success"]
-            or not self.ota.has_marker("image_committed")
+            or not self.ota.has_marker("ota_completed")
             or not ota_summary["tls_version_ok"]
             or not candidate_tls_after_activate
         ):
@@ -444,7 +462,9 @@ class Rx671OtaTransaction:
             "bootloader_markers_missing": missing_boot,
             "uart_held_for_entire_transaction": True,
             "ota": ota_summary,
+            "image_acceptance_observed": self.ota.has_marker("image_accepted"),
             "image_commit_observed": self.ota.has_marker("image_committed"),
+            "ota_success_report_observed": self.ota.has_marker("ota_completed"),
             "candidate_tls_after_activate": candidate_tls_after_activate,
             "post_ota_capacity": capacity_proof,
             "startup_recovery": {

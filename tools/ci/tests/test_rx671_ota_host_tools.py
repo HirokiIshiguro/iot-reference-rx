@@ -741,13 +741,16 @@ class OtaTransactionContractTests(unittest.TestCase):
             self.assertEqual(1, transaction.boot_hits["key_load_started"])
             self.assertEqual(1, transaction.boot_hits["key_found"])
 
-    def test_uses_existing_ota_analyzer_for_tls_and_commit(self):
+    def test_acceptance_and_success_report_do_not_require_optional_pal_commit_log(self):
         with tempfile.TemporaryDirectory() as temporary:
             args = argparse.Namespace(
                 raw_log=Path(temporary) / "raw.log",
                 baseline_version="0.1.0",
                 candidate_version="0.1.1",
                 require_tls_version="TLSv1.2",
+                min_capacity_heap_bytes=16384,
+                min_capacity_network_buffers=4,
+                expected_whd_buffer_count=8,
             )
             transaction = ota_test.Rx671OtaTransaction(args)
             for line in (
@@ -755,16 +758,23 @@ class OtaTransactionContractTests(unittest.TestCase):
                 "TLS handshake successful: version TLSv1.2\r\n",
                 "Received OTA Job.\r\n",
                 "Starting The Download.\r\n",
-                "Received file block\r\n",
+                "Downloaded block 191 of 192.\r\n",
                 "Close file event Received\r\n",
                 "Activate Image event Received\r\n",
                 "Application version 0.1.1\r\n",
                 "TLS handshake successful: version TLSv1.2\r\n",
+                "[RX671_OTA_CAPACITY] minheap=25576 minnbuf=15 whdmax=1 "
+                "tempfail=0 permfail=0 waitloop=0\r\n",
                 "New image has higher version than current image, accepted!\r\n",
-                "Accepted and committed final image.\r\n",
+                "---OTA Completed successfully!---\r\n",
             ):
                 transaction._consume(line.encode("ascii"))
-            self.assertTrue(transaction.ota.has_marker("image_committed"))
+
+            self.assertTrue(transaction.ota.is_success())
+            self.assertTrue(transaction._runtime_success_ready())
+            self.assertTrue(transaction.ota.has_marker("image_accepted"))
+            self.assertTrue(transaction.ota.has_marker("ota_completed"))
+            self.assertFalse(transaction.ota.has_marker("image_committed"))
             self.assertIn("TLSv1.2", transaction.ota.tls_versions_seen)
 
     def test_requires_capacity_headroom_after_activation(self):
