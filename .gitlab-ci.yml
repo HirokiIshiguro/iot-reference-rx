@@ -226,6 +226,7 @@ variables:
   RX671_OTA_POLICY_PROPAGATION_SECONDS: "480"
   RX671_OTA_OBSERVE_TIMEOUT_SECONDS: "900"
   RX671_OTA_READY_TIMEOUT_SECONDS: "180"
+  RX671_OTA_STARTUP_RESET_RETRIES: "2"
   RX671_OTA_S3_BUCKET: "${AWS_OTA_S3_BUCKET_RX72N_02}"
   RX671_OTA_SERVICE_ROLE_ARN: "${AWS_OTA_SERVICE_ROLE_ARN_RX72N_02}"
   RX671_OTA_BASE_THING_NAME: "${RX671_EK_AWS_IOT_THING_NAME}"
@@ -4494,6 +4495,7 @@ test_rx671_wifi_ota_atomic:
         --rfp-speed "$RX671_WIFI_RFP_SPEED" \
         --rfp-auth-id "$RX671_WIFI_RFP_AUTH_ID" \
         --boot-timeout "$RX671_OTA_READY_TIMEOUT_SECONDS" \
+        --startup-reset-retries "$RX671_OTA_STARTUP_RESET_RETRIES" \
         --ota-timeout "$RX671_OTA_OBSERVE_TIMEOUT_SECONDS" \
         --raw-log "$artifact_dir/ota_uart_raw.log" \
         --summary-json "$artifact_dir/ota_summary.json" \

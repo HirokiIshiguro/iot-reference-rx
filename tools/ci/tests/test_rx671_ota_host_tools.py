@@ -38,6 +38,7 @@ class FakeSerial:
         self.responses = bytearray(responses)
         self.writes: list[bytes] = []
         self.closed = False
+        self.input_reset_count = 0
 
     @property
     def in_waiting(self):
@@ -58,7 +59,7 @@ class FakeSerial:
         pass
 
     def reset_input_buffer(self):
-        pass
+        self.input_reset_count += 1
 
     def reset_output_buffer(self):
         pass
@@ -494,6 +495,122 @@ class OtaTransactionContractTests(unittest.TestCase):
             self.assertEqual(16384, args.min_capacity_heap_bytes)
             self.assertEqual(4, args.min_capacity_network_buffers)
             self.assertEqual(8, args.expected_whd_buffer_count)
+            self.assertEqual(2, args.startup_reset_retries)
+
+    def test_startup_retry_resets_whole_mcu_and_then_accepts_application(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                application_timeout=0.1,
+                startup_reset_retries=2,
+            )
+            serial = FakeSerial(
+                b"RX671 OTA startup retry: WHD bring-up failed\r\n"
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            rfp = host.RfpConfig(auth_id="unit-test-auth-id")
+
+            def release_after_reset(*_args, **_kwargs):
+                serial.responses.extend(
+                    b"RX671 OTA startup ready: WHD and DHCP lease verified\r\n"
+                )
+
+            with mock.patch.object(
+                ota_test, "run_checked", side_effect=release_after_reset
+            ) as reset:
+                transaction.wait_for_application_ready(serial, rfp)
+
+            self.assertEqual(1, reset.call_count)
+            self.assertEqual(1, serial.input_reset_count)
+            self.assertEqual(
+                [
+                    {
+                        "reset_number": 1,
+                        "reason": "whd_bringup_failed",
+                        "phase": "baseline_startup",
+                    }
+                ],
+                transaction.startup_reset_events,
+            )
+
+    def test_startup_retry_is_bounded_and_fails_after_exhaustion(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                application_timeout=0.1,
+                startup_reset_retries=2,
+            )
+            retry_marker = b"RX671 OTA startup retry: DHCP lease not acquired\r\n"
+            serial = FakeSerial(retry_marker)
+            transaction = ota_test.Rx671OtaTransaction(args)
+
+            def repeat_failure(*_args, **_kwargs):
+                serial.responses.extend(retry_marker)
+
+            with mock.patch.object(
+                ota_test, "run_checked", side_effect=repeat_failure
+            ) as reset:
+                with self.assertRaisesRegex(RuntimeError, "retries exhausted"):
+                    transaction.wait_for_application_ready(
+                        serial, host.RfpConfig(auth_id="unit-test-auth-id")
+                    )
+
+            self.assertEqual(2, reset.call_count)
+            self.assertEqual(2, serial.input_reset_count)
+            self.assertEqual(2, len(transaction.startup_reset_events))
+
+    def test_candidate_startup_retry_uses_the_same_global_reset_budget(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                application_timeout=0.1,
+                startup_reset_retries=2,
+            )
+            serial = FakeSerial(b"")
+            transaction = ota_test.Rx671OtaTransaction(args)
+            transaction._consume(
+                b"RX671 OTA startup retry: WHD bring-up failed\r\n"
+            )
+
+            with mock.patch.object(ota_test, "run_checked") as reset:
+                reason = transaction._startup_retry_reason()
+                transaction._perform_startup_reset(
+                    serial,
+                    host.RfpConfig(auth_id="unit-test-auth-id"),
+                    reason=reason,
+                    phase="ota_observation",
+                )
+
+            self.assertEqual(1, reset.call_count)
+            self.assertEqual("ota_observation", transaction.startup_reset_events[0]["phase"])
+            self.assertEqual("", transaction.text)
+
+    def test_application_version_alone_is_not_startup_readiness(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                application_timeout=0.01,
+                startup_reset_retries=2,
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            serial = FakeSerial(b"Application version 0.1.0\r\n")
+
+            with self.assertRaisesRegex(TimeoutError, "startup ready"):
+                transaction.wait_for_application_ready(
+                    serial, host.RfpConfig(auth_id="unit-test-auth-id")
+                )
 
     def test_requires_exact_raw_rsu_size(self):
         with tempfile.TemporaryDirectory() as temporary:

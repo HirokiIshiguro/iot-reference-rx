@@ -32,6 +32,18 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.whd_config = (PROJECT / "src/whd_join_config.h").read_text(
             encoding="utf-8"
         )
+        cls.ip_config = (
+            PROJECT / "src/frtos_config/FreeRTOSIPConfig.h"
+        ).read_text(encoding="utf-8")
+        cls.ip_hooks = (PROJECT / "src/freertos_tcp_hooks.c").read_text(
+            encoding="utf-8"
+        )
+        cls.sdio_host = (PROJECT / "src/sdio_host.c").read_text(
+            encoding="utf-8"
+        )
+        cls.ota_host = (ROOT / "tools/test_rx671_ota.py").read_text(
+            encoding="utf-8"
+        )
         cls.store_header = (ROOT / "Demos/cli/store.h").read_text(
             encoding="utf-8"
         )
@@ -172,6 +184,44 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             "        result = xTaskCreate(ota_start_task,",
             self.main,
         )
+
+    def test_ota_requires_real_station_mac_and_dhcp_lease(self) -> None:
+        self.assertIn("whd_mac_is_valid", self.whd)
+        self.assertIn(
+            "WHD station MAC unavailable; refusing network start",
+            self.whd,
+        )
+        self.assertNotIn("local_admin_mac", self.main)
+        self.assertIn("iptraceDHCP_SUCCEEDED", self.ip_config)
+        self.assertIn(
+            "iptraceDHCP_REQUESTS_FAILED_USING_DEFAULT_IP_ADDRESS",
+            self.ip_config,
+        )
+        self.assertIn("g_freertos_tcp_dhcp_lease_acquired = 1U", self.ip_hooks)
+        self.assertIn("g_freertos_tcp_dhcp_static_fallback = 1U", self.ip_hooks)
+        self.assertIn(
+            "RX671 OTA startup retry: DHCP lease not acquired",
+            self.main,
+        )
+        self.assertIn(
+            "RX671 OTA startup ready: WHD and DHCP lease verified",
+            self.main,
+        )
+        self.assertLess(
+            self.main.index(
+                "RX671 OTA startup ready: WHD and DHCP lease verified"
+            ),
+            self.main.index("vStartOtaDemo();"),
+        )
+
+    def test_startup_recovery_uses_bounded_reset_and_type1yn_power_cycle(self) -> None:
+        self.assertIn("RX671 OTA startup retry: WHD bring-up failed", self.main)
+        self.assertIn("--startup-reset-retries", self.ota_host)
+        self.assertIn("for attempt in range(reset_limit + 1)", self.ota_host)
+        self.assertIn("rfp.run_command()", self.ota_host)
+        self.assertIn("sd_slot_power_on();", self.sdio_host)
+        self.assertIn("PORT5.PODR.BIT.B1 = 0U", self.sdio_host)
+        self.assertIn("PORT5.PODR.BIT.B1 = 1U", self.sdio_host)
 
     def test_ota_runtime_reports_scheduler_fatal_hooks(self) -> None:
         self.assertIn(

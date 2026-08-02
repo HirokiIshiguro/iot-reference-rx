@@ -65,6 +65,8 @@ void vWifiRx671IpTraceNetworkInterfaceInput(uint32_t length, const uint8_t * buf
 void vWifiRx671IpTraceNetworkInterfaceOutput(uint32_t length, const uint8_t * buffer);
 void vWifiRx671IpTraceIcmpPacketReceived(void);
 void vWifiRx671IpTraceSendingPingReply(uint32_t ip_address);
+void vWifiRx671IpTraceDhcpSucceeded(uint32_t ip_address);
+void vWifiRx671IpTraceDhcpStaticFallback(uint32_t ip_address);
 
 #define iptraceNETWORK_EVENT_RECEIVED(eEvent) \
     vWifiRx671IpTraceNetworkEventReceived((uint32_t)(eEvent))
@@ -76,5 +78,9 @@ void vWifiRx671IpTraceSendingPingReply(uint32_t ip_address);
     vWifiRx671IpTraceIcmpPacketReceived()
 #define iptraceSENDING_PING_REPLY(ulIPAddress) \
     vWifiRx671IpTraceSendingPingReply((uint32_t)(ulIPAddress))
+#define iptraceDHCP_SUCCEEDED(ulOfferedIPAddress) \
+    vWifiRx671IpTraceDhcpSucceeded((uint32_t)(ulOfferedIPAddress))
+#define iptraceDHCP_REQUESTS_FAILED_USING_DEFAULT_IP_ADDRESS(ulIPAddress) \
+    vWifiRx671IpTraceDhcpStaticFallback((uint32_t)(ulIPAddress))
 
 #endif /* FREERTOS_IP_CONFIG_H */

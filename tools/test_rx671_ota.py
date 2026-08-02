@@ -41,6 +41,12 @@ BOOT_ERROR_MARKERS = (
     "Code flash is completely broken.",
     "RX671 OTA fatal:",
 )
+STARTUP_RETRY_MARKERS = {
+    "whd_bringup_failed": "RX671 OTA startup retry: WHD bring-up failed",
+    "whd_mac_unavailable": "RX671 OTA startup retry: WHD station MAC unavailable",
+    "dhcp_lease_not_acquired": "RX671 OTA startup retry: DHCP lease not acquired",
+}
+STARTUP_READY_MARKER = "RX671 OTA startup ready: WHD and DHCP lease verified"
 BOOT_REQUIRED = {
     "key_load_started": KEY_LOAD_MARKER,
     "key_found": KEY_FOUND_MARKER,
@@ -88,6 +94,7 @@ class Rx671OtaTransaction:
         self.pending = ""
         self.total_uart_bytes = 0
         self.capacity_events = []
+        self.startup_reset_events = []
 
     def _consume(self, chunk: bytes) -> None:
         decoded = chunk.decode("ascii", errors="replace")
@@ -201,6 +208,83 @@ class Rx671OtaTransaction:
             self._read(serial_port)
         raise TimeoutError(f"timed out waiting for target marker: {marker}")
 
+    def _startup_retry_reason(self) -> str | None:
+        return next(
+            (
+                name
+                for name, marker in STARTUP_RETRY_MARKERS.items()
+                if marker in self.text
+            ),
+            None,
+        )
+
+    def _perform_startup_reset(
+        self,
+        serial_port,
+        rfp: RfpConfig,
+        *,
+        reason: str,
+        phase: str,
+    ) -> None:
+        reset_limit = int(getattr(self.args, "startup_reset_retries", 2))
+        reset_number = len(self.startup_reset_events) + 1
+
+        if reset_number > reset_limit:
+            raise RuntimeError(
+                "RX671 OTA startup reset retries exhausted "
+                f"after {reset_limit} reset(s): {reason}"
+            )
+
+        self.startup_reset_events.append(
+            {
+                "reset_number": reset_number,
+                "reason": reason,
+                "phase": phase,
+            }
+        )
+        self.raw_log.write(
+            "[HOST] RX671 OTA bounded startup reset "
+            f"{reset_number}/{reset_limit}: {reason} phase={phase}\n"
+        )
+        serial_port.reset_input_buffer()
+        self.text = ""
+        self.pending = ""
+        run_checked(
+            rfp.run_command(),
+            label=f"RX671 OTA startup reset {reset_number}/{reset_limit}",
+        )
+
+    def wait_for_application_ready(self, serial_port, rfp: RfpConfig) -> None:
+        """Boundedly reset before OTA/AWS side effects when startup asks for it.
+
+        Every application boot enters ``sdio_host_init()``, which power-cycles
+        the Type 1YN rail through P51. A whole-MCU reset is therefore safer
+        than trying to unwind an unknown partially initialized WHD state.
+        """
+        application_marker = STARTUP_READY_MARKER
+        reset_limit = int(getattr(self.args, "startup_reset_retries", 2))
+
+        for attempt in range(reset_limit + 1):
+            deadline = time.monotonic() + self.args.application_timeout
+            while time.monotonic() < deadline:
+                self._read(serial_port)
+                retry_reason = self._startup_retry_reason()
+                if retry_reason is not None:
+                    break
+                if application_marker in self.text:
+                    return
+            else:
+                raise TimeoutError(
+                    f"timed out waiting for target marker: {application_marker}"
+                )
+
+            self._perform_startup_reset(
+                serial_port,
+                rfp,
+                reason=retry_reason,
+                phase="baseline_startup",
+            )
+
     def stream_baseline_rsu(self, serial_port) -> tuple[int, str]:
         """Send one flash block at a time and wait for its progress ACK.
 
@@ -285,15 +369,20 @@ class Rx671OtaTransaction:
             sent, digest = self.stream_baseline_rsu(serial_port)
             self.wait_for(serial_port, BOOT_REQUIRED["install_completed"], self.args.install_timeout)
             self.wait_for(serial_port, BOOT_REQUIRED["jump"], self.args.install_timeout)
-            self.wait_for(
-                serial_port,
-                f"Application version {self.args.baseline_version}",
-                self.args.application_timeout,
-            )
+            self.wait_for_application_ready(serial_port, rfp)
 
             deadline = time.monotonic() + self.args.ota_timeout
             while time.monotonic() < deadline:
                 self._read(serial_port)
+                retry_reason = self._startup_retry_reason()
+                if retry_reason is not None:
+                    self._perform_startup_reset(
+                        serial_port,
+                        rfp,
+                        reason=retry_reason,
+                        phase="ota_observation",
+                    )
+                    continue
                 if self.ota.first_error() is not None:
                     error = self.ota.first_error()
                     raise RuntimeError(f"OTA fail-close marker: {error['classification']}")
@@ -358,6 +447,11 @@ class Rx671OtaTransaction:
             "image_commit_observed": self.ota.has_marker("image_committed"),
             "candidate_tls_after_activate": candidate_tls_after_activate,
             "post_ota_capacity": capacity_proof,
+            "startup_recovery": {
+                "reset_limit": int(getattr(self.args, "startup_reset_retries", 2)),
+                "resets_used": len(self.startup_reset_events),
+                "events": self.startup_reset_events,
+            },
             "duration_seconds": round(time.monotonic() - self.started, 3),
         }
 
@@ -384,6 +478,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--install-timeout", type=float, default=180.0)
     parser.add_argument("--application-timeout", type=float, default=180.0)
     parser.add_argument("--ota-timeout", type=float, default=900.0)
+    parser.add_argument("--startup-reset-retries", type=int, default=2)
     parser.add_argument("--chunk-size", type=int, default=4096)
     parser.add_argument("--inter-chunk-delay", type=float, default=0.0)
     parser.add_argument("--raw-log", type=Path, required=True)
@@ -400,6 +495,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--min-capacity-network-buffers must be positive")
     if args.expected_whd_buffer_count <= 0:
         parser.error("--expected-whd-buffer-count must be positive")
+    if not 0 <= args.startup_reset_retries <= 3:
+        parser.error("--startup-reset-retries must be between 0 and 3")
     if args.cleanup_plaintext and args.cleanup_root is None:
         parser.error("--cleanup-root is required with --cleanup-plaintext")
     return args

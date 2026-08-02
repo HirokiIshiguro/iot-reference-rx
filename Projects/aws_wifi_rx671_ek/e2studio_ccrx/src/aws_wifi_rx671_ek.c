@@ -46,6 +46,7 @@ extern void abort(void);
 #define OTA_START_TASK_PRIORITY             (tskIDLE_PRIORITY + 1U)
 #define OTA_MQTT_AGENT_STACK_SIZE           (6144U)
 #define OTA_MQTT_AGENT_PRIORITY             (tskIDLE_PRIORITY + 2U)
+#define OTA_DHCP_LEASE_TIMEOUT_TICKS        pdMS_TO_TICKS(60000U)
 /* Stack depth is expressed in StackType_t words.  Private-key import reaches
  * mbedTLS entropy/DRBG frames, so keep this explicit rather than scaling the
  * target-specific idle-task minimum.  2048 words are 8192 bytes on RX600v2. */
@@ -53,6 +54,8 @@ extern void abort(void);
 #define OTA_PROVISIONER_CLI_PRIORITY        (tskIDLE_PRIORITY + 1U)
 
 extern volatile uint32_t g_freertos_tcp_network_up;
+extern volatile uint32_t g_freertos_tcp_dhcp_lease_acquired;
+extern volatile uint32_t g_freertos_tcp_dhcp_static_fallback;
 extern volatile uint32_t g_whd_port_buffer_max_in_use;
 extern volatile uint32_t g_whd_port_buffer_alloc_temp_fail_count;
 extern volatile uint32_t g_whd_port_buffer_alloc_perm_fail_count;
@@ -130,13 +133,24 @@ static BaseType_t ota_runtime_prepare(void)
 
 static void ota_start_task(void * pvParameters)
 {
+    TickType_t started = xTaskGetTickCount();
+
     (void)pvParameters;
 
-    while (pdFALSE == FreeRTOS_IsNetworkUp())
+    while ((pdFALSE == FreeRTOS_IsNetworkUp()) ||
+           (0U == g_freertos_tcp_dhcp_lease_acquired))
     {
+        if ((0U != g_freertos_tcp_dhcp_static_fallback) ||
+            ((xTaskGetTickCount() - started) >= OTA_DHCP_LEASE_TIMEOUT_TICKS))
+        {
+            debug_puts("RX671 OTA startup retry: DHCP lease not acquired\r\n");
+            vTaskDelete(NULL);
+            return;
+        }
         vTaskDelay(pdMS_TO_TICKS(100U));
     }
 
+    debug_puts("RX671 OTA startup ready: WHD and DHCP lease verified\r\n");
     xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
     vStartMQTTAgent(OTA_MQTT_AGENT_STACK_SIZE, OTA_MQTT_AGENT_PRIORITY);
     vStartOtaDemo();
@@ -245,19 +259,17 @@ static void start_freertos_tcp_after_join(void)
     static const uint8_t netmask[4]          = { 255U, 255U, 255U, 0U };
     static const uint8_t gateway[4]          = { 192U, 168U, 10U, 1U };
     static const uint8_t dns[4]              = { 192U, 168U, 10U, 1U };
-    static const uint8_t local_admin_mac[6]  = { 0x02U, 0x67U, 0x1EU, 0x00U, 0x00U, 0x01U };
     uint8_t mac[6];
     BaseType_t result;
 
     whd_bringup_get_sta_mac(mac);
     if (mac_is_zero(mac))
     {
-        uint32_t i;
-
-        for (i = 0U; i < 6U; i++)
-        {
-            mac[i] = local_admin_mac[i];
-        }
+        debug_puts("FreeRTOS+TCP skipped (WHD station MAC unavailable)\r\n");
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+        debug_puts("RX671 OTA startup retry: WHD station MAC unavailable\r\n");
+#endif
+        return;
     }
 
     result = FreeRTOS_IPInit(fallback_ip, netmask, gateway, dns, mac);
@@ -336,6 +348,9 @@ void main_task(void *pvParameters)
     else
     {
         debug_puts("FreeRTOS+TCP skipped (WHD bring-up failed)\r\n");
+#if (RX671_OTA_RUNTIME_ENABLE == 1)
+        debug_puts("RX671 OTA startup retry: WHD bring-up failed\r\n");
+#endif
     }
 #else
     /* Issue #30 (b) increment 1+2: SDHI enumerate on the corrected PORTD SDHI

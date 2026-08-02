@@ -19,6 +19,8 @@ volatile uint32_t g_freertos_tcp_ping_identifier;
 volatile uint32_t g_freertos_tcp_dhcp_hook_count;
 volatile uint32_t g_freertos_tcp_dhcp_phase;
 volatile uint32_t g_freertos_tcp_dhcp_ip;
+volatile uint32_t g_freertos_tcp_dhcp_lease_acquired;
+volatile uint32_t g_freertos_tcp_dhcp_static_fallback;
 volatile uint32_t g_iptrace_network_event_count;
 volatile uint32_t g_iptrace_network_rx_event_count;
 volatile uint32_t g_iptrace_network_tx_event_count;
@@ -147,6 +149,22 @@ void vWifiRx671IpTraceSendingPingReply(uint32_t ip_address)
 {
     g_iptrace_sending_ping_reply_count++;
     g_iptrace_sending_ping_reply_last_ip = ip_address;
+}
+
+void vWifiRx671IpTraceDhcpSucceeded(uint32_t ip_address)
+{
+    g_freertos_tcp_dhcp_ip = ip_address;
+    g_freertos_tcp_dhcp_static_fallback = 0U;
+    g_freertos_tcp_dhcp_lease_acquired = 1U;
+    debug_puts("FreeRTOS+TCP DHCP lease acquired\r\n");
+}
+
+void vWifiRx671IpTraceDhcpStaticFallback(uint32_t ip_address)
+{
+    g_freertos_tcp_dhcp_ip = ip_address;
+    g_freertos_tcp_dhcp_lease_acquired = 0U;
+    g_freertos_tcp_dhcp_static_fallback = 1U;
+    debug_puts("FreeRTOS+TCP DHCP static fallback\r\n");
 }
 
 void vApplicationIPNetworkEventHook(eIPCallbackEvent_t event)

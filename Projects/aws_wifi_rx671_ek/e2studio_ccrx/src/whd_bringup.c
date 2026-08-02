@@ -77,6 +77,27 @@ extern volatile uint32_t g_sdio_host_cmd53_xfer_engine;
 extern volatile uint32_t g_sdio_host_portd_dscr;
 extern volatile uint32_t g_sdio_host_portd_dscr2;
 
+static bool whd_mac_is_valid(const whd_mac_t * p_mac)
+{
+    uint32_t i;
+    bool any_nonzero = false;
+
+    if ((NULL == p_mac) || (0U != (p_mac->octet[0] & 0x01U)))
+    {
+        return false;
+    }
+
+    for (i = 0U; i < sizeof(p_mac->octet); i++)
+    {
+        if (0U != p_mac->octet[i])
+        {
+            any_nonzero = true;
+        }
+    }
+
+    return any_nonzero;
+}
+
 #if WHD_JOIN_USE_KVS
 static void whd_secure_zero(void * p_data, uint32_t length)
 {
@@ -469,11 +490,13 @@ bool whd_bringup_run(void)
         result = whd_wifi_get_mac_address(g_whd_ifp, &mac);
         whd_record_stage(60U, result);
         whd_log_result("whd_wifi_get_mac_address", result);
-        if (WHD_SUCCESS == result)
+        if ((WHD_SUCCESS != result) || (!whd_mac_is_valid(&mac)))
         {
-            whd_record_mac(g_whd_bringup_sta_mac, &mac);
-            whd_log_mac("sta_mac", &mac);
+            debug_puts("WHD station MAC unavailable; refusing network start\r\n");
+            return false;
         }
+        whd_record_mac(g_whd_bringup_sta_mac, &mac);
+        whd_log_mac("sta_mac", &mac);
     }
 
 #if WHD_SCAN_ENABLE

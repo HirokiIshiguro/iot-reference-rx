@@ -238,6 +238,10 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         self.assertIn("secret_cleanup_failed", hardware)
         self.assertIn("after_script_cleanup_failed", hardware)
         self.assertIn("--require-tls-version \"$RX671_OTA_REQUIRE_TLS_VERSION\"", hardware)
+        self.assertIn(
+            "--startup-reset-retries \"$RX671_OTA_STARTUP_RESET_RETRIES\"",
+            hardware,
+        )
         self.assertIn("--baseline-version \"$RX671_OTA_BASELINE_VERSION\"", hardware)
         self.assertIn("--candidate-version \"$RX671_OTA_CANDIDATE_VERSION\"", hardware)
         self.assertIn("--wifi-ssid-env RX671_EK_WIFI_SSID", hardware)
