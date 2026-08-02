@@ -197,18 +197,27 @@ class GateTests(unittest.TestCase):
         passing = layout._mqtt_ota_buffer_gate(
             block_size=4096,
             network_buffer_size=8192,
+            blocks_per_request=1,
         )
         too_small = layout._mqtt_ota_buffer_gate(
             block_size=4096,
             network_buffer_size=6000,
+            blocks_per_request=1,
         )
         drifted = layout._mqtt_ota_buffer_gate(
             block_size=2048,
             network_buffer_size=8192,
+            blocks_per_request=1,
+        )
+        burst = layout._mqtt_ota_buffer_gate(
+            block_size=4096,
+            network_buffer_size=8192,
+            blocks_per_request=3,
         )
         missing = layout._mqtt_ota_buffer_gate(
             block_size=None,
             network_buffer_size=8192,
+            blocks_per_request=1,
         )
 
         self.assertEqual("PASS", passing.status)
@@ -216,6 +225,42 @@ class GateTests(unittest.TestCase):
         self.assertIn("required=6488", passing.detail)
         self.assertEqual("FAIL", too_small.status)
         self.assertEqual("FAIL", drifted.status)
+        self.assertEqual("FAIL", burst.status)
+        self.assertIn("blocks/request=3", burst.detail)
+        self.assertEqual("FAIL", missing.status)
+
+    def test_ota_runtime_memory_profile_is_exact(self):
+        passing = layout._ota_runtime_memory_profile_gate(
+            heap_size_kb=208,
+            data_buffer_count=2,
+            max_file_blocks=192,
+        )
+        stale_heap = layout._ota_runtime_memory_profile_gate(
+            heap_size_kb=192,
+            data_buffer_count=2,
+            max_file_blocks=192,
+        )
+        stale_buffers = layout._ota_runtime_memory_profile_gate(
+            heap_size_kb=208,
+            data_buffer_count=3,
+            max_file_blocks=192,
+        )
+        stale_file_blocks = layout._ota_runtime_memory_profile_gate(
+            heap_size_kb=208,
+            data_buffer_count=2,
+            max_file_blocks=128,
+        )
+        missing = layout._ota_runtime_memory_profile_gate(
+            heap_size_kb=208,
+            data_buffer_count=None,
+            max_file_blocks=192,
+        )
+
+        self.assertEqual("PASS", passing.status)
+        self.assertIn("heap=208 KiB", passing.detail)
+        self.assertEqual("FAIL", stale_heap.status)
+        self.assertEqual("FAIL", stale_buffers.status)
+        self.assertEqual("FAIL", stale_file_blocks.status)
         self.assertEqual("FAIL", missing.status)
 
     def test_parent_bootloader_headers_are_required_provenance_inputs(self):

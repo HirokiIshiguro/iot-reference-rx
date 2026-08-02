@@ -79,6 +79,15 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.mqtt_agent_task = (
             ROOT / "Demos/mqtt_agent/mqtt_agent_task.c"
         ).read_text(encoding="utf-8")
+        cls.ota_demo = (
+            ROOT / "Demos/OtaOverMqtt/OtaOverMqttDemo.c"
+        ).read_text(encoding="utf-8")
+        cls.mqtt_file_downloader_config = (
+            PROJECT / "src/frtos_config/MQTTFileDownloader_config.h"
+        ).read_text(encoding="utf-8")
+        cls.ota_image_builder = (
+            ROOT / "tools/build_rx671_ota_images.py"
+        ).read_text(encoding="utf-8")
         cls.builder = (ROOT / "tools/build_headless_rx671_wifi.ps1").read_text(
             encoding="utf-8"
         )
@@ -229,12 +238,44 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             self.freertos_helper,
         )
         self.assertIn(
+            "RX671 OTA heap at malloc failure: free=",
+            self.freertos_helper,
+        )
+        self.assertIn("xPortGetMinimumEverFreeHeapSize()", self.freertos_helper)
+        self.assertIn(
             "RX671 OTA fatal: FreeRTOS stack overflow",
             self.freertos_helper,
         )
         self.assertIn(
             "RX671 OTA fatal: FreeRTOS assert failed",
             self.freertos_user_port,
+        )
+
+    def test_ota_profile_serializes_stream_blocks_and_bounds_static_buffers(self) -> None:
+        self.assertIn(
+            "#define mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST   (1U)",
+            self.mqtt_file_downloader_config,
+        )
+        self.assertIn(
+            "-define=mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST=1",
+            self.ota_image_builder,
+        )
+        self.assertIn(
+            "-define=OTA_MAX_NUM_DATA_BUFFERS=2",
+            self.ota_image_builder,
+        )
+        self.assertIn(
+            "-define=OTA_MAX_NUM_FILE_BLOCKS=192",
+            self.ota_image_builder,
+        )
+        self.assertIn(
+            "#define OTA_MAX_NUM_FILE_BLOCKS                  (192U)",
+            self.mqtt_file_downloader_config,
+        )
+        self.assertIn("#ifndef OTA_MAX_NUM_DATA_BUFFERS", self.ota_demo)
+        self.assertIn("#ifndef OTA_MAX_NUM_FILE_BLOCKS", self.ota_demo)
+        self.assertIn(
+            "messageLength > sizeof(dataBuffers[0].data)", self.ota_demo
         )
 
     def test_software_transport_can_pin_the_ota_proof_to_tls_1_2(self) -> None:

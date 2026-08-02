@@ -71,6 +71,10 @@ BOOTLOADER_PROVENANCE_PATHS = (
 )
 OTA_MQTT_FILE_BLOCK_SIZE = 4096
 OTA_MQTT_NETWORK_BUFFER_SIZE = 8192
+OTA_MQTT_MAX_BLOCKS_PER_REQUEST = 1
+OTA_FREERTOS_HEAP_SIZE_KB = 208
+OTA_DATA_BUFFER_COUNT = 2
+OTA_MAX_FILE_BLOCKS = 192
 OTA_MQTT_JSON_AND_PROTOCOL_OVERHEAD = 1024
 
 
@@ -347,13 +351,21 @@ def _ram_capacity_gate(
 
 
 def _mqtt_ota_buffer_gate(
-    *, block_size: int | None, network_buffer_size: int | None
+    *,
+    block_size: int | None,
+    network_buffer_size: int | None,
+    blocks_per_request: int | None,
 ) -> Gate:
-    if block_size is None or network_buffer_size is None:
+    if (
+        block_size is None
+        or network_buffer_size is None
+        or blocks_per_request is None
+    ):
         return Gate(
             "mqtt_ota_buffer_fit",
             "FAIL",
             "OTA profileのmqttFileDownloader_CONFIG_BLOCK_SIZEまたは"
+            "mqttFileDownloader_MAX_NUM_BLOCKS_REQUESTまたは"
             "MQTT_AGENT_NETWORK_BUFFER_SIZEを一意に導出できません",
         )
 
@@ -362,18 +374,55 @@ def _mqtt_ota_buffer_gate(
     profile_ok = (
         block_size == OTA_MQTT_FILE_BLOCK_SIZE
         and network_buffer_size == OTA_MQTT_NETWORK_BUFFER_SIZE
+        and blocks_per_request == OTA_MQTT_MAX_BLOCKS_PER_REQUEST
     )
     fit_ok = required_size <= network_buffer_size
     detail = (
         f"block={block_size}; base64={base64_size}; "
         f"JSON/MQTT overhead allowance={OTA_MQTT_JSON_AND_PROTOCOL_OVERHEAD}; "
         f"required={required_size}; network buffer={network_buffer_size}; "
-        f"required profile={OTA_MQTT_FILE_BLOCK_SIZE}/{OTA_MQTT_NETWORK_BUFFER_SIZE}"
+        f"blocks/request={blocks_per_request}; required profile="
+        f"{OTA_MQTT_FILE_BLOCK_SIZE}/{OTA_MQTT_NETWORK_BUFFER_SIZE}/"
+        f"{OTA_MQTT_MAX_BLOCKS_PER_REQUEST}"
     )
     return Gate(
         "mqtt_ota_buffer_fit",
         "PASS" if profile_ok and fit_ok else "FAIL",
         detail,
+    )
+
+
+def _ota_runtime_memory_profile_gate(
+    *,
+    heap_size_kb: int | None,
+    data_buffer_count: int | None,
+    max_file_blocks: int | None,
+) -> Gate:
+    if (
+        heap_size_kb is None
+        or data_buffer_count is None
+        or max_file_blocks is None
+    ):
+        return Gate(
+            "ota_runtime_memory_profile",
+            "FAIL",
+            "OTA profileのRX671_FREERTOS_HEAP_SIZE_KBまたは"
+            "OTA_MAX_NUM_DATA_BUFFERSまたはOTA_MAX_NUM_FILE_BLOCKSを"
+            "一意に導出できません",
+        )
+
+    ok = (
+        heap_size_kb == OTA_FREERTOS_HEAP_SIZE_KB
+        and data_buffer_count == OTA_DATA_BUFFER_COUNT
+        and max_file_blocks == OTA_MAX_FILE_BLOCKS
+    )
+    return Gate(
+        "ota_runtime_memory_profile",
+        "PASS" if ok else "FAIL",
+        f"heap={heap_size_kb} KiB; OTA data buffers={data_buffer_count}; "
+        f"file blocks={max_file_blocks}; required profile="
+        f"{OTA_FREERTOS_HEAP_SIZE_KB}/{OTA_DATA_BUFFER_COUNT}/"
+        f"{OTA_MAX_FILE_BLOCKS}",
     )
 
 
@@ -1401,6 +1450,22 @@ def analyze(
             ),
             network_buffer_size=_cproject_integer_define(
                 cproject_text, "MQTT_AGENT_NETWORK_BUFFER_SIZE"
+            ),
+            blocks_per_request=_cproject_integer_define(
+                cproject_text, "mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST"
+            ),
+        )
+    )
+    gates.append(
+        _ota_runtime_memory_profile_gate(
+            heap_size_kb=_cproject_integer_define(
+                cproject_text, "RX671_FREERTOS_HEAP_SIZE_KB"
+            ),
+            data_buffer_count=_cproject_integer_define(
+                cproject_text, "OTA_MAX_NUM_DATA_BUFFERS"
+            ),
+            max_file_blocks=_cproject_integer_define(
+                cproject_text, "OTA_MAX_NUM_FILE_BLOCKS"
             ),
         )
     )

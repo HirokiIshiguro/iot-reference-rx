@@ -79,7 +79,7 @@ class ProfileTests(unittest.TestCase):
             result,
         )
         self.assertIn(
-            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=192"', result
+            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"', result
         )
         self.assertIn(
             'value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"', result
@@ -93,6 +93,16 @@ class ProfileTests(unittest.TestCase):
         )
         self.assertIn(
             'value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"', result
+        )
+        self.assertIn(
+            'value="-define=mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST=1"',
+            result,
+        )
+        self.assertIn(
+            'value="-define=OTA_MAX_NUM_DATA_BUFFERS=2"', result
+        )
+        self.assertIn(
+            'value="-define=OTA_MAX_NUM_FILE_BLOCKS=192"', result
         )
         self.assertIn(
             'value="-define=WHD_PORT_BUFFER_COUNT=8"', result
