@@ -103,7 +103,10 @@
 /**
  * @brief Maximum stack size of OTA agent task.
  */
-#define AGENT_TASK_STACK_SIZE          (4096 * 2)
+#ifndef OTA_AGENT_TASK_STACK_SIZE_WORDS
+#define OTA_AGENT_TASK_STACK_SIZE_WORDS    (4096U * 2U)
+#endif
+#define AGENT_TASK_STACK_SIZE               (OTA_AGENT_TASK_STACK_SIZE_WORDS)
 
 #define NUM_OF_BLOCKS_REQUESTED                  (mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST)
 #define MAX_THING_NAME_SIZE                      (128U)
@@ -1547,6 +1550,11 @@ static void processOTAEvents(void)
     case OtaAgentEventActivateImage:
         LogInfo(("Activate Image event Received \n"));
         LogInfo(("-----------------------\n"));
+#if (INCLUDE_uxTaskGetStackHighWaterMark == 1)
+        LogInfo(("[OTA_AGENT_STACK] configured_words=%u hwm_words=%u",
+                 (unsigned int)AGENT_TASK_STACK_SIZE,
+                 (unsigned int)uxTaskGetStackHighWaterMark(NULL)));
+#endif
 
         if (true == isSecondaryRa0e2OtaJob())
         {

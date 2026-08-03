@@ -278,6 +278,25 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             "messageLength > sizeof(dataBuffers[0].data)", self.ota_demo
         )
 
+    def test_ota_agent_stack_is_profile_overridable_and_reports_high_water(self) -> None:
+        self.assertIn(
+            "#ifndef OTA_AGENT_TASK_STACK_SIZE_WORDS", self.ota_demo
+        )
+        self.assertIn(
+            "#define OTA_AGENT_TASK_STACK_SIZE_WORDS    (4096U * 2U)",
+            self.ota_demo,
+        )
+        self.assertIn(
+            "#define AGENT_TASK_STACK_SIZE               "
+            "(OTA_AGENT_TASK_STACK_SIZE_WORDS)",
+            self.ota_demo,
+        )
+        self.assertIn(
+            "[OTA_AGENT_STACK] configured_words=%u hwm_words=%u",
+            self.ota_demo,
+        )
+        self.assertIn("uxTaskGetStackHighWaterMark(NULL)", self.ota_demo)
+
     def test_software_transport_can_pin_the_ota_proof_to_tls_1_2_or_1_3(
         self,
     ) -> None:
