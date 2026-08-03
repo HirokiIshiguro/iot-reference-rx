@@ -61,8 +61,8 @@ def expected_identity(
         raise ValueError("region and S3 bucket must not be empty")
     if not baseline_version.strip() or not candidate_version.strip():
         raise ValueError("baseline and candidate versions must not be empty")
-    if not tls_version.strip():
-        raise ValueError("TLS version must not be empty")
+    if tls_version not in ("TLSv1.2", "TLSv1.3"):
+        raise ValueError("TLS version must be TLSv1.2 or TLSv1.3")
 
     thing_name = f"{base_thing_name}-ota-{pipeline_id}-{plan_job_id}"
     thing_manager.validate_ownership(
@@ -286,7 +286,9 @@ def add_identity_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--bucket", required=True)
     parser.add_argument("--baseline-version", required=True)
     parser.add_argument("--candidate-version", required=True)
-    parser.add_argument("--tls-version", required=True)
+    parser.add_argument(
+        "--tls-version", required=True, choices=("TLSv1.2", "TLSv1.3")
+    )
 
 
 def parse_args() -> argparse.Namespace:

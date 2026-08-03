@@ -1797,6 +1797,7 @@ package_rx671_ota_artifacts:
         "tools/build_rx671_ota_images.py",
         "--baseline-version", "$env:RX671_OTA_BASELINE_VERSION",
         "--candidate-version", "$env:RX671_OTA_CANDIDATE_VERSION",
+        "--tls-version", "$env:RX671_OTA_REQUIRE_TLS_VERSION",
         "--e2studio", "$env:E2STUDIO_CLI",
         "--workspace-root", "$env:E2STUDIO_WORKSPACE_RX671_OTA"
       )
@@ -1820,6 +1821,7 @@ package_rx671_ota_artifacts:
         if (($manifest.formal -ne $true) -or
             ($manifest.dirty -ne $false) -or
             ($manifest.source_sha -ne $env:CI_COMMIT_SHA) -or
+            ($manifest.tls_version -ne $env:RX671_OTA_REQUIRE_TLS_VERSION) -or
             ($manifest.credentials_embedded -ne $false) -or
             ($manifest.wifi_credentials_source -ne "littlefs_kvs_runtime_provisioning")) {
           throw "RX671 OTA artifact is not credential-free formal firmware: $($manifestPath.FullName)"
@@ -1881,8 +1883,8 @@ create_rx671_wifi_ota:
     - Write-Host "=== Create pipeline-owned EK-RX671 software OTA update ==="
     - python -m pip install --user cryptography
     - |
-      if ($env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2") {
-        throw "The first RX671 software OTA proof is intentionally pinned to TLSv1.2."
+      if ($env:RX671_OTA_REQUIRE_TLS_VERSION -notin @("TLSv1.2", "TLSv1.3")) {
+        throw "RX671 OTA creation requires TLSv1.2 or TLSv1.3."
       }
 
       $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx671_wifi_ota"
@@ -2337,8 +2339,8 @@ preflight_rx671_wifi_ota:
           $env:RX671_OTA_CANDIDATE_VERSION -ne "0.1.1") {
         throw "RX671 OTA proof is pinned to the exact 0.1.0 -> 0.1.1 transition"
       }
-      if ($env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2") {
-        throw "RX671 OTA proof is pinned to TLSv1.2"
+      if ($env:RX671_OTA_REQUIRE_TLS_VERSION -notin @("TLSv1.2", "TLSv1.3")) {
+        throw "RX671 OTA proof requires TLSv1.2 or TLSv1.3"
       }
       if ($env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480") {
         throw "RX671 OTA policy propagation wait must remain pinned to 480 seconds"

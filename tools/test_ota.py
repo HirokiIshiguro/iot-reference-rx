@@ -376,6 +376,7 @@ class OtaLogAnalyzer:
                 {
                     "version": tls_version,
                     "seen_at": round(elapsed, 3),
+                    "line_number": self.total_lines,
                     "line": stripped,
                 }
             )

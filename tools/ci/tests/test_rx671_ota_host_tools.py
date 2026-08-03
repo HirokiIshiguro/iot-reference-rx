@@ -777,6 +777,59 @@ class OtaTransactionContractTests(unittest.TestCase):
             self.assertFalse(transaction.ota.has_marker("image_committed"))
             self.assertIn("TLSv1.2", transaction.ota.tls_versions_seen)
 
+    def test_tls13_is_accepted_for_both_ota_boots(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.3",
+                min_capacity_heap_bytes=16384,
+                min_capacity_network_buffers=4,
+                expected_whd_buffer_count=8,
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            for line in (
+                "Application version 0.1.0\r\n",
+                "TLS handshake successful: version TLSv1.3\r\n",
+                "Received OTA Job.\r\n",
+                "Starting The Download.\r\n",
+                "Downloaded block 191 of 192.\r\n",
+                "Close file event Received\r\n",
+                "Activate Image event Received\r\n",
+                "Application version 0.1.1\r\n",
+                "TLS handshake successful: version TLSv1.3\r\n",
+                "[RX671_OTA_CAPACITY] minheap=25576 minnbuf=15 whdmax=1 "
+                "tempfail=0 permfail=0 waitloop=0\r\n",
+                "New image has higher version than current image, accepted!\r\n",
+                "---OTA Completed successfully!---\r\n",
+            ):
+                transaction._consume(line.encode("ascii"))
+
+            self.assertTrue(transaction.ota.is_success())
+            self.assertTrue(transaction._runtime_success_ready())
+            self.assertTrue(transaction._baseline_tls_before_activate())
+            self.assertTrue(transaction._candidate_tls_after_activate())
+            self.assertEqual(["TLSv1.3"], transaction.ota.tls_versions_seen)
+
+    def test_tls13_candidate_handshake_cannot_replace_baseline_proof(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.3",
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            transaction._consume(
+                b"Application version 0.1.0\r\n"
+                b"Activate Image event Received\r\n"
+                b"Application version 0.1.1\r\n"
+                b"TLS handshake successful: version TLSv1.3\r\n"
+            )
+            self.assertFalse(transaction._baseline_tls_before_activate())
+            self.assertTrue(transaction._candidate_tls_after_activate())
+
     def test_requires_capacity_headroom_after_activation(self):
         with tempfile.TemporaryDirectory() as temporary:
             args = argparse.Namespace(

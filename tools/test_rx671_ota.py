@@ -192,12 +192,27 @@ class Rx671OtaTransaction:
             "checks": checks,
         }
 
-    def _candidate_tls_after_activate(self) -> bool:
-        activate_at = self.ota.marker_seen_at("activate_image")
+    def _baseline_tls_before_activate(self) -> bool:
+        activate_line = self.ota.marker_state["activate_image"][
+            "first_seen_line_number"
+        ]
         return bool(
-            activate_at is not None
+            activate_line is not None
             and any(
-                event["seen_at"] >= activate_at
+                event["line_number"] < activate_line
+                and event["version"] == self.args.require_tls_version
+                for event in self.ota.tls_events
+            )
+        )
+
+    def _candidate_tls_after_activate(self) -> bool:
+        activate_line = self.ota.marker_state["activate_image"][
+            "first_seen_line_number"
+        ]
+        return bool(
+            activate_line is not None
+            and any(
+                event["line_number"] > activate_line
                 and event["version"] == self.args.require_tls_version
                 for event in self.ota.tls_events
             )
@@ -216,6 +231,7 @@ class Rx671OtaTransaction:
         return bool(
             self.ota.is_success()
             and self.ota.has_marker("ota_completed")
+            and self._baseline_tls_before_activate()
             and self._candidate_tls_after_activate()
             and self._capacity_proof()["success"]
         )
@@ -429,6 +445,7 @@ class Rx671OtaTransaction:
             elapsed=time.monotonic() - self.started,
             success=self.ota.is_success(),
         )
+        baseline_tls_before_activate = self._baseline_tls_before_activate()
         candidate_tls_after_activate = self._candidate_tls_after_activate()
         capacity_proof = self._capacity_proof()
         success = (
@@ -442,6 +459,7 @@ class Rx671OtaTransaction:
             or not ota_summary["success"]
             or not self.ota.has_marker("ota_completed")
             or not ota_summary["tls_version_ok"]
+            or not baseline_tls_before_activate
             or not candidate_tls_after_activate
         ):
             classification = "required_marker_missing"
@@ -465,6 +483,7 @@ class Rx671OtaTransaction:
             "image_acceptance_observed": self.ota.has_marker("image_accepted"),
             "image_commit_observed": self.ota.has_marker("image_committed"),
             "ota_success_report_observed": self.ota.has_marker("ota_completed"),
+            "baseline_tls_before_activate": baseline_tls_before_activate,
             "candidate_tls_after_activate": candidate_tls_after_activate,
             "post_ota_capacity": capacity_proof,
             "startup_recovery": {
@@ -481,7 +500,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baseline-rsu", type=_required_file, required=True)
     parser.add_argument("--baseline-version", default="0.1.0")
     parser.add_argument("--candidate-version", default="0.1.1")
-    parser.add_argument("--require-tls-version", default="TLSv1.2")
+    parser.add_argument(
+        "--require-tls-version",
+        choices=("TLSv1.2", "TLSv1.3"),
+        default="TLSv1.2",
+    )
     parser.add_argument("--min-capacity-heap-bytes", type=int, default=16384)
     parser.add_argument("--min-capacity-network-buffers", type=int, default=4)
     parser.add_argument("--expected-whd-buffer-count", type=int, default=8)

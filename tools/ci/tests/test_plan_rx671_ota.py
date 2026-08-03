@@ -72,6 +72,40 @@ class Rx671OtaPlanTests(unittest.TestCase):
             identity["s3_key"],
         )
 
+    def test_identity_accepts_tls13_and_records_the_exact_version(self) -> None:
+        identity = planner.expected_identity(
+            project_id=PROJECT_ID,
+            pipeline_id=PIPELINE_ID,
+            plan_job_id=PLAN_JOB_ID,
+            commit_sha=COMMIT_SHA,
+            base_thing_name=BASE_THING,
+            region=REGION,
+            bucket=BUCKET,
+            baseline_version="0.1.0",
+            candidate_version="0.1.1",
+            tls_version="TLSv1.3",
+        )
+        self.assertEqual("TLSv1.3", identity["tls_version"])
+
+    def test_identity_rejects_unapproved_tls_versions(self) -> None:
+        for tls_version in ("", "TLS1.3", "TLSv1.1", "TLSv1.4"):
+            with self.subTest(tls_version=tls_version):
+                with self.assertRaisesRegex(
+                    ValueError, "TLS version must be TLSv1.2 or TLSv1.3"
+                ):
+                    planner.expected_identity(
+                        project_id=PROJECT_ID,
+                        pipeline_id=PIPELINE_ID,
+                        plan_job_id=PLAN_JOB_ID,
+                        commit_sha=COMMIT_SHA,
+                        base_thing_name=BASE_THING,
+                        region=REGION,
+                        bucket=BUCKET,
+                        baseline_version="0.1.0",
+                        candidate_version="0.1.1",
+                        tls_version=tls_version,
+                    )
+
     def test_create_plan_records_alias_cleanup_identity_before_mutation(
         self,
     ) -> None:

@@ -199,6 +199,10 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
             '"--candidate-version", "$env:RX671_OTA_CANDIDATE_VERSION"',
             job,
         )
+        self.assertIn(
+            '"--tls-version", "$env:RX671_OTA_REQUIRE_TLS_VERSION"',
+            job,
+        )
         self.assertIn('"--e2studio", "$env:E2STUDIO_CLI"', job)
         self.assertIn(
             '"--workspace-root", "$env:E2STUDIO_WORKSPACE_RX671_OTA"',
@@ -208,6 +212,10 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
         self.assertIn("$manifest.credentials_embedded -ne $false", job)
         self.assertIn("$manifest.dirty -ne $false", job)
         self.assertIn("$manifest.source_sha -ne $env:CI_COMMIT_SHA", job)
+        self.assertIn(
+            "$manifest.tls_version -ne $env:RX671_OTA_REQUIRE_TLS_VERSION",
+            job,
+        )
         self.assertIn(
             '$manifest.wifi_credentials_source -ne '
             '"littlefs_kvs_runtime_provisioning"',

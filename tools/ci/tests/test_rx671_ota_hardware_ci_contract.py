@@ -74,7 +74,15 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
             self.assertIn(required, preflight)
         self.assertIn('$env:RX671_OTA_BASELINE_VERSION -ne "0.1.0"', preflight)
         self.assertIn('$env:RX671_OTA_CANDIDATE_VERSION -ne "0.1.1"', preflight)
-        self.assertIn('$env:RX671_OTA_REQUIRE_TLS_VERSION -ne "TLSv1.2"', preflight)
+        self.assertIn(
+            '$env:RX671_OTA_REQUIRE_TLS_VERSION -notin '
+            '@("TLSv1.2", "TLSv1.3")',
+            preflight,
+        )
+        self.assertIn(
+            "RX671 OTA proof requires TLSv1.2 or TLSv1.3",
+            preflight,
+        )
         self.assertIn(
             '$env:RX671_OTA_POLICY_PROPAGATION_SECONDS -ne "480"',
             preflight,
@@ -117,6 +125,15 @@ class Rx671OtaHardwareCiContractTests(unittest.TestCase):
         creator = job("create_rx671_wifi_ota")
         self.assertIn("- job: preflight_rx671_wifi_ota", creator)
         self.assertIn("- job: package_rx671_ota_artifacts", creator)
+        self.assertIn(
+            '$env:RX671_OTA_REQUIRE_TLS_VERSION -notin '
+            '@("TLSv1.2", "TLSv1.3")',
+            creator,
+        )
+        self.assertNotIn(
+            "intentionally pinned to TLSv1.2",
+            creator,
+        )
 
     def test_ota_park_build_is_credential_free(self) -> None:
         build = job("build_rx671_wifi")
