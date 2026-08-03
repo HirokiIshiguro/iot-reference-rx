@@ -270,8 +270,8 @@ variables:
   RX671_WIFI_FLEET_CLEANUP_RESOURCES: "true"
   RX671_WIFI_FLEET_POLICY_NAME: "rx72n-envision-kit-policy"
   RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS: "600000"
-  # The accelerated RX671 throughput implementation remains in its canonical
-  # TSIP benchmark project. Ten nightly rows trigger this ref.
+  # The accelerated RX671 throughput, AWS and OTA implementations remain in
+  # their canonical TSIP benchmark project. Nightly rows trigger this ref.
   RX671_BENCHMARK_PROJECT_REF: "main"
   RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
   RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
@@ -740,6 +740,20 @@ matrix_rx671_wifi_fleet_tls13:
     RX671_WIFI_TEST_SCOPE: "fleet"
     RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"
 
+matrix_rx671_wifi_software_ota_tls12:
+  extends: .nightly_matrix_rx671_wifi_stabilizing
+  variables:
+    RX671_WIFI_TEST_SCOPE: "ota"
+    RUN_RX671_OTA_TEST: "true"
+    RX671_OTA_REQUIRE_TLS_VERSION: "TLSv1.2"
+
+matrix_rx671_wifi_software_ota_tls13:
+  extends: .nightly_matrix_rx671_wifi_stabilizing
+  variables:
+    RX671_WIFI_TEST_SCOPE: "ota"
+    RUN_RX671_OTA_TEST: "true"
+    RX671_OTA_REQUIRE_TLS_VERSION: "TLSv1.3"
+
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
   needs:
@@ -775,16 +789,12 @@ matrix_rx671_wifi_software_tls13_resumption_0rtt:
   variables:
     RX671_SOFTWARE_BENCHMARK_PROFILE: "tls13-0rtt"
 
-.matrix_rx671_lanbench:
+.matrix_rx671_tsip_child:
   stage: nightly_matrix
   needs:
     - job: nightly_dependency_alignment
       artifacts: true
   resource_group: nightly-matrix-rx671-wifi
-  rules:
-    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
-      when: on_success
-    - when: never
   trigger:
     project: oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls
     branch: $RX671_BENCHMARK_PROJECT_REF
@@ -795,11 +805,40 @@ matrix_rx671_wifi_software_tls13_resumption_0rtt:
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
     EXPECTED_BENCHMARK_COMMIT_SHA: "$RX671_BENCHMARK_RESOLVED_SHA"
+
+.matrix_rx671_lanbench:
+  extends: .matrix_rx671_tsip_child
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $RX671_EK_WIFI_SSID && ($RX671_EK_WIFI_PASSPHRASE || $RX671_EK_WIFI_PASSWORD)'
+      when: on_success
+    - when: never
+  variables:
     RX671_BENCHMARK_RUN_HARDWARE: "true"
     RX671_BENCHMARK_HOST: "$RX671_LANBENCH_HOST"
     RX671_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"
     RX671_BENCHMARK_WIFI_PASSPHRASE: "$RX671_EK_WIFI_PASSPHRASE"
     RX671_BENCHMARK_WIFI_PASSWORD: "$RX671_EK_WIFI_PASSWORD"
+
+.matrix_rx671_tsip_ota:
+  extends: .matrix_rx671_tsip_child
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && $NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true"'
+      when: on_success
+    - when: never
+  variables:
+    RX671_BENCHMARK_RUN_HARDWARE: "false"
+    RX671_TSIP_OTA_BUILD: "true"
+    RX671_TSIP_OTA_RUN_HARDWARE: "true"
+
+matrix_rx671_wifi_tsip_ota_tls12:
+  extends: .matrix_rx671_tsip_ota
+  variables:
+    RX671_TSIP_OTA_REQUIRE_TLS_VERSION: "TLSv1.2"
+
+matrix_rx671_wifi_tsip_ota_tls13:
+  extends: .matrix_rx671_tsip_ota
+  variables:
+    RX671_TSIP_OTA_REQUIRE_TLS_VERSION: "TLSv1.3"
 
 matrix_rx671_wifi_lanbench_tcp:
   extends: .matrix_rx671_lanbench

@@ -157,6 +157,31 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         self.assertIn("$RX671_EK_FLEET_CLAIM_CERT_PEM", fleet)
         self.assertIn("$RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM", fleet)
 
+    def test_nightly_routes_both_software_ota_versions_as_stabilizing(self) -> None:
+        tls12 = job_block(
+            self.ci,
+            "matrix_rx671_wifi_software_ota_tls12",
+            "matrix_rx671_wifi_software_ota_tls13",
+        )
+        tls13 = job_block(
+            self.ci,
+            "matrix_rx671_wifi_software_ota_tls13",
+            ".matrix_rx671_software_lanbench",
+        )
+
+        for job, tls_version in ((tls12, "TLSv1.2"), (tls13, "TLSv1.3")):
+            with self.subTest(tls_version=tls_version):
+                self.assertIn(
+                    "extends: .nightly_matrix_rx671_wifi_stabilizing",
+                    job,
+                )
+                self.assertIn('RX671_WIFI_TEST_SCOPE: "ota"', job)
+                self.assertIn('RUN_RX671_OTA_TEST: "true"', job)
+                self.assertIn(
+                    f'RX671_OTA_REQUIRE_TLS_VERSION: "{tls_version}"',
+                    job,
+                )
+
     def test_nightly_routes_tsip_aws_mqtt_without_device_private_key(self) -> None:
         job = job_block(
             self.ci,
@@ -216,6 +241,69 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         self.assertIn('$NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true"', job)
         self.assertIn('RX671_BENCHMARK_WIFI_SSID: "$RX671_EK_WIFI_SSID"', self.ci)
         self.assertNotIn("PRIVATE_KEY", job)
+
+    def test_nightly_routes_both_tsip_ota_versions_as_stabilizing(self) -> None:
+        base = job_block(
+            self.ci,
+            ".matrix_rx671_tsip_child",
+            ".matrix_rx671_lanbench",
+        )
+        lanbench = job_block(
+            self.ci,
+            ".matrix_rx671_lanbench",
+            ".matrix_rx671_tsip_ota",
+        )
+        template = job_block(
+            self.ci,
+            ".matrix_rx671_tsip_ota",
+            "matrix_rx671_wifi_tsip_ota_tls12",
+        )
+        tls12 = job_block(
+            self.ci,
+            "matrix_rx671_wifi_tsip_ota_tls12",
+            "matrix_rx671_wifi_tsip_ota_tls13",
+        )
+        tls13 = job_block(
+            self.ci,
+            "matrix_rx671_wifi_tsip_ota_tls13",
+            "matrix_rx671_wifi_lanbench_tcp",
+        )
+
+        self.assertIn("job: nightly_dependency_alignment", base)
+        self.assertIn("artifacts: true", base)
+        self.assertIn("resource_group: nightly-matrix-rx671-wifi", base)
+        self.assertIn("extends: .matrix_rx671_tsip_child", lanbench)
+        self.assertIn("extends: .matrix_rx671_tsip_child", template)
+        self.assertIn('$NIGHTLY_MATRIX_INCLUDE_STABILIZING == "true"', template)
+        self.assertIn(
+            "project: oss/experiment/embedded/mcu/renesas/rx/example/"
+            "ek-rx671/benchmark/tsip_mbedtls",
+            base,
+        )
+        self.assertIn("branch: $RX671_BENCHMARK_PROJECT_REF", base)
+        self.assertIn(
+            'EXPECTED_BENCHMARK_COMMIT_SHA: '
+            '"$RX671_BENCHMARK_RESOLVED_SHA"',
+            base,
+        )
+        self.assertIn('RX671_BENCHMARK_RUN_HARDWARE: "false"', template)
+        self.assertIn('RX671_TSIP_OTA_BUILD: "true"', template)
+        self.assertIn('RX671_TSIP_OTA_RUN_HARDWARE: "true"', template)
+        for unrelated in (
+            "RX671_BENCHMARK_HOST",
+            "RX671_BENCHMARK_WIFI_SSID",
+            "RX671_BENCHMARK_WIFI_PASSPHRASE",
+            "RX671_BENCHMARK_WIFI_PASSWORD",
+            "RX671_TSIP_OTA_WIFI_",
+        ):
+            self.assertNotIn(unrelated, base + template)
+        for job, tls_version in ((tls12, "TLSv1.2"), (tls13, "TLSv1.3")):
+            with self.subTest(tls_version=tls_version):
+                self.assertIn("extends: .matrix_rx671_tsip_ota", job)
+                self.assertIn(
+                    f'RX671_TSIP_OTA_REQUIRE_TLS_VERSION: "{tls_version}"',
+                    job,
+                )
 
 
 if __name__ == "__main__":
