@@ -217,6 +217,9 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
             job,
         )
         self.assertIn(
+            '$manifest.sdio_run_clock_div -ne "SDHI_DIV_8"', job
+        )
+        self.assertIn(
             '$manifest.wifi_credentials_source -ne '
             '"littlefs_kvs_runtime_provisioning"',
             job,
@@ -266,6 +269,8 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
             "0.1.0",
             "0.1.1",
             "build/rx671-ota",
+            "SDHI_DIV_2",
+            "SDHI_DIV_8",
         ):
             self.assertIn(marker, combined)
 

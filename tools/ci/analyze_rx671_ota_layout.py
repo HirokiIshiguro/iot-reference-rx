@@ -75,6 +75,7 @@ OTA_MQTT_MAX_BLOCKS_PER_REQUEST = 1
 OTA_FREERTOS_HEAP_SIZE_KB = 208
 OTA_DATA_BUFFER_COUNT = 2
 OTA_MAX_FILE_BLOCKS = 192
+OTA_SDIO_RUN_CLOCK_DIV = "SDHI_DIV_8"
 OTA_MQTT_JSON_AND_PROTOCOL_OVERHEAD = 1024
 
 
@@ -312,6 +313,17 @@ def _cproject_integer_define(text: str, name: str) -> int | None:
     return next(iter(values)) if len(values) == 1 else None
 
 
+def _cproject_symbol_define(text: str, name: str) -> str | None:
+    values = {
+        match.group(1)
+        for match in re.finditer(
+            rf'value="-define={re.escape(name)}=([A-Za-z_][A-Za-z0-9_]*)"',
+            text,
+        )
+    }
+    return next(iter(values)) if len(values) == 1 else None
+
+
 def _ram_capacity_gate(
     *,
     sections: dict[str, Section] | None,
@@ -423,6 +435,20 @@ def _ota_runtime_memory_profile_gate(
         f"file blocks={max_file_blocks}; required profile="
         f"{OTA_FREERTOS_HEAP_SIZE_KB}/{OTA_DATA_BUFFER_COUNT}/"
         f"{OTA_MAX_FILE_BLOCKS}",
+    )
+
+
+def _ota_sdio_run_clock_gate(*, run_clock_div: str | None) -> Gate:
+    if run_clock_div is None:
+        return Gate(
+            "ota_sdio_run_clock",
+            "FAIL",
+            "OTA profileのSDIO_HOST_CFG_RUN_CLOCK_DIVを一意に導出できません",
+        )
+    return Gate(
+        "ota_sdio_run_clock",
+        "PASS" if run_clock_div == OTA_SDIO_RUN_CLOCK_DIV else "FAIL",
+        f"divider={run_clock_div}; required={OTA_SDIO_RUN_CLOCK_DIV}",
     )
 
 
@@ -1353,6 +1379,10 @@ def _rsu_image_gate(
         errors.append(f"manifest profile!={OTA_PROFILE_NAME}")
     if manifest.get("ota_image_version") != expected_version:
         errors.append("manifest ota_image_version不一致")
+    if manifest.get("sdio_run_clock_div") != OTA_SDIO_RUN_CLOCK_DIV:
+        errors.append(
+            f"manifest sdio_run_clock_div!={OTA_SDIO_RUN_CLOCK_DIV}"
+        )
     if rsu_relative is None or manifest.get("rsu_path") != rsu_relative:
         errors.append("manifest rsu_path不一致")
     if (
@@ -1467,6 +1497,13 @@ def analyze(
             max_file_blocks=_cproject_integer_define(
                 cproject_text, "OTA_MAX_NUM_FILE_BLOCKS"
             ),
+        )
+    )
+    gates.append(
+        _ota_sdio_run_clock_gate(
+            run_clock_div=_cproject_symbol_define(
+                cproject_text, "SDIO_HOST_CFG_RUN_CLOCK_DIV"
+            )
         )
     )
     build_dir = build_dir_override or configured_build_dir

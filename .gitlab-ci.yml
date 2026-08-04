@@ -1861,6 +1861,7 @@ package_rx671_ota_artifacts:
             ($manifest.dirty -ne $false) -or
             ($manifest.source_sha -ne $env:CI_COMMIT_SHA) -or
             ($manifest.tls_version -ne $env:RX671_OTA_REQUIRE_TLS_VERSION) -or
+            ($manifest.sdio_run_clock_div -ne "SDHI_DIV_8") -or
             ($manifest.credentials_embedded -ne $false) -or
             ($manifest.wifi_credentials_source -ne "littlefs_kvs_runtime_provisioning")) {
           throw "RX671 OTA artifact is not credential-free formal firmware: $($manifestPath.FullName)"

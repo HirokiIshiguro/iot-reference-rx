@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
 PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
+OTA_SDIO_RUN_CLOCK_DIV = "SDHI_DIV_8"
 TLS_VERSION_DEFINES = {
     "TLSv1.2": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1",
     "TLSv1.3": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1",
@@ -234,6 +235,9 @@ def make_ota_cproject(
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MINOR={version.minor}"/>',
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_BUILD={version.build}"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_OTA_RUNTIME_ENABLE=1"/>',
+        '<listOptionValue builtIn="false" value="-define='
+        + f'SDIO_HOST_CFG_RUN_CLOCK_DIV={OTA_SDIO_RUN_CLOCK_DIV}'
+        + '"/>',
         '<listOptionValue builtIn="false" value="-define='
         + TLS_VERSION_DEFINES[tls_version]
         + '"/>',
@@ -1032,6 +1036,7 @@ def _create_manifest(
         "wifi_credentials_source": "littlefs_kvs_runtime_provisioning",
         "ota_image_version": version.text,
         "tls_version": tls_version,
+        "sdio_run_clock_div": OTA_SDIO_RUN_CLOCK_DIV,
         "rsu_path": rsu_path.relative_to(repo_root).as_posix(),
         "signer_certificate_path": certificate_path.relative_to(repo_root).as_posix(),
         "signer_public_key_path": public_key_path.relative_to(repo_root).as_posix(),

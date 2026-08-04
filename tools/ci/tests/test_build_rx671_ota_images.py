@@ -71,6 +71,10 @@ class ProfileTests(unittest.TestCase):
             'value="-define=RX671_OTA_RUNTIME_ENABLE=1"', result
         )
         self.assertIn(
+            'value="-define=SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8"',
+            result,
+        )
+        self.assertIn(
             'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1"',
             result,
         )
@@ -211,6 +215,7 @@ class ProfileTests(unittest.TestCase):
         self.assertIn(
             'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"', result
         )
+        self.assertNotIn("SDIO_HOST_CFG_RUN_CLOCK_DIV", result)
         for define in builder.PROVISIONER_LOG_SUPPRESSION_DEFINES:
             with self.subTest(define=define):
                 self.assertIn(f'value="-define={define}"', result)
@@ -501,6 +506,9 @@ class DirtyAnalysisTests(unittest.TestCase):
         source = inspect.getsource(builder._create_manifest)
         self.assertIn('"formal": not dirty', source)
         self.assertIn('"tls_version": tls_version', source)
+        self.assertIn(
+            '"sdio_run_clock_div": OTA_SDIO_RUN_CLOCK_DIV', source
+        )
 
     def test_allows_only_dirty_provenance_and_its_dependent_unknowns(self) -> None:
         report = {
