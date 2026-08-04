@@ -81,7 +81,9 @@ formal OTA transactionをnightly matrixで反復する際のmargin不足とし�
 OTA download自体はAWS Jobs / flash処理が支配的であり、normal LANBENCHのSDIO throughput
 設定を下げずにOTA profileだけmarginを優先する。package jobはeffective `.cproject`の
 dividerを`ota_sdio_run_clock` gateで検査し、provenance manifestにも
-`sdio_run_clock_div`を記録する。TLS 1.2 / TLS 1.3のfocused実機OTAと、DIV2のnormal
+`sdio_run_clock_div`を記録する。formal builderは外部のSDIO clock override変数を除去し、
+`SDIO_HOST_USE_HIGH_SPEED_CLOCK`によるDIV8迂回もfail-closedで拒否する。
+TLS 1.2 / TLS 1.3のfocused実機OTAと、DIV2のnormal
 network / MQTT / LANBENCH回帰を同一source SHAで確認して初めて実機成立とする。
 
 ### provisioner CLI stack境界

@@ -292,13 +292,28 @@ class GateTests(unittest.TestCase):
         self.assertEqual("FAIL", missing.status)
 
     def test_ota_sdio_run_clock_profile_is_exact(self):
-        passing = layout._ota_sdio_run_clock_gate(run_clock_div="SDHI_DIV_8")
-        high_speed = layout._ota_sdio_run_clock_gate(run_clock_div="SDHI_DIV_2")
-        missing = layout._ota_sdio_run_clock_gate(run_clock_div=None)
+        passing = layout._ota_sdio_run_clock_gate(
+            run_clock_div="SDHI_DIV_8",
+            use_high_speed_clock=False,
+        )
+        high_speed_divider = layout._ota_sdio_run_clock_gate(
+            run_clock_div="SDHI_DIV_2",
+            use_high_speed_clock=False,
+        )
+        high_speed_override = layout._ota_sdio_run_clock_gate(
+            run_clock_div="SDHI_DIV_8",
+            use_high_speed_clock=True,
+        )
+        missing = layout._ota_sdio_run_clock_gate(
+            run_clock_div=None,
+            use_high_speed_clock=False,
+        )
 
         self.assertEqual("PASS", passing.status)
         self.assertIn("required=SDHI_DIV_8", passing.detail)
-        self.assertEqual("FAIL", high_speed.status)
+        self.assertEqual("FAIL", high_speed_divider.status)
+        self.assertEqual("FAIL", high_speed_override.status)
+        self.assertIn("DIV8", high_speed_override.detail)
         self.assertEqual("FAIL", missing.status)
 
     def test_parent_bootloader_headers_are_required_provenance_inputs(self):

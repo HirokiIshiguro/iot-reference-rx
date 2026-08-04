@@ -218,6 +218,13 @@ def make_ota_cproject(
         raise ValueError(
             ".cproject contains a persistent SDIO run clock override"
         )
+    if re.search(
+        r'value="-define=SDIO_HOST_USE_HIGH_SPEED_CLOCK(?:=[^"]*)?"',
+        text,
+    ):
+        raise ValueError(
+            ".cproject contains a persistent SDIO high-speed clock override"
+        )
     text = _replace_once(
         text,
         'modes="bank.single"',

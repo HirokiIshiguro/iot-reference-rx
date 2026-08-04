@@ -438,17 +438,28 @@ def _ota_runtime_memory_profile_gate(
     )
 
 
-def _ota_sdio_run_clock_gate(*, run_clock_div: str | None) -> Gate:
+def _ota_sdio_run_clock_gate(
+    *,
+    run_clock_div: str | None,
+    use_high_speed_clock: bool,
+) -> Gate:
     if run_clock_div is None:
         return Gate(
             "ota_sdio_run_clock",
             "FAIL",
             "OTA profileのSDIO_HOST_CFG_RUN_CLOCK_DIVを一意に導出できません",
         )
+    if use_high_speed_clock:
+        return Gate(
+            "ota_sdio_run_clock",
+            "FAIL",
+            "SDIO_HOST_USE_HIGH_SPEED_CLOCKがDIV8を迂回します",
+        )
     return Gate(
         "ota_sdio_run_clock",
         "PASS" if run_clock_div == OTA_SDIO_RUN_CLOCK_DIV else "FAIL",
-        f"divider={run_clock_div}; required={OTA_SDIO_RUN_CLOCK_DIV}",
+        f"divider={run_clock_div}; required={OTA_SDIO_RUN_CLOCK_DIV}; "
+        "high_speed_clock_override=false",
     )
 
 
@@ -1503,7 +1514,13 @@ def analyze(
         _ota_sdio_run_clock_gate(
             run_clock_div=_cproject_symbol_define(
                 cproject_text, "SDIO_HOST_CFG_RUN_CLOCK_DIV"
-            )
+            ),
+            use_high_speed_clock=bool(
+                re.search(
+                    r'value="-define=SDIO_HOST_USE_HIGH_SPEED_CLOCK(?:=[^"]*)?"',
+                    cproject_text,
+                )
+            ),
         )
     )
     build_dir = build_dir_override or configured_build_dir

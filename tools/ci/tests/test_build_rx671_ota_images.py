@@ -217,6 +217,18 @@ class ProfileTests(unittest.TestCase):
                 ),
                 builder.parse_version("1.2.3"),
             )
+        with self.assertRaisesRegex(
+            ValueError, "persistent SDIO high-speed clock"
+        ):
+            builder.make_ota_cproject(
+                self.cproject.replace(
+                    builder.DEFINE_ANCHOR,
+                    builder.DEFINE_ANCHOR
+                    + '\n<listOptionValue builtIn="false" '
+                    'value="-define=SDIO_HOST_USE_HIGH_SPEED_CLOCK"/>',
+                ),
+                builder.parse_version("1.2.3"),
+            )
 
     def test_provisioner_profile_stays_bank_single_and_restores(self) -> None:
         result = builder.make_provisioner_cproject(self.cproject)
