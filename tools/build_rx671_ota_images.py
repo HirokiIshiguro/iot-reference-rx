@@ -210,6 +210,10 @@ def make_ota_cproject(
             ".cproject contains persistent APP_VERSION defines: "
             + ", ".join(existing_version_defines)
         )
+    if "-define=SDIO_HOST_CFG_RUN_CLOCK_DIV=" in text:
+        raise ValueError(
+            ".cproject contains a persistent SDIO run clock override"
+        )
     text = _replace_once(
         text,
         'modes="bank.single"',
