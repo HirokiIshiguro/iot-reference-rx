@@ -490,7 +490,7 @@ Scheduler policy and cross-project guidance are documented in [development.md](d
 
 | Schedule | Status | Time (JST) | Scope | Purpose |
 |----------|--------|------------|-------|---------|
-| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | 条件を満たすnightly matrix行を1回ずつ実行します。RX671/Type 1YNはnetwork、software / TSIP MQTT（TLS 1.2 / TLS 1.3）、software / TSIP Fleet（TLS 1.2 / TLS 1.3）のstabilizing（AWS cleanup込み）、software / TSIP TLS 1.3 resumption / 0-RTT、および各benchmark projectの性能回帰をdownstream bridgeで実行します。 |
+| Nightly focused test matrix (schedule #5) | Active | 02:20 daily | `PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` | 条件を満たすnightly matrix行を1回ずつ実行します。RX671/Type 1YNはnetwork、software / TSIP MQTT・OTA・Fleet（各TLS 1.2 / TLS 1.3。OTA / FleetはAWS cleanup込みのstabilizing）、software / TSIP TLS 1.3 resumption / 0-RTT、および各benchmark projectの性能回帰をdownstream bridgeで実行します。 |
 
 Creating or updating project pipeline schedules requires Maintainer/Owner permissions on this GitLab project. Keep the active GitLab schedules and this table in sync so the scheduled regression set remains reviewable in Git.
 
@@ -500,7 +500,7 @@ one-shot AWS IoT OTA Jobを消費するため、observerジョブ単体では再
 pipeline専用Thing / OTA Job作成、実機lock内のrestore・provision・observe、
 cleanupを一巡させてください。
 
-「nightly matrix」はリポジトリ内の全jobを無条件に実行する意味ではありません。明示的なopt-inであるRX72N software dual AWS MQTT (`RUN_RX72N_MULTI_TLS_TEST=false`) や、必要なgateを満たさない行は起動しません。2026-07-18の [scheduled parent #8168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8168) は34行を生成し、そのうちRX671の8行はすべて実機成功しました。現在はRX671 TSIP AWS MQTT（TLS 1.2 / TLS 1.3）、software / TSIP TLS 1.3 resumption / 0-RTTに加え、必要なWi-Fi/Fleet/AWS cleanup変数が揃う場合だけsoftware / TSIP FleetのTLS 1.2 / TLS 1.3 stabilizing行も対象です。
+「nightly matrix」はリポジトリ内の全jobを無条件に実行する意味ではありません。明示的なopt-inであるRX72N software dual AWS MQTT (`RUN_RX72N_MULTI_TLS_TEST=false`) や、必要なgateを満たさない行は起動しません。2026-07-18の [scheduled parent #8168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/8168) は34行を生成し、そのうちRX671の8行はすべて実機成功しました。現在はRX671 software / TSIP AWS MQTT、OTA、Fleet（各TLS 1.2 / TLS 1.3）、software / TSIP TLS 1.3 resumption / 0-RTTを対象とします。OTA / Fleet行は `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` の場合だけ起動し、各子pipelineがpipeline専用AWS資源の作成、実機検証、cleanupを一巡します。
 
 ## Hardware CI Validation / 最新テスト結果
 
@@ -519,7 +519,7 @@ cleanupを一巡させてください。
 | LANBENCH TLS 1.3 Resumption / 0-RTT | RX72N/Ether software / TSIP と RX65N/BG96 software / TSIP の全セルを5回成功確認済み。 |
 | RX671/Type 1YN TLS 1.3 Resumption / 0-RTT | 親`main` `9ca442b8`上でsoftware / TSIPとも5回連続実機成功を確認し、全セルを`✓`へ昇格済み。softwareは`50770dd3`、TSIPは`6d6054e0`を使用。 |
 | RX671/Type 1YN AWS IoT | software / TSIP MQTT、OTA、FleetをTLS 1.2 / TLS 1.3でRPi#1実機Runner検証。OTAは全4構成でSCI6 runtime provisioning、`0.1.0`→`0.1.1`、image acceptance / Job `SUCCEEDED`、AWS cleanupまで成功し`○`。TSIP TLS 1.2 OTAはCertificateVerifyだけをTSIPへ委譲する小容量構成でinstall headroom 33,663 bytesを確保。 |
-| Nightly schedule | schedule #5をActiveとして02:20 JSTに毎日実行。`PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でgateを満たすパタンを1回ずつ実行し、RX671 software / TSIP Fleet（TLS 1.2 / TLS 1.3）のstabilizing行、RX671 software / TSIP MQTT（TLS 1.2 / TLS 1.3）、RX72N/Ether・RX671/Type 1YNのsoftware / TSIP TLS 1.3 resumption / 0-RTTは各対応経路で実行。 |
+| Nightly schedule | schedule #5をActiveとして02:20 JSTに毎日実行。`PIPELINE_PROFILE=nightly_matrix`, `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` でgateを満たすパタンを1回ずつ実行し、RX671 software / TSIP MQTT・OTA・Fleet（各TLS 1.2 / TLS 1.3。OTA / Fleetはstabilizing）、RX72N/Ether・RX671/Type 1YNのsoftware / TSIP TLS 1.3 resumption / 0-RTTを各対応経路で実行。 |
 | AWS IoT Core resumption / 0-RTT | AWS IoT Core が SessionTicket TLS extension をサポートしていないため、AWS IoT Core 接続表には TLS 1.3 Resumption / 0-RTT 列を置きません。 |
 
 ### Evidence Index
