@@ -362,18 +362,25 @@ class OutputSafetyTests(unittest.TestCase):
 
 
 class WifiCredentialIsolationTests(unittest.TestCase):
-    def test_ota_build_environment_removes_wifi_credentials(self) -> None:
+    def test_ota_build_environment_removes_credentials_and_clock_overrides(
+        self,
+    ) -> None:
         source = {
             "PATH": "safe",
             "CI": "true",
             "RX671_EK_WIFI_SSID": "secret-ssid",
             "RX671_EK_WIFI_PASSPHRASE": "secret-passphrase",
             "RX671_EK_WIFI_PASSWORD": "legacy-secret",
+            "RX671_EK_SDIO_RUN_CLOCK_DIV": "SDHI_DIV_2",
+            "RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK": "1",
         }
         result = builder.ota_build_environment(source)
         self.assertEqual("safe", result["PATH"])
         self.assertEqual("true", result["CI"])
-        for variable in builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
+        for variable in (
+            *builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES,
+            *builder.OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES,
+        ):
             self.assertNotIn(variable, result)
 
     def test_ota_build_always_enables_littlefs_kvs_join(self) -> None:

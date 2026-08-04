@@ -29,6 +29,10 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
 PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
 OTA_SDIO_RUN_CLOCK_DIV = "SDHI_DIV_8"
+OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES = (
+    "RX671_EK_SDIO_RUN_CLOCK_DIV",
+    "RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK",
+)
 TLS_VERSION_DEFINES = {
     "TLSv1.2": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1",
     "TLSv1.3": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1",
@@ -637,7 +641,10 @@ def ota_build_environment(
     source: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = dict(os.environ if source is None else source)
-    for variable in WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
+    for variable in (
+        *WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES,
+        *OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES,
+    ):
         environment.pop(variable, None)
     return environment
 
