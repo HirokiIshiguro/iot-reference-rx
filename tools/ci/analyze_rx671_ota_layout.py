@@ -314,14 +314,14 @@ def _cproject_integer_define(text: str, name: str) -> int | None:
 
 
 def _cproject_symbol_define(text: str, name: str) -> str | None:
-    values = {
+    values = [
         match.group(1)
         for match in re.finditer(
             rf'value="-define={re.escape(name)}=([A-Za-z_][A-Za-z0-9_]*)"',
             text,
         )
-    }
-    return next(iter(values)) if len(values) == 1 else None
+    ]
+    return values[0] if len(values) == 1 else None
 
 
 def _ram_capacity_gate(

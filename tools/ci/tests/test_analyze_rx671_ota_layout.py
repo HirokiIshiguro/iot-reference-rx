@@ -119,6 +119,12 @@ TYPE1YN_FW_BLOB
                 "SDIO_HOST_CFG_RUN_CLOCK_DIV",
             )
         )
+        self.assertIsNone(
+            layout._cproject_symbol_define(
+                text + text,
+                "SDIO_HOST_CFG_RUN_CLOCK_DIV",
+            )
+        )
 
     def test_parse_srecord_ranges_and_validate_checksum(self):
         with tempfile.TemporaryDirectory() as directory:
