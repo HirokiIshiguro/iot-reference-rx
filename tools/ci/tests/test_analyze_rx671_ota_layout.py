@@ -99,6 +99,33 @@ TYPE1YN_FW_BLOB
             )
         )
 
+    def test_parse_unique_ota_symbol_defines(self):
+        text = (
+            '<listOptionValue value="-define='
+            'SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8"/>'
+        )
+        self.assertEqual(
+            "SDHI_DIV_8",
+            layout._cproject_symbol_define(
+                text, "SDIO_HOST_CFG_RUN_CLOCK_DIV"
+            ),
+        )
+        self.assertIsNone(layout._cproject_symbol_define(text, "MISSING"))
+        self.assertIsNone(
+            layout._cproject_symbol_define(
+                text
+                + '<listOptionValue value="-define='
+                + 'SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_2"/>',
+                "SDIO_HOST_CFG_RUN_CLOCK_DIV",
+            )
+        )
+        self.assertIsNone(
+            layout._cproject_symbol_define(
+                text + text,
+                "SDIO_HOST_CFG_RUN_CLOCK_DIV",
+            )
+        )
+
     def test_parse_srecord_ranges_and_validate_checksum(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sample.mot"
@@ -132,6 +159,7 @@ class GateTests(unittest.TestCase):
 
         self.assertEqual("UNKNOWN", by_name["bootloader_layout"].status)
         self.assertEqual("FAIL", by_name["mqtt_ota_buffer_fit"].status)
+        self.assertEqual("FAIL", by_name["ota_sdio_run_clock"].status)
         self.assertEqual("PASS", by_name["rom_capacity"].status)
         self.assertEqual("PASS", by_name["fwup_data_flash_geometry"].status)
         self.assertEqual("PASS", by_name["littlefs_data_flash_geometry"].status)
@@ -261,6 +289,31 @@ class GateTests(unittest.TestCase):
         self.assertEqual("FAIL", stale_heap.status)
         self.assertEqual("FAIL", stale_buffers.status)
         self.assertEqual("FAIL", stale_file_blocks.status)
+        self.assertEqual("FAIL", missing.status)
+
+    def test_ota_sdio_run_clock_profile_is_exact(self):
+        passing = layout._ota_sdio_run_clock_gate(
+            run_clock_div="SDHI_DIV_8",
+            use_high_speed_clock=False,
+        )
+        high_speed_divider = layout._ota_sdio_run_clock_gate(
+            run_clock_div="SDHI_DIV_2",
+            use_high_speed_clock=False,
+        )
+        high_speed_override = layout._ota_sdio_run_clock_gate(
+            run_clock_div="SDHI_DIV_8",
+            use_high_speed_clock=True,
+        )
+        missing = layout._ota_sdio_run_clock_gate(
+            run_clock_div=None,
+            use_high_speed_clock=False,
+        )
+
+        self.assertEqual("PASS", passing.status)
+        self.assertIn("required=SDHI_DIV_8", passing.detail)
+        self.assertEqual("FAIL", high_speed_divider.status)
+        self.assertEqual("FAIL", high_speed_override.status)
+        self.assertIn("DIV8", high_speed_override.detail)
         self.assertEqual("FAIL", missing.status)
 
     def test_parent_bootloader_headers_are_required_provenance_inputs(self):
@@ -633,6 +686,7 @@ class RsuGateTests(unittest.TestCase):
             "schema_version": 1,
             "profile": layout.OTA_PROFILE_NAME,
             "ota_image_version": version,
+            "sdio_run_clock_div": layout.OTA_SDIO_RUN_CLOCK_DIV,
             "rsu_path": rsu_path.relative_to(root).as_posix(),
             "signer_certificate_path": certificate_path.relative_to(root).as_posix(),
             "sha256": {

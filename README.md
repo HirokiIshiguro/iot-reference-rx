@@ -419,6 +419,13 @@ absent. Fleet MQTT payload contents are never persisted to UART/CI logs; the
 firmware records only payload length and the monitor fails closed if it sees a
 CSR, certificate, ownership token, or private-key PEM block.
 
+The formal RX671 software OTA baseline and candidate images also use the
+temporary `SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8` profile. The checked-in
+normal network, MQTT, and LANBENCH project remains at `SDHI_DIV_2`; the OTA
+profile favors SDIO margin during the longer dual-bank/AWS transaction without
+changing the normal throughput configuration. The package manifest and layout
+analyzer both fail closed if the OTA-specific divider is missing or changed.
+
 Current hardware validation status is summarized in
 **Hardware CI Validation / 最新テスト結果** later in this README. As of
 [v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0),

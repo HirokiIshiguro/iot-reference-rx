@@ -40,6 +40,7 @@ provisioning、OTA、cleanup jobを合わせて判定する。
 | image version | `demo_config.h`既定値 | `APP_VERSION_*`で`0.1.0` / `0.1.1`を明示 |
 | runtime | MQTT/Fleet/LANBENCHの通常分岐 | `RX671_OTA_RUNTIME_ENABLE=1`でMQTT Agent + OTA demoを自動起動 |
 | OTA download block | library既定値 | `4096` byte（8 KiB MQTT受信bufferにJSON/Base64応答も収容） |
+| SDHI run clock | `SDHI_DIV_2`（PCLKB 60 MHz / 2 = 30 MHz） | `SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8`（7.5 MHz） |
 
 別途、資格情報投入専用のprovisionerを正規`bank.single`配置で生成する。
 `RX671_OTA_PROVISIONER_ENABLE=1`のときはWHD/IPを開始せず、LittleFS/KVS初期化後に
@@ -62,6 +63,28 @@ CLI専用にするため、どちらかが未初期化の`vLoggingPrint()`へ到
 これらはbuild終了時にbyte-for-byteで復元し、正規projectおよび
 baseline/candidateのprofileへ残さない。LittleFSのmount失敗→format→remount、
 PKCS #11 object生成、LittleFS/KVS commitという処理自体は維持する。
+
+### OTA runtimeのSDIO clock margin境界
+
+正規projectのnetwork / MQTT / LANBENCHは、通信性能を維持するため
+`SDHI_DIV_2`（30 MHz）を使い続ける。formal software OTAのbaseline / candidateだけは、
+一時`.cproject`へ`SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8`を追加して7.5 MHzで動作させる。
+WHD/IPを開始しないprovisionerにはこのdefineを追加しない。
+
+scheduled pipeline #9666のTLS 1.2 job #61870とTLS 1.3 job #61901では、DIV2のまま
+baseline startupを各3回試行した全6回で、WHD firmware load、`whd_wifi_on`、MAC取得までは
+成功した後、JOIN中のFunction 2 CMD53 readが同じstatusで停止した。host側の既定2 resetは
+毎回Type 1YNをpower-cycleしており、追加delayやretryで成功条件を緩める対象ではない。
+一方、同じDIV2のfocused job #61363 / #61398は成功しているため、機能欠落ではなく長い
+formal OTA transactionをnightly matrixで反復する際のmargin不足として扱う。
+
+OTA download自体はAWS Jobs / flash処理が支配的であり、normal LANBENCHのSDIO throughput
+設定を下げずにOTA profileだけmarginを優先する。package jobはeffective `.cproject`の
+dividerを`ota_sdio_run_clock` gateで検査し、provenance manifestにも
+`sdio_run_clock_div`を記録する。formal builderは外部のSDIO clock override変数を除去し、
+`SDIO_HOST_USE_HIGH_SPEED_CLOCK`によるDIV8迂回もfail-closedで拒否する。
+TLS 1.2 / TLS 1.3のfocused実機OTAと、DIV2のnormal
+network / MQTT / LANBENCH回帰を同一source SHAで確認して初めて実機成立とする。
 
 ### provisioner CLI stack境界
 

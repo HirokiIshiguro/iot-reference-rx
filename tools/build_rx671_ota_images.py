@@ -28,6 +28,11 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
 PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
+OTA_SDIO_RUN_CLOCK_DIV = "SDHI_DIV_8"
+OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES = (
+    "RX671_EK_SDIO_RUN_CLOCK_DIV",
+    "RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK",
+)
 TLS_VERSION_DEFINES = {
     "TLSv1.2": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1",
     "TLSv1.3": "AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1",
@@ -209,6 +214,17 @@ def make_ota_cproject(
             ".cproject contains persistent APP_VERSION defines: "
             + ", ".join(existing_version_defines)
         )
+    if "-define=SDIO_HOST_CFG_RUN_CLOCK_DIV=" in text:
+        raise ValueError(
+            ".cproject contains a persistent SDIO run clock override"
+        )
+    if re.search(
+        r'value="-define=SDIO_HOST_USE_HIGH_SPEED_CLOCK(?:=[^"]*)?"',
+        text,
+    ):
+        raise ValueError(
+            ".cproject contains a persistent SDIO high-speed clock override"
+        )
     text = _replace_once(
         text,
         'modes="bank.single"',
@@ -234,6 +250,9 @@ def make_ota_cproject(
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MINOR={version.minor}"/>',
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_BUILD={version.build}"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_OTA_RUNTIME_ENABLE=1"/>',
+        '<listOptionValue builtIn="false" value="-define='
+        + f'SDIO_HOST_CFG_RUN_CLOCK_DIV={OTA_SDIO_RUN_CLOCK_DIV}'
+        + '"/>',
         '<listOptionValue builtIn="false" value="-define='
         + TLS_VERSION_DEFINES[tls_version]
         + '"/>',
@@ -629,7 +648,10 @@ def ota_build_environment(
     source: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = dict(os.environ if source is None else source)
-    for variable in WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
+    for variable in (
+        *WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES,
+        *OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES,
+    ):
         environment.pop(variable, None)
     return environment
 
@@ -1032,6 +1054,7 @@ def _create_manifest(
         "wifi_credentials_source": "littlefs_kvs_runtime_provisioning",
         "ota_image_version": version.text,
         "tls_version": tls_version,
+        "sdio_run_clock_div": OTA_SDIO_RUN_CLOCK_DIV,
         "rsu_path": rsu_path.relative_to(repo_root).as_posix(),
         "signer_certificate_path": certificate_path.relative_to(repo_root).as_posix(),
         "signer_public_key_path": public_key_path.relative_to(repo_root).as_posix(),

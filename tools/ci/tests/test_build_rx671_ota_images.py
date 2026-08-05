@@ -71,6 +71,10 @@ class ProfileTests(unittest.TestCase):
             'value="-define=RX671_OTA_RUNTIME_ENABLE=1"', result
         )
         self.assertIn(
+            'value="-define=SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8"',
+            result,
+        )
+        self.assertIn(
             'value="-define=AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_2=1"',
             result,
         )
@@ -203,6 +207,28 @@ class ProfileTests(unittest.TestCase):
                 ),
                 builder.parse_version("1.2.3"),
             )
+        with self.assertRaisesRegex(ValueError, "persistent SDIO run clock"):
+            builder.make_ota_cproject(
+                self.cproject.replace(
+                    builder.DEFINE_ANCHOR,
+                    builder.DEFINE_ANCHOR
+                    + '\n<listOptionValue builtIn="false" '
+                    'value="-define=SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_2"/>',
+                ),
+                builder.parse_version("1.2.3"),
+            )
+        with self.assertRaisesRegex(
+            ValueError, "persistent SDIO high-speed clock"
+        ):
+            builder.make_ota_cproject(
+                self.cproject.replace(
+                    builder.DEFINE_ANCHOR,
+                    builder.DEFINE_ANCHOR
+                    + '\n<listOptionValue builtIn="false" '
+                    'value="-define=SDIO_HOST_USE_HIGH_SPEED_CLOCK"/>',
+                ),
+                builder.parse_version("1.2.3"),
+            )
 
     def test_provisioner_profile_stays_bank_single_and_restores(self) -> None:
         result = builder.make_provisioner_cproject(self.cproject)
@@ -211,6 +237,7 @@ class ProfileTests(unittest.TestCase):
         self.assertIn(
             'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"', result
         )
+        self.assertNotIn("SDIO_HOST_CFG_RUN_CLOCK_DIV", result)
         for define in builder.PROVISIONER_LOG_SUPPRESSION_DEFINES:
             with self.subTest(define=define):
                 self.assertIn(f'value="-define={define}"', result)
@@ -347,18 +374,25 @@ class OutputSafetyTests(unittest.TestCase):
 
 
 class WifiCredentialIsolationTests(unittest.TestCase):
-    def test_ota_build_environment_removes_wifi_credentials(self) -> None:
+    def test_ota_build_environment_removes_credentials_and_clock_overrides(
+        self,
+    ) -> None:
         source = {
             "PATH": "safe",
             "CI": "true",
             "RX671_EK_WIFI_SSID": "secret-ssid",
             "RX671_EK_WIFI_PASSPHRASE": "secret-passphrase",
             "RX671_EK_WIFI_PASSWORD": "legacy-secret",
+            "RX671_EK_SDIO_RUN_CLOCK_DIV": "SDHI_DIV_2",
+            "RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK": "1",
         }
         result = builder.ota_build_environment(source)
         self.assertEqual("safe", result["PATH"])
         self.assertEqual("true", result["CI"])
-        for variable in builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES:
+        for variable in (
+            *builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES,
+            *builder.OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES,
+        ):
             self.assertNotIn(variable, result)
 
     def test_ota_build_always_enables_littlefs_kvs_join(self) -> None:
@@ -501,6 +535,9 @@ class DirtyAnalysisTests(unittest.TestCase):
         source = inspect.getsource(builder._create_manifest)
         self.assertIn('"formal": not dirty', source)
         self.assertIn('"tls_version": tls_version', source)
+        self.assertIn(
+            '"sdio_run_clock_div": OTA_SDIO_RUN_CLOCK_DIV', source
+        )
 
     def test_allows_only_dirty_provenance_and_its_dependent_unknowns(self) -> None:
         report = {
