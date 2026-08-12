@@ -812,6 +812,106 @@ class OtaTransactionContractTests(unittest.TestCase):
             self.assertTrue(transaction._candidate_tls_after_activate())
             self.assertEqual(["TLSv1.3"], transaction.ota.tls_versions_seen)
 
+    def test_marker_loss_uses_ordered_candidate_as_phase_anchor(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(
+                raw_log=Path(temporary) / "raw.log",
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.3",
+                min_capacity_heap_bytes=16384,
+                min_capacity_network_buffers=4,
+                expected_whd_buffer_count=8,
+            )
+            transaction = ota_test.Rx671OtaTransaction(args)
+            for line in (
+                "Application version 0.1.0\r\n",
+                "TLS handshake successful: version TLSv1.3\r\n",
+                "Received OTA Job.\r\n",
+                "Starting The Download.\r\n",
+                "Downloaded block 191 of 192.\r\n",
+                "Application version 0.1.1\r\n",
+                "TLS handshake successful: version TLSv1.3\r\n",
+                "[RX671_OTA_CAPACITY] minheap=22424 minnbuf=13 whdmax=1 "
+                "tempfail=0 permfail=0 waitloop=0\r\n",
+                "New image has higher version than current image, accepted!\r\n",
+                "---OTA Completed successfully!---\r\n",
+            ):
+                transaction._consume(line.encode("ascii"))
+
+            self.assertEqual(
+                "ordered_candidate_acceptance_and_completion",
+                transaction.ota.success_proof(),
+            )
+            self.assertFalse(transaction.ota.has_marker("close_file"))
+            self.assertFalse(transaction.ota.has_marker("activate_image"))
+            self.assertFalse(transaction.ota.has_marker("software_reset"))
+            self.assertEqual(
+                transaction.ota.version_events[1]["line_number"],
+                transaction._ota_phase_anchor_line(),
+            )
+            self.assertTrue(transaction._baseline_tls_before_activate())
+            self.assertTrue(transaction._candidate_tls_after_activate())
+            self.assertTrue(transaction._capacity_proof()["success"])
+            self.assertTrue(transaction._runtime_success_ready())
+
+    def test_marker_loss_phase_anchor_remains_fail_closed(self):
+        base_lines = (
+            "Application version 0.1.0\r\n",
+            "TLS handshake successful: version TLSv1.3\r\n",
+            "Received OTA Job.\r\n",
+            "Starting The Download.\r\n",
+            "Downloaded block 191 of 192.\r\n",
+            "Application version 0.1.1\r\n",
+            "TLS handshake successful: version TLSv1.3\r\n",
+            "[RX671_OTA_CAPACITY] minheap=22424 minnbuf=13 whdmax=1 "
+            "tempfail=0 permfail=0 waitloop=0\r\n",
+            "New image has higher version than current image, accepted!\r\n",
+            "---OTA Completed successfully!---\r\n",
+        )
+        rejected_variants = {
+            "missing baseline TLS": base_lines[:1] + base_lines[2:],
+            "missing candidate TLS": base_lines[:6] + base_lines[7:],
+            "wrong candidate TLS": (
+                base_lines[:6]
+                + ("TLS handshake successful: version TLSv1.2\r\n",)
+                + base_lines[7:]
+            ),
+            "capacity before candidate": (
+                base_lines[:5]
+                + (base_lines[7],)
+                + base_lines[5:7]
+                + base_lines[8:]
+            ),
+            "missing capacity": base_lines[:7] + base_lines[8:],
+            "capacity below threshold": (
+                base_lines[:7]
+                + (
+                    "[RX671_OTA_CAPACITY] minheap=16383 minnbuf=3 whdmax=8 "
+                    "tempfail=1 permfail=1 waitloop=1\r\n",
+                )
+                + base_lines[8:]
+            ),
+            "missing acceptance": base_lines[:8] + base_lines[9:],
+        }
+
+        for case, lines in rejected_variants.items():
+            with self.subTest(case=case):
+                with tempfile.TemporaryDirectory() as temporary:
+                    args = argparse.Namespace(
+                        raw_log=Path(temporary) / "raw.log",
+                        baseline_version="0.1.0",
+                        candidate_version="0.1.1",
+                        require_tls_version="TLSv1.3",
+                        min_capacity_heap_bytes=16384,
+                        min_capacity_network_buffers=4,
+                        expected_whd_buffer_count=8,
+                    )
+                    transaction = ota_test.Rx671OtaTransaction(args)
+                    for line in lines:
+                        transaction._consume(line.encode("ascii"))
+                    self.assertFalse(transaction._runtime_success_ready())
+
     def test_tls13_candidate_handshake_cannot_replace_baseline_proof(self):
         with tempfile.TemporaryDirectory() as temporary:
             args = argparse.Namespace(

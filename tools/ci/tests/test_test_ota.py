@@ -23,6 +23,17 @@ class OtaLogAnalyzerTests(unittest.TestCase):
             "---OTA Completed successfully!---",
         ]
 
+    def marker_loss_events(self):
+        return [
+            "Application version 0.9.2",
+            "Received OTA Job.",
+            "Starting The Download.",
+            "Downloaded block 1 of 1.",
+            "Application version 0.9.3",
+            "New image has higher version than current image, accepted!",
+            "---OTA Completed successfully!---",
+        ]
+
     def test_existing_strict_marker_proof_remains_valid(self):
         analyzer = self.make_analyzer(
             [
@@ -74,6 +85,61 @@ class OtaLogAnalyzerTests(unittest.TestCase):
         events.append("OTA is failed!")
 
         self.assertFalse(self.make_analyzer(events).is_success())
+
+    def test_accepts_ordered_candidate_proof_when_transition_markers_are_lost(self):
+        analyzer = self.make_analyzer(self.marker_loss_events())
+
+        self.assertTrue(analyzer.is_success())
+        self.assertEqual(
+            analyzer.success_proof(),
+            "ordered_candidate_acceptance_and_completion",
+        )
+        self.assertFalse(analyzer.has_marker("close_file"))
+        self.assertFalse(analyzer.has_marker("activate_image"))
+        self.assertFalse(analyzer.has_marker("software_reset"))
+
+    def test_ordered_candidate_proof_remains_fail_closed(self):
+        base_events = self.marker_loss_events()
+        rejected_variants = {
+            "missing baseline": base_events[1:],
+            "candidate before download": [
+                base_events[0],
+                base_events[1],
+                base_events[4],
+                base_events[2],
+                base_events[3],
+                base_events[5],
+                base_events[6],
+            ],
+            "missing acceptance": [
+                event for event in base_events if "accepted!" not in event
+            ],
+            "completion before acceptance": [
+                *base_events[:5],
+                base_events[6],
+                base_events[5],
+            ],
+            "generic completion only": [
+                base_events[0],
+                base_events[6],
+            ],
+            "classified fatal error": [
+                *base_events,
+                "OTA is failed!",
+            ],
+        }
+
+        for case, events in rejected_variants.items():
+            with self.subTest(case=case):
+                self.assertFalse(self.make_analyzer(events).is_success())
+
+        with self.subTest(case="wrong expected candidate"):
+            self.assertFalse(
+                self.make_analyzer(
+                    base_events,
+                    expected_version="0.9.4",
+                ).is_success()
+            )
 
 
 if __name__ == "__main__":

@@ -440,6 +440,83 @@ class OtaLogAnalyzer:
             version == self.require_tls_version for version in self.tls_versions_seen
         )
 
+    @staticmethod
+    def _first_event_after(events, line_number, predicate=None):
+        for event in events:
+            if event["line_number"] <= line_number:
+                continue
+            if predicate is None or predicate(event):
+                return event
+        return None
+
+    def ordered_candidate_acceptance_chain(self):
+        """Return strong ordered proof when verbose transition markers are lost.
+
+        A candidate version line is only accepted as an implicit reboot boundary
+        when it follows a different baseline version and ordered job/download
+        progress, and is itself followed by image acceptance and OTA Job success.
+        This deliberately does not accept a generic completion line on its own.
+        """
+        if not self.expected_version:
+            return None
+
+        for baseline_event in self.version_events:
+            if baseline_event["version"] == self.expected_version:
+                continue
+
+            job_event = self._first_event_after(
+                self.marker_events["job_received"],
+                baseline_event["line_number"],
+            )
+            if job_event is None:
+                continue
+            download_event = self._first_event_after(
+                self.marker_events["download_started"],
+                job_event["line_number"],
+            )
+            if download_event is None:
+                continue
+            block_event = self._first_event_after(
+                self.marker_events["block_downloaded"],
+                download_event["line_number"],
+            )
+            if block_event is None:
+                continue
+            candidate_event = self._first_event_after(
+                self.version_events,
+                block_event["line_number"],
+                lambda event: event["version"] == self.expected_version,
+            )
+            if candidate_event is None:
+                continue
+            accepted_event = self._first_event_after(
+                self.marker_events["image_accepted"],
+                candidate_event["line_number"],
+            )
+            if accepted_event is None:
+                continue
+            completed_event = self._first_event_after(
+                self.marker_events["ota_completed"],
+                accepted_event["line_number"],
+            )
+            if completed_event is None:
+                continue
+
+            return {
+                "baseline_version": baseline_event,
+                "job_received": job_event,
+                "download_started": download_event,
+                "block_downloaded": block_event,
+                "candidate_version": candidate_event,
+                "image_accepted": accepted_event,
+                "ota_completed": completed_event,
+            }
+
+        return None
+
+    def ordered_candidate_acceptance_proof_ok(self):
+        return self.ordered_candidate_acceptance_chain() is not None
+
     def strict_marker_proof_ok(self):
         required_markers = (
             "job_received",
@@ -518,6 +595,8 @@ class OtaLogAnalyzer:
             return "strict_markers"
         if self.post_reboot_completion_proof_ok():
             return "post_reboot_version_and_completion"
+        if self.ordered_candidate_acceptance_proof_ok():
+            return "ordered_candidate_acceptance_and_completion"
         return None
 
     def is_success(self):

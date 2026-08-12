@@ -129,17 +129,33 @@ class Rx671OtaTransaction:
                     }
                 )
 
-    def _post_ota_capacity(self) -> dict | None:
+    def _ota_phase_anchor_line(self) -> int | None:
         activate_line = self.ota.marker_state["activate_image"][
             "first_seen_line_number"
         ]
-        if activate_line is None:
+        if activate_line is not None:
+            return activate_line
+
+        if (
+            self.ota.success_proof()
+            != "ordered_candidate_acceptance_and_completion"
+        ):
+            return None
+
+        chain = self.ota.ordered_candidate_acceptance_chain()
+        if chain is None:
+            return None
+        return chain["candidate_version"]["line_number"]
+
+    def _post_ota_capacity(self) -> dict | None:
+        phase_anchor_line = self._ota_phase_anchor_line()
+        if phase_anchor_line is None:
             return None
         return next(
             (
                 event
                 for event in self.capacity_events
-                if event["line_number"] > activate_line
+                if event["line_number"] > phase_anchor_line
             ),
             None,
         )
@@ -193,26 +209,22 @@ class Rx671OtaTransaction:
         }
 
     def _baseline_tls_before_activate(self) -> bool:
-        activate_line = self.ota.marker_state["activate_image"][
-            "first_seen_line_number"
-        ]
+        phase_anchor_line = self._ota_phase_anchor_line()
         return bool(
-            activate_line is not None
+            phase_anchor_line is not None
             and any(
-                event["line_number"] < activate_line
+                event["line_number"] < phase_anchor_line
                 and event["version"] == self.args.require_tls_version
                 for event in self.ota.tls_events
             )
         )
 
     def _candidate_tls_after_activate(self) -> bool:
-        activate_line = self.ota.marker_state["activate_image"][
-            "first_seen_line_number"
-        ]
+        phase_anchor_line = self._ota_phase_anchor_line()
         return bool(
-            activate_line is not None
+            phase_anchor_line is not None
             and any(
-                event["line_number"] > activate_line
+                event["line_number"] > phase_anchor_line
                 and event["version"] == self.args.require_tls_version
                 for event in self.ota.tls_events
             )
