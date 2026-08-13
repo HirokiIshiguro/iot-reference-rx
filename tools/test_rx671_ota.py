@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 from rx671_ota_host import (
+    BufferedSerialReader,
     DEFAULT_BAUD,
     DEFAULT_PORT,
     RfpConfig,
@@ -95,6 +96,7 @@ class Rx671OtaTransaction:
         self.total_uart_bytes = 0
         self.capacity_events = []
         self.startup_reset_events = []
+        self.uart_capture = None
 
     def _consume(self, chunk: bytes) -> None:
         decoded = chunk.decode("ascii", errors="replace")
@@ -409,12 +411,16 @@ class Rx671OtaTransaction:
             speed=self.args.rfp_speed,
             auth_id=self.args.rfp_auth_id,
         )
-        serial_port = open_serial(self.args.port, self.args.baud)
+        serial_port = BufferedSerialReader(
+            open_serial(self.args.port, self.args.baud)
+        )
         sent = 0
         digest = None
+        transaction_error = None
         try:
             serial_port.reset_input_buffer()
             serial_port.reset_output_buffer()
+            serial_port.start()
             run_checked(rfp.run_command(), label="boot-loader release")
             # LittleFS diagnostics can be emitted between the boot loader's
             # prefix and trailing "found." text.  Require both in order so the
@@ -423,7 +429,11 @@ class Rx671OtaTransaction:
             self.wait_for(serial_port, KEY_FOUND_MARKER, self.args.boot_timeout)
             self.wait_for(serial_port, READY_MARKER, self.args.boot_timeout)
             sent, digest = self.stream_baseline_rsu(serial_port)
-            self.wait_for(serial_port, BOOT_REQUIRED["install_completed"], self.args.install_timeout)
+            self.wait_for(
+                serial_port,
+                BOOT_REQUIRED["install_completed"],
+                self.args.install_timeout,
+            )
             self.wait_for(serial_port, BOOT_REQUIRED["jump"], self.args.install_timeout)
             self.wait_for_application_ready(serial_port, rfp)
 
@@ -448,8 +458,28 @@ class Rx671OtaTransaction:
                 raise TimeoutError(
                     "candidate OTA did not reach accepted-and-reported-success state"
                 )
+        except BaseException as exc:
+            transaction_error = exc
+            raise
         finally:
-            serial_port.close()
+            shutdown_error = None
+            try:
+                if transaction_error is None:
+                    serial_port.stop_after_quiet()
+                else:
+                    serial_port.stop()
+                while serial_port.in_waiting:
+                    self._read(serial_port)
+            except Exception as exc:
+                shutdown_error = exc
+            try:
+                serial_port.close()
+            except Exception as exc:
+                if shutdown_error is None:
+                    shutdown_error = exc
+            self.uart_capture = serial_port.stats()
+            if transaction_error is None and shutdown_error is not None:
+                raise shutdown_error
 
         missing_boot = [name for name, count in self.boot_hits.items() if count == 0]
         ota_summary = self.ota.build_summary(
@@ -491,6 +521,7 @@ class Rx671OtaTransaction:
             "bootloader_markers": self.boot_hits,
             "bootloader_markers_missing": missing_boot,
             "uart_held_for_entire_transaction": True,
+            "uart_capture": self.uart_capture,
             "ota": ota_summary,
             "image_acceptance_observed": self.ota.has_marker("image_accepted"),
             "image_commit_observed": self.ota.has_marker("image_committed"),
@@ -560,8 +591,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     started = time.monotonic()
+    transaction = None
     try:
-        summary = Rx671OtaTransaction(args).run()
+        transaction = Rx671OtaTransaction(args)
+        summary = transaction.run()
         status = 0 if summary["success"] else 1
     except Exception as exc:
         summary = {
@@ -570,6 +603,8 @@ def main(argv: list[str] | None = None) -> int:
             "message": str(exc),
             "duration_seconds": round(time.monotonic() - started, 3),
         }
+        if transaction is not None and transaction.uart_capture is not None:
+            summary["uart_capture"] = transaction.uart_capture
         print(f"RX671 OTA transaction failed: {exc}", file=sys.stderr)
         status = 1
     finally:

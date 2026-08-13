@@ -7,6 +7,8 @@ import inspect
 import re
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -66,6 +68,253 @@ class FakeSerial:
 
     def close(self):
         self.closed = True
+
+
+class ThreadedFakeSerial:
+    def __init__(
+        self,
+        *,
+        timeout: float = 0.01,
+        receive_capacity: int | None = None,
+    ):
+        self.timeout = timeout
+        self.receive_capacity = receive_capacity
+        self._condition = threading.Condition()
+        self._responses = bytearray()
+        self._failure = None
+        self.writes = []
+        self.closed = False
+        self.input_reset_count = 0
+        self.output_reset_count = 0
+        self.dropped_bytes = 0
+
+    @property
+    def in_waiting(self):
+        with self._condition:
+            return len(self._responses)
+
+    def feed(self, payload: bytes):
+        with self._condition:
+            accepted = payload
+            if self.receive_capacity is not None:
+                available = max(self.receive_capacity - len(self._responses), 0)
+                accepted = payload[:available]
+                self.dropped_bytes += len(payload) - len(accepted)
+            self._responses.extend(accepted)
+            self._condition.notify_all()
+
+    def fail(self, error: BaseException):
+        with self._condition:
+            self._failure = error
+            self._condition.notify_all()
+
+    def read(self, size):
+        deadline = time.monotonic() + self.timeout
+        with self._condition:
+            while not self._responses and self._failure is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return b""
+                self._condition.wait(remaining)
+            if self._failure is not None:
+                error = self._failure
+                self._failure = None
+                raise error
+            result = bytes(self._responses[:size])
+            del self._responses[:size]
+            return result
+
+    def write(self, data):
+        self.writes.append(bytes(data))
+        return len(data)
+
+    def flush(self):
+        pass
+
+    def reset_input_buffer(self):
+        with self._condition:
+            self._responses.clear()
+            self.input_reset_count += 1
+
+    def reset_output_buffer(self):
+        self.output_reset_count += 1
+
+    def close(self):
+        self.closed = True
+
+
+class BufferedSerialReaderTests(unittest.TestCase):
+    @staticmethod
+    def _wait_for(predicate, timeout=2.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():
+                return
+            time.sleep(0.005)
+        raise AssertionError("timed out waiting for serial reader state")
+
+    def test_reader_keeps_192_block_burst_while_consumer_is_stalled(self):
+        serial = ThreadedFakeSerial(receive_capacity=2048)
+        reader = host.BufferedSerialReader(serial)
+        payload = b"".join(
+            (
+                f"{block:03d} Downloaded block {block} of 192. "
+                f"{'x' * 64}\r\n"
+            ).encode("ascii")
+            for block in range(192)
+        ) + b"partial\x00tail"
+        reader.start()
+
+        def produce():
+            for offset in range(0, len(payload), 128):
+                serial.feed(payload[offset : offset + 128])
+                time.sleep(0.002)
+
+        producer = threading.Thread(target=produce)
+        producer.start()
+        # Model the synchronous analyzer/logger pause seen in job #64216.  The
+        # consumer does not call read while the dedicated reader keeps draining.
+        time.sleep(2.2)
+        producer.join()
+        self._wait_for(lambda: reader.stats()["reader_bytes"] == len(payload))
+        self.assertGreater(len(payload), 12 * 1024)
+        self.assertEqual(len(payload), reader.in_waiting)
+        self.assertEqual(len(payload), reader.stats()["max_buffered_bytes"])
+
+        captured = bytearray()
+        while reader.in_waiting:
+            captured.extend(reader.read(reader.in_waiting))
+        reader.stop_after_quiet(quiet_seconds=0.02)
+        reader.close()
+
+        self.assertEqual(payload, bytes(captured))
+        self.assertEqual(0, serial.dropped_bytes)
+        self.assertEqual(192, captured.count(b"Downloaded block "))
+        stats = reader.stats()
+        self.assertEqual(len(payload), stats["reader_bytes"])
+        self.assertEqual(len(payload), stats["consumer_bytes"])
+        self.assertGreater(stats["max_buffered_bytes"], 0)
+        self.assertFalse(stats["buffer_overflowed"])
+        self.assertTrue(stats["all_reader_bytes_accounted"])
+        self.assertTrue(stats["reader_thread_stopped"])
+        self.assertIsNotNone(stats["last_capture_wall_utc"])
+        self.assertIsNotNone(stats["last_capture_monotonic_seconds"])
+
+    def test_quiet_shutdown_keeps_tail_arriving_after_success_marker(self):
+        serial = ThreadedFakeSerial()
+        reader = host.BufferedSerialReader(serial)
+        reader.start()
+        serial.feed(b"OTA Completed successfully!\r\n")
+        self._wait_for(lambda: reader.stats()["reader_bytes"] > 0)
+
+        def late_tail():
+            time.sleep(0.05)
+            serial.feed(b"late UART tail\r\n")
+
+        producer = threading.Thread(target=late_tail)
+        producer.start()
+        reader.stop_after_quiet(quiet_seconds=0.1)
+        producer.join()
+
+        captured = reader.read(reader.in_waiting)
+        reader.close()
+        self.assertIn(b"OTA Completed successfully!", captured)
+        self.assertIn(b"late UART tail", captured)
+        self.assertTrue(reader.stats()["all_reader_bytes_accounted"])
+
+    def test_input_reset_discards_kernel_and_host_buffers_atomically(self):
+        serial = ThreadedFakeSerial()
+        reader = host.BufferedSerialReader(serial)
+        reader.start()
+        serial.feed(b"before-reset")
+        self._wait_for(lambda: reader.stats()["reader_bytes"] == 12)
+
+        reader.reset_input_buffer()
+        serial.feed(b"after-reset")
+        self._wait_for(lambda: reader.in_waiting == 11)
+        self.assertEqual(b"after-reset", reader.read(11))
+        reader.close()
+
+        stats = reader.stats()
+        self.assertEqual(1, stats["input_resets"])
+        self.assertEqual(12, stats["discarded_buffered_bytes"])
+        self.assertEqual(1, serial.input_reset_count)
+
+    def test_reader_failure_is_fail_closed_and_closes_serial(self):
+        serial = ThreadedFakeSerial()
+        reader = host.BufferedSerialReader(serial)
+        reader.start()
+        serial.fail(OSError("simulated FTDI failure"))
+        self._wait_for(lambda: reader.stats()["reader_failed"])
+
+        with self.assertRaisesRegex(RuntimeError, "UART reader failed") as raised:
+            reader.close()
+        self.assertIsInstance(raised.exception.__cause__, OSError)
+        self.assertTrue(serial.closed)
+
+    def test_buffer_overflow_is_explicit_failure_not_silent_drop(self):
+        serial = ThreadedFakeSerial()
+        reader = host.BufferedSerialReader(serial, max_buffer_bytes=8)
+        reader.start()
+        serial.feed(b"0123456789")
+        self._wait_for(lambda: reader.stats()["reader_failed"])
+
+        with self.assertRaisesRegex(RuntimeError, "UART reader failed") as raised:
+            reader.close()
+        self.assertIsInstance(raised.exception.__cause__, BufferError)
+        stats = reader.stats()
+        self.assertTrue(stats["buffer_overflowed"])
+        self.assertGreater(stats["overflow_bytes"], 0)
+        self.assertTrue(stats["all_reader_bytes_accounted"])
+
+    def test_failure_path_preserves_primary_transaction_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rsu = root / "baseline.rsu"
+            rsu.write_bytes(b"\x00" * ota_test.RSU_SIZE)
+            args = argparse.Namespace(
+                raw_log=root / "raw.log",
+                baseline_rsu=rsu,
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.2",
+                rfp_cli="rfp-cli",
+                rfp_device="RX671",
+                rfp_tool="e2l:test",
+                rfp_interface="fine",
+                rfp_speed="500K",
+                rfp_auth_id="unit-test-auth-id",
+                port="fake",
+                baud=ota_test.DEFAULT_BAUD,
+                boot_timeout=0.01,
+                transfer_timeout=0.01,
+                install_timeout=0.01,
+                application_timeout=0.01,
+                ota_timeout=0.01,
+                startup_reset_retries=0,
+                chunk_size=4096,
+                inter_chunk_delay=0.0,
+                min_capacity_heap_bytes=16384,
+                min_capacity_network_buffers=4,
+                expected_whd_buffer_count=8,
+            )
+            serial = ThreadedFakeSerial()
+            transaction = ota_test.Rx671OtaTransaction(args)
+            with mock.patch.object(
+                ota_test,
+                "open_serial",
+                return_value=serial,
+            ), mock.patch.object(
+                ota_test,
+                "run_checked",
+                side_effect=RuntimeError("primary RFP failure"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "primary RFP failure"):
+                    transaction.run()
+
+            self.assertTrue(serial.closed)
+            self.assertIsNotNone(transaction.uart_capture)
+            self.assertTrue(transaction.uart_capture["reader_thread_stopped"])
 
 
 class RfpContractTests(unittest.TestCase):
@@ -708,7 +957,10 @@ class OtaTransactionContractTests(unittest.TestCase):
             )
             transaction = ota_test.Rx671OtaTransaction(args)
             with self.assertRaisesRegex(RuntimeError, "fail-close"):
-                transaction._consume(b"Loading user code signer public key from LittleFS: not found; refusing to boot.\r\n")
+                transaction._consume(
+                    b"Loading user code signer public key from LittleFS: "
+                    b"not found; refusing to boot.\r\n"
+                )
 
     def test_runtime_fatal_marker_raises_without_waiting_for_ota_timeout(self):
         with tempfile.TemporaryDirectory() as temporary:

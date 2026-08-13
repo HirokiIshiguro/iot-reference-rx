@@ -12,8 +12,10 @@ import hashlib
 import json
 import os
 import subprocess
+import threading
 import time
 import xml.etree.ElementTree as ET
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +29,7 @@ DEFAULT_PORT = os.environ.get(
 DEFAULT_BAUD = 921600
 DEFAULT_RFP_CLI = os.environ.get("RX671_WIFI_LINUX_RFP_CLI", "./tools/rfp_cli_locked.sh")
 DEFAULT_RFP_TIMEOUT = 120.0
+DEFAULT_UART_BUFFER_LIMIT = 16 * 1024 * 1024
 RX671_TEMPORARY_INSTALL_START = 0xFFE00000
 RX671_TEMPORARY_INSTALL_END = 0xFFEBFFFF
 RX671_EXECUTE_INSTALL_START = 0xFFF00000
@@ -100,6 +103,283 @@ class RfpConfig:
         command = self.common_command()
         command.extend(["-sig", "-run", "-noquery"])
         return command
+
+
+class BufferedSerialReader:
+    """Continuously drain a serial port into a bounded host-side buffer.
+
+    RX671 OTA emits UART at 921600 bps.  The transaction consumer also formats
+    timestamped logs and analyzes every line, so a filesystem or scheduler
+    stall in that consumer must not stop the kernel tty buffer from being
+    drained.  The generous buffer absorbs transient consumer stalls; reaching
+    its limit is an explicit integrity failure rather than a silent drop.  Only
+    this reader thread touches ``serial.read``; writes remain full-duplex and
+    are delegated to the wrapped pyserial object.
+    """
+
+    def __init__(
+        self,
+        serial_port,
+        *,
+        stop_timeout: float = 5.0,
+        max_buffer_bytes: int = DEFAULT_UART_BUFFER_LIMIT,
+    ):
+        if stop_timeout <= 0:
+            raise ValueError("serial reader stop timeout must be positive")
+        if max_buffer_bytes <= 0:
+            raise ValueError("serial reader buffer limit must be positive")
+        self._serial = serial_port
+        self._stop_timeout = stop_timeout
+        self._max_buffer_bytes = max_buffer_bytes
+        self._condition = threading.Condition()
+        self._io_lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="rx671-uart-reader",
+            daemon=True,
+        )
+        self._started = False
+        self._closed = False
+        self._chunks = deque()
+        self._buffered_bytes = 0
+        self._reader_error: Exception | None = None
+        self._reader_bytes = 0
+        self._reader_chunks = 0
+        self._consumer_bytes = 0
+        self._consumer_reads = 0
+        self._max_buffered_bytes = 0
+        self._input_resets = 0
+        self._discarded_buffered_bytes = 0
+        self._overflow_bytes = 0
+        self._max_service_gap_seconds = 0.0
+        self._last_capture_wall = None
+        self._last_capture_elapsed_seconds = None
+
+    def start(self) -> None:
+        if self._closed:
+            raise RuntimeError("cannot start a closed serial reader")
+        if self._started:
+            raise RuntimeError("serial reader already started")
+        self._started = True
+        self._thread.start()
+
+    def _run(self) -> None:
+        previous_service = time.monotonic()
+        try:
+            while not self._stop.is_set():
+                service_started = time.monotonic()
+                service_gap = service_started - previous_service
+                previous_service = service_started
+                with self._condition:
+                    self._max_service_gap_seconds = max(
+                        self._max_service_gap_seconds,
+                        service_gap,
+                    )
+                # Keep the append inside the same lock as the physical read.
+                # reset_input_buffer() can then atomically discard both the
+                # kernel-side bytes and every pre-reset byte already read.
+                with self._io_lock:
+                    waiting = int(getattr(self._serial, "in_waiting", 0) or 0)
+                    chunk = self._serial.read(waiting or 1)
+                    if chunk:
+                        capture_wall = datetime.now(timezone.utc).isoformat()
+                        capture_elapsed = time.monotonic()
+                        with self._condition:
+                            self._reader_bytes += len(chunk)
+                            self._reader_chunks += 1
+                            if (
+                                self._buffered_bytes + len(chunk)
+                                > self._max_buffer_bytes
+                            ):
+                                self._overflow_bytes += len(chunk)
+                                raise BufferError(
+                                    "RX671 UART host buffer limit exceeded: "
+                                    f"{self._buffered_bytes + len(chunk)}/"
+                                    f"{self._max_buffer_bytes} bytes"
+                                )
+                            self._chunks.append(bytes(chunk))
+                            self._buffered_bytes += len(chunk)
+                            self._max_buffered_bytes = max(
+                                self._max_buffered_bytes,
+                                self._buffered_bytes,
+                            )
+                            self._last_capture_wall = capture_wall
+                            self._last_capture_elapsed_seconds = round(
+                                capture_elapsed,
+                                6,
+                            )
+                            self._condition.notify_all()
+        except Exception as exc:  # propagate hardware/driver failures
+            with self._condition:
+                self._reader_error = exc
+                self._condition.notify_all()
+
+    def _raise_reader_error_locked(self) -> None:
+        if self._reader_error is not None:
+            raise RuntimeError("RX671 UART reader failed") from self._reader_error
+
+    @property
+    def in_waiting(self) -> int:
+        with self._condition:
+            self._raise_reader_error_locked()
+            return self._buffered_bytes
+
+    def read(self, size: int = 1) -> bytes:
+        if size <= 0:
+            return b""
+        timeout = getattr(self._serial, "timeout", 0.1)
+        deadline = None if timeout is None else time.monotonic() + float(timeout)
+        with self._condition:
+            while not self._chunks:
+                self._raise_reader_error_locked()
+                if self._stop.is_set():
+                    return b""
+                if deadline is None:
+                    self._condition.wait()
+                    continue
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return b""
+                self._condition.wait(remaining)
+
+            take = min(size, self._buffered_bytes)
+            pieces = []
+            remaining = take
+            while remaining:
+                head = self._chunks[0]
+                if len(head) <= remaining:
+                    pieces.append(self._chunks.popleft())
+                    remaining -= len(head)
+                else:
+                    pieces.append(head[:remaining])
+                    self._chunks[0] = head[remaining:]
+                    remaining = 0
+            chunk = b"".join(pieces)
+            self._buffered_bytes -= len(chunk)
+            self._consumer_bytes += len(chunk)
+            self._consumer_reads += 1
+            return chunk
+
+    def write(self, payload: bytes) -> int:
+        return self._serial.write(payload)
+
+    def flush(self) -> None:
+        self._serial.flush()
+
+    def reset_input_buffer(self) -> None:
+        # _run() also appends while holding _io_lock, so no pre-reset chunk can
+        # be appended after this queue clear.
+        with self._io_lock:
+            self._serial.reset_input_buffer()
+            with self._condition:
+                self._raise_reader_error_locked()
+                self._discarded_buffered_bytes += self._buffered_bytes
+                self._chunks.clear()
+                self._buffered_bytes = 0
+                self._input_resets += 1
+
+    def reset_output_buffer(self) -> None:
+        self._serial.reset_output_buffer()
+
+    def stats(self) -> dict:
+        with self._condition:
+            accounted_bytes = (
+                self._consumer_bytes
+                + self._discarded_buffered_bytes
+                + self._buffered_bytes
+                + self._overflow_bytes
+            )
+            return {
+                "mode": "dedicated_reader_thread",
+                "reader_thread_started": self._started,
+                "reader_thread_stopped": self._started and not self._thread.is_alive(),
+                "reader_failed": self._reader_error is not None,
+                "buffer_limit_bytes": self._max_buffer_bytes,
+                "buffer_overflowed": self._overflow_bytes > 0,
+                "overflow_bytes": self._overflow_bytes,
+                "reader_bytes": self._reader_bytes,
+                "reader_chunks": self._reader_chunks,
+                "consumer_bytes": self._consumer_bytes,
+                "consumer_reads": self._consumer_reads,
+                "max_buffered_bytes": self._max_buffered_bytes,
+                "buffered_bytes": self._buffered_bytes,
+                "input_resets": self._input_resets,
+                "discarded_buffered_bytes": self._discarded_buffered_bytes,
+                "accounted_reader_bytes": accounted_bytes,
+                "all_reader_bytes_accounted": accounted_bytes == self._reader_bytes,
+                "max_reader_service_gap_seconds": round(
+                    self._max_service_gap_seconds,
+                    6,
+                ),
+                "last_capture_wall_utc": self._last_capture_wall,
+                "last_capture_monotonic_seconds": self._last_capture_elapsed_seconds,
+            }
+
+    def stop(self) -> None:
+        if not self._started:
+            return
+        with self._condition:
+            self._raise_reader_error_locked()
+        self._stop.set()
+        with self._condition:
+            self._condition.notify_all()
+        self._thread.join(self._stop_timeout)
+        if self._thread.is_alive():
+            raise RuntimeError("RX671 UART reader did not stop")
+        with self._condition:
+            self._raise_reader_error_locked()
+
+    def stop_after_quiet(self, quiet_seconds: float = 0.2) -> None:
+        """Stop after the physical port and host buffer stay quiet.
+
+        The OTA consumer can decide success immediately after a marker while a
+        final UART chunk is still moving through USB.  Wait for a bounded quiet
+        interval before stopping the only physical reader, then let the caller
+        drain every queued byte.
+        """
+        if quiet_seconds <= 0:
+            raise ValueError("serial reader quiet interval must be positive")
+        stable_since = None
+        previous_reader_bytes = None
+        deadline = time.monotonic() + max(quiet_seconds * 10, 5.0)
+        while time.monotonic() < deadline:
+            with self._condition:
+                self._raise_reader_error_locked()
+                current_reader_bytes = self._reader_bytes
+            with self._io_lock:
+                physical_waiting = int(
+                    getattr(self._serial, "in_waiting", 0) or 0
+                )
+            now = time.monotonic()
+            if (
+                physical_waiting == 0
+                and current_reader_bytes == previous_reader_bytes
+            ):
+                if stable_since is None:
+                    stable_since = now
+                elif now - stable_since >= quiet_seconds:
+                    self.stop()
+                    return
+            else:
+                stable_since = None
+            previous_reader_bytes = current_reader_bytes
+            time.sleep(min(quiet_seconds / 4, 0.05))
+        raise TimeoutError("RX671 UART reader did not become quiet before shutdown")
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        stop_error = None
+        try:
+            self.stop()
+        except Exception as exc:
+            stop_error = exc
+        finally:
+            self._serial.close()
+            self._closed = True
+        if stop_error is not None:
+            raise stop_error
 
 
 class TimestampLog:
