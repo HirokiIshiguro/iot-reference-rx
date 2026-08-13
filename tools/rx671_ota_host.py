@@ -155,6 +155,10 @@ class BufferedSerialReader:
         self._max_service_gap_seconds = 0.0
         self._last_capture_wall = None
         self._last_capture_elapsed_seconds = None
+        self._capture_cutoff_wall = None
+        self._capture_cutoff_elapsed_seconds = None
+        self._physical_pending_at_cutoff = 0
+        self._physical_final_drain_bytes = 0
 
     def start(self) -> None:
         if self._closed:
@@ -183,33 +187,11 @@ class BufferedSerialReader:
                     waiting = int(getattr(self._serial, "in_waiting", 0) or 0)
                     chunk = self._serial.read(waiting or 1)
                     if chunk:
-                        capture_wall = datetime.now(timezone.utc).isoformat()
-                        capture_elapsed = time.monotonic()
-                        with self._condition:
-                            self._reader_bytes += len(chunk)
-                            self._reader_chunks += 1
-                            if (
-                                self._buffered_bytes + len(chunk)
-                                > self._max_buffer_bytes
-                            ):
-                                self._overflow_bytes += len(chunk)
-                                raise BufferError(
-                                    "RX671 UART host buffer limit exceeded: "
-                                    f"{self._buffered_bytes + len(chunk)}/"
-                                    f"{self._max_buffer_bytes} bytes"
-                                )
-                            self._chunks.append(bytes(chunk))
-                            self._buffered_bytes += len(chunk)
-                            self._max_buffered_bytes = max(
-                                self._max_buffered_bytes,
-                                self._buffered_bytes,
-                            )
-                            self._last_capture_wall = capture_wall
-                            self._last_capture_elapsed_seconds = round(
-                                capture_elapsed,
-                                6,
-                            )
-                            self._condition.notify_all()
+                        self._append_reader_chunk(
+                            chunk,
+                            capture_wall=datetime.now(timezone.utc).isoformat(),
+                            capture_elapsed=time.monotonic(),
+                        )
         except Exception as exc:  # propagate hardware/driver failures
             with self._condition:
                 self._reader_error = exc
@@ -218,6 +200,36 @@ class BufferedSerialReader:
     def _raise_reader_error_locked(self) -> None:
         if self._reader_error is not None:
             raise RuntimeError("RX671 UART reader failed") from self._reader_error
+
+    def _append_reader_chunk(
+        self,
+        chunk: bytes,
+        *,
+        capture_wall: str,
+        capture_elapsed: float,
+        physical_final_drain: bool = False,
+    ) -> None:
+        with self._condition:
+            self._reader_bytes += len(chunk)
+            self._reader_chunks += 1
+            if physical_final_drain:
+                self._physical_final_drain_bytes += len(chunk)
+            if self._buffered_bytes + len(chunk) > self._max_buffer_bytes:
+                self._overflow_bytes += len(chunk)
+                raise BufferError(
+                    "RX671 UART host buffer limit exceeded: "
+                    f"{self._buffered_bytes + len(chunk)}/"
+                    f"{self._max_buffer_bytes} bytes"
+                )
+            self._chunks.append(bytes(chunk))
+            self._buffered_bytes += len(chunk)
+            self._max_buffered_bytes = max(
+                self._max_buffered_bytes,
+                self._buffered_bytes,
+            )
+            self._last_capture_wall = capture_wall
+            self._last_capture_elapsed_seconds = round(capture_elapsed, 6)
+            self._condition.notify_all()
 
     @property
     def in_waiting(self) -> int:
@@ -314,6 +326,12 @@ class BufferedSerialReader:
                 ),
                 "last_capture_wall_utc": self._last_capture_wall,
                 "last_capture_monotonic_seconds": self._last_capture_elapsed_seconds,
+                "capture_cutoff_wall_utc": self._capture_cutoff_wall,
+                "capture_cutoff_monotonic_seconds": (
+                    self._capture_cutoff_elapsed_seconds
+                ),
+                "physical_pending_at_cutoff": self._physical_pending_at_cutoff,
+                "physical_final_drain_bytes": self._physical_final_drain_bytes,
             }
 
     def stop(self) -> None:
@@ -321,12 +339,60 @@ class BufferedSerialReader:
             return
         with self._condition:
             self._raise_reader_error_locked()
+            if self._capture_cutoff_wall is not None:
+                return
         self._stop.set()
         with self._condition:
             self._condition.notify_all()
         self._thread.join(self._stop_timeout)
         if self._thread.is_alive():
             raise RuntimeError("RX671 UART reader did not stop")
+
+        # The thread can observe the stop event immediately after its last
+        # physical read.  Bytes may reach the tty in that narrow interval.  A
+        # single fixed-size snapshot defines the capture cutoff and prevents
+        # those pre-cutoff bytes from being silently lost.  Do not loop until
+        # quiet: the successful application intentionally logs continuously.
+        try:
+            with self._io_lock:
+                cutoff_wall = datetime.now(timezone.utc).isoformat()
+                cutoff_elapsed = time.monotonic()
+                physical_waiting = int(
+                    getattr(self._serial, "in_waiting", 0) or 0
+                )
+                if physical_waiting < 0:
+                    raise IOError(
+                        "RX671 UART reported a negative physical byte count"
+                    )
+                with self._condition:
+                    self._capture_cutoff_wall = cutoff_wall
+                    self._capture_cutoff_elapsed_seconds = round(
+                        cutoff_elapsed,
+                        6,
+                    )
+                    self._physical_pending_at_cutoff = physical_waiting
+                final_chunk = (
+                    self._serial.read(physical_waiting)
+                    if physical_waiting
+                    else b""
+                )
+                if final_chunk:
+                    self._append_reader_chunk(
+                        final_chunk,
+                        capture_wall=cutoff_wall,
+                        capture_elapsed=cutoff_elapsed,
+                        physical_final_drain=True,
+                    )
+                if len(final_chunk) != physical_waiting:
+                    raise IOError(
+                        "RX671 UART final physical drain was short: "
+                        f"{len(final_chunk)}/{physical_waiting} bytes"
+                    )
+        except Exception as exc:
+            with self._condition:
+                if self._reader_error is None:
+                    self._reader_error = exc
+                self._condition.notify_all()
         with self._condition:
             self._raise_reader_error_locked()
 

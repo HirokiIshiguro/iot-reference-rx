@@ -464,10 +464,13 @@ class Rx671OtaTransaction:
         finally:
             shutdown_error = None
             try:
-                if transaction_error is None:
-                    serial_port.stop_after_quiet()
-                else:
-                    serial_port.stop()
+                # The candidate application intentionally keeps emitting its
+                # alive/capacity diagnostics after the OTA success contract is
+                # complete, so the physical UART is not expected to become
+                # quiet.  Freeze capture at the success boundary, then parse
+                # every byte already owned by the dedicated reader.  stop()
+                # still fails closed on reader errors or a stuck thread.
+                serial_port.stop()
                 while serial_port.in_waiting:
                     self._read(serial_port)
             except Exception as exc:
