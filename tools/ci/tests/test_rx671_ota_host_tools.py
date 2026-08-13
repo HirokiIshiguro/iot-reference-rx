@@ -143,6 +143,37 @@ class ThreadedFakeSerial:
         self.closed = True
 
 
+class GatedEmptyReadSerial(ThreadedFakeSerial):
+    """Return one decided-empty read after the test releases its gate."""
+
+    def __init__(self):
+        super().__init__(timeout=0.001)
+        self.empty_read_ready = threading.Event()
+        self.release_empty_read = threading.Event()
+
+    def read(self, size):
+        deadline = time.monotonic() + self.timeout
+        with self._condition:
+            while not self._responses and self._failure is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self._condition.wait(remaining)
+            if self._failure is not None:
+                error = self._failure
+                self._failure = None
+                raise error
+            if self._responses:
+                result = bytes(self._responses[:size])
+                del self._responses[:size]
+                return result
+
+        self.empty_read_ready.set()
+        if not self.release_empty_read.wait(2.0):
+            raise TimeoutError("test did not release the gated empty read")
+        return b""
+
+
 class BufferedSerialReaderTests(unittest.TestCase):
     @staticmethod
     def _wait_for(predicate, timeout=2.0):
@@ -221,6 +252,41 @@ class BufferedSerialReaderTests(unittest.TestCase):
         self.assertIn(b"OTA Completed successfully!", captured)
         self.assertIn(b"late UART tail", captured)
         self.assertTrue(reader.stats()["all_reader_bytes_accounted"])
+
+    def test_stop_finally_drains_bytes_arriving_after_last_thread_read(self):
+        serial = GatedEmptyReadSerial()
+        reader = host.BufferedSerialReader(serial)
+        reader.start()
+        self.assertTrue(serial.empty_read_ready.wait(1.0))
+
+        stop_error = []
+
+        def stop_reader():
+            try:
+                reader.stop()
+            except Exception as exc:
+                stop_error.append(exc)
+
+        stopper = threading.Thread(target=stop_reader)
+        stopper.start()
+        self._wait_for(reader._stop.is_set)
+        tail = b"pre-cutoff physical tail\r\n"
+        serial.feed(tail)
+        serial.release_empty_read.set()
+        stopper.join(2.0)
+
+        self.assertFalse(stopper.is_alive())
+        self.assertEqual([], stop_error)
+        self.assertEqual(tail, reader.read(reader.in_waiting))
+        reader.close()
+        stats = reader.stats()
+        self.assertEqual(len(tail), stats["physical_pending_at_cutoff"])
+        self.assertEqual(len(tail), stats["physical_final_drain_bytes"])
+        self.assertEqual(len(tail), stats["reader_bytes"])
+        self.assertEqual(len(tail), stats["consumer_bytes"])
+        self.assertEqual(0, stats["buffered_bytes"])
+        self.assertTrue(stats["all_reader_bytes_accounted"])
+        self.assertIsNotNone(stats["capture_cutoff_wall_utc"])
 
     def test_input_reset_discards_kernel_and_host_buffers_atomically(self):
         serial = ThreadedFakeSerial()
@@ -315,6 +381,121 @@ class BufferedSerialReaderTests(unittest.TestCase):
             self.assertTrue(serial.closed)
             self.assertIsNotNone(transaction.uart_capture)
             self.assertTrue(transaction.uart_capture["reader_thread_stopped"])
+
+    def test_success_path_stops_continuous_uart_then_drains_reader_queue(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            rsu = root / "baseline.rsu"
+            rsu.write_bytes(b"\x00" * ota_test.RSU_SIZE)
+            args = argparse.Namespace(
+                raw_log=root / "raw.log",
+                baseline_rsu=rsu,
+                baseline_version="0.1.0",
+                candidate_version="0.1.1",
+                require_tls_version="TLSv1.3",
+                rfp_cli="rfp-cli",
+                rfp_device="RX671",
+                rfp_tool="e2l:test",
+                rfp_interface="fine",
+                rfp_speed="500K",
+                rfp_auth_id="unit-test-auth-id",
+                port="fake",
+                baud=ota_test.DEFAULT_BAUD,
+                boot_timeout=0.01,
+                transfer_timeout=0.01,
+                install_timeout=0.01,
+                application_timeout=0.01,
+                ota_timeout=0.01,
+                startup_reset_retries=0,
+                chunk_size=4096,
+                inter_chunk_delay=0.0,
+                min_capacity_heap_bytes=16384,
+                min_capacity_network_buffers=4,
+                expected_whd_buffer_count=8,
+            )
+            serial = ThreadedFakeSerial()
+            transaction = ota_test.Rx671OtaTransaction(args)
+            transaction.boot_hits = {
+                name: 1 for name in transaction.boot_hits
+            }
+            producer_stop = threading.Event()
+            producer = None
+
+            def successful_body(serial_port, _rfp):
+                nonlocal producer
+
+                def emit_continuously():
+                    while not producer_stop.is_set():
+                        serial.feed(b"alive tick after success\r\n")
+                        time.sleep(0.001)
+
+                producer = threading.Thread(target=emit_continuously)
+                producer.start()
+                self._wait_for(
+                    lambda: serial_port.stats()["reader_bytes"] > 0
+                )
+
+            with mock.patch.object(
+                ota_test,
+                "open_serial",
+                return_value=serial,
+            ), mock.patch.object(
+                ota_test,
+                "run_checked",
+            ), mock.patch.object(
+                transaction,
+                "wait_for",
+            ), mock.patch.object(
+                transaction,
+                "stream_baseline_rsu",
+                return_value=(ota_test.RSU_SIZE, "0" * 64),
+            ), mock.patch.object(
+                transaction,
+                "wait_for_application_ready",
+                side_effect=successful_body,
+            ), mock.patch.object(
+                transaction,
+                "_runtime_success_ready",
+                return_value=True,
+            ), mock.patch.object(
+                transaction,
+                "_baseline_tls_before_activate",
+                return_value=True,
+            ), mock.patch.object(
+                transaction,
+                "_candidate_tls_after_activate",
+                return_value=True,
+            ), mock.patch.object(
+                transaction,
+                "_capacity_proof",
+                return_value={"success": True},
+            ), mock.patch.object(
+                transaction.ota,
+                "is_success",
+                return_value=True,
+            ), mock.patch.object(
+                transaction.ota,
+                "has_marker",
+                return_value=True,
+            ):
+                started = time.monotonic()
+                try:
+                    summary = transaction.run()
+                finally:
+                    producer_stop.set()
+                    if producer is not None:
+                        producer.join(2.0)
+
+            self.assertTrue(summary["success"])
+            self.assertLess(time.monotonic() - started, 1.0)
+            self.assertTrue(serial.closed)
+            capture = transaction.uart_capture
+            self.assertTrue(capture["reader_thread_stopped"])
+            self.assertFalse(capture["reader_failed"])
+            self.assertEqual(0, capture["buffered_bytes"])
+            self.assertEqual(capture["reader_bytes"], capture["consumer_bytes"])
+            self.assertTrue(capture["all_reader_bytes_accounted"])
+            self.assertIsNotNone(capture["capture_cutoff_wall_utc"])
 
 
 class RfpContractTests(unittest.TestCase):
