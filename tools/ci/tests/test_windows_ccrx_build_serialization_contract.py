@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -20,6 +21,11 @@ EXPECTED_CCRX_BUILD_JOBS = {
     "build_rx72n_ether_mqtt_candidate",
     "build_rx72n_ether_ota",
 }
+RX72N_CCRX_PROJECT_FILES = (
+    "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/.cproject",
+    "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/.cproject",
+    "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/.cproject",
+)
 
 
 def top_level_job_blocks(ci: str) -> dict[str, str]:
@@ -62,6 +68,21 @@ class WindowsCcrxBuildSerializationContractTests(unittest.TestCase):
                     f"resource_group: {RESOURCE_GROUP_VARIABLE}",
                     self.jobs[name],
                 )
+
+    def test_rx72n_ccrx_projects_use_bounded_parallelism(self) -> None:
+        for relative_path in RX72N_CCRX_PROJECT_FILES:
+            with self.subTest(project=relative_path):
+                project_file = ROOT / relative_path
+                root = ET.parse(project_file).getroot()
+                builders = [
+                    builder
+                    for builder in root.iter("builder")
+                    if builder.get("name") == "CCRX Builder"
+                ]
+
+                self.assertEqual(1, len(builders))
+                self.assertEqual("true", builders[0].get("parallelBuildOn"))
+                self.assertEqual("4", builders[0].get("parallelizationNumber"))
 
 
 if __name__ == "__main__":
