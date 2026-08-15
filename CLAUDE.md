@@ -298,19 +298,24 @@ manual OTA job 用の追加入力 / 既定値:
 
 #### Progress markers / 進捗マーカー
 
-| Stage | Representative UART log | Required for success |
-|------|--------------------------|----------------------|
-| boot | `OTA over MQTT demo, Application version x.y.z`, `---------Start OTA Update Task---------` | No |
+| Stage | Representative UART log | Strict proof requirement |
+|------|--------------------------|--------------------------|
+| boot | `OTA over MQTT demo, Application version x.y.z`, `---------Start OTA Update Task---------` | activate後のcandidate versionを必須化 |
 | waiting_for_job | `Request Job Document event Received`, `Waiting for OTA job...` | No |
 | job_received | `Received OTA Job.` | **Yes** |
 | download_started | `Request File Block event Received`, `Starting The Download.` | `Starting The Download.` が **Yes** |
 | downloading | `Received File Block event Received`, `Downloaded block N of M.` | `Downloaded block N of M.` が **Yes** |
-| close_file | `Close file event Received` | No |
-| activate_image | `Activate Image event Received` | No |
-| reboot | `software reset...`, boot loader banner (`BootLoader`) | No |
-| self_test | `OTA image is in selfcheck mode.` | No |
+| close_file | `Close file event Received` | **Yes** |
+| activate_image | `Activate Image event Received` | **Yes** |
+| reboot | `software reset...`, boot loader banner (`BootLoader`) | `software reset...`は該当alternate proofで必須 |
+| self_test | `OTA image is in selfcheck mode.` | No（progress補助情報） |
 | accepted | `New image has higher version than current image, accepted!` | **Yes** |
+| completion | `OTA Completed successfully!` | alternate proofでのみ必須 |
 | accepted (optional) | `Accepted and committed final image.`, `Successful to erase the buffer area` | No |
+
+`Strict proof requirement` はstrict pathに対する必須条件であり、全success
+pathに共通する固定marker一覧ではない。UART capture gapでstrict markerを失った場合は、
+下記の明示的なalternate proofを完全に満たす場合に限って代替できる。
 
 #### Failure classes / 失敗分類
 
@@ -328,17 +333,39 @@ manual OTA job 用の追加入力 / 既定値:
   `no_uart_output`, `waiting_for_ota_job`, `download_not_started`,
   `download_incomplete`, `close_or_signature_phase`,
   `reboot_or_selfcheck_missing`, `acceptance_not_observed`,
-  `new_version_not_observed`, `expected_version_not_observed`
+  `new_version_not_observed`, `expected_version_not_observed`,
+  `required_tls_version_not_observed`, `incomplete_ordered_lifecycle_proof`,
+  `timeout_after_unknown_stage`
+
+`waiting_for_ota_job` はjob markerだけでなくdownload evidenceも未観測の場合に限る。
+early bannerが欠落してもblock以降が見えている場合は、到達したstageまたは
+`incomplete_ordered_lifecycle_proof` として分類する。
 
 #### Success rule / 成功判定
 
-- required marker を全て観測する
-  - `job_received`, `download_started`, `block_downloaded`, `image_accepted`
-- `close_file`, `activate_image`, `selfcheck_mode` は観測できれば progress 補助情報として扱う
-  - live UART では欠落するケースがあり、単独では失敗条件にしない
-- fatal な error classification を 1 件も出さない
-- `--expected-version` を指定した場合は、その version が `Application version` に出る
-- `--expected-version` 未指定の場合は、OTA 前後で **2 つの異なる version** を観測する
+- 全path共通で、fatalなerror classificationを1件も出さず、
+  `--require-tls-version` 指定時は観測した全TLS handshakeが指定versionと一致する。
+- 次のいずれか1つのproofを完全に満たす:
+  1. `strict_markers`: job -> download -> block -> close -> activate ->
+     expected candidate version -> image acceptedを厳密な行順序で観測する。
+  2. `post_reboot_version_and_completion`: job/download/blockがresetより前にあり、
+     異なるbaseline -> reset -> expected candidate -> OTA completionを観測する。
+  3. `ordered_candidate_acceptance_and_completion`: 異なるbaseline -> job ->
+     download -> block -> expected candidate -> image accepted -> OTA completionを
+     厳密な行順序で観測する。
+  4. `ordered_post_download_lifecycle`: early job/download bannerの一方または両方を
+     失った場合のfail-closed代替証明。異なるbaseline -> block -> close ->
+     activate -> reset -> expected candidate -> image accepted -> OTA completionを
+     厳密な行順序で観測する。early bannerが観測された場合はblockより前、かつ
+     両方ある場合はjob -> downloadの順序も必須とし、late/reordered bannerを拒否する。
+- `--expected-version` 未指定時に利用できるのはstrict pathのみで、OTA前後の
+  **2つの異なるversion** を必須とする。alternate pathはexpected versionを必須とする。
+- `ota_summary.json` は選択した`success_proof`に加えて、strict pathで欠落した
+  markerを`strict_markers_missing`に保存する。既存の
+  `required_markers_missing`は後方互換のため、alternate proof成功時も実際に
+  captureできなかったlegacy required markerをそのまま報告する。
+- genericなsuccess文字列、`OTA Completed successfully!`単独、unorderedなmarker集合、
+  expected version不一致は成功として受理しない。
 
 #### CI artifacts / 保存物
 

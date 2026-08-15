@@ -94,6 +94,15 @@ MARKERS = [
     Marker("buffer_area_erased", "accepted", r"Successful to erase the buffer area", False),
 ]
 
+STRICT_MARKER_IDS = (
+    "job_received",
+    "download_started",
+    "block_downloaded",
+    "close_file",
+    "activate_image",
+    "image_accepted",
+)
+
 ERROR_PATTERNS = [
     ErrorPattern("semaphore_create_failed", "resource_init_failed", r"Failed to create semaphore!", "boot"),
     ErrorPattern("mqtt_not_connected", "mqtt_not_connected", r"MQTT not connected, exiting!", "boot"),
@@ -449,6 +458,31 @@ class OtaLogAnalyzer:
                 return event
         return None
 
+    def _ordered_optional_early_markers(self, baseline_line, block_line):
+        """Validate captured early banners without requiring their presence."""
+        job_event = None
+        if self.marker_events["job_received"]:
+            job_event = self._first_event_after(
+                self.marker_events["job_received"],
+                baseline_line,
+            )
+            if job_event is None or job_event["line_number"] >= block_line:
+                return None
+
+        download_event = None
+        if self.marker_events["download_started"]:
+            download_event = self._first_event_after(
+                self.marker_events["download_started"],
+                job_event["line_number"] if job_event else baseline_line,
+            )
+            if download_event is None or download_event["line_number"] >= block_line:
+                return None
+
+        return {
+            "job_received": job_event,
+            "download_started": download_event,
+        }
+
     def ordered_candidate_acceptance_chain(self):
         """Return strong ordered proof when verbose transition markers are lost.
 
@@ -517,29 +551,168 @@ class OtaLogAnalyzer:
     def ordered_candidate_acceptance_proof_ok(self):
         return self.ordered_candidate_acceptance_chain() is not None
 
+    def ordered_post_download_lifecycle_chain(self):
+        """Return fail-closed proof when early OTA banners are not captured.
+
+        A UART capture gap can lose the job-received and download-started
+        banners even though later OTA lifecycle events remain visible.  Do not
+        infer those events from a generic completion message.  Instead require
+        a different baseline version followed, in strict line order, by a file
+        block, close, activation, software reset, the expected candidate
+        version, image acceptance, and OTA completion.
+        """
+        if not self.expected_version:
+            return None
+
+        for baseline_event in self.version_events:
+            if baseline_event["version"] == self.expected_version:
+                continue
+
+            block_event = self._first_event_after(
+                self.marker_events["block_downloaded"],
+                baseline_event["line_number"],
+            )
+            if block_event is None:
+                continue
+            early_events = self._ordered_optional_early_markers(
+                baseline_event["line_number"],
+                block_event["line_number"],
+            )
+            if early_events is None:
+                continue
+            close_event = self._first_event_after(
+                self.marker_events["close_file"],
+                block_event["line_number"],
+            )
+            if close_event is None:
+                continue
+            activate_event = self._first_event_after(
+                self.marker_events["activate_image"],
+                close_event["line_number"],
+            )
+            if activate_event is None:
+                continue
+            reset_event = self._first_event_after(
+                self.marker_events["software_reset"],
+                activate_event["line_number"],
+            )
+            if reset_event is None:
+                continue
+            candidate_event = self._first_event_after(
+                self.version_events,
+                reset_event["line_number"],
+                lambda event: event["version"] == self.expected_version,
+            )
+            if candidate_event is None:
+                continue
+            accepted_event = self._first_event_after(
+                self.marker_events["image_accepted"],
+                candidate_event["line_number"],
+            )
+            if accepted_event is None:
+                continue
+            completed_event = self._first_event_after(
+                self.marker_events["ota_completed"],
+                accepted_event["line_number"],
+            )
+            if completed_event is None:
+                continue
+
+            chain = {
+                "baseline_version": baseline_event,
+                "block_downloaded": block_event,
+                "close_file": close_event,
+                "activate_image": activate_event,
+                "software_reset": reset_event,
+                "candidate_version": candidate_event,
+                "image_accepted": accepted_event,
+                "ota_completed": completed_event,
+            }
+            chain.update(early_events)
+            return chain
+
+        return None
+
+    def ordered_post_download_lifecycle_proof_ok(self):
+        return self.ordered_post_download_lifecycle_chain() is not None
+
+    def strict_marker_chain(self):
+        """Return the ordered strict-path evidence chain, if complete."""
+        for job_event in self.marker_events["job_received"]:
+            download_event = self._first_event_after(
+                self.marker_events["download_started"],
+                job_event["line_number"],
+            )
+            if download_event is None:
+                continue
+            block_event = self._first_event_after(
+                self.marker_events["block_downloaded"],
+                download_event["line_number"],
+            )
+            if block_event is None:
+                continue
+            close_event = self._first_event_after(
+                self.marker_events["close_file"],
+                block_event["line_number"],
+            )
+            if close_event is None:
+                continue
+            activate_event = self._first_event_after(
+                self.marker_events["activate_image"],
+                close_event["line_number"],
+            )
+            if activate_event is None:
+                continue
+
+            candidate_events = [
+                event
+                for event in self.version_events
+                if event["line_number"] > activate_event["line_number"]
+                and (
+                    not self.expected_version
+                    or event["version"] == self.expected_version
+                )
+            ]
+            for candidate_event in candidate_events:
+                baseline_event = None
+                if not self.expected_version:
+                    baseline_event = next(
+                        (
+                            event
+                            for event in self.version_events
+                            if event["line_number"] < job_event["line_number"]
+                            and event["version"] != candidate_event["version"]
+                        ),
+                        None,
+                    )
+                    if baseline_event is None:
+                        continue
+
+                accepted_event = self._first_event_after(
+                    self.marker_events["image_accepted"],
+                    candidate_event["line_number"],
+                )
+                if accepted_event is None:
+                    continue
+
+                return {
+                    "baseline_version": baseline_event,
+                    "job_received": job_event,
+                    "download_started": download_event,
+                    "block_downloaded": block_event,
+                    "close_file": close_event,
+                    "activate_image": activate_event,
+                    "candidate_version": candidate_event,
+                    "image_accepted": accepted_event,
+                }
+
+        return None
+
     def strict_marker_proof_ok(self):
-        required_markers = (
-            "job_received",
-            "download_started",
-            "block_downloaded",
-            "close_file",
-            "activate_image",
-            "image_accepted",
-        )
-        required_ok = all(self.has_marker(marker_id) for marker_id in required_markers)
-        if not required_ok:
-            return False
+        return self.strict_marker_chain() is not None
 
-        if self.expected_version:
-            if self.expected_version not in self.versions_seen:
-                return False
-        elif len(self.versions_seen) < 2:
-            return False
-
-        return self.observed_reboot_into_new_image()
-
-    def post_reboot_completion_proof_ok(self):
-        """Accept strong end-to-end proof when verbose close/activate lines are lost.
+    def post_reboot_completion_chain(self):
+        """Return strong end-to-end proof when verbose close/activate lines are lost.
 
         RX72N can emit enough always-on multi-TLS traffic that individual verbose
         OTA callback lines are not captured.  This alternate proof still requires
@@ -548,45 +721,63 @@ class OtaLogAnalyzer:
         by the post-reboot completion message.
         """
         if not self.expected_version:
-            return False
+            return None
 
-        download_marker_ids = ("job_received", "download_started", "block_downloaded")
-        if not all(self.has_marker(marker_id) for marker_id in download_marker_ids):
-            return False
-
-        for reset_event in self.marker_events["software_reset"]:
-            reset_line = reset_event["line_number"]
-            download_precedes_reset = all(
-                any(
-                    event["line_number"] < reset_line
-                    for event in self.marker_events[marker_id]
-                )
-                for marker_id in download_marker_ids
+        for baseline_event in self.version_events:
+            if baseline_event["version"] == self.expected_version:
+                continue
+            job_event = self._first_event_after(
+                self.marker_events["job_received"],
+                baseline_event["line_number"],
             )
-            if not download_precedes_reset:
+            if job_event is None:
+                continue
+            download_event = self._first_event_after(
+                self.marker_events["download_started"],
+                job_event["line_number"],
+            )
+            if download_event is None:
+                continue
+            block_event = self._first_event_after(
+                self.marker_events["block_downloaded"],
+                download_event["line_number"],
+            )
+            if block_event is None:
+                continue
+            reset_event = self._first_event_after(
+                self.marker_events["software_reset"],
+                block_event["line_number"],
+            )
+            if reset_event is None:
+                continue
+            candidate_event = self._first_event_after(
+                self.version_events,
+                reset_event["line_number"],
+                lambda event: event["version"] == self.expected_version,
+            )
+            if candidate_event is None:
+                continue
+            completed_event = self._first_event_after(
+                self.marker_events["ota_completed"],
+                candidate_event["line_number"],
+            )
+            if completed_event is None:
                 continue
 
-            baseline_seen = any(
-                event["line_number"] < reset_line
-                and event["version"] != self.expected_version
-                for event in self.version_events
-            )
-            if not baseline_seen:
-                continue
+            return {
+                "baseline_version": baseline_event,
+                "job_received": job_event,
+                "download_started": download_event,
+                "block_downloaded": block_event,
+                "software_reset": reset_event,
+                "candidate_version": candidate_event,
+                "ota_completed": completed_event,
+            }
 
-            for version_event in self.version_events:
-                if (
-                    version_event["version"] != self.expected_version
-                    or version_event["line_number"] <= reset_line
-                ):
-                    continue
-                if any(
-                    event["line_number"] > version_event["line_number"]
-                    for event in self.marker_events["ota_completed"]
-                ):
-                    return True
+        return None
 
-        return False
+    def post_reboot_completion_proof_ok(self):
+        return self.post_reboot_completion_chain() is not None
 
     def success_proof(self):
         if self.first_error() is not None or not self.tls_requirement_ok():
@@ -597,6 +788,8 @@ class OtaLogAnalyzer:
             return "post_reboot_version_and_completion"
         if self.ordered_candidate_acceptance_proof_ok():
             return "ordered_candidate_acceptance_and_completion"
+        if self.ordered_post_download_lifecycle_proof_ok():
+            return "ordered_post_download_lifecycle"
         return None
 
     def is_success(self):
@@ -605,7 +798,16 @@ class OtaLogAnalyzer:
     def classify_timeout(self, total_bytes):
         if total_bytes == 0 or self.total_lines == 0:
             return "no_uart_output"
-        if not self.has_marker("job_received"):
+        download_evidence_seen = any(
+            self.has_marker(marker_id)
+            for marker_id in (
+                "request_file_block",
+                "download_started",
+                "file_block_received",
+                "block_downloaded",
+            )
+        )
+        if not self.has_marker("job_received") and not download_evidence_seen:
             return "waiting_for_ota_job"
         if not self.has_marker("block_downloaded"):
             return "download_not_started"
@@ -623,6 +825,14 @@ class OtaLogAnalyzer:
             return "new_version_not_observed"
         if not self.tls_requirement_ok():
             return "required_tls_version_not_observed"
+        if (
+            self.has_marker("block_downloaded")
+            and (
+                not self.has_marker("job_received")
+                or not self.has_marker("download_started")
+            )
+        ):
+            return "incomplete_ordered_lifecycle_proof"
         return "timeout_after_unknown_stage"
 
     def build_summary(self, total_bytes, elapsed, success):
@@ -635,12 +845,16 @@ class OtaLogAnalyzer:
             classification = self.classify_timeout(total_bytes)
 
         duration_seconds = round(max(elapsed, self.last_observed_at), 3)
-        required_markers_missing = [
+        legacy_required_markers_missing = [
             marker.marker_id
             for marker in MARKERS
             if marker.required and self.marker_state[marker.marker_id]["hits"] == 0
         ]
-
+        strict_markers_missing = [
+            marker_id
+            for marker_id in STRICT_MARKER_IDS
+            if not self.has_marker(marker_id)
+        ]
         return {
             "success": success,
             "classification": classification,
@@ -657,7 +871,10 @@ class OtaLogAnalyzer:
             "total_bytes": total_bytes,
             "duration_seconds": duration_seconds,
             "last_observed_at": round(self.last_observed_at, 3),
-            "required_markers_missing": required_markers_missing,
+            # Preserve this established field as an observation of missing
+            # legacy required markers, including on alternate-proof success.
+            "required_markers_missing": legacy_required_markers_missing,
+            "strict_markers_missing": strict_markers_missing,
             "first_error": error,
             "markers": self.marker_state,
             "errors": self.error_state,
@@ -852,6 +1069,8 @@ def print_summary(summary):
     print(f"Duration:       {summary['duration_seconds']}s")
     if summary["required_markers_missing"]:
         print(f"Missing req.:   {', '.join(summary['required_markers_missing'])}")
+    if summary["strict_markers_missing"]:
+        print(f"Missing strict: {', '.join(summary['strict_markers_missing'])}")
 
     print("\nMarkers:")
     for marker in MARKERS:
