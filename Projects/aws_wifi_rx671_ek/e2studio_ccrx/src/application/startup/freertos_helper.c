@@ -72,7 +72,7 @@ static void ota_debug_put_size(size_t value)
         value /= 10U;
     } while (value > 0U);
 
-    debug_puts(&digits[index]);
+    debug_puts_try(&digits[index]);
 }
 #endif
 
@@ -187,12 +187,12 @@ void vApplicationMallocFailedHook( void )
 #if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
     /* Keep the hardware gate fail-fast instead of becoming a silent TLS/OTA
      * timeout after the allocator disables scheduling. */
-    debug_puts("RX671 OTA fatal: FreeRTOS malloc failed\r\n");
-    debug_puts("RX671 OTA heap at malloc failure: free=");
+    debug_puts_try("RX671 OTA fatal: FreeRTOS malloc failed\r\n");
+    debug_puts_try("RX671 OTA heap at malloc failure: free=");
     ota_debug_put_size(xPortGetFreeHeapSize());
-    debug_puts(" min=");
+    debug_puts_try(" min=");
     ota_debug_put_size(xPortGetMinimumEverFreeHeapSize());
-    debug_puts("\r\n");
+    debug_puts_try("\r\n");
 #endif
     taskDISABLE_INTERRUPTS();
 
@@ -216,7 +216,7 @@ void vApplicationMallocFailedHook( void )
 void vApplicationStackOverflowHook( TaskHandle_t xTask, char * pcTaskName )
 {
 #if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
-    debug_puts("RX671 OTA fatal: FreeRTOS stack overflow\r\n");
+    debug_puts_try("RX671 OTA fatal: FreeRTOS stack overflow\r\n");
 #endif
     portDISABLE_INTERRUPTS();
 

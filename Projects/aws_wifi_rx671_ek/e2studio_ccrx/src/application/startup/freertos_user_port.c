@@ -233,7 +233,7 @@ void vAssertCalled(void)
     volatile unsigned long ul = 0;
 
 #if defined(RX671_OTA_RUNTIME_ENABLE) && (RX671_OTA_RUNTIME_ENABLE == 1)
-    debug_puts("RX671 OTA fatal: FreeRTOS assert failed\r\n");
+    debug_puts_try("RX671 OTA fatal: FreeRTOS assert failed\r\n");
 #endif
     taskENTER_CRITICAL();
     {

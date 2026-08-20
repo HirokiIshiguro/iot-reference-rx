@@ -69,6 +69,12 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.freertos_user_port = (
             PROJECT / "src/application/startup/freertos_user_port.c"
         ).read_text(encoding="utf-8")
+        cls.debug_uart = (PROJECT / "src/debug_uart.c").read_text(
+            encoding="utf-8"
+        )
+        cls.debug_uart_header = (PROJECT / "src/debug_uart.h").read_text(
+            encoding="utf-8"
+        )
         cls.software_tls_transport = (
             ROOT
             / "Middleware/network_transport/using_mbedtls_pkcs11/transport_mbedtls_pkcs11.c"
@@ -248,6 +254,96 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         )
         self.assertIn(
             "RX671 OTA fatal: FreeRTOS assert failed",
+            self.freertos_user_port,
+        )
+
+    def test_debug_uart_serializes_the_final_sci6_write_boundary(self) -> None:
+        self.assertIn('#include "semphr.h"', self.debug_uart)
+        self.assertIn(
+            "debug_uart requires configSUPPORT_STATIC_ALLOCATION=1",
+            self.debug_uart,
+        )
+        self.assertIn(
+            "debug_uart requires INCLUDE_xTaskGetSchedulerState=1",
+            self.debug_uart,
+        )
+        self.assertIn("StaticSemaphore_t g_sci6_tx_mutex_storage", self.debug_uart)
+        self.assertIn("SemaphoreHandle_t g_sci6_tx_mutex", self.debug_uart)
+        self.assertIn("xSemaphoreCreateMutexStatic", self.debug_uart)
+        self.assertIn("xSemaphoreTake(g_sci6_tx_mutex, wait_ticks)", self.debug_uart)
+        self.assertIn("xSemaphoreGive(g_sci6_tx_mutex)", self.debug_uart)
+        self.assertIn("debug_uart_write(text, portMAX_DELAY)", self.debug_uart)
+        self.assertIn("debug_uart_write(text, 0U)", self.debug_uart)
+
+        write_block = self.debug_uart.split(
+            "static bool debug_uart_write", 1
+        )[1].split("\nvoid debug_puts(", 1)[0]
+        self.assertIn("R_SCI_Control", write_block)
+        self.assertIn("R_SCI_Send", write_block)
+        self.assertIn("sci6_wait_tx_idle()", write_block)
+        self.assertIn("debug_uart_give_tx_mutex(mutex_taken)", write_block)
+        self.assertEqual(1, self.debug_uart.count("R_SCI_Send("))
+        self.assertNotIn("debug_putchar", self.debug_uart)
+        self.assertNotIn("debug_putchar", self.debug_uart_header)
+
+    def test_debug_uart_has_bounded_task_and_fatal_path_policies(self) -> None:
+        self.assertIn("taskSCHEDULER_NOT_STARTED", self.debug_uart)
+        self.assertIn("taskSCHEDULER_RUNNING", self.debug_uart)
+        self.assertIn("wait_ticks = 0U", self.debug_uart)
+        self.assertIn("DEBUG_UART_TX_SPIN_LIMIT", self.debug_uart)
+        self.assertIn("DEBUG_UART_PSW_I_BIT", self.debug_uart)
+        self.assertIn("DEBUG_UART_TX_INT_PRIORITY (3U)", self.debug_uart)
+        self.assertIn(
+            "cfg.async.int_priority = DEBUG_UART_TX_INT_PRIORITY",
+            self.debug_uart,
+        )
+        self.assertIn(
+            "R_BSP_GET_PSW() & DEBUG_UART_PSW_I_BIT",
+            self.debug_uart,
+        )
+        self.assertIn(
+            "R_BSP_GET_IPL() >= DEBUG_UART_TX_INT_PRIORITY",
+            self.debug_uart,
+        )
+        self.assertIn("g_sci6_tx_timeout_count++", self.debug_uart)
+        self.assertIn("never ISR context", self.debug_uart)
+        self.assertIn("do not call from an ISR", self.debug_uart_header)
+        callback = self.debug_uart.split(
+            "static void sci6_callback", 1
+        )[1].split("\nvoid debug_uart_init", 1)[0]
+        self.assertNotIn("debug_puts", callback)
+        self.assertNotIn("debug_uart_write", callback)
+
+        write_block = self.debug_uart.split(
+            "static bool debug_uart_write", 1
+        )[1].split("\nvoid debug_puts(", 1)[0]
+        self.assertLess(
+            write_block.index("R_BSP_GET_PSW()"),
+            write_block.index("debug_uart_take_tx_mutex"),
+        )
+        self.assertLess(
+            write_block.index("R_BSP_GET_IPL()"),
+            write_block.index("debug_uart_take_tx_mutex"),
+        )
+
+        self.assertNotIn(
+            'debug_puts("RX671 OTA fatal:',
+            self.freertos_helper + self.freertos_user_port,
+        )
+        self.assertIn(
+            'debug_puts_try("RX671 OTA fatal: FreeRTOS malloc failed',
+            self.freertos_helper,
+        )
+        self.assertIn(
+            "debug_puts_try(&digits[index])",
+            self.freertos_helper,
+        )
+        self.assertIn(
+            'debug_puts_try("RX671 OTA fatal: FreeRTOS stack overflow',
+            self.freertos_helper,
+        )
+        self.assertIn(
+            'debug_puts_try("RX671 OTA fatal: FreeRTOS assert failed',
             self.freertos_user_port,
         )
 
