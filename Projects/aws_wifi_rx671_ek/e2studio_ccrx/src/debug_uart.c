@@ -11,17 +11,31 @@
 #include "platform.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 #include "iot_logging_task.h"
 #include "r_sci_rx_if.h"
 #include "r_sci_rx_pinset.h"
 #include "debug_uart.h"
 
+#if (configSUPPORT_STATIC_ALLOCATION != 1)
+#error debug_uart requires configSUPPORT_STATIC_ALLOCATION=1
+#endif
+#if (INCLUDE_xTaskGetSchedulerState != 1)
+#error debug_uart requires INCLUDE_xTaskGetSchedulerState=1
+#endif
+
 #define DEBUG_UART_BAUD_RATE   (921600U)
 #define DEBUG_STDIO_LINE_BYTES (160U)
+#define DEBUG_UART_TX_SPIN_LIMIT (2000000UL)
+#define DEBUG_UART_PSW_I_BIT     (0x00010000UL)
+#define DEBUG_UART_TX_INT_PRIORITY (3U)
 
 static sci_hdl_t         g_sci6;
 static volatile bool     g_sci6_ready;
 static volatile uint32_t g_sci6_err_count;   /* framing/parity/overflow tally */
+static volatile uint32_t g_sci6_tx_timeout_count;
+static StaticSemaphore_t g_sci6_tx_mutex_storage;
+static SemaphoreHandle_t g_sci6_tx_mutex;
 static char              g_stdio_line[DEBUG_STDIO_LINE_BYTES];
 static uint16_t          g_stdio_line_length;
 static volatile bool     g_stdio_flush_active;
@@ -57,13 +71,22 @@ void debug_uart_init(void)
 {
     sci_cfg_t cfg = {0};
 
+    if (NULL == g_sci6_tx_mutex)
+    {
+        g_sci6_tx_mutex = xSemaphoreCreateMutexStatic(&g_sci6_tx_mutex_storage);
+    }
+    if (NULL == g_sci6_tx_mutex)
+    {
+        return;
+    }
+
     cfg.async.baud_rate    = DEBUG_UART_BAUD_RATE;
     cfg.async.clk_src      = SCI_CLK_INT;
     cfg.async.data_size    = SCI_DATA_8BIT;
     cfg.async.parity_en    = SCI_PARITY_OFF;
     cfg.async.parity_type  = SCI_EVEN_PARITY;
     cfg.async.stop_bits    = SCI_STOPBITS_1;
-    cfg.async.int_priority = 3;
+    cfg.async.int_priority = DEBUG_UART_TX_INT_PRIORITY;
 
     if (SCI_SUCCESS == R_SCI_Open(SCI_CH6, SCI_MODE_ASYNC, &cfg, sci6_callback, &g_sci6))
     {
@@ -76,14 +99,14 @@ void debug_uart_init(void)
  * Wait until the TX queue has fully drained and the last byte has shifted
  * out (SSR.TEND). TEI-independent: matches the baseline's polled flush.
  */
-static void sci6_wait_tx_idle(void)
+static bool sci6_wait_tx_idle(void)
 {
     volatile uint32_t timeout = 2000000UL;
     uint16_t tx_free = 0U;
 
     if (!g_sci6_ready)
     {
-        return;
+        return false;
     }
 
     while (0UL != timeout)
@@ -92,47 +115,12 @@ static void sci6_wait_tx_idle(void)
             (SCI_CFG_CH6_TX_BUFSIZ == tx_free) &&
             (0U != SCI6.SSR.BIT.TEND))
         {
-            return;
+            return true;
         }
         timeout--;
     }
-}
 
-static void sci6_send_byte(char output_char)
-{
-    uint8_t ch = (uint8_t)output_char;
-
-    if (!g_sci6_ready)
-    {
-        return;
-    }
-
-    for (;;)
-    {
-        uint16_t tx_free = 0U;
-
-        if (SCI_SUCCESS != R_SCI_Control(g_sci6, SCI_CMD_TX_Q_BYTES_FREE, &tx_free))
-        {
-            return;
-        }
-        if (0U == tx_free)
-        {
-            continue;
-        }
-        if (SCI_SUCCESS == R_SCI_Send(g_sci6, &ch, 1U))
-        {
-            return;
-        }
-    }
-}
-
-void debug_putchar(char output_char)
-{
-    if ('\n' == output_char)
-    {
-        sci6_send_byte('\r');
-    }
-    sci6_send_byte(output_char);
+    return false;
 }
 
 static void debug_stdio_flush(bool append_newline)
@@ -200,13 +188,69 @@ void debug_uart_stdio_charput(char output_char)
     g_stdio_line_length++;
 }
 
-void debug_puts(const char * text)
+/*
+ * The logging task and several RX671 bring-up/OTA tasks all terminate at this
+ * SCI6 handle.  r_sci_rx uses an unprotected BYTEQ in this project, so the
+ * free-space check plus enqueue must be one task-owned transaction.  Callers
+ * are task context (or the scheduler-not-started boot path), never ISR context.
+ */
+static bool debug_uart_take_tx_mutex(TickType_t wait_ticks, bool * p_taken)
+{
+    BaseType_t scheduler_state;
+
+    *p_taken = false;
+    scheduler_state = xTaskGetSchedulerState();
+    if (taskSCHEDULER_NOT_STARTED == scheduler_state)
+    {
+        return true;
+    }
+    if (NULL == g_sci6_tx_mutex)
+    {
+        return false;
+    }
+    if (taskSCHEDULER_RUNNING != scheduler_state)
+    {
+        wait_ticks = 0U;
+    }
+    if (pdTRUE != xSemaphoreTake(g_sci6_tx_mutex, wait_ticks))
+    {
+        return false;
+    }
+
+    *p_taken = true;
+    return true;
+}
+
+static void debug_uart_give_tx_mutex(bool taken)
+{
+    if (taken)
+    {
+        (void)xSemaphoreGive(g_sci6_tx_mutex);
+    }
+}
+
+static bool debug_uart_write(const char * text, TickType_t wait_ticks)
 {
     uint16_t remaining;
+    uint32_t spin_budget = DEBUG_UART_TX_SPIN_LIMIT;
+    bool mutex_taken = false;
+    bool success = false;
 
     if (!g_sci6_ready || (NULL == text))
     {
-        return;
+        return false;
+    }
+    /* Every output path depends on the TXI ISR.  Fatal/assert, ISR, or critical
+     * context can clear PSW.I or raise IPL high enough to mask TXI; drop before
+     * entering any FreeRTOS API or waiting for queue progress. */
+    if ((0UL == (R_BSP_GET_PSW() & DEBUG_UART_PSW_I_BIT)) ||
+        (R_BSP_GET_IPL() >= DEBUG_UART_TX_INT_PRIORITY))
+    {
+        return false;
+    }
+    if (!debug_uart_take_tx_mutex(wait_ticks, &mutex_taken))
+    {
+        return false;
     }
 
     remaining = (uint16_t)strlen(text);
@@ -218,24 +262,56 @@ void debug_puts(const char * text)
 
         if (SCI_SUCCESS != R_SCI_Control(g_sci6, SCI_CMD_TX_Q_BYTES_FREE, &tx_free))
         {
-            return;
+            goto cleanup;
         }
         if (0U == tx_free)
         {
+            if (0UL == spin_budget)
+            {
+                g_sci6_tx_timeout_count++;
+                goto cleanup;
+            }
+            spin_budget--;
             continue;                          /* let the TXI ISR drain */
         }
 
         n = (remaining < tx_free) ? remaining : tx_free;
         if (SCI_SUCCESS != R_SCI_Send(g_sci6, (uint8_t *)text, n))
         {
+            if (0UL == spin_budget)
+            {
+                g_sci6_tx_timeout_count++;
+                goto cleanup;
+            }
+            spin_budget--;
             continue;                          /* transient busy: retry */
         }
 
         text      += n;
         remaining -= n;
+        spin_budget = DEBUG_UART_TX_SPIN_LIMIT;
     }
 
-    sci6_wait_tx_idle();
+    if (!sci6_wait_tx_idle())
+    {
+        g_sci6_tx_timeout_count++;
+        goto cleanup;
+    }
+    success = true;
+
+cleanup:
+    debug_uart_give_tx_mutex(mutex_taken);
+    return success;
+}
+
+void debug_puts(const char * text)
+{
+    (void)debug_uart_write(text, portMAX_DELAY);
+}
+
+void debug_puts_try(const char * text)
+{
+    (void)debug_uart_write(text, 0U);
 }
 
 static char hex_nibble(uint8_t value)

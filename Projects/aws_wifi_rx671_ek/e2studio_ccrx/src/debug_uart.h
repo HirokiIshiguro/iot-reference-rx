@@ -17,12 +17,14 @@
  * task start; debug_puts() is a no-op until this succeeds. */
 void debug_uart_init(void);
 
-/* Blocking, NUL-terminated string output. Enqueues to the SCI TX queue in
- * pieces no larger than the free space, then waits for the line to drain. */
+/* Blocking, NUL-terminated task-context output. Every scheduler-running caller
+ * is serialized across enqueue through TX-idle; do not call from an ISR. */
 void debug_puts(const char * text);
 
-/* Direct single-character output for local printf-free diagnostics. */
-void debug_putchar(char output_char);
+/* Best-effort fatal-hook variant. Mutex acquisition never waits; if acquired,
+ * queued bytes still drain synchronously. Calls with PSW.I clear or IPL high
+ * enough to mask TXI are dropped before any FreeRTOS/TXI-dependent operation. */
+void debug_puts_try(const char * text);
 
 /* BSP stdio charput hook. Buffers printf output by line, then hands completed
  * lines to the FreeRTOS logging task so WHD's WPRINT path does not block in

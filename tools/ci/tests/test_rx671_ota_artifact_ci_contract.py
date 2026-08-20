@@ -90,6 +90,12 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/.cproject",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
             "src/aws_wifi_rx671_ek.c",
+            "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/debug_uart.c",
+            "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/debug_uart.h",
+            "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
+            "src/application/startup/freertos_helper.c",
+            "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
+            "src/application/startup/freertos_user_port.c",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
             "src/application_code/ota_image_identity.c",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
