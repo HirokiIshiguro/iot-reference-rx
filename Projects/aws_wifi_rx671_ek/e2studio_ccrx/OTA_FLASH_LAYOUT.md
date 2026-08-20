@@ -198,6 +198,38 @@ fail-closeとし、900秒のOTA timeoutまで無言で待たない。最終的�
 self-test時の`[RX671_OTA_CAPACITY]`でminimum-ever-free heap、network buffer、
 WHD buffer枯渇回数を取得し、既存の下限を下げずに判定する。
 
+### SCI6受入証跡のsingle-writer境界
+
+Run 4 job #65809では`Starting The Download.`へ`alive tick=8`がbyte単位で
+挿入され、focused job #66024ではcandidate boot直後の1行が553 chars中367
+replacement charsへgarbleした。#66024のhost readerは312,380 bytesを全量accountし、
+overflow 0、reader failureなし、最大service gap 0.101012秒だったため、host側の
+取りこぼしではない。
+
+`iot_logging_task`は自身のqueueをserializeするが、最終的な`vOutputString()`と、
+main heartbeat / WHD / OTAのdirect出力はいずれも`debug_puts()`から同じSCI6
+handleと保護なしBYTEQへ到達していた。`R_SCI_Control`のfree-space確認から
+`R_SCI_Send`のenqueue、TX idleまでをstatic FreeRTOS mutexで1 transactionにし、
+全task writerをこの境界へ収束させる。
+
+- scheduler running時の通常出力はpriority-inheritance mutexでserializeする
+- scheduler suspended時はnonblocking、scheduler開始前は単一callerとして従来動作を維持する
+- malloc / stack overflow / assert hookは`debug_puts_try()`でbest-effortとし、
+  既にlockを保持したfatal pathでdeadlockしない
+- SCI6 TXI priority 3を設定とguardの単一定義にし、PSW.Iがclear、または
+  `PSW.IPL >= 3`でTXIがmaskされるcontextはFreeRTOS APIへ入る前にdropする。
+  RX700v3_DPFPUのstack-overflow hookはcontext-switch ISR内のIPL 4なのでwire出力を
+  諦め、kernel再入・TX idle待ちを防ぐ
+- ISRからの通常呼出しは禁止し、TX progress / idle waitはboundedにして全exitでlockを解放する
+
+`debug_uart_stdio_charput()`のline bufferはC library側で同時に1 writerであることを
+前提とする。今回のmutexは最終SCI/BYTEQ破壊を防ぐ境界であり、将来複数taskが同時に
+raw `printf`を行う場合の文字列単位serializeは別途扱う。focused HILではreplacement
+burstとmarker行分断が0であることを受入条件に残す。
+
+この修正はUART証跡の生成側を直すものであり、observerのversion / TLS / acceptance /
+completion条件やtimeoutを緩めない。
+
 ### MQTT Agent task notification array境界
 
 source SHA `d8757cee`のpipeline #9572 / hardware job #61274では、TLS 1.2
