@@ -56,6 +56,26 @@ class OtaLogAnalyzerTests(unittest.TestCase):
             "---OTA Completed successfully!---",
         ]
 
+    def rx671_interleaved_banner_events(self):
+        return [
+            "RX secure boot program",
+            "Application version 0.1.0",
+            "RX secure boot program",
+            "Received OTA Job.",
+            "RX secure boot program",
+            "Starting The Downloaalive tick=8",
+            "d.",
+            "Downloaded block 0 of 192.",
+            "Close file event Received",
+            "Activate Image event Received",
+            "OTA image is in selfcheck mode.",
+            "RX secure boot program",
+            "Application version 0.1.1",
+            "TLS handshake successful: version TLSv1.3",
+            "New image has higher version than current image, accepted!",
+            "---OTA Completed successfully!---",
+        ]
+
     def test_existing_strict_marker_proof_remains_valid(self):
         analyzer = self.make_analyzer(
             [
@@ -205,6 +225,13 @@ class OtaLogAnalyzerTests(unittest.TestCase):
             "missing reset": [
                 event for event in base_events if "software reset" not in event
             ],
+            "quoted reset": [
+                event.replace(
+                    "software reset after install area erase...",
+                    "quoted: software reset after install area erase...",
+                )
+                for event in base_events
+            ],
             "missing candidate": [
                 event for event in base_events if "version 0.9.3" not in event
             ],
@@ -280,6 +307,181 @@ class OtaLogAnalyzerTests(unittest.TestCase):
                     require_tls_version="TLSv1.2",
                 ).is_success()
             )
+
+    def test_accepts_rx671_secure_boot_boundary_after_interleaved_banner(self):
+        analyzer = self.make_analyzer(
+            self.rx671_interleaved_banner_events(),
+            expected_version="0.1.1",
+            require_tls_version="TLSv1.3",
+        )
+
+        self.assertTrue(analyzer.is_success())
+        self.assertEqual(
+            analyzer.success_proof(),
+            "ordered_post_download_lifecycle",
+        )
+        self.assertFalse(analyzer.has_marker("download_started"))
+        self.assertEqual(analyzer.marker_state["rx_secure_boot"]["hits"], 4)
+        chain = analyzer.ordered_post_download_lifecycle_chain()
+        self.assertEqual(
+            chain["reboot_boundary"]["marker_id"],
+            "rx_secure_boot",
+        )
+        self.assertEqual(chain["reboot_boundary"]["line_number"], 12)
+
+        summary = analyzer.build_summary(
+            total_bytes=4096,
+            elapsed=100.0,
+            success=analyzer.is_success(),
+        )
+        self.assertEqual(summary["required_markers_missing"], ["download_started"])
+        self.assertEqual(summary["strict_markers_missing"], ["download_started"])
+        self.assertEqual(
+            summary["reboot_boundary"],
+            {
+                "marker_id": "rx_secure_boot",
+                "line_number": 12,
+                "seen_at": 1.0,
+            },
+        )
+
+    def test_rx671_secure_boot_boundary_remains_fail_closed(self):
+        base_events = self.rx671_interleaved_banner_events()
+        post_boot_index = 11
+        candidate_index = 12
+        rejected_variants = {
+            "pre-activate banners only": [
+                *base_events[:post_boot_index],
+                *base_events[post_boot_index + 1 :],
+            ],
+            "candidate before reboot boundary": [
+                *base_events[:post_boot_index],
+                base_events[candidate_index],
+                base_events[post_boot_index],
+                *base_events[candidate_index + 1 :],
+            ],
+            "missing baseline": [
+                event for event in base_events if "version 0.1.0" not in event
+            ],
+            "missing block": [
+                event for event in base_events if "Downloaded block" not in event
+            ],
+            "missing close": [
+                event for event in base_events if "Close file" not in event
+            ],
+            "missing activate": [
+                event for event in base_events if "Activate Image" not in event
+            ],
+            "missing candidate": [
+                event for event in base_events if "version 0.1.1" not in event
+            ],
+            "missing acceptance": [
+                event for event in base_events if "accepted!" not in event
+            ],
+            "missing completion": [
+                event for event in base_events if "OTA Completed" not in event
+            ],
+            "partial post-activate banner": [
+                *base_events[:post_boot_index],
+                "prefix RX secure boot program suffix",
+                *base_events[post_boot_index + 1 :],
+            ],
+            "late exact download banner": [
+                *base_events,
+                "Starting The Download.",
+            ],
+            "classified fatal error": [
+                *base_events,
+                "OTA is failed!",
+            ],
+        }
+
+        for case, events in rejected_variants.items():
+            with self.subTest(case=case):
+                analyzer = self.make_analyzer(
+                    events,
+                    expected_version="0.1.1",
+                    require_tls_version="TLSv1.3",
+                )
+                self.assertFalse(analyzer.is_success())
+
+        with self.subTest(case="wrong expected candidate"):
+            self.assertFalse(
+                self.make_analyzer(
+                    base_events,
+                    expected_version="0.1.2",
+                    require_tls_version="TLSv1.3",
+                ).is_success()
+            )
+
+        with self.subTest(case="TLS mismatch"):
+            events = [
+                event.replace("TLSv1.3", "TLSv1.2")
+                for event in base_events
+            ]
+            self.assertFalse(
+                self.make_analyzer(
+                    events,
+                    expected_version="0.1.1",
+                    require_tls_version="TLSv1.3",
+                ).is_success()
+            )
+
+    def test_first_post_activate_boundary_is_selected_deterministically(self):
+        events = self.rx671_interleaved_banner_events()
+        activate_index = events.index("Activate Image event Received")
+        events.insert(
+            activate_index + 1,
+            "software reset after install area erase...",
+        )
+        analyzer = self.make_analyzer(
+            events,
+            expected_version="0.1.1",
+            require_tls_version="TLSv1.3",
+        )
+
+        self.assertTrue(analyzer.is_success())
+        boundary = analyzer.ordered_post_download_lifecycle_chain()[
+            "reboot_boundary"
+        ]
+        self.assertEqual(boundary["marker_id"], "software_reset")
+        self.assertEqual(boundary["line_number"], 11)
+        self.assertEqual(
+            analyzer.marker_events["rx_secure_boot"][-1]["line_number"],
+            13,
+        )
+
+    def test_rx671_secure_boot_marker_requires_an_exact_line(self):
+        analyzer = self.make_analyzer(
+            [
+                "prefix RX secure boot program",
+                "RX secure boot program suffix",
+                "quoted: RX secure boot program",
+            ],
+            expected_version="0.1.1",
+        )
+
+        self.assertFalse(analyzer.has_marker("rx_secure_boot"))
+
+    def test_rx671_secure_boot_boundary_advances_timeout_classification(self):
+        analyzer = self.make_analyzer(
+            [
+                "Application version 0.1.0",
+                "Downloaded block 0 of 192.",
+                "Close file event Received",
+                "Activate Image event Received",
+                "RX secure boot program",
+            ],
+            expected_version="0.1.1",
+            require_tls_version="TLSv1.3",
+        )
+
+        self.assertFalse(analyzer.is_success())
+        self.assertTrue(analyzer.observed_reboot_into_new_image())
+        self.assertEqual(
+            analyzer.classify_timeout(total_bytes=1024),
+            "acceptance_not_observed",
+        )
 
     def test_late_evidence_is_not_classified_as_waiting_for_job(self):
         events = self.early_banner_capture_gap_events()

@@ -307,7 +307,7 @@ manual OTA job 用の追加入力 / 既定値:
 | downloading | `Received File Block event Received`, `Downloaded block N of M.` | `Downloaded block N of M.` が **Yes** |
 | close_file | `Close file event Received` | **Yes** |
 | activate_image | `Activate Image event Received` | **Yes** |
-| reboot | `software reset...`, boot loader banner (`BootLoader`) | `software reset...`は該当alternate proofで必須 |
+| reboot | `software reset...`, boot loader banner (`BootLoader`), RX `RX secure boot program` | `ordered_post_download_lifecycle`ではActivate後の`software reset...`またはexact RX secure-boot bannerを必須化 |
 | self_test | `OTA image is in selfcheck mode.` | No（progress補助情報） |
 | accepted | `New image has higher version than current image, accepted!` | **Yes** |
 | completion | `OTA Completed successfully!` | alternate proofでのみ必須 |
@@ -355,15 +355,23 @@ early bannerが欠落してもblock以降が見えている場合は、到達し
      厳密な行順序で観測する。
   4. `ordered_post_download_lifecycle`: early job/download bannerの一方または両方を
      失った場合のfail-closed代替証明。異なるbaseline -> block -> close ->
-     activate -> reset -> expected candidate -> image accepted -> OTA completionを
-     厳密な行順序で観測する。early bannerが観測された場合はblockより前、かつ
-     両方ある場合はjob -> downloadの順序も必須とし、late/reordered bannerを拒否する。
+     activate -> recognized reboot boundary -> expected candidate -> image accepted ->
+     OTA completionを厳密な行順序で観測する。reboot boundaryはActivate後の
+     exact `software reset...`系lineまたはexact `RX secure boot program` lineだけを受理し、
+     OTA前のRX secure-boot bannerと`selfcheck_mode`は境界に使わない。early bannerが
+     観測された場合はblockより前、かつ両方ある場合はjob -> downloadの順序も
+     必須とし、late/reordered bannerを拒否する。
+- 別taskのUART出力が`Starting The Download.`の途中へ挿入された場合、その文字列を
+  observer内で復元せず`download_started`欠落として保持する。上記の完全な下流証明が
+  揃う場合だけalternate proofを許可する。
 - `--expected-version` 未指定時に利用できるのはstrict pathのみで、OTA前後の
   **2つの異なるversion** を必須とする。alternate pathはexpected versionを必須とする。
 - `ota_summary.json` は選択した`success_proof`に加えて、strict pathで欠落した
   markerを`strict_markers_missing`に保存する。既存の
   `required_markers_missing`は後方互換のため、alternate proof成功時も実際に
   captureできなかったlegacy required markerをそのまま報告する。
+- `ordered_post_download_lifecycle`を選択した場合は、使用した境界の
+  `marker_id` / `line_number` / `seen_at`を`reboot_boundary`へ保存する。
 - genericなsuccess文字列、`OTA Completed successfully!`単独、unorderedなmarker集合、
   expected version不一致は成功として受理しない。
 
