@@ -21,10 +21,11 @@ EXPECTED_CCRX_BUILD_JOBS = {
     "build_rx72n_ether_mqtt_candidate",
     "build_rx72n_ether_ota",
 }
-RX72N_CCRX_PROJECT_FILES = (
+BOUNDED_PARALLEL_CCRX_PROJECT_FILES = (
     "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/.cproject",
     "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/.cproject",
     "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/.cproject",
+    "Projects/boot_loader_rx671_ek/e2studio_ccrx/.cproject",
 )
 
 
@@ -69,8 +70,8 @@ class WindowsCcrxBuildSerializationContractTests(unittest.TestCase):
                     self.jobs[name],
                 )
 
-    def test_rx72n_ccrx_projects_use_bounded_parallelism(self) -> None:
-        for relative_path in RX72N_CCRX_PROJECT_FILES:
+    def test_bounded_ccrx_projects_use_bounded_parallelism(self) -> None:
+        for relative_path in BOUNDED_PARALLEL_CCRX_PROJECT_FILES:
             with self.subTest(project=relative_path):
                 project_file = ROOT / relative_path
                 root = ET.parse(project_file).getroot()
@@ -83,6 +84,10 @@ class WindowsCcrxBuildSerializationContractTests(unittest.TestCase):
                 self.assertEqual(1, len(builders))
                 self.assertEqual("true", builders[0].get("parallelBuildOn"))
                 self.assertEqual("4", builders[0].get("parallelizationNumber"))
+                self.assertNotIn(
+                    'parallelizationNumber="optimal"',
+                    project_file.read_text(encoding="utf-8"),
+                )
 
 
 if __name__ == "__main__":

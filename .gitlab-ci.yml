@@ -1722,7 +1722,7 @@ build_rx671_bootloader:
     - when: never
   script:
     - Write-Host "=== Build standalone EK-RX671 dual-bank boot loader ==="
-    - python -m unittest tools.ci.tests.test_rx671_bootloader_contract
+    - python -m unittest tools.ci.tests.test_rx671_bootloader_contract tools.ci.tests.test_windows_ccrx_build_serialization_contract
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       & "$env:CI_PROJECT_DIR\tools\build_headless_rx671_bootloader.ps1" `
