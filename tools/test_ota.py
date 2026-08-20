@@ -63,6 +63,12 @@ class ErrorPattern:
 
 MARKERS = [
     Marker("bootloader", "boot", r"==== .*BootLoader", False),
+    Marker(
+        "rx_secure_boot",
+        "boot",
+        r"^RX secure boot program\s*$",
+        False,
+    ),
     Marker("app_version", "boot", r"Application version \d+\.\d+\.\d+", False, True),
     Marker("ota_task_started", "boot", r"Start OTA Update Task", False),
     Marker("request_job_document", "waiting_for_job", r"Request Job Document event Received", False),
@@ -78,7 +84,7 @@ MARKERS = [
     Marker(
         "software_reset",
         "reboot",
-        r"software reset(?: after install area erase)?\.\.\.",
+        r"^software reset(?: after install area erase)?\.\.\.\s*$",
         False,
     ),
     Marker("selfcheck_mode", "self_test", r"OTA image is in selfcheck mode\.", False),
@@ -407,33 +413,42 @@ class OtaLogAnalyzer:
     def has_marker(self, marker_id):
         return self.marker_state[marker_id]["hits"] > 0
 
-    def marker_seen_at(self, marker_id):
-        return self.marker_state[marker_id]["first_seen_at"]
-
-    def version_seen_after(self, version, elapsed_threshold):
-        return any(
-            event["version"] == version and event["seen_at"] is not None and event["seen_at"] >= elapsed_threshold
-            for event in self.version_events
-        )
-
     def observed_reboot_into_new_image(self):
-        activate_at = self.marker_seen_at("activate_image")
-        if activate_at is None:
+        if not self.marker_events["activate_image"]:
             return False
+        activate_event = self.marker_events["activate_image"][0]
+        activate_line = activate_event["line_number"]
 
-        if self.has_marker("selfcheck_mode") or self.has_marker("image_self_test_passed") or self.has_marker("image_committed"):
+        if self._first_reboot_boundary_after(activate_line) is not None:
             return True
 
-        bootloader_at = self.marker_seen_at("bootloader")
-        if bootloader_at is not None and bootloader_at >= activate_at:
+        if any(
+            self._first_event_after(self.marker_events[marker_id], activate_line)
+            is not None
+            for marker_id in (
+                "selfcheck_mode",
+                "image_self_test_passed",
+                "image_committed",
+            )
+        ):
+            return True
+
+        if self._first_event_after(
+            self.marker_events["bootloader"], activate_line
+        ) is not None:
             return True
 
         if self.expected_version:
-            return self.version_seen_after(self.expected_version, activate_at)
+            return self._first_event_after(
+                self.version_events,
+                activate_line,
+                lambda event: event["version"] == self.expected_version,
+            ) is not None
 
         baseline_version = self.version_events[0]["version"] if self.version_events else None
         return any(
-            event["seen_at"] >= activate_at and event["version"] != baseline_version
+            event["line_number"] > activate_line
+            and event["version"] != baseline_version
             for event in self.version_events
         )
 
@@ -482,6 +497,23 @@ class OtaLogAnalyzer:
             "job_received": job_event,
             "download_started": download_event,
         }
+
+    def _first_reboot_boundary_after(self, line_number):
+        """Return the first recognized reboot boundary after ``line_number``.
+
+        RX targets emit this secure-boot banner both before an OTA starts and after
+        bank activation.  A first-hit lookup would therefore select stale
+        pre-OTA evidence.  Merge all explicit reset and RX secure-boot
+        events by line order, then select only an event after activation.
+        """
+        boundary_events = []
+        for marker_id in ("software_reset", "rx_secure_boot"):
+            boundary_events.extend(
+                {**event, "marker_id": marker_id}
+                for event in self.marker_events[marker_id]
+            )
+        boundary_events.sort(key=lambda event: event["line_number"])
+        return self._first_event_after(boundary_events, line_number)
 
     def ordered_candidate_acceptance_chain(self):
         """Return strong ordered proof when verbose transition markers are lost.
@@ -558,8 +590,10 @@ class OtaLogAnalyzer:
         banners even though later OTA lifecycle events remain visible.  Do not
         infer those events from a generic completion message.  Instead require
         a different baseline version followed, in strict line order, by a file
-        block, close, activation, software reset, the expected candidate
-        version, image acceptance, and OTA completion.
+        block, close, activation, a recognized reboot boundary, the expected
+        candidate version, image acceptance, and OTA completion.  A reboot
+        boundary is either an explicit software-reset line or an RX secure-
+        boot banner observed after activation.
         """
         if not self.expected_version:
             return None
@@ -592,15 +626,14 @@ class OtaLogAnalyzer:
             )
             if activate_event is None:
                 continue
-            reset_event = self._first_event_after(
-                self.marker_events["software_reset"],
-                activate_event["line_number"],
+            reboot_boundary = self._first_reboot_boundary_after(
+                activate_event["line_number"]
             )
-            if reset_event is None:
+            if reboot_boundary is None:
                 continue
             candidate_event = self._first_event_after(
                 self.version_events,
-                reset_event["line_number"],
+                reboot_boundary["line_number"],
                 lambda event: event["version"] == self.expected_version,
             )
             if candidate_event is None:
@@ -623,7 +656,7 @@ class OtaLogAnalyzer:
                 "block_downloaded": block_event,
                 "close_file": close_event,
                 "activate_image": activate_event,
-                "software_reset": reset_event,
+                "reboot_boundary": reboot_boundary,
                 "candidate_version": candidate_event,
                 "image_accepted": accepted_event,
                 "ota_completed": completed_event,
@@ -855,10 +888,29 @@ class OtaLogAnalyzer:
             for marker_id in STRICT_MARKER_IDS
             if not self.has_marker(marker_id)
         ]
+        success_proof = self.success_proof() if success else None
+        lifecycle_chain = (
+            self.ordered_post_download_lifecycle_chain()
+            if success_proof == "ordered_post_download_lifecycle"
+            else None
+        )
+        boundary_event = (
+            lifecycle_chain["reboot_boundary"] if lifecycle_chain else None
+        )
+        reboot_boundary = (
+            {
+                "marker_id": boundary_event["marker_id"],
+                "line_number": boundary_event["line_number"],
+                "seen_at": boundary_event["seen_at"],
+            }
+            if boundary_event
+            else None
+        )
         return {
             "success": success,
             "classification": classification,
-            "success_proof": self.success_proof() if success else None,
+            "success_proof": success_proof,
+            "reboot_boundary": reboot_boundary,
             "last_progress_stage": self.last_progress_stage,
             "expected_version": self.expected_version,
             "versions_seen": self.versions_seen,
