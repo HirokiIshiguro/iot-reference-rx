@@ -12,6 +12,10 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
 MODULE_PATH = ROOT / "tools/ci/check_nightly_dependency_alignment.py"
+RUN5_FIXTURE_PATH = (
+    ROOT
+    / "tools/ci/tests/fixtures/nightly_dependency_alignment_run5.json"
+)
 SPEC = importlib.util.spec_from_file_location("dependency_alignment", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None
 alignment = importlib.util.module_from_spec(SPEC)
@@ -52,7 +56,9 @@ class GitlinkTests(unittest.TestCase):
         (self.repo / "README.md").write_text("base\n", encoding="utf-8")
         (self.repo / "Common").mkdir()
         (self.repo / "Common/source.c").write_text("base\n", encoding="utf-8")
-        git(self.repo, "add", "README.md", "Common/source.c")
+        (self.repo / "tools").mkdir()
+        (self.repo / "tools/helper.py").write_text("base\n", encoding="utf-8")
+        git(self.repo, "add", "README.md", "Common/source.c", "tools/helper.py")
         git(self.repo, "commit", "--quiet", "-m", "base")
         self.base = git(self.repo, "rev-parse", "HEAD")
 
@@ -112,6 +118,28 @@ class GitlinkTests(unittest.TestCase):
         with self.assertRaisesRegex(alignment.AlignmentError, "mode 040000"):
             alignment.read_source_tree(self.repo, self.base, "README.md")
 
+    def test_source_file_match_and_change_are_reported(self) -> None:
+        self.assertEqual(
+            git(self.repo, "rev-parse", f"{self.base}:tools/helper.py"),
+            alignment.read_source_file(self.repo, self.base, "tools/helper.py"),
+        )
+        (self.repo / "tools/helper.py").write_text("changed\n", encoding="utf-8")
+        changed = commit_all(self.repo, "tool change")
+        checks = alignment.compare_parent_source_files(
+            self.repo,
+            changed,
+            self.base,
+            ["tools/helper.py"],
+        )
+        self.assertEqual("failed", checks[0]["status"])
+        self.assertEqual("source_file", checks[0]["kind"])
+
+    def test_missing_and_non_file_source_files_fail_closed(self) -> None:
+        with self.assertRaisesRegex(alignment.AlignmentError, "missing source file"):
+            alignment.read_source_file(self.repo, self.base, "missing.py")
+        with self.assertRaisesRegex(alignment.AlignmentError, "regular source file"):
+            alignment.read_source_file(self.repo, self.base, "Common")
+
 
 class ConfigurationAndCheckoutTests(unittest.TestCase):
     def test_invalid_config_is_rejected(self) -> None:
@@ -150,6 +178,7 @@ class ConfigurationAndCheckoutTests(unittest.TestCase):
             "mode": "parent_gitlinks",
             "iot_reference_gitlink": "external/iot-reference-rx",
             "dependencies": ["Middleware/FreeRTOS/FreeRTOS-Kernel"],
+            "source_files": ["tools/helper.py"],
         }
         with tempfile.TemporaryDirectory() as temp:
             config = Path(temp) / "config.json"
@@ -165,6 +194,43 @@ class ConfigurationAndCheckoutTests(unittest.TestCase):
 
             unsafe = dict(base_target)
             unsafe["source_roots"] = ["../Common"]
+            config.write_text(
+                json.dumps({"schema_version": 1, "targets": [unsafe]}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                alignment.AlignmentError,
+                "safe repository-relative path",
+            ):
+                alignment.load_config(config)
+
+    def test_source_files_are_required_and_must_be_safe(self) -> None:
+        base_target = {
+            "name": "benchmark",
+            "project": "group/project",
+            "repository": "https://example.com/group/project.git",
+            "ref_env": "BENCHMARK_REF",
+            "resolved_ref_env": "BENCHMARK_RESOLVED_SHA",
+            "default_ref": "main",
+            "mode": "parent_gitlinks",
+            "iot_reference_gitlink": "external/iot-reference-rx",
+            "dependencies": ["Middleware/FreeRTOS/FreeRTOS-Kernel"],
+            "source_roots": ["Common"],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            config = Path(temp) / "config.json"
+            config.write_text(
+                json.dumps({"schema_version": 1, "targets": [base_target]}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                alignment.AlignmentError,
+                "source_files must be non-empty",
+            ):
+                alignment.load_config(config)
+
+            unsafe = dict(base_target)
+            unsafe["source_files"] = ["../tools/helper.py"]
             config.write_text(
                 json.dumps({"schema_version": 1, "targets": [unsafe]}),
                 encoding="utf-8",
@@ -248,6 +314,95 @@ class ConfigurationAndCheckoutTests(unittest.TestCase):
                 f"BENCHMARK_RESOLVED_SHA={'a' * 40}\n",
                 output.read_text(encoding="utf-8"),
             )
+
+
+class Run5FixtureTests(unittest.TestCase):
+    def test_run5_stale_pins_fail_on_target_specific_projects_and_tools(self) -> None:
+        fixture = json.loads(RUN5_FIXTURE_PATH.read_text(encoding="utf-8"))
+        config = alignment.load_config(
+            ROOT / "tools/ci/nightly-dependency-targets.json"
+        )
+        targets = {target["name"]: target for target in config["targets"]}
+
+        self.assertEqual(
+            "06830f3820812cebe7451d198091b6da5c7c64e6",
+            fixture["parent_sha"],
+        )
+        self.assertEqual(
+            {
+                "c8da31dd32c76eb878ecf6cdc153efcf8215e614",
+                "96d269aa346322e5e46fff91ac5e05100c5edf02",
+            },
+            {item["child_parent_sha"] for item in fixture["stale_pins"]},
+        )
+
+        for stale_pin in fixture["stale_pins"]:
+            target = targets[stale_pin["target"]]
+            configured_paths = set(target["source_roots"]) | set(
+                target["source_files"]
+            )
+            with self.subTest(target=stale_pin["target"]):
+                self.assertTrue(stale_pin["differences"])
+                for difference in stale_pin["differences"]:
+                    self.assertIn(difference["path"], configured_paths)
+                    check = alignment.make_source_check(
+                        difference["path"],
+                        difference["kind"],
+                        difference["parent_object"],
+                        difference["child_object"],
+                    )
+                    self.assertEqual("failed", check["status"])
+
+    def test_evaluate_target_records_explicit_failed_paths(self) -> None:
+        target = {
+            "name": "benchmark",
+            "mode": "parent_gitlinks",
+            "repository": "https://example.com/group/project.git",
+            "iot_reference_gitlink": "external/iot-reference-rx",
+            "dependencies": ["Middleware/FreeRTOS/FreeRTOS-Kernel"],
+            "source_roots": ["Projects/app"],
+            "source_files": ["tools/helper.py"],
+        }
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(
+            alignment,
+            "clone_target",
+            return_value=(Path(temp), "main", "b" * 40),
+        ), mock.patch.object(
+            alignment,
+            "read_gitlink",
+            return_value="c" * 40,
+        ), mock.patch.object(
+            alignment,
+            "run_git",
+            return_value="",
+        ), mock.patch.object(
+            alignment,
+            "compare_parent_gitlinks",
+            return_value=[
+                {"path": "Middleware/FreeRTOS/FreeRTOS-Kernel", "status": "passed"}
+            ],
+        ), mock.patch.object(
+            alignment,
+            "compare_parent_source_trees",
+            return_value=[
+                {"path": "Projects/app", "kind": "source_tree", "status": "failed"}
+            ],
+        ), mock.patch.object(
+            alignment,
+            "compare_parent_source_files",
+            return_value=[
+                {"path": "tools/helper.py", "kind": "source_file", "status": "failed"}
+            ],
+        ):
+            result = alignment.evaluate_target(
+                Path(temp), "a" * 40, target, Path(temp)
+            )
+
+        self.assertEqual("failed", result["status"])
+        self.assertEqual(
+            ["Projects/app", "tools/helper.py"],
+            result["failed_paths"],
+        )
 
 
 if __name__ == "__main__":

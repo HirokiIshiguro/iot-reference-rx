@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "parent_sha": "06830f3820812cebe7451d198091b6da5c7c64e6",
+  "stale_pins": [
+    {
+      "target": "rx671-tsip-mbedtls",
+      "child_parent_sha": "c8da31dd32c76eb878ecf6cdc153efcf8215e614",
+      "differences": [
+        {
+          "path": "Projects/aws_wifi_rx671_ek",
+          "kind": "source_tree",
+          "parent_object": "111dcbd2a33387e4a2e32d23e0044e9042425496",
+          "child_object": "a6f8fa30965ac7f8a128c8787fa487f4fed1a08b"
+        },
+        {
+          "path": "Projects/boot_loader_rx671_ek",
+          "kind": "source_tree",
+          "parent_object": "f5f1b8e1faba722eb5402a07ffd3079d30c4a3e2",
+          "child_object": "a00a50165632a0264c0c48ee7288a58a889db327"
+        }
+      ]
+    },
+    {
+      "target": "rx671-software-mbedtls",
+      "child_parent_sha": "96d269aa346322e5e46fff91ac5e05100c5edf02",
+      "differences": [
+        {
+          "path": "Projects/aws_wifi_rx671_ek",
+          "kind": "source_tree",
+          "parent_object": "111dcbd2a33387e4a2e32d23e0044e9042425496",
+          "child_object": "560e538a878d50e353142f9c6fc803e7daa35ae0"
+        },
+        {
+          "path": "Projects/boot_loader_rx671_ek",
+          "kind": "source_tree",
+          "parent_object": "f5f1b8e1faba722eb5402a07ffd3079d30c4a3e2",
+          "child_object": "a00a50165632a0264c0c48ee7288a58a889db327"
+        },
+        {
+          "path": "tools/build_rx671_ota_images.py",
+          "kind": "source_file",
+          "parent_object": "f9c7632505349d75b3a82a3b428ea2bcfd2fa051",
+          "child_object": "24ec848b2f349a52408c2101c4059d61c5ad9bbd"
+        },
+        {
+          "path": "tools/rx671_ota_host.py",
+          "kind": "source_file",
+          "parent_object": "c5a165c646c90d58edf62c35abd5c746009238c2",
+          "child_object": "efb65df3a0858cedbe0153076a6edc718ae71e82"
+        },
+        {
+          "path": "tools/test_rx671_ota.py",
+          "kind": "source_file",
+          "parent_object": "ffdeee6f3e7be8e848963a3c044dba8094761293",
+          "child_object": "7fd35eea991e40f8138b1f0bd67f1d30d07de155"
+        }
+      ]
+    },
+    {
+      "target": "rx72n-tsip-mbedtls13",
+      "child_parent_sha": "96d269aa346322e5e46fff91ac5e05100c5edf02",
+      "differences": [
+        {
+          "path": "Projects/aws_ether_rx72n_envision_kit",
+          "kind": "source_tree",
+          "parent_object": "f4f5cfcd4ed3dfcee76b29a56fbb1939ba632868",
+          "child_object": "1c72349a56998346d9ea4ba83af596e3e8e9a72b"
+        },
+        {
+          "path": "Projects/aws_ether_rx72n_envision_kit_tsip",
+          "kind": "source_tree",
+          "parent_object": "4042b46a39e273f95f293c6a74aa6d018afa6c66",
+          "child_object": "c41a63717b8d44220c3e60ed5859a83931d55449"
+        },
+        {
+          "path": "Projects/boot_loader_rx72n_envision_kit",
+          "kind": "source_tree",
+          "parent_object": "200d97a0fa8407cab52cc8376565dc0b7c977a65",
+          "child_object": "5de259c78b4cbb159a52e97566e040383fbaf5b6"
+        },
+        {
+          "path": "tools/test_ota.py",
+          "kind": "source_file",
+          "parent_object": "2a808603276373b9a8feb30dcaafbaa0280e2da8",
+          "child_object": "c6539ccd20f6f9df3b87da31342b9538ced7c264"
+        }
+      ]
+    }
+  ]
+}

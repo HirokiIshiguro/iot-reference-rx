@@ -14,6 +14,7 @@ ALLOWED_PATHS = {
     ".gitlab-ci.yml",
     "tools/ci/check_nightly_dependency_alignment.py",
     "tools/ci/nightly-dependency-targets.json",
+    "tools/ci/tests/fixtures/nightly_dependency_alignment_run5.json",
     "tools/ci/tests/test_nightly_dependency_alignment.py",
     "tools/ci/tests/test_nightly_dependency_ci_contract.py",
     "tools/ci/tests/test_verify_dependency_gate_mr_scope.py",
@@ -21,7 +22,9 @@ ALLOWED_PATHS = {
 }
 CI_PATH = ".gitlab-ci.yml"
 DEPENDENCY_WORKFLOW_START = "    # Dependency-gate MRs validate"
-DEPENDENCY_WORKFLOW_END = "    # Match the OTA artifact leaf"
+DEPENDENCY_WORKFLOW_END = (
+    "    # Shared RX671 application/build inputs affect both the normal network image"
+)
 DEPENDENCY_JOBS = (
     "nightly_dependency_contract",
     "nightly_dependency_alignment",
