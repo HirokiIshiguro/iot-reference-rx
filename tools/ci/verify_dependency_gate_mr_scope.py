@@ -14,6 +14,7 @@ ALLOWED_PATHS = {
     ".gitlab-ci.yml",
     "tools/ci/check_nightly_dependency_alignment.py",
     "tools/ci/nightly-dependency-targets.json",
+    "tools/ci/tests/fixtures/nightly_dependency_alignment_run5.json",
     "tools/ci/tests/test_nightly_dependency_alignment.py",
     "tools/ci/tests/test_nightly_dependency_ci_contract.py",
     "tools/ci/tests/test_verify_dependency_gate_mr_scope.py",

@@ -32,6 +32,9 @@ GITLINK_RE = re.compile(
 TREE_RE = re.compile(
     r"^040000 tree ([0-9a-f]{40})\t(.+)$"
 )
+BLOB_RE = re.compile(
+    r"^100(?:644|755) blob ([0-9a-f]{40})\t(.+)$"
+)
 SUPPORTED_MODES = {"parent_gitlinks"}
 
 
@@ -191,6 +194,22 @@ def load_config(path: Path) -> dict[str, Any]:
             raise AlignmentError(f"{name}: source_roots must be unique paths")
         target["source_roots"] = normalized_source_roots
 
+        source_files = target.get("source_files")
+        if not isinstance(source_files, list) or not source_files:
+            raise AlignmentError(f"{name}: source_files must be non-empty")
+        normalized_source_files = [
+            safe_relative_path(item, f"{name} source file")
+            if isinstance(item, str)
+            else ""
+            for item in source_files
+        ]
+        if (
+            "" in normalized_source_files
+            or len(normalized_source_files) != len(set(normalized_source_files))
+        ):
+            raise AlignmentError(f"{name}: source_files must be unique paths")
+        target["source_files"] = normalized_source_files
+
         if target.get("allowed_patches"):
             raise AlignmentError(
                 f"{name}: allowed_patches is not valid for gitlink alignment"
@@ -234,6 +253,34 @@ def read_source_tree(repo: Path, ref: str, path: str) -> str:
     return require_sha40(match.group(1), f"source tree {path}")
 
 
+def read_source_file(repo: Path, ref: str, path: str) -> str:
+    require_sha40(ref, "blob ref")
+    line = run_git(["ls-tree", ref, "--", path], repo)
+    match = BLOB_RE.fullmatch(line.strip())
+    if not match:
+        if not line.strip():
+            raise AlignmentError(f"missing source file: {path}")
+        raise AlignmentError(f"path is not a regular source file: {path}")
+    if match.group(2) != path:
+        raise AlignmentError(f"source file path mismatch for {path}")
+    return require_sha40(match.group(1), f"source file {path}")
+
+
+def make_source_check(
+    path: str,
+    kind: str,
+    expected: str,
+    actual: str,
+) -> dict[str, str]:
+    return {
+        "path": path,
+        "kind": kind,
+        "status": "passed" if expected == actual else "failed",
+        "expected": expected,
+        "actual": actual,
+    }
+
+
 def compare_parent_gitlinks(
     parent_repo: Path,
     parent_sha: str,
@@ -266,13 +313,23 @@ def compare_parent_source_trees(
         expected = read_source_tree(parent_repo, parent_sha, source_root)
         actual = read_source_tree(parent_repo, child_parent_sha, source_root)
         checks.append(
-            {
-                "path": source_root,
-                "kind": "source_tree",
-                "status": "passed" if expected == actual else "failed",
-                "expected": expected,
-                "actual": actual,
-            }
+            make_source_check(source_root, "source_tree", expected, actual)
+        )
+    return checks
+
+
+def compare_parent_source_files(
+    parent_repo: Path,
+    parent_sha: str,
+    child_parent_sha: str,
+    source_files: list[str],
+) -> list[dict[str, str]]:
+    checks: list[dict[str, str]] = []
+    for source_file in source_files:
+        expected = read_source_file(parent_repo, parent_sha, source_file)
+        actual = read_source_file(parent_repo, child_parent_sha, source_file)
+        checks.append(
+            make_source_check(source_file, "source_file", expected, actual)
         )
     return checks
 
@@ -315,6 +372,7 @@ def evaluate_target(
         "repository": target["repository"],
         "status": "failed",
         "checks": [],
+        "failed_paths": [],
         "errors": [],
     }
     try:
@@ -347,6 +405,19 @@ def evaluate_target(
                 target["source_roots"],
             )
         )
+        result["checks"].extend(
+            compare_parent_source_files(
+                parent_repo,
+                parent_sha,
+                child_parent_sha,
+                target["source_files"],
+            )
+        )
+        result["failed_paths"] = [
+            check["path"]
+            for check in result["checks"]
+            if check["status"] == "failed"
+        ]
 
         result["status"] = (
             "passed"
