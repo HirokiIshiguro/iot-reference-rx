@@ -110,7 +110,11 @@ environment. The jobs are serialized by the
 `WHD bring-up done`, and `FreeRTOS+TCP network up`. The optional `mqtt` scope
 also checks `AWS TLS=0` and `AWS MQTT=0`. Setting
 `RX671_WIFI_REQUIRE_TLS_VERSION=TLSv1.3` additionally fixes the build to TLS
-1.3 and requires `AWS TLS version=TLSv1.3` from the target. Feature-branch push pipelines remain
+1.3 and requires `AWS TLS version=TLSv1.3` from the target. If startup reports
+both a WHD IOCTL-ID mismatch and a nonzero `whd_wifi_on` result before any
+network milestone, `test_rx671_wifi` performs one whole-device reset and records
+both attempts in the UART and JUnit artifacts. The recovery is never used for a
+generic timeout, after network progress, or more than once. Feature-branch push pipelines remain
 build-only; RX671-related merge requests and `main` use the network hardware
 scope, while the nightly matrix has separate network, conditional MQTT, and
 conditional TLS 1.3 MQTT rows.

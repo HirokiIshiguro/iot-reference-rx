@@ -4290,6 +4290,7 @@ test_rx671_wifi:
         --mode "$mode" \
         "${tls_version_args[@]}" \
         --reset-cmd "$reset_cmd" \
+        --startup-retries 1 \
         --output-log "$artifact_dir/uart.log" \
         --junit-output "$artifact_dir/junit.xml"
   artifacts:

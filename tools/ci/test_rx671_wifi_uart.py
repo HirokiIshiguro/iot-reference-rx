@@ -29,6 +29,7 @@ MQTT_MARKERS = (
     "AWS TLS=0",
     "AWS MQTT=0",
 )
+IOCTL_MISMATCH_MARKER = "Received a response for a different IOCTL - retry"
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,8 @@ class SmokeResult:
     message: str
     log: str
     duration_seconds: float
+    attempts: int = 1
+    recovery_reasons: tuple[str, ...] = ()
 
 
 def sanitize_xml_text(value: str) -> str:
@@ -86,6 +89,10 @@ def evaluate_log(
     if join_match and join_match.group(1) != "00000000":
         failures.append(f"whd_wifi_join failed: {join_match.group(1)}")
 
+    wifi_on_match = re.search(r"whd_wifi_on=([0-9A-Fa-f]{8})", text)
+    if wifi_on_match and wifi_on_match.group(1) != "00000000":
+        failures.append(f"whd_wifi_on failed: {wifi_on_match.group(1)}")
+
     if mode == "mqtt":
         for label in ("AWS TLS", "AWS MQTT"):
             match = re.search(rf"{re.escape(label)}=(-?[0-9A-Fa-f]+)", text)
@@ -93,6 +100,21 @@ def evaluate_log(
                 failures.append(f"{label} failed: {match.group(1)}")
 
     return missing, failures
+
+
+def retryable_pre_network_failure(text: str, failures: Sequence[str]) -> bool:
+    """Return true only for the Run 5 F2/IOCTL mismatch before networking.
+
+    A whole-device reset is the recovery boundary because Function 2 abort made
+    the retried CMD53 look successful while the returned control frame carried
+    stale IOCTL ID 0.  Never retry after WHD/network progress or for a generic
+    timeout with no causal mismatch evidence.
+    """
+    if IOCTL_MISMATCH_MARKER not in text:
+        return False
+    if any(marker in text for marker in NETWORK_MARKERS):
+        return False
+    return any(item.startswith("whd_wifi_on failed:") for item in failures)
 
 
 def run_reset_command(command: str, timeout_seconds: float) -> subprocess.CompletedProcess[str]:
@@ -114,12 +136,14 @@ def monitor_uart(
     require_tls_version: str,
     reset_command: str,
     reset_timeout_seconds: float,
+    startup_retries: int = 0,
 ) -> SmokeResult:
     import serial
 
     start = time.monotonic()
     captured = bytearray()
-    reset_details = ""
+    attempt_logs: list[str] = []
+    recovery_reasons: list[str] = []
 
     try:
         with serial.Serial(
@@ -128,70 +152,128 @@ def monitor_uart(
             timeout=0.1,
             write_timeout=1.0,
         ) as uart:
-            uart.reset_input_buffer()
             print(f"Opened UART {port} at {baud} bps before reset", flush=True)
 
-            reset = run_reset_command(reset_command, reset_timeout_seconds)
-            reset_details = (
-                "\n# reset command stdout\n"
-                + reset.stdout
-                + "\n# reset command stderr\n"
-                + reset.stderr
-            )
-            if reset.stdout:
-                print(reset.stdout, end="", flush=True)
-            if reset.stderr:
-                print(reset.stderr, end="", file=sys.stderr, flush=True)
-            if reset.returncode != 0:
-                duration = time.monotonic() - start
-                return SmokeResult(
-                    False,
-                    f"reset command failed with exit code {reset.returncode}",
-                    reset_details,
-                    duration,
+            for attempt_index in range(startup_retries + 1):
+                captured = bytearray()
+                uart.reset_input_buffer()
+                print(
+                    f"RX671 startup attempt {attempt_index + 1}/{startup_retries + 1}",
+                    flush=True,
                 )
 
-            deadline = time.monotonic() + timeout_seconds
-            while time.monotonic() < deadline:
-                chunk = uart.read(4096)
-                if chunk:
-                    captured.extend(chunk)
-                    sys.stdout.write(chunk.decode("utf-8", errors="replace"))
-                    sys.stdout.flush()
+                reset = run_reset_command(reset_command, reset_timeout_seconds)
+                reset_details = (
+                    "\n# reset command stdout\n"
+                    + reset.stdout
+                    + "\n# reset command stderr\n"
+                    + reset.stderr
+                )
+                if reset.stdout:
+                    print(reset.stdout, end="", flush=True)
+                if reset.stderr:
+                    print(reset.stderr, end="", file=sys.stderr, flush=True)
+                if reset.returncode != 0:
+                    duration = time.monotonic() - start
+                    attempt_logs.append(reset_details)
+                    return SmokeResult(
+                        False,
+                        f"reset command failed with exit code {reset.returncode}",
+                        "".join(attempt_logs),
+                        duration,
+                        attempt_index + 1,
+                        tuple(recovery_reasons),
+                    )
+
+                retry_requested = False
+                deadline = time.monotonic() + timeout_seconds
+                while time.monotonic() < deadline:
+                    chunk = uart.read(4096)
+                    if chunk:
+                        captured.extend(chunk)
+                        sys.stdout.write(chunk.decode("utf-8", errors="replace"))
+                        sys.stdout.flush()
+
+                    text = captured.decode("utf-8", errors="replace")
+                    missing, failures = evaluate_log(text, mode, require_tls_version)
+                    if failures:
+                        attempt_log = (
+                            f"\n# startup attempt {attempt_index + 1}\n"
+                            + text
+                            + reset_details
+                        )
+                        attempt_logs.append(attempt_log)
+                        if (
+                            attempt_index < startup_retries
+                            and retryable_pre_network_failure(text, failures)
+                        ):
+                            reason = "f2-ioctl-id-mismatch-before-network"
+                            recovery_reasons.append(reason)
+                            print(
+                                "Bounded RX671 pre-network recovery: " + reason,
+                                flush=True,
+                            )
+                            retry_requested = True
+                            break
+                        duration = time.monotonic() - start
+                        return SmokeResult(
+                            False,
+                            "; ".join(failures),
+                            "".join(attempt_logs),
+                            duration,
+                            attempt_index + 1,
+                            tuple(recovery_reasons),
+                        )
+                    if not missing:
+                        attempt_logs.append(
+                            f"\n# startup attempt {attempt_index + 1}\n"
+                            + text
+                            + reset_details
+                        )
+                        duration = time.monotonic() - start
+                        message = f"all {mode} milestones observed"
+                        if recovery_reasons:
+                            message += f" after {len(recovery_reasons)} recovery reset"
+                        return SmokeResult(
+                            True,
+                            message,
+                            "".join(attempt_logs),
+                            duration,
+                            attempt_index + 1,
+                            tuple(recovery_reasons),
+                        )
+
+                if retry_requested:
+                    continue
 
                 text = captured.decode("utf-8", errors="replace")
                 missing, failures = evaluate_log(text, mode, require_tls_version)
-                if failures:
-                    duration = time.monotonic() - start
-                    return SmokeResult(
-                        False,
-                        "; ".join(failures),
-                        text + reset_details,
-                        duration,
-                    )
-                if not missing:
-                    duration = time.monotonic() - start
-                    return SmokeResult(
-                        True,
-                        f"all {mode} milestones observed",
-                        text + reset_details,
-                        duration,
-                    )
-
-            text = captured.decode("utf-8", errors="replace")
-            missing, failures = evaluate_log(text, mode, require_tls_version)
-            details = failures or ["missing: " + ", ".join(missing)]
-            duration = time.monotonic() - start
-            return SmokeResult(
-                False,
-                "; ".join(details),
-                text + reset_details,
-                duration,
-            )
+                attempt_logs.append(
+                    f"\n# startup attempt {attempt_index + 1}\n"
+                    + text
+                    + reset_details
+                )
+                details = failures or ["missing: " + ", ".join(missing)]
+                duration = time.monotonic() - start
+                return SmokeResult(
+                    False,
+                    "; ".join(details),
+                    "".join(attempt_logs),
+                    duration,
+                    attempt_index + 1,
+                    tuple(recovery_reasons),
+                )
     except Exception as exc:
         duration = time.monotonic() - start
-        text = captured.decode("utf-8", errors="replace") + reset_details
-        return SmokeResult(False, f"UART smoke exception: {exc}", text, duration)
+        text = "".join(attempt_logs) + captured.decode("utf-8", errors="replace")
+        return SmokeResult(
+            False,
+            f"UART smoke exception: {exc}",
+            text,
+            duration,
+            max(1, len(attempt_logs)),
+            tuple(recovery_reasons),
+        )
 
 
 def write_junit(
@@ -218,6 +300,19 @@ def write_junit(
         properties,
         "property",
         {"name": "mode", "value": sanitize_xml_text(mode)},
+    )
+    ET.SubElement(
+        properties,
+        "property",
+        {"name": "startup_attempts", "value": str(result.attempts)},
+    )
+    ET.SubElement(
+        properties,
+        "property",
+        {
+            "name": "recovery_reasons",
+            "value": sanitize_xml_text(",".join(result.recovery_reasons)),
+        },
     )
     ET.SubElement(
         properties,
@@ -265,6 +360,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--reset-cmd", required=True)
     parser.add_argument("--reset-timeout", type=float, default=90.0)
+    parser.add_argument(
+        "--startup-retries",
+        type=int,
+        choices=(0, 1),
+        default=0,
+        help=(
+            "Allow one whole-device reset only for an explicit F2/IOCTL ID "
+            "mismatch before network startup."
+        ),
+    )
     parser.add_argument("--output-log", type=Path, required=True)
     parser.add_argument("--junit-output", type=Path, required=True)
     return parser.parse_args(argv)
@@ -280,6 +385,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         require_tls_version=args.require_tls_version,
         reset_command=args.reset_cmd,
         reset_timeout_seconds=args.reset_timeout,
+        startup_retries=args.startup_retries,
     )
 
     args.output_log.parent.mkdir(parents=True, exist_ok=True)
