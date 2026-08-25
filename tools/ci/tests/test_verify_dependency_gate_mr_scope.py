@@ -35,7 +35,7 @@ class DependencyGateMrScopeTests(unittest.TestCase):
 
 workflow:
   rules:
-    # Match the OTA artifact leaf before the broad project rule.
+    # Shared RX671 application/build inputs affect both the normal network image
     - when: always
 
 matrix_job:
@@ -59,7 +59,7 @@ workflow:
   rules:
     # Dependency-gate MRs validate checker-only changes.
     - when: always
-    # Match the OTA artifact leaf before the broad project rule.
+    # Shared RX671 application/build inputs affect both the normal network image
     - when: always
 
 nightly_dependency_contract:
@@ -168,6 +168,14 @@ other_job:
         git(self.repo, "commit", "--quiet", "-m", "dependency ci")
         head = git(self.repo, "rev-parse", "HEAD")
         self.assertEqual(0, self.run_main(head))
+
+    def test_real_ci_has_stable_dependency_workflow_boundaries(self) -> None:
+        ci = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        self.assertIn(scope.DEPENDENCY_WORKFLOW_START, ci)
+        self.assertIn(scope.DEPENDENCY_WORKFLOW_END, ci)
+        stripped = scope.strip_dependency_ci_regions(ci)
+        self.assertNotIn(scope.DEPENDENCY_WORKFLOW_START, stripped)
+        self.assertIn(scope.DEPENDENCY_WORKFLOW_END, stripped)
 
     def test_dependency_bridge_submodule_strategy_override_passes(self) -> None:
         changed = self.DEPENDENCY_CI.replace(

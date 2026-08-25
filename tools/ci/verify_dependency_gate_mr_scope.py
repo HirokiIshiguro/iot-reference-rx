@@ -22,7 +22,9 @@ ALLOWED_PATHS = {
 }
 CI_PATH = ".gitlab-ci.yml"
 DEPENDENCY_WORKFLOW_START = "    # Dependency-gate MRs validate"
-DEPENDENCY_WORKFLOW_END = "    # Match the OTA artifact leaf"
+DEPENDENCY_WORKFLOW_END = (
+    "    # Shared RX671 application/build inputs affect both the normal network image"
+)
 DEPENDENCY_JOBS = (
     "nightly_dependency_contract",
     "nightly_dependency_alignment",
