@@ -43,6 +43,7 @@ param(
     [string]$SdioCmd53DmacaBlockMode = "",
     [switch]$SdioUseHighSpeedClock,
     [switch]$SdioHighSpeedDrive,
+    [switch]$SdioF2FaultInjectOnce,
     [switch]$TcpThroughputEnable,
     [string]$TcpThroughputHost = "",
     [int]$TcpThroughputPort = -1,
@@ -1206,6 +1207,9 @@ if ($SdioUseHighSpeedClock.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_USE_HIGH_SP
 if ($SdioHighSpeedDrive.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_HIGH_SPEED_DRIVE)) {
     Write-Host "SDIO PORTD high-speed interface drive: enabled"
 }
+if ($SdioF2FaultInjectOnce.IsPresent -or ("true" -eq $env:RX671_WIFI_F2_FAULT_INJECT_ONCE)) {
+    Write-Host "SDIO Function 2 one-shot read fault injection: enabled"
+}
 $effectiveSdioCmd53XferEngine = Get-FirstNonEmpty @($SdioCmd53XferEngine, $env:RX671_EK_SDIO_CMD53_XFER_ENGINE)
 if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {
     Write-Host "SDIO CMD53 transfer engine override: $effectiveSdioCmd53XferEngine"
@@ -1359,6 +1363,10 @@ try {
 
     if ($SdioHighSpeedDrive.IsPresent -or ("1" -eq $env:RX671_EK_SDIO_HIGH_SPEED_DRIVE)) {
         $cprojectDefines += "SDIO_HOST_CFG_HIGH_SPEED_DRIVE=1"
+    }
+
+    if ($SdioF2FaultInjectOnce.IsPresent -or ("true" -eq $env:RX671_WIFI_F2_FAULT_INJECT_ONCE)) {
+        $cprojectDefines += "WHD_SDIO_CMD53_F2_BYTE_READ_FAULT_INJECT_ONCE=1"
     }
 
     if (-not [string]::IsNullOrWhiteSpace($effectiveSdioCmd53XferEngine)) {

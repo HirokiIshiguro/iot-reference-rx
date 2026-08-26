@@ -55,6 +55,7 @@ static uint32_t g_cmd52_fail_log_count;
 static uint32_t g_cmd53_fail_log_count;
 static bool g_pre_cmd53_clocks_ready;
 static volatile bool g_sdio_bus_busy;
+static bool g_sdio_f2_byte_read_fault_injected;
 
 volatile uint32_t g_whd_sdio_sdhi_irq_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_ignored_count;
@@ -102,6 +103,8 @@ volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_count;
 volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_recovered_count;
 volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_fail_count;
 volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_retry_abort_count;
+volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_lost_count;
+volatile uint32_t g_whd_sdio_cmd53_f2_byte_read_fault_inject_count;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_stage;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_s1;
 volatile uint32_t g_whd_sdio_cmd53_fail_last_s2;
@@ -862,8 +865,21 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
         return CYHAL_SDIO_RSLT_ERR_FUNC_RET(CYHAL_SDIO_RET_CMD_TIMEOUT);
     }
 
-    ok = sdio_host_cmd53(write, function, address, increment, block_mode,
-                         (uint8_t *)data, count, &r5);
+#if WHD_SDIO_CMD53_F2_BYTE_READ_FAULT_INJECT_ONCE
+    if ((!write) && (2U == function) && (!block_mode) &&
+        (!g_sdio_f2_byte_read_fault_injected))
+    {
+        /* Test-only: fail before consuming the pending Function 2 frame. */
+        g_sdio_f2_byte_read_fault_injected = true;
+        g_whd_sdio_cmd53_f2_byte_read_fault_inject_count++;
+        ok = false;
+    }
+    else
+#endif
+    {
+        ok = sdio_host_cmd53(write, function, address, increment, block_mode,
+                             (uint8_t *)data, count, &r5);
+    }
 #if (WHD_SDIO_CMD53_F2_BYTE_READ_RETRY > 0U)
     if ((!ok) && (!write) && (2U == function) && (!block_mode))
     {
@@ -876,6 +892,10 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
             if (sdio_host_abort_function(function))
             {
                 g_whd_sdio_cmd53_f2_byte_read_retry_abort_count++;
+                /* CCCR I/O Abort discards the in-flight Function 2 frame. The
+                 * same CMD53 cannot be reported as recovery for this buffer. */
+                g_whd_sdio_cmd53_f2_byte_read_lost_count++;
+                break;
             }
 #endif
             R_BSP_SoftwareDelay(WHD_SDIO_CMD53_F2_BYTE_READ_RETRY_DELAY_US, BSP_DELAY_MICROSECS);
