@@ -30,6 +30,10 @@ MQTT_MARKERS = (
     "AWS MQTT=0",
 )
 IOCTL_MISMATCH_MARKER = "Received a response for a different IOCTL - retry"
+F2_DIAG_RE = re.compile(
+    r"f2retry=(\d+) f2rec=(\d+) f2fail=(\d+) f2abort=(\d+) "
+    r"f2lost=(\d+) f2inject=(\d+)"
+)
 
 
 @dataclass(frozen=True)
@@ -79,7 +83,10 @@ def required_markers(mode: str, require_tls_version: str = "") -> tuple[str, ...
 
 
 def evaluate_log(
-    text: str, mode: str, require_tls_version: str = ""
+    text: str,
+    mode: str,
+    require_tls_version: str = "",
+    require_f2_fault_injection: bool = False,
 ) -> tuple[list[str], list[str]]:
     markers = required_markers(mode, require_tls_version)
     missing = [marker for marker in markers if marker not in text]
@@ -98,6 +105,23 @@ def evaluate_log(
             match = re.search(rf"{re.escape(label)}=(-?[0-9A-Fa-f]+)", text)
             if match and match.group(1) != "0":
                 failures.append(f"{label} failed: {match.group(1)}")
+
+    if require_f2_fault_injection:
+        diagnostics = [
+            tuple(map(int, values)) for values in F2_DIAG_RE.findall(text)
+        ]
+        if not diagnostics:
+            missing.append("F2 one-shot fault injection diagnostics")
+        elif not any(
+            retry >= 1
+            and recovered >= 1
+            and failed == 0
+            and aborted == 0
+            and lost == 0
+            and injected == 1
+            for retry, recovered, failed, aborted, lost, injected in diagnostics
+        ):
+            failures.append("F2 one-shot fault injection did not recover cleanly")
 
     return missing, failures
 
@@ -137,6 +161,7 @@ def monitor_uart(
     reset_command: str,
     reset_timeout_seconds: float,
     startup_retries: int = 0,
+    require_f2_fault_injection: bool = False,
 ) -> SmokeResult:
     import serial
 
@@ -195,7 +220,12 @@ def monitor_uart(
                         sys.stdout.flush()
 
                     text = captured.decode("utf-8", errors="replace")
-                    missing, failures = evaluate_log(text, mode, require_tls_version)
+                    missing, failures = evaluate_log(
+                        text,
+                        mode,
+                        require_tls_version,
+                        require_f2_fault_injection,
+                    )
                     if failures:
                         attempt_log = (
                             f"\n# startup attempt {attempt_index + 1}\n"
@@ -247,7 +277,12 @@ def monitor_uart(
                     continue
 
                 text = captured.decode("utf-8", errors="replace")
-                missing, failures = evaluate_log(text, mode, require_tls_version)
+                missing, failures = evaluate_log(
+                    text,
+                    mode,
+                    require_tls_version,
+                    require_f2_fault_injection,
+                )
                 attempt_logs.append(
                     f"\n# startup attempt {attempt_index + 1}\n"
                     + text
@@ -283,6 +318,7 @@ def write_junit(
     port: str,
     baud: int,
     require_tls_version: str = "",
+    require_f2_fault_injection: bool = False,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     suite = ET.Element(
@@ -300,6 +336,14 @@ def write_junit(
         properties,
         "property",
         {"name": "mode", "value": sanitize_xml_text(mode)},
+    )
+    ET.SubElement(
+        properties,
+        "property",
+        {
+            "name": "require_f2_fault_injection",
+            "value": str(require_f2_fault_injection).lower(),
+        },
     )
     ET.SubElement(
         properties,
@@ -358,6 +402,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="",
         help="Require the negotiated AWS IoT TLS version in mqtt mode.",
     )
+    parser.add_argument(
+        "--require-f2-fault-injection",
+        action="store_true",
+        help=(
+            "Require one injected F2 byte-read failure and a clean non-abort "
+            "recovery in the UART diagnostics."
+        ),
+    )
     parser.add_argument("--reset-cmd", required=True)
     parser.add_argument("--reset-timeout", type=float, default=90.0)
     parser.add_argument(
@@ -386,6 +438,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         reset_command=args.reset_cmd,
         reset_timeout_seconds=args.reset_timeout,
         startup_retries=args.startup_retries,
+        require_f2_fault_injection=args.require_f2_fault_injection,
     )
 
     args.output_log.parent.mkdir(parents=True, exist_ok=True)
@@ -397,6 +450,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.port,
         args.baud,
         args.require_tls_version,
+        args.require_f2_fault_injection,
     )
 
     status = "PASS" if result.passed else "FAIL"

@@ -246,6 +246,9 @@ variables:
   # Empty keeps the normal MQTT smoke compatible with the server default.
   # Set TLSv1.3 to pin both mbedTLS min/max and require the UART version marker.
   RX671_WIFI_REQUIRE_TLS_VERSION: ""
+  # Diagnostic-only one-shot failure before the first F2 byte read consumes a
+  # frame. Focused HIL uses this to prove the bounded non-abort recovery path.
+  RX671_WIFI_F2_FAULT_INJECT_ONCE: "false"
   RX671_WIFI_SKIP_HW_TESTS: "false"
   RX671_WIFI_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   RX671_WIFI_DEVICE_RESOURCE_GROUP: "ek-rx671-rpi1-hardware"
@@ -1456,6 +1459,9 @@ build_rx671_wifi:
         Workspace = "$env:E2STUDIO_WORKSPACE_RX671_WIFI"
         LogFile = "$env:CI_PROJECT_DIR\rx671_wifi_e2studio_build.log"
         WlanAllowBusSleepDelayMs = [int]$env:RX671_WIFI_WLAN_ALLOW_BUS_SLEEP_DELAY_MS
+      }
+      if ($env:RX671_WIFI_F2_FAULT_INJECT_ONCE -eq "true") {
+        $buildArgs.SdioF2FaultInjectOnce = $true
       }
       if ($otaParkBuild) {
         # This image is retained only as a safe post-test parking image. It must
@@ -4284,6 +4290,10 @@ test_rx671_wifi:
       if [ -n "${RX671_WIFI_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args=(--require-tls-version "$RX671_WIFI_REQUIRE_TLS_VERSION")
       fi
+      fault_injection_args=()
+      if [ "${RX671_WIFI_F2_FAULT_INJECT_ONCE:-false}" = "true" ]; then
+        fault_injection_args=(--require-f2-fault-injection)
+      fi
 
       python tools/ci/test_rx671_wifi_uart.py \
         --port "$RX671_WIFI_UART_PORT" \
@@ -4291,6 +4301,7 @@ test_rx671_wifi:
         --timeout "$RX671_WIFI_UART_TIMEOUT_SECONDS" \
         --mode "$mode" \
         "${tls_version_args[@]}" \
+        "${fault_injection_args[@]}" \
         --reset-cmd "$reset_cmd" \
         --startup-retries 1 \
         --output-log "$artifact_dir/uart.log" \

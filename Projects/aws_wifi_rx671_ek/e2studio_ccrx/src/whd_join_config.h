@@ -90,7 +90,13 @@
 #endif
 
 #ifndef WHD_SDIO_CMD53_F2_BYTE_READ_ABORT_ON_RETRY
-#define WHD_SDIO_CMD53_F2_BYTE_READ_ABORT_ON_RETRY (1)
+/* CCCR I/O Abort discards the pending F2 control frame. Preserve it so the
+ * bounded CMD53 retry can read the response WHD is waiting for. */
+#define WHD_SDIO_CMD53_F2_BYTE_READ_ABORT_ON_RETRY (0)
+#endif
+
+#ifndef WHD_SDIO_CMD53_F2_BYTE_READ_FAULT_INJECT_ONCE
+#define WHD_SDIO_CMD53_F2_BYTE_READ_FAULT_INJECT_ONCE (0)
 #endif
 
 #endif /* WHD_JOIN_CONFIG_H_ */

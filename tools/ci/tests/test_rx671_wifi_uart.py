@@ -75,6 +75,36 @@ class EvaluateLogTests(unittest.TestCase):
         _, failures = evaluate_log(text, "network")
         self.assertFalse(retryable_pre_network_failure(text, failures))
 
+    def test_forced_f2_fault_requires_clean_non_abort_recovery(self):
+        text = "\n".join(
+            NETWORK_MARKERS
+            + (
+                "f2retry=1 f2rec=1 f2fail=0 f2abort=0 f2lost=0 f2inject=1",
+            )
+        )
+        missing, failures = evaluate_log(
+            text,
+            "network",
+            require_f2_fault_injection=True,
+        )
+        self.assertEqual([], missing)
+        self.assertEqual([], failures)
+
+        false_green = "\n".join(
+            NETWORK_MARKERS
+            + (
+                "f2retry=1 f2rec=1 f2fail=0 f2abort=1 f2lost=1 f2inject=1",
+            )
+        )
+        _, failures = evaluate_log(
+            false_green,
+            "network",
+            require_f2_fault_injection=True,
+        )
+        self.assertEqual(
+            ["F2 one-shot fault injection did not recover cleanly"], failures
+        )
+
     def test_nonzero_mqtt_status_is_reported(self):
         text = "\n".join(NETWORK_MARKERS + ("AWS MQTT smoke: network ready", "AWS TLS=0", "AWS MQTT=7"))
         missing, failures = evaluate_log(text, "mqtt")
