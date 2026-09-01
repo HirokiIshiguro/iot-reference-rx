@@ -8,6 +8,7 @@
 
 | Tag | 主な内容 |
 |---|---|
+| [v202604.00-LTS-rx-1.0.0-saffti-1.4.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.4.0) | RX671/Type 1YN AWS IoT全10セルのfixed-SHA full matrix 5回連続strict PASS |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0) | LANBENCH TLS 1.3 session resumption / 0-RTT の4経路5回成功と夜間 matrix 整備 |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.2.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.2.0) | TSIP backend + TLS 1.3 の MQTT / OTA / Fleet Provisioning 実機CI確認 |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.1.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.1.0) | RX72N/RX65N の OTA・Fleet Provisioning 実機CI整備 |
@@ -86,6 +87,21 @@
 - `aws_wifi_rx671_ek` は map の `__SEGGER_RTT` をTracealyzer CLI用のRTT block addressとして使い、`reset=true` の有界取得を標準手順にします。
 - TSIP offload時の性能変化を、処理時間だけでなくCPU使用率でも確認します。
 - RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.4.0
+
+### 検証
+
+- RX671/Type 1YN の software / TSIP MQTT、OTA、Fleet Provisioningを
+  TLS 1.2 / TLS 1.3で含むfull Schedule #5 matrixについて、P38 `666d97f6`と
+  固定downstream SHAの組合せで5回連続strict PASSを確認しました。
+- accepted parentは `#10633`、`#10934`、`#10989`、`#11038`、`#11088`です。
+  各Runで48/48 child、253/253 job、cleanup 42/42、AWS IoT/S3一時資源残留0、
+  base資源保全、Windows/RPi1/RPi2/RPi3 safe idleを確認しています。
+- READMEのAWS IoT Core接続表で残っていたRX671/Type 1YNの10セルを
+  `○`から`✓`へ昇格しました。詳細証跡は
+  [Issue #140](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/140)
+  に集約しています。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.3.0
 
