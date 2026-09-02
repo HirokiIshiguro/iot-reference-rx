@@ -52,4 +52,4 @@ The bootloader project needs to register a public key for firmware signature ver
   Please check the following webpage:
   * <https://www.renesas.com/document/apn/rx-family-how-implement-freertos-ota-using-amazon-web-services-202406-lts-version-rev100>  
 * Refer to Section 4.2.2 of the application note to register the public key to the project.
-* Also, For software setup instructions, see [**Getting Started Guide: step 4-2**](../../Getting_Started_Guide.md#step-4-2-run-pubsubmqtt-with-over-the-airota-update-sample-project).
+* Also, For software setup instructions, see [**Getting Started Guide: step 4-3**](../../Getting_Started_Guide.md#ステップ4-3-over-the-airota更新対応-pubsubmqtt-サンプルプロジェクトの実行).

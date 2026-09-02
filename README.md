@@ -6,6 +6,7 @@ TSIP（ハードウェア暗号）をGitLab CIで検証します。
 
 ベースはFreeRTOS `202604.00-LTS-rx`、最新リリースは
 [`v202604.00-LTS-rx-1.0.0-saffti-1.4.0`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.4.0)です。
+変更点は[Changelog](Changelog.md)を参照してください。
 
 ## 対応ターゲット
 
@@ -13,7 +14,20 @@ TSIP（ハードウェア暗号）をGitLab CIで検証します。
 |---|---|---|
 | RX72N Envision Kit | Ethernet | [software](Projects/aws_ether_rx72n_envision_kit/) / [TSIP](Projects/aws_ether_rx72n_envision_kit_tsip/) |
 | CK-RX65N V1 | BG96 Cellular | [software](Projects/aws_bg96_ck_rx65n/) / [TSIP](Projects/aws_bg96_ck_rx65n_tsip/) |
-| EK-RX671 | Murata Type 1YN Wi-Fi | [application](Projects/aws_wifi_rx671_ek/) / [boot loader](Projects/boot_loader_rx671_ek/) |
+| EK-RX671 | Murata Type 1YN Wi-Fi | [software](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls) / [TSIP](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls) |
+
+## 代表通信性能（TCP）
+
+`SINK`はMCUから対向への送信、`SOURCE`は対向からMCUへの受信です。
+
+| ターゲット | 接続 | SINK | SOURCE | 固定測定 |
+|---|---|---:|---:|---|
+| RX72N Envision Kit | Ethernet | 84.373 Mbps | 94.154 Mbps | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#merged-main-ether-transport) |
+| EK-RX671 | Murata Type 1YN Wi-Fi | 平均42.5 Mbps | 平均46.2 Mbps | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#単一セッション正式性能) |
+| CK-RX65N V1 | BG96 Cellular | 0.124 Mbps | 0.144 Mbps | [`RX65N@1b9ea826`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench/-/blob/1b9ea82608efcd4bffcfb2991d4f507faea200fe/README.md#最新性能) |
+
+接続媒体、payload、対向、統計方法が異なるため、媒体間の直接比較には使えません。
+RX65N/BG96のTLS throughputとCPU負荷率は未測定で、TCP値から推定していません。
 
 ## 現在の検証状態
 
@@ -21,11 +35,9 @@ TSIP（ハードウェア暗号）をGitLab CIで検証します。
 
 | 項目 | 状態 |
 |---|---|
-| AWS IoT MQTT / OTA / Fleet | 3ターゲット × software / TSIP × TLS 1.2 / 1.3を実機確認済み |
+| AWS IoT MQTT / OTA / Fleet Provisioning | 3ターゲット × software / TSIP × TLS 1.2 / 1.3を実機確認済み |
 | TLS 1.3 resumption / 0-RTT | LANBENCH対向で全6環境を5回連続確認済み |
-| RX671 AWS IoT full matrix | 固定SHAで5回連続strict PASS、各Run 48/48 child・253/253 job・cleanup 42/42・AWS/S3残留0 |
 | release tag pipeline | [`#11140`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11140) が35/35 job success |
-| Nightly Schedule #5 | **Inactive**。再開は人間承認が必要 |
 
 個別セルは[検証結果](docs/validation-evidence.md)を参照してください。AWS IoT Coreは
 SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認しています。
