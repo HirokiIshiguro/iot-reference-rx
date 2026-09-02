@@ -16,15 +16,22 @@ TSIP（ハードウェア暗号）をGitLab CIで検証します。
 | CK-RX65N V1 | BG96 Cellular | [software](Projects/aws_bg96_ck_rx65n/) / [TSIP](Projects/aws_bg96_ck_rx65n_tsip/) |
 | EK-RX671 | Murata Type 1YN Wi-Fi | [software](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls) / [TSIP](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls) |
 
-## 代表通信性能（TCP）
+## 代表通信性能
 
 `SINK`はMCUから対向への送信、`SOURCE`は対向からMCUへの受信です。
+TLSは1.2の測定値で、`software`はソフトウェア暗号、`TSIP hardware`はMCU内蔵暗号を示します。
 
-| ターゲット | 接続 | SINK | SOURCE | 固定測定 |
-|---|---|---:|---:|---|
-| RX72N Envision Kit | Ethernet | 84.373 Mbps | 94.154 Mbps | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#merged-main-ether-transport) |
-| EK-RX671 | Murata Type 1YN Wi-Fi | 平均42.5 Mbps | 平均46.2 Mbps | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#単一セッション正式性能) |
-| CK-RX65N V1 | BG96 Cellular | 0.124 Mbps | 0.144 Mbps | [`RX65N@1b9ea826`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench/-/blob/1b9ea82608efcd4bffcfb2991d4f507faea200fe/README.md#最新性能) |
+| ターゲット | 接続 | 方式 | SINK | SOURCE | 固定測定 |
+|---|---|---|---:|---:|---|
+| RX72N Envision Kit | Ethernet | TCP | 84.373 Mbps | 94.154 Mbps | [`RX72N@840c6451`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/readme/-/blob/840c64514f2ac55bbe4d7101596f56ae55fde833/README.md#merged-main-ether-transport) |
+| RX72N Envision Kit | Ethernet | TLS（software） | 4.189 Mbps | 4.434 Mbps | 同上 |
+| RX72N Envision Kit | Ethernet | TLS（TSIP hardware） | 43.113 Mbps | 54.448 Mbps | 同上 |
+| EK-RX671 | Murata Type 1YN Wi-Fi | TCP | 平均42.5 Mbps | 平均46.2 Mbps | [`RX671@e247d8fe`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/readme/-/blob/e247d8fe81e89731062cbf321e5fd12668f397ae/README.md#単一セッション正式性能) |
+| EK-RX671 | Murata Type 1YN Wi-Fi | TLS（software） | 2.250 Mbps | 2.110 Mbps | 同上 |
+| EK-RX671 | Murata Type 1YN Wi-Fi | TLS（TSIP hardware） | 38.633 Mbps | 33.428 Mbps | 同上 |
+| CK-RX65N V1 | BG96 Cellular | TCP | 0.124 Mbps | 0.144 Mbps | [`RX65N@1b9ea826`](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench/-/blob/1b9ea82608efcd4bffcfb2991d4f507faea200fe/README.md#最新性能) |
+| CK-RX65N V1 | BG96 Cellular | TLS（software） | 未測定 | 未測定 | 同上 |
+| CK-RX65N V1 | BG96 Cellular | TLS（TSIP hardware） | 未測定 | 未測定 | 同上 |
 
 接続媒体、payload、対向、統計方法が異なるため、媒体間の直接比較には使えません。
 RX65N/BG96のTLS throughputとCPU負荷率は未測定で、TCP値から推定していません。
