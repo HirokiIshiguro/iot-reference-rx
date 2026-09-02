@@ -47,11 +47,11 @@ This demo performs the following tasks:
 
 ### Hardware setup
 
-For hardware setup instructions, see [**Getting Started Guide: step 2**](../../Getting_Started_Guide.md#step-2-hardware-setup).
+For hardware setup instructions, see [**Getting Started Guide: step 2**](../../Getting_Started_Guide.md#ステップ2-ハードウェアのセットアップ).
 
 ### Software setup
 
-For software setup instructions, see [**Getting Started Guide: step 4-1-1**](../../Getting_Started_Guide.md#step-4-1-1-software-setup-for-pubsub-demo).
+For software setup instructions, see [**Getting Started Guide: step 4-1-1**](../../Getting_Started_Guide.md#ステップ4-1-1-pubsub-デモ用ソフトウェアのセットアップ).
 
 ## Troubleshooting
 
