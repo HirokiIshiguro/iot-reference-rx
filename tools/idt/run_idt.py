@@ -99,6 +99,15 @@ def export_report(source: Path, target: Path, credentials) -> None:
     ET.ElementTree(clean(parsed)).write(target, encoding="utf-8", xml_declaration=True)
 
 
+def combined_summary(junit_result: dict, runner_exit_code: int) -> dict:
+    result = dict(junit_result, runner_exit_code=runner_exit_code)
+    result["problems"] = list(junit_result.get("problems", []))
+    result["passed"] = bool(junit_result.get("passed")) and runner_exit_code == 0
+    if runner_exit_code != 0:
+        result["problems"].append("IDT execution or runtime cleanup did not succeed")
+    return result
+
+
 def install_idt(host_os: str, credentials) -> Path:
     """Use AWS's documented signed API; never print the temporary download URL."""
     import requests
@@ -202,6 +211,12 @@ def transport(runtime: Path, region: str, credentials, provenance: dict) -> tupl
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives import serialization
 
+    powershell = Path(os.getenv("RX72N_IDT_POWERSHELL", str(Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "PowerShell/7/pwsh.exe")))
+    if not powershell.is_file():
+        raise RuntimeError("PowerShell 7 is required for the IDT build callback; configure RX72N_IDT_POWERSHELL if installed elsewhere")
+    major = subprocess.check_output([str(powershell), "-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"], encoding="utf-8").strip()
+    if major != "7":
+        raise RuntimeError("IDT build callbacks require the validated PowerShell 7 runtime")
     root = install_idt("linux", credentials)
     inputs = runtime / "inputs"
     inputs.mkdir()
@@ -233,7 +248,6 @@ def transport(runtime: Path, region: str, credentials, provenance: dict) -> tupl
     binaries = [root_linux + "/bin/devicetester_linux_x86-64", root_linux + "/tests/FRQ_2.5.0/frq_linux_x86-64",
                 root_linux + "/tests/FRQ_2.5.0/suite/parseProductVersion_linux_x86-64"]
     subprocess.run([str(WSL), "-d", "Ubuntu", "--exec", "chmod", "+x", *binaries], check=True)
-    powershell = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
     env = os.environ.copy()
     inherited = {"AWS_ACCESS_KEY_ID": credentials.access_key, "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
                  "AWS_REGION": region, "AWS_DEFAULT_REGION": region, "IDT_RUNTIME_DIR": wsl_path(execution),
@@ -303,9 +317,16 @@ def main() -> int:
     checked = subprocess.run([sys.executable, str(Path(__file__).with_name("check_idt_report.py")),
                               str(exported), "--required-group", "FullTransportInterfaceTLS" if args.scope == "transport" else "FreeRTOSVersion"],
                              capture_output=True, encoding="utf-8", errors="replace")
-    (args.output / "summary.json").write_text(checked.stdout, encoding="utf-8")
-    metadata.update(idt_exit_code=idt_code, report_check_exit_code=checked.returncode,
+    summary = combined_summary(json.loads(checked.stdout), idt_code)
+    write_json(args.output / "summary.json", summary)
+    metadata.update(runner_exit_code=idt_code, report_check_exit_code=checked.returncode,
                     finished_utc=datetime.now(timezone.utc).isoformat())
+    if args.scope == "transport":
+        detail = runtime / "execution/transport-result.json"
+        if detail.is_file():
+            metadata["idt_exit_code"] = json.loads(detail.read_text(encoding="utf-8")).get("idtExitCode")
+    else:
+        metadata["idt_exit_code"] = idt_code
     if args.scope == "transport" and idt_code == checked.returncode == 0:
         manifests = list((runtime / "execution").rglob("build_manifest.json"))
         if len(manifests) == 1:
@@ -317,7 +338,7 @@ def main() -> int:
             if rsu.is_file():
                 metadata["firmware_sha256"]["rsu"] = hashlib.sha256(rsu.read_bytes()).hexdigest()
     write_json(args.output / "metadata.json", metadata)
-    print(checked.stdout, end="")
+    print(json.dumps(summary, sort_keys=True))
     return 0 if idt_code == 0 and checked.returncode == 0 else 1
 
 

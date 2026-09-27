@@ -11,6 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from tools.idt.check_idt_report import check_report, main
+from tools.idt.run_idt import combined_summary
 from tools.idt.run_idt import export_report
 
 
@@ -46,6 +47,19 @@ class IdtReportTests(unittest.TestCase):
     def check(self, xml: str, groups: tuple[str, ...] = ("FreeRTOSVersion",)) -> dict:
         self.path.write_text(xml, encoding="utf-8")
         return check_report(self.path, groups)
+
+    def test_runtime_cleanup_failure_overrules_passing_junit(self) -> None:
+        junit = self.check(report())
+        merged = combined_summary(junit, 1)
+        self.assertFalse(merged["passed"])
+        self.assertTrue(junit["passed"])
+        self.assertEqual([], junit["problems"])
+        self.assertEqual(1, merged["runner_exit_code"])
+
+    def test_zero_process_exit_does_not_override_junit_failure(self) -> None:
+        merged = combined_summary(self.check(report(status="error")), 0)
+        self.assertFalse(merged["passed"])
+        self.assertEqual(1, merged["errors"])
 
     def test_complete_selected_group_passes_without_claiming_qualification(self) -> None:
         result = self.check(report())

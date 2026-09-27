@@ -29,7 +29,9 @@ GitLabのRun pipelineまたはPipelines APIで、次の引数を指定します�
 IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指定しません。
 web / API以外のpush、MR、main更新、schedule、tag作成ではIDT jobを生成しません。
 CIはWindowsのAWS / CC-RX runnerで[run_idt.py](../tools/idt/run_idt.py)を実行します。
-ホストの前提はUbuntu WSL、Windows OpenSSHの`rpi1` alias、CC-RX / e2 studio、AWS権限です。
+ホストの前提はUbuntu WSL、PowerShell 7、Windows OpenSSHの`rpi1` alias、CC-RX / e2 studio、AWS権限です。
+build callbackは`C:\Program Files\PowerShell\7\pwsh.exe`を使用します。別配置の場合のみ`RX72N_IDT_POWERSHELL`で指定します。
+Windows PowerShell 5.1ではe2 studio終了コードが取得できない事象を確認したため、使用しません。
 Pythonの`boto3`、`requests`、`cryptography`と、WSL側のPython `cryptography`を使用します。
 
 IDT本体が未配置なら、[AWS公式の署名付きダウンロードAPI](https://docs.aws.amazon.com/freertos/latest/userguide/idt-programmatic-download-process.html)から固定版を取得します。

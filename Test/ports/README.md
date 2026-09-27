@@ -15,7 +15,7 @@ Select only
 test flags must be zero. Then run:
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File tools/build_rx72n_idt_transport.ps1 `
+pwsh.exe -ExecutionPolicy Bypass -File tools/build_rx72n_idt_transport.ps1 `
   -ProjectRoot <runtime-copy> -Workspace C:\ai\codex\ws\rx72n-idt-build `
   -ProvenanceFile <runtime-source-provenance.json>
 ```
