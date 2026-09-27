@@ -20,6 +20,11 @@
 
 #if ( OTA_E2E_TEST_ENABLED == 1 )
     #include "idt_ota_signer.h"
+    #if ( APP_VERSION_MAJOR != OTA_APP_VERSION_MAJOR ) || \
+        ( APP_VERSION_MINOR != OTA_APP_VERSION_MINOR ) || \
+        ( APP_VERSION_BUILD != OTA_APP_VERSION_BUILD )
+        #error "The executing application version must match the IDT build parameters."
+    #endif
 #endif
 
 static BaseType_t prvWriteIdtValue( char * key, const char * value )

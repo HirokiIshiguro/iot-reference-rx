@@ -135,7 +135,7 @@ OTA PALのfilesystem専用IGNOREはnative IDTがFAILへ変換しました。こ�
 公開CI artifactは、診断本文を除いた`FRQ_Report.xml`、`summary.json`、`metadata.json`だけです。
 commit / submodule SHA、dirty状態、firmwareと試験設定のhash、IDT / suite版、部分実行の有無を対応付けます。
 UARTはnativeへの転送前にprivate runtimeの`uart-witness/uart.bin`へ保存します。nativeの読み取り終了後もSSH出力をEOFまで回収し、末尾の起動情報を残します。公開metadataにはrawのbyte数 / SHA-256と、識別子・版数・hash等の限定した観測情報だけを載せます。
-raw captureは128 MiBを上限とし、書込みエラー・上限超過・不完全な起動markerは正常な証跡として扱いません。rawと`events.jsonl`はprivate runtimeと同じ保持・削除対象です。
+raw captureは128 MiBを上限とし、書込みエラー・上限超過は不合格にします。解析できない起動markerはカウントとして残し、native試験を途中で打ち切りません。GreaterVersion単独の追加判定では、欠落・不完全なmarkerを正常な起動証跡として扱いません。rawと`events.jsonl`はprivate runtimeと同じ保持・削除対象です。
 
 private runtimeと`<workspace_root>\idt-private-<run>`は、失敗解析とレビューのため保持します。MRの確認後、必要なsanitized証跡を保存し、当該runのプロセス終了・AWS cleanup・実機停止を確認してから両ディレクトリを削除対象にします。自動世代削除は行わず、調査中のrunや別runを一括削除しません。
 private runtime内の`diagnostic-*`資料も同じ保持・削除対象です。

@@ -33,6 +33,7 @@ class UartWitness:
         self._hash, self._bytes = hashlib.sha256(), 0
         self._pending, self.events = b"", []
         self._error, self._finished = None, False
+        self.invalid_marker_count, self.truncated_marker = 0, False
         self.max_bytes = max_bytes
         try:
             self._raw = self._open("uart.bin")
@@ -67,10 +68,14 @@ class UartWitness:
                     match = BOOT.fullmatch(line)
                     if not match:
                         if line.startswith(b"[IDT_BOOT]"):
-                            raise OSError("Invalid boot witness frame")
+                            self.invalid_marker_count += 1
                         continue
                     image_id, version = (part.decode("ascii") for part in match.groups())
-                    version_tuple(version)
+                    try:
+                        version_tuple(version)
+                    except ValueError:
+                        self.invalid_marker_count += 1
+                        continue
                     event = {"event": "boot", "image_id": image_id, "version": version,
                              "utc": datetime.now(timezone.utc).isoformat(),
                              "monotonic_ns": time.monotonic_ns()}
@@ -87,7 +92,7 @@ class UartWitness:
         with self._lock:
             if not self._finished:
                 if self._pending.startswith(b"[IDT_BOOT"):
-                    self._error = "truncated_boot_marker"
+                    self.truncated_marker = True
                 for stream in (self._raw, self._events_file):
                     if stream:
                         try:
@@ -103,6 +108,8 @@ class UartWitness:
                 self._finished = True
             return {"schema_version": 1, "complete": self._error is None,
                     "error": self._error, "raw_bytes": self._bytes,
+                    "invalid_marker_count": self.invalid_marker_count,
+                    "truncated_marker": self.truncated_marker,
                     "raw_sha256": self._hash.hexdigest(), "events": list(self.events)}
 
 

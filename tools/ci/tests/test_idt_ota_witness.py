@@ -50,10 +50,14 @@ class OtaWitnessTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             UartWitness(self.root / "artifacts/raw", public_output=self.root / "artifacts")
 
-    def test_truncated_marker_and_io_or_capacity_failures_never_complete(self):
+    def test_parse_problems_are_observations_and_io_failures_invalidate_capture(self):
         capture = self.capture()
+        capture.feed(b"[IDT_BOOT] broken frame\n")
         capture.feed(marker(A, "1.9.1")[:-2])
-        self.assertFalse(capture.finish()["complete"])
+        result = capture.finish()
+        self.assertTrue(result["complete"])
+        self.assertTrue(result["truncated_marker"])
+        self.assertEqual(1, result["invalid_marker_count"])
         for mode in ("io", "capacity"):
             with self.subTest(mode=mode):
                 capture = UartWitness(self.root / mode, max_bytes=1 if mode == "capacity" else 100)

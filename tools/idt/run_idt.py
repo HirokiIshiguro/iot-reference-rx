@@ -536,7 +536,8 @@ def main() -> int:
         capture_path = runtime / "execution/uart-capture.json"
         capture = json.loads(capture_path.read_text(encoding="utf-8")) if capture_path.is_file() else {}
         metadata["uart_capture"] = {key: capture.get(key) for key in
-                                    ("complete", "error", "raw_bytes", "raw_sha256")}
+                                    ("complete", "error", "raw_bytes", "raw_sha256",
+                                     "invalid_marker_count", "truncated_marker")}
         if capture.get("complete") is not True:
             summary["passed"] = False
             summary["problems"].append("Private UART capture is missing or incomplete")
@@ -547,6 +548,8 @@ def main() -> int:
         if args.scope == "ota-mqtt":
             builds = metadata.get("ota_builds", [])
             initial_id = candidate_id = None
+            # The pinned native GT setup builds one candidate and one initial
+            # image (confirmed by run #11255); ambiguous ledgers fail closed.
             if args.test_id == "OTAE2EGreaterVersion" and len(builds) == 2:
                 ordered = sorted(builds, key=lambda item: version_tuple(item["ota_version"]))
                 initial_id, candidate_id = (item["image_id"] for item in ordered)
@@ -558,9 +561,14 @@ def main() -> int:
                    item.get("source_tree_dirty") != metadata["source_dirty"] for item in builds):
                 witness.update(verified=False, verdict="not_verified")
                 witness["reasons"].append("Build provenance does not match this run")
+                summary["passed"] = False
+                summary["problems"].append("Build provenance does not match this run")
+            if capture.get("invalid_marker_count") or capture.get("truncated_marker"):
+                witness.update(verified=False, verdict="not_verified")
+                witness["reasons"].append("Unparseable or truncated boot markers were captured")
             metadata["ota_witness"] = witness
             summary["ota_boot_verified"] = witness["verified"]
-            if witness["reasons"] or (witness["required"] and not witness["verified"]):
+            if witness["required"] and not witness["verified"]:
                 summary["passed"] = False
                 summary["problems"].extend(witness["reasons"] or ["OTA boot witness is not verified"])
         metadata["builds"] = []
