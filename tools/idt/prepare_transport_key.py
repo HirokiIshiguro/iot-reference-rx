@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 
 
 def validate_source(value):
@@ -58,6 +59,14 @@ def matching_iot_certificate(client, account, region, thing_name, public_key):
             raise RuntimeError("IoT principal pagination did not advance")
         seen_tokens.add(token)
     matches = []
+    observed = {"thing_name": thing_name, "principal_count": len(principals), "certificates": []}
+    diagnostic = os.environ.get("IDT_DIAGNOSTIC_ONLY") == "1"
+    def record():
+        if diagnostic:
+            path = Path(os.environ["IDT_RUNTIME_DIR"]) / "credential-diagnostic.json"
+            observed["matching_active_certificates"] = len(matches)
+            path.write_text(json.dumps(observed, indent=2) + "\n", encoding="utf-8")
+    record()
     for principal in sorted(principals):
         parts = principal.split(":", 5)
         if (len(parts) != 6 or parts[0] != "arn" or parts[2] != "iot"
@@ -67,10 +76,18 @@ def matching_iot_certificate(client, account, region, thing_name, public_key):
         result = client.describe_certificate(certificateId=parts[5][5:])["certificateDescription"]
         if result.get("certificateArn") != principal:
             raise RuntimeError("IoT returned a different certificate identity")
+        if diagnostic:
+            from cryptography import x509
+            certificate_key = x509.load_pem_x509_certificate(result["certificatePem"].encode()).public_key()
+            observed["certificates"].append({"status": result.get("status"),
+                "key_type": type(certificate_key).__name__,
+                "public_key_matches": certificate_public_key(result["certificatePem"]) == public_key})
+            record()
         if result.get("status") == "ACTIVE":
             certificate = result["certificatePem"]
             if certificate_public_key(certificate) == public_key:
                 matches.append(certificate)
+    record()
     if len(matches) != 1:
         raise RuntimeError("Expected exactly one active IDT thing certificate matching the disposable key")
     return matches[0]
@@ -96,6 +113,19 @@ def main():
     # Source checkout is allowed for validation, but credential injection is runtime-only.
     if source.parent not in (runtime, runtime / "source"):
         raise RuntimeError("refusing credential injection into the original checkout")
+    if os.environ.get("IDT_DIAGNOSTIC_ONLY") == "1":
+        destination = runtime / "diagnostic-headers"
+        certificates = runtime / "certificates"
+        if certificates.is_dir():
+            shutil.copytree(certificates, runtime / "diagnostic-certificates", dirs_exist_ok=True)
+        for relative in ("Test/include/test_param_config.h", "Test/include/test_execution_config.h",
+                         "Test/include/aws_clientcredential_keys.h", "Demos/include/aws_clientcredential_keys.h"):
+            original_file = (source / relative).resolve()
+            if not original_file.is_file() or source not in original_file.parents:
+                continue
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(original_file, target)
     key_file = Path(os.environ["IDT_PRIVATE_KEY_FILE"]).resolve(strict=True)
     if runtime not in key_file.parents and key_file.parent != runtime.parent / "inputs":
         raise RuntimeError("disposable private key must be inside this run's private runtime")
@@ -123,6 +153,8 @@ def main():
         lines[start:end] = ["#define " + prefix + "_CLIENT_CERTIFICATE " + json.dumps(certificate) + "\n"]
     if public_key != certificate_public_key(certificate):
         raise RuntimeError("TLS client certificate and private key do not match")
+    if os.environ.get("IDT_DIAGNOSTIC_ONLY") == "1":
+        raise RuntimeError("Diagnostic-only run stopped before compiler and hardware flash")
     if imported:
         start, end, _ = macro(lines, prefix + "_CLIENT_PRIVATE_KEY")
         lines[start:end] = ["#define " + prefix + "_CLIENT_PRIVATE_KEY " + json.dumps(private) + "\n"]

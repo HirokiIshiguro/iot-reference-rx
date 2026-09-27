@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tools.idt.host_profile import load_host_profile
-from tools.idt.check_host import requirements
+from tools.idt.check_host import installed_toolchain, requirements
 
 
 class IdtHostProfileTests(unittest.TestCase):
@@ -92,6 +92,27 @@ class IdtHostProfileTests(unittest.TestCase):
         self.assertTrue(all("IDT-Custom" in args for args in wsl_probes))
         self.assertTrue(all("/opt/idt/bin/python" in args for args in wsl_probes))
         self.assertEqual(profile, result["profile"])
+
+    def test_installed_tool_versions_use_product_metadata_not_directory_names(self):
+        eclipse = self.path.parent / "wrong-looking-install-name"
+        (eclipse / "configuration").mkdir(parents=True)
+        (eclipse / ".eclipseproduct").write_text("id=com.renesas.platform\nversion=26.4.2\n")
+        (eclipse / "configuration/config.ini").write_text("e2studio.release=2026-04.2\n")
+        profile = {"e2studio_cli": str(eclipse / "e2studioc.exe")}
+        versions = {"ccrx": {"ProductVersion": "3.07.00.00", "FileVersion": "3.07.00.92"}}
+        result = installed_toolchain(profile, versions)
+        self.assertEqual("verified", result["e2studio"]["status"])
+        self.assertEqual("verified", result["ccrx"]["status"])
+        (eclipse / ".eclipseproduct").write_text("id=com.renesas.platform\nversion=25.10.0\n")
+        versions["ccrx"]["ProductVersion"] = "3.06.00.00"
+        result = installed_toolchain(profile, versions)
+        self.assertEqual("mismatch", result["e2studio"]["status"])
+        self.assertEqual("mismatch", result["ccrx"]["status"])
+
+    def test_missing_product_metadata_is_unverified_even_with_version_in_path(self):
+        result = installed_toolchain({"e2studio_cli": str(self.path.parent / "2026-04.2/e2studioc.exe")}, {})
+        self.assertEqual("unverified", result["e2studio"]["status"])
+        self.assertEqual("unverified", result["ccrx"]["status"])
 
 
 if __name__ == "__main__":

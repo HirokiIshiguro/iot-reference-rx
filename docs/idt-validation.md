@@ -16,7 +16,7 @@ FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリー
 | `mqtt` | `FullCloudIoT` | native MQTT03: 10件完走、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAIL |
 | `pkcs11` | `FullPKCS11_Core` | **10件PASS / 0 FAIL / 0 ERROR / 0 SKIP**。capabilities、digest、random、初期化 / session |
 | `ota-pal` | `OTACore` | **14件のassertion PASS**、filesystem専用1件はIGNORE。native IDTはこのIGNOREをFAILと記録し、全体NG |
-| `ota-mqtt` | `OTADataplaneMQTT` | setupで認証情報の受渡しを調整中。実際のOTA更新は未確認。試行で作成したACM証明書2件は削除確認済み |
+| `ota-mqtt` | `OTADataplaneMQTT` | setupの認証情報検査でERROR。nativeが生成したRSA証明書と設定したEC鍵が不一致のため、compiler / flash前に停止。実際のOTA更新は未確認 |
 
 TLSの確定証跡は[`9cadbfeb0a10a51a1f2953127346a58bd38805bf`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/9cadbfeb0a10a51a1f2953127346a58bd38805bf)のclean checkoutによるものです。
 他のscopeや対象SHAに、この14件の合格を流用しません。
@@ -27,7 +27,13 @@ PKCS11試験終了時はreset保持成功とUART 0 bytesを確認しました。
 [PKCS11 Coreの証跡](https://gitlab.saffti.jp/-/project/38/uploads/814c9055ccc191fa8b63cabb5bdc564c/pilot-pkcs11-02-sanitized-evidence.zip)は、
 main `0dc57833`に実装中の差分を加えた試作の結果（`source_dirty=true`）です。リリース対象SHAの証跡には流用しません。
 [OTA PALの証跡](https://gitlab.saffti.jp/-/project/38/uploads/c40a51ac23d6972d57beb71b3d924dbb/pilot-otapal-01-sanitized-evidence.zip)では、
-実機Unity出力が`15 Tests 0 Failures 1 Ignored`、native JUnitが14 PASS / 1 FAILでした。署名検証、異常署名拒否、inactive bankへの書込み・状態APIのassertionを確認し、終了時のreset保持とUART 0 bytesも確認しました。
+実機Unity出力が`15 Tests 0 Failures 1 Ignored`、native JUnitが14 PASS / 1 FAILでした。これも`source_dirty=true`の試作結果です。署名検証、異常署名拒否、inactive bankへの書込み・状態APIのassertionを確認し、終了時のreset保持とUART 0 bytesも確認しました。
+
+OTA setupでは`KeyProvisioning=Import`、ECC公開鍵を設定しても、対象ThingのprincipalはACTIVEなRSA証明書でした。
+既存EC証明書を指定する診断でも同じ不一致になったため、この追加証明書を作る試作コードは採用していません。
+証明書と秘密鍵の一致検査は維持し、更新成功・署名検証成功・復帰成功の証跡には扱いません。
+各試行の一時ACM証明書2件と、既存証明書指定の診断用IoT証明書は削除を確認しました。
+19:05頃の診断中にはRPi #1へのSSH接続も切れました。compiler / flash前でしたが、この試行の終了状態の確認に失敗したため、接続とベンチ状態の復旧確認後に再試験します。
 
 ## 明示実行
 
@@ -42,6 +48,7 @@ IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指
 `RX72N_IDT_SCOPE=ota-mqtt`に限り、`RX72N_IDT_TEST_ID=OTAE2EGreaterVersion`で単一caseを選べます。
 通常は指定せず、選択group全体を実行します。
 単一caseは`metadata.json`と`summary.json`に部分実行として記録し、group全体の合格には扱いません。
+認証情報の切り分け用にlocal CLIの`--diagnostic-only`を指定すると、秘密情報を含む診断資料をprivate runtime内へ保存し、compiler / flash前に必ず停止します。これは合格試験ではなく、通常のpipeline引数には加えません。
 
 </details>
 
@@ -57,12 +64,13 @@ IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指
 
 Linux版IDTはx86_64用のため、RPiのARM64上では直接動かしません。
 Windowsホストはprofileとrunner設定で移設可能にし、接続個体とツールの正本は[hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config)に従います。
-**既存PCの新規Windows / WSL venvでhost検査15項目PASS**を確認しました。新規PCでの再構築・実機完走は未検証です。
+**既存PCの新規Windows / WSL venvでhost検査17項目PASS**を確認しました。e2 studioのproduct / release metadataとCC-RXの版も照合しています。新規PCでの再構築・実機完走は未検証です。
 
 <details>
 <summary>ホストを再構築する手順と固定版の検査</summary>
 
 ホスト固有の配置は[非secret profile](../tools/idt/host-profile.example.json)で管理し、`RX72N_IDT_HOST_PROFILE`で選びます。
+別PCでもworkspace規約に合わせて`C:\ai\codex`配下を使用します。任意driveへの移設を保証する構成ではありません。
 Windows / WSLのPython依存は[Windows](../tools/idt/requirements-windows.txt)と[WSL](../tools/idt/requirements-wsl.txt)の固定版から専用venvへ導入します。
 PowerShell 7、Windows OpenSSH、WSL 2のx86_64 Linux、Python 3.11以降、e2 studio 2026-04.2 / CC-RX 3.07.00を事前に導入してください。
 検証ホストはWSL 2.6.3.0、Ubuntu 24.04.4 LTS、Linux Python 3.12.3です。
@@ -92,6 +100,8 @@ IDTは[AWS公式署名付きAPI](https://docs.aws.amazon.com/freertos/latest/use
 [manifest](../tools/idt/bundle-manifest.json)と[検証コード](../tools/idt/idt_bundle.py)でZIPのSHA-256および各OSの静的74ファイルを確認します。
 公式ZIPを再取得して既知hashと照合済みです。cached binaryの存在だけでは成功にせず、追加・欠落・改変された実行ファイルや試験定義を拒否します。
 可変のconfigs / logs / resultsはhash対象から除きます。
+`latestidt`が別版へ更新された場合は自動で追従せず停止します。固定版を再構築する場合は、保管した公式ZIPのhashをmanifestと照合してprofileの`install_root`へ展開し、`verify_install`で検査します。
+版を更新するときは公式bundleの版・suite・対応FreeRTOSを確認し、両OSのZIP hashと静的file一覧を再生成してMRでレビューし、実機scopeを再検証します。既存のPASSを新しいtoolへ流用しません。
 
 </details>
 
@@ -104,6 +114,8 @@ OTA PALのfilesystem専用IGNOREはnative IDTがFAILへ変換しました。こ�
 
 公開CI artifactは、診断本文を除いた`FRQ_Report.xml`、`summary.json`、`metadata.json`だけです。
 commit / submodule SHA、dirty状態、firmwareと試験設定のhash、IDT / suite版、部分実行の有無を対応付けます。
+
+private runtimeと`<workspace_root>\idt-private-<run>`は、失敗解析とレビューのため保持します。MRの確認後、必要なsanitized証跡を保存し、当該runのプロセス終了・AWS cleanup・実機停止を確認してから両ディレクトリを削除対象にします。自動世代削除は行わず、調査中のrunや別runを一括削除しません。
 試験用秘密鍵、注入済みsource / firmware、元のIDTログ、e2 studio workspaceはアクセスを制限したcheckout外の領域に保持します。
 試験後は共有lockを保持したままreset保持とUART静止を確認し、試験用AWS資源とRPiの一時firmwareを片付けます。
 通常運用へ戻す際は既存のflash / provision CIで通常firmwareと認証情報を再設定します。

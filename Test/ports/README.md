@@ -22,11 +22,16 @@ The cloud port never generates a local PASS or changes the production MQTT proto
 
 ## Build and provenance
 
+For a manual build of an already restricted source copy:
+
 ```powershell
 pwsh.exe -ExecutionPolicy Bypass -File tools/build_rx72n_idt_transport.ps1 `
   -ProjectRoot <restricted-runtime-copy> -Workspace C:\ai\codex\ws\idt-private-run\build `
   -ProvenanceFile <runtime-source-provenance.json> -TestGroup Transport
 ```
+
+Native runs choose the workspace automatically as
+`<workspace_root>\idt-private-<run>\rx72n-idt-build-<run>`.
 
 The wrapper links only the selected sources, applies temporary IDT defines,
 and restores project metadata, demo configuration and tracked Smart Configurator

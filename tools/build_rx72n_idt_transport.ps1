@@ -259,7 +259,8 @@ if ($TestGroup -in @('Transport', 'PKCS11', 'OTAPAL')) {
 else {
     Add-OptionValue $defineOption 'ENABLE_IDT_CLOUD_DEMO=1'
     # Keep the production pub/sub tasks active across Device Advisor cases.
-    Add-OptionValue $defineOption 'mqttexamplePUBLISH_COUNT=4294967295U'
+    # Far beyond the bounded IDT run, while keeping the demo's signed log cast safe.
+    Add-OptionValue $defineOption 'mqttexamplePUBLISH_COUNT=1000000U'
     $demoFlags = @{
         ENABLE_FLEET_PROVISIONING_DEMO = 0
         ENABLE_MULTI_TLS_DEMO = 0
@@ -346,7 +347,7 @@ try {
         qualification_status = 'not-established; selected individual group only'
     }
     $evidence | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $idtOutput 'build_manifest.json') -Encoding UTF8
-    Write-Host "IDT transport build ready: $idtOutput"
+    Write-Host "IDT $TestGroup build ready: $idtOutput"
 }
 finally {
     foreach ($generatedPath in $generatedSnapshots.Keys) {

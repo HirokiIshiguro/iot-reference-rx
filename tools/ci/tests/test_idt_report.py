@@ -144,6 +144,7 @@ class IdtScopeContractTests(unittest.TestCase):
         expected = {
             "preflight": "FreeRTOSVersion", "transport": "FullTransportInterfaceTLS",
             "mqtt": "FullCloudIoT", "ota-mqtt": "OTADataplaneMQTT",
+            "pkcs11": "FullPKCS11_Core", "ota-pal": "OTACore",
         }
         self.assertEqual(expected, {scope: run_idt.SCOPE_GROUPS[scope] for scope in expected})
         stdout = io.StringIO()
@@ -158,7 +159,7 @@ class IdtScopeContractTests(unittest.TestCase):
     def test_single_ota_case_cannot_be_used_for_a_non_ota_scope(self):
         from unittest.mock import patch
         from contextlib import redirect_stderr
-        for scope in ("preflight", "transport", "mqtt"):
+        for scope in ("preflight", "transport", "mqtt", "pkcs11", "ota-pal"):
             with self.subTest(scope=scope), patch("sys.argv", [
                 "run_idt.py", "--scope", scope, "--test-id", "OTAE2EGreaterVersion", "--output", "unused",
             ]), redirect_stderr(io.StringIO()):
@@ -263,6 +264,7 @@ class IdtCiContractTests(unittest.TestCase):
     def test_idt_is_opt_in_and_has_no_automatic_source_rule(self) -> None:
         self.assertIn('RUN_RX72N_IDT: "false"', self.blocks["variables"])
         self.assertIn('RX72N_IDT_SCOPE: "preflight"', self.blocks["variables"])
+        self.assertIn('RX72N_IDT_PYTHON: "C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe"', self.blocks["variables"])
         rules = self.blocks["test_rx72n_idt"].split("  rules:\n", 1)[1].split("  script:", 1)[0]
         self.assertEqual([OPT_IN], re.findall(r"- if: '([^']+)'", rules))
         self.assertIn("- when: never", rules)
@@ -313,9 +315,26 @@ class IdtCiContractTests(unittest.TestCase):
             'CI_PIPELINE_SOURCE == "merge_request_event"',
             'GIT_SUBMODULE_STRATEGY: "none"', "- .gitlab-ci.yml",
             "- tools/idt/**/*", "- tools/ci/tests/test_idt_report.py",
-            "python3 -m unittest tools.ci.tests.test_idt_report tools.ci.tests.test_idt_host_profile -v",
+            'python3 -m venv "$idt_ci_venv"',
+            '"$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-wsl.txt',
+            '"$idt_ci_python" -m pip check',
+            "tools.ci.tests.test_idt_report", "tools.ci.tests.test_idt_host_profile",
+            "tools.ci.tests.test_idt_credentials", "tools.ci.tests.test_idt_bundle",
+            "tools.ci.tests.test_idt_stop",
+            "tools.idt.ota_aws_signers_tests", "tools.idt.ota_support_tests",
         ):
             self.assertIn(setting, job)
+        self.assertNotIn("--user", job)
+
+    def test_explicit_idt_checks_host_before_run_and_logs_no_aws_identity(self):
+        job = self.blocks["test_rx72n_idt"]
+        self.assertLess(job.index("tools/idt/check_host.py --check-aws"), job.index("tools/idt/run_idt.py"))
+        self.assertIn('$idtHostJson = & "$env:RX72N_IDT_PYTHON"', job)
+        self.assertIn("$idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed", job)
+        self.assertIn('"IDT host check {0}: passed={1}" -f $check.name, $check.passed', job)
+        self.assertNotIn("$idtHostCheck.aws", job)
+        self.assertNotIn("Write-Host $idtHostJson", job)
+        self.assertNotIn("idt-host-check.json", job)
 
 
 if __name__ == "__main__":

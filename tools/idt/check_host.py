@@ -33,6 +33,36 @@ def command(args: list[str], *, env=None) -> tuple[int, str]:
         return 1, ""
 
 
+def installed_toolchain(profile: dict[str, str], file_versions: dict) -> dict:
+    """Read the Eclipse product/release files and the actual compiler PE version."""
+    eclipse = Path(profile["e2studio_cli"]).parent
+
+    def properties(path):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+            return dict(line.split("=", 1) for line in lines if "=" in line and not line.lstrip().startswith("#"))
+        except (OSError, UnicodeError):
+            return {}
+
+    product = properties(eclipse / ".eclipseproduct")
+    configuration = properties(eclipse / "configuration/config.ini")
+    release = configuration.get("e2studio.release")
+    platform_version = product.get("version")
+    product_id = product.get("id")
+    e2_verified = bool(release and platform_version and product_id)
+    e2_matches = e2_verified and (release, platform_version, product_id) == (
+        "2026-04.2", "26.4.2", "com.renesas.platform")
+    compiler = file_versions.get("ccrx") or {}
+    compiler_version = compiler.get("ProductVersion")
+    compiler_match = bool(compiler_version and re.fullmatch(r"3\.0?7\.0{1,2}(?:\.0{1,2})?", compiler_version))
+    return {
+        "e2studio": {"status": "verified" if e2_matches else "mismatch" if e2_verified else "unverified",
+                     "release": release, "platform_version": platform_version, "product_id": product_id},
+        "ccrx": {"status": "verified" if compiler_match else "mismatch" if compiler_version else "unverified",
+                 "version": compiler_version},
+    }
+
+
 def check_host(profile: dict[str, str], *, check_aws: bool = False) -> dict:
     checks = []
 
@@ -97,6 +127,9 @@ def check_host(profile: dict[str, str], *, check_aws: bool = False) -> dict:
         record("pinned_bench_ssh_identity", code == 0 and hostname == "ef-saffti-001-rpi-001", "rpi1 -> ef-saffti-001-rpi-001")
     else:
         tool_versions = {}
+    toolchain = installed_toolchain(profile, tool_versions)
+    record("e2studio_release", toolchain["e2studio"]["status"] == "verified", toolchain["e2studio"])
+    record("ccrx_release", toolchain["ccrx"]["status"] == "verified", toolchain["ccrx"])
     aws = {"checked": False}
     if check_aws:
         try:
@@ -113,7 +146,7 @@ def check_host(profile: dict[str, str], *, check_aws: bool = False) -> dict:
             "host": platform.node(), "execution_user": getpass.getuser(),
             "ci_runner_description": os.getenv("CI_RUNNER_DESCRIPTION"), "profile": profile,
             "checks": checks, "tool_file_versions": tool_versions, "wsl_version": wsl_version,
-            "linux_os_release": linux_os_release, "aws": aws,
+            "linux_os_release": linux_os_release, "installed_toolchain": toolchain, "aws": aws,
             "qualification": "not-assessed", "compiler_license": "not-verified; requires a representative firmware compile/link",
             "toolchain_expected": {"e2studio": "2026-04.2", "ccrx": "3.07.00"},
             "limitations": ["Host checks do not prove firmware build, AWS test permissions or IDT E2E success",

@@ -12,6 +12,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import csv
 import io
 import re
@@ -137,6 +138,10 @@ def public_warnings(console: str) -> list[dict]:
             pass
         warnings.append({"test_case": match.group(1), "codes": sorted(codes or {"UNCLASSIFIED_WARNING"}),
                          "cipher_ids": sorted(ciphers)})
+    unmatched = console.count("with status PASS_WITH_WARNINGS") - len(warnings)
+    if unmatched > 0 or ("PASS_WITH_WARNINGS" in console and not warnings):
+        warnings.append({"test_case": "unparsed_native_warning", "codes": ["UNCLASSIFIED_WARNING"],
+                         "cipher_ids": []})
     return warnings
 
 
@@ -242,8 +247,36 @@ def wsl_path(path: Path) -> str:
     return subprocess.check_output([str(WSL), "-d", HOST["wsl_distribution"], "--exec", "wslpath", "-a", "-u", str(path.resolve())], encoding="utf-8").strip()
 
 
+def stop_hardware_runtime(process, runtime, env, credentials):
+    """Let the owned Linux supervisor clean AWS and reset the board on interruption."""
+    command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"],
+               wsl_path(Path(__file__).with_name("stop_runtime.py")), "--source", wsl_path(SOURCE),
+               "--runtime", wsl_path(runtime / "execution")]
+    # Account for interruption during WSL/Python startup, before the supervisor
+    # is visible. This is bounded startup recovery, not device-command polling.
+    for attempt in range(3):
+        if process.poll() is not None:
+            break
+        result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20)
+        if result.returncode != 0:
+            raise RuntimeError("Could not signal the owned IDT supervisor")
+        if json.loads(result.stdout)["signaled"]:
+            break
+        if attempt < 2:
+            time.sleep(1)
+    try:
+        remaining, _ = process.communicate(timeout=300)
+    except subprocess.TimeoutExpired:
+        # Killing wsl.exe alone would abandon the Linux SDK and bench helper.
+        # Keep the ownership journal and fail rather than delete live signers.
+        raise RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse") from None
+    if remaining:
+        with (runtime / "console.log").open("a", encoding="utf-8") as stream:
+            stream.write(redact(remaining, credentials))
+
+
 def transport(runtime: Path, region: str, credentials, provenance: dict, scope: str = "transport",
-              test_id: str | None = None) -> tuple[Path, int]:
+              test_id: str | None = None, diagnostic_only: bool = False) -> tuple[Path, int]:
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives import serialization
 
@@ -279,10 +312,11 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
                 "testStartDelayms": 0, "echoServerConfiguration": {"keyGenerationMethod": "EC", "serverPort": 9000}}
     if scope == "pkcs11":
         userdata["pkcs11LabelConfiguration"] = {
-            # FRQ inserts these values verbatim into C macro definitions.
-            "pkcs11LabelDevicePrivateKeyForTLS": json.dumps("Device Priv TLS Key"),
-            "pkcs11LabelDevicePublicKeyForTLS": json.dumps("Device Pub TLS Key"),
-            "pkcs11LabelDeviceCertificateForTLS": json.dumps("Device Cert"),
+            # FRQ inserts C expressions verbatim. Resolve through the same
+            # project/default macros as the production PAL, including overrides.
+            "pkcs11LabelDevicePrivateKeyForTLS": "pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS",
+            "pkcs11LabelDevicePublicKeyForTLS": "pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS",
+            "pkcs11LabelDeviceCertificateForTLS": "pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS",
         }
     ota_env = {}
     if scope == "ota-pal":
@@ -322,6 +356,8 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
                  "IDT_WINDOWS_SSH": wsl_path(Path(HOST["windows_ssh"])),
                  "IDT_WINDOWS_SCP": wsl_path(Path(HOST["windows_scp"]))}
     inherited.update(ota_env)
+    if diagnostic_only:
+        inherited["IDT_DIAGNOSTIC_ONLY"] = "1"
     if credentials.token:
         inherited["AWS_SESSION_TOKEN"] = credentials.token
     env.update(inherited)
@@ -366,6 +402,10 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
                         print("IDT phase: " + phase, flush=True)
                         break
             code = process.wait()
+    except BaseException:
+        if process is not None and process.poll() is None:
+            stop_hardware_runtime(process, runtime, env, credentials)
+        raise
     finally:
         if signer_session is not None:
             try:
@@ -395,10 +435,15 @@ def main() -> int:
                         default=os.getenv("RX72N_IDT_TEST_ID") or None,
                         help="Optional single-case OTA bring-up; not a complete group result")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--diagnostic-only", action="store_true", help="OTA credential diagnosis; stops before compiler/flash")
     parser.add_argument("--region", default=os.getenv("AWS_DEFAULT_REGION", "ap-northeast-1"))
     args = parser.parse_args()
+    if args.test_id not in {None, "OTAE2EGreaterVersion"}:
+        parser.error("Unsupported RX72N_IDT_TEST_ID")
     if args.test_id and args.scope != "ota-mqtt":
         parser.error("The selected test ID requires --scope ota-mqtt")
+    if args.diagnostic_only and args.scope != "ota-mqtt":
+        parser.error("Diagnostic-only is restricted to OTA credential bring-up")
     if os.name != "nt":
         parser.error("Run this entry point on the Windows CC-RX/AWS runner")
     HOST = load_host_profile()
@@ -410,6 +455,7 @@ def main() -> int:
     import boto3
     credentials = boto3.Session().get_credentials().get_frozen_credentials()
     metadata = {"scope": args.scope, "test_id": args.test_id,
+                "diagnostic_only": args.diagnostic_only,
                 "complete_group_requested": args.test_id is None,
                 "source_sha": git("rev-parse", "HEAD"),
                 "source_dirty": bool(git("status", "--porcelain")), "idt_version": VERSION,
@@ -422,13 +468,15 @@ def main() -> int:
         if args.scope != "preflight":
             library_sha = test_library_sha()
             provenance = {"source_sha": metadata["source_sha"], "test_library_sha": library_sha, "source_tree_dirty": metadata["source_dirty"]}
-            report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id)
+            report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id, args.diagnostic_only)
         else:
             report, idt_code = preflight(runtime, args.region, credentials)
-    except Exception as error:
+    except (Exception, KeyboardInterrupt) as error:
         write_json(args.output / "summary.json", {"passed": False, "scope": args.scope, "problem": "IDT runtime/setup failure", "error_type": type(error).__name__})
         metadata.update(finished_utc=datetime.now(timezone.utc).isoformat(), runtime_failed=True)
         write_json(args.output / "metadata.json", metadata)
+        if isinstance(error, KeyboardInterrupt):
+            raise SystemExit(130) from None
         raise
     exported = args.output / "FRQ_Report.xml"
     export_report(report, exported, credentials)
@@ -452,7 +500,11 @@ def main() -> int:
     warnings = public_warnings(console_file.read_text(encoding="utf-8")) if console_file.is_file() else []
     summary["warnings"] = warnings
     metadata["warnings"] = warnings
-    write_json(args.output / "summary.json", summary)
+    # A partially written/corrupt build manifest must not leave an apparent
+    # passing summary when the host exits during evidence collection.
+    incomplete = dict(summary, passed=False,
+                      problems=list(summary["problems"]) + ["IDT evidence collection did not finish"])
+    write_json(args.output / "summary.json", incomplete)
     metadata.update(runner_exit_code=idt_code, report_check_exit_code=checked.returncode,
                     finished_utc=datetime.now(timezone.utc).isoformat())
     if args.scope != "preflight":
@@ -488,6 +540,7 @@ def main() -> int:
             if rsu.is_file():
                 metadata["firmware_sha256"]["rsu"] = hashlib.sha256(rsu.read_bytes()).hexdigest()
     write_json(args.output / "metadata.json", metadata)
+    write_json(args.output / "summary.json", summary)
     print(json.dumps(summary, sort_keys=True))
     return 0 if summary["passed"] and idt_code == 0 and checked.returncode == 0 else 1
 

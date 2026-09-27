@@ -61,7 +61,7 @@ variables:
   RUN_RX72N_IDT: "false"
   # Override when a second Windows/WSL host has the same validated capabilities.
   RX72N_IDT_RUNNER_TAG: "hw-ishiguro-pc"
-  RX72N_IDT_PYTHON: "python"
+  RX72N_IDT_PYTHON: "C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe"
   # Bring-up scopes are partial results, not a release qualification PASS.
   RX72N_IDT_SCOPE: "preflight"
   NIGHTLY_MATRIX_INCLUDE_STABILIZING: "false"
@@ -539,12 +539,25 @@ idt_ci_contract:
         - tools/ci/tests/test_idt_host_profile.py
         - tools/ci/tests/test_idt_credentials.py
         - tools/ci/tests/test_idt_bundle.py
+        - tools/ci/tests/test_idt_stop.py
       when: on_success
     - when: never
   script:
-    - python3 -m unittest tools.ci.tests.test_idt_report tools.ci.tests.test_idt_host_profile -v
-    - python3 -m unittest tools.ci.tests.test_idt_credentials -v
-    - python3 -m unittest tools.ci.tests.test_idt_bundle -v
+    - |
+      idt_ci_venv="$(mktemp -d "$CI_PROJECT_DIR/.idt-ci-venv.XXXXXX")"
+      trap 'rm -rf -- "$idt_ci_venv"' EXIT
+      python3 -m venv "$idt_ci_venv"
+      idt_ci_python="$idt_ci_venv/bin/python"
+      "$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-wsl.txt
+      "$idt_ci_python" -m pip check
+      "$idt_ci_python" -m unittest \
+        tools.ci.tests.test_idt_report \
+        tools.ci.tests.test_idt_host_profile \
+        tools.ci.tests.test_idt_credentials \
+        tools.ci.tests.test_idt_bundle \
+        tools.ci.tests.test_idt_stop \
+        tools.idt.ota_aws_signers_tests \
+        tools.idt.ota_support_tests -v
 
 test_rx72n_idt:
   stage: test
@@ -566,6 +579,20 @@ test_rx72n_idt:
     - when: never
   script:
     - |
+      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --check-aws
+      $idtHostStatus = $LASTEXITCODE
+      try { $idtHostCheck = ($idtHostJson -join "`n") | ConvertFrom-Json }
+      catch { throw "IDT host preflight did not return valid JSON" }
+      foreach ($check in $idtHostCheck.checks) {
+        Write-Host ("IDT host check {0}: passed={1}" -f $check.name, $check.passed)
+      }
+      Write-Host ("IDT host versions: e2studio={0}, CC-RX={1}, Linux={2}" -f `
+        $idtHostCheck.installed_toolchain.e2studio.release, `
+        $idtHostCheck.installed_toolchain.ccrx.version, `
+        $idtHostCheck.linux_os_release.VERSION_ID)
+      if ($idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed) {
+        throw "IDT host preflight failed; inspect the named checks under the runner identity"
+      }
       & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
