@@ -66,6 +66,7 @@ IDTは専用のパイプライン引数を明示した場合だけ実行する�
 native MQTT試験は10件完走し、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAILです。IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致しません。
 PKCS11 Coreの基本APIは10件PASSですが、ECC object / signの別groupは未実行です。
 OTA PALは14件のassertionがPASS、対象外のfilesystem専用1件をIDTがFAILとして記録しました。全体合格には扱いません。
+OTA E2Eの`OTAE2EGreaterVersion`は、clean SHA `97e6c070`の[pipeline #11255](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11255)でPASSしました。初期1.9.1・更新先1.9.2をビルドし、AWSジョブの`SUCCEEDED`とnativeのsetup / 更新ケース / cleanupの3件PASSを確認しています。OTA group全体の合格ではありません。
 版照合・TLS・MQTT・PKCS11・OTA PAL・OTA E2Eの実行経路と再構築用host profileを用意しています。各scopeの結果と未検証範囲は[IDT検証](docs/idt-validation.md)に集約します。
 **全IDT合格とタグ作成前の自動gateは未完了**で、新規リリースタグを保留します。
 既存のMQTT / OTA CI成功はIDT合格の代用にはなりません。

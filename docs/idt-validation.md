@@ -1,6 +1,7 @@
 # RX72N EthernetのIDT検証
 
 RX72N Envision Kit / Ethernet / software TLSで、**TLS transportの14件が実機PASS**しました。
+OTA E2Eの**新しいバージョンへの更新ケースも、clean SHA `97e6c070`の実機CIでPASS**しました。
 MQTTのnative IDT試験は完走しましたが、IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致せず、6件がFAILです。
 FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリース要件充足には達していません**。
 新規リリースタグの保留方針を維持し、IDTは明示したパイプラインだけで実行します。
@@ -16,7 +17,7 @@ FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリー
 | `mqtt` | `FullCloudIoT` | native MQTT03: 10件完走、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAIL |
 | `pkcs11` | `FullPKCS11_Core` | **10件PASS / 0 FAIL / 0 ERROR / 0 SKIP**。capabilities、digest、random、初期化 / session |
 | `ota-pal` | `OTACore` | **14件のassertion PASS**、filesystem専用1件はIGNORE。native IDTはこのIGNOREをFAILと記録し、全体NG |
-| `ota-mqtt` | `OTADataplaneMQTT` | 公開鍵を渡す経路で、ACTIVEなEC証明書と設定した秘密鍵の一致を診断確認。実際のOTA更新は未確認 |
+| `ota-mqtt` | `OTADataplaneMQTT` | **GreaterVersionの単一ケースPASS**。setup / 更新ケース / cleanupの3件PASS。[pipeline #11255](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11255)。group全体は未実行 |
 
 TLSの確定証跡は[`9cadbfeb0a10a51a1f2953127346a58bd38805bf`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/9cadbfeb0a10a51a1f2953127346a58bd38805bf)のclean checkoutによるものです。
 他のscopeや対象SHAに、この14件の合格を流用しません。
@@ -30,6 +31,15 @@ main `0dc57833`に実装中の差分を加えた試作の結果（`source_dirty=
 [OTA PALの証跡](https://gitlab.saffti.jp/-/project/38/uploads/c40a51ac23d6972d57beb71b3d924dbb/pilot-otapal-01-sanitized-evidence.zip)では、
 実機Unity出力が`15 Tests 0 Failures 1 Ignored`、native JUnitが14 PASS / 1 FAILでした。これも`source_dirty=true`の試作結果です。署名検証、異常署名拒否、inactive bankへの書込み・状態APIのassertionを確認し、終了時のreset保持とUART 0 bytesも確認しました。
 
+**OTA E2E:** [job #70643](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70643)は未変更の`97e6c070bd51aa11f0a93cc3d4fbf50070554e01`で実行し、1.9.1と1.9.2のpayload（各1,834,496 bytes）を生成しました。
+nativeはAWS OTAジョブの`SUCCEEDED`を確認し、JUnitは3 PASS / 0 FAIL / 0 ERROR / 0 SKIPです。これは1つの更新ケースとsetup / cleanupの結果で、3種類の更新試験やgroup全体の合格を意味しません。
+[sanitized証跡](https://gitlab.saffti.jp/-/project/38/uploads/ebf169ff93dc2c741d3c88467abc937c/ota-greater-version-11255-sanitized-evidence.zip)のSHA-256は`681ab46a68bae10d77a49cd684a2e4fb463f58d20acebad4e70c88f954b70b60`です。payload hashと版数はmetadataに保持しています。
+bankの整合性検査・切替ログは得られましたが、更新後の`Application version 1.9.2`というUARTバナーはこのcaptureでは得られていません。nativeのPASSと、独立した起動版確認を区別します。
+IDT終了時はreset保持 / UART 0 bytes、AWSのThing / job / OTA updateの不存在、公開鍵が一致する証明書0件、一時ACM証明書2件削除を確認しました。その後、通常MR CIのjob #70641が通常firmwareを再書込み・provisionし、MQTT試験に成功しています。
+
+<details>
+<summary>OTA認証情報の接続方法と立上げ時の切り分け</summary>
+
 OTA setupでは`KeyProvisioning=Import`、ECC公開鍵を設定しても、対象ThingのprincipalはACTIVEなRSA証明書でした。
 既存EC証明書を指定する診断でも同じ不一致になったため、この追加証明書を作る試作コードは採用していません。
 その後、OTAスコープだけnativeの`KeyProvisioning=Onboard`で公開鍵を渡すと、ACTIVEなEC証明書1件と試験用秘密鍵の一致を確認できました。
@@ -38,6 +48,8 @@ OTA setupでは`KeyProvisioning=Import`、ECC公開鍵を設定しても、対�
 各試行の一時ACM証明書2件と、既存証明書指定の診断用IoT証明書は削除を確認しました。
 19:05頃の診断中にはRPi #1へのSSH接続も切れ、native cleanupがERRORになりました。CloudTrailで所有を確認して残存資源を回収しました。[診断・回収証跡](https://gitlab.saffti.jp/-/project/38/uploads/3902f283dfdc894cfc895060ce5d4d7e/ota-setup-sanitized-evidence.zip)はこの失敗を維持しています。
 再接続後のreset操作は成功しましたが、直後のUART2 bytesで静止検査はNGでした。その後、共有lock下の観測で3秒連続0 bytesを確認しました。
+
+</details>
 
 ## 明示実行
 
@@ -136,7 +148,7 @@ TLS cipherの`PASS_WITH_WARNINGS`もそのまま保持します。
 警告中の8 cipher suiteは[AWS IoTの現行対応表](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)にあり、`0x00FF`はSCSVです。警告を危険な暗号方式の使用確定として扱いません。
 
 **OTA署名:** 文書化された`customSignCommand`の波括弧placeholderがnative IDTの`GetUserData`による先行展開と衝突し、その経路では試験開始に至りませんでした。
-[AWS Signer用の準備・cleanup](../tools/idt/ota_aws_signers.py)を実装し、native OTA02で実行専用ACM証明書2件のimportと終了時の削除確認に成功しました。setup時に一致する有効なデバイス証明書を取得できず、更新用firmwareのbuild前で停止しました。OTA更新はまだ未確認です。
+[AWS Signer用の準備・cleanup](../tools/idt/ota_aws_signers.py)を実装しています。初期のOTA02は認証情報の不一致でbuild前に停止しましたが、公開鍵の受渡し経路を修正したpipeline #11255ではGreaterVersionの単一ケースがPASSしました。署名不正・旧版・同版等を含むgroup全体は未実行です。
 一時ACM証明書は実行固有のtagとjournalで所有を確認し、IDT終了・native cleanup後に削除します。
 
 **OTA PAL:** inactive bankの実flashに対する既存assertionを実行するportです。
