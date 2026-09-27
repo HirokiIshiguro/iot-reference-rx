@@ -62,6 +62,11 @@
 #ifndef AWS_UNITY_CONFIG_H
 #define AWS_UNITY_CONFIG_H
 
+void TEST_CacheResult( char cResult );
+void TEST_SubmitResultBuffer( void );
+void TEST_NotifyTestStart( void );
+void TEST_NotifyTestFinished( void );
+
 /* ************************* AUTOMATIC INTEGER TYPES ***************************
  * C's concept of an integer varies from target to target. The C Standard has
  * rules about the `int` matching the register size of the target

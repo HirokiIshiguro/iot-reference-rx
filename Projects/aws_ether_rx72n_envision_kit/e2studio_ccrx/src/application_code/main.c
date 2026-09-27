@@ -50,6 +50,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
+#if defined( ENABLE_IDT_TRANSPORT_TEST ) && ( ENABLE_IDT_TRANSPORT_TEST == 1 )
+#include "rx72n_idt_transport.h"
+#endif
 #if defined(ENABLE_MULTI_TLS_DEMO) && (ENABLE_MULTI_TLS_DEMO == 1)
 #include "multi_tls_demo.h"
 #endif
@@ -221,14 +224,21 @@ void main_task(void *pvParameters)
     xResults = littlFs_init();
     prvDisplayWrite((LFS_ERR_OK == xResults) ? "LittleFS OK\r\n" : "LittleFS ERROR\r\n");
 
+#if !defined( ENABLE_IDT_TRANSPORT_TEST ) || ( ENABLE_IDT_TRANSPORT_TEST != 1 )
     xMQTTAgentInit();
     prvDisplayWrite("MQTT agent init\r\n");
+#endif
 
     if (LFS_ERR_OK == xResults)
     {
         xCacheInitResult = vprvCacheInit();
     }
 
+#if defined( ENABLE_IDT_TRANSPORT_TEST ) && ( ENABLE_IDT_TRANSPORT_TEST == 1 )
+    /* The test task provisions the IDT echo-server credentials after KVS init. */
+    xProceedToDemo = ( ( LFS_ERR_OK == xResults ) &&
+                       ( LFS_ERR_OK == xCacheInitResult ) ) ? pdTRUE : pdFALSE;
+#else
 #if (ENABLE_CREDENTIAL_BY_CLI == 1)
     if( ( LFS_ERR_OK == xResults ) &&
         ( LFS_ERR_OK == xCacheInitResult ) &&
@@ -243,6 +253,7 @@ void main_task(void *pvParameters)
 #else
     xProceedToDemo = ApplicationCounter(Time2Wait);
 #endif
+#endif /* ENABLE_IDT_TRANSPORT_TEST */
 
     if (pdTRUE == xProceedToDemo)
     {
@@ -279,7 +290,19 @@ void main_task(void *pvParameters)
         FreeRTOS_printf(("---------STARTING DEMO---------\r\n"));
         prvDisplayWrite("Starting demo\r\n");
 
-            #if (ENABLE_FLEET_PROVISIONING_DEMO == 1)
+            #if defined( ENABLE_IDT_TRANSPORT_TEST ) && ( ENABLE_IDT_TRANSPORT_TEST == 1 )
+                BaseType_t xIdtStartResult = xStartIdtTransportTest();
+                if( xIdtStartResult != pdPASS )
+                {
+                    configPRINT_STRING( "IDT_PORT_FATAL: test task creation failed\r\n" );
+                    /* Keep this failure explicit even when configASSERT is disabled. */
+                    for( ;; )
+                    {
+                        vTaskSuspend( NULL );
+                    }
+                }
+                prvDisplayWrite("IDT transport test start\r\n");
+            #elif (ENABLE_FLEET_PROVISIONING_DEMO == 1)
                 vStartFleetProvisioningDemo();
             #else
                 xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
