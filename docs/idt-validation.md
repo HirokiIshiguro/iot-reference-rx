@@ -34,6 +34,8 @@ main `0dc57833`に実装中の差分を加えた試作の結果（`source_dirty=
 **OTA E2E（最新）:** [job #70703](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70703)は未変更の`c9fcadb1d733e7116d6641661c3e94fe25264c78`で、native 3 PASS / 0 FAIL / 0 ERROR / 0 SKIPでした。UARTで初期image `3b0a915e…`（1.9.1）→更新image `5cedbf7d…`（1.9.2）を順に確認し、`native_junit_passed=true`と`ota_boot_verified=true`を別々に記録しています。各imageはbuild ledgerのpayload hash・source SHAと一致します。
 IDT終了時はreset保持 / UART 1秒0 bytesでした。AWS APIでもThing / job / OTA update / S3 bucketの不存在、実行時間帯のIDT用IAM role / policyと一致証明書の残存0、一時ACM証明書2件の不存在を確認しました。
 
+[#11262・#11264・#11265のsanitized証跡](https://gitlab.saffti.jp/-/project/38/uploads/539031949e04d575e3cc0e0ef84248ee/idt-ota-witness-11262-11265-sanitized-evidence.zip)は公開用JSON/XMLと説明だけを含みます。SHA-256は`2ba4766587b60b504a79021369df84bcc530bbd7b221b9ddf5d216e69cc4e3ba`です。raw UART、注入済みsource/firmware、秘密鍵は含めていません。
+
 **異常系の途中結果:** 同じ`c9fcadb1`の[pipeline #11265](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11265)は、PreviousVersion → SameVersion → UntrustedCertificateの選択実行中に停止しました。
 
 | case | 確認結果 |
@@ -44,6 +46,9 @@ IDT終了時はreset保持 / UART 1秒0 bytesでした。AWS APIでもThing / jo
 
 nativeは失敗したflash callbackの後も試験を継続しました。所有するsupervisorへ停止を要求したところ、IDTのCancel処理がnil-pointer panicで終了し、最終JUnitは生成されませんでした。従ってこのrunを合格件数に加えません。MCUはreset保持 / UART 1秒0 bytesで停止しました。CloudTrail作成履歴、IAMの不変ID・専用参照、試験用公開鍵との一致を確認して残存資源を回収し、Thing・証明書・S3 bucket・IAM role/policy等の残存0をAPIで確認しています。
 UART downloaderはCRの進捗行とCRLFのエラー行を個別に扱い、`R_FLASH_*`エラーや`system error`を即時不合格にします。flash callbackの失敗もprivate runtimeへ保持し、nativeが無視してもsupervisorが停止・不合格にするようにしています。これはconst-data書込み不具合や旧版rollback自体を修正したものではありません。
+旧版拒否・自律rollbackの設計と実機検証は[Issue #158](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/158)で追跡します。
+
+残る2ケースを指定した#11267は、native開始前のACM準備でWindowsの記録ファイル保存が`PermissionError`となり停止しました。ready状態の一時ファイルが残り、同じ権限で後処理時の保存は成功したため、一時的な置換拒否が疑われます。MCU書込みは行わず、ACM証明書2件は削除しました。対策としてWindowsの該当エラーだけ、同じ一時ファイルの置換を最大5回・合計0.75秒の待ち時間で試みます。AWS importや実機試験は再試行せず、恒久的な拒否は不合格のまま記録を保持します。
 
 **OTA E2E（旧記録）:** [job #70643](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70643)は未変更の`97e6c070bd51aa11f0a93cc3d4fbf50070554e01`で実行し、1.9.1と1.9.2のpayload（各1,834,496 bytes）を生成しました。
 nativeはAWS OTAジョブの`SUCCEEDED`を確認し、JUnitは3 PASS / 0 FAIL / 0 ERROR / 0 SKIPです。これは1つの更新ケースとsetup / cleanupの結果で、3種類の更新試験やgroup全体の合格を意味しません。

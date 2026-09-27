@@ -115,6 +115,50 @@ class AwsSignerTests(OtaSupportTests):
         self.assertEqual(journal["certificates"][0]["role"], "trusted")
         self.assertEqual(journal["state"], "prepare_failed")
 
+    def test_transient_windows_ready_rename_does_not_repeat_aws_import(self):
+        replace = module.os.replace
+        failed = []
+        def sharing_violation_once(source, target):
+            if json.loads(source.read_text())["state"] == "ready" and not failed:
+                failed.append(True)
+                error = PermissionError("test sharing violation")
+                error.winerror = 32
+                raise error
+            return replace(source, target)
+        with patch.object(module.os, "replace", side_effect=sharing_violation_once), \
+                patch.object(module.time, "sleep") as sleep:
+            self.prepare()
+        self.assertEqual(len(self.acm.certificates), 2)
+        self.assertEqual(json.loads((self.inputs / module.JOURNAL).read_text())["state"], "ready")
+        sleep.assert_called_once_with(0.05)
+        self.assertEqual(list(self.inputs.glob(module.JOURNAL + ".*.tmp")), [])
+
+    def test_persistent_windows_rename_failure_is_bounded_and_preserves_journal(self):
+        path = self.inputs / "rename-test.json"
+        module._persist(path, {"state": "before"}, initial=True)
+        error = PermissionError("test permanent access denial")
+        error.winerror = 5
+        with patch.object(module.os, "replace", side_effect=error) as replace, \
+                patch.object(module.time, "sleep") as sleep:
+            with self.assertRaises(PermissionError):
+                module._persist(path, {"state": "after"})
+        self.assertEqual(replace.call_count, 5)
+        self.assertEqual(sleep.call_count, 4)
+        self.assertEqual(json.loads(path.read_text())["state"], "before")
+        temporary = list(self.inputs.glob("rename-test.json.*.tmp"))
+        self.assertEqual(len(temporary), 1)
+        self.assertEqual(json.loads(temporary[0].read_text())["state"], "after")
+
+    def test_other_permission_errors_are_not_retried(self):
+        path = self.inputs / "rename-test.json"
+        module._persist(path, {"state": "before"}, initial=True)
+        with patch.object(module.os, "replace", side_effect=PermissionError("test denial")) as replace, \
+                patch.object(module.time, "sleep") as sleep:
+            with self.assertRaises(PermissionError):
+                module._persist(path, {"state": "after"})
+        self.assertEqual(replace.call_count, 1)
+        sleep.assert_not_called()
+
 
 def load_tests(loader, _tests, _pattern):
     return loader.loadTestsFromTestCase(AwsSignerTests)

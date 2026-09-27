@@ -55,6 +55,9 @@ The host records UART before native parsing and drains it through EOF; raw
 bytes remain private. The single GreaterVersion job additionally requires an
 observed initial-image boot followed by the newer built image. This observation
 does not replace or rewrite the native JUnit result.
+Flash callback failures remain latched in the private runtime. The supervisor
+checks that latch during execution and after native exit, so a native zero exit
+cannot turn a failed initial flash into a passing run.
 
 ## Credentials and runtime isolation
 
