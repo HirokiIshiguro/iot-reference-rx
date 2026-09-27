@@ -181,9 +181,23 @@
  */
 #define PKCS11_TEST_RSA_KEY_SUPPORT                      ( 0 )
 #define PKCS11_TEST_EC_KEY_SUPPORT                       ( 1 )
-#define PKCS11_TEST_IMPORT_PRIVATE_KEY_SUPPORT           ( 0 )
+#define PKCS11_TEST_IMPORT_PRIVATE_KEY_SUPPORT           ( 1 )
 #define PKCS11_TEST_GENERATE_KEYPAIR_SUPPORT             ( 0 )
-#define PKCS11_TEST_PREPROVISIONED_SUPPORT               ( 1 )
+#define PKCS11_TEST_PREPROVISIONED_SUPPORT               ( 0 )
+
+/* Match the RX72N software PAL's supported labels. The EC/import test profile
+ * creates and destroys disposable objects at these labels. */
+#include "core_pkcs11_config.h"
+#include "core_pkcs11_config_defaults.h"
+#ifndef PKCS11_TEST_LABEL_DEVICE_PRIVATE_KEY_FOR_TLS
+#define PKCS11_TEST_LABEL_DEVICE_PRIVATE_KEY_FOR_TLS pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS
+#endif
+#ifndef PKCS11_TEST_LABEL_DEVICE_PUBLIC_KEY_FOR_TLS
+#define PKCS11_TEST_LABEL_DEVICE_PUBLIC_KEY_FOR_TLS pkcs11configLABEL_DEVICE_PUBLIC_KEY_FOR_TLS
+#endif
+#ifndef PKCS11_TEST_LABEL_DEVICE_CERTIFICATE_FOR_TLS
+#define PKCS11_TEST_LABEL_DEVICE_CERTIFICATE_FOR_TLS pkcs11configLABEL_DEVICE_CERTIFICATE_FOR_TLS
+#endif
 
 #define PKCS11_TEST_JITP_CODEVERIFY_ROOT_CERT_SUPPORTED   (0)
 

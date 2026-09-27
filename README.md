@@ -60,10 +60,14 @@ IDTは専用のパイプライン引数を明示した場合だけ実行する�
 
 - **合格条件:** 対象構成の必須試験がすべてPASSであること。未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。
 - **証跡:** commit / submodule SHA、ボード・TLS構成、firmware hash、IDT / test suite版、実行pipelineと結果reportを対応付け、リリース時に参照できる形で保存します。対象SHAや構成が変わった場合、以前の合格結果は流用しません。
-- **費用:** コード変更ごとのIDT実行と無制限の自動再試行は行いません。[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生するため、実行前に利用量・費用上限・停止条件を定め、終了時に試験用AWS資源を片付けます。
+- **費用:** 実装時の動作検証を進め、通常運用ではコード変更ごとのIDT実行と無制限の自動再試行を避けます。[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生するため、運用時は利用量・費用上限・停止条件を定め、試験終了時にAWS資源を片付けます。
 
-**初回実機検証:** RX72N Ethernet / software TLSで、IDTの`FullTransportInterfaceTLS`が14/14 PASS（2026-09-27）でした。
-版照合とTLS通信の明示実行経路を用意していますが、MQTT・PKCS11・Device Advisor・OTAを含む全IDT合格と、タグ作成前の自動gateは未完了です。
+**実機検証:** RX72N Ethernet / software TLSの`FullTransportInterfaceTLS`は、clean SHA `9cadbfeb`の[pipeline #11247](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11247)で14/14 PASSでした。
+native MQTT試験は10件完走し、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAILです。IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致しません。
+PKCS11 Coreの基本APIは10件PASSですが、ECC object / signの別groupは未実行です。
+OTA PALは14件のassertionがPASS、対象外のfilesystem専用1件をIDTがFAILとして記録しました。全体合格には扱いません。
+版照合・TLS・MQTT・PKCS11・OTA PAL・OTA E2Eの実行経路と再構築用host profileを用意しています。各scopeの結果と未検証範囲は[IDT検証](docs/idt-validation.md)に集約します。
+**全IDT合格とタグ作成前の自動gateは未完了**で、新規リリースタグを保留します。
 既存のMQTT / OTA CI成功はIDT合格の代用にはなりません。
 2026-09-27確認時点の[AWS公式対応表](https://docs.aws.amazon.com/freertos/latest/userguide/dev-test-versions-afr.html)は
 IDT 4.9.0 / FRQ_2.5.0と202210-LTSまでを掲載しており、本リポジトリの202604.00-LTSは実際のIDT版照合でも不合格でした。

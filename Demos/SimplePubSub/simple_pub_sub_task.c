@@ -75,7 +75,9 @@
 /**
  * @brief Number of publishes done by each task in this demo.
  */
-#define mqttexamplePUBLISH_COUNT (10)
+#ifndef mqttexamplePUBLISH_COUNT
+    #define mqttexamplePUBLISH_COUNT (10)
+#endif
 
 /**
  * @brief Number of unsubscribe retries in this demo.

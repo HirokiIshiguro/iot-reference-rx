@@ -1,0 +1,9 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef RX72N_IDT_CLOUD_H
+#define RX72N_IDT_CLOUD_H
+
+#include "FreeRTOS.h"
+
+BaseType_t xProvisionIdtCloudCredentials( void );
+
+#endif

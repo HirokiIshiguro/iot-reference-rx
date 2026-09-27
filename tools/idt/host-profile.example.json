@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "install_root": "C:\\ai\\codex\\tools\\aws-idt",
+  "runtime_root": "C:\\ai\\codex\\tmp\\rx72n-idt",
+  "workspace_root": "C:\\ai\\codex\\ws",
+  "wsl_distribution": "Ubuntu",
+  "wsl_python": "python3",
+  "windows_powershell": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+  "e2studio_cli": "C:\\Renesas\\e2_studio_2026_04_2\\eclipse\\e2studioc.exe",
+  "ccrx": "C:\\Program Files (x86)\\Renesas\\RX\\3_7_0\\bin\\ccrx.exe",
+  "windows_ssh": "C:\\Windows\\System32\\OpenSSH\\ssh.exe",
+  "windows_scp": "C:\\Windows\\System32\\OpenSSH\\scp.exe"
+}

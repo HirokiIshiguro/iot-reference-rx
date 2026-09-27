@@ -13,6 +13,8 @@ from types import SimpleNamespace
 from tools.idt.check_idt_report import check_report, main
 from tools.idt.run_idt import combined_summary
 from tools.idt.run_idt import export_report
+from tools.idt.run_idt import public_warnings
+from tools.idt import run_idt
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -39,6 +41,20 @@ def report(group: str = "FreeRTOSVersion", status: str = "") -> str:
 
 
 class IdtReportTests(unittest.TestCase):
+    def test_cipher_warning_is_preserved_without_raw_diagnostics(self) -> None:
+        diagnostics = json.dumps([{"message": "FOUND_UNSUPPORTED_CIPHER_SUITE",
+                                   "description": "secret-value must stay private; [0xc02f, 0xff]"},
+                                  {"message": "NO_RECOMMENDED_CIPHER_SUITE", "description": "secret-value"}])
+        result = public_warnings("-- Finished: TLS_Ciphers with status PASS_WITH_WARNINGS and message " + diagnostics + " --")
+        self.assertEqual(["0xc02f", "0xff"], result[0]["cipher_ids"])
+        self.assertEqual(2, len(result[0]["codes"]))
+        self.assertNotIn("secret-value", json.dumps(result))
+
+    def test_unparsed_warning_cannot_silently_look_like_clean_pass(self) -> None:
+        result = public_warnings("-- Finished: Example with status PASS_WITH_WARNINGS and message secret-value --")
+        self.assertEqual(["UNCLASSIFIED_WARNING"], result[0]["codes"])
+        self.assertNotIn("secret-value", json.dumps(result))
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -121,6 +137,34 @@ class IdtReportTests(unittest.TestCase):
                 result = main([str(self.path), "--required-group", "FreeRTOSVersion"])
             self.assertEqual(exit_code, result)
             self.assertEqual(exit_code == 0, json.loads(stdout.getvalue())["passed"])
+
+
+class IdtScopeContractTests(unittest.TestCase):
+    def test_scopes_select_native_idt_groups_and_are_exposed_by_cli(self):
+        expected = {
+            "preflight": "FreeRTOSVersion", "transport": "FullTransportInterfaceTLS",
+            "mqtt": "FullCloudIoT", "ota-mqtt": "OTADataplaneMQTT",
+        }
+        self.assertEqual(expected, {scope: run_idt.SCOPE_GROUPS[scope] for scope in expected})
+        stdout = io.StringIO()
+        from unittest.mock import patch
+        with patch("sys.argv", ["run_idt.py", "--help"]), contextlib.redirect_stdout(stdout):
+            with self.assertRaises(SystemExit) as result:
+                run_idt.main()
+        self.assertEqual(0, result.exception.code)
+        for scope in run_idt.SCOPE_GROUPS:
+            self.assertIn(scope, stdout.getvalue())
+
+    def test_single_ota_case_cannot_be_used_for_a_non_ota_scope(self):
+        from unittest.mock import patch
+        from contextlib import redirect_stderr
+        for scope in ("preflight", "transport", "mqtt"):
+            with self.subTest(scope=scope), patch("sys.argv", [
+                "run_idt.py", "--scope", scope, "--test-id", "OTAE2EGreaterVersion", "--output", "unused",
+            ]), redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as result:
+                    run_idt.main()
+                self.assertEqual(2, result.exception.code)
 
 
 class IdtReportExportTests(unittest.TestCase):
@@ -243,9 +287,9 @@ class IdtCiContractTests(unittest.TestCase):
     def test_idt_uses_windows_aws_runner_and_shared_compiler_lock(self) -> None:
         job = self.blocks["test_rx72n_idt"]
         for setting in (
-            "extends: .aws_cli_windows_job", "- os-windows", "- hw-ishiguro-pc",
+            "extends: .aws_cli_windows_job", "- os-windows", "- $RX72N_IDT_RUNNER_TAG",
             "- $AWS_CLI_RUNNER_TAG", "resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP",
-            'python tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt',
+            '& "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt',
             "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
         ):
             self.assertIn(setting, job)
@@ -269,7 +313,7 @@ class IdtCiContractTests(unittest.TestCase):
             'CI_PIPELINE_SOURCE == "merge_request_event"',
             'GIT_SUBMODULE_STRATEGY: "none"', "- .gitlab-ci.yml",
             "- tools/idt/**/*", "- tools/ci/tests/test_idt_report.py",
-            "python3 -m unittest tools.ci.tests.test_idt_report -v",
+            "python3 -m unittest tools.ci.tests.test_idt_report tools.ci.tests.test_idt_host_profile -v",
         ):
             self.assertIn(setting, job)
 

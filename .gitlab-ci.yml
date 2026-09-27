@@ -59,6 +59,9 @@ variables:
   #   idt     - explicit web/API IDT run; no normal board/OTA jobs.
   PIPELINE_PROFILE: "branch"
   RUN_RX72N_IDT: "false"
+  # Override when a second Windows/WSL host has the same validated capabilities.
+  RX72N_IDT_RUNNER_TAG: "hw-ishiguro-pc"
+  RX72N_IDT_PYTHON: "python"
   # Bring-up scopes are partial results, not a release qualification PASS.
   RX72N_IDT_SCOPE: "preflight"
   NIGHTLY_MATRIX_INCLUDE_STABILIZING: "false"
@@ -533,10 +536,15 @@ idt_ci_contract:
         - .gitlab-ci.yml
         - tools/idt/**/*
         - tools/ci/tests/test_idt_report.py
+        - tools/ci/tests/test_idt_host_profile.py
+        - tools/ci/tests/test_idt_credentials.py
+        - tools/ci/tests/test_idt_bundle.py
       when: on_success
     - when: never
   script:
-    - python3 -m unittest tools.ci.tests.test_idt_report -v
+    - python3 -m unittest tools.ci.tests.test_idt_report tools.ci.tests.test_idt_host_profile -v
+    - python3 -m unittest tools.ci.tests.test_idt_credentials -v
+    - python3 -m unittest tools.ci.tests.test_idt_bundle -v
 
 test_rx72n_idt:
   stage: test
@@ -544,7 +552,7 @@ test_rx72n_idt:
   tags:
     - exec-shell
     - os-windows
-    - hw-ishiguro-pc
+    - $RX72N_IDT_RUNNER_TAG
     - ccrx
     - $AWS_CLI_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
@@ -558,7 +566,7 @@ test_rx72n_idt:
     - when: never
   script:
     - |
-      python tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt
+      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
