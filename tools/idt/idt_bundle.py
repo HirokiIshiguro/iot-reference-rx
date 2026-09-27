@@ -67,7 +67,12 @@ def verify_install(root: Path, host_os: str) -> None:
             raise RuntimeError("IDT static file resolves outside its installation")
         try:
             with path.open("rb") as stream:
-                digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                # The lightweight Linux CI runner predates Python 3.11's
+                # hashlib.file_digest. Keep streaming without that newer API.
+                digest_state = hashlib.sha256()
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest_state.update(chunk)
+                digest = digest_state.hexdigest()
         except OSError:
             raise RuntimeError("IDT static file is unreadable: " + relative) from None
         if digest != expected_digest:

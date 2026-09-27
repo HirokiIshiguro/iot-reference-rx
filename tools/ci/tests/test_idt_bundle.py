@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from tools.idt import idt_bundle
@@ -46,6 +47,11 @@ class IdtBundleTests(unittest.TestCase):
                 idt_bundle.verify_install(self.root, "linux")
             self.assertEqual(b"changed", path.read_bytes(), "Verifier must not repair files")
             path.write_bytes(original)
+
+    def test_verification_does_not_require_python311_file_digest(self):
+        old_hashlib = SimpleNamespace(sha256=hashlib.sha256)
+        with patch.object(idt_bundle, "hashlib", old_hashlib):
+            idt_bundle.verify_install(self.root, "linux")
 
     def test_missing_or_extra_static_file_fails(self):
         path = self.root / "tests/FRQ_2.5.0/suite/group.json"
