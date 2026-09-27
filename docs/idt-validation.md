@@ -21,6 +21,7 @@ FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリー
 TLSの確定証跡は[`9cadbfeb0a10a51a1f2953127346a58bd38805bf`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/9cadbfeb0a10a51a1f2953127346a58bd38805bf)のclean checkoutによるものです。
 他のscopeや対象SHAに、この14件の合格を流用しません。
 PKCS11 Coreの10件は基本APIの結果です。ECC object / signを検査する別group `FullPKCS11_Import_ECC`は未実行です。
+この10件の後でlabel設定をproductionと同じ`pkcs11configLABEL_*`参照へ統一しました。この変更後の実機再試験は未実施です。
 PKCS11試験終了時はreset保持成功とUART 0 bytesを確認しました。
 
 [MQTT03の証跡](https://gitlab.saffti.jp/-/project/38/uploads/de289e072658138a255bf5a54a1062b2/pilot-mqtt-03-sanitized-evidence.zip)と
@@ -116,6 +117,8 @@ OTA PALのfilesystem専用IGNOREはnative IDTがFAILへ変換しました。こ�
 commit / submodule SHA、dirty状態、firmwareと試験設定のhash、IDT / suite版、部分実行の有無を対応付けます。
 
 private runtimeと`<workspace_root>\idt-private-<run>`は、失敗解析とレビューのため保持します。MRの確認後、必要なsanitized証跡を保存し、当該runのプロセス終了・AWS cleanup・実機停止を確認してから両ディレクトリを削除対象にします。自動世代削除は行わず、調査中のrunや別runを一括削除しません。
+private runtime内の`diagnostic-*`資料も同じ保持・削除対象です。
+
 試験用秘密鍵、注入済みsource / firmware、元のIDTログ、e2 studio workspaceはアクセスを制限したcheckout外の領域に保持します。
 試験後は共有lockを保持したままreset保持とUART静止を確認し、試験用AWS資源とRPiの一時firmwareを片付けます。
 通常運用へ戻す際は既存のflash / provision CIで通常firmwareと認証情報を再設定します。

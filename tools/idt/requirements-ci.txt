@@ -1,0 +1,9 @@
+# Mock-only contract tests on Sakura's Python 3.9.2+ runner.
+# AWS clients are replaced in these tests; no boto3/botocore is needed.
+# Keep runtime host pins in requirements-windows.txt / requirements-wsl.txt.
+# cryptography: Python >=3.8 excluding 3.9.0/1; cffi/typing-extensions: >=3.9.
+# pycparser 3.0 requires >=3.10; 2.23 supports >=3.8.
+cryptography==46.0.5
+cffi==2.0.0
+pycparser==2.23
+typing-extensions==4.15.0

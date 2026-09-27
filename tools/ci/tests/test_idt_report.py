@@ -316,7 +316,7 @@ class IdtCiContractTests(unittest.TestCase):
             'GIT_SUBMODULE_STRATEGY: "none"', "- .gitlab-ci.yml",
             "- tools/idt/**/*", "- tools/ci/tests/test_idt_report.py",
             'python3 -m venv "$idt_ci_venv"',
-            '"$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-wsl.txt',
+            '"$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-ci.txt',
             '"$idt_ci_python" -m pip check',
             "tools.ci.tests.test_idt_report", "tools.ci.tests.test_idt_host_profile",
             "tools.ci.tests.test_idt_credentials", "tools.ci.tests.test_idt_bundle",

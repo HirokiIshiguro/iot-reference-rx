@@ -60,7 +60,7 @@ IDTは専用のパイプライン引数を明示した場合だけ実行する�
 
 - **合格条件:** 対象構成の必須試験がすべてPASSであること。未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。
 - **証跡:** commit / submodule SHA、ボード・TLS構成、firmware hash、IDT / test suite版、実行pipelineと結果reportを対応付け、リリース時に参照できる形で保存します。対象SHAや構成が変わった場合、以前の合格結果は流用しません。
-- **費用:** 実装時の動作検証を進め、通常運用ではコード変更ごとのIDT実行と無制限の自動再試行は行いません。[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生します。実装時も1実行75分のhost timeoutを設け、中断・異常終了時は実機を停止し試験用AWS資源を回収します。通常運用時は利用量・費用上限・停止条件を定めます。
+- **費用:** 実装時の動作検証を進め、通常運用ではコード変更ごとのIDT実行と無制限の自動再試行は行いません。[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生します。実装時も1実行75分のhost timeoutを設け、中断・異常終了時は実機の停止と試験用AWS資源の回収を試みます。回収・終了状態の確認に失敗した場合は合格にせず、記録を保持して個別に復旧します。通常運用時は利用量・費用上限・停止条件を定めます。
 
 **実機検証:** RX72N Ethernet / software TLSの`FullTransportInterfaceTLS`は、clean SHA `9cadbfeb`の[pipeline #11247](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11247)で14/14 PASSでした。
 native MQTT試験は10件完走し、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAILです。IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致しません。
