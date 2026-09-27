@@ -53,8 +53,10 @@ SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認�
 
 [AWS IoT Device Tester for FreeRTOS](https://docs.aws.amazon.com/freertos/latest/userguide/device-tester-for-freertos-ug.html)の
 初期対象は**RX72N Envision Kit（Ethernet）**です。
-IDTは専用のパイプライン引数を明示した場合だけ実行し、**新規リリースタグの作成前に、タグ対象commit SHAのIDT結果がOKであることを確認**します。
+以下は採用する運用要件であり、IDT実行環境と自動gateはまだ実装していません。
+IDTは専用のパイプライン引数を明示した場合だけ実行する方針とし、**新規リリースタグの作成前に、タグ対象commit SHAのIDT結果がOKであることを確認**します。
 通常のpush / MR / main更新 / nightly / tag作成を契機にはIDTを自動実行しません。
+自動gate整備まではOwner / Maintainerが証跡を確認し、IDT未整備・未合格で要件を満たせない間は新規リリースタグの作成を保留します。
 
 - **合格条件:** 対象構成の必須試験がすべてPASSであること。未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。
 - **証跡:** commit / submodule SHA、ボード・TLS構成、firmware hash、IDT / test suite版、実行pipelineと結果reportを対応付け、リリース時に参照できる形で保存します。対象SHAや構成が変わった場合、以前の合格結果は流用しません。
@@ -64,7 +66,7 @@ IDTは専用のパイプライン引数を明示した場合だけ実行し、**
 既存のMQTT / OTA CI成功はIDT合格の代用にはなりません。
 2026-09-27確認時点の[AWS公式対応表](https://docs.aws.amazon.com/freertos/latest/userguide/dev-test-versions-afr.html)は
 IDT 4.9.0 / FRQ_2.5.0と202210-LTSまでを掲載しており、本リポジトリの202604.00-LTSとの互換性確認が先に必要です。
-IDTによる検証と[AWSの正式認定](https://docs.aws.amazon.com/freertos/latest/userguide/idt-support-policy.html)は区別します。
+IDTによる検証と[AWSの正式認定](https://docs.aws.amazon.com/freertos/latest/qualificationguide/freertos-qualification.html)は区別します。
 
 ## 最短の開始方法
 
