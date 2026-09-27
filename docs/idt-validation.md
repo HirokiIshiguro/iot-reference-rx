@@ -67,6 +67,7 @@ IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指
 選択caseは`metadata.json`と`summary.json`の`selected_test_ids`に部分実行として記録し、group全体の合格には扱いません。
 OTA imageごとに異なる識別子を埋め込み、実起動時に`[IDT_BOOT] image=... version=...`を出力します。build ledgerで識別子・コンパイル版・payload hash・source SHAを対応付けます。
 GreaterVersion単独実行では、native JUnitの合格に加え、初期imageと新版imageの起動を順に観測することを追加条件にします。`native_junit_passed`と`ota_boot_verified`は別々に保存し、起動証跡が欠けた場合はjobを不合格にします。native JUnit自体は書き換えません。
+この追加条件を導入した[pipeline #11262](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11262)ではnative 3件PASSでも新版のUART起動情報がなく、jobを不合格にしました。実機フラッシュのreadbackは新版payloadのSHA-256と一致しましたが、これをUART起動確認の代用にはしていません。IDT起動では対話CLIタスクを作らずUARTを同期初期化し、CLI削除による送信mutexの取り残しを避けます。
 他case・group全体では観測したimageを記録しますが、GreaterVersion単独と同じ起動版判定を行ったとは扱いません。
 認証情報の切り分け用にlocal CLIの`--diagnostic-only`を指定すると、秘密情報を含む診断資料をprivate runtime内へ保存し、compiler / flash前に必ず停止します。これは合格試験ではなく、通常のpipeline引数には加えません。
 

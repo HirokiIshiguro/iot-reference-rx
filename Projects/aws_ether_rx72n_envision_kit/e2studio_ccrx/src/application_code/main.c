@@ -195,6 +195,7 @@ static void prvDisplayWrite( const char * pcMessage );
 extern void UserInitialization (void);
 extern void CLI_Support_Settings (void);
 extern void vUARTCommandConsoleStart (uint16_t usStackSize, UBaseType_t uxPriority);
+extern void vUARTCommandConsoleInitPort (void);
 extern void vRegisterSampleCLICommands (void);
 
 static BaseType_t xDisplayInitialized = pdFALSE;
@@ -225,9 +226,19 @@ void main_task(void *pvParameters)
     prvDisplayWrite("FreeRTOS init\r\n");
 
 #if (ENABLE_CREDENTIAL_BY_CLI == 1)
+#if ( defined( ENABLE_IDT_TRANSPORT_TEST ) && ( ENABLE_IDT_TRANSPORT_TEST == 1 ) ) || \
+    ( defined( ENABLE_IDT_CLOUD_DEMO ) && ( ENABLE_IDT_CLOUD_DEMO == 1 ) ) || \
+    ( defined( ENABLE_IDT_PKCS11_TEST ) && ( ENABLE_IDT_PKCS11_TEST == 1 ) ) || \
+    ( defined( ENABLE_IDT_OTAPAL_TEST ) && ( ENABLE_IDT_OTAPAL_TEST == 1 ) )
+    /* IDT supplies credentials directly. Do not create an interactive task:
+     * deleting it after fast KVS initialization can strand the UART TX mutex
+     * while its welcome message is being sent, especially after OTA reboot. */
+    vUARTCommandConsoleInitPort();
+#else
     /* Register the standard CLI commands. */
     vRegisterSampleCLICommands();
     vUARTCommandConsoleStart(mainUART_COMMAND_CONSOLE_STACK_SIZE, mainUART_COMMAND_CONSOLE_TASK_PRIORITY);
+#endif
 #endif
 
     xResults = littlFs_init();
@@ -249,7 +260,7 @@ void main_task(void *pvParameters)
     ( defined( ENABLE_IDT_CLOUD_DEMO ) && ( ENABLE_IDT_CLOUD_DEMO == 1 ) ) || \
     ( defined( ENABLE_IDT_PKCS11_TEST ) && ( ENABLE_IDT_PKCS11_TEST == 1 ) ) || \
     ( defined( ENABLE_IDT_OTAPAL_TEST ) && ( ENABLE_IDT_OTAPAL_TEST == 1 ) )
-    /* IDT credentials are provisioned after KVS init and CLI termination. */
+    /* IDT credentials are provisioned after KVS init, without a CLI task. */
     xProceedToDemo = ( ( LFS_ERR_OK == xResults ) &&
                        ( LFS_ERR_OK == xCacheInitResult ) ) ? pdTRUE : pdFALSE;
 #else
