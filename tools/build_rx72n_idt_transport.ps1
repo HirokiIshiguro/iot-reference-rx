@@ -4,6 +4,8 @@ param(
     [string]$Workspace = "C:\ai\codex\ws\rx72n-idt-transport-build",
     [string]$OutputDirectory = "",
     [string]$ProvenanceFile = "",
+    [ValidateSet('Transport', 'DeviceAdvisor', 'OTAE2E', 'PKCS11', 'OTAPAL')]
+    [string]$TestGroup = 'Transport',
     [int]$E2StudioTimeoutSeconds = 900,
     [switch]$ValidateOnly
 )
@@ -93,23 +95,31 @@ $sourceWasDirty = $provenance.source_tree_dirty
 $executionPath = Join-Path $idtRoot "Test\include\test_execution_config.h"
 $executionText = [System.IO.File]::ReadAllText($executionPath)
 $testFlags = @{
-    TRANSPORT_INTERFACE_TEST_ENABLED = 1
+    TRANSPORT_INTERFACE_TEST_ENABLED = 0
     DEVICE_ADVISOR_TEST_ENABLED = 0
     MQTT_TEST_ENABLED = 0
     CORE_PKCS11_TEST_ENABLED = 0
     OTA_PAL_TEST_ENABLED = 0
     OTA_E2E_TEST_ENABLED = 0
 }
+switch ($TestGroup) {
+    'Transport' { $testFlags.TRANSPORT_INTERFACE_TEST_ENABLED = 1; $suiteName = 'FullTransportInterfaceTLS' }
+    'DeviceAdvisor' { $testFlags.DEVICE_ADVISOR_TEST_ENABLED = 1; $suiteName = 'FullCloudIoT' }
+    'OTAE2E' { $testFlags.OTA_E2E_TEST_ENABLED = 1; $suiteName = 'OTADataplaneMQTT' }
+    'PKCS11' { $testFlags.CORE_PKCS11_TEST_ENABLED = 1; $suiteName = 'FullPKCS11_Core' }
+    'OTAPAL' { $testFlags.OTA_PAL_TEST_ENABLED = 1; $suiteName = 'OTACore' }
+}
 foreach ($flag in $testFlags.Keys) {
     $definitions = [regex]::Matches($executionText, "(?m)^\s*#\s*define\s+$flag\s+\(?\s*([01])\s*\)?\s*(?://[^\r\n]*)?$")
     if ($definitions.Count -ne 1 -or [int]$definitions[0].Groups[1].Value -ne $testFlags[$flag]) {
-        throw "Transport-only build requires $flag=$($testFlags[$flag]) in Test/include/test_execution_config.h."
+        throw "$TestGroup build requires $flag=$($testFlags[$flag]) in Test/include/test_execution_config.h."
     }
 }
 
 # Link only these sources. Linking all of Test/ would compile the incompatible
 # 202406 MQTT suite and Unity's own tests, and introduce duplicate entry points.
 $testSources = [ordered]@{
+    "rx72n_idt_platform.c" = "Test/ports/rx72n_idt_platform.c"
     "rx72n_idt_transport.c" = "Test/ports/rx72n_idt_transport.c"
     "test_framework.c" = "Test/Common/test_framework.c"
     "transport_interface_test.c" = "Test/FreeRTOS-Libraries-Integration-Tests/src/transport_interface/transport_interface_test.c"
@@ -126,6 +136,62 @@ $testIncludes = @(
     "Test/Unity/extras/fixture/src",
     "Test/Unity/extras/memory/src"
 )
+if ($TestGroup -in @('DeviceAdvisor', 'OTAE2E')) {
+    $testSources = [ordered]@{ 'rx72n_idt_cloud.c' = 'Test/ports/rx72n_idt_cloud.c' }
+    $testIncludes = @('Test/include', 'Test/ports')
+}
+elseif ($TestGroup -eq 'PKCS11') {
+    $testSources.Remove('rx72n_idt_transport.c')
+    $testSources.Remove('transport_interface_test.c')
+    $testSources['rx72n_idt_pkcs11.c'] = 'Test/ports/rx72n_idt_pkcs11.c'
+    $testSources['core_pkcs11_test.c'] = 'Test/FreeRTOS-Libraries-Integration-Tests/src/pkcs11/core_pkcs11_test.c'
+    # The existing production provisioning implementation exports the helpers
+    # declared by this header. Do not link a duplicate upstream implementation.
+    $testIncludes += @('Test/FreeRTOS-Libraries-Integration-Tests/src/pkcs11',
+        'Test/FreeRTOS-Libraries-Integration-Tests/src/pkcs11/dev_mode_key_provisioning')
+    $parameterText = [System.IO.File]::ReadAllText((Join-Path $idtRoot 'Test/include/test_param_config.h'))
+    $capabilities = @{
+        PKCS11_TEST_RSA_KEY_SUPPORT = 0
+        PKCS11_TEST_EC_KEY_SUPPORT = 1
+        PKCS11_TEST_IMPORT_PRIVATE_KEY_SUPPORT = 1
+        PKCS11_TEST_GENERATE_KEYPAIR_SUPPORT = 0
+        PKCS11_TEST_PREPROVISIONED_SUPPORT = 0
+        PKCS11_TEST_JITP_CODEVERIFY_ROOT_CERT_SUPPORTED = 0
+    }
+    foreach ($capability in $capabilities.Keys) {
+        $definitions = [regex]::Matches($parameterText, "(?m)^\s*#\s*define\s+$capability\s+\(?\s*([01])\s*\)?\s*$")
+        if ($definitions.Count -ne 1 -or [int]$definitions[0].Groups[1].Value -ne $capabilities[$capability]) {
+            throw "PKCS11 EC/import profile requires $capability=$($capabilities[$capability])."
+        }
+    }
+}
+elseif ($TestGroup -eq 'OTAPAL') {
+    $testSources.Remove('rx72n_idt_transport.c')
+    $testSources.Remove('transport_interface_test.c')
+    $testSources['rx72n_idt_otapal.c'] = 'Test/ports/rx72n_idt_otapal.c'
+    $testSources['ota_pal_test.c'] = 'Test/Custom/ota/ota_pal_test.c'
+    $testIncludes += @('Test/Custom/ota')
+    $parameterText = [System.IO.File]::ReadAllText((Join-Path $idtRoot 'Test/include/test_param_config.h'))
+    if ($parameterText -notmatch '(?m)^\s*#define\s+OTA_PAL_USE_FILE_SYSTEM\s+\(?\s*0\s*\)?\s*$' -or
+        $parameterText -notmatch '(?m)^\s*#define\s+OTA_PAL_TEST_CERT_TYPE\s+\(?\s*(OTA_ECDSA_SHA256|3)\s*\)?\s*$') {
+        throw 'OTAPAL requires the direct-flash/ECDSA-SHA256 test profile.'
+    }
+}
+$appVersion = [ordered]@{}
+if ($TestGroup -eq 'OTAE2E') {
+    if (-not (Test-Path -LiteralPath (Join-Path $idtRoot 'Test/include/idt_ota_signer.h'))) {
+        throw 'OTAE2E requires the runtime-only Test/include/idt_ota_signer.h.'
+    }
+    $parameterText = [System.IO.File]::ReadAllText((Join-Path $idtRoot 'Test/include/test_param_config.h'))
+    foreach ($part in @('MAJOR', 'MINOR', 'BUILD')) {
+        $versionMatch = [regex]::Matches($parameterText, "(?m)^\s*#\s*define\s+OTA_APP_VERSION_$part\s+\(?\s*([0-9]+)[uUlL]*\s*\)?\s*$")
+        if ($versionMatch.Count -ne 1) { throw "Missing numeric OTA_APP_VERSION_$part." }
+        $appVersion[$part] = [uint32]$versionMatch[0].Groups[1].Value
+    }
+    if ($appVersion.MAJOR -gt 255 -or $appVersion.MINOR -gt 255 -or $appVersion.BUILD -gt 65535) {
+        throw 'OTA version exceeds the production 8/8/16-bit application version fields.'
+    }
+}
 foreach ($relativePath in @($testSources.Values) + $testIncludes) {
     if (-not (Test-Path -LiteralPath (Join-Path $idtRoot $relativePath))) {
         throw "Missing IDT build dependency: $relativePath"
@@ -136,6 +202,9 @@ $projectPath = Join-Path $idtProject '.project'
 $cprojectPath = Join-Path $idtProject '.cproject'
 $originalProject = [System.IO.File]::ReadAllBytes($projectPath)
 $originalCproject = [System.IO.File]::ReadAllBytes($cprojectPath)
+$demoConfigPath = Join-Path $idtProject 'src/frtos_config/demo_config.h'
+$originalDemoConfig = [System.IO.File]::ReadAllBytes($demoConfigPath)
+$demoConfigText = [System.IO.File]::ReadAllText($demoConfigPath)
 $projectXml = New-Object System.Xml.XmlDocument
 $projectXml.PreserveWhitespace = $true
 $projectXml.Load($projectPath)
@@ -181,8 +250,33 @@ foreach ($sourceName in $testSources.Keys) {
 foreach ($include in $testIncludes) {
     Add-OptionValue $includeOption ('"' + (Join-Path $idtRoot $include) + '"')
 }
-Add-OptionValue $defineOption 'ENABLE_IDT_TRANSPORT_TEST=1'
-Add-OptionValue $defineOption 'UNITY_INCLUDE_CONFIG_H'
+if ($TestGroup -in @('Transport', 'PKCS11', 'OTAPAL')) {
+    if ($TestGroup -eq 'Transport') { Add-OptionValue $defineOption 'ENABLE_IDT_TRANSPORT_TEST=1' }
+    elseif ($TestGroup -eq 'PKCS11') { Add-OptionValue $defineOption 'ENABLE_IDT_PKCS11_TEST=1' }
+    else { Add-OptionValue $defineOption 'ENABLE_IDT_OTAPAL_TEST=1' }
+    Add-OptionValue $defineOption 'UNITY_INCLUDE_CONFIG_H'
+}
+else {
+    Add-OptionValue $defineOption 'ENABLE_IDT_CLOUD_DEMO=1'
+    # Keep the production pub/sub tasks active across Device Advisor cases.
+    # Far beyond the bounded IDT run, while keeping the demo's signed log cast safe.
+    Add-OptionValue $defineOption 'mqttexamplePUBLISH_COUNT=1000000U'
+    $demoFlags = @{
+        ENABLE_FLEET_PROVISIONING_DEMO = 0
+        ENABLE_MULTI_TLS_DEMO = 0
+        ENABLE_OTA_UPDATE_DEMO = $(if ($TestGroup -eq 'OTAE2E') { 1 } else { 0 })
+    }
+    foreach ($flag in $demoFlags.Keys) {
+        $pattern = "(?m)^\s*#define\s+$flag\s+\([01]\)\s*$"
+        if ([regex]::Matches($demoConfigText, $pattern).Count -ne 1) {
+            throw "Expected one demo config definition of $flag."
+        }
+        $demoConfigText = [regex]::Replace($demoConfigText, $pattern, "#define $flag ($($demoFlags[$flag]))")
+    }
+    foreach ($part in $appVersion.Keys) {
+        Add-OptionValue $defineOption "APP_VERSION_$part=$($appVersion[$part])"
+    }
+}
 
 # IDT copies source trees without usable Git worktree/submodule metadata. Limit
 # filesystem enumeration to the two projects' generated and IDE-owned files.
@@ -198,7 +292,7 @@ foreach ($snapshotProject in @($idtProject, (Join-Path $idtRoot 'Projects\boot_l
         Where-Object { $_.Extension -in @('.launch', '.scfg', '.rcpc') })
 }
 if ($ValidateOnly) {
-    Write-Host "IDT transport metadata/provenance validated: $($testSources.Count) sources, $($generatedFiles.Count) snapshot files; no compiler or hardware action."
+    Write-Host "IDT $TestGroup metadata/provenance validated: $($testSources.Count) sources, $($generatedFiles.Count) snapshot files; no compiler or hardware action."
     return
 }
 
@@ -212,6 +306,9 @@ foreach ($generatedFile in $generatedFiles) {
 try {
     $projectXml.Save($projectPath)
     $cprojectXml.Save($cprojectPath)
+    if ($TestGroup -in @('DeviceAdvisor', 'OTAE2E')) {
+        [System.IO.File]::WriteAllText($demoConfigPath, $demoConfigText, [System.Text.UTF8Encoding]::new($false))
+    }
     & (Join-Path $PSScriptRoot 'build_headless_rx72n.ps1') `
         -ProjectRoot $idtRoot -E2Studio $E2Studio -Workspace $idtWorkspace `
         -TlsBackend software -LogFile $buildLog `
@@ -229,18 +326,28 @@ try {
     }
     # No configuration text or credential value belongs in this manifest.
     $evidence = [ordered]@{
-        mode = 'idt-transport-only'
-        suite = 'FullTransportInterfaceTLS'
+        mode = $(if ($TestGroup -eq 'Transport') { 'idt-transport-only' } else { "idt-$($TestGroup.ToLowerInvariant())" })
+        suite = $suiteName
+        application_version = $appVersion
+        coverage = $(if ($TestGroup -eq 'OTAPAL') {
+            [ordered]@{
+                nominal_cases = 15
+                assertion_capable_cases = 14
+                not_applicable_cases = 1
+                not_applicable_test = 'otaPal_CloseFile_NonexistingCodeSignerCertificate'
+                required_end_state = 'MCU reset-hold; reflash/reprovision before reuse'
+            }
+        } else { $null })
         source_sha = $sourceSha
         source_tree_dirty = $sourceWasDirty
         test_library_sha = $testLibrarySha
         execution_config_sha256 = (Get-FileHash -LiteralPath $executionPath -Algorithm SHA256).Hash.ToLowerInvariant()
         parameter_config_sha256 = (Get-FileHash -LiteralPath (Join-Path $idtRoot 'Test/include/test_param_config.h') -Algorithm SHA256).Hash.ToLowerInvariant()
         outputs = $outputs
-        qualification_status = 'not-established; individual transport validation only'
+        qualification_status = 'not-established; selected individual group only'
     }
     $evidence | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $idtOutput 'build_manifest.json') -Encoding UTF8
-    Write-Host "IDT transport build ready: $idtOutput"
+    Write-Host "IDT $TestGroup build ready: $idtOutput"
 }
 finally {
     foreach ($generatedPath in $generatedSnapshots.Keys) {
@@ -248,4 +355,5 @@ finally {
     }
     [System.IO.File]::WriteAllBytes($projectPath, $originalProject)
     [System.IO.File]::WriteAllBytes($cprojectPath, $originalCproject)
+    [System.IO.File]::WriteAllBytes($demoConfigPath, $originalDemoConfig)
 }

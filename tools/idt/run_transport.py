@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run only the FRQ transport TLS development group through a guarded RPi1 PTY."""
+"""Run a selected FRQ development group through a guarded RPi1 PTY."""
 import argparse
 import fcntl
 import json
@@ -18,9 +18,9 @@ import tty
 from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
 
-GROUP = "FullTransportInterfaceTLS"
+GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
-SSH = "/mnt/c/Windows/System32/OpenSSH/ssh.exe"
+SSH = os.environ.get("IDT_WINDOWS_SSH", "/mnt/c/Windows/System32/OpenSSH/ssh.exe")
 
 
 def write_all(fd, data):
@@ -193,10 +193,14 @@ def main():
     parser.add_argument("--device-template", required=True)
     parser.add_argument("--region", default=os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"))
     parser.add_argument("--output", required=True, help="new, nonexistent run output directory")
-    parser.add_argument("--group", choices=[GROUP], default=GROUP)
+    parser.add_argument("--group", choices=GROUPS, default=GROUPS[0])
+    parser.add_argument("--test-id", choices=["OTAE2EGreaterVersion"],
+                        help="Optional first OTA bring-up case; omitted runs the selected group")
     parser.add_argument("--timeout-seconds", type=int, default=4500)
     parser.add_argument("--cleanup-timeout-seconds", type=int, default=120)
     args = parser.parse_args()
+    if args.test_id and args.group != "OTADataplaneMQTT":
+        parser.error("The selected test ID belongs to OTADataplaneMQTT")
     if sys.platform != "linux" or not Path(SSH).is_file():
         parser.error("this prototype requires WSL and Windows OpenSSH")
     if not args.region or not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
@@ -245,7 +249,7 @@ def main():
     bridge = process = None
     original_config = None
     config_written = False
-    result = {"group": GROUP, "suite": SUITE, "qualification": "not_evaluated",
+    result = {"group": args.group, "testId": args.test_id, "suite": SUITE, "qualification": "not_evaluated",
               "sourcePath": str(source), "startedUtc": datetime.now(timezone.utc).isoformat()}
     exit_code = 1
     try:
@@ -275,10 +279,12 @@ def main():
         env.update(TMPDIR=str(temporary_sources), IDT_BENCH_TOKEN=token, AWS_REGION=args.region,
                    AWS_DEFAULT_REGION=args.region, IDT_SOURCE_PATH=str(source),
                    IDT_RUNTIME_DIR=str(run_dir))
-        command = [str(binary), "run-suite", "--suite-id", SUITE, "--group-id", GROUP,
+        command = [str(binary), "run-suite", "--suite-id", SUITE, "--group-id", args.group,
                    "--pool-id", devices[0]["id"], "--userdata", "userdata.json",
                    "--upgrade-test-suite", "n", "--update-idt", "n", "--update-managed-policy", "n"]
-        print("Starting development-only " + GROUP + "; this cannot qualify a release.", flush=True)
+        if args.test_id:
+            command += ["--test-id", args.test_id]
+        print("Starting development-only " + args.group + "; this cannot qualify a release.", flush=True)
         sensitive = [env[key] for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN") if env.get(key)]
         process = subprocess.Popen(command, cwd=idt_root / "bin", env=env,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -305,7 +311,7 @@ def main():
         result.update(inspect_junit(run_dir / "results"))
         passed = (process.returncode == 0 and result["tests"] > 0 and
                   result["failures"] == result["errors"] == result["skipped"] == 0)
-        result["verdict"] = "TRANSPORT_ONLY_PASS" if passed else "FAIL"
+        result["verdict"] = ("SINGLE_CASE_PASS" if args.test_id else "SELECTED_GROUP_PASS") if passed else "FAIL"
         exit_code = 0 if passed else 1
     except KeyboardInterrupt:
         result.update(verdict="INTERRUPTED", reason="signal received")

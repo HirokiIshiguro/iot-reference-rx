@@ -1,59 +1,100 @@
-# RX72N IDT transport port
+# RX72N IDT test ports
 
-`rx72n_idt_transport.c` runs the pinned upstream `Full_TransportInterfaceTest`
-suite on RX72N Envision Kit Ethernet with the production software TLS transport.
-This is an individual `FullTransportInterfaceTLS` validation build. It does not
-establish full IDT qualification or make the current `202604.00-LTS` manifest
-compatible with IDT's version checks.
+These ports build selected native IDT groups for RX72N Envision Kit Ethernet
+with the production software TLS, coreMQTT 5, corePKCS11 and OTA paths.
+A selected group result does not establish complete IDT qualification or make
+`202604.00-LTS` compatible with IDT 4.9.0's version checks.
+Current results and host setup are maintained in [IDT validation](../../docs/idt-validation.md).
 
-IDT populates `Test/include/test_param_config.h` with the echo endpoint, CA,
-and client certificate. The development build callback verifies the certificate
-against its disposable host-generated EC key, then injects that matching private
-key into the runtime source copy. FRQ 2.5 does not inject the private key itself.
-Select only
-`TRANSPORT_INTERFACE_TEST_ENABLED=1` in `test_execution_config.h`. All other
-test flags must be zero. Then run:
+| Host scope | Builder `-TestGroup` | Device entry / source |
+|---|---|---|
+| `transport` | `Transport` | `rx72n_idt_transport.c`; upstream transport assertions |
+| `mqtt` | `DeviceAdvisor` | `rx72n_idt_cloud.c`; production MQTT agent / SimplePubSub, evaluated by native `FullCloudIoT` |
+| `pkcs11` | `PKCS11` | `rx72n_idt_pkcs11.c`; upstream `RunPkcs11Test()` and production provisioning helpers |
+| `ota-pal` | `OTAPAL` | `rx72n_idt_otapal.c`; existing `Test/Custom/ota/ota_pal_test.c` assertions |
+| `ota-mqtt` | `OTAE2E` | `rx72n_idt_cloud.c`; production MQTT / OTA tasks and IDT-provided application version |
+
+`preflight` checks versions on the host and does not build firmware.
+The builder requires exactly the selected test flag; other test flags stay zero.
+The inactive legacy `MQTT_TEST_ENABLED` suite is not linked: its 202406 API is
+not compatible with coreMQTT 5. Native `FullCloudIoT` uses Device Advisor instead.
+The cloud port never generates a local PASS or changes the production MQTT protocol.
+
+## Build and provenance
+
+For a manual build of an already restricted source copy:
 
 ```powershell
 pwsh.exe -ExecutionPolicy Bypass -File tools/build_rx72n_idt_transport.ps1 `
-  -ProjectRoot <runtime-copy> -Workspace C:\ai\codex\ws\rx72n-idt-build `
-  -ProvenanceFile <runtime-source-provenance.json>
+  -ProjectRoot <restricted-runtime-copy> -Workspace C:\ai\codex\ws\idt-private-run\build `
+  -ProvenanceFile <runtime-source-provenance.json> -TestGroup Transport
 ```
 
-The wrapper temporarily links six test sources and defines
-`ENABLE_IDT_TRANSPORT_TEST=1` and `UNITY_INCLUDE_CONFIG_H`. It restores project
-metadata and tracked Smart Configurator output after the build. The default
-project still starts its usual MQTT/OTA demos. The script builds only; it does
-not flash a board, reset hardware, or create AWS resources.
+Native runs choose the workspace automatically as
+`<workspace_root>\idt-private-<run>\rx72n-idt-build-<run>`.
 
-The provenance JSON records `source_sha`, `test_library_sha` (40 hex characters)
-and `source_tree_dirty` (boolean), collected from the original checkout before
-IDT copies it. Git submodule pointers in that copy may no longer resolve.
+The wrapper links only the selected sources, applies temporary IDT defines,
+and restores project metadata, demo configuration and tracked Smart Configurator
+output after the build. Normal project builds retain their usual startup path.
+`-ValidateOnly` checks the selected profile without compiling or touching hardware.
+The build script itself does not flash a board or create AWS resources.
 
-Build the IDT-injected configuration only in the restricted runtime copy.
-Outputs there are `artifacts/idt/build_transport/rx72n_idt_transport.{mot,abs,x}`
-plus the build log and hash manifest. Test binaries contain the disposable IDT
-credentials and must stay in that runtime copy. Do not include them in CI
-artifacts or release assets, despite the local output directory's name.
-Only credential-free logs and metadata may be exported from the runtime copy.
-At runtime the test writes those credentials through the normal KVS/PKCS11
-provisioning path. Restore the board's normal credentials after testing.
+The provenance JSON carries the original `source_sha`, `test_library_sha`
+(40 hexadecimal characters) and `source_tree_dirty` (boolean). IDT's runtime
+copy may contain broken worktree/submodule `.git` pointers; provenance is
+collected before copying and is never reconstructed from those pointers.
+The build manifest records output/configuration hashes, selected group and,
+for OTA, application version or PAL coverage.
 
-Each of the two TLS connections owns a separate transport context. Test workers
-inherit the calling test task's priority. Completion is joined through a
-semaphore, and only a completed worker is deleted and freed. On a join timeout,
-the port emits `IDT_PORT_FATAL: thread join timeout` and suspends the calling
-test task indefinitely. It preserves the worker, descriptor and context because
-the worker may hold TLS/PKCS11 locks. No subsequent test or teardown runs; the
-host must stop IDT, clean up its test resources, and reset/hold the MCU before
-reuse. The fatal marker is a failed run, never a PASS.
+## Credentials and runtime isolation
 
-Socket timeout (1000 ms) and worker stack depth (8192 words) follow the existing
-`Test/integration_test.c` port. The transport functions and upstream assertions
-are not altered. Optional
-`writev` tests are not selected because the production port has no `writev`.
+Only the restricted runtime copy may contain IDT-injected test parameters.
+Transport uses the IDT-issued client certificate and a matching disposable
+host-generated EC key. For native MQTT, IDT supplies endpoint/Thing but not the
+client certificate: the callback reads only that exact Thing's active certificate
+with the matching public key, checking account and region before accepting it.
+The cloud port provisions the temporary Thing, endpoint, certificate/key and
+Amazon Root CA 1 through production KVS. OTA also provisions its test signer.
+Credential values are never printed.
 
-MQTT, PKCS11, Device Advisor, OTA PAL and OTA E2E tests are excluded from this
-build. In particular, the pinned 202406 MQTT test calls the old coreMQTT API;
-coreMQTT 5 requires different callback signatures and API parameters, as well
-as an explicit review of persistent-session and retransmission semantics.
+Outputs remain under the runtime copy's `artifacts/idt/build_transport`, including
+`rx72n_idt_transport.{mot,abs,x}`, the RSU, build log and manifest. The historical
+output basename is shared across selected groups; the manifest identifies the
+actual group. These binaries contain test credentials and must not be published
+as CI artifacts or release assets. Export only the sanitized JUnit and summaries
+from the host launcher. The e2 studio workspace also remains outside the checkout
+under a restricted parent.
+
+## Test boundaries
+
+`rx72n_idt_platform.c` supplies FreeRTOS threads, time, allocation and randomness
+for the local assertion suites. Workers inherit the caller's priority; a semaphore
+joins completion before deletion/free. On a join timeout the port emits
+`IDT_PORT_FATAL`, retains live worker/context storage and suspends the caller.
+The host stops IDT, cleans resources, and resets/holds the MCU. A fatal marker
+is never a PASS.
+
+Transport gives its two TLS connections separate contexts. Its 1000 ms socket
+timeout and 8192-word worker stack follow the existing integration port.
+Production transport functions and upstream assertions are unchanged. Optional
+`writev` tests remain unselected because the production port has no `writev`.
+
+The PKCS11 profile is EC/import: RSA, onboard key generation, pre-provisioned
+mode and JITP tests are disabled. It uses existing production provisioning helpers
+rather than linking duplicate upstream implementations. Test objects are disposable;
+this profile does not prove an onboard-generated-key qualification path.
+The native `FullPKCS11_Core` result covers ten basic API cases. It does not cover
+the separate `FullPKCS11_Import_ECC` object/sign group, which has not been run.
+
+OTA PAL is restricted to the reviewed RX72N dual-bank layout and writes the
+inactive flash region `0xFFC00000–0xFFDBFFFF`. The port performs no activation,
+bank swap or reset. Of 15 nominal cases, 14 can execute assertions; the filesystem-only
+`otaPal_CloseFile_NonexistingCodeSignerCertificate` is explicitly IGNORE. The host
+native FRQ 2.5 maps this IGNORE to a JUnit failure. The checker preserves that
+nonpassing full-group result; it does not report 15 PASS.
+
+OTA E2E uses native IDT's OTA cases. Selecting `OTAE2EGreaterVersion` alone is
+recorded as partial coverage. The AWS Signer preparation/cleanup code does not
+itself prove that an OTA update succeeded. After every hardware run, retain the
+bench lock through reset-hold/UART-quiet verification. Reflash and reprovision
+the normal firmware before returning the board to ordinary use.

@@ -8,10 +8,10 @@ import re
 import shlex
 import subprocess
 import sys
-from prepare_transport_key import validate_source
+from prepare_transport_key import validate_source, macro
 
-SSH='/mnt/c/Windows/System32/OpenSSH/ssh.exe'
-SCP='/mnt/c/Windows/System32/OpenSSH/scp.exe'
+SSH=os.environ.get('IDT_WINDOWS_SSH','/mnt/c/Windows/System32/OpenSSH/ssh.exe')
+SCP=os.environ.get('IDT_WINDOWS_SCP','/mnt/c/Windows/System32/OpenSSH/scp.exe')
 def main():
     token=os.environ.get('IDT_BENCH_TOKEN','')
     if not re.fullmatch('[a-f0-9]{32}',token):raise RuntimeError('No valid bench token')
@@ -26,9 +26,13 @@ def main():
         raise RuntimeError('Firmware hash mismatch')
     if hashlib.sha256((source/'Test/include/test_param_config.h').read_bytes()).hexdigest()!=manifest['parameter_config_sha256']:
         raise RuntimeError('Test parameter hash mismatch')
-    params=(source/'Test/include/test_param_config.h').read_text()
-    if '-----BEGIN CERTIFICATE-----' not in params or 'PRIVATE KEY-----' not in params:
-        raise RuntimeError('No IDT-generated TLS credentials')
+    if os.environ.get('IDT_SCOPE','transport') not in {'pkcs11','ota-pal'}:
+        params=(source/'Test/include/test_param_config.h').read_text().splitlines(keepends=True)
+        prefix='TRANSPORT' if os.environ.get('IDT_SCOPE','transport') == 'transport' else 'MQTT'
+        certificate=macro(params,prefix+'_CLIENT_CERTIFICATE')[2]
+        key=macro(params,prefix+'_CLIENT_PRIVATE_KEY')[2]
+        if not certificate or not certificate.startswith('-----BEGIN CERTIFICATE-----') or not key or 'PRIVATE KEY-----' not in key:
+            raise RuntimeError('No IDT-generated TLS credentials')
     files={'bootloader.mot':source/'Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot','bootloader_bank1.mot':out/'bootloader_bank1.mot','rx72n_idt_transport.rsu':out/'rx72n_idt_transport.rsu','test_uart_download_rx72n.py':source/'tools/test_uart_download_rx72n.py','rpi_flash.py':Path(__file__).with_name('rpi_flash.py')}
     remote='/tmp/codex-idt-155-flash-'+token
     env={k:v for k,v in os.environ.items() if not k.startswith('AWS_')}

@@ -7,7 +7,6 @@
 #include <string.h>
 #include "FreeRTOS.h"
 #include "task.h"
-#include "semphr.h"
 #include "test_execution_config.h"
 #include "test_param_config.h"
 #include "platform_function.h"
@@ -36,20 +35,10 @@ struct NetworkContext
     TlsTransportParams_t * pParams;
 };
 
-typedef struct IdtThread
-{
-    TaskHandle_t task;
-    SemaphoreHandle_t completed;
-    FRTestThreadFunction_t function;
-    void * argument;
-} IdtThread_t;
-
 static TlsTransportParams_t xTlsParameters[ 2 ];
 static NetworkContext_t xNetworkContexts[ 2 ];
 static NetworkCredentials_t xCredentials;
 static TransportInterface_t xTransport;
-
-extern void get_random_number( uint8_t * data, uint32_t len );
 
 static NetworkConnectStatus_t prvConnect( void * context,
                                          TestHostInfo_t * host,
@@ -109,106 +98,6 @@ void SetupTransportTestParam( TransportTestParam_t * parameters )
     parameters->pNetworkConnect = prvConnect;
     parameters->pNetworkDisconnect = prvDisconnect;
     parameters->pNetworkCredentials = &xCredentials;
-}
-
-static void prvThread( void * argument )
-{
-    IdtThread_t * thread = argument;
-
-    thread->function( thread->argument );
-    xSemaphoreGive( thread->completed );
-    /* The joining task owns deletion and storage. Do not dereference thread
-     * after signalling: the joiner may already have released the descriptor. */
-    vTaskSuspend( NULL );
-}
-
-FRTestThreadHandle_t FRTest_ThreadCreate( FRTestThreadFunction_t function,
-                                        void * argument )
-{
-    IdtThread_t * thread;
-
-    if( function == NULL )
-    {
-        return NULL;
-    }
-    thread = pvPortMalloc( sizeof( *thread ) );
-    if( thread == NULL )
-    {
-        return NULL;
-    }
-    memset( thread, 0, sizeof( *thread ) );
-    thread->completed = xSemaphoreCreateBinary();
-    thread->function = function;
-    thread->argument = argument;
-    if( ( thread->completed == NULL ) ||
-        ( xTaskCreate( prvThread, "IDT worker", IDT_TASK_STACK_WORDS, thread,
-                       uxTaskPriorityGet( NULL ), &thread->task ) != pdPASS ) )
-    {
-        if( thread->completed != NULL )
-        {
-            vSemaphoreDelete( thread->completed );
-        }
-        vPortFree( thread );
-        return NULL;
-    }
-    return thread;
-}
-
-int FRTest_ThreadTimedJoin( FRTestThreadHandle_t handle, uint32_t timeoutMs )
-{
-    IdtThread_t * thread = handle;
-    BaseType_t completed;
-
-    if( thread == NULL )
-    {
-        return -1;
-    }
-    completed = xSemaphoreTake( thread->completed, pdMS_TO_TICKS( timeoutMs ) );
-    if( completed != pdTRUE )
-    {
-        /* A worker may own TLS/PKCS11/socket locks. Do not kill it, free its
-         * descriptor, or let upstream teardown touch the live context. Keep
-         * this calling task and all test storage alive until the host resets
-         * the MCU after stopping IDT and cleaning up the test resources. */
-        configPRINT_STRING( "IDT_PORT_FATAL: thread join timeout\r\n" );
-        for( ;; )
-        {
-            vTaskSuspend( NULL );
-        }
-    }
-    /* Only a worker that has returned from its test function is reclaimed. */
-    vTaskDelete( thread->task );
-    vSemaphoreDelete( thread->completed );
-    vPortFree( thread );
-    return 0;
-}
-
-void FRTest_TimeDelay( uint32_t delayMs )
-{
-    vTaskDelay( pdMS_TO_TICKS( delayMs ) );
-}
-
-uint32_t FRTest_GetTimeMs( void )
-{
-    return ( uint32_t ) ( ( ( uint64_t ) xTaskGetTickCount() * 1000U ) /
-                         ( uint64_t ) configTICK_RATE_HZ );
-}
-
-void * FRTest_MemoryAlloc( size_t size )
-{
-    return pvPortMalloc( size );
-}
-
-void FRTest_MemoryFree( void * pointer )
-{
-    vPortFree( pointer );
-}
-
-int FRTest_GenerateRandInt( void )
-{
-    uint32_t random = 0U;
-    get_random_number( ( uint8_t * ) &random, sizeof( random ) );
-    return ( int ) ( random & 0x7fffffffU );
 }
 
 static BaseType_t prvProvisionEchoCredentials( void )

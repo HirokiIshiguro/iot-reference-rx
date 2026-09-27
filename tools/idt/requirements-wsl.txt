@@ -1,0 +1,13 @@
+# The selected Linux Python must be 3.11+ in an IDT-only venv.
+# Native MQTT callbacks use AWS IoT DescribeCertificate with inherited runtime
+# credentials; keep the AWS SDK subset aligned with the Windows requirements.
+boto3==1.42.91
+botocore==1.42.91
+s3transfer==0.16.0
+jmespath==1.1.0
+python-dateutil==2.9.0.post0
+six==1.17.0
+urllib3==2.6.3
+cryptography==46.0.5
+cffi==2.0.0
+pycparser==3.0

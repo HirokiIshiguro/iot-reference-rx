@@ -297,6 +297,8 @@ TEST( Full_OTA_PAL, otaPal_CloseFile_NonexistingCodeSignerCertificate )
             OtaPalStatus_t xCloseFileStatus = otaPal_CloseFile( &xOtaFile );
             TEST_ASSERT_EQUAL( OtaPalBadSignerCert , xCloseFileStatus );
         }
+    #else
+        TEST_IGNORE_MESSAGE( "Not applicable: the direct-flash PAL loads its signer from KVS, not a certificate file path." );
     #endif /* if ( OTA_PAL_USE_FILE_SYSTEM == 1 ) */
 }
 

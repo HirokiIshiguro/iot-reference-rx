@@ -53,6 +53,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if defined( ENABLE_IDT_TRANSPORT_TEST ) && ( ENABLE_IDT_TRANSPORT_TEST == 1 )
 #include "rx72n_idt_transport.h"
 #endif
+#if defined( ENABLE_IDT_CLOUD_DEMO ) && ( ENABLE_IDT_CLOUD_DEMO == 1 )
+#include "rx72n_idt_cloud.h"
+#endif
+#if defined( ENABLE_IDT_PKCS11_TEST ) && ( ENABLE_IDT_PKCS11_TEST == 1 )
+#include "rx72n_idt_pkcs11.h"
+#endif
+#if defined( ENABLE_IDT_OTAPAL_TEST ) && ( ENABLE_IDT_OTAPAL_TEST == 1 )
+#include "rx72n_idt_otapal.h"
+#endif
 #if defined(ENABLE_MULTI_TLS_DEMO) && (ENABLE_MULTI_TLS_DEMO == 1)
 #include "multi_tls_demo.h"
 #endif
@@ -224,7 +233,9 @@ void main_task(void *pvParameters)
     xResults = littlFs_init();
     prvDisplayWrite((LFS_ERR_OK == xResults) ? "LittleFS OK\r\n" : "LittleFS ERROR\r\n");
 
-#if !defined( ENABLE_IDT_TRANSPORT_TEST ) || ( ENABLE_IDT_TRANSPORT_TEST != 1 )
+#if ( !defined( ENABLE_IDT_TRANSPORT_TEST ) || ( ENABLE_IDT_TRANSPORT_TEST != 1 ) ) && \
+    ( !defined( ENABLE_IDT_PKCS11_TEST ) || ( ENABLE_IDT_PKCS11_TEST != 1 ) ) && \
+    ( !defined( ENABLE_IDT_OTAPAL_TEST ) || ( ENABLE_IDT_OTAPAL_TEST != 1 ) )
     xMQTTAgentInit();
     prvDisplayWrite("MQTT agent init\r\n");
 #endif
@@ -234,8 +245,11 @@ void main_task(void *pvParameters)
         xCacheInitResult = vprvCacheInit();
     }
 
-#if defined( ENABLE_IDT_TRANSPORT_TEST ) && ( ENABLE_IDT_TRANSPORT_TEST == 1 )
-    /* The test task provisions the IDT echo-server credentials after KVS init. */
+#if ( defined( ENABLE_IDT_TRANSPORT_TEST ) && ( ENABLE_IDT_TRANSPORT_TEST == 1 ) ) || \
+    ( defined( ENABLE_IDT_CLOUD_DEMO ) && ( ENABLE_IDT_CLOUD_DEMO == 1 ) ) || \
+    ( defined( ENABLE_IDT_PKCS11_TEST ) && ( ENABLE_IDT_PKCS11_TEST == 1 ) ) || \
+    ( defined( ENABLE_IDT_OTAPAL_TEST ) && ( ENABLE_IDT_OTAPAL_TEST == 1 ) )
+    /* IDT credentials are provisioned after KVS init and CLI termination. */
     xProceedToDemo = ( ( LFS_ERR_OK == xResults ) &&
                        ( LFS_ERR_OK == xCacheInitResult ) ) ? pdTRUE : pdFALSE;
 #else
@@ -267,6 +281,43 @@ void main_task(void *pvParameters)
         }
     #endif
 
+#if defined( ENABLE_IDT_CLOUD_DEMO ) && ( ENABLE_IDT_CLOUD_DEMO == 1 )
+        if( xProvisionIdtCloudCredentials() != pdTRUE )
+        {
+            configPRINT_STRING( "IDT_PORT_FATAL: cloud credential provisioning failed\r\n" );
+            for( ;; )
+            {
+                vTaskSuspend( NULL );
+            }
+        }
+        prvDisplayWrite("IDT cloud credentials ready\r\n");
+#endif
+
+#if defined( ENABLE_IDT_PKCS11_TEST ) && ( ENABLE_IDT_PKCS11_TEST == 1 )
+        /* No network/MQTT task may use PKCS11 while its lifecycle is tested. */
+        BaseType_t xPkcs11StartResult = xStartIdtPkcs11Test();
+        if( xPkcs11StartResult != pdPASS )
+        {
+            configPRINT_STRING( "IDT_PORT_FATAL: PKCS11 test task creation failed\r\n" );
+            for( ;; )
+            {
+                vTaskSuspend( NULL );
+            }
+        }
+        prvDisplayWrite("IDT PKCS11 test start\r\n");
+#elif defined( ENABLE_IDT_OTAPAL_TEST ) && ( ENABLE_IDT_OTAPAL_TEST == 1 )
+        /* Keep the production network/OTA tasks stopped during PAL flash tests. */
+        BaseType_t xOtaPalStartResult = xStartIdtOtaPalTest();
+        if( xOtaPalStartResult != pdPASS )
+        {
+            configPRINT_STRING( "IDT_PORT_FATAL: OTA PAL test task creation failed\r\n" );
+            for( ;; )
+            {
+                vTaskSuspend( NULL );
+            }
+        }
+        prvDisplayWrite("IDT OTA PAL test start\r\n");
+#else
         /* Initialise the RTOS's TCP/IP stack.  The tasks that use the network
             are created in the vApplicationIPNetworkEventHook() hook function
             below.  The hook function is called when the network connects. */
@@ -324,6 +375,7 @@ void main_task(void *pvParameters)
                     prvDisplayWrite("OTA task start\r\n");
                 #endif
             #endif
+#endif /* ENABLE_IDT_PKCS11_TEST */
     }
     else
     {
