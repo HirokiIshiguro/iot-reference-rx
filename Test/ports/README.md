@@ -45,6 +45,13 @@ copy may contain broken worktree/submodule `.git` pointers; provenance is
 collected before copying and is never reconstructed from those pointers.
 The build manifest records output/configuration hashes, selected group and,
 for OTA, application version or PAL coverage.
+For OTA E2E, each build gets a unique image ID in the generated signer header.
+The running image emits that ID with its compiled application version before
+cloud provisioning. The build ledger maps it to the MOT/payload hashes.
+The host records UART before native parsing and drains it through EOF; raw
+bytes remain private. The single GreaterVersion job additionally requires an
+observed initial-image boot followed by the newer built image. This observation
+does not replace or rewrite the native JUnit result.
 
 ## Credentials and runtime isolation
 

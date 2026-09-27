@@ -178,10 +178,17 @@ elseif ($TestGroup -eq 'OTAPAL') {
     }
 }
 $appVersion = [ordered]@{}
+$otaImageId = $null
+$otaSignerHeaderHash = $null
 if ($TestGroup -eq 'OTAE2E') {
-    if (-not (Test-Path -LiteralPath (Join-Path $idtRoot 'Test/include/idt_ota_signer.h'))) {
+    $otaSignerHeader = Join-Path $idtRoot 'Test/include/idt_ota_signer.h'
+    if (-not (Test-Path -LiteralPath $otaSignerHeader)) {
         throw 'OTAE2E requires the runtime-only Test/include/idt_ota_signer.h.'
     }
+    $imageIdMatch = [regex]::Matches([IO.File]::ReadAllText($otaSignerHeader), '(?m)^#define IDT_OTA_IMAGE_ID "([a-f0-9]{32})"\r?$')
+    if ($imageIdMatch.Count -ne 1) { throw 'OTAE2E requires one generated image identity.' }
+    $otaImageId = $imageIdMatch[0].Groups[1].Value
+    $otaSignerHeaderHash = (Get-FileHash -LiteralPath $otaSignerHeader -Algorithm SHA256).Hash.ToLowerInvariant()
     $parameterText = [System.IO.File]::ReadAllText((Join-Path $idtRoot 'Test/include/test_param_config.h'))
     foreach ($part in @('MAJOR', 'MINOR', 'BUILD')) {
         $versionMatch = [regex]::Matches($parameterText, "(?m)^\s*#\s*define\s+OTA_APP_VERSION_$part\s+\(?\s*([0-9]+)[uUlL]*\s*\)?\s*$")
@@ -329,6 +336,8 @@ try {
         mode = $(if ($TestGroup -eq 'Transport') { 'idt-transport-only' } else { "idt-$($TestGroup.ToLowerInvariant())" })
         suite = $suiteName
         application_version = $appVersion
+        image_id = $otaImageId
+        signer_header_sha256 = $otaSignerHeaderHash
         coverage = $(if ($TestGroup -eq 'OTAPAL') {
             [ordered]@{
                 nominal_cases = 15

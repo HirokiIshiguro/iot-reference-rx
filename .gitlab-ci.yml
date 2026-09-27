@@ -541,6 +541,8 @@ idt_ci_contract:
         - tools/ci/tests/test_idt_credentials.py
         - tools/ci/tests/test_idt_bundle.py
         - tools/ci/tests/test_idt_stop.py
+        - tools/ci/tests/test_idt_ota_witness.py
+        - tools/ci/tests/test_idt_selection.py
       when: on_success
     - when: never
   script:
@@ -557,6 +559,8 @@ idt_ci_contract:
         tools.ci.tests.test_idt_credentials \
         tools.ci.tests.test_idt_bundle \
         tools.ci.tests.test_idt_stop \
+        tools.ci.tests.test_idt_ota_witness \
+        tools.ci.tests.test_idt_selection \
         tools.idt.ota_aws_signers_tests \
         tools.idt.ota_support_tests -v
 

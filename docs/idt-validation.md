@@ -59,11 +59,15 @@ IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指
 通常のpush、MR、main更新、schedule、tag作成ではIDT jobを生成しません。
 
 <details>
-<summary>単一OTA caseによる立上げ</summary>
+<summary>OTAケースの選択と起動版の確認</summary>
 
 `RX72N_IDT_SCOPE=ota-mqtt`に限り、`RX72N_IDT_TEST_ID=OTAE2EGreaterVersion`で単一caseを選べます。
+カンマ区切りで複数caseを選べます。例えば`OTAE2ESameVersion,OTAE2EPreviousVersion,OTAE2EUntrustedCertificate`です。空要素、重複、固定suiteにないcaseは実行前に拒否します。
 通常は指定せず、選択group全体を実行します。
-単一caseは`metadata.json`と`summary.json`に部分実行として記録し、group全体の合格には扱いません。
+選択caseは`metadata.json`と`summary.json`の`selected_test_ids`に部分実行として記録し、group全体の合格には扱いません。
+OTA imageごとに異なる識別子を埋め込み、実起動時に`[IDT_BOOT] image=... version=...`を出力します。build ledgerで識別子・コンパイル版・payload hash・source SHAを対応付けます。
+GreaterVersion単独実行では、native JUnitの合格に加え、初期imageと新版imageの起動を順に観測することを追加条件にします。`native_junit_passed`と`ota_boot_verified`は別々に保存し、起動証跡が欠けた場合はjobを不合格にします。native JUnit自体は書き換えません。
+他case・group全体では観測したimageを記録しますが、GreaterVersion単独と同じ起動版判定を行ったとは扱いません。
 認証情報の切り分け用にlocal CLIの`--diagnostic-only`を指定すると、秘密情報を含む診断資料をprivate runtime内へ保存し、compiler / flash前に必ず停止します。これは合格試験ではなく、通常のpipeline引数には加えません。
 
 </details>
@@ -130,6 +134,8 @@ OTA PALのfilesystem専用IGNOREはnative IDTがFAILへ変換しました。こ�
 
 公開CI artifactは、診断本文を除いた`FRQ_Report.xml`、`summary.json`、`metadata.json`だけです。
 commit / submodule SHA、dirty状態、firmwareと試験設定のhash、IDT / suite版、部分実行の有無を対応付けます。
+UARTはnativeへの転送前にprivate runtimeの`uart-witness/uart.bin`へ保存します。nativeの読み取り終了後もSSH出力をEOFまで回収し、末尾の起動情報を残します。公開metadataにはrawのbyte数 / SHA-256と、識別子・版数・hash等の限定した観測情報だけを載せます。
+raw captureは128 MiBを上限とし、書込みエラー・上限超過・不完全な起動markerは正常な証跡として扱いません。rawと`events.jsonl`はprivate runtimeと同じ保持・削除対象です。
 
 private runtimeと`<workspace_root>\idt-private-<run>`は、失敗解析とレビューのため保持します。MRの確認後、必要なsanitized証跡を保存し、当該runのプロセス終了・AWS cleanup・実機停止を確認してから両ディレクトリを削除対象にします。自動世代削除は行わず、調査中のrunや別runを一括削除しません。
 private runtime内の`diagnostic-*`資料も同じ保持・削除対象です。
