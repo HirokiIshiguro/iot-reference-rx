@@ -23,6 +23,7 @@ job定義の正本は[`.gitlab-ci.yml`](../.gitlab-ci.yml)、接続構成とツ�
 | `main` | default branch push | RX72N / RX65N MQTTとRX671 network smoke |
 | `release` | tag | RX72N / RX65N software TLS regressionとRX671 network smoke |
 | `focused` | manual / API | 指定したターゲット・機能だけを実行 |
+| `idt` | web / APIで明示指定 | RX72NのIDT版照合、または開発用TLS通信試験 |
 | `nightly_matrix` | schedule | 複数projectを含む重い回帰matrix |
 
 ## Focused pipelineの主な変数
@@ -36,6 +37,8 @@ job定義の正本は[`.gitlab-ci.yml`](../.gitlab-ci.yml)、接続構成とツ�
 
 未指定ターゲットは`build`へ明示的に絞ってください。秘密情報の値はpipeline引数やjob logへ
 直接書かず、project CI/CD Variablesを使用します。
+
+IDTは通常の`full`やnightlyには含めません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt-validation.md)を参照してください。
 
 ## 実機とAWSの安全境界
 

@@ -56,7 +56,11 @@ variables:
   #   focused - manual/API pipeline; set board scopes explicitly.
   #   release - default branch/tag release-confidence pipeline.
   #   nightly_matrix - scheduled parent pipeline that fans out focused rows.
+  #   idt     - explicit web/API IDT run; no normal board/OTA jobs.
   PIPELINE_PROFILE: "branch"
+  RUN_RX72N_IDT: "false"
+  # Bring-up scopes are partial results, not a release qualification PASS.
+  RX72N_IDT_SCOPE: "preflight"
   NIGHTLY_MATRIX_INCLUDE_STABILIZING: "false"
   RUN_RX65N_BG96_BUILD: "true"
   # RX65N_BG96_TEST_SCOPE:
@@ -294,6 +298,36 @@ variables:
 
 workflow:
   rules:
+    # Use only RUN_RX72N_IDT and RX72N_IDT_SCOPE as pipeline inputs for this
+    # lane. Pipeline variables override workflow defaults; do not combine IDT
+    # with the existing board build, hardware, OTA or nightly scope inputs.
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true"'
+      variables:
+        PIPELINE_PROFILE: "idt"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
     - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
       when: always
     - if: $CI_COMMIT_TAG
@@ -483,6 +517,60 @@ workflow:
       when: always
     - if: $CI_COMMIT_BRANCH
       when: always
+
+idt_ci_contract:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - .gitlab-ci.yml
+        - tools/idt/**/*
+        - tools/ci/tests/test_idt_report.py
+      when: on_success
+    - when: never
+  script:
+    - python3 -m unittest tools.ci.tests.test_idt_report -v
+
+test_rx72n_idt:
+  stage: test
+  extends: .aws_cli_windows_job
+  tags:
+    - exec-shell
+    - os-windows
+    - hw-ishiguro-pc
+    - ccrx
+    - $AWS_CLI_RUNNER_TAG
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  timeout: 90 minutes
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    PYTHONUTF8: "1"
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true"'
+      when: on_success
+    - when: never
+  script:
+    - |
+      python tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  artifacts:
+    when: always
+    # IDT raw results can retain credential-injected source, firmware and
+    # certificates. Publish only the sanitized files emitted by run_idt.py.
+    paths:
+      - artifacts/idt/FRQ_Report.xml
+      - artifacts/idt/metadata.json
+      - artifacts/idt/summary.json
+    reports:
+      junit: artifacts/idt/FRQ_Report.xml
+    expire_in: 30 days
 
 nightly_dependency_contract:
   stage: dependency_check

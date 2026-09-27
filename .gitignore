@@ -44,6 +44,7 @@ RemoteSystemsTempFiles/*
 
 # Ignore GitLab CI dependency and job artifacts
 /artifacts/
+/.ci-bin/
 
 # Ignore certificate files (security-sensitive)
 *.pem
