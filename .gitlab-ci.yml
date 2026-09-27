@@ -543,6 +543,9 @@ idt_ci_contract:
         - tools/ci/tests/test_idt_stop.py
         - tools/ci/tests/test_idt_ota_witness.py
         - tools/ci/tests/test_idt_selection.py
+        - tools/ci/tests/test_idt_flash_failure.py
+        - tools/ci/tests/test_uart_download_errors.py
+        - tools/test_uart_download_rx72n.py
       when: on_success
     - when: never
   script:
@@ -561,6 +564,8 @@ idt_ci_contract:
         tools.ci.tests.test_idt_stop \
         tools.ci.tests.test_idt_ota_witness \
         tools.ci.tests.test_idt_selection \
+        tools.ci.tests.test_idt_flash_failure \
+        tools.ci.tests.test_uart_download_errors \
         tools.idt.ota_aws_signers_tests \
         tools.idt.ota_support_tests -v
 

@@ -36,6 +36,9 @@ Native runs choose the workspace automatically as
 The wrapper links only the selected sources, applies temporary IDT defines,
 and restores project metadata, demo configuration and tracked Smart Configurator
 output after the build. Normal project builds retain their usual startup path.
+IDT profiles initialize the UART port synchronously without creating an
+interactive CLI task. This avoids deleting that task while it holds the TX
+mutex during its welcome message, which previously hid post-OTA boot output.
 `-ValidateOnly` checks the selected profile without compiling or touching hardware.
 The build script itself does not flash a board or create AWS resources.
 

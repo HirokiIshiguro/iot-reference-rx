@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
 from test_selection import parse_test_ids
 from ota_witness import UartWitness
+from flash_failure import raise_if_flash_failed
 
 GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
@@ -83,6 +84,19 @@ def inspect_junit(results):
         skipped = max(skipped, int(suite.get("skipped", "0")))
     return {"report": str(reports[0]), "tests": tests, "failures": failures,
             "errors": errors, "skipped": skipped}
+
+
+def wait_for_native(process, bridge, run_dir, timeout_seconds):
+    deadline = time.monotonic() + timeout_seconds
+    while process.poll() is None:
+        raise_if_flash_failed(run_dir)
+        if bridge.failed.is_set() or bridge.remote.poll() is not None:
+            raise RuntimeError(bridge.failure_reason or "UART bridge exited during IDT execution")
+        if time.monotonic() > deadline:
+            raise RuntimeError("IDT run exceeded its time budget")
+        time.sleep(0.2)
+    # Native IDT may exit zero before the next poll after ignoring a failed callback.
+    raise_if_flash_failed(run_dir)
 
 
 class Bridge:
@@ -356,13 +370,7 @@ def main():
 
         output_thread = threading.Thread(target=console, daemon=True)
         output_thread.start()
-        deadline = time.monotonic() + args.timeout_seconds
-        while process.poll() is None:
-            if bridge.failed.is_set() or bridge.remote.poll() is not None:
-                raise RuntimeError(bridge.failure_reason or "UART bridge exited during IDT execution")
-            if time.monotonic() > deadline:
-                raise RuntimeError("IDT run exceeded its time budget")
-            time.sleep(0.2)
+        wait_for_native(process, bridge, run_dir, args.timeout_seconds)
         bridge.forward_stopped.set()
         output_thread.join(timeout=5)
         result["idtExitCode"] = process.returncode
