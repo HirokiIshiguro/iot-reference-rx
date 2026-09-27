@@ -16,7 +16,7 @@ FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリー
 | `mqtt` | `FullCloudIoT` | native MQTT03: 10件完走、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAIL |
 | `pkcs11` | `FullPKCS11_Core` | **10件PASS / 0 FAIL / 0 ERROR / 0 SKIP**。capabilities、digest、random、初期化 / session |
 | `ota-pal` | `OTACore` | **14件のassertion PASS**、filesystem専用1件はIGNORE。native IDTはこのIGNOREをFAILと記録し、全体NG |
-| `ota-mqtt` | `OTADataplaneMQTT` | setupの認証情報検査でERROR。nativeが生成したRSA証明書と設定したEC鍵が不一致のため、compiler / flash前に停止。実際のOTA更新は未確認 |
+| `ota-mqtt` | `OTADataplaneMQTT` | 公開鍵を渡す経路で、ACTIVEなEC証明書と設定した秘密鍵の一致を診断確認。実際のOTA更新は未確認 |
 
 TLSの確定証跡は[`9cadbfeb0a10a51a1f2953127346a58bd38805bf`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/9cadbfeb0a10a51a1f2953127346a58bd38805bf)のclean checkoutによるものです。
 他のscopeや対象SHAに、この14件の合格を流用しません。
@@ -32,9 +32,12 @@ main `0dc57833`に実装中の差分を加えた試作の結果（`source_dirty=
 
 OTA setupでは`KeyProvisioning=Import`、ECC公開鍵を設定しても、対象ThingのprincipalはACTIVEなRSA証明書でした。
 既存EC証明書を指定する診断でも同じ不一致になったため、この追加証明書を作る試作コードは採用していません。
-証明書と秘密鍵の一致検査は維持し、更新成功・署名検証成功・復帰成功の証跡には扱いません。
+その後、OTAスコープだけnativeの`KeyProvisioning=Onboard`で公開鍵を渡すと、ACTIVEなEC証明書1件と試験用秘密鍵の一致を確認できました。
+これはホスト生成鍵を試験firmwareへimportする開発用の接続方法です。マイコン上の鍵生成・secure elementの認定試験結果には扱いません。PKCS11スコープは`Import`のままです。
+証明書と秘密鍵の一致検査は維持し、診断だけでは更新成功・署名検証成功・復帰成功の証跡には扱いません。
 各試行の一時ACM証明書2件と、既存証明書指定の診断用IoT証明書は削除を確認しました。
-19:05頃の診断中にはRPi #1へのSSH接続も切れました。compiler / flash前でしたが、この試行の終了状態の確認に失敗したため、接続とベンチ状態の復旧確認後に再試験します。
+19:05頃の診断中にはRPi #1へのSSH接続も切れ、native cleanupがERRORになりました。CloudTrailで所有を確認して残存資源を回収しました。[診断・回収証跡](https://gitlab.saffti.jp/-/project/38/uploads/3902f283dfdc894cfc895060ce5d4d7e/ota-setup-sanitized-evidence.zip)はこの失敗を維持しています。
+再接続後のreset操作は成功しましたが、直後のUART2 bytesで静止検査はNGでした。その後、共有lock下の観測で3秒連続0 bytesを確認しました。
 
 ## 明示実行
 

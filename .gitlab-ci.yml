@@ -62,6 +62,7 @@ variables:
   # Override when a second Windows/WSL host has the same validated capabilities.
   RX72N_IDT_RUNNER_TAG: "hw-ishiguro-pc"
   RX72N_IDT_PYTHON: "C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe"
+  RX72N_IDT_HOST_PROFILE: "C:/ai/codex/tools/venvs/rx72n-idt-windows/host-profile.json"
   # Bring-up scopes are partial results, not a release qualification PASS.
   RX72N_IDT_SCOPE: "preflight"
   NIGHTLY_MATRIX_INCLUDE_STABILIZING: "false"

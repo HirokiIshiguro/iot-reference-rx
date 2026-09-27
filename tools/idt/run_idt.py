@@ -300,7 +300,11 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     device = [{"id": "rx72n-ether-development", "sku": "RX72N-Envision-Kit-Ethernet", "features": [
         {"name": "Wifi", "value": "No"}, {"name": "Cellular", "value": "No"},
         {"name": "BLE", "value": "No"}, {"name": "PKCS11", "value": "ECC"},
-        {"name": "KeyProvisioning", "value": "Import"},
+        # OTA's native Import route creates an RSA key without exposing it to
+        # the callback. Exercise its supplied-public-key route for development;
+        # the firmware still imports a host-generated EC key. This must never
+        # be described as an onboard key-generation qualification result.
+        {"name": "KeyProvisioning", "value": "Onboard" if scope == "ota-mqtt" else "Import"},
         {"name": "OTA", "value": "Yes", "configs": [{"name": "OTADataPlaneProtocol", "value": "MQTT"}]}],
         "devices": [{"id": "rx72n-ether-rpi1", "secureElementConfig": {
             "preProvisioned": "No", "pkcs11JITPCodeVerifyRootCertSupport": "No", "publicKeyAsciiHexFilePath": wsl_path(public_path)}}]}]
@@ -463,6 +467,8 @@ def main() -> int:
                 "qualification": "not-established", "runtime_directory": str(runtime),
                 "submodule_pins": submodule_pins(), "board": "RX72N Envision Kit Ethernet",
                 "tls_backend": "software"}
+    if args.scope == "ota-mqtt":
+        metadata["device_provisioning"] = "development host-generated EC key via native supplied-public-key route; no onboard key-generation qualification"
     write_json(args.output / "metadata.json", metadata)
     try:
         if args.scope != "preflight":
