@@ -49,6 +49,23 @@ RX65N/BG96のTLS throughputとCPU負荷率は未測定で、TCP値から推定�
 個別セルは[検証結果](docs/validation-evidence.md)を参照してください。AWS IoT Coreは
 SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認しています。
 
+## IoT Device Tester（IDT）対応方針
+
+[AWS IoT Device Tester for FreeRTOS](https://docs.aws.amazon.com/freertos/latest/userguide/device-tester-for-freertos-ug.html)の
+初期対象は**RX72N Envision Kit（Ethernet）**です。
+IDTは専用のパイプライン引数を明示した場合だけ実行し、**新規リリースタグの作成前に、タグ対象commit SHAのIDT結果がOKであることを確認**します。
+通常のpush / MR / main更新 / nightly / tag作成を契機にはIDTを自動実行しません。
+
+- **合格条件:** 対象構成の必須試験がすべてPASSであること。未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。
+- **証跡:** commit / submodule SHA、ボード・TLS構成、firmware hash、IDT / test suite版、実行pipelineと結果reportを対応付け、リリース時に参照できる形で保存します。対象SHAや構成が変わった場合、以前の合格結果は流用しません。
+- **費用:** コード変更ごとのIDT実行と無制限の自動再試行は行いません。[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生するため、実行前に利用量・費用上限・停止条件を定め、終了時に試験用AWS資源を片付けます。
+
+**現在は運用方針を定めた段階です。** IDT専用build / runner・起動引数・タグ作成前の自動gateは未実装で、IDT実機合格も未確認です。
+既存のMQTT / OTA CI成功はIDT合格の代用にはなりません。
+2026-09-27確認時点の[AWS公式対応表](https://docs.aws.amazon.com/freertos/latest/userguide/dev-test-versions-afr.html)は
+IDT 4.9.0 / FRQ_2.5.0と202210-LTSまでを掲載しており、本リポジトリの202604.00-LTSとの互換性確認が先に必要です。
+IDTによる検証と[AWSの正式認定](https://docs.aws.amazon.com/freertos/latest/userguide/idt-support-policy.html)は区別します。
+
 ## 最短の開始方法
 
 ```bash
