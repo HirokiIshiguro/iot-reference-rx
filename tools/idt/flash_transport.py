@@ -9,6 +9,7 @@ import shlex
 import subprocess
 import sys
 from prepare_transport_key import validate_source, macro
+from flash_failure import record_flash_failure
 
 SSH=os.environ.get('IDT_WINDOWS_SSH','/mnt/c/Windows/System32/OpenSSH/ssh.exe')
 SCP=os.environ.get('IDT_WINDOWS_SCP','/mnt/c/Windows/System32/OpenSSH/scp.exe')
@@ -56,4 +57,12 @@ def main():
             "if resolved.parent != Path('/tmp') or resolved.name != expected: raise RuntimeError('Staging path escaped /tmp')",
             "if resolved.exists(): shutil.rmtree(resolved)"])
         run([SSH,'-T','-o','BatchMode=yes','rpi1','python3 -c '+shlex.quote(cleanup)],timeout=30)
-if __name__=='__main__':main()
+def run_callback():
+    try:
+        main()
+    except BaseException as error:
+        record_flash_failure(os.environ['IDT_RUNTIME_DIR'], error)
+        raise
+
+
+if __name__=='__main__':run_callback()

@@ -4,6 +4,7 @@
  * Advisor determines results; this file never emits a local PASS.
  */
 #include <string.h>
+#include <stdio.h>
 #include "FreeRTOS.h"
 #include "test_execution_config.h"
 #include "test_param_config.h"
@@ -19,6 +20,11 @@
 
 #if ( OTA_E2E_TEST_ENABLED == 1 )
     #include "idt_ota_signer.h"
+    #if ( APP_VERSION_MAJOR != OTA_APP_VERSION_MAJOR ) || \
+        ( APP_VERSION_MINOR != OTA_APP_VERSION_MINOR ) || \
+        ( APP_VERSION_BUILD != OTA_APP_VERSION_BUILD )
+        #error "The executing application version must match the IDT build parameters."
+    #endif
 #endif
 
 static BaseType_t prvWriteIdtValue( char * key, const char * value )
@@ -33,6 +39,17 @@ static BaseType_t prvWriteIdtValue( char * key, const char * value )
 
 BaseType_t xProvisionIdtCloudCredentials( void )
 {
+#if ( OTA_E2E_TEST_ENABLED == 1 )
+    char bootWitness[ 128 ];
+
+    /* This identifies the image actually executing, before any cloud verdict.
+     * The host binds the generated ID to this build's hashes in its ledger. */
+    ( void ) snprintf( bootWitness, sizeof( bootWitness ),
+                       "\r\n[IDT_BOOT] image=%s version=%u.%u.%u\r\n",
+                       IDT_OTA_IMAGE_ID, ( unsigned int ) APP_VERSION_MAJOR,
+                       ( unsigned int ) APP_VERSION_MINOR, ( unsigned int ) APP_VERSION_BUILD );
+    configPRINT_STRING( bootWitness );
+#endif
     /* The production agent reads these entries from KVS, including the host
      * used for SNI. Never print credential values or use transport-echo mode. */
     if( ( prvWriteIdtValue( "thingname", IOT_THING_NAME ) != pdTRUE ) ||

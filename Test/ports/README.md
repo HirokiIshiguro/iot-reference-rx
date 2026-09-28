@@ -36,6 +36,9 @@ Native runs choose the workspace automatically as
 The wrapper links only the selected sources, applies temporary IDT defines,
 and restores project metadata, demo configuration and tracked Smart Configurator
 output after the build. Normal project builds retain their usual startup path.
+IDT profiles initialize the UART port synchronously without creating an
+interactive CLI task. This avoids deleting that task while it holds the TX
+mutex during its welcome message, which previously hid post-OTA boot output.
 `-ValidateOnly` checks the selected profile without compiling or touching hardware.
 The build script itself does not flash a board or create AWS resources.
 
@@ -45,6 +48,16 @@ copy may contain broken worktree/submodule `.git` pointers; provenance is
 collected before copying and is never reconstructed from those pointers.
 The build manifest records output/configuration hashes, selected group and,
 for OTA, application version or PAL coverage.
+For OTA E2E, each build gets a unique image ID in the generated signer header.
+The running image emits that ID with its compiled application version before
+cloud provisioning. The build ledger maps it to the MOT/payload hashes.
+The host records UART before native parsing and drains it through EOF; raw
+bytes remain private. The single GreaterVersion job additionally requires an
+observed initial-image boot followed by the newer built image. This observation
+does not replace or rewrite the native JUnit result.
+Flash callback failures remain latched in the private runtime. The supervisor
+checks that latch during execution and after native exit, so a native zero exit
+cannot turn a failed initial flash into a passing run.
 
 ## Credentials and runtime isolation
 

@@ -8,6 +8,7 @@ from pathlib import Path
 import pty
 import re
 import secrets
+import select
 import shlex
 import signal
 import subprocess
@@ -17,6 +18,9 @@ import time
 import tty
 from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
+from test_selection import parse_test_ids
+from ota_witness import UartWitness
+from flash_failure import raise_if_flash_failed
 
 GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
@@ -82,26 +86,46 @@ def inspect_junit(results):
             "errors": errors, "skipped": skipped}
 
 
+def wait_for_native(process, bridge, run_dir, timeout_seconds):
+    deadline = time.monotonic() + timeout_seconds
+    while process.poll() is None:
+        raise_if_flash_failed(run_dir)
+        if bridge.failed.is_set() or bridge.remote.poll() is not None:
+            raise RuntimeError(bridge.failure_reason or "UART bridge exited during IDT execution")
+        if time.monotonic() > deadline:
+            raise RuntimeError("IDT run exceeded its time budget")
+        time.sleep(0.2)
+    # Native IDT may exit zero before the next poll after ignoring a failed callback.
+    raise_if_flash_failed(run_dir)
+
+
 class Bridge:
-    def __init__(self, token):
+    def __init__(self, token, capture_dir):
         self.ready = threading.Event()
         self.failed = threading.Event()
         self.closed = threading.Event()
+        self.closing = threading.Event()
+        self.forward_stopped = threading.Event()
         self.failure_reason = None
         self.master, self.slave = pty.openpty()
         tty.setraw(self.slave)
+        os.set_blocking(self.master, False)
         self.device = os.ttyname(self.slave)
         source = Path(__file__).with_name("rpi_uart_bridge.py").read_bytes()
         bootstrap = "exec(bytes.fromhex('" + source.hex() + "'))"
         command = "python3 -u -c " + shlex.quote(bootstrap) + " " + shlex.quote(token)
         env = {key: value for key, value in os.environ.items() if not key.startswith("AWS_")}
+        self.capture = None
         try:
+            self.capture = UartWitness(capture_dir)
             self.remote = subprocess.Popen(
                 [SSH, "-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10",
                  "-o", "ServerAliveCountMax=3", "rpi1", command],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 bufsize=0, env=env)
         except Exception:
+            if self.capture is not None:
+                self.capture.finish()
             os.close(self.master)
             os.close(self.slave)
             raise
@@ -117,47 +141,78 @@ class Bridge:
                 self.ready.set()
             if line:
                 print("[bridge] " + line, file=sys.stderr, flush=True)
-        if not self.closed.is_set():
+        if not self.closing.is_set():
             self.failed.set()
 
     def pump(self, source, destination):
         try:
-            while not self.closed.is_set():
-                data = os.read(source, 65536)
+            while not self.closing.is_set():
+                if not select.select([source], [], [], 0.2)[0]:
+                    continue
+                try:
+                    data = os.read(source, 65536)
+                except BlockingIOError:
+                    continue
                 if not data:
                     break
                 write_all(destination, data)
         except OSError as error:
-            if not self.closed.is_set():
+            if not self.closing.is_set():
                 print("[bridge] stream failure: " + str(error), file=sys.stderr, flush=True)
         finally:
-            if not self.closed.is_set():
+            if not self.closing.is_set():
                 self.failed.set()
+
+    def forward_uart(self, data):
+        remaining = memoryview(data)
+        while remaining and not self.closing.is_set() and not self.forward_stopped.is_set():
+            if not select.select([], [self.master], [], 0.2)[1]:
+                continue
+            try:
+                written = os.write(self.master, remaining)
+            except BlockingIOError:
+                continue
+            if written <= 0:
+                raise OSError("PTY forwarding failed")
+            remaining = remaining[written:]
 
     def from_uart(self):
         tail = b""
+        capture_failed = False
         try:
             while not self.closed.is_set():
                 data = os.read(self.remote.stdout.fileno(), 65536)
                 if not data:
                     break
-                write_all(self.master, data)
+                # Capture before the native reader. After IDT exits, keep
+                # draining SSH stdout through EOF instead of losing its tail.
+                if not capture_failed:
+                    try:
+                        self.capture.feed(data)
+                    except (OSError, ValueError, RuntimeError):
+                        capture_failed = True
+                        self.failure_reason = "private UART capture failed"
+                        self.failed.set()
+                if not capture_failed:
+                    self.forward_uart(data)
                 tail = (tail + data)[-1024:]
                 if b"IDT_PORT_FATAL:" in tail:
                     self.failure_reason = "device reported a fatal IDT port error"
                     self.failed.set()
-                    break
+                    self.forward_stopped.set()
         except OSError:
-            pass
+            self.failure_reason = "UART RX stream failed"
+            self.failed.set()
         finally:
-            if not self.closed.is_set():
+            if not self.closing.is_set():
                 self.failed.set()
 
     def to_uart(self):
         self.pump(self.master, self.remote.stdin.fileno())
 
     def close(self):
-        self.closed.set()
+        self.closing.set()
+        self.forward_stopped.set()
         # EOF makes the remote helper close UART, unlink its owner file, and unlock.
         if self.remote.stdin:
             try:
@@ -173,10 +228,22 @@ class Bridge:
             except subprocess.TimeoutExpired:
                 self.remote.kill()
                 self.remote.wait()
+        self.threads[1].join(timeout=5)
+        self.closed.set()
         for descriptor in (self.master, self.slave):
             os.close(descriptor)
         for thread in self.threads:
             thread.join(timeout=1)
+        if self.threads[1].is_alive():
+            raise RuntimeError("UART capture did not drain before closing")
+        for stream in (self.remote.stdout, self.remote.stderr):
+            if stream:
+                stream.close()
+        capture = self.capture.finish()
+        (self.capture.directory.parent / "uart-capture.json").write_text(
+            json.dumps(capture, indent=2) + "\n", encoding="utf-8")
+        if not capture["complete"] or self.failure_reason:
+            raise RuntimeError(self.failure_reason or "UART capture did not complete")
         if self.remote.returncode != 0:
             raise RuntimeError("RPi bridge/end-state cleanup failed, exit " + str(self.remote.returncode))
 
@@ -194,11 +261,15 @@ def main():
     parser.add_argument("--region", default=os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"))
     parser.add_argument("--output", required=True, help="new, nonexistent run output directory")
     parser.add_argument("--group", choices=GROUPS, default=GROUPS[0])
-    parser.add_argument("--test-id", choices=["OTAE2EGreaterVersion"],
-                        help="Optional first OTA bring-up case; omitted runs the selected group")
+    parser.add_argument("--test-id", help="Optional comma-separated OTA cases; omitted runs the group")
     parser.add_argument("--timeout-seconds", type=int, default=4500)
     parser.add_argument("--cleanup-timeout-seconds", type=int, default=120)
     args = parser.parse_args()
+    try:
+        selected_test_ids = parse_test_ids(args.test_id)
+    except ValueError as error:
+        parser.error(str(error))
+    args.test_id = ",".join(selected_test_ids) if selected_test_ids else None
     if args.test_id and args.group != "OTADataplaneMQTT":
         parser.error("The selected test ID belongs to OTADataplaneMQTT")
     if sys.platform != "linux" or not Path(SSH).is_file():
@@ -258,7 +329,7 @@ def main():
         signal.signal(signal.SIGINT, interrupted)
         signal.signal(signal.SIGTERM, interrupted)
         token = secrets.token_hex(16)
-        bridge = Bridge(token)
+        bridge = Bridge(token, run_dir / "uart-witness")
         deadline = time.monotonic() + 30
         while not bridge.ready.wait(0.1):
             if bridge.failed.is_set() or bridge.remote.poll() is not None or time.monotonic() > deadline:
@@ -299,19 +370,15 @@ def main():
 
         output_thread = threading.Thread(target=console, daemon=True)
         output_thread.start()
-        deadline = time.monotonic() + args.timeout_seconds
-        while process.poll() is None:
-            if bridge.failed.is_set() or bridge.remote.poll() is not None:
-                raise RuntimeError(bridge.failure_reason or "UART bridge exited during IDT execution")
-            if time.monotonic() > deadline:
-                raise RuntimeError("IDT run exceeded its time budget")
-            time.sleep(0.2)
+        wait_for_native(process, bridge, run_dir, args.timeout_seconds)
+        bridge.forward_stopped.set()
         output_thread.join(timeout=5)
         result["idtExitCode"] = process.returncode
         result.update(inspect_junit(run_dir / "results"))
         passed = (process.returncode == 0 and result["tests"] > 0 and
                   result["failures"] == result["errors"] == result["skipped"] == 0)
-        result["verdict"] = ("SINGLE_CASE_PASS" if args.test_id else "SELECTED_GROUP_PASS") if passed else "FAIL"
+        selected_verdict = "SINGLE_CASE_PASS" if len(selected_test_ids) == 1 else "SELECTED_CASES_PASS"
+        result["verdict"] = (selected_verdict if args.test_id else "SELECTED_GROUP_PASS") if passed else "FAIL"
         exit_code = 0 if passed else 1
     except KeyboardInterrupt:
         result.update(verdict="INTERRUPTED", reason="signal received")

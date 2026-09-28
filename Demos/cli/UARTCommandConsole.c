@@ -78,6 +78,7 @@ available. */
  */
 static void prvUARTCommandConsoleTask (void *pvParameters);
 void vUARTCommandConsoleStart (uint16_t usStackSize, UBaseType_t uxPriority);
+void vUARTCommandConsoleInitPort (void);
 
 /*-----------------------------------------------------------*/
 /* Const messages output by the command console. */
@@ -200,6 +201,13 @@ void vUARTCommandConsoleStart(uint16_t usStackSize, UBaseType_t uxPriority)
  * Argument     : pvParameters
  * Return Value : .
  *********************************************************************************************************************/
+void vUARTCommandConsoleInitPort(void)
+{
+    /* Also used by automated tests that need UART output without an
+     * interactive task that could be deleted while holding the TX mutex. */
+    xPort = xSerialPortInitMinimal(configCLI_BAUD_RATE, cmdQUEUE_LENGTH);
+}
+
 static void prvUARTCommandConsoleTask(void *pvParameters)
 {
     signed char cPrevChar = '\0';
@@ -217,7 +225,7 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
     pcOutputString = FreeRTOS_CLIGetOutputBuffer();
 
     /* Initialise the UART. */
-    xPort = xSerialPortInitMinimal(configCLI_BAUD_RATE, cmdQUEUE_LENGTH);
+    vUARTCommandConsoleInitPort();
 
     /* Send the welcome message. */
     vSerialPutString((signed char *)pcWelcomeMessage1, (unsigned short)strlen(pcWelcomeMessage1));

@@ -22,9 +22,13 @@ import xml.etree.ElementTree as ET
 try:
     from .host_profile import load_host_profile
     from .idt_bundle import verify_install, verify_archive_digest
+    from .test_selection import parse_test_ids
+    from .ota_witness import analyze_ota_witness, version_tuple
 except ImportError:
     from host_profile import load_host_profile
     from idt_bundle import verify_install, verify_archive_digest
+    from test_selection import parse_test_ids
+    from ota_witness import analyze_ota_witness, version_tuple
 
 VERSION = "4.9.0"
 SUITE = "FRQ_2.5.0"
@@ -435,15 +439,18 @@ def main() -> int:
     global HOST, INSTALL, RUNTIME
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scope", choices=list(SCOPE_GROUPS), default="preflight")
-    parser.add_argument("--test-id", choices=["OTAE2EGreaterVersion"],
+    parser.add_argument("--test-id",
                         default=os.getenv("RX72N_IDT_TEST_ID") or None,
-                        help="Optional single-case OTA bring-up; not a complete group result")
+                        help="Optional comma-separated OTA test IDs; not a complete group result")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--diagnostic-only", action="store_true", help="OTA credential diagnosis; stops before compiler/flash")
     parser.add_argument("--region", default=os.getenv("AWS_DEFAULT_REGION", "ap-northeast-1"))
     args = parser.parse_args()
-    if args.test_id not in {None, "OTAE2EGreaterVersion"}:
-        parser.error("Unsupported RX72N_IDT_TEST_ID")
+    try:
+        selected_test_ids = parse_test_ids(args.test_id)
+    except ValueError as error:
+        parser.error(str(error))
+    args.test_id = ",".join(selected_test_ids) if selected_test_ids else None
     if args.test_id and args.scope != "ota-mqtt":
         parser.error("The selected test ID requires --scope ota-mqtt")
     if args.diagnostic_only and args.scope != "ota-mqtt":
@@ -459,6 +466,7 @@ def main() -> int:
     import boto3
     credentials = boto3.Session().get_credentials().get_frozen_credentials()
     metadata = {"scope": args.scope, "test_id": args.test_id,
+                "selected_test_ids": list(selected_test_ids),
                 "diagnostic_only": args.diagnostic_only,
                 "complete_group_requested": args.test_id is None,
                 "source_sha": git("rev-parse", "HEAD"),
@@ -494,9 +502,11 @@ def main() -> int:
     except (ValueError, TypeError):
         junit_summary = {"passed": False, "problems": ["IDT report checker did not return a valid result"]}
     summary = combined_summary(junit_summary, idt_code)
+    summary["native_junit_passed"] = bool(junit_summary.get("passed")) and checked.returncode == 0
     if checked.returncode != 0:
         summary["passed"] = False
     summary.update(scope=args.scope, test_id=args.test_id, complete_group_requested=args.test_id is None,
+                   selected_test_ids=list(selected_test_ids),
                    interrupted=idt_code == 130)
     if idt_code == 130:
         summary["problems"].append("IDT was interrupted; unfinished cases can appear as failures in the native report")
@@ -523,10 +533,44 @@ def main() -> int:
     else:
         metadata["idt_exit_code"] = idt_code
     if args.scope != "preflight":
+        capture_path = runtime / "execution/uart-capture.json"
+        capture = json.loads(capture_path.read_text(encoding="utf-8")) if capture_path.is_file() else {}
+        metadata["uart_capture"] = {key: capture.get(key) for key in
+                                    ("complete", "error", "raw_bytes", "raw_sha256",
+                                     "invalid_marker_count", "truncated_marker")}
+        if capture.get("complete") is not True:
+            summary["passed"] = False
+            summary["problems"].append("Private UART capture is missing or incomplete")
         manifests = list((runtime / "execution").rglob("build_manifest.json"))
         ledger = runtime / "execution/ota-build-ledger.jsonl"
         if ledger.is_file():
             metadata["ota_builds"] = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if args.scope == "ota-mqtt":
+            builds = metadata.get("ota_builds", [])
+            initial_id = candidate_id = None
+            # The pinned native GT setup builds one candidate and one initial
+            # image (confirmed by run #11255); ambiguous ledgers fail closed.
+            if args.test_id == "OTAE2EGreaterVersion" and len(builds) == 2:
+                ordered = sorted(builds, key=lambda item: version_tuple(item["ota_version"]))
+                initial_id, candidate_id = (item["image_id"] for item in ordered)
+            witness = analyze_ota_witness(capture.get("events", []), builds,
+                                          selected_test_id=args.test_id,
+                                          capture_complete=capture.get("complete") is True,
+                                          initial_image_id=initial_id, candidate_image_id=candidate_id)
+            if any(item.get("source_sha") != metadata["source_sha"] or
+                   item.get("source_tree_dirty") != metadata["source_dirty"] for item in builds):
+                witness.update(verified=False, verdict="not_verified")
+                witness["reasons"].append("Build provenance does not match this run")
+                summary["passed"] = False
+                summary["problems"].append("Build provenance does not match this run")
+            if capture.get("invalid_marker_count") or capture.get("truncated_marker"):
+                witness.update(verified=False, verdict="not_verified")
+                witness["reasons"].append("Unparseable or truncated boot markers were captured")
+            metadata["ota_witness"] = witness
+            summary["ota_boot_verified"] = witness["verified"]
+            if witness["required"] and not witness["verified"]:
+                summary["passed"] = False
+                summary["problems"].extend(witness["reasons"] or ["OTA boot witness is not verified"])
         metadata["builds"] = []
         for manifest in manifests:
             build = json.loads(manifest.read_text(encoding="utf-8-sig"))

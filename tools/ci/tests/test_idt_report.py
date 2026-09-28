@@ -321,6 +321,7 @@ class IdtCiContractTests(unittest.TestCase):
             "tools.ci.tests.test_idt_report", "tools.ci.tests.test_idt_host_profile",
             "tools.ci.tests.test_idt_credentials", "tools.ci.tests.test_idt_bundle",
             "tools.ci.tests.test_idt_stop",
+            "tools.ci.tests.test_idt_ota_witness", "tools.ci.tests.test_idt_selection",
             "tools.idt.ota_aws_signers_tests", "tools.idt.ota_support_tests",
         ):
             self.assertIn(setting, job)

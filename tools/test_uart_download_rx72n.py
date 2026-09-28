@@ -40,6 +40,7 @@ Dependencies:
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -85,6 +86,13 @@ MSG_ERROR = "error occurred"
 DEFAULT_SUCCESS_MESSAGE = "jump to user program"
 DEFAULT_READY_MESSAGE = "send \"userprog.rsu\" via UART."
 DEFAULT_WRITE_ACK_PREFIX = "W 0x"
+
+
+def bootloader_failed(line):
+    """Recognize fatal boot-loader output before progress filtering."""
+    lowered = line.lower()
+    return (MSG_ERROR in lowered or "system error" in lowered or
+            bool(re.search(r"r_flash_\w+\(\).*\berror\b", lowered)))
 
 
 class UartDownloader:
@@ -215,30 +223,18 @@ class UartDownloader:
                 text = data.decode('ascii', errors='replace')
                 self.rx_buffer += text
 
-                # Split on newline, keeping partial lines in buffer
-                while '\n' in self.rx_buffer:
-                    line, self.rx_buffer = self.rx_buffer.split('\n', 1)
-                    line = line.strip('\r')
+                # A CR progress line and a CRLF error can arrive in one read.
+                # Split both, otherwise progress throttling hides the error code.
+                parts = re.split(r'\r\n|\r|\n', self.rx_buffer)
+                self.rx_buffer = parts.pop()
+                for line in parts:
+                    line = line.strip()
                     if line:
                         lines.append(line)
-                        self.messages.append(line)
+                        if MSG_INSTALLING_FW not in line and MSG_CONST_DATA not in line:
+                            self.messages.append(line)
                         if self.ack_each_chunk and line.startswith(self.ack_prefix):
                             self.write_ack_count += 1
-
-                # Also check for \r-only lines (progress updates use \r)
-                if '\r' in self.rx_buffer and '\n' not in self.rx_buffer:
-                    parts = self.rx_buffer.split('\r')
-                    # Keep the last part (possibly incomplete)
-                    for part in parts[:-1]:
-                        part = part.strip()
-                        if part:
-                            lines.append(part)
-                            # Don't add progress lines to messages (too many)
-                            if MSG_INSTALLING_FW not in part and MSG_CONST_DATA not in part:
-                                self.messages.append(part)
-                            if self.ack_each_chunk and part.startswith(self.ack_prefix):
-                                self.write_ack_count += 1
-                    self.rx_buffer = parts[-1]
         except serial.SerialException:
             pass
         return lines
@@ -369,6 +365,10 @@ class UartDownloader:
             # Read UART output
             lines = self.read_uart()
             for line in lines:
+                if bootloader_failed(line):
+                    print(f"\nERROR: Boot loader reported failure: {line}")
+                    self.close_port()
+                    return 1
                 # Print significant messages
                 if self.ack_each_chunk and line.startswith(self.ack_prefix):
                     pass
@@ -391,10 +391,6 @@ class UartDownloader:
                     integrity_ok = True
                 elif MSG_CHECK_NG in line and MSG_INTEGRITY_CHECK in '\n'.join(self.messages[-5:]):
                     print(f"\nERROR: Firmware integrity check FAILED")
-                    self.close_port()
-                    return 1
-                elif MSG_ERROR in line.lower():
-                    print(f"\nERROR: Boot loader reported failure: {line}")
                     self.close_port()
                     return 1
                 elif MSG_COMPLETED_CONST in line:

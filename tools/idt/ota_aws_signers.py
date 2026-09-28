@@ -35,7 +35,17 @@ def _persist(path, journal, *, initial=False):
         stream.flush()
         os.fsync(stream.fileno())
     if not initial:
-        os.replace(temporary, path)
+        # Windows scanners/readers can briefly deny replacement of a recently
+        # written file. Retry only this local rename, never the AWS import.
+        # Permanent ACL errors remain failures; total backoff is at most 0.75s.
+        for attempt in range(5):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError as error:
+                if getattr(error, "winerror", None) not in (5, 32, 33) or attempt == 4:
+                    raise
+                time.sleep(0.05 * (2 ** attempt))
 
 
 def _clients(region, session):

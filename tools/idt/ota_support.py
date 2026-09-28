@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import subprocess
 import sys
 
@@ -169,6 +170,7 @@ def prepare_source(value):
     load_signer(key, cert)
     header = ("/* Generated inside private IDT runtime; do not publish. */\n"
               "#ifndef IDT_OTA_SIGNER_H\n#define IDT_OTA_SIGNER_H\n"
+              "#define IDT_OTA_IMAGE_ID " + json.dumps(secrets.token_hex(16)) + "\n"
               "#define IDT_OTA_SIGNER_CERTIFICATE " + json.dumps(cert.read_text(encoding="ascii")) +
               "\n#endif\n")
     (source / "Test/include/idt_ota_signer.h").write_text(header, encoding="utf-8")
@@ -195,11 +197,20 @@ def build_payload(value):
     expected_version = dict(zip(("MAJOR", "MINOR", "BUILD"), map(int, version.split("."))))
     if manifest.get("application_version") != expected_version:
         raise RuntimeError("compiled application version differs from the IDT OTA version")
+    signer_header = source / "Test/include/idt_ota_signer.h"
+    if sha(signer_header) != manifest.get("signer_header_sha256"):
+        raise RuntimeError("OTA signer/image identity header changed after firmware compilation")
+    identifiers = re.findall(r'^#define IDT_OTA_IMAGE_ID "([a-f0-9]{32})"$',
+                             signer_header.read_text(encoding="utf-8"), re.MULTILINE)
+    if len(identifiers) != 1 or identifiers[0] != manifest.get("image_id"):
+        raise RuntimeError("OTA image identity differs from the completed build manifest")
     subprocess.run([sys.executable, str(source / "tools/build_fwup_v2_rsu.py"),
                     "--mot", str(mot), "--prm", str(source / "tools/fwup/rx72n_envision_kit_dual_bank.prm.csv"),
                     "--key", str(key), "--output", str(payload), "--format", "rtos-ota-payload"], check=True)
     entry = {"schema_version": 1, "built_utc": datetime.now(timezone.utc).isoformat(),
-             "ota_version": version, "source_runtime_path": str(source.relative_to(runtime)),
+             "ota_version": version, "image_id": identifiers[0],
+             "signer_header_sha256": manifest["signer_header_sha256"],
+             "source_runtime_path": str(source.relative_to(runtime)),
              "mot_sha256": sha(mot), "payload_sha256": sha(payload), "payload_bytes": payload.stat().st_size,
              "parameter_config_sha256": parameters_sha}
     for field in ("source_sha", "test_library_sha", "source_tree_dirty"):
