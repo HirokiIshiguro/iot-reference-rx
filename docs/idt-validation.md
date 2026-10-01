@@ -2,13 +2,14 @@
 
 RX72N Envision Kit / Ethernet / software TLSで、**TLS transportの14件が実機PASS**しました。
 OTA E2Eの**新しいバージョンへの更新と、1.9.1 → 1.9.2の起動識別子を、clean SHA `c9fcadb1`の実機CIで確認**しました。
+同版・非信頼証明書の試験もclean SHA `2e0c7a5b`でPASSしましたが、全13ケースは未完了です。
 MQTTのnative IDT試験は完走しましたが、IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致せず、6件がFAILです。
 FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリース要件充足には達していません**。
 新規リリースタグの保留方針を維持し、IDTは明示したパイプラインだけで実行します。
 
 ## 試験範囲と現在の結果
 
-2026-09-27時点。IDT 4.9.0 / FRQ_2.5.0を使用しています。
+2026-09-28時点。IDT 4.9.0 / FRQ_2.5.0を使用しています。
 
 | `RX72N_IDT_SCOPE` | native IDT group | 結果・確認範囲 |
 |---|---|---|
@@ -17,7 +18,7 @@ FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリー
 | `mqtt` | `FullCloudIoT` | native MQTT03: 10件完走、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAIL |
 | `pkcs11` | `FullPKCS11_Core` | **10件PASS / 0 FAIL / 0 ERROR / 0 SKIP**。capabilities、digest、random、初期化 / session |
 | `ota-pal` | `OTACore` | **14件のassertion PASS**、filesystem専用1件はIGNORE。native IDTはこのIGNOREをFAILと記録し、全体NG |
-| `ota-mqtt` | `OTADataplaneMQTT` | **GreaterVersionの単一ケースと独立した起動判定がPASS**。setup / 更新ケース / cleanupの3件PASS。[pipeline #11264](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11264)。group全体は未実行 |
+| `ota-mqtt` | `OTADataplaneMQTT` | **GreaterVersion、SameVersion、UntrustedCertificateの3ケースPASS**。GreaterVersionは独立した起動判定もPASS。全13ケースは未完了。SHAと証跡は以下を参照 |
 
 TLSの確定証跡は[`9cadbfeb0a10a51a1f2953127346a58bd38805bf`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/9cadbfeb0a10a51a1f2953127346a58bd38805bf)のclean checkoutによるものです。
 他のscopeや対象SHAに、この14件の合格を流用しません。
@@ -35,6 +36,12 @@ main `0dc57833`に実装中の差分を加えた試作の結果（`source_dirty=
 IDT終了時はreset保持 / UART 1秒0 bytesでした。AWS APIでもThing / job / OTA update / S3 bucketの不存在、実行時間帯のIDT用IAM role / policyと一致証明書の残存0、一時ACM証明書2件の不存在を確認しました。
 
 [#11262・#11264・#11265のsanitized証跡](https://gitlab.saffti.jp/-/project/38/uploads/539031949e04d575e3cc0e0ef84248ee/idt-ota-witness-11262-11265-sanitized-evidence.zip)は公開用JSON/XMLと説明だけを含みます。SHA-256は`2ba4766587b60b504a79021369df84bcc530bbd7b221b9ddf5d216e69cc4e3ba`です。raw UART、注入済みsource/firmware、秘密鍵は含めていません。
+
+**OTA E2E（同版・非信頼証明書）:** clean SHA `2e0c7a5bd6d990d364f20ccb7d7691f874d60689`の[pipeline #11272](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11272)は、setup / SameVersion / UntrustedCertificate / cleanupの4件がPASSしました。
+同版では同一imageの1.9.1 → 1.9.1、非信頼証明書では署名検証エラーと1.9.1の維持を実機で確認し、両ケースのAWS jobは期待どおり`FAILED`でした。
+新版1.9.2は起動していません。これらの起動観測はGreaterVersion単独実行の必須gateとは区別します。
+[sanitized証跡](https://gitlab.saffti.jp/-/project/38/uploads/53441e5d51c146715b283e80c9f3c628/idt-ota-negative-11272-sanitized-evidence.zip)のSHA-256は`4767ee5ae6a8ca333aae0ce72458aac99a8105835da03e84a5e4f236163892a2`です。
+GreaterVersionの`c9fcadb1`と異なるSHAの部分試験であり、合算してリリース対象SHAの全IDT合格にはしません。
 
 **異常系の途中結果:** 同じ`c9fcadb1`の[pipeline #11265](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11265)は、PreviousVersion → SameVersion → UntrustedCertificateの選択実行中に停止しました。
 
@@ -91,6 +98,23 @@ GreaterVersion単独実行では、native JUnitの合格に加え、初期image�
 認証情報の切り分け用にlocal CLIの`--diagnostic-only`を指定すると、秘密情報を含む診断資料をprivate runtime内へ保存し、compiler / flash前に必ず停止します。これは合格試験ではなく、通常のpipeline引数には加えません。
 
 </details>
+
+## 運用・リリース要件
+
+IDTは専用のパイプライン引数を明示した場合だけ実行します。
+新規リリースタグの作成前に、タグ対象commit SHAの対象構成で必須試験がすべてPASSしていることを確認します。
+未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。通常のMQTT / OTA CI成功もIDT合格の代用にはなりません。
+自動gate整備まではOwner / Maintainerが証跡を確認し、要件を満たせない間は新規リリースタグを保留します。
+
+証跡はcommit / submodule SHA、ボード・TLS構成、firmware hash、IDT / suite版、pipeline、reportを対応付けて保存します。
+対象SHAや構成が変わった場合、以前の合格結果は流用しません。
+IDTによる検証と[AWSの正式認定](https://docs.aws.amazon.com/freertos/latest/qualificationguide/freertos-qualification.html)は区別します。
+
+実装時は動作検証を進め、通常運用ではコード変更ごとのIDT実行と無制限の自動再試行は行いません。
+[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生します。
+1実行75分のhost timeoutを設け、中断・異常終了時は実機の停止と試験用AWS資源の回収を試みます。
+回収・終了状態の確認に失敗した場合は不合格とし、記録を保持して個別に復旧します。
+通常運用時は利用量・費用上限・停止条件を定めます。
 
 ## 実行するコンピュータ
 
