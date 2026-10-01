@@ -77,7 +77,7 @@ IDT **4.9.0 / FRQ_2.5.0**での結果（2026-09-28まで）です。
 | PKCS #11 | 基本API 10 PASS、ECC object / signは未実行 |
 | OTA PAL | 14 assertions PASS、対象外1件のIGNOREをIDTがFAILと判定 |
 | OTA MQTT E2E | 新版更新・同版・信頼されない証明書の3ケースPASS、全13ケースは未完了 |
-| 全IDT | **未合格**（異なるSHAでの部分試験結果） |
+| 全IDT | **未合格**（異なるSHA・試作を含む部分試験） |
 
 実行方法、運用・リリース要件、各結果の証跡は[IDT検証](docs/idt-validation.md)を参照してください。
 

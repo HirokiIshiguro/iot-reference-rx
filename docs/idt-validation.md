@@ -2,6 +2,7 @@
 
 RX72N Envision Kit / Ethernet / software TLSで、**TLS transportの14件が実機PASS**しました。
 OTA E2Eの**新しいバージョンへの更新と、1.9.1 → 1.9.2の起動識別子を、clean SHA `c9fcadb1`の実機CIで確認**しました。
+同版・非信頼証明書の試験もclean SHA `2e0c7a5b`でPASSしましたが、全13ケースは未完了です。
 MQTTのnative IDT試験は完走しましたが、IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致せず、6件がFAILです。
 FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリース要件充足には達していません**。
 新規リリースタグの保留方針を維持し、IDTは明示したパイプラインだけで実行します。
