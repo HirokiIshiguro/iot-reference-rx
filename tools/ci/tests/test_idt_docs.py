@@ -12,10 +12,7 @@ class IdtDocsTests(unittest.TestCase):
     def test_docs_and_narrow_bootstrap_ci_are_allowed(self):
         changed = docs.DOCS | docs.BOOTSTRAP | {".gitlab-ci.yml"}
         head = self.BASE.replace("    - when: always\n", docs.BEGIN + "    - if: docs\n" + docs.END + "    - when: always\n")
-        head += "\nidt_docs_check:\n  script: check\n"
-        # The separate newline belongs to the preceding job; match normal YAML
-        # insertion, where the inserted block sits before an existing block.
-        head = head.replace("\nnormal_build:", "\nidt_docs_check:\n  script: check\n\nnormal_build:").rsplit("\nidt_docs_check:", 1)[0]
+        head = head.replace("\nnormal_build:", "\nidt_docs_check:\n  script: check\n\nnormal_build:")
         docs.verify_scope(changed, self.BASE, head)
 
     def test_mixed_code_other_docs_and_unrelated_ci_fail(self):

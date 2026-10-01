@@ -39,7 +39,8 @@ RX671は[pipeline #9733](https://gitlab.saffti.jp/oss/import/github/renesas/iot-
 [job #62156](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/62156)（success）です。
 source SHAは[`11fc797f034c34faf295f7db6352736230da5223`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/11fc797f034c34faf295f7db6352736230da5223)。
 保存済みの`ota_summary.json` / `ota_uart_raw.log`でTLS 1.2、`fileSize=785920`（block size 4,096 bytes）、Application version 0.1.0 → 0.1.1を確認しました。
-期限切れのartifact全体は再公開せず、公開用の時刻・payload・job情報だけを別途保存します。
+公開用の時刻・payload・job情報は[算出証跡JSON](https://gitlab.saffti.jp/-/project/38/uploads/64832e26988bbb514eec9f669bf75043/ota-timing-evidence.json)に保存しました。
+SHA-256は`fbf54e7ad255fc4e729f271e77370dd554ad000f60d2aa1f2795f9a9755b3b27`です。raw UARTや認証情報は含みません。
 
 ## 適用範囲
 
