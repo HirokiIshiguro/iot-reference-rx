@@ -16,7 +16,9 @@ TSIP（ハードウェア暗号）をGitLab CIで検証します。
 | CK-RX65N V1 | BG96 Cellular | [software](Projects/aws_bg96_ck_rx65n/) / [TSIP](Projects/aws_bg96_ck_rx65n_tsip/) |
 | EK-RX671 | Murata Type 1YN Wi-Fi | [software](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls) / [TSIP](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls) |
 
-## 代表通信性能
+## 代表性能
+
+### 通信
 
 `SINK`はMCUから対向への送信、`SOURCE`は対向からMCUへの受信です。
 TLSは1.2の測定値で、`software`はソフトウェア暗号、`TSIP hardware`はMCU内蔵暗号を示します。
@@ -36,6 +38,18 @@ TLSは1.2の測定値で、`software`はソフトウェア暗号、`TSIP hardwar
 接続媒体、payload、対向、統計方法が異なるため、媒体間の直接比較には使えません。
 RX65N/BG96のTLS throughputとCPU負荷率は未測定で、TCP値から推定していません。
 
+### OTA
+
+AWS IoT MQTT OTA / software TLS 1.2の単発実測です。時間はダウンロード開始を起点とし、転送・flash書込みを含みます。
+
+| ターゲット | 接続 | payload | ダウンロード | 更新確定まで | 固定測定 |
+|---|---|---:|---:|---:|---|
+| RX72N Envision Kit | Ethernet | 1,834,496 B | 23.68秒 | 75.11秒 | [job #70280](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70280) |
+| EK-RX671 | Murata Type 1YN Wi-Fi | 785,920 B | 20.45秒 | 53.12秒 | [job #62156](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/62156) |
+| CK-RX65N V1 | BG96 Cellular | 785,920 B | 143.51秒 | 204.96秒 | [job #70279](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70279) |
+
+測定区間・SHA・条件は[OTA性能](docs/ota-performance.md)を参照してください。TSIP構成の時間は未測定です。
+
 ## 現在の検証状態
 
 最終更新: 2026-09-01 JST。
@@ -49,30 +63,23 @@ RX65N/BG96のTLS throughputとCPU負荷率は未測定で、TCP値から推定�
 個別セルは[検証結果](docs/validation-evidence.md)を参照してください。AWS IoT Coreは
 SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認しています。
 
-## IoT Device Tester（IDT）対応方針
+## IoT Device Tester（IDT）
 
-[AWS IoT Device Tester for FreeRTOS](https://docs.aws.amazon.com/freertos/latest/userguide/device-tester-for-freertos-ug.html)の
-初期対象は**RX72N Envision Kit（Ethernet）**です。
-以下をIDTの運用要件とします。対応範囲と実行方法は[IDT検証](docs/idt-validation.md)を参照してください。
-IDTは専用のパイプライン引数を明示した場合だけ実行する方針とし、**新規リリースタグの作成前に、タグ対象commit SHAのIDT結果がOKであることを確認**します。
-通常のpush / MR / main更新 / nightly / tag作成を契機にはIDTを自動実行しません。
-自動gate整備まではOwner / Maintainerが証跡を確認し、IDT未整備・未合格で要件を満たせない間は新規リリースタグの作成を保留します。
+検証環境: **RX72N Envision Kit / Ethernet / software TLS**、ishiguro-pc（Windows x86_64でビルド、
+Ubuntu WSL 2 / x86_64でIDT実行）、RPi #1（書込み・UART中継）、AWS東京リージョン。
+IDT **4.9.0 / FRQ_2.5.0**での結果（2026-09-28まで）です。
 
-- **合格条件:** 対象構成の必須試験がすべてPASSであること。未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。
-- **証跡:** commit / submodule SHA、ボード・TLS構成、firmware hash、IDT / test suite版、実行pipelineと結果reportを対応付け、リリース時に参照できる形で保存します。対象SHAや構成が変わった場合、以前の合格結果は流用しません。
-- **費用:** 実装時の動作検証を進め、通常運用ではコード変更ごとのIDT実行と無制限の自動再試行は行いません。[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生します。実装時も1実行75分のhost timeoutを設け、中断・異常終了時は実機の停止と試験用AWS資源の回収を試みます。回収・終了状態の確認に失敗した場合は合格にせず、記録を保持して個別に復旧します。通常運用時は利用量・費用上限・停止条件を定めます。
+| 主要項目 | 結果 |
+|---|---|
+| FreeRTOS版照合 | FAIL（202604.00-LTS未対応） |
+| TLS transport | 14/14 PASS |
+| MQTT | 6 FAIL（IDT: MQTT 3.1.1 / 実装: MQTT 5） |
+| PKCS #11 | 基本API 10 PASS、ECC object / signは未実行 |
+| OTA PAL | 14 assertions PASS、対象外1件のIGNOREをIDTがFAILと判定 |
+| OTA MQTT E2E | 新版更新・同版・信頼されない証明書の3ケースPASS、全13ケースは未完了 |
+| 全IDT | **未合格**（異なるSHAでの部分試験結果） |
 
-**実機検証:** RX72N Ethernet / software TLSの`FullTransportInterfaceTLS`は、clean SHA `9cadbfeb`の[pipeline #11247](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11247)で14/14 PASSでした。
-native MQTT試験は10件完走し、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAILです。IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致しません。
-PKCS11 Coreの基本APIは10件PASSですが、ECC object / signの別groupは未実行です。
-OTA PALは14件のassertionがPASS、対象外のfilesystem専用1件をIDTがFAILとして記録しました。全体合格には扱いません。
-OTA E2Eの`OTAE2EGreaterVersion`は、clean SHA `c9fcadb1`の[pipeline #11264](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11264)でPASSしました。nativeのsetup / 更新ケース / cleanupの3件PASSに加え、実機UARTで初期1.9.1 → 更新先1.9.2の起動識別子を確認し、独立した起動判定もPASSしています。OTA group全体の合格ではありません。
-版照合・TLS・MQTT・PKCS11・OTA PAL・OTA E2Eの実行経路と再構築用host profileを用意しています。各scopeの結果と未検証範囲は[IDT検証](docs/idt-validation.md)に集約します。
-**全IDT合格とタグ作成前の自動gateは未完了**で、新規リリースタグを保留します。
-既存のMQTT / OTA CI成功はIDT合格の代用にはなりません。
-2026-09-27確認時点の[AWS公式対応表](https://docs.aws.amazon.com/freertos/latest/userguide/dev-test-versions-afr.html)は
-IDT 4.9.0 / FRQ_2.5.0と202210-LTSまでを掲載しており、本リポジトリの202604.00-LTSは実際のIDT版照合でも不合格でした。
-IDTによる検証と[AWSの正式認定](https://docs.aws.amazon.com/freertos/latest/qualificationguide/freertos-qualification.html)は区別します。
+実行方法、運用・リリース要件、各結果の証跡は[IDT検証](docs/idt-validation.md)を参照してください。
 
 ## 最短の開始方法
 

@@ -341,6 +341,31 @@ workflow:
         RX72N_TEST_SCOPE: "full"
         RX671_WIFI_TEST_SCOPE: "network"
       when: always
+    # BEGIN IDT DOCS WORKFLOW
+    # Only explicitly named docs/readme branches enter this candidate lane.
+    # The checker rejects mixed source/CI changes; ordinary feature MRs retain
+    # their normal validation even when they also update README.md.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-(readme|docs)-/'
+      changes:
+        - README.md
+        - docs/idt-validation.md
+        - docs/ota-performance.md
+        - tools/ci/check_idt_docs.py
+        - tools/ci/tests/test_idt_docs.py
+      variables:
+        PIPELINE_PROFILE: "mr-idt-docs"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+      when: always
+    # END IDT DOCS WORKFLOW
     # Dependency-gate MRs validate the checker contract without touching any
     # shared board. The contract job rejects any MR that mixes these files with
     # board implementation changes, so this lane cannot suppress their normal
@@ -521,6 +546,23 @@ workflow:
       when: always
     - if: $CI_COMMIT_BRANCH
       when: always
+
+idt_docs_check:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-idt-docs"'
+      when: on_success
+    - when: never
+  script:
+    - python3 tools/ci/check_idt_docs.py
+    - python3 -m unittest tools.ci.tests.test_idt_docs -v
 
 idt_ci_contract:
   stage: dependency_check
