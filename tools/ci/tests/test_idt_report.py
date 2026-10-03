@@ -310,9 +310,11 @@ class IdtCiContractTests(unittest.TestCase):
         self.assertEqual(expected, guard)
         block = workflow.split("- if: '" + guard + "'", 1)[1].split("\n    - if:", 1)[0]
         self.assertIn('PIPELINE_PROFILE: "mr-idt-targets"', block)
-        self.assertIn('RUN_RX72N_BUILD: "false"', block)
-        self.assertIn('RUN_RX65N_BG96_BUILD: "false"', block)
-        self.assertIn('RUN_RX671_WIFI_BUILD: "false"', block)
+        self.assertIn('RUN_RX72N_BUILD: "true"', block)
+        self.assertIn('RUN_RX65N_BG96_BUILD: "true"', block)
+        self.assertIn('RUN_RX671_WIFI_BUILD: "true"', block)
+        for target in ("RX72N", "RX65N_BG96", "RX671_WIFI"):
+            self.assertIn(target + '_SKIP_HW_TESTS: "true"', block)
         self.assertTrue(block.strip().endswith("when: always"))
         # Evaluate the real rule's equality clauses across event/draft/branch cases.
         clauses = re.findall(r'\$([A-Z_]+) == "([^"]+)"', guard)
@@ -341,7 +343,7 @@ class IdtCiContractTests(unittest.TestCase):
         for setting in (
             "extends: .aws_cli_windows_job", "- os-windows", "- $RX72N_IDT_RUNNER_TAG",
             "- $AWS_CLI_RUNNER_TAG", "resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP",
-            '& "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$env:IDT_TARGET" --scope "$idtScope" --output artifacts/idt',
+            '& "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$idtTarget" --scope "$idtScope" --output artifacts/idt',
             "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
         ):
             self.assertIn(setting, job)
@@ -355,7 +357,6 @@ class IdtCiContractTests(unittest.TestCase):
             "artifacts/idt/FRQ_Report.xml",
             "artifacts/idt/metadata.json",
             "artifacts/idt/summary.json",
-            "artifacts/idt/hardware-preflight.json",
         ], paths)
         self.assertIn("junit: artifacts/idt/FRQ_Report.xml", artifacts)
         self.assertNotIn("untracked: true", artifacts)
@@ -380,13 +381,20 @@ class IdtCiContractTests(unittest.TestCase):
 
     def test_explicit_idt_checks_host_before_run_and_logs_no_aws_identity(self):
         job = self.blocks[".rx_idt_job"]
-        self.assertLess(job.index('tools/idt/check_host.py --target "$env:IDT_TARGET" --check-aws'), job.index("tools/idt/run_idt.py"))
+        self.assertLess(job.index('tools/idt/check_host.py --target "$idtTarget" --check-aws'), job.index("tools/idt/run_idt.py"))
         self.assertIn('$idtHostJson = & "$env:RX72N_IDT_PYTHON"', job)
         self.assertIn("$idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed", job)
         self.assertIn('"IDT host check {0}: passed={1}" -f $check.name, $check.passed', job)
         self.assertNotIn("$idtHostCheck.aws", job)
         self.assertNotIn("Write-Host $idtHostJson", job)
         self.assertNotIn("idt-host-check.json", job)
+
+    def test_legacy_entry_binds_rx72n_before_host_or_native_run(self):
+        job = self.blocks[".rx_idt_job"]
+        binding = "$idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }"
+        self.assertLess(job.index(binding), job.index("tools/idt/check_host.py"))
+        self.assertIn("$env:IDT_TARGET = $idtTarget", job)
+        self.assertEqual(2, job.count('--target "$idtTarget"'))
 
 
 if __name__ == "__main__":

@@ -74,6 +74,6 @@ Timeouts include a reserved RFP child-process termination interval. A persistent
 cannot be proved. A privileged timeout or interruption requires manual recovery,
 including inspection for unobserved sudo descendants. Failed SSH callbacks retain
 their private remote staging rather than removing inputs that a remote process
-may still be using. The shared file lock is OS-managed and ordinary CI does not
-consume this sentinel; maintaining physical exclusivity during recovery remains
-an operator responsibility.
+may still be using. The shared file lock is OS-managed. The parent project's ordinary hardware CI
+also checks this sentinel after taking the device lock. Other projects or manual
+tools must be kept exclusive during recovery; they do not inherit this check.

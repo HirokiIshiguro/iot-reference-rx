@@ -557,7 +557,7 @@ def main() -> int:
             plan["requirements"] += ["Exclusive board use, reset-command/UART-quiet end state, and normal firmware restoration must be agreed",
                 "Native cloud resource usage requires a separate approved cost/scope budget"]
         if target["id"] == "rx65n-bg96":
-            plan["requirements"].append("Current BG96 CI lacks the IDT transaction flock; quiesce conflicting CI before a local run")
+            plan["requirements"].append("BG96 normal CI and IDT must use the shared device transaction flock")
         if target["id"] == "rx671-wifi" and args.scope != "preflight":
             plan["requirements"].append("Same-source reviewed linear signer-only provisioner MOT/manifest and matching P-256 public signer certificate/key are required before native launch")
             plan["required_public_bootstrap_inputs"] = list(RX671_BOOTSTRAP_INPUTS)

@@ -340,10 +340,10 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-idt-/'
       variables:
         PIPELINE_PROFILE: "mr-idt-targets"
-        RUN_RX65N_BG96_BUILD: "false"
+        RUN_RX65N_BG96_BUILD: "true"
         RX65N_BG96_TEST_SCOPE: "build"
         RX65N_BG96_SKIP_HW_TESTS: "true"
-        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_BUILD: "true"
         RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
         RX72N_TEST_SCOPE: "build"
         RX72N_SKIP_HW_TESTS: "true"
@@ -352,7 +352,7 @@ workflow:
         RUN_RX72N_MULTI_TLS_TEST: "false"
         RUN_RX72N_OTA_TESTS: "false"
         RUN_RX72N_FLEET_TESTS: "false"
-        RUN_RX671_WIFI_BUILD: "false"
+        RUN_RX671_WIFI_BUILD: "true"
         RX671_WIFI_TEST_SCOPE: "build"
         RX671_WIFI_SKIP_HW_TESTS: "true"
         RUN_RX671_BOOTLOADER_BUILD: "false"
@@ -671,7 +671,9 @@ idt_ci_contract:
     PYTHONUTF8: "1"
   script:
     - |
-      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --target "$env:IDT_TARGET" --check-aws
+      $idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }
+      $env:IDT_TARGET = $idtTarget
+      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --target "$idtTarget" --check-aws
       $idtHostStatus = $LASTEXITCODE
       try { $idtHostCheck = ($idtHostJson -join "`n") | ConvertFrom-Json }
       catch { throw "IDT host preflight did not return valid JSON" }
@@ -686,7 +688,7 @@ idt_ci_contract:
         throw "IDT host preflight failed; inspect the named checks under the runner identity"
       }
       $idtScope = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_SCOPE } else { $env:RX72N_IDT_SCOPE }
-      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$env:IDT_TARGET" --scope "$idtScope" --output artifacts/idt
+      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$idtTarget" --scope "$idtScope" --output artifacts/idt
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
@@ -696,7 +698,6 @@ idt_ci_contract:
       - artifacts/idt/FRQ_Report.xml
       - artifacts/idt/metadata.json
       - artifacts/idt/summary.json
-      - artifacts/idt/hardware-preflight.json
     reports:
       junit: artifacts/idt/FRQ_Report.xml
     expire_in: 30 days
@@ -762,7 +763,6 @@ idt_target_plans:
 
 idt_source_matrix:
   stage: dependency_check
-  extends: .aws_cli_windows_job
   tags:
     - exec-shell
     - os-windows
@@ -2566,6 +2566,7 @@ build_rx72n_ether_fleet:
         exit 1
       fi
       echo "Acquired shared RX72N hardware lock for pipeline ${CI_PIPELINE_ID}, job ${CI_JOB_ID}."
+    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx72n-ethernet'))"
 
 .rx65n_bg96_linux_hw_job:
   tags:
@@ -2637,6 +2638,7 @@ build_rx72n_ether_fleet:
         exit 1
       fi
       echo "Acquired shared RX671 hardware lock for pipeline ${CI_PIPELINE_ID}, job ${CI_JOB_ID}."
+    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx671-wifi'))"
 
 .aws_cli_windows_job:
   tags:

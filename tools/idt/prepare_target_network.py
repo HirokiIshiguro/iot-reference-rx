@@ -40,9 +40,8 @@ def network_values(target, environ=None):
         if len(values["IDT_WIFI_SSID"].encode("utf-8")) > 32:
             raise ValueError("Wi-Fi SSID exceeds 32 bytes")
         phrase = values["IDT_WIFI_PASSPHRASE"]
-        if not (8 <= len(phrase.encode("utf-8")) <= 63 or
-                (len(phrase) == 64 and all(c in "0123456789abcdefABCDEF" for c in phrase))):
-            raise ValueError("Wi-Fi passphrase must be 8–63 bytes or a 64-character hexadecimal PSK")
+        if not 8 <= len(phrase.encode("utf-8")) <= 63:
+            raise ValueError("Wi-Fi passphrase must be 8–63 bytes")
     elif target["id"] == "rx65n-bg96":
         if not values["IDT_CELLULAR_APN"]:
             raise RuntimeError("RX65N IDT requires existing AWS_IOT_CELLULAR_APN_CK_RX65N_01 runner input")

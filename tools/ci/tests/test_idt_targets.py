@@ -122,6 +122,11 @@ class NetworkInputTests(unittest.TestCase):
                     prepare(str(original), get_target("rx671-wifi"))
             self.assertFalse((original / "Test/include/idt_network_config.h").exists())
 
+    def test_hex_psk_exceeding_firmware_passphrase_bound_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "8–63 bytes"):
+            network_values(get_target("rx671-wifi"),
+                           {"RX671_EK_WIFI_SSID": "unit-network", "RX671_EK_WIFI_PASSPHRASE": "a" * 64})
+
 
 if __name__ == "__main__":
     unittest.main()

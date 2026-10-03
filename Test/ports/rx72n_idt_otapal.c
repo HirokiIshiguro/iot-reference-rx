@@ -82,7 +82,7 @@ static void prvRunOtaPalTests( void * unused )
     configPRINT_STRING( "IDT OTA PAL coverage: 15 nominal, 14 assertion-capable, 1 filesystem-only not applicable\r\n" );
     FRTest_TimeDelay( 5000U );
     failures = RunOtaPalTest();
-    configPRINTF( ( "IDT OTA PAL result: %d failures; host reset-hold required\r\n", failures ) );
+    configPRINTF( ( "IDT OTA PAL result: %d failures; host reset/quiet check required\r\n", failures ) );
     vTaskDelete( NULL );
 }
 

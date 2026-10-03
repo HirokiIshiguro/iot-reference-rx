@@ -162,9 +162,8 @@ nonpassing full-group result; it does not report 15 PASS.
 
 OTA E2E uses native IDT's OTA cases. Selecting `OTAE2EGreaterVersion` alone is
 recorded as partial coverage. The AWS Signer preparation/cleanup code does not
-itself prove that an OTA update succeeded. Hardware execution currently fails
-closed because physical reset hold after RFP CLI disconnection is unverified;
-UART silence alone cannot establish it. See the final-state gate in
-[IDT validation](../../docs/idt-validation.md). A supported hardware run must
-retain the bench lock through physical-stop/UART-quiet verification. Reflash and reprovision
+itself prove that an OTA update succeeded. Keep the bench lock until the guarded
+reset command succeeds and a fresh one-second UART observation is quiet.
+RESET pin voltage measurement is not a prerequisite; record physical hold as
+unverified. Failed reset/quiet checks retain ownership. Reflash and reprovision
 the normal firmware before returning the board to ordinary use.
