@@ -20,7 +20,7 @@ from tools.idt import run_idt
 ROOT = Path(__file__).resolve().parents[3]
 OPT_IN = (
     '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") '
-    '&& $RUN_RX72N_IDT == "true"'
+    '&& ($RUN_RX_IDT == "true" || $RUN_RX72N_IDT == "true")'
 )
 
 
@@ -262,12 +262,24 @@ class IdtCiContractTests(unittest.TestCase):
         }
 
     def test_idt_is_opt_in_and_has_no_automatic_source_rule(self) -> None:
+        self.assertIn('RUN_RX_IDT: "false"', self.blocks["variables"])
+        self.assertIn('IDT_TARGET: "rx72n-ethernet"', self.blocks["variables"])
         self.assertIn('RUN_RX72N_IDT: "false"', self.blocks["variables"])
         self.assertIn('RX72N_IDT_SCOPE: "preflight"', self.blocks["variables"])
         self.assertIn('RX72N_IDT_PYTHON: "C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe"', self.blocks["variables"])
-        rules = self.blocks["test_rx72n_idt"].split("  rules:\n", 1)[1].split("  script:", 1)[0]
-        self.assertEqual([OPT_IN], re.findall(r"- if: '([^']+)'", rules))
-        self.assertIn("- when: never", rules)
+        for job, target in (("test_rx72n_idt", "rx72n-ethernet"),
+                            ("test_rx65n_bg96_idt", "rx65n-bg96"),
+                            ("test_rx671_wifi_idt", "rx671-wifi")):
+            block = self.blocks[job]
+            self.assertIn('extends: .rx_idt_job', block)
+            rules = re.findall(r"- if: '([^']+)'", block)
+            self.assertIn('$RUN_RX_IDT == "true"', rules[0])
+            self.assertIn('$IDT_TARGET == "' + target + '"', rules[0])
+            self.assertIn('$IDT_SCOPE != "plan"', rules[0])
+            self.assertNotIn('merge_request_event', block)
+            self.assertIn("- when: never", block)
+        self.assertIn('$RUN_RX_IDT != "true"', self.blocks["test_rx72n_idt"])
+        self.assertIn('$RUN_RX72N_IDT == "true"', self.blocks["test_rx72n_idt"])
 
     def test_idt_workflow_precedes_other_profiles_and_disables_normal_targets(self) -> None:
         workflow = self.blocks["workflow"]
@@ -286,12 +298,52 @@ class IdtCiContractTests(unittest.TestCase):
             self.assertIn(f'{target}_TEST_SCOPE: "build"', selected_rule)
             self.assertIn(f'{target}_SKIP_HW_TESTS: "true"', selected_rule)
 
+    def test_review_draft_does_not_start_shared_bench_jobs(self) -> None:
+        workflow = self.blocks["workflow"]
+        conditions = re.findall(r"- if: '([^']+)'", workflow)
+        guard = conditions[1]
+        expected = (
+            '$CI_PIPELINE_SOURCE == "merge_request_event" && '
+            '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-idt-/'
+        )
+        self.assertEqual(OPT_IN, conditions[0])
+        self.assertEqual(expected, guard)
+        block = workflow.split("- if: '" + guard + "'", 1)[1].split("\n    - if:", 1)[0]
+        self.assertIn('PIPELINE_PROFILE: "mr-idt-targets"', block)
+        self.assertIn('RUN_RX72N_BUILD: "true"', block)
+        self.assertIn('RUN_RX65N_BG96_BUILD: "true"', block)
+        self.assertIn('RUN_RX671_WIFI_BUILD: "true"', block)
+        for target in ("RX72N", "RX65N_BG96", "RX671_WIFI"):
+            self.assertIn(target + '_SKIP_HW_TESTS: "true"', block)
+        self.assertTrue(block.strip().endswith("when: always"))
+        # Evaluate the real rule's equality clauses across event/draft/branch cases.
+        clauses = re.findall(r'\$([A-Z_]+) == "([^"]+)"', guard)
+        self.assertEqual(1, len(clauses))
+        def selected(event, draft, branch):
+            variables = {"CI_PIPELINE_SOURCE": event, "CI_MERGE_REQUEST_DRAFT": draft,
+                         "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME": branch}
+            return all(variables[name] == value for name, value in clauses) and bool(
+                re.match(r"^((codex|claude)/)?[0-9]+-idt-", branch))
+        self.assertTrue(selected("merge_request_event", "true", "codex/161-idt-rx671-rx65n-ci"))
+        self.assertTrue(selected("merge_request_event", "false", "codex/161-idt-rx671-rx65n-ci"))
+        for event, draft, branch in (
+            ("merge_request_event", "true", "another-idt-target-validation"),
+            ("web", "true", "codex/161-idt-rx671-rx65n-ci"), ("api", "true", "codex/161-idt-rx671-rx65n-ci"),
+            ("push", "true", "codex/161-idt-rx671-rx65n-ci"), ("parent_pipeline", "true", "codex/161-idt-rx671-rx65n-ci"),
+        ):
+            with self.subTest(event=event, draft=draft, branch=branch):
+                self.assertFalse(selected(event, draft, branch))
+        other_mr_positions = [index for index, item in enumerate(conditions)
+                              if '"merge_request_event"' in item and item != guard]
+        self.assertTrue(other_mr_positions)
+        self.assertTrue(all(index > 1 for index in other_mr_positions))
+
     def test_idt_uses_windows_aws_runner_and_shared_compiler_lock(self) -> None:
-        job = self.blocks["test_rx72n_idt"]
+        job = self.blocks[".rx_idt_job"]
         for setting in (
             "extends: .aws_cli_windows_job", "- os-windows", "- $RX72N_IDT_RUNNER_TAG",
             "- $AWS_CLI_RUNNER_TAG", "resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP",
-            '& "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt',
+            '& "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$idtTarget" --scope "$idtScope" --output artifacts/idt',
             "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
         ):
             self.assertIn(setting, job)
@@ -299,7 +351,7 @@ class IdtCiContractTests(unittest.TestCase):
         self.assertNotIn("retry:", job)
 
     def test_artifacts_are_an_explicit_sanitized_allowlist(self) -> None:
-        artifacts = self.blocks["test_rx72n_idt"].split("  artifacts:", 1)[1]
+        artifacts = self.blocks[".rx_idt_job"].split("  artifacts:", 1)[1]
         paths = re.findall(r"^      - (.+)$", artifacts, re.MULTILINE)
         self.assertEqual([
             "artifacts/idt/FRQ_Report.xml",
@@ -328,14 +380,21 @@ class IdtCiContractTests(unittest.TestCase):
         self.assertNotIn("--user", job)
 
     def test_explicit_idt_checks_host_before_run_and_logs_no_aws_identity(self):
-        job = self.blocks["test_rx72n_idt"]
-        self.assertLess(job.index("tools/idt/check_host.py --check-aws"), job.index("tools/idt/run_idt.py"))
+        job = self.blocks[".rx_idt_job"]
+        self.assertLess(job.index('tools/idt/check_host.py --target "$idtTarget" --check-aws'), job.index("tools/idt/run_idt.py"))
         self.assertIn('$idtHostJson = & "$env:RX72N_IDT_PYTHON"', job)
         self.assertIn("$idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed", job)
         self.assertIn('"IDT host check {0}: passed={1}" -f $check.name, $check.passed', job)
         self.assertNotIn("$idtHostCheck.aws", job)
         self.assertNotIn("Write-Host $idtHostJson", job)
         self.assertNotIn("idt-host-check.json", job)
+
+    def test_legacy_entry_binds_rx72n_before_host_or_native_run(self):
+        job = self.blocks[".rx_idt_job"]
+        binding = "$idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }"
+        self.assertLess(job.index(binding), job.index("tools/idt/check_host.py"))
+        self.assertIn("$env:IDT_TARGET = $idtTarget", job)
+        self.assertEqual(2, job.count('--target "$idtTarget"'))
 
 
 if __name__ == "__main__":

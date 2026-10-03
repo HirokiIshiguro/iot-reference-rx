@@ -71,8 +71,9 @@ class RfpConfig:
         """Program only records present in *mot*; never issue chip erase."""
         command = self.common_command()
         command.extend(["-p", "-v"])
-        # RFP -reset/-run both release the target.  Omitting both is the
-        # established Linux-runner path for holding the MCU after programming.
+        # RFP CLI V1.15 uses -reset by default when neither option is given;
+        # -run explicitly releases reset after disconnection. Keep the established
+        # command selection; this is a request, not physical reset-level readback.
         if not leave_reset:
             command.append("-run")
         command.extend(["-noquery", str(mot)])
@@ -155,6 +156,7 @@ class BufferedSerialReader:
         self._max_service_gap_seconds = 0.0
         self._last_capture_wall = None
         self._last_capture_elapsed_seconds = None
+        self._last_empty_read_elapsed_seconds = None
         self._capture_cutoff_wall = None
         self._capture_cutoff_elapsed_seconds = None
         self._physical_pending_at_cutoff = 0
@@ -187,11 +189,26 @@ class BufferedSerialReader:
                     waiting = int(getattr(self._serial, "in_waiting", 0) or 0)
                     chunk = self._serial.read(waiting or 1)
                     if chunk:
+                        with self._condition:
+                            self._last_empty_read_elapsed_seconds = None
                         self._append_reader_chunk(
                             chunk,
                             capture_wall=datetime.now(timezone.utc).isoformat(),
                             capture_elapsed=time.monotonic(),
                         )
+                    else:
+                        # The only physical reader acknowledges an empty read
+                        # and a drained kernel buffer. Quiet shutdown observes
+                        # this progress instead of competing with a blocking
+                        # read for the unfair I/O lock.
+                        pending = int(getattr(self._serial, "in_waiting", 0) or 0)
+                        if pending < 0:
+                            raise IOError("RX671 UART reported a negative physical byte count")
+                        with self._condition:
+                            self._last_empty_read_elapsed_seconds = (
+                                time.monotonic() if pending == 0 else None
+                            )
+                            self._condition.notify_all()
         except Exception as exc:  # propagate hardware/driver failures
             with self._condition:
                 self._reader_error = exc
@@ -289,6 +306,7 @@ class BufferedSerialReader:
                 self._discarded_buffered_bytes += self._buffered_bytes
                 self._chunks.clear()
                 self._buffered_bytes = 0
+                self._last_empty_read_elapsed_seconds = None
                 self._input_resets += 1
 
     def reset_output_buffer(self) -> None:
@@ -413,24 +431,25 @@ class BufferedSerialReader:
             with self._condition:
                 self._raise_reader_error_locked()
                 current_reader_bytes = self._reader_bytes
-            with self._io_lock:
-                physical_waiting = int(
-                    getattr(self._serial, "in_waiting", 0) or 0
-                )
-            now = time.monotonic()
-            if (
-                physical_waiting == 0
-                and current_reader_bytes == previous_reader_bytes
-            ):
-                if stable_since is None:
-                    stable_since = now
-                elif now - stable_since >= quiet_seconds:
-                    self.stop()
-                    return
-            else:
-                stable_since = None
-            previous_reader_bytes = current_reader_bytes
-            time.sleep(min(quiet_seconds / 4, 0.05))
+                empty_read_elapsed = self._last_empty_read_elapsed_seconds
+                now = time.monotonic()
+                quiet = False
+                if empty_read_elapsed is not None and current_reader_bytes == previous_reader_bytes:
+                    if stable_since is None:
+                        stable_since = now
+                    # A new empty-read acknowledgement after the entire quiet
+                    # interval is required. Stale buffer counts cannot certify
+                    # quiet while the serial driver is blocked or stalled.
+                    elif empty_read_elapsed >= stable_since + quiet_seconds:
+                        quiet = True
+                else:
+                    stable_since = None
+                previous_reader_bytes = current_reader_bytes
+                if not quiet:
+                    self._condition.wait(min(quiet_seconds / 4, 0.05, max(0, deadline - now)))
+            if quiet:
+                self.stop()
+                return
         raise TimeoutError("RX671 UART reader did not become quiet before shutdown")
 
     def close(self) -> None:

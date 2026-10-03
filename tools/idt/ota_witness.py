@@ -114,13 +114,24 @@ class UartWitness:
 
 
 def analyze_ota_witness(events, build_ledger, selected_test_id=None, capture_complete=True,
-                        initial_image_id=None, candidate_image_id=None):
+                        initial_image_id=None, candidate_image_id=None, *, target_id, target_sha256):
     reasons, images, observed, pre_run = [], {}, [], []
     required = selected_test_id == "OTAE2EGreaterVersion"
     if not capture_complete:
         reasons.append("UART capture did not finish successfully")
     try:
+        if (not isinstance(target_id, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", target_id) or
+                not isinstance(target_sha256, str) or not re.fullmatch(r"[a-f0-9]{64}", target_sha256)):
+            reasons.append("Selected target identity is missing or malformed")
+            raise ValueError("Selected target identity is missing or malformed")
         for build in build_ledger:
+            if not isinstance(build, dict):
+                raise ValueError("Malformed build ledger entry")
+            # The source SHA is shared by different boards. Require the actual
+            # reviewed board fingerprint before accepting either OTA image.
+            if build.get("target_id") != target_id or build.get("target_sha256") != target_sha256:
+                reasons.append("Build target provenance does not match the selected target")
+                raise ValueError("Build target mismatch")
             image_id = build["image_id"]
             if not re.fullmatch(r"[a-f0-9]{32}", image_id) or image_id in images:
                 raise ValueError("Duplicate or malformed build image ID")
@@ -150,6 +161,7 @@ def analyze_ota_witness(events, build_ledger, selected_test_id=None, capture_com
             if version_tuple(event["version"]) != version_tuple(build["ota_version"]):
                 reasons.append("Observed version differs from its compiled image")
             observed.append({"image_id": image_id, "version": event["version"],
+                             "target_id": build["target_id"], "target_sha256": build["target_sha256"],
                              "payload_sha256": build["payload_sha256"],
                              "source_sha": build["source_sha"],
                              "source_tree_dirty": build["source_tree_dirty"],
@@ -168,6 +180,7 @@ def analyze_ota_witness(events, build_ledger, selected_test_id=None, capture_com
     except (KeyError, TypeError, ValueError):
         reasons.append("Build ledger or boot observation is invalid")
     return {"required": required, "verified": required and not reasons,
+            "target_id": target_id, "target_sha256": target_sha256,
             "verdict": "not_verified" if reasons else "verified" if required else "observed_only",
             "reasons": list(dict.fromkeys(reasons)), "observed_images": observed,
             "pre_run_image_ids": pre_run}

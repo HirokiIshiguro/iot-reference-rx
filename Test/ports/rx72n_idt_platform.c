@@ -6,6 +6,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
+#include "rx_idt_config.h"
 #include "platform_function.h"
 
 #define IDT_TASK_STACK_WORDS       ( 8192U )

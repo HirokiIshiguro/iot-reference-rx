@@ -3,6 +3,8 @@ param(
     [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studioc.exe",
     [string]$Workspace = "C:\Temp\e2ws_iot_ref_rx671_bootloader_2026_04_2",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx671_bootloader_e2studio_build.log"),
+    [string]$SourceProvenanceFile = "",
+    [string]$Python = 'python',
     [int]$TimeoutSeconds = 600
 )
 
@@ -110,16 +112,27 @@ foreach ($path in $generatedMetadata) {
 if (-not (Test-Path -LiteralPath (Join-Path $projectPath ".project"))) {
     throw "RX671 boot-loader e2 studio project is missing: $projectPath"
 }
+if ($SourceProvenanceFile) {
+    & $Python (Join-Path $PSScriptRoot 'idt_source_manifest.py') verify `
+        --source $projectRootPath --target rx671-wifi --provenance $SourceProvenanceFile
+    if ($LASTEXITCODE -ne 0) { throw 'RX671 boot-loader source-copy dependency verification failed.' }
+}
+else {
 if (-not (Test-Path -LiteralPath (Join-Path $submodulePath ".git"))) {
     $relativeSubmoduleGit = $relativeSubmodule -replace '\\', '/'
-    & git -C $projectRootPath submodule update --init --recursive -- $relativeSubmoduleGit
+    & git -c "safe.directory=$projectRootPath" -C $projectRootPath submodule update --init --recursive -- $relativeSubmoduleGit
     if ($LASTEXITCODE -ne 0) {
         throw "RX671 boot-loader submodule initialization failed"
     }
 }
-$actualSubmoduleHead = (& git -C $submodulePath rev-parse HEAD).Trim()
+$actualSubmoduleRoot = (& git -c "safe.directory=$submodulePath" -C $submodulePath rev-parse --show-toplevel).Trim()
+if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($actualSubmoduleRoot) -ne $submodulePath) {
+    throw 'RX671 boot-loader dependency Git root is uninitialized or mismatched.'
+}
+$actualSubmoduleHead = (& git -c "safe.directory=$submodulePath" -C $submodulePath rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $actualSubmoduleHead -ne $expectedSubmoduleHead) {
     throw "RX671 boot-loader submodule HEAD is '$actualSubmoduleHead'; expected '$expectedSubmoduleHead'"
+}
 }
 
 Remove-BuildDirectory `

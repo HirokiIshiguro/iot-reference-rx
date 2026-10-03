@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * RX72N Ethernet port for the upstream transport integration tests.
+ * Shared RX production-TLS port for upstream transport integration tests.
  * Built only by tools/build_rx72n_idt_transport.ps1. This does not adapt MQTT
  * qualification tests or claim IDT support for the 202604.00-LTS manifest.
  */
@@ -7,6 +7,7 @@
 #include <string.h>
 #include "FreeRTOS.h"
 #include "task.h"
+#include "rx_idt_config.h"
 #include "test_execution_config.h"
 #include "test_param_config.h"
 #include "platform_function.h"
@@ -128,9 +129,11 @@ static void prvRunTransportTests( void * unused )
 
     if( prvProvisionEchoCredentials() != pdTRUE )
     {
-        configPRINT_STRING( "IDT transport credential provisioning failed\r\n" );
-        vTaskDelete( NULL );
-        return;
+        configPRINT_STRING( "IDT_PORT_FATAL: transport credential provisioning failed\r\n" );
+        for( ;; )
+        {
+            vTaskSuspend( NULL );
+        }
     }
     FRTest_TimeDelay( IDT_START_DELAY_MS );
     failures = RunTransportInterfaceTest();

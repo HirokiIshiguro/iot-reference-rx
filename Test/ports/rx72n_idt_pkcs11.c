@@ -4,6 +4,7 @@
  */
 #include "FreeRTOS.h"
 #include "task.h"
+#include "rx_idt_config.h"
 #include "test_execution_config.h"
 #include "test_param_config.h"
 #include "core_pkcs11_test.h"

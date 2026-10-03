@@ -37,7 +37,7 @@ def load_host_profile(
         "windows_ssh": str(windows / "System32/OpenSSH/ssh.exe"),
         "windows_scp": str(windows / "System32/OpenSSH/scp.exe"),
     }
-    selected = profile_path or env.get("RX72N_IDT_HOST_PROFILE")
+    selected = profile_path or env.get("RX_IDT_HOST_PROFILE") or env.get("RX72N_IDT_HOST_PROFILE")
     if selected:
         with Path(selected).open(encoding="utf-8-sig") as source:
             supplied = json.load(source)

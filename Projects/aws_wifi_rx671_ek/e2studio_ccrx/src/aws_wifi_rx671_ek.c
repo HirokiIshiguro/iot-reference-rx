@@ -33,6 +33,27 @@
 #include "r_sci_rx_pinset.h"
 #include "trcRecorder.h"
 
+#if (ENABLE_IDT_TRANSPORT_TEST == 1) || (ENABLE_IDT_CLOUD_DEMO == 1) || \
+    (ENABLE_IDT_PKCS11_TEST == 1) || (ENABLE_IDT_OTAPAL_TEST == 1)
+#include "rx_idt_config.h"
+#if (ENABLE_IDT_TRANSPORT_TEST == 1) || (ENABLE_IDT_CLOUD_DEMO == 1)
+#include "rx_idt_network.h"
+#endif
+#if (ENABLE_IDT_TRANSPORT_TEST == 1)
+#include "rx72n_idt_transport.h"
+#elif (ENABLE_IDT_PKCS11_TEST == 1)
+#include "rx72n_idt_pkcs11.h"
+#elif (ENABLE_IDT_OTAPAL_TEST == 1)
+#include "rx72n_idt_otapal.h"
+#elif (ENABLE_IDT_CLOUD_DEMO == 1)
+#include "rx72n_idt_cloud.h"
+#endif
+#if ((ENABLE_IDT_TRANSPORT_TEST == 1) || (ENABLE_IDT_CLOUD_DEMO == 1)) && \
+    ((WHD_BRINGUP_ENABLE != 1) || (WHD_JOIN_ENABLE != 1))
+#error "RX671 network IDT profiles require WHD bring-up and AP JOIN"
+#endif
+#endif
+
 #if BSP_CFG_CPLUSPLUS == 1
 extern void abort(void);
 #endif
@@ -61,8 +82,12 @@ extern volatile uint32_t g_whd_port_buffer_alloc_temp_fail_count;
 extern volatile uint32_t g_whd_port_buffer_alloc_perm_fail_count;
 extern volatile uint32_t g_whd_port_buffer_wait_loop_count;
 extern void UserInitialization(void);
-#if (RX671_OTA_RUNTIME_ENABLE == 1)
+#if (RX671_OTA_RUNTIME_ENABLE == 1) || \
+    ((ENABLE_IDT_CLOUD_DEMO == 1) && (ENABLE_OTA_UPDATE_DEMO == 1))
 extern void vStartOtaDemo(void);
+#endif
+#if (ENABLE_IDT_CLOUD_DEMO == 1) && (ENABLE_OTA_UPDATE_DEMO != 1)
+extern void vStartSimplePubSubDemo(void);
 #endif
 #if (RX671_OTA_PROVISIONER_ENABLE == 1)
 extern void CLI_Support_Settings(void);
@@ -221,6 +246,127 @@ static bool mac_is_zero(const uint8_t mac[6])
     return true;
 }
 
+#if (IDT_TEST_ENABLED == 1)
+static void idt_stop(const char * message)
+{
+    if (NULL != message)
+    {
+        debug_puts(message);
+    }
+    /* An initialization failure cannot be reported as a test verdict. Keep
+     * the console and any selected test alive until the IDT host resets. */
+    for (;;)
+    {
+        vTaskSuspend(NULL);
+    }
+}
+
+#if (ENABLE_IDT_TRANSPORT_TEST == 1) || (ENABLE_IDT_CLOUD_DEMO == 1)
+static void idt_network_prepare(void)
+{
+    static const uint8_t fallback_ip[4] = { 192U, 168U, 10U, 114U };
+    static const uint8_t netmask[4] = { 255U, 255U, 255U, 0U };
+    static const uint8_t gateway[4] = { 192U, 168U, 10U, 1U };
+    static const uint8_t dns[4] = { 192U, 168U, 10U, 1U };
+    uint8_t mac[6];
+    TickType_t started;
+
+    if (pdTRUE != xProvisionIdtNetworkCredentials())
+    {
+        idt_stop("IDT_PORT_FATAL: Wi-Fi credential provisioning failed\r\n");
+    }
+    /* The same production WHD join path verifies both JOIN and ready status.
+     * Do not enter the normal startup that also launches smoke/ping tasks. */
+    if (!whd_bringup_run())
+    {
+        idt_stop("IDT_PORT_FATAL: WHD AP JOIN failed\r\n");
+    }
+    whd_bringup_get_sta_mac(mac);
+    if (mac_is_zero(mac))
+    {
+        idt_stop("IDT_PORT_FATAL: WHD station MAC unavailable\r\n");
+    }
+    if (pdPASS != FreeRTOS_IPInit(fallback_ip, netmask, gateway, dns, mac))
+    {
+        idt_stop("IDT_PORT_FATAL: FreeRTOS IP initialization failed\r\n");
+    }
+
+    started = xTaskGetTickCount();
+    while ((pdFALSE == FreeRTOS_IsNetworkUp()) ||
+           (0U == g_freertos_tcp_dhcp_lease_acquired))
+    {
+        if ((0U != g_freertos_tcp_dhcp_static_fallback) ||
+            ((xTaskGetTickCount() - started) >= OTA_DHCP_LEASE_TIMEOUT_TICKS))
+        {
+            idt_stop("IDT_PORT_FATAL: DHCP lease not acquired\r\n");
+        }
+        vTaskDelay(pdMS_TO_TICKS(100U));
+    }
+    debug_puts("RX671 IDT network ready: WHD JOIN and DHCP lease verified\r\n");
+}
+#endif
+
+static void idt_run(void)
+{
+    /* debug_uart and the production logging task share the existing SCI6
+     * console at 921600. The common interactive CLI must not open SCI6. */
+    debug_uart_init();
+    UserInitialization();
+    xStartDemoEventGroup = xEventGroupCreate();
+    if (NULL == xStartDemoEventGroup)
+    {
+        idt_stop("IDT_PORT_FATAL: demo event group initialization failed\r\n");
+    }
+    g_logging_task_init_result = (uint32_t)xLoggingTaskInitialize(
+        MAIN_LOGGING_TASK_STACK_SIZE, tskIDLE_PRIORITY + 2U,
+        MAIN_LOGGING_MESSAGE_QUEUE_LENGTH);
+    if (pdPASS != (BaseType_t)g_logging_task_init_result)
+    {
+        idt_stop("IDT_PORT_FATAL: logging initialization failed\r\n");
+    }
+    if ((0 != littlFs_init()) || (0 != vprvCacheInit()))
+    {
+        idt_stop("IDT_PORT_FATAL: LittleFS/KVS initialization failed\r\n");
+    }
+
+#if (ENABLE_IDT_PKCS11_TEST == 1)
+    if (pdPASS != xStartIdtPkcs11Test())
+    {
+        idt_stop("IDT_PORT_FATAL: PKCS11 test task creation failed\r\n");
+    }
+#elif (ENABLE_IDT_OTAPAL_TEST == 1)
+    if (pdPASS != xStartIdtOtaPalTest())
+    {
+        idt_stop("IDT_PORT_FATAL: OTA PAL test task creation failed\r\n");
+    }
+#elif (ENABLE_IDT_TRANSPORT_TEST == 1)
+    idt_network_prepare();
+    if (pdPASS != xStartIdtTransportTest())
+    {
+        idt_stop("IDT_PORT_FATAL: transport test task creation failed\r\n");
+    }
+#elif (ENABLE_IDT_CLOUD_DEMO == 1)
+    if (pdTRUE != xProvisionIdtCloudCredentials())
+    {
+        idt_stop("IDT_PORT_FATAL: cloud credential provisioning failed\r\n");
+    }
+    if (pdPASS != xMQTTAgentInit())
+    {
+        idt_stop("IDT_PORT_FATAL: MQTT agent initialization failed\r\n");
+    }
+    idt_network_prepare();
+    xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
+    vStartMQTTAgent(OTA_MQTT_AGENT_STACK_SIZE, OTA_MQTT_AGENT_PRIORITY);
+#if (ENABLE_OTA_UPDATE_DEMO == 1)
+    vStartOtaDemo();
+#else
+    vStartSimplePubSubDemo();
+#endif
+#endif
+    idt_stop(NULL);
+}
+#endif /* IDT_TEST_ENABLED */
+
 static void diag_ping_task(void * pvParameters)
 {
     TickType_t last_wake = xTaskGetTickCount();
@@ -304,7 +450,10 @@ static void start_freertos_tcp_after_join(void)
 
 void main_task(void *pvParameters)
 {
-#if (RX671_OTA_PROVISIONER_ENABLE == 1)
+#if (IDT_TEST_ENABLED == 1)
+    (void)pvParameters;
+    idt_run();
+#elif (RX671_OTA_PROVISIONER_ENABLE == 1)
     (void)pvParameters;
     ota_provisioner_run();
 #else

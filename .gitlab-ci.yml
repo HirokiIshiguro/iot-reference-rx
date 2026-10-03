@@ -58,6 +58,10 @@ variables:
   #   nightly_matrix - scheduled parent pipeline that fans out focused rows.
   #   idt     - explicit web/API IDT run; no normal board/OTA jobs.
   PIPELINE_PROFILE: "branch"
+  # Shared entry; the RX72N inputs below remain compatible.
+  RUN_RX_IDT: "false"
+  IDT_TARGET: "rx72n-ethernet"
+  IDT_SCOPE: "preflight"
   RUN_RX72N_IDT: "false"
   # Override when a second Windows/WSL host has the same validated capabilities.
   RX72N_IDT_RUNNER_TAG: "hw-ishiguro-pc"
@@ -302,10 +306,10 @@ variables:
 
 workflow:
   rules:
-    # Use only RUN_RX72N_IDT and RX72N_IDT_SCOPE as pipeline inputs for this
-    # lane. Pipeline variables override workflow defaults; do not combine IDT
+    # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
+    # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true"'
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && ($RUN_RX_IDT == "true" || $RUN_RX72N_IDT == "true")'
       variables:
         PIPELINE_PROFILE: "idt"
         RUN_RX65N_BG96_BUILD: "false"
@@ -321,6 +325,34 @@ workflow:
         RUN_RX72N_OTA_TESTS: "false"
         RUN_RX72N_FLEET_TESTS: "false"
         RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
+    # Validate this multi-target change without taking any physical bench.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-idt-/'
+      variables:
+        PIPELINE_PROFILE: "mr-idt-targets"
+        RUN_RX65N_BG96_BUILD: "true"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "true"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "true"
         RX671_WIFI_TEST_SCOPE: "build"
         RX671_WIFI_SKIP_HW_TESTS: "true"
         RUN_RX671_BOOTLOADER_BUILD: "false"
@@ -586,8 +618,17 @@ idt_ci_contract:
         - tools/ci/tests/test_idt_ota_witness.py
         - tools/ci/tests/test_idt_selection.py
         - tools/ci/tests/test_idt_flash_failure.py
+        - tools/ci/tests/test_idt_*.py
+        - tools/ci/tests/test_rfp_cli_locked.py
+        - tools/rfp_cli_locked.sh
         - tools/ci/tests/test_uart_download_errors.py
         - tools/test_uart_download_rx72n.py
+        - tools/idt_source_manifest.py
+        - tools/idt_rx671_build_profile.py
+        - tools/build_rx72n_idt_transport.ps1
+        - tools/test_build_rx_idt.ps1
+        - tools/build_headless_rx*.ps1
+        - tools/provision_rx671_ota.py
       when: on_success
     - when: never
   script:
@@ -607,11 +648,17 @@ idt_ci_contract:
         tools.ci.tests.test_idt_ota_witness \
         tools.ci.tests.test_idt_selection \
         tools.ci.tests.test_idt_flash_failure \
+        tools.ci.tests.test_idt_targets \
+        tools.ci.tests.test_idt_source_manifest \
+        tools.ci.tests.test_idt_rx671_provision \
+        tools.ci.tests.test_idt_rfp_process \
+        tools.ci.tests.test_idt_cleanup_budget \
+        tools.ci.tests.test_rfp_cli_locked \
         tools.ci.tests.test_uart_download_errors \
         tools.idt.ota_aws_signers_tests \
         tools.idt.ota_support_tests -v
 
-test_rx72n_idt:
+.rx_idt_job:
   stage: test
   extends: .aws_cli_windows_job
   tags:
@@ -625,13 +672,12 @@ test_rx72n_idt:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     PYTHONUTF8: "1"
-  rules:
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true"'
-      when: on_success
-    - when: never
   script:
     - |
-      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --check-aws
+      $idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }
+      $env:IDT_TARGET = $idtTarget
+      $idtScope = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_SCOPE } else { $env:RX72N_IDT_SCOPE }
+      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --target "$idtTarget" --check-aws
       $idtHostStatus = $LASTEXITCODE
       try { $idtHostCheck = ($idtHostJson -join "`n") | ConvertFrom-Json }
       catch { throw "IDT host preflight did not return valid JSON" }
@@ -645,7 +691,22 @@ test_rx72n_idt:
       if ($idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed) {
         throw "IDT host preflight failed; inspect the named checks under the runner identity"
       }
-      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt
+      if ($idtTarget -eq 'rx671-wifi' -and $idtScope -ne 'preflight') {
+        $bootstrapNames = @('IDT_RX671_PROVISIONER_MOT_FILE', 'IDT_RX671_PROVISIONER_MANIFEST_FILE', 'IDT_RX671_SIGNER_CERT_FILE', 'IDT_RX671_SIGNER_PUBLIC_KEY_FILE')
+        $bootstrapPresent = @($bootstrapNames | Where-Object { [Environment]::GetEnvironmentVariable($_, 'Process') })
+        if ($bootstrapPresent.Count -eq 0) {
+          $bootstrapRoot = "$env:CI_PROJECT_DIR/build/rx671-ota"
+          & "$env:RX72N_IDT_PYTHON" tools/build_rx671_ota_images.py --repo-root "$env:CI_PROJECT_DIR" --provisioner-only --output-root "$bootstrapRoot" --workspace-root "C:/ai/codex/ws/rx-idt-bootstrap-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:IDT_RX671_PROVISIONER_MOT_FILE = "$bootstrapRoot/provisioner/aws_wifi_rx671_ek.mot"
+          $env:IDT_RX671_PROVISIONER_MANIFEST_FILE = "$bootstrapRoot/provisioner/provisioner-manifest.json"
+          $env:IDT_RX671_SIGNER_CERT_FILE = "$bootstrapRoot/rx671-ota-signer.crt.pem"
+          $env:IDT_RX671_SIGNER_PUBLIC_KEY_FILE = "$bootstrapRoot/rx671-ota-signer.pub.pem"
+        } elseif ($bootstrapPresent.Count -ne $bootstrapNames.Count) {
+          throw 'RX671 public bootstrap input overrides must supply the complete set'
+        }
+      }
+      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$idtTarget" --scope "$idtScope" --output artifacts/idt
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
@@ -658,6 +719,102 @@ test_rx72n_idt:
     reports:
       junit: artifacts/idt/FRQ_Report.xml
     expire_in: 30 days
+
+test_rx72n_idt:
+  extends: .rx_idt_job
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx72n-ethernet"'
+      when: on_success
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true" && $RUN_RX_IDT != "true"'
+      when: on_success
+    - when: never
+
+test_rx65n_bg96_idt:
+  extends: .rx_idt_job
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx65n-bg96"'
+      when: on_success
+    - when: never
+
+test_rx671_wifi_idt:
+  extends: .rx_idt_job
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx671-wifi"'
+      when: on_success
+    - when: never
+
+idt_target_plans:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-idt-targets"'
+      when: on_success
+    - if: '$PIPELINE_PROFILE == "idt" && $RUN_RX_IDT == "true" && $IDT_SCOPE == "plan"'
+      when: on_success
+    - when: never
+  script:
+    - |
+      idt_plan_venv="$(mktemp -d "$CI_PROJECT_DIR/.idt-plan-venv.XXXXXX")"
+      trap 'rm -rf -- "$idt_plan_venv"' EXIT
+      python3 -m venv "$idt_plan_venv"
+      idt_plan_python="$idt_plan_venv/bin/python"
+      "$idt_plan_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-ci.txt
+      "$idt_plan_python" -m pip check
+      if [ "$PIPELINE_PROFILE" = "mr-idt-targets" ]; then
+        idt_targets="rx72n-ethernet rx65n-bg96 rx671-wifi"
+      else
+        idt_targets="$IDT_TARGET"
+      fi
+      for idt_target in $idt_targets; do
+        "$idt_plan_python" tools/idt/run_idt.py --target "$idt_target" --scope transport --plan-only --output "artifacts/idt-plan/$idt_target"
+      done
+  artifacts:
+    when: always
+    paths:
+      - artifacts/idt-plan/*/plan.json
+    expire_in: 30 days
+
+idt_source_matrix:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-windows
+    - $RX72N_IDT_RUNNER_TAG
+    - ccrx
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  timeout: 90 minutes
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    PYTHONUTF8: "1"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-idt-targets"'
+      when: on_success
+    - when: never
+  script:
+    - '& tools/test_build_rx_idt.ps1 -Python "$env:RX72N_IDT_PYTHON" -CompileTargets @("rx72n-ethernet", "rx65n-bg96", "rx671-wifi") -OutputDirectory "$env:CI_PROJECT_DIR/artifacts/idt-compile" -WorkspaceRoot "C:/ai/codex/ws/idt-ci-$env:CI_PIPELINE_ID"'
+    - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+    - '& "$env:RX72N_IDT_PYTHON" tools/build_rx671_ota_images.py --repo-root "$env:CI_PROJECT_DIR" --provisioner-only --output-root "$env:CI_PROJECT_DIR/build/rx671-ota" --workspace-root "C:/ai/codex/ws/idt-bootstrap-ci-$env:CI_PIPELINE_ID"'
+    - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+    - |
+      New-Item -ItemType Directory -Force artifacts/idt-bootstrap | Out-Null
+      Copy-Item -LiteralPath build/rx671-ota/provisioner/provisioner-manifest.json -Destination artifacts/idt-bootstrap/provisioner-manifest.json
+      Copy-Item -LiteralPath build/rx671-ota/rx671-ota-signer.crt.pem -Destination artifacts/idt-bootstrap/signer.crt.pem
+      Copy-Item -LiteralPath build/rx671-ota/rx671-ota-signer.pub.pem -Destination artifacts/idt-bootstrap/signer.pub.pem
+  artifacts:
+    when: always
+    # Placeholder firmware and raw compiler logs are not runtime test evidence.
+    paths:
+      - artifacts/idt-compile/*/build_manifest.json
+      - artifacts/idt-bootstrap/provisioner-manifest.json
+      - artifacts/idt-bootstrap/signer.crt.pem
+      - artifacts/idt-bootstrap/signer.pub.pem
+    expire_in: 30 days
+
 
 nightly_dependency_contract:
   stage: dependency_check
@@ -2437,6 +2594,7 @@ build_rx72n_ether_fleet:
         exit 1
       fi
       echo "Acquired shared RX72N hardware lock for pipeline ${CI_PIPELINE_ID}, job ${CI_JOB_ID}."
+    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx72n-ethernet'))"
 
 .rx65n_bg96_linux_hw_job:
   tags:
@@ -2447,6 +2605,17 @@ build_rx72n_ether_fleet:
   resource_group: $RX65N_BG96_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail
+    - |
+      # Share the device transaction lock with the Windows/WSL IDT supervisor.
+      idt_saved_umask=$(umask)
+      umask 000
+      exec 9>>/tmp/ck-rx65n-rpi3-hardware.lock
+      umask "$idt_saved_umask"
+      if ! flock -n 9; then
+        echo "CK-RX65N is owned by another hardware transaction"
+        exit 1
+      fi
+    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx65n-bg96'))"
     - python3 -m venv .venv-pi
     - source .venv-pi/bin/activate
     - python -m pip install --quiet pyserial cryptography
@@ -2497,6 +2666,7 @@ build_rx72n_ether_fleet:
         exit 1
       fi
       echo "Acquired shared RX671 hardware lock for pipeline ${CI_PIPELINE_ID}, job ${CI_JOB_ID}."
+    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx671-wifi'))"
 
 .aws_cli_windows_job:
   tags:
@@ -4758,7 +4928,13 @@ test_rx671_wifi_ota_atomic:
         echo "RX671 OTA after_script: board already parked." | tee "$artifact_dir/after_script_park.log"
       elif [ -f "$park_mot" ]; then
         exec 8>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"
-        if flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 8; then
+        if ! flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 8; then
+          echo "RX671 OTA after_script: hardware lock is unavailable." >&2
+          touch "$artifact_dir/after_script_park_failed"
+        elif ! python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx671-wifi'))"; then
+          echo "RX671 OTA after_script: unverified RFP termination; park skipped." >&2
+          touch "$artifact_dir/after_script_park_failed"
+        else
           echo "=== after_script: park EK-RX671 after interrupted OTA ===" | tee "$artifact_dir/after_script_park.log"
           "$RX671_WIFI_LINUX_RFP_CLI" \
             -d "$RX671_WIFI_RFP_DEVICE" \
@@ -4783,9 +4959,6 @@ test_rx671_wifi_ota_atomic:
           else
             touch "$artifact_dir/after_script_park_failed"
           fi
-        else
-          echo "RX671 OTA after_script: timed out waiting for hardware lock." | tee "$artifact_dir/after_script_park.log" >&2
-          touch "$artifact_dir/after_script_park_failed"
         fi
       else
         echo "RX671 OTA after_script: park image is unavailable." | tee "$artifact_dir/after_script_park.log" >&2
@@ -5135,30 +5308,39 @@ test_rx671_wifi_fleet:
         echo "RX671 Fleet after_script: claim-free park image is unavailable." | tee "$artifact_dir/after_script_park.log" >&2
         touch "$artifact_dir/after_script_park_failed"
       else
-        echo "=== after_script: park EK-RX671 on claim-free network image ===" | tee "$artifact_dir/after_script_park.log"
-        "$RX671_WIFI_LINUX_RFP_CLI" \
-          -d "$RX671_WIFI_RFP_DEVICE" \
-          -t "$RX671_WIFI_RFP_TOOL" \
-          -if "$RX671_WIFI_RFP_INTERFACE" \
-          -s "$RX671_WIFI_RFP_SPEED" \
-          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-          -erase-chip -noquery \
-          2>&1 | tee -a "$artifact_dir/after_script_park.log"
-        erase_status=${PIPESTATUS[0]}
-        "$RX671_WIFI_LINUX_RFP_CLI" \
-          -d "$RX671_WIFI_RFP_DEVICE" \
-          -t "$RX671_WIFI_RFP_TOOL" \
-          -if "$RX671_WIFI_RFP_INTERFACE" \
-          -s "$RX671_WIFI_RFP_SPEED" \
-          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-          -p -v -reset -noquery "$park_mot" \
-          2>&1 | tee -a "$artifact_dir/after_script_park.log"
-        park_status=${PIPESTATUS[0]}
-        if [ "$erase_status" -eq 0 ] && [ "$park_status" -eq 0 ]; then
-          touch "$artifact_dir/parked.ok" "$artifact_dir/after_script_parked.ok"
-        else
-          echo "RX671 Fleet after_script: failed to park the board." | tee -a "$artifact_dir/after_script_park.log" >&2
+        exec 8>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"
+        if ! flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 8; then
+          echo "RX671 Fleet after_script: hardware lock is unavailable." >&2
           touch "$artifact_dir/after_script_park_failed"
+        elif ! python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx671-wifi'))"; then
+          echo "RX671 Fleet after_script: unverified RFP termination; park skipped." >&2
+          touch "$artifact_dir/after_script_park_failed"
+        else
+          echo "=== after_script: park EK-RX671 on claim-free network image ===" | tee "$artifact_dir/after_script_park.log"
+          "$RX671_WIFI_LINUX_RFP_CLI" \
+            -d "$RX671_WIFI_RFP_DEVICE" \
+            -t "$RX671_WIFI_RFP_TOOL" \
+            -if "$RX671_WIFI_RFP_INTERFACE" \
+            -s "$RX671_WIFI_RFP_SPEED" \
+            -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+            -erase-chip -noquery \
+            2>&1 | tee -a "$artifact_dir/after_script_park.log"
+          erase_status=${PIPESTATUS[0]}
+          "$RX671_WIFI_LINUX_RFP_CLI" \
+            -d "$RX671_WIFI_RFP_DEVICE" \
+            -t "$RX671_WIFI_RFP_TOOL" \
+            -if "$RX671_WIFI_RFP_INTERFACE" \
+            -s "$RX671_WIFI_RFP_SPEED" \
+            -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+            -p -v -reset -noquery "$park_mot" \
+            2>&1 | tee -a "$artifact_dir/after_script_park.log"
+          park_status=${PIPESTATUS[0]}
+          if [ "$erase_status" -eq 0 ] && [ "$park_status" -eq 0 ]; then
+            touch "$artifact_dir/parked.ok" "$artifact_dir/after_script_parked.ok"
+          else
+            echo "RX671 Fleet after_script: failed to park the board." | tee -a "$artifact_dir/after_script_park.log" >&2
+            touch "$artifact_dir/after_script_park_failed"
+          fi
         fi
       fi
       rm -f "$fleet_mot"

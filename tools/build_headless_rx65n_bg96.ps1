@@ -12,7 +12,8 @@ param(
     [string]$LanbenchTls13ZeroRttHost = $env:LANBENCH_MBEDTLS_0RTT_HOST,
     [string]$LanbenchTls13ZeroRttServerName = $env:LANBENCH_MBEDTLS_0RTT_SERVER_NAME,
     [string]$LanbenchTls13ZeroRttPort = $(if ($env:LANBENCH_MBEDTLS_0RTT_PORT) { $env:LANBENCH_MBEDTLS_0RTT_PORT } else { "5443" }),
-    [switch]$PrepareBuildFilesOnly
+    [switch]$PrepareBuildFilesOnly,
+    [switch]$PreserveLinkerLayout
 )
 
 $ErrorActionPreference = "Stop"
@@ -247,39 +248,48 @@ function Invoke-Tool {
         [switch]$AllowNonZeroExit
     )
 
-    Write-Host "+ $FilePath $($Arguments -join ' ')"
-    Add-Content -LiteralPath $logFile -Value "+ $FilePath $($Arguments -join ' ')"
+    $displayArguments = @($Arguments | ForEach-Object {
+        if ($_.StartsWith('PATH=', [StringComparison]::Ordinal)) { 'PATH=<current process tool paths>' }
+        else { $_ }
+    })
+    Write-Host "+ $FilePath $($displayArguments -join ' ')"
+    Add-Content -LiteralPath $logFile -Value "+ $FilePath $($displayArguments -join ' ')"
     $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("iotref_rx65n_bg96_make_" + [System.Guid]::NewGuid().ToString("N"))
     $stdoutPath = "$tempBase.out"
     $stderrPath = "$tempBase.err"
+    $stdinPath = "$tempBase.in"
+    # Headless builds accept no interactive input. An EOF stdin also prevents
+    # no-argument compiler version probes from waiting for linker commands.
+    [IO.File]::WriteAllBytes($stdinPath, [byte[]]@())
     $process = Start-Process `
         -FilePath $FilePath `
         -ArgumentList (Convert-ToArgumentString $Arguments) `
         -WorkingDirectory $WorkingDirectory `
         -RedirectStandardOutput $stdoutPath `
         -RedirectStandardError $stderrPath `
-        -NoNewWindow `
+        -RedirectStandardInput $stdinPath `
+        -WindowStyle Hidden `
         -PassThru
 
     try {
         if (-not $process.WaitForExit($E2StudioTimeoutSeconds * 1000)) {
             Stop-ProcessTree -ProcessId $process.Id
             Write-ProcessOutput @($stdoutPath, $stderrPath)
-            throw "build command timed out after $E2StudioTimeoutSeconds seconds: $FilePath $($Arguments -join ' ')"
+            throw "build command timed out after $E2StudioTimeoutSeconds seconds: $FilePath $($displayArguments -join ' ')"
         }
         $process.WaitForExit()
         $process.Refresh()
         Write-ProcessOutput @($stdoutPath, $stderrPath)
         if ($process.ExitCode -ne 0) {
             if ($AllowNonZeroExit) {
-                Write-Warning "build command returned exit code $($process.ExitCode); continuing after output validation: $FilePath $($Arguments -join ' ')"
+                Write-Warning "build command returned exit code $($process.ExitCode); continuing after output validation: $FilePath $($displayArguments -join ' ')"
                 return
             }
-            throw "build command failed with exit code $($process.ExitCode): $FilePath $($Arguments -join ' ')"
+            throw "build command failed with exit code $($process.ExitCode): $FilePath $($displayArguments -join ' ')"
         }
     }
     finally {
-        Remove-Item -Force -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
+        Remove-Item -Force -LiteralPath $stdoutPath, $stderrPath, $stdinPath -ErrorAction SilentlyContinue
     }
 }
 
@@ -393,8 +403,11 @@ function Invoke-MakeBuild {
         [string]$Target
     )
 
-    Invoke-Tool -FilePath $makeExe -Arguments @("clean") -WorkingDirectory $BuildDir
-    Invoke-Tool -FilePath $makeExe -Arguments @("-j2", $Target) -WorkingDirectory $BuildDir
+    # Start-Process can inherit the launcher's original environment rather than
+    # the tool paths added by this script. Bind GNU make's exported PATH to the
+    # resolved current process paths so lbgrx, ccrx and BusyBox remain available.
+    Invoke-Tool -FilePath $makeExe -Arguments @("PATH=$env:Path", "clean") -WorkingDirectory $BuildDir
+    Invoke-Tool -FilePath $makeExe -Arguments @("PATH=$env:Path", "-j2", $Target) -WorkingDirectory $BuildDir
 }
 
 function Resolve-E2StudioHeadless {
@@ -504,6 +517,61 @@ function Ensure-ManagedBuildFiles {
     }
 }
 
+function Get-ReviewedLinkerLayout {
+    param([string]$ProjectDir)
+
+    $metadataPath = Join-Path $ProjectDir '.cproject'
+    $metadata = [Xml.XmlDocument]::new()
+    $metadata.Load($metadataPath)
+    $section = $metadata.SelectSingleNode("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection']")
+    $mapping = $metadata.SelectSingleNode("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.rom']")
+    if (-not $section -or -not $mapping -or [string]::IsNullOrWhiteSpace($section.GetAttribute('value'))) {
+        throw 'Cannot capture the reviewed CC-RX linker layout.'
+    }
+    $rom = @($mapping.SelectNodes('listOptionValue') | ForEach-Object { $_.GetAttribute('value') } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ','
+    if ([string]::IsNullOrWhiteSpace($rom)) { throw 'The reviewed CC-RX ROM/RAM mapping is empty.' }
+    return [ordered]@{
+        start = '-start=' + $section.GetAttribute('value')
+        rom = '-rom=' + $rom
+        cproject_sha256 = (Get-FileHash -LiteralPath $metadataPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+}
+
+function Restore-ReviewedLinkerLayout {
+    param([hashtable]$Layouts)
+
+    $evidence = @()
+    foreach ($projectDir in $Layouts.Keys) {
+        $projectName = Split-Path (Split-Path $projectDir -Parent) -Leaf
+        $commandPath = Join-Path $projectDir "HardwareDebug\Linker$projectName.tmp"
+        if (-not (Test-Path -LiteralPath $commandPath -PathType Leaf)) {
+            throw "Generated CC-RX linker command is missing: $commandPath"
+        }
+        $text = [IO.File]::ReadAllText($commandPath)
+        foreach ($option in @('start', 'rom')) {
+            if ($text -notmatch "(?m)^\s*-$option=") {
+                throw "Generated CC-RX linker command has no -$option option."
+            }
+        }
+        # e2 studio's cold import can replace .cproject sections with an older
+        # Smart Configurator layout. CC-RX combines repeated -start options, so
+        # an override must replace those lines instead of appending a map.
+        $text = [regex]::Replace($text, '(?m)^[ \t]*-(start|rom)=[^\r\n]*(?:\r?\n|$)', '')
+        $layout = $Layouts[$projectDir]
+        $text = $layout.start + "`r`n" + $layout.rom + "`r`n" + $text
+        [IO.File]::WriteAllText($commandPath, $text, [Text.UTF8Encoding]::new($false))
+        $evidence += [ordered]@{
+            project = $projectName; start = $layout.start; rom = $layout.rom
+            cproject_sha256 = $layout.cproject_sha256
+            linker_command_sha256 = (Get-FileHash -LiteralPath $commandPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+        Write-Host "Restored the reviewed CC-RX linker layout: $projectName"
+    }
+    ConvertTo-Json -InputObject @($evidence) -Depth 4 |
+        Set-Content -LiteralPath ($logFile + '.linker-layout.json') -Encoding UTF8
+}
+
 if (-not (Test-Path (Join-Path $appProject "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h"))) {
     throw "CK-RX65N BG96 project middleware is incomplete."
 }
@@ -534,6 +602,12 @@ if ($workspace) {
 }
 
 $metadataSnapshots = Save-ProjectMetadata @($bootProject, $appProject)
+$reviewedLinkerLayouts = @{}
+if ($PreserveLinkerLayout) {
+    foreach ($projectDir in @($bootProject, $appProject)) {
+        $reviewedLinkerLayouts[$projectDir] = Get-ReviewedLinkerLayout $projectDir
+    }
+}
 $lanbenchConfigHeaderExisted = Test-Path -LiteralPath $lanbenchTls13ZeroRttConfigHeader
 $lanbenchConfigHeaderSnapshot = if ($lanbenchConfigHeaderExisted) {
     [System.IO.File]::ReadAllBytes($lanbenchTls13ZeroRttConfigHeader)
@@ -557,6 +631,7 @@ try {
 
     Reset-ManagedBuildFilesOnMbedTlsConfigDrift
     Ensure-ManagedBuildFiles
+    if ($PreserveLinkerLayout) { Restore-ReviewedLinkerLayout $reviewedLinkerLayouts }
     if ($PrepareBuildFilesOnly) {
         Write-Host "CK-RX65N BG96 generated build files are ready."
         return

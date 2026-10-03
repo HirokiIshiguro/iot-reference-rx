@@ -65,7 +65,20 @@ SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認�
 
 ## IoT Device Tester（IDT）
 
-検証環境: **RX72N Envision Kit / Ethernet / software TLS**、ishiguro-pc（Windows x86_64でビルド、
+IDTの明示CI入口は3ターゲットに対応します。`RUN_RX_IDT=true`、`IDT_TARGET`、`IDT_SCOPE`で選択します。
+通常push / MRではnative IDTを起動しません。MRでは単体検査、3ターゲットの実行計画、15構成のソース選択を確認します。
+
+| 環境 | `IDT_TARGET` | native CI job | 実機IDTの証跡 |
+|---|---|---|---|
+| RX72N Envision Kit / Ethernet | `rx72n-ethernet` | `test_rx72n_idt` | 以下の限定試験 |
+| CK-RX65N V1 / BG96 | `rx65n-bg96` | `test_rx65n_bg96_idt` | 未検証 |
+| EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | `test_rx671_wifi_idt` | 未検証 |
+
+`IDT_SCOPE=plan`は機器・AWSを操作しない計画確認です。`preflight`はnativeの版照合で、現行LTSとの不一致はNGとして記録します。
+実機scopeの準備条件と終了状態は[IDT検証](docs/idt-validation.md)を参照してください。
+旧`RUN_RX72N_IDT` / `RX72N_IDT_SCOPE`によるRX72N選択も保持します。
+
+以下の実測環境: **RX72N Envision Kit / Ethernet / software TLS**、ishiguro-pc（Windows x86_64でビルド、
 Ubuntu WSL 2 / x86_64でIDT実行）、RPi #1（書込み・UART中継）、AWS東京リージョン。
 IDT **4.9.0 / FRQ_2.5.0**での結果（2026-09-28まで）です。
 

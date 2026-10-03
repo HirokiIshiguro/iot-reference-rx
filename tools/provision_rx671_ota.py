@@ -201,14 +201,23 @@ def _verify_value(
     )
 
 
-def provision(args: argparse.Namespace) -> dict:
+def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=None, serial_opener=None) -> dict:
+    """Run the linear provisioner, optionally storing only public signer trust.
+
+    IDT must establish boot trust before its first dual-bank application boot.
+    That caller supplies a guarded runner while already owning UART and the
+    global RFP lock. The default CLI path retains full credential provisioning.
+    ``signer_only`` never reads Wi-Fi credentials or a device private key.
+    """
     started = time.monotonic()
-    wifi_ssid, wifi_passphrase = _wifi_credentials_from_environment(
-        args.wifi_ssid_env,
-        args.wifi_passphrase_env,
-    )
-    _zeroize(wifi_ssid)
-    _zeroize(wifi_passphrase)
+    execute = run_checked if runner is None else runner
+    if not signer_only:
+        wifi_ssid, wifi_passphrase = _wifi_credentials_from_environment(
+            args.wifi_ssid_env,
+            args.wifi_passphrase_env,
+        )
+        _zeroize(wifi_ssid)
+        _zeroize(wifi_passphrase)
     artifact_dir = args.artifact_dir.resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
     event_log = TimestampLog(artifact_dir / "provision-events.log")
@@ -222,19 +231,19 @@ def provision(args: argparse.Namespace) -> dict:
     )
     completed: list[str] = []
     event_log.write("program provisioner MOT without chip erase; leave target reset\n")
-    run_checked(
+    execute(
         rfp.program_command(args.provisioner_mot, leave_reset=True),
         label="provisioner programming",
         timeout=args.rfp_timeout,
     )
     completed.append("provisioner_programmed")
 
-    serial_port = open_serial(args.port, args.baud)
+    serial_port = (open_serial if serial_opener is None else serial_opener)(args.port, args.baud)
     try:
         serial_port.reset_input_buffer()
         serial_port.reset_output_buffer()
         event_log.write("release provisioner after SCI6 is open\n")
-        run_checked(
+        execute(
             rfp.run_command(),
             label="provisioner run",
             timeout=args.rfp_timeout,
@@ -253,44 +262,32 @@ def provision(args: argparse.Namespace) -> dict:
         completed.append("format")
         event_log.write("LittleFS format OK\n")
 
-        _set_wifi_credentials(
-            serial_port,
-            ssid_variable=args.wifi_ssid_env,
-            passphrase_variable=args.wifi_passphrase_env,
-            char_delay=args.char_delay,
-            timeout=args.command_timeout,
-        )
-        completed.append("wifi_credentials")
-        event_log.write("Wi-Fi SSID/passphrase stored (values redacted)\n")
-
-        send_ascii_command(
-            serial_port,
-            f"conf set endpoint {args.endpoint}",
-            timeout=args.command_timeout,
-            char_delay=args.char_delay,
-        )
-        completed.append("endpoint")
-        event_log.write("endpoint stored (value redacted)\n")
-
-        send_ascii_command(
-            serial_port,
-            f"conf set thingname {args.thing_name}",
-            timeout=args.command_timeout,
-            char_delay=args.char_delay,
-        )
-        completed.append("thing")
-        event_log.write("Thing name stored (value redacted)\n")
-
-        verification_values = {
-            "endpoint": args.endpoint,
-            "thingname": args.thing_name,
-        }
-        for name, path in (
-            ("cert", args.certificate),
-            ("key", args.private_key),
+        verification_values = {}
+        pem_values = []
+        if not signer_only:
+            _set_wifi_credentials(
+                serial_port,
+                ssid_variable=args.wifi_ssid_env,
+                passphrase_variable=args.wifi_passphrase_env,
+                char_delay=args.char_delay,
+                timeout=args.command_timeout,
+            )
+            completed.append("wifi_credentials")
+            event_log.write("Wi-Fi SSID/passphrase stored (values redacted)\n")
+            for name, value in (("endpoint", args.endpoint), ("thingname", args.thing_name)):
+                send_ascii_command(
+                    serial_port, f"conf set {name} {value}",
+                    timeout=args.command_timeout, char_delay=args.char_delay,
+                )
+                verification_values[name] = value
+            completed.extend(("endpoint", "thing"))
+            event_log.write("endpoint and Thing name stored (values redacted)\n")
+            pem_values.extend((("cert", args.certificate), ("key", args.private_key)))
+        pem_values.extend((
             ("codesigncert", args.codesigner_certificate),
             ("codesignpubkey", args.codesigner_public_key),
-        ):
+        ))
+        for name, path in pem_values:
             _set_pem(
                 serial_port,
                 name,
@@ -319,11 +316,9 @@ def provision(args: argparse.Namespace) -> dict:
                 char_delay=args.char_delay,
                 timeout=args.command_timeout,
             )
-        completed.append("public_config_readback_verified")
-        event_log.write(
-            "endpoint and Thing name readback verified; PEM persistence is "
-            "delegated to bootloader key loading, TLS, and OTA signature proof\n"
-        )
+        if verification_values:
+            completed.append("public_config_readback_verified")
+        event_log.write("PEM persistence requires bootloader key loading and signature proof\n")
     finally:
         serial_port.close()
 
@@ -332,7 +327,7 @@ def provision(args: argparse.Namespace) -> dict:
         "0xFFF00000-0xFFFBFFFF; preserve Data Flash, flash options, "
         "and both boot-loader regions\n"
     )
-    run_checked(
+    execute(
         rfp.erase_ota_install_areas_command(),
         label="post-provisioning OTA install-area erase",
         timeout=args.rfp_timeout,
@@ -343,7 +338,7 @@ def provision(args: argparse.Namespace) -> dict:
     )
 
     event_log.write("program boot-loader MOT without chip erase; preserve Data Flash and leave reset\n")
-    run_checked(
+    execute(
         rfp.program_command(args.bootloader_mot, leave_reset=True),
         label="boot-loader programming",
         timeout=args.rfp_timeout,
@@ -352,6 +347,7 @@ def provision(args: argparse.Namespace) -> dict:
     event_log.write("boot-loader programming OK; target remains reset\n")
     return {
         "success": True,
+        "signer_only": signer_only,
         "classification": "provisioned_and_bootloader_left_reset",
         "completed_steps": completed,
         "data_flash_preserved_during_rfp_programming": True,
@@ -363,7 +359,7 @@ def provision(args: argparse.Namespace) -> dict:
         ],
         "pem_readback_performed": False,
         "wifi_passphrase_readback_performed": False,
-        "wifi_credentials_source": "environment_to_sci6_to_littlefs",
+        "wifi_credentials_source": "not_used" if signer_only else "environment_to_sci6_to_littlefs",
         "pem_verification": "delegated_to_bootloader_tls_and_ota_signature",
         "port": args.port,
         "baud": args.baud,

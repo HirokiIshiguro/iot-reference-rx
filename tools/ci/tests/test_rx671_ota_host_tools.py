@@ -234,6 +234,7 @@ class BufferedSerialReaderTests(unittest.TestCase):
     def test_quiet_shutdown_keeps_tail_arriving_after_success_marker(self):
         serial = ThreadedFakeSerial()
         reader = host.BufferedSerialReader(serial)
+        self.addCleanup(reader.close)
         reader.start()
         serial.feed(b"OTA Completed successfully!\r\n")
         self._wait_for(lambda: reader.stats()["reader_bytes"] > 0)
@@ -251,6 +252,57 @@ class BufferedSerialReaderTests(unittest.TestCase):
         reader.close()
         self.assertIn(b"OTA Completed successfully!", captured)
         self.assertIn(b"late UART tail", captured)
+        self.assertTrue(reader.stats()["all_reader_bytes_accounted"])
+
+    def test_quiet_observer_does_not_compete_for_physical_read_lock(self):
+        serial = ThreadedFakeSerial()
+        reader = host.BufferedSerialReader(serial)
+        self.addCleanup(reader.close)
+        physical_lock = threading.Lock()
+        class ReaderOrStoppedLock:
+            def __enter__(self):
+                if threading.current_thread() is not reader._thread and not reader._stop.is_set():
+                    raise AssertionError("quiet observer competed with a physical serial read")
+                physical_lock.acquire()
+            def __exit__(self, *_):
+                physical_lock.release()
+        reader._io_lock = ReaderOrStoppedLock()
+        reader.start()
+        serial.feed(b"initial marker\r\n")
+        self._wait_for(lambda: reader.stats()["reader_bytes"] > 0)
+        reader.stop_after_quiet(quiet_seconds=0.02)
+        self.assertEqual(b"initial marker\r\n", reader.read(reader.in_waiting))
+        self.assertTrue(reader.stats()["all_reader_bytes_accounted"])
+
+    def test_quiet_shutdown_waits_for_fresh_empty_read_progress(self):
+        serial = GatedEmptyReadSerial()
+        reader = host.BufferedSerialReader(serial)
+        self.addCleanup(reader.close)
+        self.addCleanup(serial.release_empty_read.set)
+        reader.start()
+        self.assertTrue(serial.empty_read_ready.wait(1.0))
+        stopped = threading.Event()
+        errors = []
+        def quiet_stop():
+            try:
+                reader.stop_after_quiet(quiet_seconds=0.02)
+            except Exception as error:
+                errors.append(error)
+            finally:
+                stopped.set()
+        stopper = threading.Thread(target=quiet_stop)
+        stopper.start()
+        try:
+            # A quiet-looking buffer cannot bypass the outstanding driver read.
+            self.assertFalse(stopped.wait(0.06))
+            self.assertFalse(reader._stop.is_set())
+            serial.feed(b"tail during outstanding empty read\r\n")
+        finally:
+            serial.release_empty_read.set()
+            stopper.join(2.0)
+        self.assertFalse(stopper.is_alive())
+        self.assertEqual([], errors)
+        self.assertEqual(b"tail during outstanding empty read\r\n", reader.read(reader.in_waiting))
         self.assertTrue(reader.stats()["all_reader_bytes_accounted"])
 
     def test_stop_finally_drains_bytes_arriving_after_last_thread_read(self):
