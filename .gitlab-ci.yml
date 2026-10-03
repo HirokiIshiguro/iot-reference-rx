@@ -800,11 +800,19 @@ idt_source_matrix:
     - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
     - '& "$env:RX72N_IDT_PYTHON" tools/build_rx671_ota_images.py --repo-root "$env:CI_PROJECT_DIR" --provisioner-only --output-root "$env:CI_PROJECT_DIR/build/rx671-ota" --workspace-root "C:/ai/codex/ws/idt-bootstrap-ci-$env:CI_PIPELINE_ID"'
     - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+    - |
+      New-Item -ItemType Directory -Force artifacts/idt-bootstrap | Out-Null
+      Copy-Item -LiteralPath build/rx671-ota/provisioner/provisioner-manifest.json -Destination artifacts/idt-bootstrap/provisioner-manifest.json
+      Copy-Item -LiteralPath build/rx671-ota/rx671-ota-signer.crt.pem -Destination artifacts/idt-bootstrap/signer.crt.pem
+      Copy-Item -LiteralPath build/rx671-ota/rx671-ota-signer.pub.pem -Destination artifacts/idt-bootstrap/signer.pub.pem
   artifacts:
     when: always
     # Placeholder firmware and raw compiler logs are not runtime test evidence.
     paths:
       - artifacts/idt-compile/*/build_manifest.json
+      - artifacts/idt-bootstrap/provisioner-manifest.json
+      - artifacts/idt-bootstrap/signer.crt.pem
+      - artifacts/idt-bootstrap/signer.pub.pem
     expire_in: 30 days
 
 
