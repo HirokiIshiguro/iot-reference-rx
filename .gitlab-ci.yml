@@ -619,6 +619,8 @@ idt_ci_contract:
         - tools/ci/tests/test_idt_selection.py
         - tools/ci/tests/test_idt_flash_failure.py
         - tools/ci/tests/test_idt_*.py
+        - tools/ci/tests/test_rfp_cli_locked.py
+        - tools/rfp_cli_locked.sh
         - tools/ci/tests/test_uart_download_errors.py
         - tools/test_uart_download_rx72n.py
         - tools/idt_source_manifest.py
