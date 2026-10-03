@@ -7,8 +7,10 @@ initialize this trust before its own first boot. Built-in public-key fallback
 remains disabled, ECDSA remains required, and the bootloader never installs Data
 Flash from the RSU.
 
-The launcher requires these existing public/firmware file references before
-installing or starting native IDT:
+The CI job builds the production credential-free provisioner and matching public
+signer inputs automatically for RX671 hardware scopes. Host-only preflight does
+not perform this build. Local runs or reviewed CI overrides can instead supply
+the complete set of public/firmware references before native IDT starts:
 
 | Variable | Input |
 |---|---|

@@ -1314,6 +1314,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=default_root / "sample_keys/secp256r1.privatekey",
     )
     parser.add_argument("--e2studio-timeout-seconds", type=int, default=600)
+    parser.add_argument("--provisioner-only", action="store_true",
+                        help="Build only the credential-free linear provisioner and public signer material; no board or AWS operation")
     parser.add_argument(
         "--allow-dirty",
         action="store_true",
@@ -1356,7 +1358,7 @@ def main(argv: list[str] | None = None) -> int:
     certificate_source = output_root / SIGNER_CERTIFICATE_NAME
     public_key_source = output_root / SIGNER_PUBLIC_KEY_NAME
     output_root.mkdir(parents=True, exist_ok=True)
-    bootloader_artifacts = _copy_bootloader_outputs(repo_root, output_root)
+    bootloader_artifacts = [] if args.provisioner_only else _copy_bootloader_outputs(repo_root, output_root)
     _run(
         [
             sys.executable,
@@ -1382,6 +1384,9 @@ def main(argv: list[str] | None = None) -> int:
             timeout_seconds=args.e2studio_timeout_seconds,
             input_gitlinks=input_gitlinks,
         )
+        if args.provisioner_only:
+            print(f"RX671 public IDT bootstrap inputs: {output_root}")
+            return 0
         with TemporaryOtaProfile(project_dir) as profile:
             for label, version in versions:
                 profile.apply(version, tls_version)

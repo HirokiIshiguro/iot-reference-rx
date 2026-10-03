@@ -674,6 +674,7 @@ idt_ci_contract:
     - |
       $idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }
       $env:IDT_TARGET = $idtTarget
+      $idtScope = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_SCOPE } else { $env:RX72N_IDT_SCOPE }
       $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --target "$idtTarget" --check-aws
       $idtHostStatus = $LASTEXITCODE
       try { $idtHostCheck = ($idtHostJson -join "`n") | ConvertFrom-Json }
@@ -688,7 +689,21 @@ idt_ci_contract:
       if ($idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed) {
         throw "IDT host preflight failed; inspect the named checks under the runner identity"
       }
-      $idtScope = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_SCOPE } else { $env:RX72N_IDT_SCOPE }
+      if ($idtTarget -eq 'rx671-wifi' -and $idtScope -ne 'preflight') {
+        $bootstrapNames = @('IDT_RX671_PROVISIONER_MOT_FILE', 'IDT_RX671_PROVISIONER_MANIFEST_FILE', 'IDT_RX671_SIGNER_CERT_FILE', 'IDT_RX671_SIGNER_PUBLIC_KEY_FILE')
+        $bootstrapPresent = @($bootstrapNames | Where-Object { [Environment]::GetEnvironmentVariable($_, 'Process') })
+        if ($bootstrapPresent.Count -eq 0) {
+          $bootstrapRoot = "$env:CI_PROJECT_DIR/build/rx671-ota"
+          & "$env:RX72N_IDT_PYTHON" tools/build_rx671_ota_images.py --repo-root "$env:CI_PROJECT_DIR" --provisioner-only --output-root "$bootstrapRoot" --workspace-root "C:/ai/codex/ws/rx-idt-bootstrap-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:IDT_RX671_PROVISIONER_MOT_FILE = "$bootstrapRoot/provisioner/aws_wifi_rx671_ek.mot"
+          $env:IDT_RX671_PROVISIONER_MANIFEST_FILE = "$bootstrapRoot/provisioner/provisioner-manifest.json"
+          $env:IDT_RX671_SIGNER_CERT_FILE = "$bootstrapRoot/rx671-ota-signer.crt.pem"
+          $env:IDT_RX671_SIGNER_PUBLIC_KEY_FILE = "$bootstrapRoot/rx671-ota-signer.pub.pem"
+        } elseif ($bootstrapPresent.Count -ne $bootstrapNames.Count) {
+          throw 'RX671 public bootstrap input overrides must supply the complete set'
+        }
+      }
       & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$idtTarget" --scope "$idtScope" --output artifacts/idt
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
@@ -780,6 +795,8 @@ idt_source_matrix:
     - when: never
   script:
     - '& tools/test_build_rx_idt.ps1 -Python "$env:RX72N_IDT_PYTHON" -CompileTargets @("rx72n-ethernet", "rx65n-bg96", "rx671-wifi") -OutputDirectory "$env:CI_PROJECT_DIR/artifacts/idt-compile" -WorkspaceRoot "C:/ai/codex/ws/idt-ci-$env:CI_PIPELINE_ID"'
+    - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+    - '& "$env:RX72N_IDT_PYTHON" tools/build_rx671_ota_images.py --repo-root "$env:CI_PROJECT_DIR" --provisioner-only --output-root "$env:CI_PROJECT_DIR/build/rx671-ota" --workspace-root "C:/ai/codex/ws/idt-bootstrap-ci-$env:CI_PIPELINE_ID"'
     - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
   artifacts:
     when: always
