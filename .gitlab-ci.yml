@@ -778,7 +778,7 @@ idt_source_matrix:
       when: on_success
     - when: never
   script:
-    - '& "$env:RX72N_IDT_PYTHON" tools/test_build_rx_idt.ps1 -Python "$env:RX72N_IDT_PYTHON" -CompileTargets @("rx72n-ethernet", "rx65n-bg96", "rx671-wifi") -OutputDirectory "$env:CI_PROJECT_DIR/artifacts/idt-compile" -WorkspaceRoot "C:/ai/codex/ws/idt-ci-$env:CI_PIPELINE_ID"'
+    - '& tools/test_build_rx_idt.ps1 -Python "$env:RX72N_IDT_PYTHON" -CompileTargets @("rx72n-ethernet", "rx65n-bg96", "rx671-wifi") -OutputDirectory "$env:CI_PROJECT_DIR/artifacts/idt-compile" -WorkspaceRoot "C:/ai/codex/ws/idt-ci-$env:CI_PIPELINE_ID"'
     - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
   artifacts:
     when: always
