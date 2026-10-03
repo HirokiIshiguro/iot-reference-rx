@@ -491,9 +491,10 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             "Failed to restore or remove a generated local credential header",
             self.builder,
         )
+        normal_startup = self.main[self.main.index("void main_task("):]
         self.assertLess(
-            self.main.index("ota_runtime_prepare()"),
-            self.main.index("whd_bringup_run()"),
+            normal_startup.index("ota_runtime_prepare()"),
+            normal_startup.index("whd_bringup_run()"),
         )
 
     def test_wifi_credential_code_is_isolated_from_normal_network_profile(

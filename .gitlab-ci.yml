@@ -58,6 +58,10 @@ variables:
   #   nightly_matrix - scheduled parent pipeline that fans out focused rows.
   #   idt     - explicit web/API IDT run; no normal board/OTA jobs.
   PIPELINE_PROFILE: "branch"
+  # Shared entry; the RX72N inputs below remain compatible.
+  RUN_RX_IDT: "false"
+  IDT_TARGET: "rx72n-ethernet"
+  IDT_SCOPE: "preflight"
   RUN_RX72N_IDT: "false"
   # Override when a second Windows/WSL host has the same validated capabilities.
   RX72N_IDT_RUNNER_TAG: "hw-ishiguro-pc"
@@ -302,12 +306,40 @@ variables:
 
 workflow:
   rules:
-    # Use only RUN_RX72N_IDT and RX72N_IDT_SCOPE as pipeline inputs for this
-    # lane. Pipeline variables override workflow defaults; do not combine IDT
+    # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
+    # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true"'
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && ($RUN_RX_IDT == "true" || $RUN_RX72N_IDT == "true")'
       variables:
         PIPELINE_PROFILE: "idt"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
+    # Validate this multi-target change without taking any physical bench.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-idt-/'
+      variables:
+        PIPELINE_PROFILE: "mr-idt-targets"
         RUN_RX65N_BG96_BUILD: "false"
         RX65N_BG96_TEST_SCOPE: "build"
         RX65N_BG96_SKIP_HW_TESTS: "true"
@@ -586,8 +618,15 @@ idt_ci_contract:
         - tools/ci/tests/test_idt_ota_witness.py
         - tools/ci/tests/test_idt_selection.py
         - tools/ci/tests/test_idt_flash_failure.py
+        - tools/ci/tests/test_idt_*.py
         - tools/ci/tests/test_uart_download_errors.py
         - tools/test_uart_download_rx72n.py
+        - tools/idt_source_manifest.py
+        - tools/idt_rx671_build_profile.py
+        - tools/build_rx72n_idt_transport.ps1
+        - tools/test_build_rx_idt.ps1
+        - tools/build_headless_rx*.ps1
+        - tools/provision_rx671_ota.py
       when: on_success
     - when: never
   script:
@@ -607,11 +646,16 @@ idt_ci_contract:
         tools.ci.tests.test_idt_ota_witness \
         tools.ci.tests.test_idt_selection \
         tools.ci.tests.test_idt_flash_failure \
+        tools.ci.tests.test_idt_targets \
+        tools.ci.tests.test_idt_source_manifest \
+        tools.ci.tests.test_idt_rx671_provision \
+        tools.ci.tests.test_idt_rfp_process \
+        tools.ci.tests.test_idt_cleanup_budget \
         tools.ci.tests.test_uart_download_errors \
         tools.idt.ota_aws_signers_tests \
         tools.idt.ota_support_tests -v
 
-test_rx72n_idt:
+.rx_idt_job:
   stage: test
   extends: .aws_cli_windows_job
   tags:
@@ -625,13 +669,9 @@ test_rx72n_idt:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
     PYTHONUTF8: "1"
-  rules:
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true"'
-      when: on_success
-    - when: never
   script:
     - |
-      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --check-aws
+      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --target "$env:IDT_TARGET" --check-aws
       $idtHostStatus = $LASTEXITCODE
       try { $idtHostCheck = ($idtHostJson -join "`n") | ConvertFrom-Json }
       catch { throw "IDT host preflight did not return valid JSON" }
@@ -645,7 +685,8 @@ test_rx72n_idt:
       if ($idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed) {
         throw "IDT host preflight failed; inspect the named checks under the runner identity"
       }
-      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --scope "$env:RX72N_IDT_SCOPE" --output artifacts/idt
+      $idtScope = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_SCOPE } else { $env:RX72N_IDT_SCOPE }
+      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$env:IDT_TARGET" --scope "$idtScope" --output artifacts/idt
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
@@ -655,9 +696,97 @@ test_rx72n_idt:
       - artifacts/idt/FRQ_Report.xml
       - artifacts/idt/metadata.json
       - artifacts/idt/summary.json
+      - artifacts/idt/hardware-preflight.json
     reports:
       junit: artifacts/idt/FRQ_Report.xml
     expire_in: 30 days
+
+test_rx72n_idt:
+  extends: .rx_idt_job
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx72n-ethernet"'
+      when: on_success
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX72N_IDT == "true" && $RUN_RX_IDT != "true"'
+      when: on_success
+    - when: never
+
+test_rx65n_bg96_idt:
+  extends: .rx_idt_job
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx65n-bg96"'
+      when: on_success
+    - when: never
+
+test_rx671_wifi_idt:
+  extends: .rx_idt_job
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx671-wifi"'
+      when: on_success
+    - when: never
+
+idt_target_plans:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-idt-targets"'
+      when: on_success
+    - if: '$PIPELINE_PROFILE == "idt" && $RUN_RX_IDT == "true" && $IDT_SCOPE == "plan"'
+      when: on_success
+    - when: never
+  script:
+    - |
+      idt_plan_venv="$(mktemp -d "$CI_PROJECT_DIR/.idt-plan-venv.XXXXXX")"
+      trap 'rm -rf -- "$idt_plan_venv"' EXIT
+      python3 -m venv "$idt_plan_venv"
+      idt_plan_python="$idt_plan_venv/bin/python"
+      "$idt_plan_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-ci.txt
+      "$idt_plan_python" -m pip check
+      if [ "$PIPELINE_PROFILE" = "mr-idt-targets" ]; then
+        idt_targets="rx72n-ethernet rx65n-bg96 rx671-wifi"
+      else
+        idt_targets="$IDT_TARGET"
+      fi
+      for idt_target in $idt_targets; do
+        "$idt_plan_python" tools/idt/run_idt.py --target "$idt_target" --scope transport --plan-only --output "artifacts/idt-plan/$idt_target"
+      done
+  artifacts:
+    when: always
+    paths:
+      - artifacts/idt-plan/*/plan.json
+    expire_in: 30 days
+
+idt_source_matrix:
+  stage: dependency_check
+  extends: .aws_cli_windows_job
+  tags:
+    - exec-shell
+    - os-windows
+    - $RX72N_IDT_RUNNER_TAG
+    - ccrx
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  timeout: 90 minutes
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    PYTHONUTF8: "1"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-idt-targets"'
+      when: on_success
+    - when: never
+  script:
+    - '& "$env:RX72N_IDT_PYTHON" tools/test_build_rx_idt.ps1 -Python "$env:RX72N_IDT_PYTHON" -CompileTargets @("rx72n-ethernet", "rx65n-bg96", "rx671-wifi") -OutputDirectory "$env:CI_PROJECT_DIR/artifacts/idt-compile" -WorkspaceRoot "C:/ai/codex/ws/idt-ci-$env:CI_PIPELINE_ID"'
+    - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+  artifacts:
+    when: always
+    # Placeholder firmware and raw compiler logs are not runtime test evidence.
+    paths:
+      - artifacts/idt-compile/*/build_manifest.json
+    expire_in: 30 days
+
 
 nightly_dependency_contract:
   stage: dependency_check
@@ -2447,6 +2576,17 @@ build_rx72n_ether_fleet:
   resource_group: $RX65N_BG96_DEVICE_RESOURCE_GROUP
   before_script:
     - set -o pipefail
+    - |
+      # Share the device transaction lock with the Windows/WSL IDT supervisor.
+      idt_saved_umask=$(umask)
+      umask 000
+      exec 9>>/tmp/ck-rx65n-rpi3-hardware.lock
+      umask "$idt_saved_umask"
+      if ! flock -n 9; then
+        echo "CK-RX65N is owned by another hardware transaction"
+        exit 1
+      fi
+    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx65n-bg96'))"
     - python3 -m venv .venv-pi
     - source .venv-pi/bin/activate
     - python -m pip install --quiet pyserial cryptography

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run a selected FRQ development group through a guarded RPi1 PTY."""
 import argparse
+import base64
 import fcntl
 import json
 import os
@@ -18,9 +19,14 @@ import time
 import tty
 from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
+import zlib
 from test_selection import parse_test_ids
 from ota_witness import UartWitness
 from flash_failure import raise_if_flash_failed
+from targets import get_target, target_ids, target_fingerprint, load_manifest
+from cleanup_budget import (NATIVE_CLEANUP_SECONDS, NATIVE_TERMINATE_SECONDS, NATIVE_KILL_SECONDS,
+                            BRIDGE_SHUTDOWN_SECONDS, REMOTE_TERMINATE_SECONDS, REMOTE_KILL_SECONDS,
+                            CAPTURE_DRAIN_SECONDS, BRIDGE_THREAD_JOIN_SECONDS)
 
 GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
@@ -60,13 +66,16 @@ def stop_idt(process, timeout):
         except ProcessLookupError:
             return
         try:
-            process.wait(timeout=10)
+            process.wait(timeout=NATIVE_TERMINATE_SECONDS)
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 return
-            process.wait()
+            try:
+                process.wait(timeout=NATIVE_KILL_SECONDS)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("Owned native IDT process did not stop within its cleanup budget") from None
 
 
 def inspect_junit(results):
@@ -99,8 +108,27 @@ def wait_for_native(process, bridge, run_dir, timeout_seconds):
     raise_if_flash_failed(run_dir)
 
 
+def bridge_command(token, target):
+    # Windows ssh.exe receives this argv through WSL. Hex-encoding all helper
+    # sources exceeds the 32767-character Windows process command-line limit.
+    # A compressed stdlib-only payload also keeps remote imports self-contained.
+    modules = {name: Path(__file__).with_name(name + ".py").read_bytes().decode("utf-8")
+               for name in ("targets", "cleanup_budget", "rfp_process")}
+    payload = {"modules": modules,
+               "manifest": {"schema_version": 1, "targets": {target["id"]: target}},
+               "bridge": Path(__file__).with_name("rpi_uart_bridge.py").read_bytes().decode("utf-8")}
+    packed = base64.b64encode(zlib.compress(json.dumps(payload).encode("utf-8"))).decode("ascii")
+    bootstrap = ("import base64,zlib,json,sys,types; p=json.loads(zlib.decompress(base64.b64decode(" + repr(packed) + "))); "
+                 "mods=[types.ModuleType(name) for name in p['modules']]; "
+                 "sys.modules.update((m.__name__,m) for m in mods); "
+                 "[exec(p['modules'][m.__name__],m.__dict__) for m in mods]; "
+                 "sys.modules['targets']._MANIFEST=p['manifest']; exec(p['bridge'])")
+    return "python3 -u -c " + shlex.quote(bootstrap) + " " + shlex.quote(token) + " " + shlex.quote(target["id"])
+
+
 class Bridge:
-    def __init__(self, token, capture_dir):
+    def __init__(self, token, capture_dir, target=None):
+        target = get_target() if target is None else target
         self.ready = threading.Event()
         self.failed = threading.Event()
         self.closed = threading.Event()
@@ -111,16 +139,14 @@ class Bridge:
         tty.setraw(self.slave)
         os.set_blocking(self.master, False)
         self.device = os.ttyname(self.slave)
-        source = Path(__file__).with_name("rpi_uart_bridge.py").read_bytes()
-        bootstrap = "exec(bytes.fromhex('" + source.hex() + "'))"
-        command = "python3 -u -c " + shlex.quote(bootstrap) + " " + shlex.quote(token)
+        command = bridge_command(token, target)
         env = {key: value for key, value in os.environ.items() if not key.startswith("AWS_")}
         self.capture = None
         try:
             self.capture = UartWitness(capture_dir)
             self.remote = subprocess.Popen(
                 [SSH, "-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10",
-                 "-o", "ServerAliveCountMax=3", "rpi1", command],
+                 "-o", "ServerAliveCountMax=3", target["ssh_alias"], command],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 bufsize=0, env=env)
         except Exception:
@@ -220,20 +246,25 @@ class Bridge:
             except BrokenPipeError:
                 pass
         try:
-            self.remote.wait(timeout=135)  # Remote reset may wait for the shared RFP lock.
+            self.remote.wait(timeout=BRIDGE_SHUTDOWN_SECONDS)
         except subprocess.TimeoutExpired:
+            self.failure_reason = "RPi bridge exceeded its end-state cleanup budget; inspect the owned bench"
+            self.failed.set()
             self.remote.terminate()
             try:
-                self.remote.wait(timeout=5)
+                self.remote.wait(timeout=REMOTE_TERMINATE_SECONDS)
             except subprocess.TimeoutExpired:
                 self.remote.kill()
-                self.remote.wait()
-        self.threads[1].join(timeout=5)
+                try:
+                    self.remote.wait(timeout=REMOTE_KILL_SECONDS)
+                except subprocess.TimeoutExpired:
+                    raise RuntimeError("Owned SSH process did not stop; inspect the private runtime and bench") from None
+        self.threads[1].join(timeout=CAPTURE_DRAIN_SECONDS)
         self.closed.set()
         for descriptor in (self.master, self.slave):
             os.close(descriptor)
         for thread in self.threads:
-            thread.join(timeout=1)
+            thread.join(timeout=BRIDGE_THREAD_JOIN_SECONDS)
         if self.threads[1].is_alive():
             raise RuntimeError("UART capture did not drain before closing")
         for stream in (self.remote.stdout, self.remote.stderr):
@@ -255,6 +286,7 @@ def interrupted(_signum, _frame):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--idt-root", required=True)
+    parser.add_argument("--target", choices=target_ids(), default=os.getenv("IDT_TARGET", "rx72n-ethernet"))
     parser.add_argument("--source-path", required=True)
     parser.add_argument("--userdata-template", required=True)
     parser.add_argument("--device-template", required=True)
@@ -263,8 +295,11 @@ def main():
     parser.add_argument("--group", choices=GROUPS, default=GROUPS[0])
     parser.add_argument("--test-id", help="Optional comma-separated OTA cases; omitted runs the group")
     parser.add_argument("--timeout-seconds", type=int, default=4500)
-    parser.add_argument("--cleanup-timeout-seconds", type=int, default=120)
+    parser.add_argument("--cleanup-timeout-seconds", type=int, default=NATIVE_CLEANUP_SECONDS)
     args = parser.parse_args()
+    target = get_target(args.target)
+    if os.getenv("IDT_TARGET") and os.environ["IDT_TARGET"] != args.target:
+        parser.error("Target argument disagrees with inherited IDT_TARGET")
     try:
         selected_test_ids = parse_test_ids(args.test_id)
     except ValueError as error:
@@ -305,6 +340,8 @@ def main():
         parser.error("userdata FreeRTOS version must match the source manifest")
     if len(devices) != 1 or len(devices[0].get("devices", [])) != 1:
         parser.error("device template must contain exactly one pool and one device")
+    if devices[0].get("sku") != target["sku"]:
+        parser.error("Device template SKU differs from selected target")
     userdata["sourcePath"] = str(source)
     userdata["retainModifiedSourceDirectories"] = True
     for field, wrapper in (("buildTool", Path(__file__).with_name("build_transport.sh")),
@@ -320,7 +357,7 @@ def main():
     bridge = process = None
     original_config = None
     config_written = False
-    result = {"group": args.group, "testId": args.test_id, "suite": SUITE, "qualification": "not_evaluated",
+    result = {"target_id": target["id"], "target_sha256": target_fingerprint(target), "group": args.group, "testId": args.test_id, "suite": SUITE, "qualification": "not_evaluated",
               "sourcePath": str(source), "startedUtc": datetime.now(timezone.utc).isoformat()}
     exit_code = 1
     try:
@@ -329,14 +366,14 @@ def main():
         signal.signal(signal.SIGINT, interrupted)
         signal.signal(signal.SIGTERM, interrupted)
         token = secrets.token_hex(16)
-        bridge = Bridge(token, run_dir / "uart-witness")
+        bridge = Bridge(token, run_dir / "uart-witness", target)
         deadline = time.monotonic() + 30
         while not bridge.ready.wait(0.1):
             if bridge.failed.is_set() or bridge.remote.poll() is not None or time.monotonic() > deadline:
                 raise RuntimeError("RPi UART bridge did not become ready")
-        devices[0]["id"] = "rx72n-ether-prototype"
+        devices[0]["id"] = target["id"] + "-prototype"
         devices[0]["devices"][0]["connectivity"] = {
-            "protocol": "uart", "serialPort": bridge.device, "baudRate": 921600}
+            "protocol": "uart", "serialPort": bridge.device, "baudRate": target["baud"]}
         for filename, data in (("device.json", devices), ("userdata.json", userdata)):
             (run_dir / filename).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         config = {"log": {"location": str(run_dir / "logs")},
@@ -349,7 +386,7 @@ def main():
         env = os.environ.copy()
         env.update(TMPDIR=str(temporary_sources), IDT_BENCH_TOKEN=token, AWS_REGION=args.region,
                    AWS_DEFAULT_REGION=args.region, IDT_SOURCE_PATH=str(source),
-                   IDT_RUNTIME_DIR=str(run_dir))
+                   IDT_RUNTIME_DIR=str(run_dir), IDT_TARGET=target["id"])
         command = [str(binary), "run-suite", "--suite-id", SUITE, "--group-id", args.group,
                    "--pool-id", devices[0]["id"], "--userdata", "userdata.json",
                    "--upgrade-test-suite", "n", "--update-idt", "n", "--update-managed-policy", "n"]
@@ -390,7 +427,12 @@ def main():
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
         try:
-            stop_idt(process, args.cleanup_timeout_seconds)
+            try:
+                stop_idt(process, args.cleanup_timeout_seconds)
+            except Exception as error:
+                result.update(verdict="FAIL", cleanupError=str(error))
+                exit_code = 1
+                print("IDT cleanup failed: " + str(error), file=sys.stderr, flush=True)
         finally:
             try:
                 if bridge is not None:

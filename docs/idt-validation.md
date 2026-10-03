@@ -1,5 +1,54 @@
 # RX72N EthernetのIDT検証
 
+## 3ターゲットのCI入口
+
+GitLabのRun pipeline / Pipelines APIで、次の3入力を指定します。
+
+| 入力 | 値 |
+|---|---|
+| `RUN_RX_IDT` | `true`（既定は`false`） |
+| `IDT_TARGET` | `rx72n-ethernet` / `rx65n-bg96` / `rx671-wifi` |
+| `IDT_SCOPE` | `plan` / `preflight` / `transport` / `mqtt` / `pkcs11` / `ota-pal` / `ota-mqtt` |
+
+選択した1ターゲットだけのnative jobを生成し、通常のboard / OTA / nightly jobは起動しません。
+RX72Nの旧入力`RUN_RX72N_IDT=true` / `RX72N_IDT_SCOPE`も保持します。新旧入力を同時に指定した場合は新入力を優先します。
+任意のOTA case選択は`IDT_TEST_ID`（旧`RX72N_IDT_TEST_ID`も可）で指定します。
+
+| ターゲット | native job | MCU側の接続 |
+|---|---|---|
+| `rx72n-ethernet` | `test_rx72n_idt` | RX72N Envision Kit Ethernet、RPi #1 |
+| `rx65n-bg96` | `test_rx65n_bg96_idt` | CK-RX65N V1 / BG96、RPi #3 |
+| `rx671-wifi` | `test_rx671_wifi_idt` | EK-RX671 / Type 1YN Wi-Fi、RPi #1 |
+
+同じWindows / WSL / CC-RX / AWSホストを使い、host preflightは選択したRPiのhostnameを確認します。
+共有ホスト設定は既存の`RX72N_IDT_RUNNER_TAG` / `RX72N_IDT_PYTHON` / `RX72N_IDT_HOST_PROFILE`を継承します。
+Wi-Fi / APNは既存のターゲット専用CI変数からprivate runtimeへ渡し、source・firmware・値を公開artifactに含めません。
+
+`plan`はホストの版・依存と固定されたboard identityを計画へ記録するだけで、AWS、compiler、UART、flashを操作しません。
+`preflight`はnative `FreeRTOSVersion`を実行します。FreeRTOS `202604.00-LTS`とIDT 4.9.0 / FRQ_2.5.0の不一致はNGとして保持し、環境整備の失敗と区別します。
+MQTTもRX72N/RX671のcoreMQTT 5.0.2（MQTT 5）がsuiteのMQTT 3.1.1期待値と不一致です。RX65N/BG96はcoreMQTT 2.3.1（MQTT 3.1.1）ですが、protocol一致だけではnative合格とは判断しません。
+失敗・ERROR・SKIPをPASSへ書き換えず、LTS / manifest / vendor suiteを変更しません。
+
+MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検査、`idt_target_plans`は3ターゲットの計画を保存します。
+`idt_source_matrix`はWindows runnerで3ターゲット×5groupの実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
+過去のローカル15構成compile成功は保存されたsourceに対する結果として保持し、このMRのclean SHA・runner・実機の合格へ流用しません。
+
+### 実機scopeの準備条件
+
+固定target identityがapplication、bootloader、packager、UART、debugger、bench lockを選びます。
+共有CC-RX resource groupに加え、実機の既存lockと通常CIとの排他を確認します。
+RX671の初期secure bootは、同じsourceで確認したlinear provisionerと対応するP-256公開signerをLittleFSへ用意し、Data Flashを保持して両bankへ書き込みます。built-in fallbackは有効にしません。
+OTAのbuild ledger / 起動witnessはターゲットとfingerprintを照合します。通常firmwareの復帰は既存flash / provision経路で確認します。
+
+終了時は既存RX72N CIと同じresetコマンド成功と、freshな1秒間のUART静止を確認します。
+RESET端子の電圧測定は実行条件に含めません。物理RESET Lowを測定したという記録は作りません。
+reset失敗、UART出力継続、privileged子processの終了が不明な場合は不合格とし、所有記録を保持して再利用を止めます。
+これは全IDT合格の条件緩和ではなく、終了時に実際に観測できる事実の記録です。
+
+## RX72Nの既存実測
+
+以下はそれぞれに記載された過去SHAの結果です。今回の追加2ターゲットや変更後sourceの合格として扱いません。
+
 RX72N Envision Kit / Ethernet / software TLSで、**TLS transportの14件が実機PASS**しました。
 OTA E2Eの**新しいバージョンへの更新と、1.9.1 → 1.9.2の起動識別子を、clean SHA `c9fcadb1`の実機CIで確認**しました。
 同版・非信頼証明書の試験もclean SHA `2e0c7a5b`でPASSしましたが、全13ケースは未完了です。

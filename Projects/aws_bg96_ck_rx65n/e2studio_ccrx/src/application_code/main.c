@@ -42,6 +42,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "mqtt_agent_task.h"
 #include "bg96_probe.h"
 
+#if ( ENABLE_IDT_TRANSPORT_TEST == 1 ) || ( ENABLE_IDT_CLOUD_DEMO == 1 ) || \
+    ( ENABLE_IDT_PKCS11_TEST == 1 ) || ( ENABLE_IDT_OTAPAL_TEST == 1 )
+#include "rx_idt_config.h"
+#include "serial.h"
+#include "queue.h"
+#if ( ENABLE_IDT_TRANSPORT_TEST == 1 ) || ( ENABLE_IDT_CLOUD_DEMO == 1 )
+#include "rx_idt_network.h"
+#endif
+#if ( ENABLE_IDT_TRANSPORT_TEST == 1 )
+#include "rx72n_idt_transport.h"
+#elif ( ENABLE_IDT_PKCS11_TEST == 1 )
+#include "rx72n_idt_pkcs11.h"
+#elif ( ENABLE_IDT_OTAPAL_TEST == 1 )
+#include "rx72n_idt_otapal.h"
+#elif ( ENABLE_IDT_CLOUD_DEMO == 1 )
+#include "rx72n_idt_cloud.h"
+#endif
+#if ( ENABLE_BG96_PROBE_ONLY == 1 ) || ( LANBENCH_TLS13_0RTT_ENABLE != 0 ) || \
+    ( ENABLE_FLEET_PROVISIONING_DEMO == 1 )
+#error "IDT profiles must not start the BG96 probe, benchmark or Fleet demo."
+#endif
+#endif
+
 #ifndef LANBENCH_TLS13_0RTT_ENABLE
     #define LANBENCH_TLS13_0RTT_ENABLE    ( 0U )
 #endif
@@ -130,6 +153,94 @@ extern void CLI_Support_Settings (void);
 extern void vUARTCommandConsoleStart (uint16_t usStackSize, UBaseType_t uxPriority);
 extern void vRegisterSampleCLICommands (void);
 
+#if ( IDT_TEST_ENABLED == 1 )
+static void prvIdtStop( const char * message )
+{
+    if( message != NULL )
+    {
+        configPRINT_STRING( message );
+    }
+    for( ;; )
+    {
+        vTaskSuspend( NULL );
+    }
+}
+
+static void prvRunIdtProfile( void )
+{
+    extern QueueHandle_t xRxQueue;
+
+    /* Open the production SCI0 (P32/P33, 921600) UART and its RX queue
+     * synchronously, without an
+     * interactive CLI task that could hold UART state during IDT startup. */
+    CLI_Support_Settings();
+    ( void ) xSerialPortInitMinimal( BSP_CFG_SCI_UART_TERMINAL_BITRATE, 2048U );
+    if( xRxQueue == NULL )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: UART queue initialization failed\r\n" );
+    }
+    if( xLoggingTaskInitialize( mainLOGGING_TASK_STACK_SIZE,
+                                tskIDLE_PRIORITY + 2,
+                                mainLOGGING_MESSAGE_QUEUE_LENGTH ) != pdPASS )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: logging initialization failed\r\n" );
+    }
+    UserInitialization();
+    if( ( littlFs_init() != LFS_ERR_OK ) || ( vprvCacheInit() != LFS_ERR_OK ) )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: LittleFS/KVS initialization failed\r\n" );
+    }
+
+#if ( ENABLE_IDT_PKCS11_TEST == 1 )
+    if( xStartIdtPkcs11Test() != pdPASS )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: PKCS11 test task creation failed\r\n" );
+    }
+#elif ( ENABLE_IDT_OTAPAL_TEST == 1 )
+    if( xStartIdtOtaPalTest() != pdPASS )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: OTA PAL test task creation failed\r\n" );
+    }
+#else
+    if( xProvisionIdtNetworkCredentials() != pdTRUE )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: cellular credential provisioning failed\r\n" );
+    }
+#if ( ENABLE_IDT_CLOUD_DEMO == 1 )
+    if( xProvisionIdtCloudCredentials() != pdTRUE )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: cloud credential provisioning failed\r\n" );
+    }
+    if( xMQTTAgentInit() != pdPASS )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: MQTT agent initialization failed\r\n" );
+    }
+#endif
+    /* BG96 owns the production cellular socket stack. It must not initialize
+     * the unrelated Ethernet FreeRTOS+TCP stack for a transport/cloud test. */
+    if( !Connect2AP() )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: BG96 cellular connection failed\r\n" );
+    }
+    configPRINT_STRING( "RX65N IDT network ready: BG96 cellular connected\r\n" );
+#if ( ENABLE_IDT_TRANSPORT_TEST == 1 )
+    if( xStartIdtTransportTest() != pdPASS )
+    {
+        prvIdtStop( "IDT_PORT_FATAL: transport test task creation failed\r\n" );
+    }
+#else
+    xSetMQTTAgentState( MQTT_AGENT_STATE_INITIALIZED );
+    vStartMQTTAgent( appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY );
+#if ( ENABLE_OTA_UPDATE_DEMO == 1 )
+    vStartOtaDemo();
+#endif
+    vStartSimplePubSubDemo();
+#endif
+#endif
+    prvIdtStop( NULL );
+}
+#endif /* IDT_TEST_ENABLED */
+
 /*-----------------------------------------------------------*/
 
 /**********************************************************************************************************************
@@ -140,6 +251,9 @@ extern void vRegisterSampleCLICommands (void);
  *********************************************************************************************************************/
 void main_task(void)
 {
+#if ( IDT_TEST_ENABLED == 1 )
+    prvRunIdtProfile();
+#else
     int32_t xResults;
     int32_t Time2Wait = 10000;
     extern void vRegisterSampleCLICommands (void);
@@ -228,6 +342,7 @@ void main_task(void)
     {
         vTaskSuspend(NULL);
     }
+#endif /* IDT_TEST_ENABLED */
 }
 /*****************************************************************************************
 End of function main_task

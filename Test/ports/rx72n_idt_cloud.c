@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "FreeRTOS.h"
+#include "rx_idt_config.h"
 #include "test_execution_config.h"
 #include "test_param_config.h"
 #include "demo_config.h"

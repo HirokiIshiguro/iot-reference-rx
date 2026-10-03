@@ -14,8 +14,10 @@ import sys
 
 try:
     from .host_profile import load_host_profile
+    from .targets import get_target, target_ids
 except ImportError:
     from host_profile import load_host_profile
+    from targets import get_target, target_ids
 
 
 def requirements(filename: str) -> dict[str, str]:
@@ -63,7 +65,8 @@ def installed_toolchain(profile: dict[str, str], file_versions: dict) -> dict:
     }
 
 
-def check_host(profile: dict[str, str], *, check_aws: bool = False) -> dict:
+def check_host(profile: dict[str, str], *, check_aws: bool = False, target=None) -> dict:
+    target = get_target() if target is None else target
     checks = []
 
     def record(name: str, passed: bool, detail=None):
@@ -123,8 +126,9 @@ def check_host(profile: dict[str, str], *, check_aws: bool = False) -> dict:
         record("wsl_python_dependency_consistency", code == 0)
         # Only ask for the hostname. Do not open the UART, take a bench lock,
         # reset or flash a board. Run under the eventual service account.
-        code, hostname = command([profile["windows_ssh"], "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "rpi1", "hostname"])
-        record("pinned_bench_ssh_identity", code == 0 and hostname == "ef-saffti-001-rpi-001", "rpi1 -> ef-saffti-001-rpi-001")
+        code, hostname = command([profile["windows_ssh"], "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", target["ssh_alias"], "hostname"])
+        record("pinned_bench_ssh_identity", code == 0 and hostname == target["hostname"],
+               target["ssh_alias"] + " -> " + target["hostname"])
     else:
         tool_versions = {}
     toolchain = installed_toolchain(profile, tool_versions)
@@ -143,7 +147,7 @@ def check_host(profile: dict[str, str], *, check_aws: bool = False) -> dict:
             aws = {"checked": True, "error_type": type(error).__name__}
             record("aws_caller_identity", False)
     return {"host_preflight_passed": all(check["passed"] for check in checks),
-            "host": platform.node(), "execution_user": getpass.getuser(),
+            "host": platform.node(), "execution_user": getpass.getuser(), "target_id": target["id"],
             "ci_runner_description": os.getenv("CI_RUNNER_DESCRIPTION"), "profile": profile,
             "checks": checks, "tool_file_versions": tool_versions, "wsl_version": wsl_version,
             "linux_os_release": linux_os_release, "installed_toolchain": toolchain, "aws": aws,
@@ -156,10 +160,12 @@ def check_host(profile: dict[str, str], *, check_aws: bool = False) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path)
+    parser.add_argument("--target", choices=target_ids(), default=None)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check-aws", action="store_true", help="Also call read-only AWS STS GetCallerIdentity")
     args = parser.parse_args()
-    result = check_host(load_host_profile(args.profile), check_aws=args.check_aws)
+    result = check_host(load_host_profile(args.profile), check_aws=args.check_aws,
+                        target=get_target(args.target))
     text = json.dumps(result, ensure_ascii=True, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

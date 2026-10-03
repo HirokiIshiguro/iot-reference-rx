@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run explicit RX72N IDT checks; a partial group never qualifies a release."""
+"""Run explicit target-selected RX IDT checks; a partial group never qualifies a release."""
 from __future__ import annotations
 
 import argparse
@@ -16,6 +16,7 @@ import time
 import csv
 import io
 import re
+import shutil
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -24,22 +25,94 @@ try:
     from .idt_bundle import verify_install, verify_archive_digest
     from .test_selection import parse_test_ids
     from .ota_witness import analyze_ota_witness, version_tuple
+    from .cleanup_budget import NATIVE_CLEANUP_SECONDS, owned_runtime_cleanup_seconds
+    from .ota_support import source_stack_metadata
 except ImportError:
     from host_profile import load_host_profile
     from idt_bundle import verify_install, verify_archive_digest
     from test_selection import parse_test_ids
     from ota_witness import analyze_ota_witness, version_tuple
+    from cleanup_budget import NATIVE_CLEANUP_SECONDS, owned_runtime_cleanup_seconds
+    from ota_support import source_stack_metadata
+
+try:
+    from ..idt_source_manifest import capture_dependency_provenance
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from idt_source_manifest import capture_dependency_provenance
 
 VERSION = "4.9.0"
 SUITE = "FRQ_2.5.0"
 SCOPE_GROUPS = {"preflight": "FreeRTOSVersion", "transport": "FullTransportInterfaceTLS",
                 "mqtt": "FullCloudIoT", "ota-mqtt": "OTADataplaneMQTT", "pkcs11": "FullPKCS11_Core",
                 "ota-pal": "OTACore"}
+try:
+    from .targets import (get_target, target_ids, target_fingerprint, device_template,
+                          hardware_end_state_status)
+    from .prepare_target_network import network_values, INPUTS as NETWORK_INPUTS
+except ImportError:
+    from targets import (get_target, target_ids, target_fingerprint, device_template,
+                         hardware_end_state_status)
+    from prepare_target_network import network_values, INPUTS as NETWORK_INPUTS
+
 SOURCE = Path(__file__).resolve().parents[2]
 INSTALL = Path(r"C:\ai\codex\tools\aws-idt")
 RUNTIME = Path(r"C:\ai\codex\tmp\rx72n-idt")
 WSL = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32/wsl.exe"
 HOST: dict = {}
+RX671_BOOTSTRAP_INPUTS = {
+    "IDT_RX671_PROVISIONER_MOT_FILE": "rx671_provisioner.mot",
+    "IDT_RX671_PROVISIONER_MANIFEST_FILE": "rx671_provisioner_manifest.json",
+    "IDT_RX671_SIGNER_CERT_FILE": "rx671_signer.crt.pem",
+    "IDT_RX671_SIGNER_PUBLIC_KEY_FILE": "rx671_signer.pub.pem",
+}
+
+
+def rx671_bootstrap_environment(inputs: Path, source_sha: str, environ=None) -> dict[str, str]:
+    """Validate public bootstrap inputs before native/AWS setup, then copy them."""
+    try:
+        from .rx671_provision import validate_public_signer_material, validate_prepared_signer
+    except ImportError:
+        from rx671_provision import validate_public_signer_material, validate_prepared_signer
+    environment = os.environ if environ is None else environ
+    original = {}
+    for variable in RX671_BOOTSTRAP_INPUTS:
+        value = environment.get(variable)
+        if not value:
+            raise RuntimeError("RX671 native IDT requires reviewed public bootstrap input: " + variable)
+        raw = Path(value)
+        if not raw.is_file() or any(path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction())
+                                    for path in (raw, *raw.parents)):
+            raise RuntimeError("RX671 public bootstrap input must be a regular unlinked file: " + variable)
+        original[variable] = raw.resolve(strict=True)
+    # Reject private PEM objects before any input can be copied into a runtime.
+    public_material = validate_public_signer_material(original["IDT_RX671_SIGNER_CERT_FILE"],
+                                                      original["IDT_RX671_SIGNER_PUBLIC_KEY_FILE"])
+    # Every initial build is packaged with the reviewed development key. Bind
+    # the public bootstrap signer before provisioning any native cloud resource.
+    from cryptography.hazmat.primitives import serialization
+    public_path = (SOURCE / get_target("rx671-wifi")["signing_key"]).with_suffix(".publickey")
+    reviewed_public = serialization.load_pem_public_key(public_path.read_bytes())
+    reviewed_spki = reviewed_public.public_bytes(serialization.Encoding.DER,
+                                                serialization.PublicFormat.SubjectPublicKeyInfo)
+    if public_material["public_signer_spki_sha256"] != hashlib.sha256(reviewed_spki).hexdigest():
+        raise RuntimeError("RX671 public bootstrap signer differs from the initial development package signer")
+    destination = inputs / "rx671-bootstrap"
+    destination.mkdir(exist_ok=False)
+    copied = {}
+    try:
+        for variable, name in RX671_BOOTSTRAP_INPUTS.items():
+            path = destination / name
+            copied[variable] = str(path)
+            shutil.copyfile(original[variable], path)
+        validate_prepared_signer(SOURCE, inputs.parent, get_target("rx671-wifi"), source_sha,
+                                 environ=copied)
+    except BaseException:
+        for value in copied.values():
+            Path(value).unlink(missing_ok=True)
+        destination.rmdir()
+        raise
+    return copied
 
 
 def write_json(path: Path, value: object) -> None:
@@ -60,7 +133,7 @@ def restrict_runtime(path: Path) -> None:
 
 
 def git(*args: str) -> str:
-    return subprocess.check_output(["git", "-C", str(SOURCE), *args], encoding="utf-8").strip()
+    return subprocess.check_output(["git", "--no-optional-locks", "-c", "safe.directory=" + str(SOURCE), "-C", str(SOURCE), *args], encoding="utf-8").strip()
 
 
 def manifest_version() -> str:
@@ -70,16 +143,27 @@ def manifest_version() -> str:
     return match.group(1)
 
 
+def plan_stack_metadata(target: dict) -> dict:
+    """An offline plan can describe missing inputs without asserting a stack."""
+    try:
+        return source_stack_metadata(SOURCE, target)
+    except (OSError, RuntimeError, ValueError) as error:
+        return {"status": "unavailable", "native_result": "not-run", "qualification": "not-established",
+                "problem": "Initialize and verify selected production dependencies before stack assessment",
+                "error_type": type(error).__name__}
+
+
 def test_library_sha() -> str:
     library = SOURCE / "Test/FreeRTOS-Libraries-Integration-Tests"
-    root = subprocess.check_output(["git", "-C", str(library), "rev-parse", "--show-toplevel"], encoding="utf-8").strip()
+    command = ["git", "--no-optional-locks", "-c", "safe.directory=" + str(library), "-C", str(library)]
+    root = subprocess.check_output(command + ["rev-parse", "--show-toplevel"], encoding="utf-8").strip()
     if Path(root).resolve() != library.resolve():
         raise RuntimeError("Initialize the pinned FreeRTOS integration-test submodule before running IDT")
-    return subprocess.check_output(["git", "-C", str(library), "rev-parse", "HEAD"], encoding="utf-8").strip()
+    return subprocess.check_output(command + ["rev-parse", "HEAD"], encoding="utf-8").strip()
 
 
 def submodule_pins() -> list[dict]:
-    lines = subprocess.check_output(["git", "-C", str(SOURCE), "submodule", "status", "--recursive"], encoding="utf-8").splitlines()
+    lines = git("submodule", "status", "--recursive").splitlines()
     pins = []
     for line in lines:
         match = re.match(r"^([-+ U])([0-9a-f]{40})\s+(\S+)", line)
@@ -214,15 +298,10 @@ def package_config(root: Path, config: dict):
             msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
-def preflight(runtime: Path, region: str, credentials) -> tuple[Path, int]:
+def preflight(runtime: Path, region: str, credentials, target=None) -> tuple[Path, int]:
     root = install_idt("windows", credentials)
-    device = [{"id": "rx72n-host-preflight", "sku": "RX72N-Envision-Kit-Ethernet", "features": [
-        {"name": "Wifi", "value": "No"}, {"name": "Cellular", "value": "No"},
-        {"name": "BLE", "value": "No"}, {"name": "PKCS11", "value": "ECC"},
-        {"name": "KeyProvisioning", "value": "Import"},
-        {"name": "OTA", "value": "Yes", "configs": [{"name": "OTADataPlaneProtocol", "value": "MQTT"}]}],
-        "devices": [{"id": "metadata-only-no-hardware", "connectivity": {"protocol": "uart", "serialPort": "COM0"},
-                     "secureElementConfig": {"preProvisioned": "No", "pkcs11JITPCodeVerifyRootCertSupport": "No"}}]}]
+    target = get_target() if target is None else target
+    device = device_template(target, "preflight")
     write_json(runtime / "device.json", device)
     write_json(runtime / "userdata.json", {"sourcePath": str(SOURCE), "freeRTOSVersion": manifest_version(), "retainModifiedSourceDirectories": True})
     config = {"log": {"location": str(runtime / "logs")},
@@ -235,7 +314,7 @@ def preflight(runtime: Path, region: str, credentials) -> tuple[Path, int]:
     if credentials.token:
         env["AWS_SESSION_TOKEN"] = credentials.token
     command = [str(root / "bin/devicetester_win_x86-64.exe"), "run-suite", "--suite-id", SUITE,
-               "--pool-id", "rx72n-host-preflight", "--group-id", "FreeRTOSVersion", "--userdata", "userdata.json",
+               "--pool-id", device[0]["id"], "--group-id", "FreeRTOSVersion", "--userdata", "userdata.json",
                "--update-idt", "n", "--upgrade-test-suite", "n", "--update-managed-policy", "n"]
     with package_config(root, config):
         completed = subprocess.run(command, cwd=root / "bin", env=env, capture_output=True,
@@ -269,7 +348,7 @@ def stop_hardware_runtime(process, runtime, env, credentials):
         if attempt < 2:
             time.sleep(1)
     try:
-        remaining, _ = process.communicate(timeout=300)
+        remaining, _ = process.communicate(timeout=owned_runtime_cleanup_seconds(NATIVE_CLEANUP_SECONDS))
     except subprocess.TimeoutExpired:
         # Killing wsl.exe alone would abandon the Linux SDK and bench helper.
         # Keep the ownership journal and fail rather than delete live signers.
@@ -280,7 +359,8 @@ def stop_hardware_runtime(process, runtime, env, credentials):
 
 
 def transport(runtime: Path, region: str, credentials, provenance: dict, scope: str = "transport",
-              test_id: str | None = None, diagnostic_only: bool = False) -> tuple[Path, int]:
+              test_id: str | None = None, diagnostic_only: bool = False, target=None) -> tuple[Path, int]:
+    target = get_target() if target is None else target
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives import serialization
 
@@ -290,9 +370,11 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     major = subprocess.check_output([str(powershell), "-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"], encoding="utf-8").strip()
     if major != "7":
         raise RuntimeError("IDT build callbacks require the validated PowerShell 7 runtime")
-    root = install_idt("linux", credentials)
+    target = get_target() if target is None else target
     inputs = runtime / "inputs"
     inputs.mkdir()
+    bootstrap_environment = rx671_bootstrap_environment(inputs, provenance["source_sha"]) if target["id"] == "rx671-wifi" else {}
+    root = install_idt("linux", credentials)
     private_path = inputs / "transport-private.pem"
     public_path = inputs / "transport-public.hex"
     key = ec.generate_private_key(ec.SECP256R1())
@@ -301,17 +383,7 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     os.chmod(private_path, 0o600)
     provenance_file = runtime / "source-provenance.json"
     write_json(provenance_file, provenance)
-    device = [{"id": "rx72n-ether-development", "sku": "RX72N-Envision-Kit-Ethernet", "features": [
-        {"name": "Wifi", "value": "No"}, {"name": "Cellular", "value": "No"},
-        {"name": "BLE", "value": "No"}, {"name": "PKCS11", "value": "ECC"},
-        # OTA's native Import route creates an RSA key without exposing it to
-        # the callback. Exercise its supplied-public-key route for development;
-        # the firmware still imports a host-generated EC key. This must never
-        # be described as an onboard key-generation qualification result.
-        {"name": "KeyProvisioning", "value": "Onboard" if scope == "ota-mqtt" else "Import"},
-        {"name": "OTA", "value": "Yes", "configs": [{"name": "OTADataPlaneProtocol", "value": "MQTT"}]}],
-        "devices": [{"id": "rx72n-ether-rpi1", "secureElementConfig": {
-            "preProvisioned": "No", "pkcs11JITPCodeVerifyRootCertSupport": "No", "publicKeyAsciiHexFilePath": wsl_path(public_path)}}]}]
+    device = device_template(target, scope, wsl_path(public_path))
     userdata = {"freeRTOSVersion": manifest_version(), "retainModifiedSourceDirectories": True,
                 "freeRTOSTestParamConfigPath": "{{testData.sourcePath}}/Test/include/test_param_config.h",
                 "freeRTOSTestExecutionConfigPath": "{{testData.sourcePath}}/Test/include/test_execution_config.h",
@@ -339,7 +411,9 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
         except ImportError:
             from ota_support import make_ota_config, ota_environment
         userdata["otaConfiguration"] = make_ota_config(inputs, SOURCE, wsl_path,
-                                                       python_executable=HOST["wsl_python"])
+                                                       python_executable=HOST["wsl_python"], target=target,
+                                                       bootstrap_environment=bootstrap_environment,
+                                                       source_sha=provenance["source_sha"])
         ota_env = ota_environment(inputs, wsl_path)
     write_json(inputs / "device.json", device)
     write_json(inputs / "userdata.json", userdata)
@@ -358,12 +432,17 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
                  "AWS_REGION": region, "AWS_DEFAULT_REGION": region, "IDT_RUNTIME_DIR": wsl_path(execution),
                  "IDT_PRIVATE_KEY_FILE": wsl_path(private_path), "IDT_PROVENANCE_FILE": str(provenance_file),
                  "IDT_WINDOWS_PYTHON": wsl_path(Path(sys.executable)), "IDT_WINDOWS_PWSH": wsl_path(powershell),
-                 "IDT_SCOPE": scope, "IDT_E2STUDIO_CLI": HOST["e2studio_cli"],
+                 "IDT_SCOPE": scope, "IDT_TARGET": target["id"], "IDT_SOURCE_SHA": provenance["source_sha"],
+                 "IDT_E2STUDIO_CLI": HOST["e2studio_cli"],
                  "IDT_WORKSPACE_ROOT": str(workspace_parent),
                  "IDT_LINUX_PYTHON": HOST["wsl_python"],
                  "IDT_WINDOWS_SSH": wsl_path(Path(HOST["windows_ssh"])),
                  "IDT_WINDOWS_SCP": wsl_path(Path(HOST["windows_scp"]))}
+    if scope in {"transport", "mqtt", "ota-mqtt"}:
+        inherited.update({variable: os.environ[variable] for variable in NETWORK_INPUTS.get(target["id"], {}).values()
+                          if variable in os.environ})
     inherited.update(ota_env)
+    inherited.update({variable: wsl_path(Path(path)) for variable, path in bootstrap_environment.items()})
     if diagnostic_only:
         inherited["IDT_DIAGNOSTIC_ONLY"] = "1"
     if credentials.token:
@@ -375,7 +454,8 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"], wsl_path(Path(__file__).with_name("run_transport.py")),
                "--source-path", wsl_path(SOURCE), "--idt-root", root_linux, "--output", wsl_path(execution),
                "--userdata-template", wsl_path(inputs / "userdata.json"), "--device-template", wsl_path(inputs / "device.json"), "--region", region,
-               "--group", SCOPE_GROUPS[scope]]
+               "--group", SCOPE_GROUPS[scope], "--target", target["id"],
+               "--cleanup-timeout-seconds", str(NATIVE_CLEANUP_SECONDS)]
     if test_id:
         command += ["--test-id", test_id]
     signer_session = None
@@ -438,9 +518,11 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
 def main() -> int:
     global HOST, INSTALL, RUNTIME
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", choices=target_ids(), default=os.getenv("IDT_TARGET", "rx72n-ethernet"))
+    parser.add_argument("--plan-only", action="store_true", help="Write a nonsecret execution plan without AWS, build, UART or flash")
     parser.add_argument("--scope", choices=list(SCOPE_GROUPS), default="preflight")
     parser.add_argument("--test-id",
-                        default=os.getenv("RX72N_IDT_TEST_ID") or None,
+                        default=os.getenv("IDT_TEST_ID") or os.getenv("RX72N_IDT_TEST_ID") or None,
                         help="Optional comma-separated OTA test IDs; not a complete group result")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--diagnostic-only", action="store_true", help="OTA credential diagnosis; stops before compiler/flash")
@@ -455,8 +537,39 @@ def main() -> int:
         parser.error("The selected test ID requires --scope ota-mqtt")
     if args.diagnostic_only and args.scope != "ota-mqtt":
         parser.error("Diagnostic-only is restricted to OTA credential bring-up")
+    target = get_target(args.target)
+    if args.plan_only:
+        args.output.mkdir(parents=True, exist_ok=True)
+        plan = {"status": "not_run", "target_id": target["id"], "target_sha256": target_fingerprint(target),
+                "board": target["board"], "scope": args.scope, "native_group": SCOPE_GROUPS[args.scope],
+                "selected_test_ids": list(selected_test_ids), "qualification": "not-established",
+                "host_os": "Windows x86_64 + WSL x86_64", "bench": {key: target[key] for key in
+                    ("hostname", "ssh_alias", "uart", "baud", "e2lite", "bench_lock", "rfp_lock")},
+                "application_project": target["application_project"], "bootloader_project": target["bootloader_project"],
+                "idt_version": VERSION, "suite": SUITE, "freeRTOSVersion": manifest_version(),
+                "production_stack": plan_stack_metadata(target),
+                "hardware_end_state": hardware_end_state_status(target),
+                "requirements": ["Selected target source and dependency pins must be verified",
+                    "IDT 4.9.0 does not establish 202604.00-LTS version qualification",
+                    "Native reports, including failure/skip, must be preserved"],
+                "hardware_execution": "not_requested_by_plan"}
+        if args.scope != "preflight":
+            plan["requirements"] += ["Exclusive board use, reset-command/UART-quiet end state, and normal firmware restoration must be agreed",
+                "Native cloud resource usage requires a separate approved cost/scope budget"]
+        if target["id"] == "rx65n-bg96":
+            plan["requirements"].append("Current BG96 CI lacks the IDT transaction flock; quiesce conflicting CI before a local run")
+        if target["id"] == "rx671-wifi" and args.scope != "preflight":
+            plan["requirements"].append("Same-source reviewed linear signer-only provisioner MOT/manifest and matching P-256 public signer certificate/key are required before native launch")
+            plan["required_public_bootstrap_inputs"] = list(RX671_BOOTSTRAP_INPUTS)
+            if args.scope == "ota-mqtt":
+                plan["requirements"].append("Native OTA signer material, stored boot public signer and initial package signature must match; local checks do not establish runtime trust")
+        write_json(args.output / "plan.json", plan)
+        print(json.dumps(plan, sort_keys=True))
+        return 0
     if os.name != "nt":
         parser.error("Run this entry point on the Windows CC-RX/AWS runner")
+    if args.scope in {"transport", "mqtt", "ota-mqtt"}:
+        network_values(target)
     HOST = load_host_profile()
     INSTALL, RUNTIME = Path(HOST["install_root"]), Path(HOST["runtime_root"])
     args.output.mkdir(parents=True, exist_ok=True)
@@ -473,18 +586,30 @@ def main() -> int:
                 "source_dirty": bool(git("status", "--porcelain")), "idt_version": VERSION,
                 "suite": SUITE, "started_utc": datetime.now(timezone.utc).isoformat(),
                 "qualification": "not-established", "runtime_directory": str(runtime),
-                "submodule_pins": submodule_pins(), "board": "RX72N Envision Kit Ethernet",
+                "submodule_pins": submodule_pins(), "board": target["board"],
+                "target_id": target["id"], "target_sha256": target_fingerprint(target),
                 "tls_backend": "software"}
+    metadata["production_stack"] = source_stack_metadata(SOURCE, target)
     if args.scope == "ota-mqtt":
         metadata["device_provisioning"] = "development host-generated EC key via native supplied-public-key route; no onboard key-generation qualification"
     write_json(args.output / "metadata.json", metadata)
     try:
         if args.scope != "preflight":
             library_sha = test_library_sha()
-            provenance = {"source_sha": metadata["source_sha"], "test_library_sha": library_sha, "source_tree_dirty": metadata["source_dirty"]}
-            report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id, args.diagnostic_only)
+            provenance = {"source_sha": metadata["source_sha"], "test_library_sha": library_sha, "source_tree_dirty": metadata["source_dirty"],
+                          "target_id": target["id"], "target_sha256": target_fingerprint(target)}
+            provenance.update(capture_dependency_provenance(SOURCE, target["id"]))
+            metadata["dependency_source_copy"] = {
+                "schema_version": provenance["dependency_manifest_schema_version"],
+                "target_id": provenance["dependency_target_id"],
+                "file_count": len(provenance["dependency_files_sha256"]),
+                "submodule_shas": provenance["submodule_shas"],
+                "manifest_sha256": hashlib.sha256(json.dumps(provenance["dependency_files_sha256"], sort_keys=True,
+                                                             separators=(",", ":")).encode()).hexdigest(),
+            }
+            report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id, args.diagnostic_only, target)
         else:
-            report, idt_code = preflight(runtime, args.region, credentials)
+            report, idt_code = preflight(runtime, args.region, credentials, target)
     except (Exception, KeyboardInterrupt) as error:
         write_json(args.output / "summary.json", {"passed": False, "scope": args.scope, "problem": "IDT runtime/setup failure", "error_type": type(error).__name__})
         metadata.update(finished_utc=datetime.now(timezone.utc).isoformat(), runtime_failed=True)
@@ -505,7 +630,7 @@ def main() -> int:
     summary["native_junit_passed"] = bool(junit_summary.get("passed")) and checked.returncode == 0
     if checked.returncode != 0:
         summary["passed"] = False
-    summary.update(scope=args.scope, test_id=args.test_id, complete_group_requested=args.test_id is None,
+    summary.update(target_id=target["id"], target_sha256=target_fingerprint(target), scope=args.scope, test_id=args.test_id, complete_group_requested=args.test_id is None,
                    selected_test_ids=list(selected_test_ids),
                    interrupted=idt_code == 130)
     if idt_code == 130:
@@ -554,6 +679,7 @@ def main() -> int:
                 ordered = sorted(builds, key=lambda item: version_tuple(item["ota_version"]))
                 initial_id, candidate_id = (item["image_id"] for item in ordered)
             witness = analyze_ota_witness(capture.get("events", []), builds,
+                                          target_id=target["id"], target_sha256=target_fingerprint(target),
                                           selected_test_id=args.test_id,
                                           capture_complete=capture.get("complete") is True,
                                           initial_image_id=initial_id, candidate_image_id=candidate_id)
@@ -574,9 +700,19 @@ def main() -> int:
         metadata["builds"] = []
         for manifest in manifests:
             build = json.loads(manifest.read_text(encoding="utf-8-sig"))
+            if build.get("target_id") != target["id"] or build.get("target_sha256") != target_fingerprint(target):
+                summary["passed"] = False
+                summary["problems"].append("Firmware target provenance differs from this run")
             metadata["builds"].append({
+                "target_id": build.get("target_id"),
+                "target_sha256": build.get("target_sha256"),
                 "suite": build.get("suite"),
                 "source_sha": build.get("source_sha"),
+                "source_tree_dirty": build.get("source_tree_dirty"),
+                "production_stack": build.get("production_stack"),
+                "mode": build.get("mode"),
+                "dependency_target_id": build.get("dependency_target_id"),
+                "submodule_shas": build.get("submodule_shas"),
                 "firmware_sha256": {name: value["sha256"] for name, value in build["outputs"].items()},
                 "execution_config_sha256": build["execution_config_sha256"],
                 "parameter_config_sha256": build["parameter_config_sha256"],
@@ -586,7 +722,7 @@ def main() -> int:
             metadata["firmware_sha256"] = {name: value["sha256"] for name, value in build["outputs"].items()}
             metadata["execution_config_sha256"] = build["execution_config_sha256"]
             metadata["parameter_config_sha256"] = build["parameter_config_sha256"]
-            rsu = manifests[0].with_name("rx72n_idt_transport.rsu")
+            rsu = manifests[0].with_name(target["artifact_basename"] + ".rsu")
             if rsu.is_file():
                 metadata["firmware_sha256"]["rsu"] = hashlib.sha256(rsu.read_bytes()).hexdigest()
     write_json(args.output / "metadata.json", metadata)

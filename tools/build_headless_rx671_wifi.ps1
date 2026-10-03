@@ -5,6 +5,8 @@ param(
     [string]$OtaImageVersion = "",
     [string]$Make = "",
     [string]$CcrxBin = "",
+    [string]$SourceProvenanceFile = "",
+    [string]$Python = 'python',
     [string]$Workspace = "C:\iotref-rx671-wifi-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx671_wifi_e2studio_build.log"),
     [string]$WifiConfigFile = "",
@@ -220,15 +222,22 @@ $submodulePaths = @(
     "Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk"
 )
 
+if ($SourceProvenanceFile) {
+    & $Python (Join-Path $PSScriptRoot 'idt_source_manifest.py') verify `
+        --source $projectRoot --target rx671-wifi --provenance $SourceProvenanceFile
+    if ($LASTEXITCODE -ne 0) { throw 'RX671 Wi-Fi source-copy dependency verification failed.' }
+}
+else {
 foreach ($submodulePath in $submodulePaths) {
     $submoduleFullPath = Join-Path $projectRoot ($submodulePath -replace '/', '\')
     if (-not (Test-Path -LiteralPath (Join-Path $submoduleFullPath ".git"))) {
         Write-Host "Initializing submodule: $submodulePath"
-        & git -C $projectRoot submodule update --init --recursive $submodulePath
+        & git -c "safe.directory=$projectRoot" -C $projectRoot submodule update --init --recursive $submodulePath
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to initialize submodule: $submodulePath"
         }
     }
+}
 }
 
 if (-not (Test-Path -LiteralPath $whdPatch)) {
@@ -716,24 +725,47 @@ function Write-LocalFleetConfig {
     [System.IO.File]::WriteAllLines($Path, $lines, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Add-CProjectOptionValue {
+    param(
+        [string]$Text,
+        [string]$SuperClass,
+        [string]$Value
+    )
+
+    # The IDT profile is serialized by XmlDocument before this helper runs.
+    # Select the actual HardwareDebug option, independent of attribute order,
+    # quoting and the whitespace used to serialize empty XML elements.
+    $metadata = [System.Xml.XmlDocument]::new()
+    $metadata.PreserveWhitespace = $true
+    $metadata.LoadXml($Text)
+    $configurations = $metadata.SelectNodes("//configuration[@name='HardwareDebug']")
+    if ($configurations.Count -ne 1) {
+        throw 'Expected one CCRX HardwareDebug configuration in .cproject.'
+    }
+    $options = $configurations[0].SelectNodes(".//option[@superClass='$SuperClass']")
+    if ($options.Count -ne 1) {
+        throw "Expected one CCRX HardwareDebug option in .cproject: $SuperClass"
+    }
+    $option = $options[0]
+    foreach ($entry in $option.SelectNodes('listOptionValue')) {
+        if ($entry.GetAttribute('value') -ceq $Value) { return $Text }
+    }
+    $entry = $metadata.CreateElement('listOptionValue')
+    $entry.SetAttribute('builtIn', 'false')
+    $entry.SetAttribute('value', $Value)
+    [void]$option.AppendChild($entry)
+    return $metadata.OuterXml
+}
+
 function Add-CProjectDefine {
     param(
         [string]$Text,
         [string]$Define
     )
 
-    $option = "-define=$Define"
-    if ($Text.Contains($option)) {
-        return $Text
-    }
-
-    $needle = '<listOptionValue builtIn="false" value="-define=__FUNCTION__=__func__"/>'
-    if (-not $Text.Contains($needle)) {
-        throw "Could not find the CCRX userBefore define anchor in .cproject."
-    }
-
-    $insert = "$needle`r`n`t`t`t`t`t`t`t`t`t<listOptionValue builtIn=`"false`" value=`"$option`"/>"
-    return $Text.Replace($needle, $insert)
+    return Add-CProjectOptionValue -Text $Text `
+        -SuperClass 'com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.userBefore' `
+        -Value "-define=$Define"
 }
 
 function Add-CProjectLinkerOption {
@@ -742,30 +774,9 @@ function Add-CProjectLinkerOption {
         [string]$Option
     )
 
-    $encodedOption = $Option.Replace("&", "&amp;").Replace('"', "&quot;")
-    $optionElement = "<listOptionValue builtIn=`"false`" value=`"$encodedOption`"/>"
-    if ($Text.Contains($optionElement)) {
-        return $Text
-    }
-
-    $anchor = 'id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore.'
-    $anchorIndex = $Text.IndexOf($anchor, [System.StringComparison]::Ordinal)
-    if ($anchorIndex -lt 0) {
-        throw "Could not find the CCRX linker userBefore option in .cproject."
-    }
-
-    $emptyOption = '<listOptionValue builtIn="false" value=""/>'
-    $emptyOptionIndex = $Text.IndexOf(
-        $emptyOption,
-        $anchorIndex,
-        [System.StringComparison]::Ordinal)
-    if ($emptyOptionIndex -lt 0) {
-        throw "Could not find the CCRX linker userBefore value anchor in .cproject."
-    }
-
-    $insertIndex = $emptyOptionIndex + $emptyOption.Length
-    $insert = "`r`n`t`t`t`t`t`t`t`t`t$optionElement"
-    return $Text.Insert($insertIndex, $insert)
+    return Add-CProjectOptionValue -Text $Text `
+        -SuperClass 'com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore' `
+        -Value $Option
 }
 
 function Assert-SRecordContainsAsciiMarker {
@@ -878,12 +889,34 @@ function Remove-DirectoryBestEffort {
         [string]$Label
     )
 
-    if (-not (Test-Path -LiteralPath $Path)) {
+    $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    $sourcePrefix = $projectRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if ($Label -eq 'HardwareDebug') {
+        if ($fullPath -ne [IO.Path]::GetFullPath((Join-Path $projectDir 'HardwareDebug')) -or
+            -not $fullPath.StartsWith($sourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Refusing to remove a generated directory outside the selected project.'
+        }
+    }
+    elseif ($Label -eq 'workspace') {
+        if ($fullPath -eq $projectRoot -or $projectRoot.StartsWith($fullPath + '\', [StringComparison]::OrdinalIgnoreCase) -or
+            $fullPath.StartsWith($sourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'The disposable e2 studio workspace must be separate from the source tree.'
+        }
+        $allowedRoots = @('C:\Temp', 'C:\ai\codex\ws', [IO.Path]::GetTempPath(), 'C:\iotref-rx671-wifi-ws')
+        $allowed = @($allowedRoots | Where-Object {
+            $allowedRoot = [IO.Path]::GetFullPath($_).TrimEnd('\', '/')
+            $fullPath.StartsWith($allowedRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or
+                ($allowedRoot -eq 'C:\iotref-rx671-wifi-ws' -and $fullPath -eq $allowedRoot)
+        }).Count -gt 0
+        if (-not $allowed) { throw 'Refusing to remove a workspace outside the configured temporary/workspace roots.' }
+    }
+    else { throw 'Unsupported generated directory removal.' }
+    if (-not (Test-Path -LiteralPath $fullPath)) {
         return
     }
 
     try {
-        Remove-Item -LiteralPath $Path -Recurse -Force
+        Remove-Item -LiteralPath $fullPath -Recurse -Force
     } catch {
         Write-Warning "Could not remove $Label '$Path' before build: $($_.Exception.Message)"
         Write-Warning "Continuing; e2 studio -cleanBuild will attempt to refresh build outputs."
@@ -1144,15 +1177,44 @@ function Invoke-E2StudioHeadlessBuild {
     return $proc.ExitCode
 }
 
+$whdPatchSnapshots = @{}
+$whdPatchWorkspace = $null
+$whdApplyRoot = $whdDir
+try {
+if ($SourceProvenanceFile) {
+    # Copied Git pointers may refer to another worktree or a missing path.
+    # Check the approved patch inputs in a neutral temporary directory and
+    # restore the source copy's original dependency bytes after each build.
+    $whdPatchWorkspace = Join-Path ([IO.Path]::GetTempPath()) ('rx671-whd-patch-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $whdPatchWorkspace | Out-Null
+    $patchPaths = [regex]::Matches([IO.File]::ReadAllText($whdPatch), '(?m)^diff --git a/(\S+) b/(\S+)\r?$')
+    if ($patchPaths.Count -eq 0) { throw 'WHD patch has no reviewed file paths.' }
+    foreach ($entry in $patchPaths) {
+        $relative = $entry.Groups[1].Value
+        if ($relative -ne $entry.Groups[2].Value -or $relative -match '(^|/)\.\.(/|$)' -or
+            [IO.Path]::IsPathRooted($relative)) { throw 'WHD patch path is outside the selected dependency.' }
+        $originalPath = [IO.Path]::GetFullPath((Join-Path $whdDir $relative))
+        if (-not $originalPath.StartsWith($whdDir.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'WHD patch file is outside the selected dependency.'
+        }
+        $whdPatchSnapshots[$originalPath] = [IO.File]::ReadAllBytes($originalPath)
+        $stagedPath = Join-Path $whdPatchWorkspace $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path $stagedPath -Parent) | Out-Null
+        [IO.File]::WriteAllBytes($stagedPath, $whdPatchSnapshots[$originalPath])
+    }
+    $whdApplyRoot = $whdPatchWorkspace
+}
 $gitApplyWhitespaceArgs = @("--ignore-space-change", "--ignore-whitespace")
-$reverseCheckArgs = @("-C", $whdDir, "apply") + $gitApplyWhitespaceArgs + @("--reverse", "--check", $whdPatch)
-$forwardCheckArgs = @("-C", $whdDir, "apply") + $gitApplyWhitespaceArgs + @("--check", $whdPatch)
+$gitApplyBaseArgs = @('-c', "safe.directory=$whdApplyRoot", '-C', $whdApplyRoot, 'apply')
+if ($SourceProvenanceFile) { $gitApplyBaseArgs += '--no-index' }
+$reverseCheckArgs = $gitApplyBaseArgs + $gitApplyWhitespaceArgs + @("--reverse", "--check", $whdPatch)
+$forwardCheckArgs = $gitApplyBaseArgs + $gitApplyWhitespaceArgs + @("--check", $whdPatch)
 
 if (Test-GitApply $reverseCheckArgs) {
     Write-Host "WHD patch is already applied."
 } elseif (Test-GitApply $forwardCheckArgs) {
     Write-Host "Applying WHD patch..."
-    & git -C $whdDir apply @gitApplyWhitespaceArgs $whdPatch
+    & git @gitApplyBaseArgs @gitApplyWhitespaceArgs $whdPatch
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply WHD patch."
     }
@@ -1160,6 +1222,12 @@ if (Test-GitApply $reverseCheckArgs) {
     throw "WHD patch state is neither clean nor applied. Check submodule status: $whdDir"
 }
 
+if ($SourceProvenanceFile) {
+    foreach ($originalPath in $whdPatchSnapshots.Keys) {
+        $relative = [IO.Path]::GetRelativePath($whdDir, $originalPath)
+        [IO.File]::WriteAllBytes($originalPath, [IO.File]::ReadAllBytes((Join-Path $whdPatchWorkspace $relative)))
+    }
+}
 Write-Host "Staging Type 1YN WHD blobs..."
 & $type1ynBlobStageScript
 if ($LASTEXITCODE -ne 0) {
@@ -1414,9 +1482,17 @@ try {
     # .cproject is excluded because temporary CI defines must stay active until
     # the final make invocation; it is restored separately in the finally block.
     $repoProjectPath = "Projects/$projectName/e2studio_ccrx"
-    $trackedProjectPaths = @(& git -C $projectRoot ls-files -- $repoProjectPath)
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not enumerate tracked RX671 project files."
+    if ($SourceProvenanceFile) {
+        # IDT's copy has no usable Git root. Preserve the same IDE/SC inputs
+        # and all supplied project sources without enumerating generated outputs.
+        $trackedProjectPaths = @(Get-ChildItem -LiteralPath $projectDir -File -Recurse -Force |
+            Where-Object { $_.FullName -notlike (Join-Path $projectDir 'HardwareDebug\*') -and
+                $_.FullName -notlike (Join-Path $projectDir '.git\*') } |
+            ForEach-Object { [IO.Path]::GetRelativePath($projectRoot, $_.FullName).Replace('\', '/') })
+    }
+    else {
+        $trackedProjectPaths = @(& git -c "safe.directory=$projectRoot" -C $projectRoot ls-files -- $repoProjectPath)
+        if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate tracked RX671 project files.' }
     }
     foreach ($relativePath in $trackedProjectPaths) {
         if ($relativePath -eq "$repoProjectPath/.cproject") {
@@ -1537,3 +1613,18 @@ foreach ($extension in @(".mot", ".abs", ".map")) {
 }
 
 Write-Host "RX671 Wi-Fi build completed successfully."
+}
+finally {
+    foreach ($originalPath in $whdPatchSnapshots.Keys) {
+        [IO.File]::WriteAllBytes($originalPath, $whdPatchSnapshots[$originalPath])
+    }
+    if ($null -ne $whdPatchWorkspace -and (Test-Path -LiteralPath $whdPatchWorkspace)) {
+        $tempPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+        $fullPatchWorkspace = [IO.Path]::GetFullPath($whdPatchWorkspace)
+        if (-not $fullPatchWorkspace.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase) -or
+            (Split-Path $fullPatchWorkspace -Leaf) -notlike 'rx671-whd-patch-*') {
+            throw 'Refusing to remove a WHD patch directory outside the temporary root.'
+        }
+        Remove-Item -LiteralPath $fullPatchWorkspace -Recurse -Force
+    }
+}

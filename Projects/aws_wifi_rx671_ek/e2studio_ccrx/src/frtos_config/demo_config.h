@@ -20,6 +20,15 @@
 #include "iot_logging_task.h"
 #include "logging_stack.h"
 
+#if (ENABLE_IDT_TRANSPORT_TEST == 1) || (ENABLE_IDT_CLOUD_DEMO == 1) || \
+    (ENABLE_IDT_PKCS11_TEST == 1) || (ENABLE_IDT_OTAPAL_TEST == 1)
+#include "rx_idt_config.h"
+#if (ENABLE_IDT_CLOUD_DEMO == 1)
+#include "test_execution_config.h"
+#include "test_param_config.h"
+#endif
+#endif
+
 #ifndef RX671_OTA_RUNTIME_ENABLE
 #define RX671_OTA_RUNTIME_ENABLE            (0)
 #endif
@@ -30,8 +39,19 @@
 #error "RX671 OTA runtime and provisioner profiles are mutually exclusive"
 #endif
 
+#if (IDT_TEST_ENABLED == 1)
+/* IDT provisions the existing store directly and starts only its selected
+ * production demo. The interactive credential CLI never owns SCI6 here. */
+#define ENABLE_FLEET_PROVISIONING_DEMO      (0)
+#if (ENABLE_IDT_CLOUD_DEMO == 1)
+#define ENABLE_OTA_UPDATE_DEMO              OTA_E2E_TEST_ENABLED
+#else
+#define ENABLE_OTA_UPDATE_DEMO              (0)
+#endif
+#else
 #define ENABLE_FLEET_PROVISIONING_DEMO      RX671_FLEET_PROVISIONING_ENABLE
 #define ENABLE_OTA_UPDATE_DEMO              RX671_OTA_RUNTIME_ENABLE
+#endif
 #define democonfigUSE_AWS_IOT_CORE_BROKER   (1)
 #define democonfigDISABLE_SNI               (0)
 
@@ -78,6 +98,7 @@
 
 #define appmainPROVISIONING_MODE            (0)
 #define otapalconfigCODE_SIGNING_CERTIFICATE "Insert code signing certificate..."
+#if (ENABLE_IDT_CLOUD_DEMO != 1) || (OTA_E2E_TEST_ENABLED != 1)
 #ifndef APP_VERSION_MAJOR
 #define APP_VERSION_MAJOR                   0
 #endif
@@ -86,6 +107,22 @@
 #endif
 #ifndef APP_VERSION_BUILD
 #define APP_VERSION_BUILD                   0
+#endif
+#else
+#ifndef APP_VERSION_MAJOR
+#define APP_VERSION_MAJOR                   OTA_APP_VERSION_MAJOR
+#endif
+#ifndef APP_VERSION_MINOR
+#define APP_VERSION_MINOR                   OTA_APP_VERSION_MINOR
+#endif
+#ifndef APP_VERSION_BUILD
+#define APP_VERSION_BUILD                   OTA_APP_VERSION_BUILD
+#endif
+#if (APP_VERSION_MAJOR != OTA_APP_VERSION_MAJOR) || \
+    (APP_VERSION_MINOR != OTA_APP_VERSION_MINOR) || \
+    (APP_VERSION_BUILD != OTA_APP_VERSION_BUILD)
+#error "The RX671 OTA application version must match the IDT parameters"
+#endif
 #endif
 
 #define democonfigROOT_CA_PEM               tlsATS1_ROOT_CERTIFICATE_PEM
@@ -99,8 +136,12 @@
  * the shared credential CLI.  The dual-bank OTA runtime starts unattended
  * from credentials already committed to LittleFS/KVS.
  */
+#if (IDT_TEST_ENABLED == 1)
+#define ENABLE_CREDENTIAL_BY_CLI            (0)
+#else
 #define ENABLE_CREDENTIAL_BY_CLI            RX671_OTA_PROVISIONER_ENABLE
-#if (RX671_OTA_PROVISIONER_ENABLE == 1)
+#endif
+#if (RX671_OTA_PROVISIONER_ENABLE == 1) && (IDT_TEST_ENABLED != 1)
 #define configCLI_BAUD_RATE                    (921600)
 #endif
 #define SELF_TEST_PASSED                    ((EventBits_t)(1U))

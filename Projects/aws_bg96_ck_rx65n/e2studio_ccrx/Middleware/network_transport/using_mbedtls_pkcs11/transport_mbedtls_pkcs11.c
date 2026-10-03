@@ -477,15 +477,23 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
         {
             mbedtlsError = mbedtls_ssl_set_hostname( &( pTlsTransportParams->sslContext.context ),
                                                      pHostName );
+        }
+        else
+        {
+            /* Mbed TLS 3.6 requires an explicit hostname decision before
+             * certificate verification, including the production no-SNI path.
+             * Retain VERIFY_REQUIRED and its root-chain verification. */
+            mbedtlsError = mbedtls_ssl_set_hostname( &( pTlsTransportParams->sslContext.context ),
+                                                     NULL );
+        }
 
-            if( mbedtlsError != 0 )
-            {
-                LogError( ( "Failed to set server name: mbedTLSError= %s : %s.",
-                            mbedtlsHighLevelCodeOrDefault( mbedtlsError ),
-                            mbedtlsLowLevelCodeOrDefault( mbedtlsError ) ) );
+        if( mbedtlsError != 0 )
+        {
+            LogError( ( "Failed to set server name: mbedTLSError= %s : %s.",
+                        mbedtlsHighLevelCodeOrDefault( mbedtlsError ),
+                        mbedtlsLowLevelCodeOrDefault( mbedtlsError ) ) );
 
-                returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
-            }
+            returnStatus = TLS_TRANSPORT_INTERNAL_ERROR;
         }
     }
 
