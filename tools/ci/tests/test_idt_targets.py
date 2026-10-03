@@ -1,8 +1,10 @@
 """Target identity and runtime network boundaries; no cloud or board access."""
 import importlib.util
 import json
+import ntpath
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,6 +16,7 @@ from tools.idt.targets import (get_target, target_fingerprint, device_template, 
 from tools.idt.prepare_target_network import network_values, prepare
 
 ROOT = Path(__file__).resolve().parents[3]
+BUILD_SCRIPT = ROOT / "tools/idt/build_transport.sh"
 
 
 class TargetIdentityTests(unittest.TestCase):
@@ -126,6 +129,62 @@ class NetworkInputTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "8–63 bytes"):
             network_values(get_target("rx671-wifi"),
                            {"RX671_EK_WIFI_SSID": "unit-network", "RX671_EK_WIFI_PASSPHRASE": "a" * 64})
+
+
+@unittest.skipUnless(os.name == "posix" and shutil.which("bash"), "requires POSIX bash")
+class BuildPackagingArgumentTests(unittest.TestCase):
+    def test_real_shell_expands_artifact_paths_for_every_target(self):
+        # Execute the production shell; tool stubs only record argv. No key,
+        # compiler, cloud service or device is accessed by this regression test.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source with spaces"
+            source.mkdir()
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            capture = root / "arguments.jsonl"
+            commands = {
+                "wslpath": '#!/bin/sh\nprintf "%s\\n" "$2"\n',
+                "pwsh": "#!/bin/sh\nexit 0\n",
+                "linux-python": (
+                    "#!/usr/bin/env python3\nimport pathlib,subprocess,sys\n"
+                    "if pathlib.Path(sys.argv[1]).name == 'targets.py':\n"
+                    f" sys.exit(subprocess.call([sys.executable, {str(ROOT / 'tools/idt/targets.py')!r}, *sys.argv[2:]]))\n"
+                ),
+                "windows-python": (
+                    "#!/usr/bin/env python3\nimport json,os,sys\n"
+                    "with open(os.environ['IDT_TEST_ARGUMENTS'], 'a') as output:\n"
+                    " output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                ),
+            }
+            for name, text in commands.items():
+                path = bin_dir / name
+                path.write_text(text)
+                path.chmod(0o700)
+            env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ['PATH'],
+                       IDT_LINUX_PYTHON=str(bin_dir / "linux-python"),
+                       IDT_WINDOWS_PWSH=str(bin_dir / "pwsh"),
+                       IDT_WINDOWS_PYTHON=str(bin_dir / "windows-python"),
+                       IDT_RUNTIME_DIR=str(root / "run-test" / "execution"),
+                       IDT_WORKSPACE_ROOT="C:/idt-test", IDT_E2STUDIO_CLI="C:/inert/e2studioc.exe",
+                       IDT_PROVENANCE_FILE="C:/inert/provenance.json", IDT_SCOPE="pkcs11",
+                       IDT_TEST_ARGUMENTS=str(capture))
+            for target_id in target_ids():
+                with self.subTest(target=target_id):
+                    capture.unlink(missing_ok=True)
+                    env['IDT_TARGET'] = target_id
+                    completed = subprocess.run(['bash', str(BUILD_SCRIPT), str(source)], env=env,
+                                               capture_output=True, text=True, timeout=15)
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    calls = [json.loads(line) for line in capture.read_text().splitlines()]
+                    target = get_target(target_id)
+                    self.assertEqual(2, len(calls))
+                    self.assertEqual(str(source / target['packager']), calls[0][0])
+                    for flag, extension in (('--mot', 'mot'), ('--output', 'rsu')):
+                        actual = calls[0][calls[0].index(flag) + 1]
+                        expected = source / 'artifacts/idt/build_transport' / f"{target['artifact_basename']}.{extension}"
+                        self.assertEqual(ntpath.normpath(str(expected)), ntpath.normpath(actual))
+                    self.assertEqual(str(source / target['signing_key']), calls[0][calls[0].index('--key') + 1])
 
 
 if __name__ == "__main__":
