@@ -127,11 +127,14 @@ $testLibrarySha = $provenance.test_library_sha.ToLowerInvariant()
 $sourceWasDirty = $provenance.source_tree_dirty
 
 # Capture at the original initialized Git tree. Runtime copies must match the
-# captured file list and bytes before any build helper can patch a dependency.
+# captured file list and bytes. PKCS11 alone permits the pinned native suite's
+# verified runner-group selection, without permitting other code changes.
 $dependencyTool = Join-Path $PSScriptRoot 'idt_source_manifest.py'
+$dependencyVerification = $null
 if ($ProvenanceFile) {
-    & $Python $dependencyTool verify --source $idtRoot --target $Target --provenance $ProvenanceFile
+    $verificationJson = & $Python $dependencyTool verify --source $idtRoot --target $Target --provenance $ProvenanceFile --test-group $TestGroup --json-output
     if ($LASTEXITCODE -ne 0) { throw 'IDT dependency source-copy verification failed.' }
+    $dependencyVerification = ($verificationJson -join "`n") | ConvertFrom-Json
 }
 else {
     $capturedJson = & $Python $dependencyTool capture --source $idtRoot --target $Target
@@ -619,6 +622,7 @@ try {
         dependency_target_id = $provenance.dependency_target_id
         submodule_shas = $provenance.submodule_shas
         dependency_file_count = @($provenance.dependency_files_sha256.PSObject.Properties).Count
+        dependency_pkcs11_runner = $(if ($null -ne $dependencyVerification) { $dependencyVerification.pkcs11_runner } else { $null })
         production_stack = $productionStack
         bootloader_policy_sha256 = $(if ($Target -eq 'rx671-wifi') {
             @{
