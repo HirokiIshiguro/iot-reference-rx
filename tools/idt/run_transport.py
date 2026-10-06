@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
 import zlib
 from test_selection import parse_test_ids
+from check_idt_report import check_report
 from ota_witness import UartWitness
 from flash_failure import raise_if_flash_failed
 from targets import get_target, target_ids, target_fingerprint, load_manifest
@@ -412,8 +413,10 @@ def main():
         output_thread.join(timeout=5)
         result["idtExitCode"] = process.returncode
         result.update(inspect_junit(run_dir / "results"))
-        passed = (process.returncode == 0 and result["tests"] > 0 and
-                  result["failures"] == result["errors"] == result["skipped"] == 0)
+        report_summary = check_report(result["report"], [args.group])
+        result["reportProblems"] = report_summary["problems"]
+        result["coverage"] = report_summary.get("coverage", {})
+        passed = process.returncode == 0 and report_summary["passed"]
         selected_verdict = "SINGLE_CASE_PASS" if len(selected_test_ids) == 1 else "SELECTED_CASES_PASS"
         result["verdict"] = (selected_verdict if args.test_id else "SELECTED_GROUP_PASS") if passed else "FAIL"
         exit_code = 0 if passed else 1
