@@ -45,8 +45,8 @@ fi
   -ProvenanceFile "${IDT_PROVENANCE_FILE:?Source provenance is required}"
 out="$win\artifacts\idt\build_transport"
 "$linux_py" "$here/ota_support.py" validate-packaging "$src" --target "$target"
-package_args=("$(wslpath -w "$src/$packager")" --mot "$out\${artifact}.mot"
-  --key "$(wslpath -w "$src/$signing_key")" --output "$out\${artifact}.rsu")
+package_args=("$(wslpath -w "$src/$packager")" --mot "${out}/${artifact}.mot"
+  --key "$(wslpath -w "$src/$signing_key")" --output "${out}/${artifact}.rsu")
 if [[ "$prm" != None ]]; then
   package_args+=(--prm "$(wslpath -w "$src/$prm")")
 fi
