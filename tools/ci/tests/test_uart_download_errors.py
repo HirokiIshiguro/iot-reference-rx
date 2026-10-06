@@ -83,6 +83,52 @@ class UartDownloadErrorTests(unittest.TestCase):
                 self.assertIn("callback error. 4.", output.getvalue())
                 self.assertNotIn("TX only, no RX", output.getvalue())
 
+    def test_32k_progress_is_consumed_before_the_next_block_is_sent(self):
+        class Receiver(FakeSerial):
+            def __init__(self):
+                super().__init__([])
+                self.blocks = 0
+                self.pending_ack = False
+
+            def write(self, data):
+                if self.pending_ack:
+                    raise AssertionError('Sender wrote before receiving the previous flash-write ACK')
+                if len(data) != 32768:
+                    raise AssertionError('Receiver needs one complete 32 KiB block')
+                self.blocks += 1
+                self.pending_ack = True
+                progress = f'installing firmware...({self.blocks * 32}/96KB).\r\n'
+                if self.blocks == 3:
+                    progress += ('completed installing firmware.\r\n'
+                                 'bank1(temporary area) on code flash integrity check...OK\r\n'
+                                 'completed installing const data.\r\n'
+                                 'software reset...\r\n'
+                                 'jump to user program\r\n')
+                self.chunks.append(progress.encode())
+                return len(data)
+
+            def read(self, size):
+                data = super().read(size)
+                if data:
+                    self.pending_ack = False
+                return data
+
+        with tempfile.TemporaryDirectory() as directory:
+            image = Path(directory) / 'inert.rsu'
+            image.write_bytes(b'\xff' * (3 * 32768))
+            downloader = subject.UartDownloader('unused', 921600, 5, strict_success=True,
+                                                ack_each_chunk=True, send_chunk_size=32768,
+                                                ack_prefix='installing firmware...',
+                                                success_message='jump to user program')
+            port = Receiver()
+            downloader.open_port = lambda: setattr(downloader, 'ser', port)
+            downloader.trigger_reset = lambda: None
+            with patch.object(subject.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(0, downloader.download(image))
+            self.assertEqual(3, port.blocks)
+            self.assertEqual(3, downloader.write_ack_count)
+            self.assertFalse(port.is_open)
+
 
 if __name__ == "__main__":
     unittest.main()

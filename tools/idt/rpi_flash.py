@@ -130,11 +130,18 @@ def download_command(root, target, reset_command):
     # These are bootloader markers, independent of network/application startup.
     success = 'swap bank' if target['id'] == 'rx65n-bg96' else 'jump to user program'
     ready_timeout = '180' if target['id'] == 'rx65n-bg96' else '90'
-    return [sys.executable, str(root / 'test_uart_download_rx72n.py'), '--rsu',
+    command = [sys.executable, str(root / 'test_uart_download_rx72n.py'), '--rsu',
             str(root / 'idt_transport.rsu'), '--port', target['uart'], '--baud', str(target['baud']),
             '--timeout', '420', '--post-tx-wait', '120', '--wait-for-ready',
             '--ready-timeout', ready_timeout, '--ready-message', 'send "userprog.rsu" via UART.',
             '--reset-cmd', shlex.join(reset_command), '--success-message', success, '--strict-success']
+    if target['id'] in ('rx65n-bg96', 'rx671-wifi'):
+        # These receivers acknowledge each 32 KiB flash write. Continuous TX
+        # overruns reception during flash programming; keep the existing
+        # signature/end-state checks and wait for the real progress event.
+        command += ['--ack-each-chunk', '--send-chunk-size', '32768',
+                    '--ack-prefix', 'installing firmware...']
+    return command
 
 
 def open_rfp_lock(path):

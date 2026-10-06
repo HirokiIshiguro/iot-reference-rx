@@ -124,6 +124,19 @@ class Rx671TrustTests(unittest.TestCase):
         self.provisioner = controller._tools_module('provision_rx671_ota')
         self.host = controller._tools_module('rx671_ota_host')
 
+    def test_selected_uart_downloaders_use_receiver_progress_without_changing_gates(self):
+        for name in ('rx72n-ethernet', 'rx65n-bg96', 'rx671-wifi'):
+            with self.subTest(target=name):
+                command = rpi_flash.download_command(Path('/private'), get_target(name), ['inert-reset'])
+                self.assertIn('--strict-success', command)
+                self.assertEqual('420', command[command.index('--timeout') + 1])
+                if name == 'rx72n-ethernet':
+                    self.assertNotIn('--ack-each-chunk', command)
+                else:
+                    self.assertIn('--ack-each-chunk', command)
+                    self.assertEqual('32768', command[command.index('--send-chunk-size') + 1])
+                    self.assertEqual('installing firmware...', command[command.index('--ack-prefix') + 1])
+
     def test_public_plan_does_not_establish_runtime_or_qualification(self):
         plan = self.fixture.plan()
         self.assertEqual('not_run', plan['status'])
