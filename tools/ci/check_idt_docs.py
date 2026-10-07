@@ -1,7 +1,8 @@
-"""Fail closed for the three IDT documentation paths and their narrow CI lane."""
+"""Fail closed for the declared IDT/audit documents and their narrow CI lane."""
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 import re
 import sys
@@ -13,7 +14,10 @@ except ImportError:
     from verify_dependency_gate_mr_scope import ensure_commit, read_blob, remove_top_level_block, require_sha, run_git
 
 
-DOCS = {"README.md", "docs/idt-validation.md", "docs/ota-performance.md"}
+AUDIT_DOCS = {"docs/common-core-audit/" + name for name in (
+    "README.md", "core-versions-config.md", "core-versions-config.json",
+    "project-options.md", "project-options.json", "submodule-graph.md", "submodule-graph.json")}
+DOCS = {"README.md", "docs/idt-validation.md", "docs/ota-performance.md"} | AUDIT_DOCS
 BOOTSTRAP = {"tools/ci/check_idt_docs.py", "tools/ci/tests/test_idt_docs.py"}
 BEGIN = "    # BEGIN IDT DOCS WORKFLOW\n"
 END = "    # END IDT DOCS WORKFLOW\n"
@@ -57,14 +61,23 @@ def lint_document(path: Path) -> list[str]:
                 if not (path.parent / unquote(link.path)).exists():
                     errors.append(f"{path}:{number}: relative link target is missing: {link.path}")
     expected = None
+    def table_cells(line: str) -> list[str]:
+        # Remove the outer delimiters once; preserve empty edge cells, which
+        # also occur after inline code is removed for pipe-safe parsing.
+        value = line.strip()
+        if value.startswith("|"):
+            value = value[1:]
+        if value.endswith("|"):
+            value = value[:-1]
+        return re.split(r"(?<!\\)\|", value)
     for index, (number, line) in enumerate(rows):
         if not line.strip().startswith("|"):
             expected = None
             continue
-        cells = re.split(r"(?<!\\)\|", line.strip().strip("|"))
+        cells = table_cells(line)
         if all(re.fullmatch(r"\s*:?-{3,}:?\s*", cell) for cell in cells):
             expected = len(cells)
-            if index and len(re.split(r"(?<!\\)\|", rows[index - 1][1].strip().strip("|"))) != expected:
+            if index and len(table_cells(rows[index - 1][1])) != expected:
                 errors.append(f"{path}:{number}: table header column count differs")
         elif expected is not None and len(cells) != expected:
             errors.append(f"{path}:{number}: table row column count differs")
@@ -89,7 +102,10 @@ def main() -> int:
         for name in sorted(DOCS):
             path = Path(name)
             if path.is_file():
-                errors.extend(lint_document(path))
+                if path.suffix == ".json":
+                    json.loads(path.read_text(encoding="utf-8"))
+                else:
+                    errors.extend(lint_document(path))
         if errors:
             raise RuntimeError("\n".join(errors))
         print(f"IDT docs scope, relative links and tables verified ({len(changed)} changed paths)")

@@ -382,6 +382,7 @@ workflow:
         - README.md
         - docs/idt-validation.md
         - docs/ota-performance.md
+        - docs/common-core-audit/**/*
         - tools/ci/check_idt_docs.py
         - tools/ci/tests/test_idt_docs.py
       variables:

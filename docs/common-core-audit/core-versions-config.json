@@ -1,0 +1,755 @@
+{
+  "audit_date": "2026-10-07",
+  "source_sha": "44232ef62ea5be65161b95ae9741c6da555c7f3b",
+  "method": "Primary repository git objects and pinned dependency objects/raw metadata; dirty working-tree contents were not used.",
+  "projects": [
+    {
+      "label": "RX671 app",
+      "project": "aws_wifi_rx671_ek",
+      "dependencies": "root_gitlinks",
+      "flash_fit_version": "5.30",
+      "bsp_version": "7.70",
+      "checked_in_bank_mode": "linear",
+      "checked_in_bank_mode_value": 1,
+      "start_bank_value": 0,
+      "cproject_device_modes": [
+        "bank.single"
+      ],
+      "flash_type": 4,
+      "defines": {
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "value": "(1)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 649
+        },
+        "BSP_CFG_CODE_FLASH_START_BANK": {
+          "value": "(0)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 658
+        },
+        "BSP_CFG_MCU_PART_MEMORY_SIZE": {
+          "value": "(0xE)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 110
+        },
+        "FLASH_CFG_CODE_FLASH_ENABLE": {
+          "value": "(1)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 46
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 71
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 58
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "value": "(1)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 81
+        },
+        "FLASH_RX_VERSION_MAJOR": {
+          "value": "(5)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 175
+        },
+        "FLASH_RX_VERSION_MINOR": {
+          "value": "(30)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 176
+        },
+        "R_BSP_VERSION_MAJOR": {
+          "value": "(7)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 120
+        },
+        "R_BSP_VERSION_MINOR": {
+          "value": "(70)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 121
+        }
+      },
+      "evidence_scope": "pinned source configuration; runtime register state not measured in this audit",
+      "freertos_config": {
+        "configKERNEL_INTERRUPT_PRIORITY": {
+          "value": "1",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 102
+        },
+        "configMAX_SYSCALL_INTERRUPT_PRIORITY": {
+          "value": "4",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 108
+        },
+        "configTICK_RATE_HZ": {
+          "value": "(( TickType_t ) 1000)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 119
+        },
+        "configCPU_CLOCK_HZ": {
+          "value": "(BSP_ICLK_HZ)",
+          "path": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 62
+        }
+      },
+      "kernel_version": "V11.3.0",
+      "middleware_links": [
+        {
+          "name": "Common",
+          "locationURI": "AWS_IOT_MCU_ROOT/Common"
+        },
+        {
+          "name": "Middleware",
+          "locationURI": "AWS_IOT_MCU_ROOT/Middleware"
+        }
+      ]
+    },
+    {
+      "label": "RX65N app",
+      "project": "aws_bg96_ck_rx65n",
+      "dependencies": "project_flat_import",
+      "flash_fit_version": "5.22",
+      "bsp_version": "7.52",
+      "checked_in_bank_mode": "dual",
+      "checked_in_bank_mode_value": 0,
+      "start_bank_value": 0,
+      "cproject_device_modes": [
+        "bank.single"
+      ],
+      "flash_type": 4,
+      "defines": {
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "value": "(0)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 554
+        },
+        "BSP_CFG_CODE_FLASH_START_BANK": {
+          "value": "(0)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 563
+        },
+        "BSP_CFG_MCU_PART_MEMORY_SIZE": {
+          "value": "(0xE)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 164
+        },
+        "FLASH_CFG_CODE_FLASH_ENABLE": {
+          "value": "(1)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 58
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 84
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 70
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "value": "(1)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 95
+        },
+        "FLASH_RX_VERSION_MAJOR": {
+          "value": "(5)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 174
+        },
+        "FLASH_RX_VERSION_MINOR": {
+          "value": "(22)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 175
+        },
+        "R_BSP_VERSION_MAJOR": {
+          "value": "(7)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 128
+        },
+        "R_BSP_VERSION_MINOR": {
+          "value": "(52)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 129
+        }
+      },
+      "evidence_scope": "pinned source configuration; runtime register state not measured in this audit",
+      "freertos_config": {
+        "configKERNEL_INTERRUPT_PRIORITY": {
+          "value": "1",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 99
+        },
+        "configMAX_SYSCALL_INTERRUPT_PRIORITY": {
+          "value": "4",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 104
+        },
+        "configTICK_RATE_HZ": {
+          "value": "(( TickType_t ) 1000)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 58
+        },
+        "configCPU_CLOCK_HZ": {
+          "value": "(BSP_ICLK_HZ)",
+          "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 81
+        }
+      },
+      "kernel_version": "V11.1.0",
+      "middleware_links": []
+    },
+    {
+      "label": "RX72N app",
+      "project": "aws_ether_rx72n_envision_kit",
+      "dependencies": "root_gitlinks",
+      "flash_fit_version": "5.22",
+      "bsp_version": "7.52",
+      "checked_in_bank_mode": "dual",
+      "checked_in_bank_mode_value": 0,
+      "start_bank_value": 0,
+      "cproject_device_modes": [
+        "bank.dual"
+      ],
+      "flash_type": 4,
+      "defines": {
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "value": "(0)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 667
+        },
+        "BSP_CFG_CODE_FLASH_START_BANK": {
+          "value": "(0)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 676
+        },
+        "BSP_CFG_MCU_PART_MEMORY_SIZE": {
+          "value": "(0x17)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 127
+        },
+        "FLASH_CFG_CODE_FLASH_ENABLE": {
+          "value": "(1)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 58
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 84
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 70
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "value": "(1)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 95
+        },
+        "FLASH_RX_VERSION_MAJOR": {
+          "value": "(5)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 174
+        },
+        "FLASH_RX_VERSION_MINOR": {
+          "value": "(22)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 175
+        },
+        "R_BSP_VERSION_MAJOR": {
+          "value": "(7)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 128
+        },
+        "R_BSP_VERSION_MINOR": {
+          "value": "(52)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 129
+        }
+      },
+      "evidence_scope": "pinned source configuration; runtime register state not measured in this audit",
+      "freertos_config": {
+        "configKERNEL_INTERRUPT_PRIORITY": {
+          "value": "1",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 101
+        },
+        "configMAX_SYSCALL_INTERRUPT_PRIORITY": {
+          "value": "4",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 106
+        },
+        "configTICK_RATE_HZ": {
+          "value": "(( TickType_t ) 1000)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 59
+        },
+        "configCPU_CLOCK_HZ": {
+          "value": "(BSP_ICLK_HZ)",
+          "path": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/frtos_config/FreeRTOSConfig.h",
+          "line": 83
+        }
+      },
+      "kernel_version": "V11.3.0",
+      "middleware_links": [
+        {
+          "name": "Common",
+          "locationURI": "AWS_IOT_MCU_ROOT/Common"
+        },
+        {
+          "name": "Middleware",
+          "locationURI": "AWS_IOT_MCU_ROOT/Middleware"
+        }
+      ]
+    },
+    {
+      "label": "RX671 boot",
+      "project": "boot_loader_rx671_ek",
+      "dependencies": "bare_metal",
+      "flash_fit_version": "5.30",
+      "bsp_version": "7.70",
+      "checked_in_bank_mode": "dual",
+      "checked_in_bank_mode_value": 0,
+      "start_bank_value": 0,
+      "cproject_device_modes": [
+        "bank.dual"
+      ],
+      "flash_type": 4,
+      "defines": {
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "value": "(0)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 649
+        },
+        "BSP_CFG_CODE_FLASH_START_BANK": {
+          "value": "(0)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 658
+        },
+        "BSP_CFG_MCU_PART_MEMORY_SIZE": {
+          "value": "(0xE)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 110
+        },
+        "FLASH_CFG_CODE_FLASH_ENABLE": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 46
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 71
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 58
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 81
+        },
+        "FLASH_RX_VERSION_MAJOR": {
+          "value": "(5)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 175
+        },
+        "FLASH_RX_VERSION_MINOR": {
+          "value": "(30)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 176
+        },
+        "R_BSP_VERSION_MAJOR": {
+          "value": "(7)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 120
+        },
+        "R_BSP_VERSION_MINOR": {
+          "value": "(70)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 121
+        }
+      },
+      "evidence_scope": "pinned source configuration; runtime register state not measured in this audit",
+      "kernel_version": "not applicable (bare-metal bootloader)",
+      "boot_config": {
+        "RX_BOOTLOADER_USE_DUAL_BANK": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/rx_bootloader_config.h",
+          "line": 13
+        },
+        "RX_BOOTLOADER_FLASH_INT_PRIORITY": {
+          "value": "(14)",
+          "path": "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/rx_bootloader_config.h",
+          "line": 25
+        }
+      }
+    },
+    {
+      "label": "RX65N boot",
+      "project": "boot_loader_ck_rx65n",
+      "dependencies": "bare_metal",
+      "flash_fit_version": "5.30",
+      "bsp_version": "7.70",
+      "checked_in_bank_mode": "dual",
+      "checked_in_bank_mode_value": 0,
+      "start_bank_value": 0,
+      "cproject_device_modes": [
+        "bank.dual"
+      ],
+      "flash_type": 4,
+      "defines": {
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "value": "(0)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 549
+        },
+        "BSP_CFG_CODE_FLASH_START_BANK": {
+          "value": "(0)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 558
+        },
+        "BSP_CFG_MCU_PART_MEMORY_SIZE": {
+          "value": "(0xE)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 159
+        },
+        "FLASH_CFG_CODE_FLASH_ENABLE": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 46
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 71
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 58
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 81
+        },
+        "FLASH_RX_VERSION_MAJOR": {
+          "value": "(5)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 175
+        },
+        "FLASH_RX_VERSION_MINOR": {
+          "value": "(30)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 176
+        },
+        "R_BSP_VERSION_MAJOR": {
+          "value": "(7)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 120
+        },
+        "R_BSP_VERSION_MINOR": {
+          "value": "(70)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 121
+        }
+      },
+      "evidence_scope": "pinned source configuration; runtime register state not measured in this audit",
+      "kernel_version": "not applicable (bare-metal bootloader)",
+      "boot_config": {
+        "RX_BOOTLOADER_USE_DUAL_BANK": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/rx_bootloader_config.h",
+          "line": 13
+        },
+        "RX_BOOTLOADER_FLASH_INT_PRIORITY": {
+          "value": "(14)",
+          "path": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/rx_bootloader_config.h",
+          "line": 17
+        }
+      }
+    },
+    {
+      "label": "RX72N boot",
+      "project": "boot_loader_rx72n_envision_kit",
+      "dependencies": "bare_metal",
+      "flash_fit_version": "4.50",
+      "bsp_version": "5.52",
+      "checked_in_bank_mode": "dual",
+      "checked_in_bank_mode_value": 0,
+      "start_bank_value": 0,
+      "cproject_device_modes": [
+        "not_declared"
+      ],
+      "flash_type": 4,
+      "defines": {
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "value": "(0)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 604
+        },
+        "BSP_CFG_CODE_FLASH_START_BANK": {
+          "value": "(0)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 613
+        },
+        "BSP_CFG_MCU_PART_MEMORY_SIZE": {
+          "value": "(0x17)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h",
+          "line": 98
+        },
+        "FLASH_CFG_CODE_FLASH_ENABLE": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 58
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 84
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 70
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h",
+          "line": 95
+        },
+        "FLASH_RX_VERSION_MAJOR": {
+          "value": "(4)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 167
+        },
+        "FLASH_RX_VERSION_MINOR": {
+          "value": "(50)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+          "line": 168
+        },
+        "R_BSP_VERSION_MAJOR": {
+          "value": "(5)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 103
+        },
+        "R_BSP_VERSION_MINOR": {
+          "value": "(52)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_bsp/mcu/all/r_bsp_common.h",
+          "line": 104
+        }
+      },
+      "evidence_scope": "pinned source configuration; runtime register state not measured in this audit",
+      "kernel_version": "not applicable (bare-metal bootloader)",
+      "boot_config": {
+        "RX_BOOTLOADER_USE_DUAL_BANK": {
+          "value": "(1)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/rx_bootloader_config.h",
+          "line": 14
+        },
+        "RX_BOOTLOADER_FLASH_INT_PRIORITY": {
+          "value": "(14)",
+          "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/rx_bootloader_config.h",
+          "line": 29
+        }
+      }
+    }
+  ],
+  "libraries": [
+    {
+      "library": "FreeRTOS-Cellular-Interface",
+      "root_gitlink": "5d76e3b3099c3693f98ecc6e15bc62cca140f13f",
+      "rx671_rx72_source_version": "v1.4.2",
+      "rx65_flat_source_version": "v1.4.0",
+      "root_reference": "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/manifest.yml",
+      "root_version_source": "upstream raw file at main-pinned gitlink commit; local object unavailable",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group",
+      "root_pinned_url": "https://raw.githubusercontent.com/FreeRTOS/FreeRTOS-Cellular-Interface/5d76e3b3099c3693f98ecc6e15bc62cca140f13f/manifest.yml"
+    },
+    {
+      "library": "FreeRTOS-Kernel",
+      "root_gitlink": "9b777ae5c5b8e9e456065a00294d1e5f5f9facf5",
+      "rx671_rx72_source_version": "V11.3.0",
+      "rx65_flat_source_version": "V11.1.0",
+      "root_reference": "Middleware/FreeRTOS/FreeRTOS-Kernel/include/task.h",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/FreeRTOS-Kernel/include/task.h",
+      "root_version_source": "git show at pinned submodule commit",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group"
+    },
+    {
+      "library": "FreeRTOS-Plus-TCP",
+      "root_gitlink": "c12361095aca68aeed858f45d14395fbffa92c0d",
+      "rx671_rx72_source_version": "V4.4.1",
+      "rx65_flat_source_version": "V4.2.2",
+      "root_reference": "Middleware/FreeRTOS/FreeRTOS-Plus-TCP/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/FreeRTOS-Plus-TCP/manifest.yml",
+      "root_version_source": "git show at pinned submodule commit",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group"
+    },
+    {
+      "library": "backoffAlgorithm",
+      "root_gitlink": "14f4c88b33dd554be30a00a312c88d3986d457d0",
+      "rx671_rx72_source_version": "v1.4.2",
+      "rx65_flat_source_version": "v1.4.1",
+      "root_reference": "Middleware/FreeRTOS/backoffAlgorithm/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/backoffAlgorithm/manifest.yml",
+      "root_version_source": "git show at pinned submodule commit",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group"
+    },
+    {
+      "library": "coreHTTP",
+      "root_gitlink": "3c4a5838658cd6d0ff8fb7c3a14e30baafcbcd28",
+      "rx671_rx72_source_version": "v3.1.3",
+      "rx65_flat_source_version": "v3.1.1",
+      "root_reference": "Middleware/FreeRTOS/coreHTTP/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/coreHTTP/manifest.yml",
+      "root_version_source": "upstream raw file at main-pinned gitlink commit; local object unavailable",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group",
+      "root_pinned_url": "https://raw.githubusercontent.com/FreeRTOS/coreHTTP/3c4a5838658cd6d0ff8fb7c3a14e30baafcbcd28/manifest.yml"
+    },
+    {
+      "library": "coreJSON",
+      "root_gitlink": "cffa492da18c890181d64462f8af63992a69d3b0",
+      "rx671_rx72_source_version": "v3.3.1",
+      "rx65_flat_source_version": "v3.3.0",
+      "root_reference": "Middleware/FreeRTOS/coreJSON/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/coreJSON/manifest.yml",
+      "root_version_source": "git show at pinned submodule commit",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group"
+    },
+    {
+      "library": "coreMQTT",
+      "root_gitlink": "04845c6a8e5f9cf2d232f1c6e80baeb81302e690",
+      "rx671_rx72_source_version": "v5.0.2",
+      "rx65_flat_source_version": "v2.3.1",
+      "root_reference": "Middleware/FreeRTOS/coreMQTT/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/coreMQTT/manifest.yml",
+      "root_version_source": "git show at pinned submodule commit",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group"
+    },
+    {
+      "library": "coreMQTT-Agent",
+      "root_gitlink": "e977d70ee68c95f94d967ea18feadfffe5c7a584",
+      "rx671_rx72_source_version": "v1.3.1",
+      "rx65_flat_source_version": "v1.3.1",
+      "root_reference": "Middleware/FreeRTOS/coreMQTT-Agent/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/coreMQTT-Agent/manifest.yml",
+      "root_version_source": "git show at pinned submodule commit",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group",
+      "effective_patch_note": "RX671 and RX72 project exclusions select Common/patches/coreMQTT-Agent/source instead of upstream agent C files; RX65 uses project-local flat agent source. Same manifest version does not mean byte-identical implementation."
+    },
+    {
+      "library": "corePKCS11",
+      "root_gitlink": "ccc78afee1716436cca832dd3d9388ead2ba05b0",
+      "rx671_rx72_source_version": "v3.6.4",
+      "rx65_flat_source_version": "v3.6.1",
+      "root_reference": "Middleware/FreeRTOS/corePKCS11/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/corePKCS11/manifest.yml",
+      "root_version_source": "git show at pinned submodule commit",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group"
+    },
+    {
+      "library": "coreSNTP",
+      "root_gitlink": "50f5f96f4c33b14c0358f404ff4ff2a29d422ad7",
+      "rx671_rx72_source_version": "v2.0.0",
+      "rx65_flat_source_version": "v1.3.1",
+      "root_reference": "Middleware/FreeRTOS/coreSNTP/manifest.yml",
+      "rx65_reference": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/Middleware/FreeRTOS/coreSNTP/manifest.yml",
+      "root_version_source": "upstream raw file at main-pinned gitlink commit; local object unavailable",
+      "scope": "source dependency inventory; not every library is linked or exercised in every test group",
+      "root_pinned_url": "https://raw.githubusercontent.com/FreeRTOS/coreSNTP/50f5f96f4c33b14c0358f404ff4ff2a29d422ad7/manifest.yml"
+    }
+  ],
+  "normal_native_distinction": {
+    "RX671": "Normal app is checked-in linear. Native and OTA build profiles produce a dual app. A separate linear provisioner precedes dual bootloader installation.",
+    "RX65N": "Checked-in BSP is dual but .cproject device modes says bank.single. Native preserves the selected linker layout. The mismatch is a configuration fact, not by itself proof of runtime linear mode.",
+    "RX72N": "Checked-in normal app and native layout use dual mode; native test sources/defines are added.",
+    "bootloaders": "All three BSP configurations are dual/start-bank 0; all bootloaders are bare metal."
+  },
+  "references": [
+    {
+      "path": "tools/idt_rx671_build_profile.py",
+      "line": 28,
+      "fact": "RX671 native profile applies make_ota_cproject; line 40 applies make_ota_bank_config."
+    },
+    {
+      "path": "tools/build_rx671_ota_images.py",
+      "line": 230,
+      "fact": "Native/OTA profile changes bank.single to bank.dual; lines 340-341 change BSP bank mode 1 to 0; PFRAM2 mapping is added at lines 234-239."
+    },
+    {
+      "path": "tools/build_rx72n_idt_transport.ps1",
+      "line": 373,
+      "fact": "Native build validates dual bank mode; RX65 uses production helper with PreserveLinkerLayout (lines 546-549)."
+    },
+    {
+      "path": "tools/build_rx72n_idt_transport.ps1",
+      "line": 547,
+      "fact": "RX65 native helper forces software TLS and preserves the selected linker layout; it does not substitute root FreeRTOS sources for the flat project middleware."
+    },
+    {
+      "path": "tools/idt/rpi_flash.py",
+      "line": 214,
+      "fact": "RX671 provisioning route differs from RX72/RX65 erase-chip/bootloader/UART route at lines 221-224."
+    },
+    {
+      "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_flash_rx/r_flash_rx_if.h",
+      "line": 284,
+      "fact": "FLASH_IN_DUAL_BANK_MODE=1 when Flash type 4 or 5, APP_SWAP support, BSP bank mode 0 and code flash enabled."
+    },
+    {
+      "path": "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_flash_rx/src/r_flash_rx.c",
+      "line": 118,
+      "fact": "Code flash enable invokes R_FlashCodeCopy. Lines 172-181 copy PFRAM2 to RPFRAM2 for PFRAM2 size when dual mode is defined; the loop does not use RPFRAM2 size."
+    },
+    {
+      "path": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_flash_rx/src/r_flash_rx.c",
+      "line": 89,
+      "fact": "Older Flash 4.50 calls R_FlashCodeCopy; dual-mode PFRAM2 copy is at lines 143-151."
+    }
+  ],
+  "bootloader_pins_and_interrupts": [
+    {
+      "target": "RX671",
+      "pin": "c31bac703e1406e7a94d398b7bcad108b5e8fdce",
+      "swap_interrupt_disable_line": 1173,
+      "bank_toggle_line": 1175,
+      "source": "rx_bootloader.c",
+      "pinned_url": "https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/bootloader/submodule/-/blob/c31bac703e1406e7a94d398b7bcad108b5e8fdce/rx_bootloader.c"
+    },
+    {
+      "target": "RX65N/RX72N",
+      "pin": "4968ad7d5fc942a38b312a6847c60f281f16cc50",
+      "swap_interrupt_disable_line": 1183,
+      "bank_toggle_line": 1185,
+      "source": "rx_bootloader.c",
+      "pinned_url": "https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/bootloader/submodule/-/blob/4968ad7d5fc942a38b312a6847c60f281f16cc50/rx_bootloader.c"
+    }
+  ],
+  "tsip_inventory": {
+    "separate_projects": [
+      "aws_bg96_ck_rx65n_tsip",
+      "aws_ether_rx72n_envision_kit_tsip"
+    ],
+    "rx671_separate_tsip_project": false,
+    "scope": "Presence only. TSIP variants were not included in the primary six-configuration comparison."
+  },
+  "limitations": [
+    "Versions are actual selected source/header/manifest versions at the fixed main commit, not SDK/SC preset labels.",
+    "This audit did not build or flash any image, measure effective hardware registers, or verify runtime SRAM copies.",
+    "RX671 prior MAP/ABS facts are separately recorded in idt-hardware-20261007/linker-ram-assessment.json. RX65/RX72 binary layout is being audited by a separate project-options task.",
+    "An identical setting or library manifest version does not prove identical generated code or linked objects.",
+    "RX65 PFRAM2/RPFRAM2 mapping concern must be evaluated with the project/MAP audit; no runtime fault is asserted here."
+  ]
+}
