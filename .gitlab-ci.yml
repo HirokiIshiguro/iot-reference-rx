@@ -2932,6 +2932,20 @@ flash_rx671_wifi:
       fi
 
       readlink -f "$RX671_WIFI_UART_PORT" | tee "$artifact_dir/uart_device.txt"
+      # Normalize bank/mode before a fresh connection writes the linear image.
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -erase-chip -reset -noquery \
+        2>&1 | tee "$artifact_dir/initial_chip_erase.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
       "$RX671_WIFI_LINUX_RFP_CLI" \
         -d "$RX671_WIFI_RFP_DEVICE" \
         -t "$RX671_WIFI_RFP_TOOL" \
@@ -4613,6 +4627,20 @@ test_rx671_wifi:
       # UART observation. A standalone benchmark may legitimately run between
       # the earlier flash job and this test job.
       echo "=== Atomic RX671 reflash before UART observation ==="
+      # Normalize bank/mode before a fresh connection writes the linear image.
+      "$RX671_WIFI_LINUX_RFP_CLI" \
+        -d "$RX671_WIFI_RFP_DEVICE" \
+        -t "$RX671_WIFI_RFP_TOOL" \
+        -if "$RX671_WIFI_RFP_INTERFACE" \
+        -s "$RX671_WIFI_RFP_SPEED" \
+        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
+        -erase-chip -reset -noquery \
+        2>&1 | tee "$artifact_dir/initial_chip_erase.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
       "$RX671_WIFI_LINUX_RFP_CLI" \
         -d "$RX671_WIFI_RFP_DEVICE" \
         -t "$RX671_WIFI_RFP_TOOL" \

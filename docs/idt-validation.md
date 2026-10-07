@@ -39,6 +39,7 @@ MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検
 共有CC-RX resource groupに加え、実機の既存lockと通常CIとの排他を確認します。
 RX671の独立したIDT初期書込みは、最初にRFPのchip eraseでCode Flash・Data Flash・flash optionを消去します。OTA後の起動バンク000からlinear provisionerを一括書込みすると、verify成功後も旧bootloaderを指す起動不良を実機で再現したためです（[#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)）。消去後は同じsourceのlinear provisionerでP-256公開signerをLittleFSへ再投入・commitし、その後の両bank書込みではData Flashを保持します。built-in fallbackは有効にしません。
 RX671の実機scopeでは、この公開bootstrap資料を既存production builderからCIが自動生成します。host-only preflightでは生成しません。既に確認した資料で置き換える場合は[4入力を一組で指定](../tools/idt/RX671_BOOTSTRAP.md)し、部分的な指定は拒否します。
+通常RX671 CIの独立したflashとUART観測前のatomic reflashも、chip eraseを別コマンドで完了してからlinear画像を書きます。同じ通常FWでもdual/000からの1回目は旧bootloaderのvectorが残り、同画像の2回目で正しい配置へ収束することを実機で確認しました。2回書けば成功することに依存せず、各書込みの開始状態を揃えます。初期Data Flashは消去され、通常FWの接続設定は通常ビルド／provision経路で用意します。
 OTAのbuild ledger / 起動witnessはターゲットとfingerprintを照合します。通常firmwareの復帰は既存flash / provision経路で確認します。
 
 終了時は既存RX72N CIと同じresetコマンド成功と、freshな1秒間のUART静止を確認します。

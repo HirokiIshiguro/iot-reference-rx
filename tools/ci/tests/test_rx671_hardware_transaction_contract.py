@@ -43,11 +43,23 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         ordered_tokens = (
             'mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"',
             "Atomic RX671 reflash before UART observation",
+            "-erase-chip -reset -noquery",
+            'initial_chip_erase.log',
+            'if [ "$status" -ne 0 ]',
             "-p -v -reset -noquery",
             "tools/ci/test_rx671_wifi_uart.py",
         )
         positions = [job.index(token) for token in ordered_tokens]
         self.assertEqual(positions, sorted(positions))
+
+    def test_normal_flash_clears_bank_state_before_linear_programming(self) -> None:
+        job = job_block(self.ci, "flash_rx671_wifi", "flash_rx72n_ether")
+        erase = job.index("-erase-chip -reset -noquery")
+        program = job.index("-p -v -reset -noquery")
+        self.assertLess(job.index('if [ ! -f "$mot" ]'), erase)
+        self.assertLess(erase, program)
+        self.assertIn('exit "$status"', job[erase:program])
+        self.assertEqual(2, job.count('-t "$RX671_WIFI_RFP_TOOL"'))
 
     def test_both_split_jobs_extend_the_locked_template(self) -> None:
         flash = job_block(self.ci, "flash_rx671_wifi", "flash_rx72n_ether")
