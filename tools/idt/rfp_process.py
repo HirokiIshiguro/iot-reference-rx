@@ -115,8 +115,8 @@ def _proc_snapshot():
                 raise ValueError('Unknown process credentials')
             result[pid] = _Process(pid, int(fields[1]), int(fields[2]), int(fields[3]),
                                    int(fields[19]), tuple(map(int, uids)))
-        except FileNotFoundError:
-            pass  # Process exited during enumeration.
+        except (FileNotFoundError, ProcessLookupError):
+            pass  # An enumerated process exited before stat/status was read.
     return result
 
 

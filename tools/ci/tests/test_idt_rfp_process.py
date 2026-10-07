@@ -1,5 +1,6 @@
 """RFP shutdown proofs use mocked processes only; never touch hardware or /proc."""
 from contextlib import ExitStack, contextmanager
+import errno
 import json
 import os
 from pathlib import Path
@@ -244,6 +245,36 @@ class RfpSupervisionTests(unittest.TestCase):
 
 
 class ProcInspectionTests(unittest.TestCase):
+    def test_process_exit_during_stat_or_status_keeps_other_processes_visible(self):
+        stat = '4323 (unit) ' + ' '.join(['S', '1', '4323', '4323'] + ['0'] * 15 + ['123'])
+        for filename in ('stat', 'status'):
+            for error in (FileNotFoundError(errno.ENOENT, 'exited'),
+                          ProcessLookupError(errno.ESRCH, 'exited')):
+                with self.subTest(filename=filename, error=type(error).__name__):
+                    def read(path):
+                        if path.parent.name == '4322' and path.name == filename:
+                            raise error
+                        return stat if path.name == 'stat' else 'Uid:\t1000\t1000\t1000\t1000\n'
+                    with patch.object(rfp, '_proc_visible'), \
+                            patch.object(Path, 'iterdir', return_value=[Path('/proc/4322'), Path('/proc/4323')]), \
+                            patch.object(Path, 'read_text', autospec=True, side_effect=read):
+                        self.assertEqual({4323: member(4323, pgrp=4323, session=4323)}, rfp._proc_snapshot())
+
+    def test_other_proc_read_errors_still_prevent_visibility_proof(self):
+        stat = '4322 (unit) ' + ' '.join(['S', '1', '4322', '4322'] + ['0'] * 15 + ['123'])
+        for filename in ('stat', 'status'):
+            for error in (PermissionError(errno.EACCES, 'hidden'), OSError(errno.EIO, 'unknown')):
+                with self.subTest(filename=filename, error=type(error).__name__):
+                    def read(path):
+                        if path.name == filename:
+                            raise error
+                        return stat
+                    with patch.object(rfp, '_proc_visible'), \
+                            patch.object(Path, 'iterdir', return_value=[Path('/proc/4322')]), \
+                            patch.object(Path, 'read_text', autospec=True, side_effect=read), \
+                            self.assertRaises(type(error)):
+                        rfp._proc_snapshot()
+
     def test_known_descendants_remain_visible_after_parent_exit_and_reparent(self):
         parent = member()
         monitor = member(4322, uid=0, pgrp=4322, ppid=4321, session=4322, starttime=456)
