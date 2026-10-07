@@ -252,7 +252,9 @@ def validate_bundle(files, target, source_sha):
         'source_sha': source_sha, 'public_signer_spki_sha256': signer_sha,
         'status': 'not_run', 'runtime_trust': 'not_established',
         'builtin_public_key_fallback': False, 'private_credentials_used': False,
-        'steps': ['program_linear_provisioner', 'run_linear_cli', 'format_littlefs',
+        'initial_state_reset': 'rfp_chip_erase_before_signer_provisioning',
+        'data_flash_preserved_during_initialization': False,
+        'steps': ['erase_chip_and_clear_flash_options', 'program_linear_provisioner', 'run_linear_cli', 'format_littlefs',
                   'store_codesigncert_and_codesignpubkey', 'commit_littlefs',
                   'erase_install_ranges_preserving_data_flash', 'program_bootloader_bank0',
                   'program_bootloader_bank1', 'uart_install_signed_dualbank_application'],
@@ -360,6 +362,16 @@ def provision_and_install(root, target, source_sha, call, download, check_owner=
         serial_port = host.open_serial(port, baud)
         return _DeadlineSerial(serial_port, time.monotonic() + RX671_SIGNER_PROVISION_SECONDS,
                                check_owner)
+    rfp = host.RfpConfig(executable='/usr/local/bin/rfp-cli', device=target['rfp_device'],
+                         tool='e2l:' + target['e2lite'], speed=target['rfp_speed'])
+    # A previous signed install can leave BANKSWP=000. Changing MDE together
+    # with the linear image then verifies under the old map but boots the other
+    # physical bank after reset. Start each independent IDT image from a blank
+    # chip/options state; the real CLI below reconstructs public signer trust.
+    check_owner()
+    call(['sudo', '-n', *rfp.common_command(), '-erase-chip', '-reset', '-noquery'],
+         timeout=FLASH_RFP_COMMAND_SECONDS)
+    check_owner()
     summary = provisioner.provision(args, signer_only=True, runner=guarded, serial_opener=serial_opener)
     if (summary.get('success') is not True or summary.get('signer_only') is not True or
             summary.get('data_flash_preserved_during_rfp_operations') is not True or
@@ -367,8 +379,6 @@ def provision_and_install(root, target, source_sha, call, download, check_owner=
                  'ota_install_areas_erased_after_provisioning', 'bootloader_programmed'}
             <= set(summary.get('completed_steps', []))):
         raise RuntimeError('RX671 production signer provisioning did not complete')
-    rfp = host.RfpConfig(executable='/usr/local/bin/rfp-cli', device=target['rfp_device'],
-                         tool='e2l:' + target['e2lite'], speed=target['rfp_speed'])
     guarded(rfp.program_command(root / 'bootloader_bank1.mot', leave_reset=True),
             label='bank1 bootloader programming', timeout=FLASH_RFP_COMMAND_SECONDS)
     call(download, timeout=FLASH_DOWNLOAD_SECONDS)

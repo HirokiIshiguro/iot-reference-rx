@@ -37,7 +37,7 @@ MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検
 
 固定target identityがapplication、bootloader、packager、UART、debugger、bench lockを選びます。
 共有CC-RX resource groupに加え、実機の既存lockと通常CIとの排他を確認します。
-RX671の初期secure bootは、同じsourceで確認したlinear provisionerと対応するP-256公開signerをLittleFSへ用意し、Data Flashを保持して両bankへ書き込みます。built-in fallbackは有効にしません。
+RX671の独立したIDT初期書込みは、最初にRFPのchip eraseでCode Flash・Data Flash・flash optionを消去します。OTA後の起動バンク000からlinear provisionerを一括書込みすると、verify成功後も旧bootloaderを指す起動不良を実機で再現したためです（[#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)）。消去後は同じsourceのlinear provisionerでP-256公開signerをLittleFSへ再投入・commitし、その後の両bank書込みではData Flashを保持します。built-in fallbackは有効にしません。
 RX671の実機scopeでは、この公開bootstrap資料を既存production builderからCIが自動生成します。host-only preflightでは生成しません。既に確認した資料で置き換える場合は[4入力を一組で指定](../tools/idt/RX671_BOOTSTRAP.md)し、部分的な指定は拒否します。
 OTAのbuild ledger / 起動witnessはターゲットとfingerprintを照合します。通常firmwareの復帰は既存flash / provision経路で確認します。
 
