@@ -16,7 +16,8 @@ class IdtDocsTests(unittest.TestCase):
         docs.verify_scope(changed, self.BASE, head)
 
     def test_mixed_code_other_docs_and_unrelated_ci_fail(self):
-        for path in ("Projects/main.c", "docs/unrelated.md", "tools/test.py", ".gitmodules"):
+        for path in ("Projects/main.c", "docs/unrelated.md", "tools/test.py", ".gitmodules",
+                     "docs/common-core-audit/hidden.py", "docs/common-core-audit/unknown.md"):
             with self.subTest(path=path), self.assertRaises(RuntimeError):
                 docs.verify_scope({"README.md", path}, self.BASE, self.BASE)
         with self.assertRaises(RuntimeError):
@@ -29,6 +30,11 @@ class IdtDocsTests(unittest.TestCase):
             with self.subTest(text=text), self.assertRaises(RuntimeError):
                 docs.strip_docs_ci(text)
 
+    def test_declared_audit_paths_are_allowed_but_mixed_firmware_is_refused(self):
+        docs.verify_scope(docs.AUDIT_DOCS, self.BASE, self.BASE)
+        with self.assertRaises(RuntimeError):
+            docs.verify_scope(docs.AUDIT_DOCS | {"Projects/main.c"}, self.BASE, self.BASE)
+
     def test_missing_relative_link_and_broken_table_fail(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "README.md"
@@ -40,8 +46,27 @@ class IdtDocsTests(unittest.TestCase):
             path.write_text("[ok](ok.md#heading) [web](https://example.invalid/)\n| A | B |\n|---|---|\n| `x|y` | value |\n", encoding="utf-8")
             self.assertEqual([], docs.lint_document(path))
 
+    def test_inline_only_or_empty_edge_cells_preserve_table_width(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "README.md"
+            path.write_text("|`A`|`B`|\n|---|---|\n| `one` | `two` |\n|left||\n", encoding="utf-8")
+            self.assertEqual([], docs.lint_document(path))
+
     def test_non_mr_cannot_use_docs_checker(self):
         with patch.dict(docs.os.environ, {"CI_PIPELINE_SOURCE": "api"}):
+            self.assertEqual(1, docs.main())
+
+    def test_invalid_audit_json_fails_docs_lane(self):
+        with patch.dict(docs.os.environ, {
+            "CI_PIPELINE_SOURCE": "merge_request_event",
+            "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME": "codex/169-docs-common-core-audit",
+            "CI_MERGE_REQUEST_DIFF_BASE_SHA": "a" * 40,
+            "CI_MERGE_REQUEST_SOURCE_BRANCH_SHA": "b" * 40,
+        }), patch.object(docs, "ensure_commit"), patch.object(docs, "read_blob", return_value=self.BASE), \
+                patch.object(docs, "run_git", return_value=b"docs/common-core-audit/project-options.json\0"), \
+                patch.object(docs, "lint_document", return_value=[]), \
+                patch.object(Path, "is_file", return_value=True), \
+                patch.object(Path, "read_text", return_value="invalid json"):
             self.assertEqual(1, docs.main())
 
     def test_mr_uses_source_sha_and_disables_rename_collapsing(self):
@@ -69,6 +94,7 @@ class IdtDocsTests(unittest.TestCase):
         head = (root / ".gitlab-ci.yml").read_text(encoding="utf-8")
         self.assertIn(docs.BEGIN, head)
         self.assertIn('PIPELINE_PROFILE: "mr-idt-docs"', head)
+        self.assertIn('docs/common-core-audit/**/*', head.split(docs.BEGIN)[1].split(docs.END)[0])
         self.assertIn('$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-(readme|docs)-/', head)
         for name in ("RUN_RX72N_BUILD", "RUN_RX65N_BG96_BUILD", "RUN_RX671_WIFI_BUILD", "RUN_RX671_BOOTLOADER_BUILD"):
             lane = head.split(docs.BEGIN)[1].split(docs.END)[0]
