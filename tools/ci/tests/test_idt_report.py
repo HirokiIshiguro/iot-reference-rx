@@ -234,7 +234,7 @@ class IdtReportExportTests(unittest.TestCase):
         self.assertEqual("26", root.get("time"))
         self.assertNotIn("202604.00-LTS", self.target.read_text(encoding="utf-8"))
 
-    def test_export_preserves_selected_group_pass_and_redacts_attribute_credentials(self) -> None:
+    def test_export_preserves_case_status_and_redacts_attribute_credentials(self) -> None:
         xml = report("FullTransportInterfaceTLS").replace(
             'name="test"',
             'name="test ' + " ".join(vars(self.credentials).values()) + '"',
@@ -245,10 +245,49 @@ class IdtReportExportTests(unittest.TestCase):
             self.assertNotIn(value, exported)
         self.assertEqual("test [REDACTED] [REDACTED] [REDACTED]", next(root.iter("testcase")).get("name"))
         result = check_report(self.target, ["FullTransportInterfaceTLS"])
-        self.assertTrue(result["passed"])
+        self.assertFalse(result["passed"])
+        self.assertEqual(["Required IDT group is incomplete: FullTransportInterfaceTLS "
+                          "(14 mandatory cases missing)"], result["problems"])
         self.assertEqual(1, result["tests"])
         self.assertEqual("selected_groups_only", result["result_scope"])
         self.assertEqual({"tests": 1, "failures": 0, "errors": 0, "skipped": 0}, result["groups"]["FullTransportInterfaceTLS"])
+
+
+class TransportCoverageTests(unittest.TestCase):
+    def test_native_rx671_partial_pass_is_incomplete_without_rewriting_counts(self):
+        result = check_report((ROOT / 'tools/ci/tests/fixtures/idt') / 'rx671-transport-truncated-70882.xml', ['FullTransportInterfaceTLS'])
+        self.assertFalse(result['passed'])
+        self.assertEqual((9, 0, 0, 0), tuple(result[k] for k in
+                         ('tests', 'failures', 'errors', 'skipped')))
+        missing = result['coverage']['FullTransportInterfaceTLS']['missing_cases']
+        self.assertEqual(5, len(missing))
+        self.assertIn('Transport_SendRecvCompareMultithreaded', missing)
+
+    def test_real_rx72n_complete_pass_stays_pass(self):
+        result = check_report((ROOT / 'tools/ci/tests/fixtures/idt') / 'rx72n-transport-complete-pass-70574.xml', ['FullTransportInterfaceTLS'])
+        self.assertTrue(result['passed'])
+        self.assertEqual(14, result['tests'])
+        self.assertTrue(result['coverage']['FullTransportInterfaceTLS']['complete'])
+
+    def test_real_rx65n_complete_failure_stays_failure(self):
+        result = check_report((ROOT / 'tools/ci/tests/fixtures/idt') / 'rx65n-transport-complete-fail-70856.xml', ['FullTransportInterfaceTLS'])
+        self.assertFalse(result['passed'])
+        self.assertEqual((14, 1), (result['tests'], result['failures']))
+        self.assertTrue(result['coverage']['FullTransportInterfaceTLS']['complete'])
+
+    def test_duplicate_case_cannot_fill_missing_coverage(self):
+        root = ET.parse((ROOT / 'tools/ci/tests/fixtures/idt') / 'rx72n-transport-complete-pass-70574.xml').getroot()
+        cases = root.findall('.//testcase')
+        cases[-1].set('name', cases[0].get('name'))
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / 'duplicate.xml'
+            ET.ElementTree(root).write(report)
+            result = check_report(report, ['FullTransportInterfaceTLS'])
+        self.assertFalse(result['passed'])
+        self.assertEqual(14, result['tests'])
+        self.assertEqual(['TransportRecv_ReturnZeroRetry'],
+                         result['coverage']['FullTransportInterfaceTLS']['missing_cases'])
+
 
 
 class IdtCiContractTests(unittest.TestCase):

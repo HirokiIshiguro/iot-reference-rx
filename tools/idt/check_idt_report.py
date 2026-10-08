@@ -16,6 +16,20 @@ from pathlib import Path
 from typing import Sequence
 
 
+# The pinned FRQ_2.5.0 transport runner invokes these 14 cases unconditionally.
+# Optional writev cases are not enabled by our production TLS port. IDT 4.9.0
+# can emit a passing report containing only the cases completed before timeout.
+TRANSPORT_REQUIRED_CASES = (
+    "TransportSend_NetworkContextNullPtr", "TransportSend_BufferNullPtr",
+    "TransportSend_ZeroByteToSend", "TransportRecv_NetworkContextNullPtr",
+    "TransportRecv_BufferNullPtr", "TransportRecv_ZeroByteToRecv",
+    "Transport_SendOneByteRecvCompare", "Transport_SendRecvOneByteCompare",
+    "Transport_SendRecvCompare", "Transport_SendRecvCompareMultithreaded",
+    "TransportSend_RemoteDisconnect", "TransportRecv_RemoteDisconnect",
+    "TransportRecv_NoDataToReceive", "TransportRecv_ReturnZeroRetry",
+)
+
+
 def _tag(element: ET.Element) -> str:
     return element.tag.rsplit("}", 1)[-1]
 
@@ -102,6 +116,22 @@ def check_report(
         if group_counts["tests"] == 0:
             problems.append(f"Required IDT group contains no test cases: {group}")
     summary["groups"] = groups
+    if "FullTransportInterfaceTLS" in required_groups:
+        observed = {
+            case.get("name")
+            for suite in suites if suite.get("name") == "FullTransportInterfaceTLS"
+            for case in suite.iter() if _tag(case) == "testcase"
+        }
+        missing = [name for name in TRANSPORT_REQUIRED_CASES if name not in observed]
+        summary["coverage"] = {"FullTransportInterfaceTLS": {
+            "required_cases": len(TRANSPORT_REQUIRED_CASES),
+            "reported_required_cases": len(TRANSPORT_REQUIRED_CASES) - len(missing),
+            "missing_cases": missing,
+            "complete": not missing,
+        }}
+        if missing:
+            problems.append("Required IDT group is incomplete: FullTransportInterfaceTLS "
+                            f"({len(missing)} mandatory cases missing)")
     summary["passed"] = not problems
     return summary
 
