@@ -344,7 +344,7 @@ class Rx671TrustTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'reviewed hardware identity'):
             controller.validate_bundle(self.fixture.files, get_target('rx65n-bg96'), SOURCE_SHA)
 
-    def test_real_linear_helper_public_only_order_preserves_data_flash(self):
+    def test_initial_chip_erase_precedes_public_signer_reprovisioning_and_install(self):
         commands, cli = [], []
         serial = Mock(timeout=0.1, write_timeout=10)
         def run(command, **kwargs):
@@ -360,20 +360,24 @@ class Rx671TrustTests(unittest.TestCase):
              patch.object(self.provisioner, '_set_wifi_credentials', side_effect=AssertionError('no secrets')):
             result = controller.provision_and_install(self.fixture.root, get_target('rx671-wifi'), SOURCE_SHA,
                                                       run, ['synthetic-uart-download'])
-        self.assertEqual(6, len(commands))
-        self.assertTrue(all('-erase-chip' not in command for command in commands))
-        self.assertEqual(self.fixture.files['rx671_provisioner.mot'], Path(commands[0][-1]))
-        self.assertIn('-run', commands[1])
+        self.assertEqual(7, len(commands))
+        self.assertEqual(['-erase-chip', '-reset', '-noquery'], commands[0][-3:])
+        self.assertIn('e2l:OBE110024', commands[0])
+        self.assertTrue(all('-erase-chip' not in command for command in commands[1:]))
+        self.assertEqual(self.fixture.files['rx671_provisioner.mot'], Path(commands[1][-1]))
+        self.assertIn('-run', commands[2])
         self.assertEqual(['FFE00000,FFEBFFFF', 'FFF00000,FFFBFFFF'],
-                         [commands[2][index+1] for index, value in enumerate(commands[2]) if value == '-range'])
-        self.assertEqual(self.fixture.files['bootloader.mot'], Path(commands[3][-1]))
-        self.assertEqual(self.fixture.files['bootloader_bank1.mot'], Path(commands[4][-1]))
-        self.assertEqual(['synthetic-uart-download'], commands[5])
+                         [commands[3][index+1] for index, value in enumerate(commands[3]) if value == '-range'])
+        self.assertEqual(self.fixture.files['bootloader.mot'], Path(commands[4][-1]))
+        self.assertEqual(self.fixture.files['bootloader_bank1.mot'], Path(commands[5][-1]))
+        self.assertEqual(['synthetic-uart-download'], commands[6])
         self.assertEqual('format', cli[0])
         self.assertTrue(cli[1].startswith('conf set codesigncert '))
         self.assertTrue(cli[2].startswith('conf set codesignpubkey '))
         self.assertEqual('conf commit', cli[3])
         self.assertEqual('provisioned_and_initial_image_installed', result['status'])
+        self.assertFalse(result['data_flash_preserved_during_initialization'])
+        self.assertEqual('erase_chip_and_clear_flash_options', result['steps'][0])
         serial.close.assert_called_once()
 
     def test_failed_real_provisioner_cannot_be_replaced_by_receipt(self):
@@ -383,9 +387,30 @@ class Rx671TrustTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'did not complete'):
                 controller.provision_and_install(self.fixture.root, get_target('rx671-wifi'), SOURCE_SHA,
                                                  run, ['synthetic-uart-download'])
+        self.assertEqual(1, run.call_count)
+        self.assertIn('-erase-chip', run.call_args.args[0])
+
+    def test_invalid_inputs_refuse_initial_chip_erase(self):
+        self.fixture.files['rx671_provisioner.mot'].write_text('changed')
+        run = Mock()
+        with self.assertRaisesRegex(RuntimeError, 'manifest/hash/source mismatch'):
+            controller.provision_and_install(self.fixture.root, get_target('rx671-wifi'), SOURCE_SHA,
+                                             run, ['synthetic-uart-download'])
         run.assert_not_called()
 
-    def test_cli_commit_failure_stops_before_erase_and_closes_uart(self):
+    def test_initial_chip_erase_failure_stops_before_uart_and_provisioner(self):
+        run = Mock(side_effect=RuntimeError('synthetic chip erase failure'))
+        with patch.object(self.provisioner, 'provision') as provision, \
+                patch.object(self.host, 'open_serial') as uart, \
+                self.assertRaisesRegex(RuntimeError, 'synthetic chip erase failure'):
+            controller.provision_and_install(self.fixture.root, get_target('rx671-wifi'), SOURCE_SHA,
+                                             run, ['synthetic-uart-download'])
+        self.assertEqual(1, run.call_count)
+        self.assertIn('-erase-chip', run.call_args.args[0])
+        provision.assert_not_called()
+        uart.assert_not_called()
+
+    def test_cli_commit_failure_stops_before_install_area_erase_and_closes_uart(self):
         commands = []
         serial = Mock(timeout=0.1, write_timeout=10)
         def send(_serial, command, **kwargs):
@@ -399,8 +424,9 @@ class Rx671TrustTests(unittest.TestCase):
                 controller.provision_and_install(self.fixture.root, get_target('rx671-wifi'), SOURCE_SHA,
                                                  lambda command, **kwargs: commands.append(command),
                                                  ['synthetic-uart-download'])
-        self.assertEqual(2, len(commands))
-        self.assertFalse(any('-erase' in command for command in commands))
+        self.assertEqual(3, len(commands))
+        self.assertIn('-erase-chip', commands[0])
+        self.assertFalse(any('-erase' in command for command in commands[1:]))
         serial.close.assert_called_once()
 
     def test_cli_deadline_rejects_without_writing(self):

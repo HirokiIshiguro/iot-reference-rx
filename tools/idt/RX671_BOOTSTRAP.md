@@ -39,14 +39,18 @@ The callback additionally checks the actual RSU ECDSA signature, provisioner MOT
 address ranges, bootloader bank0/bank1 exact shift, and the compiled boot policy
 input hashes. The remote helper repeats these checks before programming.
 
-Inside the existing bench and global RFP locks, the real production provisioner
+Inside the existing bench and global RFP locks, each independent IDT image first
+uses RFP chip erase to clear Code Flash, Data Flash and flash options. This
+removes the startup-bank state left by a previous signed install (see
+[#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)).
+The real production provisioner then reconstructs public signer trust and
 runs with `signer_only=True`: program the linear MOT, open SCI6, run the CLI,
 format LittleFS, set `codesigncert`/`codesignpubkey`, and commit. It then erases only
 `FFE00000..FFEBFFFF` and `FFF00000..FFFBFFFF`, preserving Data Flash, and programs
 bootloader bank0. The callback programs bank1 and downloads the verified signed
-dual-bank RSU through the existing strict UART downloader. No chip erase is used
-on this RX671 path. Ordinary full credential provisioning keeps its existing
-behavior.
+dual-bank RSU through the existing strict UART downloader. Data Flash is
+preserved after signer provisioning. Ordinary full credential provisioning
+keeps its existing behavior.
 
 The local prepared plan records `runtime_trust=not_established`. Actual LittleFS
 persistence and successful secure boot require a separately authorized hardware
@@ -62,9 +66,9 @@ RESET pin voltage measurement is not an execution prerequisite. Evidence retains
 
 The shared [`cleanup_budget.py`](cleanup_budget.py) derives the RX671 transaction
 bound from its operations: 60 seconds for RFP lock acquisition, three 15-second
-UART control phases, four 90-second provisioner/RFP operations, a 200-second
+UART control phases, one 90-second initial chip erase, four 90-second provisioner/RFP operations, a 200-second
 absolute CLI bound, a 90-second bank1 write, a 540-second UART download, and two
-90-second final RFP operations: 1475 seconds. The CLI bound covers the existing
+90-second final RFP operations: 1565 seconds. The CLI bound covers the existing
 45-second invitation wait, three 5-second CLI retries, 15-second commands,
 30-second commit and bounded 2-ms character pacing. Other targets total 1095
 seconds using their existing three erase/bootloader operations. Abort reset has

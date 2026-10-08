@@ -30,6 +30,7 @@ FLASH_TRANSACTION_PHASES = {
     "rx671-wifi": {
         "rfp_lock": FLASH_LOCK_WAIT_SECONDS,
         "uart_control": 3 * FLASH_CONTROL_SECONDS,
+        "initial_chip_erase": FLASH_RFP_COMMAND_SECONDS,
         "linear_provisioning_and_bootloader": 4 * FLASH_RFP_COMMAND_SECONDS,
         "signer_provisioning_cli": RX671_SIGNER_PROVISION_SECONDS,
         "bank1_bootloader_write": FLASH_RFP_COMMAND_SECONDS,
