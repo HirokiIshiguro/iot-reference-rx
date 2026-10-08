@@ -50,7 +50,7 @@ reset失敗、UART出力継続、privileged子processの終了が不明な場合
 ## RX65N・RX671の実測
 
 **追加2環境でも実機IDTを実施しましたが、全IDT合格には達していません。**
-2026-10-08確認時点の過去SHAの結果を下表に示します。main `0b5ac82f`に反映した制御修正後の再試験結果ではありません。
+2026-10-08確認時点の結果を下表に示します。RX65N PKCS11 Coreはmain `0b5ac82f`の再試験結果、他の行は制御修正前の過去SHAの結果です。
 IDT 4.9.0 / FRQ_2.5.0、software TLSの結果です。PASS・FAIL・ERRORと未完了を保持します。
 
 | 対象・scope | 実測結果 | 試験範囲・証跡 |
@@ -58,7 +58,7 @@ IDT 4.9.0 / FRQ_2.5.0、software TLSの結果です。PASS・FAIL・ERRORと未�
 | RX65N Transport | 13 PASS / 1 FAIL | 必須14件完走。[job #70856](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70856) |
 | RX65N MQTT | 4 PASS / 1 PASS_WITH_WARNINGS / 5 FAIL | 10件完走。[job #70858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70858) |
 | RX65N OTA PAL | 14 PASS / 1 FAIL | 15件完走。[job #70884](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70884) |
-| RX65N PKCS11 | 5 PASS / 1 ERROR | 後続groupの書込み中断、全scope未完了。[job #70910](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70910) |
+| RX65N PKCS11 Core | 10 PASS / 0 FAIL / 0 ERROR / 0 SKIP | Core group完走。[job #71028](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71028)。ECC object / signの別groupは範囲外 |
 | RX671 Transport | 9 PASS / 必須5件未報告 | 未完走（必須14件中5件欠落）。[job #70882](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70882) |
 
 RX671のMQTT・PKCS11・OTA PALと、両環境のOTA MQTT選択3ケースは実機試験の成立・完了が残っています。
@@ -69,16 +69,17 @@ OTA MQTTの対象は新版更新・同版・信頼されない証明書の3ケ�
 <details>
 <summary>追加2環境のsource・失敗項目・終了状態</summary>
 
-Transport / MQTTのRX65N sourceは `7536258a58caec99d6aae004f4f720edd4e83782`、RX65N OTA PALとRX671 Transportは `44232ef62ea5be65161b95ae9741c6da555c7f3b`、RX65N PKCS11は `6caa2a2b3783fcd883509fc4de78fa44b92ffb14` です。
+Transport / MQTTのRX65N sourceは `7536258a58caec99d6aae004f4f720edd4e83782`、RX65N OTA PALとRX671 Transportは `44232ef62ea5be65161b95ae9741c6da555c7f3b`、RX65N PKCS11 Coreは `0b5ac82fe18f28a20bf815d8950e064f15ec0a35` です。
 各pipeline SHA、metadataのsource SHA、build source SHAは一致し、`source_dirty=false`でした。7536258aと44232ef6は同じGit treeです。
-後からTransport完走判定（!217）、PKCS11選択（!218）、RFP監視（!219）、RX671初期化（!220）を修正したため、旧結果を修正後の再試験済にはしません。
+Transport完走判定（!217）、PKCS11選択（!218）、RFP監視（!219）、RX671初期化（!220）の修正後にRX65N PKCS11 Coreを再試験しました。他の旧結果を修正後の再試験済にはしません。
 
 RX65N TransportのFAILは `TransportSend_RemoteDisconnect`、OTA PALのFAILは `otaPal_CloseFile_NonexistingCodeSignerCertificate` です。
 MQTTのwarningはTLS cipher suiteです。RX65NはMQTT 3.1.1の実装であり、5件のFAILをMQTT 5との不一致だけで説明しません。
 RX671 Transportは元のnative reportに9 PASSだけがあり、旧checkerはCIを成功にしましたが、必須14件のうち5件が欠けています。!217の完走条件では不合格です。元のnative件数やreportは変更しません。
 
 RX65N Transport・MQTT・OTA PALとRX671 Transportの終了記録はresetコマンド成功、freshな1秒のUART 0 bytes、`cleanupError=null`でした。物理RESET Lowは測定していません。
-RX65N PKCS11 #70910は終了処理にもERRORがあり、`end_state`は空です。このrun単独を終了確認済とはしません。後続の回復操作と区別します。
+RX65N PKCS11 Core #71028はresetコマンド成功、freshな1秒のUART 0 bytes、nativeの後処理完了を確認しました。AWS横断の残存監査とは区別します。
+旧PKCS11 #70910（source `6caa2a2b3783fcd883509fc4de78fa44b92ffb14`）は5 PASS / 1 ERRORで後続groupの書込み中断、終了処理にもERRORがあり、`end_state`は空でした。このrun単独を終了確認済とはせず、後続の回復操作・再試験と区別して保持します。
 Transportの実行所有EC2はterminatedを確認しました。他scopeのnative cleanup結果だけをAWS横断の残存0の証明にはしません。
 
 RX65N native appのRAM写像には確認事項が残ります。通常OTAのbank切替はbootloaderへ委譲され、app内のbank切替関数がFlashに存在することだけで実行時faultとは判断しません。配置・コピー・呼出し経路の境界は監査文書を参照してください。
