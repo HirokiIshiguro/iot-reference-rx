@@ -100,6 +100,95 @@ class DependencyProvenanceTests(unittest.TestCase):
         copy_without_git(self.source, destination)
         return destination, provenance
 
+    def pkcs11_snapshot(self):
+        dependency = self.source / 'Test/FreeRTOS-Libraries-Integration-Tests'
+        runner = self.source / manifest.PKCS11_RUNNER_FILE
+        runner.parent.mkdir(parents=True)
+        # Replay the exact native comment/line-ending transformation observed
+        # in job70883, while keeping a separate untouched function in the hash.
+        groups = ('Full_PKCS11_StartFinish', 'Full_PKCS11_NoObject',
+                  'Full_PKCS11_RSA', 'Full_PKCS11_EC')
+        body = 'int unchanged(void) { return 7; }\r\nvoid runner(void) {\r\n'
+        body += ''.join('    RUN_TEST_GROUP( ' + group + ' );\r\n' for group in groups)
+        body += '}\r\n'
+        runner.write_bytes(body.encode('ascii'))
+        git(dependency, 'add', '--', 'src/pkcs11/core_pkcs11_test.c')
+        sha = commit_fixture_tree(dependency)
+        git(self.source, 'update-index', '--cacheinfo',
+            '160000,' + sha + ',Test/FreeRTOS-Libraries-Integration-Tests')
+        commit_fixture_tree(self.source)
+        destination, provenance = self.snapshot()
+        return destination / manifest.PKCS11_RUNNER_FILE, destination, provenance, groups
+
+    def test_native_pkcs11_selection_is_scope_bound_and_read_only(self):
+        runner, destination, provenance, groups = self.pkcs11_snapshot()
+        original = runner.read_bytes()
+        for selected in ('Full_PKCS11_StartFinish', 'Full_PKCS11_NoObject'):
+            native = original.decode('ascii').replace('\r\n', '\n')
+            for group in groups:
+                if group != selected:
+                    native = native.replace('    RUN_TEST_GROUP( ' + group + ' );',
+                                            '\t\t//RUN_TEST_GROUP( ' + group + ' );')
+            runner.write_bytes(native.encode('ascii'))
+            with self.assertRaisesRegex(ValueError, 'differs from captured'):
+                manifest.verify_dependency_provenance(destination, self.target, provenance)
+            with self.assertRaisesRegex(ValueError, 'differs from captured'):
+                manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='Transport')
+            manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
+            self.assertEqual(native.encode('ascii'), runner.read_bytes())
+            missing = dict(provenance)
+            missing.pop('dependency_pkcs11_runner_sha256')
+            with self.assertRaisesRegex(ValueError, 'differs from captured'):
+                manifest.verify_dependency_provenance(destination, self.target, missing, test_group='PKCS11')
+            runner.write_bytes(native.replace('return 7', 'return 8').encode('ascii'))
+            with self.assertRaisesRegex(ValueError, 'differs from captured'):
+                manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
+
+    def test_pkcs11_unknown_or_noncore_selection_is_rejected(self):
+        runner, destination, provenance, groups = self.pkcs11_snapshot()
+        original = runner.read_bytes().decode('ascii').replace('\r\n', '\n')
+        native = original
+        for group in groups:
+            if group != 'Full_PKCS11_RSA':
+                native = native.replace('    RUN_TEST_GROUP( ' + group + ' );',
+                                        '\t\t//RUN_TEST_GROUP( ' + group + ' );')
+        runner.write_bytes(native.encode('ascii'))
+        with self.assertRaisesRegex(ValueError, 'differs from captured'):
+            manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
+
+    def test_pkcs11_cli_json_records_effective_selection(self):
+        runner, destination, provenance, groups = self.pkcs11_snapshot()
+        native = runner.read_text(encoding='ascii')
+        for group in groups:
+            if group != 'Full_PKCS11_NoObject':
+                native = native.replace('    RUN_TEST_GROUP( ' + group + ' );',
+                                        '\t\t//RUN_TEST_GROUP( ' + group + ' );')
+        runner.write_bytes(native.encode('ascii'))
+        path = self.root / 'provenance.json'
+        path.write_text(json.dumps(provenance), encoding='utf-8')
+        result = subprocess.run([sys.executable, str(ROOT / 'tools/idt_source_manifest.py'),
+                                 'verify', '--source', str(destination), '--target', self.target,
+                                 '--provenance', str(path), '--test-group', 'PKCS11', '--json-output'],
+                                capture_output=True, text=True, check=True)
+        evidence = json.loads(result.stdout)['pkcs11_runner']
+        self.assertEqual(['Full_PKCS11_NoObject'], evidence['enabled_groups'])
+        self.assertTrue(evidence['canonical_selection_used'])
+        self.assertEqual(hashlib.sha256(runner.read_bytes()).hexdigest(), evidence['effective_sha256'])
+
+    def test_pkcs11_invalid_structure_and_all_enabled_are_rejected(self):
+        runner, destination, provenance, groups = self.pkcs11_snapshot()
+        original = runner.read_bytes().decode('ascii').replace('\r\n', '\n')
+        for text in (original.replace('Full_PKCS11_EC', 'Unknown_PKCS11_Group'),
+                     original + 'RUN_TEST_GROUP( Full_PKCS11_EC );\n',
+                     original.replace('RUN_TEST_GROUP( Full_PKCS11_EC );', 'RUN_TEST_GROUP( Full_PKCS11_EC ); extra')):
+            runner.write_bytes(text.encode('ascii'))
+            with self.assertRaisesRegex(ValueError, 'selection structure'):
+                manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
+        # LF-only normalization must not authorize all four groups for Core.
+        runner.write_bytes(original.encode('ascii'))
+        with self.assertRaisesRegex(ValueError, 'differs from captured'):
+            manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
+
     def test_dependency_selection_uses_bg96_self_contained_stack(self):
         bg96 = manifest.dependency_paths(self.target)
         self.assertEqual(set(manifest.TEST) | {manifest.BOOT[self.target]}, set(bg96))

@@ -42,6 +42,31 @@ BOOT = {
 }
 BOOT_RX671_SHA = "c31bac703e1406e7a94d398b7bcad108b5e8fdce"
 
+PKCS11_RUNNER_FILE = "Test/FreeRTOS-Libraries-Integration-Tests/src/pkcs11/core_pkcs11_test.c"
+PKCS11_RUNNER_GROUPS = (
+    "Full_PKCS11_StartFinish", "Full_PKCS11_NoObject", "Full_PKCS11_RSA", "Full_PKCS11_EC",
+)
+_RUNNER_LINE = re.compile(
+    rb"^[ \t]*(?P<comment>//[ \t]*)?RUN_TEST_GROUP[ \t]*\([ \t]*"
+    rb"(?P<group>Full_PKCS11_StartFinish|Full_PKCS11_NoObject|Full_PKCS11_RSA|Full_PKCS11_EC)"
+    rb"[ \t]*\)[ \t]*;[ \t]*$", re.M)
+
+
+def pkcs11_runner_fingerprint(raw: bytes) -> tuple[str, tuple[str, ...]]:
+    """Canonicalize only the pinned suite's four selector lines and CRLF.
+
+    Every other byte remains part of the digest. Native FRQ changes these
+    comments to run one Core group per build; it also writes LF on Windows.
+    """
+    raw = raw.replace(b"\r\n", b"\n")
+    matches = list(_RUNNER_LINE.finditer(raw))
+    groups = [match['group'].decode('ascii') for match in matches]
+    if sorted(groups) != sorted(PKCS11_RUNNER_GROUPS):
+        raise ValueError("Unexpected PKCS11 runner selection structure")
+    enabled = tuple(match['group'].decode('ascii') for match in matches if not match['comment'])
+    canonical = _RUNNER_LINE.sub(lambda match: b"RUN_TEST_GROUP( " + match['group'] + b" );", raw)
+    return hashlib.sha256(canonical).hexdigest(), enabled
+
 
 def dependency_paths(target_id: str) -> tuple[str, ...]:
     if target_id not in BOOT:
@@ -117,14 +142,19 @@ def capture_dependency_provenance(source: Path, target_id: str) -> dict:
         shas[relative] = sha.lower()
     if target_id == "rx671-wifi" and shas[BOOT[target_id]] != BOOT_RX671_SHA:
         raise ValueError("RX671 boot-loader pin differs from the reviewed production helper")
-    return {"dependency_manifest_schema_version": 1, "dependency_target_id": target_id,
+    captured = {"dependency_manifest_schema_version": 1, "dependency_target_id": target_id,
             "dependency_files_sha256": {
         relative: hashlib.sha256(path.read_bytes()).hexdigest()
         for relative, path in sorted(_files(source, target_id).items())
     }, "submodule_shas": shas}
+    runner = source / PKCS11_RUNNER_FILE
+    if runner.is_file():
+        captured["dependency_pkcs11_runner_sha256"] = pkcs11_runner_fingerprint(runner.read_bytes())[0]
+    return captured
 
 
-def verify_dependency_provenance(source: Path, target_id: str, provenance: dict) -> int:
+def verify_dependency_provenance(source: Path, target_id: str, provenance: dict,
+                                 *, test_group: str | None = None) -> int:
     source = Path(source).resolve(strict=True)
     if (provenance.get("dependency_manifest_schema_version") != 1 or
             provenance.get("dependency_target_id") != target_id):
@@ -146,6 +176,13 @@ def verify_dependency_provenance(source: Path, target_id: str, provenance: dict)
         if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
             raise ValueError("Unrecorded dependency file: " + relative)
         if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            if relative == PKCS11_RUNNER_FILE and test_group == "PKCS11":
+                canonical, enabled = pkcs11_runner_fingerprint(path.read_bytes())
+                expected_runner = provenance.get("dependency_pkcs11_runner_sha256")
+                if (isinstance(expected_runner, str) and re.fullmatch(r"[a-f0-9]{64}", expected_runner)
+                        and canonical == expected_runner
+                        and enabled in (("Full_PKCS11_StartFinish",), ("Full_PKCS11_NoObject",))):
+                    continue
             raise ValueError("Dependency file differs from captured source: " + relative)
     if set(expected) != set(files):
         raise ValueError("Dependency source-copy file list differs from captured source")
@@ -158,6 +195,8 @@ def main() -> None:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--target", choices=tuple(BOOT), required=True)
     parser.add_argument("--provenance", type=Path)
+    parser.add_argument("--test-group", choices=("Transport", "DeviceAdvisor", "OTAE2E", "PKCS11", "OTAPAL"))
+    parser.add_argument("--json-output", action="store_true")
     args = parser.parse_args()
     if args.action == "capture":
         captured = capture_dependency_provenance(args.source, args.target)
@@ -171,8 +210,21 @@ def main() -> None:
         if args.provenance is None:
             parser.error("verify requires --provenance")
         provenance = json.loads(args.provenance.read_text(encoding="utf-8-sig"))
-        count = verify_dependency_provenance(args.source, args.target, provenance)
-        print(f"Verified {count} captured dependency files for {args.target}; no Git/network action.")
+        count = verify_dependency_provenance(args.source, args.target, provenance, test_group=args.test_group)
+        if args.json_output:
+            runner_evidence = None
+            if args.test_group == "PKCS11":
+                raw = (args.source / PKCS11_RUNNER_FILE).read_bytes()
+                canonical, enabled = pkcs11_runner_fingerprint(raw)
+                digest = hashlib.sha256(raw).hexdigest()
+                original = provenance['dependency_files_sha256'][PKCS11_RUNNER_FILE]
+                runner_evidence = {"source_file": PKCS11_RUNNER_FILE,
+                                   "captured_sha256": original, "effective_sha256": digest,
+                                   "canonical_sha256": canonical, "enabled_groups": list(enabled),
+                                   "canonical_selection_used": digest != original}
+            print(json.dumps({"file_count": count, "pkcs11_runner": runner_evidence}))
+        else:
+            print(f"Verified {count} captured dependency files for {args.target}; no Git/network action.")
 
 
 if __name__ == "__main__":
