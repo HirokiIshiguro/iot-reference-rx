@@ -50,7 +50,7 @@ reset失敗、UART出力継続、privileged子processの終了が不明な場合
 ## RX65N・RX671の実測
 
 **追加2環境でも実機IDTを実施しましたが、全IDT合格には達していません。**
-2026-10-08確認時点の過去SHAの結果を下表に示します。現main `0b5ac82f`での再試験済という記録ではありません。
+2026-10-08確認時点の過去SHAの結果を下表に示します。main `0b5ac82f`に反映した制御修正後の再試験結果ではありません。
 IDT 4.9.0 / FRQ_2.5.0、software TLSの結果です。PASS・FAIL・ERRORと未完了を保持します。
 
 | 対象・scope | 実測結果 | 試験範囲・証跡 |
@@ -59,7 +59,7 @@ IDT 4.9.0 / FRQ_2.5.0、software TLSの結果です。PASS・FAIL・ERRORと未�
 | RX65N MQTT | 4 PASS / 1 PASS_WITH_WARNINGS / 5 FAIL | 10件完走。[job #70858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70858) |
 | RX65N OTA PAL | 14 PASS / 1 FAIL | 15件完走。[job #70884](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70884) |
 | RX65N PKCS11 | 5 PASS / 1 ERROR | 後続groupの書込み中断、全scope未完了。[job #70910](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70910) |
-| RX671 Transport | 9 PASS / 必須5件未報告 | 必須14件の完走未確認。[job #70882](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70882) |
+| RX671 Transport | 9 PASS / 必須5件未報告 | 未完走（必須14件中5件欠落）。[job #70882](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70882) |
 
 RX671のMQTT・PKCS11・OTA PALと、両環境のOTA MQTT選択3ケースは実機試験の成立・完了が残っています。
 OTA MQTTの対象は新版更新・同版・信頼されない証明書の3ケースで、全13ケースの実行結果には扱いません。
@@ -78,7 +78,7 @@ MQTTのwarningはTLS cipher suiteです。RX65NはMQTT 3.1.1の実装であり�
 RX671 Transportは元のnative reportに9 PASSだけがあり、旧checkerはCIを成功にしましたが、必須14件のうち5件が欠けています。!217の完走条件では不合格です。元のnative件数やreportは変更しません。
 
 RX65N Transport・MQTT・OTA PALとRX671 Transportの終了記録はresetコマンド成功、freshな1秒のUART 0 bytes、`cleanupError=null`でした。物理RESET Lowは測定していません。
-RX65N PKCS11 #70910は終了処理にもERRORがあり、このrun単独を終了確認済とはしません。後続の回復操作と区別します。
+RX65N PKCS11 #70910は終了処理にもERRORがあり、`end_state`は空です。このrun単独を終了確認済とはしません。後続の回復操作と区別します。
 Transportの実行所有EC2はterminatedを確認しました。他scopeのnative cleanup結果だけをAWS横断の残存0の証明にはしません。
 
 RX65N native appのRAM写像には確認事項が残ります。通常OTAのbank切替はbootloaderへ委譲され、app内のbank切替関数がFlashに存在することだけで実行時faultとは判断しません。配置・コピー・呼出し経路の境界は監査文書を参照してください。

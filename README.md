@@ -72,11 +72,11 @@ IDTの明示CI入口は3ターゲットに対応します。`RUN_RX_IDT=true`、
 |---|---|---|---|
 | RX72N Envision Kit / Ethernet | `rx72n-ethernet` | `test_rx72n_idt` | 以下の限定試験 |
 | CK-RX65N V1 / BG96 | `rx65n-bg96` | `test_rx65n_bg96_idt` | [限定試験実施済み（NG・残件あり）](docs/idt-validation.md#rx65nrx671の実測) |
-| EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | `test_rx671_wifi_idt` | [Transport一部実施（完走未確認）](docs/idt-validation.md#rx65nrx671の実測) |
+| EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | `test_rx671_wifi_idt` | [Transport一部実施（未完走）](docs/idt-validation.md#rx65nrx671の実測) |
 
 `IDT_SCOPE=plan`は機器・AWSを操作しない計画確認です。`preflight`はnativeの版照合で、現行LTSとの不一致はNGとして記録します。
 実機scopeの準備条件と終了状態は[IDT検証](docs/idt-validation.md)を参照してください。
-追加2環境は過去SHAでの部分試験であり、現mainの全IDT合格には扱いません。
+追加2環境は各試験に記載した過去SHAでの部分試験であり、全IDT合格には扱いません。
 3環境のファイル構成・依存参照・版数の差と改定順は[共通基盤監査](docs/common-core-audit/README.md)を参照してください。
 旧`RUN_RX72N_IDT` / `RX72N_IDT_SCOPE`によるRX72N選択も保持します。
 
