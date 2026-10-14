@@ -452,7 +452,7 @@ Configuration Options
    0 = ROM cache operation disabled.
    1 = ROM cache operation enabled.
 */
-#define BSP_CFG_ROM_CACHE_ENABLE        (0)
+#define BSP_CFG_ROM_CACHE_ENABLE        (1)
 
 /* Configure WDT and IWDT settings.
    OFS0 - Option Function Select Register 0

@@ -43,10 +43,6 @@ class ProfileTests(unittest.TestCase):
         cls.bsp = (
             PROJECT / "src/smc_gen/r_config/r_bsp_config.h"
         ).read_text(encoding="utf-8")
-        cls.reference = (
-            PROJECT
-            / "src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h"
-        ).read_text(encoding="utf-8")
         cls.fwup = (
             PROJECT / "src/frtos_config/r_fwup_config.h"
         ).read_text(encoding="utf-8")
@@ -148,10 +144,7 @@ class ProfileTests(unittest.TestCase):
                     )
 
     def test_bsp_and_fwup_profile_values_are_exact(self) -> None:
-        for label, source in (
-            ("bsp", self.bsp),
-            ("reference", self.reference),
-        ):
+        for label, source in (("bsp", self.bsp),):
             with self.subTest(label=label):
                 result = builder.make_ota_bank_config(source, label)
                 self.assertIn(
@@ -161,10 +154,7 @@ class ProfileTests(unittest.TestCase):
                     "#define BSP_CFG_CODE_FLASH_BANK_MODE    (1)", result
                 )
         fwup = builder.make_ota_fwup_config(self.fwup)
-        self.assertIn(
-            "#define FWUP_CFG_AREA_SIZE                          (0x000C0000U)",
-            fwup,
-        )
+        self.assertRegex(fwup, r"#define\s+FWUP_CFG_AREA_SIZE\s+\(0x0*C0000U\)")
 
     def test_profile_restores_files_after_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -192,9 +182,9 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(before, after)
 
     def test_profile_fails_closed_if_project_drifted(self) -> None:
-        with self.assertRaisesRegex(ValueError, "bank mode"):
+        with self.assertRaisesRegex(ValueError, "dual-bank project"):
             builder.make_ota_cproject(
-                self.cproject.replace('modes="bank.single"', 'modes="bank.dual"'),
+                self.cproject.replace('modes="bank.dual"', 'modes="bank.single"'),
                 builder.parse_version("1.2.3"),
             )
         with self.assertRaisesRegex(ValueError, "persistent APP_VERSION"):
@@ -230,10 +220,12 @@ class ProfileTests(unittest.TestCase):
                 builder.parse_version("1.2.3"),
             )
 
-    def test_provisioner_profile_stays_bank_single_and_restores(self) -> None:
+    def test_provisioner_profile_stays_dual_with_standalone_vector_and_restores(self) -> None:
         result = builder.make_provisioner_cproject(self.cproject)
-        self.assertIn('modes="bank.single"', result)
-        self.assertNotIn('modes="bank.dual"', result)
+        self.assertIn('modes="bank.dual"', result)
+        self.assertNotIn('modes="bank.single"', result)
+        self.assertIn(f'value="{builder.PROVISIONER_START_VALUE}"', result)
+        self.assertNotIn(f'value="{builder.OTA_START_VALUE}"', result)
         self.assertIn(
             'value="-define=RX671_OTA_PROVISIONER_ENABLE=1"', result
         )
@@ -461,73 +453,27 @@ class SubmoduleProvenanceTests(unittest.TestCase):
             all(re.fullmatch(r"[0-9a-f]{40}", sha) for sha in gitlinks.values())
         )
 
-    def test_temporary_whd_patch_is_reversed_after_build(self) -> None:
+    def test_whd_changes_are_rejected_and_preserved_before_or_after_build(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
             submodule = repo / builder.WHD_SUBMODULE_RELATIVE
-            patch = repo / builder.WHD_PATCH_RELATIVE
             submodule.mkdir(parents=True)
-            patch.parent.mkdir(parents=True, exist_ok=True)
             run(["git", "init", "--quiet"], cwd=submodule, check=True)
-            run(
-                ["git", "config", "user.name", "OTA test"],
-                cwd=submodule,
-                check=True,
-            )
-            run(
-                ["git", "config", "user.email", "ota-test@example.invalid"],
-                cwd=submodule,
-                check=True,
-            )
             source = submodule / "source.txt"
             source.write_text("original\n", encoding="utf-8")
             run(["git", "add", "source.txt"], cwd=submodule, check=True)
-            run(
-                ["git", "commit", "--quiet", "-m", "fixture"],
-                cwd=submodule,
-                check=True,
-            )
-            patch.write_bytes(
-                b"diff --git a/source.txt b/source.txt\n"
-                b"--- a/source.txt\n"
-                b"+++ b/source.txt\n"
-                b"@@ -1 +1 @@\n"
-                b"-original\n"
-                b"+patched\n"
-            )
-            with builder.TemporaryWhdPatchIsolation(repo):
-                run(
-                    [
-                        "git",
-                        "apply",
-                        "--ignore-space-change",
-                        "--ignore-whitespace",
-                        str(patch),
-                    ],
-                    cwd=submodule,
-                    check=True,
-                )
-                self.assertEqual(
-                    "patched\n", source.read_text(encoding="utf-8")
-                )
-            self.assertEqual(
-                "original\n", source.read_text(encoding="utf-8")
-            )
-            self.assertEqual(
-                "",
-                run(
-                    [
-                        "git",
-                        "status",
-                        "--porcelain=v1",
-                        "--untracked-files=all",
-                    ],
-                    cwd=submodule,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                ).stdout,
-            )
+            run(["git", "-c", "user.name=Codex", "-c", "user.email=codex@openai.com",
+                 "commit", "--quiet", "-m", "synthetic fixture"], cwd=submodule, check=True)
+            with builder.PristineWhdInputs(repo):
+                self.assertEqual("original\n", source.read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(RuntimeError, "original sources changed"):
+                with builder.PristineWhdInputs(repo):
+                    source.write_text("unexpected change\n", encoding="utf-8")
+            self.assertEqual("unexpected change\n", source.read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(RuntimeError, "original sources changed"):
+                with builder.PristineWhdInputs(repo):
+                    self.fail("dirty dependency must fail before build")
+            self.assertEqual("unexpected change\n", source.read_text(encoding="utf-8"))
 
 
 class DirtyAnalysisTests(unittest.TestCase):

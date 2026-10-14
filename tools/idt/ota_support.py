@@ -48,41 +48,21 @@ def validate_target_manifest(manifest, target, *, allow_legacy=False):
 
 
 def verify_bootloader_signer(source, target, key, *, runtime=None, source_sha=None, environ=None):
-    """Validate the public key actually selected by a development bootloader."""
+    """Bind the OTA signer to public trust prepared for the first secure boot."""
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
-    if target["id"] == "rx671-wifi":
-        # Local public materials bind the intended signer, not existing Data
-        # Flash contents. The guarded flash callback must still run the real
-        # linear provisioner and verify this signer's actual initial RSU.
-        if runtime is None or source_sha is None:
-            raise ValueError("RX671 OTA requires verified LittleFS code_signer_public_key provisioning inputs "
-                             "and their exact source SHA before building")
-        try:
-            from .rx671_provision import validate_prepared_signer
-        except ImportError:
-            from rx671_provision import validate_prepared_signer
-        prepared = validate_prepared_signer(source, runtime, target, source_sha, environ)
-        public = key.public_key().public_bytes(serialization.Encoding.DER,
-                                               serialization.PublicFormat.SubjectPublicKeyInfo)
-        if hashlib.sha256(public).hexdigest() != prepared["public_signer_spki_sha256"]:
-            raise ValueError("OTA signing key does not match the prepared RX671 public signer")
-        return Path(prepared["signer_certificate"]).read_bytes()
+    if runtime is None or source_sha is None:
+        raise ValueError("OTA requires reviewed LittleFS public signer inputs and their exact source SHA")
     try:
-        from .prepare_transport_key import macro
+        from .public_signer_provision import validate_prepared_signer, source_inputs
     except ImportError:
-        from prepare_transport_key import macro
-    public_header = Path(source) / target["bootloader_project"] / "src/key/code_signer_public_key.h"
-    _, _, public_pem = macro(public_header.read_text(encoding="utf-8").splitlines(keepends=True),
-                             "CODE_SIGNER_PUBLIC_KEY_PEM")
-    if not public_pem:
-        raise ValueError("bootloader signing public key is missing")
-    public_body = public_pem.split("-----BEGIN PUBLIC KEY-----", 1)[1].split("-----END PUBLIC KEY-----", 1)[0]
-    boot_key = serialization.load_der_public_key(base64.b64decode(re.sub(r"\s+", "", public_body), validate=True))
-    if (not isinstance(boot_key, ec.EllipticCurvePublicKey)
-            or not isinstance(boot_key.curve, ec.SECP256R1)
-            or key.public_key().public_numbers() != boot_key.public_numbers()):
-        raise ValueError("OTA signing key does not match the development bootloader public key")
+        from public_signer_provision import validate_prepared_signer, source_inputs
+    prepared = validate_prepared_signer(source, runtime, target, source_sha, environ)
+    public = key.public_key().public_bytes(serialization.Encoding.DER,
+                                          serialization.PublicFormat.SubjectPublicKeyInfo)
+    if hashlib.sha256(public).hexdigest() != prepared["public_signer_spki_sha256"]:
+        raise ValueError("OTA signing key does not match the prepared public signer")
+    files = source_inputs(source, runtime, target, source_sha, environ)
+    return files["signer.crt.pem"].read_bytes()
 
 
 def payload_relative_path(target):
@@ -339,20 +319,16 @@ def record_packaging(value, target=None):
     for kind, path in artifacts:
         if path.is_symlink() or not path.is_file():
             raise RuntimeError("packaged firmware artifact is missing or a symlink: " + kind)
-    if target["id"] == "rx65n-bg96":
-        # The BG96 UART downloader sends this pad separately in production.
-        # The generic IDT downloader streams one file, so retain the same exact
-        # bytes in its UART artifact; OTA payloads never include this trailer.
-        image = rsu.read_bytes()
-        if len(image) == 0xC0000:
-            rsu.write_bytes(image + b"\xff" * 32768)
-        elif len(image) != 0xC8000 or image[-32768:] != b"\xff" * 32768:
-            raise RuntimeError("BG96 UART RSU has an unexpected image or const-data trailer")
+    image = rsu.read_bytes()
+    expected_size = 0xFFFC0000 - int(target["bank_range_start"], 0)
+    if (len(image) != expected_size or len(image) < 0x200 or
+            struct.unpack_from("<III", image, 0x12C) != (0, 0xFFFFFFFF, 0xFFFFFFFF)):
+        raise RuntimeError("UART RSU must contain only the signed Code Flash image and preserve Data Flash")
     for kind, path in artifacts:
         manifest.setdefault("outputs", {})[kind] = {
             "path": path.relative_to(source).as_posix(),
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "bytes": path.stat().st_size}
-    manifest["uart_trailer_bytes"] = 32768 if target["id"] == "rx65n-bg96" else 0
+    manifest["uart_trailer_bytes"] = 0
     (output / "build_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 

@@ -831,19 +831,15 @@ static void prvResetDevice(void)
 
 static BaseType_t prvActivateBank(void)
 {
-#if defined(BSP_MCU_RX65N)
-    /*
-     * CK-RX65N uses the common RX bootloader. The application leaves the
-     * temporary bank marked TESTING; the bootloader verifies it, refreshes its
-     * mirrored boot area, then performs FLASH_CMD_BANK_TOGGLE.
-     */
-    LogInfo(("prvActivateBank: defer bank toggle to RX65N bootloader"));
-    return pdTRUE;
-#elif defined(BSP_MCU_RX72N) || defined(BSP_MCU_RX671)
+#if defined(BSP_MCU_RX65N) || defined(BSP_MCU_RX72N) || defined(BSP_MCU_RX671)
     flash_err_t err;
+    uint32_t saved_psw;
 
     R_BSP_SoftwareDelay(5000U, BSP_DELAY_MILLISECS);
+    saved_psw = R_BSP_GET_PSW();
+    R_BSP_InterruptsDisable();
     err = R_FLASH_Control(FLASH_CMD_BANK_TOGGLE, NULL);
+    R_BSP_SET_PSW(saved_psw);
 
     if (FLASH_SUCCESS != err)
     {

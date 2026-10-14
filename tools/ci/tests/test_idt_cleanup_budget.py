@@ -36,8 +36,11 @@ class CleanupBudgetTests(unittest.TestCase):
                                         transaction + budget.FLASH_ABORT_RESET_SECONDS)
                 self.assertGreater(budget.flash_remote_seconds(name),
                                    transaction + budget.FLASH_ABORT_RESET_SECONDS)
-        self.assertGreater(budget.flash_transaction_seconds("rx671-wifi"),
-                           budget.flash_transaction_seconds("rx72n-ethernet"))
+        self.assertEqual(1, len({budget.flash_transaction_seconds(name)
+                                for name in budget.FLASH_TRANSACTION_PHASES}))
+        for phases in budget.FLASH_TRANSACTION_PHASES.values():
+            self.assertEqual(budget.PUBLIC_SIGNER_PROVISION_SECONDS, phases["signer_provisioning_cli"])
+            self.assertEqual(budget.FLASH_RFP_COMMAND_SECONDS, phases["initial_chip_erase"])
         with self.assertRaises(ValueError):
             budget.flash_transaction_seconds("")
 

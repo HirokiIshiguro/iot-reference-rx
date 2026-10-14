@@ -65,25 +65,25 @@ BaseType_t xprvWriteValueToImpl (KVStoreKey_t keyIndex, char *pucData, uint32_t 
 	lfs_file_t file;
 	lfs_ssize_t lfs_err;
 
-	lfs_err = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, (char *) keys[ keyIndex ]);
+	lfs_err = LfsCommon_Remove(LfsCommon_GetLfs(), (char *) keys[ keyIndex ]);
 
 	if ((LFS_ERR_NOENT != lfs_err) && (LFS_ERR_OK != lfs_err))
 	{
 		return -1;
 	}
 
-	lfs_err = lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS, &file, (char *) keys[ keyIndex ], LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
+	lfs_err = LfsCommon_FileOpen(LfsCommon_GetLfs(), &file, (char *) keys[ keyIndex ], LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
 
 	if (LFS_ERR_OK != lfs_err)
 	{
 		return -1;
 	}
 
-	lfs_err = lfs_file_write(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pucData, ulDataSize);
+	lfs_err = LfsCommon_FileWrite(LfsCommon_GetLfs(), &file, pucData, ulDataSize);
 	pvwrite +=ulDataSize;
 	vLfsSSizeToErr( &lfs_err, (lfs_ssize_t)ulDataSize );
 
-	lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+	LfsCommon_FileClose(LfsCommon_GetLfs(), &file);
 	return( lfs_err == LFS_ERR_OK );
 }
 
@@ -101,18 +101,18 @@ int32_t xprvReadValueFromImpl (KVStoreKey_t keyIndex,
 
 	lfs_file_t file;
 	lfs_ssize_t lfs_ret =
-		lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS,
+		LfsCommon_FileOpen(LfsCommon_GetLfs(),
 					  &file,
 					  (char *) keys[ keyIndex ],
 					  LFS_O_RDONLY);
 
-	lfs_ret = lfs_file_size(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+	lfs_ret = LfsCommon_FileSize(LfsCommon_GetLfs(), &file);
 
 	*ppucData = pvPortMalloc((size_t) lfs_ret);
 
 	if ((lfs_ret >= 0) && (NULL != *ppucData))
 	{
-		lfs_ret = lfs_file_read(&RM_STDIO_LITTLEFS_CFG_LFS, &file, *ppucData, (lfs_size_t) lfs_ret);
+		lfs_ret = LfsCommon_FileRead(LfsCommon_GetLfs(), &file, *ppucData, (lfs_size_t) lfs_ret);
 
 		if (lfs_ret >= 0)
 		{
@@ -123,7 +123,7 @@ int32_t xprvReadValueFromImpl (KVStoreKey_t keyIndex,
 	}
 	if( lfs_ret == LFS_ERR_OK )
 	{
-		lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+		LfsCommon_FileClose(LfsCommon_GetLfs(), &file);
 	}
 
 
@@ -140,7 +140,7 @@ int32_t xprvGetValueLengthFromImpl( KVStoreKey_t keyIndex)
 	size_t xLength = 0;
 	struct lfs_info xFileInfo = { 0 };
 
-	if( lfs_stat( &RM_STDIO_LITTLEFS_CFG_LFS, (char *) keys[ keyIndex ], &xFileInfo ) == LFS_ERR_OK )
+	if( LfsCommon_Stat( LfsCommon_GetLfs(), (char *) keys[ keyIndex ], &xFileInfo ) == LFS_ERR_OK )
 	{
 		xLength =  xFileInfo.size;
 	}
@@ -159,7 +159,7 @@ int32_t GetTotalLengthFromImpl()
     struct lfs_info xFileInfo = { 0 };
     for (uint32_t i = 0; i < KVS_NUM_KEYS; i++)
     {
-        if (lfs_stat (&RM_STDIO_LITTLEFS_CFG_LFS, (char*) keys[i], &xFileInfo) == LFS_ERR_OK)
+        if (LfsCommon_Stat (LfsCommon_GetLfs(), (char*) keys[i], &xFileInfo) == LFS_ERR_OK)
         {
             xLength += xFileInfo.size;
         }

@@ -32,7 +32,7 @@
 /* Standard includes. */
 #include <stdio.h>
 #include <string.h>
-#include "../../../../../Common/littlefs_common/lfs_util_config.h"
+#include "lfs_common_data.h"
 
 #include "FreeRTOS.h"
 #include "lfs.h"
@@ -54,7 +54,6 @@
 #endif
 
 
-extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
 
 #define KVSTORE_KEY_MAX_LEN    32
 #define KVSTORE_VAL_MAX_LEN    2048

@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 /* C runtime includes. */
+#include "public_signer_provisioner.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -212,6 +213,11 @@ static BaseType_t xDisplayInitialized = pdFALSE;
  *********************************************************************************************************************/
 void main_task(void *pvParameters)
 {
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+    (void)pvParameters;
+    vRunPublicSignerProvisioner(NULL);
+#else
+
     int32_t xResults;
     int32_t xCacheInitResult = LFS_ERR_OK;
     int32_t Time2Wait = 10000;
@@ -334,6 +340,7 @@ void main_task(void *pvParameters)
     {
         vTaskSuspend(NULL);
     }
+#endif /* PUBLIC_SIGNER_PROVISIONER_ENABLE */
 }
 /*****************************************************************************************
 End of function main_task

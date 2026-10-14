@@ -187,12 +187,14 @@ class OtaSupportTests(unittest.TestCase):
             encoded = bytes([len(data) + 5]) + address.to_bytes(4, "big") + data
             return "S3" + (encoded + bytes([(~sum(encoded)) & 0xFF])).hex().upper() + "\n"
         mot = root / "provisioner.mot"
-        mot.write_text(record(0xFFE00000, b"ephemeral-linear-fixture") +
-                       record(0xFFFFFFFC, b"\x00\x00\xe0\xff"), encoding="ascii")
+        mot.write_text(record(0xFFF00300, b"ephemeral-dual-fixture") +
+                       record(0xFFFFFFFC, b"\x00\x03\xf0\xff") +
+                       record(0xFE7F5D00, bytes.fromhex("8FFFFFFF")) +
+                       record(0xFE7F5D20, bytes.fromhex("FFFFFFFF")), encoding="ascii")
         source_sha = "a" * 40
         manifest = root / "manifest.json"
         manifest.write_text(json.dumps({"schema_version": 1,
-            "profile": "rx671-bank-single-ota-provisioner-v1", "bank_mode": "bank.single",
+            "profile": "rx671-bank-dual-ota-provisioner-v2", "bank_mode": "bank.dual",
             "credentials_embedded": False, "source_sha": source_sha,
             "sha256": {"aws_wifi_rx671_ek.mot": hashlib.sha256(mot.read_bytes()).hexdigest()}}))
         policy_dir = self.source / target["bootloader_project"] / "src"

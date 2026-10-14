@@ -35,7 +35,6 @@ def make_profile(project: Path, group: str, version: Version) -> dict[str, str]:
     )
     for path in (
         "src/smc_gen/r_config/r_bsp_config.h",
-        "src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h",
     ):
         files[path] = make_ota_bank_config(files[path], path)
     return files

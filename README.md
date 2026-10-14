@@ -57,7 +57,7 @@ AWS IoT MQTT OTA / software TLS 1.2の単発実測です。時間はダウンロ
 | 項目 | 状態 |
 |---|---|
 | AWS IoT MQTT / OTA / Fleet Provisioning | 3ターゲット × software / TSIP × TLS 1.2 / 1.3を実機確認済み |
-| TLS 1.3 resumption / 0-RTT | LANBENCH対向で全6環境を5回連続確認済み |
+| TLS 1.3 resumption / 0-RTT | 旧構成のLANBENCH対向で全6環境を5回連続確認済み（共通化後のTSIP 0-RTTは未対応） |
 | release tag pipeline | [`#11140`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11140) が35/35 job success |
 
 個別セルは[検証結果](docs/validation-evidence.md)を参照してください。AWS IoT Coreは

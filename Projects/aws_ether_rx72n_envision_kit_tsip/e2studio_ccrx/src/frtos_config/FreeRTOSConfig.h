@@ -27,6 +27,8 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
+#define configHEAP_CLEAR_MEMORY_ON_FREE    0
+
 
 /* Unity includes. */
 #if defined(FREERTOS_ENABLE_UNIT_TESTS)
@@ -63,7 +65,7 @@
 #define configAPPLICATION_ALLOCATED_HEAP           1
 #define configMAX_TASK_NAME_LEN                    (12)
 #define configUSE_TRACE_FACILITY                   1
-#define configUSE_16_BIT_TICKS                     0
+#define configTICK_TYPE_WIDTH_IN_BITS    TICK_TYPE_WIDTH_32_BITS
 #define configIDLE_SHOULD_YIELD                    1
 #define configUSE_CO_ROUTINES                      0
 #define configUSE_MUTEXES                          1
@@ -72,13 +74,13 @@
 #define configUSE_APPLICATION_TASK_TAG             0
 #define configUSE_COUNTING_SEMAPHORES              1
 #define configUSE_ALTERNATIVE_API                  0
-#define configNUM_THREAD_LOCAL_STORAGE_POINTERS    3      /* FreeRTOS+FAT requires 2 pointers if a CWD is supported. */
+#define configNUM_THREAD_LOCAL_STORAGE_POINTERS    3
 #define configRECORD_STACK_HIGH_ADDRESS            1
 
 /* Task notification settings. */
 #define configTASK_NOTIFICATION_ARRAY_ENTRIES      4
 
-#define configUSE_DAEMON_TASK_STARTUP_HOOK 1
+#define configUSE_DAEMON_TASK_STARTUP_HOOK 0
 
 #define configCPU_CLOCK_HZ				(BSP_ICLK_HZ)
 #define configPERIPHERAL_CLOCK_HZ		(BSP_PCLKB_HZ)

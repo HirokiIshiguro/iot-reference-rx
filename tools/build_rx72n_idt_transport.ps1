@@ -2,7 +2,7 @@ param(
     [string]$ProjectRoot = (Split-Path $PSScriptRoot -Parent),
     [ValidateSet('rx72n-ethernet', 'rx65n-bg96', 'rx671-wifi')]
     [string]$Target = 'rx72n-ethernet',
-    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studioc.exe",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
     [string]$Workspace = "",
     [string]$Python = 'python',
     [string]$OutputDirectory = "",
@@ -10,6 +10,8 @@ param(
     [string]$ValidationReportFile = "",
     [ValidateSet('Transport', 'DeviceAdvisor', 'OTAE2E', 'PKCS11', 'OTAPAL')]
     [string]$TestGroup = 'Transport',
+    [ValidateSet('', 'StartFinish', 'NoObject')]
+    [string]$Pkcs11Group = '',
     [int]$E2StudioTimeoutSeconds = 900,
     [switch]$ValidateOnly
 )
@@ -19,6 +21,19 @@ param(
 # transport. Do not downgrade or rewrite the manifest to satisfy IDT versions.
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+if ($TestGroup -eq 'PKCS11' -and -not $Pkcs11Group) {
+    throw 'PKCS11 requires an explicit -Pkcs11Group StartFinish or NoObject; do not infer it from edits to borrowed sources.'
+}
+if ($TestGroup -ne 'PKCS11' -and $Pkcs11Group) {
+    throw '-Pkcs11Group applies only to -TestGroup PKCS11.'
+}
+$pkcs11Selection = switch ($Pkcs11Group) {
+    'StartFinish' { [ordered]@{ definition=1; native_test_id='Full_PKCS11_StartFinish'; assertion_cases=6;
+        groups=@('Full_PKCS11_StartFinish', 'Full_PKCS11_Capabilities') } }
+    'NoObject' { [ordered]@{ definition=2; native_test_id='Full_PKCS11_NoObject'; assertion_cases=5;
+        groups=@('Full_PKCS11_Capabilities', 'Full_PKCS11_NoObject') } }
+    default { $null }
+}
 
 $idtRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $targetManifestPath = Join-Path $idtRoot 'tools/idt/targets.json'
@@ -127,8 +142,8 @@ $testLibrarySha = $provenance.test_library_sha.ToLowerInvariant()
 $sourceWasDirty = $provenance.source_tree_dirty
 
 # Capture at the original initialized Git tree. Runtime copies must match the
-# captured file list and bytes. PKCS11 alone permits the pinned native suite's
-# verified runner-group selection, without permitting other code changes.
+# captured file list and bytes. Test selection belongs to the product adapter;
+# no selector, line-ending or body changes are permitted in dependencies.
 $dependencyTool = Join-Path $PSScriptRoot 'idt_source_manifest.py'
 $dependencyVerification = $null
 if ($ProvenanceFile) {
@@ -186,7 +201,7 @@ foreach ($flag in $testFlags.Keys) {
 $testSources = [ordered]@{
     "rx72n_idt_platform.c" = "Test/ports/rx72n_idt_platform.c"
     "rx72n_idt_transport.c" = "Test/ports/rx72n_idt_transport.c"
-    "test_framework.c" = "Test/Common/test_framework.c"
+    "rx_idt_unity_output.c" = "Test/ports/rx_idt_unity_output.c"
     "transport_interface_test.c" = "Test/FreeRTOS-Libraries-Integration-Tests/src/transport_interface/transport_interface_test.c"
     "unity.c" = "Test/Unity/src/unity.c"
     "unity_fixture.c" = "Test/Unity/extras/fixture/src/unity_fixture.c"
@@ -410,7 +425,10 @@ foreach ($include in $testIncludes) {
 }
 if ($TestGroup -in @('Transport', 'PKCS11', 'OTAPAL')) {
     if ($TestGroup -eq 'Transport') { Add-OptionValue $defineOption 'ENABLE_IDT_TRANSPORT_TEST=1' }
-    elseif ($TestGroup -eq 'PKCS11') { Add-OptionValue $defineOption 'ENABLE_IDT_PKCS11_TEST=1' }
+    elseif ($TestGroup -eq 'PKCS11') {
+        Add-OptionValue $defineOption 'ENABLE_IDT_PKCS11_TEST=1'
+        Add-OptionValue $defineOption ('RX_IDT_PKCS11_SELECTED_GROUP=' + $pkcs11Selection.definition)
+    }
     else { Add-OptionValue $defineOption 'ENABLE_IDT_OTAPAL_TEST=1' }
     Add-OptionValue $defineOption 'UNITY_INCLUDE_CONFIG_H'
 }
@@ -474,6 +492,7 @@ if ($ValidateOnly) {
         }
         [ordered]@{ target_id=$Target; target_sha256=$targetSha256; group=$TestGroup;
                     repository_variable=$repositoryVariable; source_links=$sourceLinks;
+                    pkcs11_selection=$pkcs11Selection;
                     qualification='not-established'; compiler_invoked=$false } |
             ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ValidationReportFile -Encoding UTF8
     }
@@ -603,6 +622,7 @@ try {
         }
         mode = $(if ($TestGroup -eq 'Transport') { 'idt-transport-only' } else { "idt-$($TestGroup.ToLowerInvariant())" })
         suite = $suiteName
+        pkcs11_selection = $pkcs11Selection
         application_version = $appVersion
         image_id = $otaImageId
         signer_header_sha256 = $otaSignerHeaderHash
@@ -624,12 +644,22 @@ try {
         dependency_file_count = @($provenance.dependency_files_sha256.PSObject.Properties).Count
         dependency_pkcs11_runner = $(if ($null -ne $dependencyVerification) { $dependencyVerification.pkcs11_runner } else { $null })
         production_stack = $productionStack
-        bootloader_policy_sha256 = $(if ($Target -eq 'rx671-wifi') {
+        bootloader_policy_sha256 = $(
+            $chipHeader = switch ($Target) {
+                'rx72n-ethernet' { 'rx72n.h' }
+                'rx65n-bg96' { 'rx65n.h' }
+                'rx671-wifi' { 'rx671.h' }
+                default { throw 'Unknown bootloader target policy' }
+            }
+            $chipPath = Join-Path $idtBootProject "src/$chipHeader"
+            if (-not (Test-Path -LiteralPath $chipPath)) {
+                $chipPath = Join-Path $idtBootProject "lib/rx_bootloader/config/$chipHeader"
+            }
             @{
                 'rx_bootloader_config.h' = (Get-FileHash -LiteralPath (Join-Path $idtBootProject 'src/rx_bootloader_config.h') -Algorithm SHA256).Hash.ToLowerInvariant()
-                'rx671.h' = (Get-FileHash -LiteralPath (Join-Path $idtBootProject 'src/rx671.h') -Algorithm SHA256).Hash.ToLowerInvariant()
+                $chipHeader = (Get-FileHash -LiteralPath $chipPath -Algorithm SHA256).Hash.ToLowerInvariant()
             }
-        } else { $null })
+        )
         execution_config_sha256 = (Get-FileHash -LiteralPath $executionPath -Algorithm SHA256).Hash.ToLowerInvariant()
         parameter_config_sha256 = (Get-FileHash -LiteralPath (Join-Path $idtRoot 'Test/include/test_param_config.h') -Algorithm SHA256).Hash.ToLowerInvariant()
         outputs = $outputs

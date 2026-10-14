@@ -14,9 +14,28 @@ Current results and host setup are maintained in [IDT validation](../../docs/idt
 |---|---|---|
 | `transport` | `Transport` | `rx72n_idt_transport.c`; upstream transport assertions |
 | `mqtt` | `DeviceAdvisor` | `rx72n_idt_cloud.c`; production MQTT agent / SimplePubSub, evaluated by native `FullCloudIoT` |
-| `pkcs11` | `PKCS11` | `rx72n_idt_pkcs11.c`; upstream `RunPkcs11Test()` and production provisioning helpers |
+| `pkcs11` | `PKCS11` | `rx72n_idt_pkcs11.c`; product-selected public Unity group runners and production provisioning helpers |
 | `ota-pal` | `OTAPAL` | `rx72n_idt_otapal.c`; existing `Test/Custom/ota/ota_pal_test.c` assertions |
 | `ota-mqtt` | `OTAE2E` | `rx72n_idt_cloud.c`; production MQTT / OTA tasks and IDT-provided application version |
+
+PKCS11 requires an explicit builder argument `-Pkcs11Group StartFinish` or
+`-Pkcs11Group NoObject`. The builder sets `RX_IDT_PKCS11_SELECTED_GROUP=1` or `=2`.
+StartFinish runs the original StartFinish and Capabilities group runners (six
+cases); NoObject runs Capabilities and its original group runner (five cases).
+Across the two native executions, Capabilities repeats and ten distinct basic
+cases of native `FullPKCS11_Core` are covered.
+The adapter calls the public Unity `RUN_TEST_GROUP` entries.
+Borrowed test bodies, group runners and Unity sources remain byte-identical to
+their fixed submodules. The dependency checker rejects selector comments and
+line-ending changes as well as test-body changes; it never rewrites the input.
+Native FRQ receives a product-owned configuration view containing an editable
+group list. The callback maps that list to the argument and imports the SDK's
+edited product headers into a separate private build tree. The original SDK
+assertions compile unchanged from the captured dependency inputs. Actual FRQ
+component invocations confirmed both selector routes against a host fixture that
+intentionally stopped the build callback. That proves input routing only; it
+does not establish the native group result or IDT qualification.
+See [PKCS11 input boundary](PKCS11_INPUT_BOUNDARY.md).
 
 `preflight` checks versions on the host and does not build firmware.
 The builder requires exactly the selected test flag; other test flags stay zero.

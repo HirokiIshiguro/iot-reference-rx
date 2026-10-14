@@ -12,12 +12,11 @@
 #define FWUP_CFG_UPDATE_MODE                        (0)
 #define FWUP_CFG_FUNCTION_MODE                      (1)
 
-/* RX671 2 MB code flash, prepared for the future dual-bank OTA layout.
- * The OTA image build profile temporarily narrows each install area to
- * 768 KiB while preserving this linear-mode runtime default. */
+/* RX671 2 MiB code flash uses two 1 MiB banks. Each application area is
+ * 768 KiB; the last 256 KiB of each bank is reserved for the bootloader. */
 #define FWUP_CFG_MAIN_AREA_ADDR_L                   (0xFFF00000U)
 #define FWUP_CFG_BUF_AREA_ADDR_L                    (0xFFE00000U)
-#define FWUP_CFG_AREA_SIZE                          (0x00100000U)
+#define FWUP_CFG_AREA_SIZE                          (0xC0000U)
 
 #define FWUP_CFG_CF_BLK_SIZE                        (0x8000U)
 #define FWUP_CFG_CF_W_UNIT_SIZE                     (128U)

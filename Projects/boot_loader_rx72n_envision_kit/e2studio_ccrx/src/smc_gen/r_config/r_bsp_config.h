@@ -101,13 +101,13 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
    Character(s) = Value for macro = Description
    2N           = 0x0             = RX72N Group
 */
-#define BSP_CFG_MCU_PART_GROUP          (0x0) /* Generated value. Do not edit this manually */
+#define BSP_CFG_MCU_PART_GROUP          "RX72N"
 
 /* Series name.
    Character(s) = Value for macro = Description
    57           = 0x0             = RX700 Series
 */
-#define BSP_CFG_MCU_PART_SERIES         (0x0) /* Generated value. Do not edit this manually */
+#define BSP_CFG_MCU_PART_SERIES         "RX700"
 
 /* Memory type.
    Character(s) = Value for macro = Description
@@ -417,7 +417,7 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
    0 = ROM cache operation disabled.
    1 = ROM cache operation enabled.
 */ 
-#define BSP_CFG_ROM_CACHE_ENABLE        (0)
+#define BSP_CFG_ROM_CACHE_ENABLE        (1)
 
 /* Configure non-cacheable area 0 of the ROM cache function.
    0 = Non-cacheable area 0 settings disabled.
@@ -753,8 +753,8 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
    1 = Software interrupt is used.
    NOTE: When this macro is set to 1, the software interrupt is initialized in bsp startup routine. 
 */
-#define BSP_CFG_SWINT_UNIT1_ENABLE    (1)
-#define BSP_CFG_SWINT_UNIT2_ENABLE    (1)
+#define BSP_CFG_SWINT_UNIT1_ENABLE    (0)
+#define BSP_CFG_SWINT_UNIT2_ENABLE    (0)
 
 /* Software Interrupt Task Buffer Number.
    For software interrupt, this value is number of buffering user tasks.
@@ -787,5 +787,35 @@ NOTE: The RAM areas are not contiguous.It is separated by 512 KB each.
    0(low) - 15(high)
  */
 #define MY_BSP_CFG_SERIAL_TERM_SCI_INTERRUPT_PRIORITY   (15)
+
+/* BSP 7.71 settings added without replacing the board clock/memory configuration. */
+#define BSP_CFG_MCU_PART_ENCRYPTION_INCLUDED (true)
+#define BSP_CFG_BUS_PRIORITY_INITIALIZE_ENABLE           (0)
+#define BSP_CFG_CONFIGURATOR_VERSION                     (2280)
+#define BSP_CFG_CPLUSPLUS                                (0)
+#define BSP_CFG_EXPANSION_RAM_ENABLE                     (1)
+#define BSP_CFG_EXTERNAL_BUS_PRIORITY                    (0)
+#define BSP_CFG_HOCO_OSCILLATE_ENABLE                    (0)
+#define BSP_CFG_INTERNAL_PERIPHERAL_BUS1_PRIORITY        (0)
+#define BSP_CFG_INTERNAL_PERIPHERAL_BUS2_3_PRIORITY      (0)
+#define BSP_CFG_INTERNAL_PERIPHERAL_BUS4_5_PRIORITY      (0)
+#define BSP_CFG_INTERNAL_PERIPHERAL_BUS6_PRIORITY        (0)
+#define BSP_CFG_IWDT_CLOCK_OSCILLATE_ENABLE              (0)
+#define BSP_CFG_LOCO_OSCILLATE_ENABLE                    (0)
+#define BSP_CFG_LOW_LEVEL_INTERFACE_REENTRANT_LIB_ENABLE (1)
+#define BSP_CFG_LOW_LEVEL_INTERFACE_SBRK_ENABLE          (1)
+#define BSP_CFG_LOW_LEVEL_INTERFACE_STDIO_ENABLE         (1)
+#define BSP_CFG_MAIN_CLOCK_OSCILLATE_ENABLE              (1)
+#define BSP_CFG_MEMORY_BUS1_3_PRIORITY                   (0)
+#define BSP_CFG_MEMORY_BUS2_PRIORITY                     (0)
+#define BSP_CFG_SCI_UART_TERMINAL_BITRATE                (921600)
+#define BSP_CFG_SCI_UART_TERMINAL_CHANNEL                (7)
+#define BSP_CFG_SCI_UART_TERMINAL_ENABLE                 (1)
+#define BSP_CFG_SCI_UART_TERMINAL_INTERRUPT_PRIORITY     (15)
+#define BSP_CFG_SERIAL_PROGRAMMER_CONECT_ENABLE          (1)
+#define BSP_CFG_SUB_CLOCK_OSCILLATE_ENABLE               (0)
+#define BSP_CFG_USER_ENTER_CRITICAL_FUNCTION             my_enter_critical_function
+#define BSP_CFG_USER_EXCLUSIVE_CONTROL_ENABLE            (0)
+#define BSP_CFG_USER_EXIT_CRITICAL_FUNCTION              my_exit_critical_function
 
 #endif /* R_BSP_CONFIG_REF_HEADER_FILE */

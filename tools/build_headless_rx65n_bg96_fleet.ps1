@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studio-cli.exe",
-    [string]$Workspace = "C:\iotref-rx65n-bg96-fleet-ws",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
+    [string]$Workspace = "C:\ai\codex\ws\iotref-rx65n-bg96-fleet-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build_fleet.log"),
     [string]$FleetDemoId = "rx65n-bg96-fp",
     [int]$E2StudioTimeoutSeconds = 600,
@@ -10,9 +10,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "rx_e2studio_cli.ps1")
 Set-StrictMode -Version Latest
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
+Initialize-RxBuildDependencies -ProjectRoot $projectRoot
+Assert-RxCommonKernel -ProjectRoot $projectRoot
 $normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
 switch ($normalizedTlsBackend) {
     "software" { $appProjectName = "aws_bg96_ck_rx65n" }
@@ -38,9 +41,9 @@ function Set-FleetDemoBuildInputs {
 
 # Add inputs and outputs from these tool invocations to the build variables
 C_SRCS += \
-../Demos/Fleet_Provisioning_With_CSR_Demo/FleetProvisioningDemoExample.c \
-../Demos/Fleet_Provisioning_With_CSR_Demo/pkcs11_operations.c \
-../Demos/Fleet_Provisioning_With_CSR_Demo/tinycbor_serializer.c
+@@FLEET_SOURCE_ROOT@@/FleetProvisioningDemoExample.c \
+@@FLEET_SOURCE_ROOT@@/pkcs11_operations.c \
+@@FLEET_SOURCE_ROOT@@/tinycbor_serializer.c
 
 COMPILER_OBJS += \
 Demos/Fleet_Provisioning_With_CSR_Demo/FleetProvisioningDemoExample.obj \
@@ -53,11 +56,16 @@ Demos/Fleet_Provisioning_With_CSR_Demo/pkcs11_operations.d \
 Demos/Fleet_Provisioning_With_CSR_Demo/tinycbor_serializer.d
 
 # Each subdirectory must supply rules for building sources it contributes
-Demos/Fleet_Provisioning_With_CSR_Demo/%.obj: ../Demos/Fleet_Provisioning_With_CSR_Demo/%.c Demos/Fleet_Provisioning_With_CSR_Demo/Compiler.sub
+Demos/Fleet_Provisioning_With_CSR_Demo/%.obj: @@FLEET_SOURCE_ROOT@@/%.c Demos/Fleet_Provisioning_With_CSR_Demo/Compiler.sub
 	@echo 'Scanning and building file: $<'
 	ccrx -subcommand="Demos\Fleet_Provisioning_With_CSR_Demo\cDepSubCommand.tmp" -output=dep="$(@:%.obj=%.d)" -MT="$(@:%.d=%.obj)" -MT="$(@:%.obj=%.d)" "$<"
 	ccrx -subcommand="Demos\Fleet_Provisioning_With_CSR_Demo\cSubCommand.tmp" "$<"
 '@
+
+    $fleetSourceRoot = (Join-Path $projectRoot "Demos\Fleet_Provisioning_With_CSR_Demo") -replace '\\', '/'
+    # GNU make prerequisites escape spaces; CC-RX receives the quoted $<.
+    $fleetSourceRoot = $fleetSourceRoot.Replace(' ', '\ ')
+    $subdirContent = $subdirContent.Replace('@@FLEET_SOURCE_ROOT@@', $fleetSourceRoot)
 
     [System.IO.File]::WriteAllText(
         $SubdirMk,

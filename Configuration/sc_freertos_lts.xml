@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SAFFTI project configuration only. Kernel source is the pristine root submodule.
+     This is not a Renesas-issued RTOS package. No source files are copied by this descriptor. -->
+<refinfo>
+    <package>
+        <type>rtosmodule</type>
+        <name>FreeRTOSLTS</name>
+        <version>202604.00-LTS-saffti-1.0.0</version>
+        <component>
+            <name>FreeRTOS_Kernel</name>
+            <display>FreeRTOS Kernel</display>
+            <detail>FreeRTOS V11.3.0 from the root git submodule; configure headers only.</detail>
+            <configgenpath><path>src/frtos_config/FreeRTOSConfig.h</path></configgenpath>
+            <category>rtos.kernel</category>
+        </component>
+        <component>
+            <name>FreeRTOS_IP</name>
+            <display>FreeRTOS-Plus-TCP</display>
+            <detail>Configure the IP stack header; source stays in the root git submodule.</detail>
+            <configgenpath><path>src/frtos_config/FreeRTOSIPConfig.h</path></configgenpath>
+            <category>rtos.library</category>
+        </component>
+        <component>
+            <name>LittleFS</name>
+            <display>LittleFS</display>
+            <detail>Configure the filesystem header; source stays in the root git submodule.</detail>
+            <configgenpath><path>src/frtos_config/rm_littlefs_flash_config.h</path></configgenpath>
+            <category>rtos.library</category>
+        </component>
+    </package>
+</refinfo>

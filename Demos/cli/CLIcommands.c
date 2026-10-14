@@ -44,6 +44,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include "config_command_value.h"
 
 /* FreeRTOS+CLI includes. */
 #include "FreeRTOS_CLI.h"
@@ -257,7 +259,7 @@ static CLI_Command_Definition_t xCommandConfig =
                                    "           {rootca}   : select root CA certificate as input target element\r\n"
                                    "           {codesigncert} : select code signer certificate as input target element\r\n"
                                    "           {codesignpubkey}: select bootloader code signer public key as input target element\r\n"
-                                   "           VALUE : the value of input target element, this is only required for 'conf set' command\r\n"
+                                   "           VALUE : complete remaining text, including PEM spaces; required for 'conf set'\r\n"
                                    "    Usage: conf commit\r\n"
                                    "           commit   : to write the configured value to Internal Data Flash Memory\r\n",
 #endif
@@ -331,6 +333,11 @@ void vRegisterSampleCLICommands( void )
         FreeRTOS_CLIRegisterCommand( &xStartStopTrace );
     }
     #endif
+}
+
+void vRegisterPublicSignerCLICommands(void)
+{
+    FreeRTOS_CLIRegisterCommand(&xCommandConfig);
 }
 /**********************************************************************************************************************
  End of function vRegisterSampleCLICommands
@@ -421,7 +428,7 @@ static BaseType_t prvRunTimeStatsCommand( char *pcWriteBuffer, size_t xWriteBuff
         ( void ) xWriteBufferLen;
         configASSERT( pcWriteBuffer );
 
-        sprintf( pcWriteBuffer, "Current free heap %d bytes, minimum ever free heap %d bytes\r\n", ( int ) xPortGetFreeHeapSize(), ( int ) xPortGetMinimumEverFreeHeapSize() );
+        snprintf( pcWriteBuffer, xWriteBufferLen, "Current free heap %d bytes, minimum ever free heap %d bytes\r\n", ( int ) xPortGetFreeHeapSize(), ( int ) xPortGetMinimumEverFreeHeapSize() );
 
         /* There is no more data to return after this single string, so return
         pdFALSE. */
@@ -449,7 +456,7 @@ static BaseType_t prvWaitMessage( char * pcWriteBuffer,
     extern signed char cRxedChar;
     if (0 != cRxedChar)
     {
-            sprintf( pcWriteBuffer, "Going to FreeRTOS-CLI !\r\n");
+            snprintf( pcWriteBuffer, xWriteBufferLen, "Going to FreeRTOS-CLI !\r\n");
     }
 
     return pdFALSE;
@@ -476,7 +483,7 @@ static BaseType_t prvReset( char * pcWriteBuffer,
     (void)pcCommandString;
     (void)xWriteBufferLen;
     configASSERT( pcWriteBuffer );
-    sprintf( pcWriteBuffer, "Resetting !\r\n");
+    snprintf( pcWriteBuffer, xWriteBufferLen, "Resetting !\r\n");
     vTaskDelay(1000);
     R_BSP_SET_PSW( 0 );
     R_BSP_InterruptsDisable();
@@ -510,22 +517,17 @@ static BaseType_t prvFormat( char * pcWriteBuffer,
     (void)xWriteBufferLen;
     int32_t err;
 
-    /* File system is already mounted, unmount it to free up memory. */
-    lfs_unmount(&g_rm_littlefs0_lfs);
-    RM_LITTLEFS_FLASH_Open(g_rm_littlefs0.p_ctrl, g_rm_littlefs0.p_cfg);
-
-    err = lfs_format(&g_rm_littlefs0_lfs, &g_rm_littlefs0_lfs_cfg);
+    err = littlFs_format();
     if (LFS_ERR_OK == err)
     {
-        lfs_mount(&g_rm_littlefs0_lfs, &g_rm_littlefs0_lfs_cfg);
-        sprintf( pcWriteBuffer, "Format OK !\r\n");
+        snprintf( pcWriteBuffer, xWriteBufferLen, "Format OK !\r\n");
 
         /* Format the cache too */
         vprvCacheFormat();
     }
     else
     {
-        sprintf( pcWriteBuffer, "Format NG !\r\n");
+        snprintf( pcWriteBuffer, xWriteBufferLen, "Format NG !\r\n");
     }
 
     /* There is no more data to return after this single string, so return
@@ -544,10 +546,32 @@ static BaseType_t prvFormat( char * pcWriteBuffer,
  *              : pcCommandString
  * Return Value : .
  *********************************************************************************************************************/
+static const char * prvConfigValue(const char * command, BaseType_t * length)
+{
+    size_t size = 0U;
+    const char * value = Cli_ConfigValueTail(command, &size);
+    *length = 0;
+    if ((value != NULL) && (size <= INT_MAX))
+    {
+        *length = (BaseType_t)size;
+        return value;
+    }
+    return NULL;
+}
+
 static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                                            size_t xWriteBufferLen,
                                            const char * pcCommandString )
 {
+    if ((pcWriteBuffer == NULL) || (xWriteBufferLen == 0U)) { return pdFALSE; }
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+    if (!Cli_PublicSignerCommandAllowed(pcCommandString))
+    {
+        snprintf(pcWriteBuffer, xWriteBufferLen,
+                 "Public signer profile: use conf get/set codesigncert/codesignpubkey or conf commit.\r\n");
+        return pdFALSE;
+    }
+#endif
 #if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
     (void) xWriteBufferLen;
     BaseType_t   result        = pdPASS;
@@ -584,12 +608,12 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                     if( ( 0U < prvGetCacheEntryLength( xKey ) ) ||
                         ( 0 < xprvGetValueLengthFromImpl( xKey ) ) )
                     {
-                        sprintf(pcWriteBuffer, "%s configured; readback disabled.\r\n",
+                        snprintf(pcWriteBuffer, xWriteBufferLen, "%s configured; readback disabled.\r\n",
                                 pcWifiLabel);
                     }
                     else
                     {
-                        sprintf(pcWriteBuffer, "%s not configured.\r\n",
+                        snprintf(pcWriteBuffer, xWriteBufferLen, "%s not configured.\r\n",
                                 pcWifiLabel);
                     }
                 }
@@ -599,11 +623,11 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                     getValue = (const char *)xprvGetCacheEntry((char *)pKey, (size_t)keyLength);
                     if (NULL == getValue)
                     {
-                        sprintf(pcWriteBuffer, "Configuration value not found in Data Flash.\r\n");
+                        snprintf(pcWriteBuffer, xWriteBufferLen, "Configuration value not found in Data Flash.\r\n");
                     }
                     else
                     {
-                        sprintf(pcWriteBuffer, "%s\r\n", getValue);
+                        snprintf(pcWriteBuffer, xWriteBufferLen, "%s\r\n", getValue);
                         getValue = NULL;
                     }
                 }
@@ -613,7 +637,7 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                   ( 0 == strncmp( pRequest, "set", (size_t)requestLength ) ) )
         {
             pKey   = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
-            pValue = FreeRTOS_CLIGetParameter( pcCommandString, 3U, &valueLength );
+            pValue = prvConfigValue(pcCommandString, &valueLength);
             if( NULL != pKey )
             {
                 xKey = (KVStoreKey_t)Filename2Handle( (char *)pKey,
@@ -634,11 +658,11 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                     (KVS_TSIP_CLIENT_PUBKEY_ID == xKey) ||
                     (KVS_TSIP_CLIENT_PRIKEY_ID == xKey))
                 {
-                    sprintf(pcWriteBuffer, "The TSIP key index cannot be write.\r\n");
+                    snprintf(pcWriteBuffer, xWriteBufferLen, "The TSIP key index cannot be write.\r\n");
                 }
                 else
                 {
-                    sprintf(pcWriteBuffer, "OK.\r\n" );
+                    snprintf(pcWriteBuffer, xWriteBufferLen, "OK.\r\n" );
                 }
             }
         }
@@ -666,7 +690,7 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
             }
             else
             {
-                sprintf(pcWriteBuffer, "OK.\r\n" );
+                snprintf(pcWriteBuffer, xWriteBufferLen, "OK.\r\n" );
             }
             prvSecureZero( pucDecoded, sizeof(pucDecoded) );
         }
@@ -679,12 +703,12 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                 uint32_t totalSize = GetTotalLengthFromImpl();
 
                 /* Cast to type "int" to be compatible with parameter type */
-                sprintf(pcWriteBuffer, "Configuration save %d bytes to Data Flash. Total used size is %d bytes .\r\n", (int)pvwrite, (int)totalSize );
+                snprintf(pcWriteBuffer, xWriteBufferLen, "Configuration save %d bytes to Data Flash. Total used size is %d bytes .\r\n", (int)pvwrite, (int)totalSize );
                 pvwrite = 0;
             }
             else
             {
-                sprintf(pcWriteBuffer, "Error: Could not save configuration to Data Flash or saved before.\r\n" );
+                snprintf(pcWriteBuffer, xWriteBufferLen, "Error: Could not save configuration to Data Flash or saved before.\r\n" );
             }
 
         }
@@ -697,7 +721,7 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
 
     if ( pdPASS != result)
     {
-        sprintf(pcWriteBuffer, "Error.\r\n\r\n" );
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error.\r\n\r\n" );
     }
 
     return pdFALSE;
@@ -724,11 +748,11 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
             getValue = (const char *)xprvGetCacheEntry((char *)pKey, keyLength);
             if (NULL == getValue)
             {
-                sprintf(pcWriteBuffer, "No %s in Data Flash!\r\n", pKey);
+                snprintf(pcWriteBuffer, xWriteBufferLen, "No %s in Data Flash!\r\n", pKey);
             }
             else
             {
-                sprintf(pcWriteBuffer, "%s\r\n", getValue);
+                snprintf(pcWriteBuffer, xWriteBufferLen, "%s\r\n", getValue);
                 getValue = NULL;
             }
 
@@ -736,7 +760,7 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
         else if ( 0 == strncmp( pRequest, "set", requestLength ) )
         {
             pKey   = FreeRTOS_CLIGetParameter( pcCommandString, 2U, &keyLength );
-            pValue = FreeRTOS_CLIGetParameter( pcCommandString, 3U, &valueLength );
+            pValue = prvConfigValue(pcCommandString, &valueLength);
 
             /* Cast to type "char *" to be compatible with parameter type */
             if (xprvWriteCacheEntry(keyLength, (char *)pKey, valueLength, (char *)pValue) < 0)
@@ -753,11 +777,11 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                     (KVS_TSIP_CLIENT_PUBKEY_ID == xKey) ||
                     (KVS_TSIP_CLIENT_PRIKEY_ID == xKey))
                 {
-                    sprintf(pcWriteBuffer, "The TSIP key index cannot be write.\r\n");
+                    snprintf(pcWriteBuffer, xWriteBufferLen, "The TSIP key index cannot be write.\r\n");
                 }
                 else
                 {
-                    sprintf(pcWriteBuffer, "OK.\r\n" );
+                    snprintf(pcWriteBuffer, xWriteBufferLen, "OK.\r\n" );
                 }
             }
         }
@@ -769,12 +793,12 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
                 uint32_t totalSize = GetTotalLengthFromImpl();
 
                 /* Cast to type "int" to be compatible with parameter type */
-                sprintf(pcWriteBuffer, "Configuration save %d bytes to Data Flash. Total used size is %d bytes .\r\n", (int)pvwrite, (int)totalSize );
+                snprintf(pcWriteBuffer, xWriteBufferLen, "Configuration save %d bytes to Data Flash. Total used size is %d bytes .\r\n", (int)pvwrite, (int)totalSize );
                 pvwrite = 0;
             }
             else
             {
-                sprintf(pcWriteBuffer, "Error: Could not save configuration to Data Flash or saved before.\r\n" );
+                snprintf(pcWriteBuffer, xWriteBufferLen, "Error: Could not save configuration to Data Flash or saved before.\r\n" );
             }
 
         }
@@ -787,7 +811,7 @@ static BaseType_t prvConfigCommandHandler( char * pcWriteBuffer,
 
     if ( pdPASS != result)
     {
-        sprintf(pcWriteBuffer, "Error.\r\n\r\n" );
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Error.\r\n\r\n" );
     }
 
     return pdFALSE;
@@ -824,7 +848,7 @@ static UBaseType_t  uxParameterNumber = 0;
     {
         /* The first time the function is called after the command has been
         entered just a header string is returned. */
-        sprintf( pcWriteBuffer, "The parameters were:\r\n" );
+        snprintf( pcWriteBuffer, xWriteBufferLen, "The parameters were:\r\n" );
 
         /* Next time the function is called the first parameter will be echoed
         back. */
@@ -850,7 +874,7 @@ static UBaseType_t  uxParameterNumber = 0;
             memset(pcWriteBuffer, 0x00, xWriteBufferLen);
 
             /* Cast to type "int" to be compatible with parameter type */
-            sprintf(pcWriteBuffer, "%d: ", (int)uxParameterNumber);
+            snprintf(pcWriteBuffer, xWriteBufferLen, "%d: ", (int)uxParameterNumber);
 
             /* Cast to type "char *" and "size_t" to be compatible with parameter type */
             strncat(pcWriteBuffer, (char *)pcParameter, (size_t)xParameterStringLength);

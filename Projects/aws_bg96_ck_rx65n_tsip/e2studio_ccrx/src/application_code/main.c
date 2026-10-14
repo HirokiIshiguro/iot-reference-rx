@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 /* FreeRTOS includes. */
+#include "public_signer_provisioner.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -36,7 +37,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Demo includes */
 #include "aws_clientcredential.h"
-#include "r_cellular_if.h"
+#include "bg96_network.h"
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
@@ -45,7 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     #include "tsip_provisioning_cli.h"
 #endif
 
-st_cellular_ctrl_t cellular_ctrl;
+
 extern bool Connect2AP( void );
 
 bool ApplicationCounter (uint32_t xWaitTime);
@@ -146,6 +147,10 @@ extern void vRegisterSampleCLICommands (void);
  *********************************************************************************************************************/
 void main_task(void)
 {
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+    vRunPublicSignerProvisioner(NULL);
+#else
+
     int32_t xResults;
     int32_t Time2Wait = 10000;
     extern void vRegisterSampleCLICommands (void);
@@ -237,6 +242,7 @@ void main_task(void)
     {
         vTaskSuspend(NULL);
     }
+#endif /* PUBLIC_SIGNER_PROVISIONER_ENABLE */
 }
 /*****************************************************************************************
 End of function main_task

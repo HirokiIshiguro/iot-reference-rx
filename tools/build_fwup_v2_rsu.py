@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Generate a RELFWV2 RSU for the legacy RX72N Envision Kit bootloader.
+Generate a Code Flash-only RELFWV2 RSU for the RX72N dual-bank bootloader.
 
 Unlike the r_fwup sample bootloader, this bootloader expects the RSU payload to
 contain the whole bank-1 user image area (excluding the 0x300-byte RSU header +
 descriptor) rather than sparse segments only.
 
-The implementation is aligned with the working `mot_to_rsu.py` flow used by the
-known-good rx72n-envision-kit pipeline.
+The signed application payload preserves the UART RELFWV2 layout. Public signer
+trust and other persistent Data Flash contents are provisioned independently;
+application updates never contain or install raw Data Flash.
 """
 
 from __future__ import annotations
@@ -25,16 +26,13 @@ RSU_DESCRIPTOR_SIZE = 0x100
 IMAGE_FLAG_TESTING = 0xFE
 SIG_TYPE = b"sig-sha256-ecdsa"
 
-# Legacy RX72N Envision Kit secure-boot layout.
+# RX72N Envision Kit dual-bank secure-boot layout.
 HW_ID = 0x00000009
 USER_PROGRAM_TOP = 0xFFE00300
 USER_PROGRAM_BOTTOM = 0xFFFBFFFF
 BOOTLOADER_TOP = 0xFFFC0000
 BOOTLOADER_BOTTOM = 0xFFFFFFFF
 FLASH_WRITE_SIZE = 128
-USER_CONST_DATA_TOP = 0x00100800
-USER_CONST_DATA_BOTTOM = 0x001077FF
-DATA_FLASH_PAD_SIZE = 32768  # bootloader expects one 32 KB DF block
 
 
 @dataclass(frozen=True)
@@ -136,7 +134,7 @@ def validate_prm_layout(layout: PrmLayout) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate RELFWV2 RSU for the legacy RX72N bootloader"
+        description="Generate Code Flash-only RELFWV2 RSU for the RX72N bootloader"
     )
     parser.add_argument("--mot", required=True, type=Path, help="Input Motorola S-record (.mot)")
     parser.add_argument("--prm", required=True, type=Path, help="PRM CSV (validated for compatibility)")
@@ -155,14 +153,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def parse_mot_file(mot_path: Path) -> tuple[bytearray, bytearray, int, int]:
+def parse_mot_file(mot_path: Path) -> tuple[bytearray, int]:
     user_prog_size = USER_PROGRAM_BOTTOM - USER_PROGRAM_TOP + 1
-    const_data_size = USER_CONST_DATA_BOTTOM - USER_CONST_DATA_TOP + 1
 
     code_flash = bytearray(b"\xFF" * user_prog_size)
-    data_flash = bytearray(b"\xFF" * const_data_size)
     code_bytes_written = 0
-    data_bytes_written = 0
 
     with mot_path.open("r", encoding="ascii", errors="strict") as handle:
         for line_no, raw_line in enumerate(handle, 1):
@@ -190,18 +185,12 @@ def parse_mot_file(mot_path: Path) -> tuple[bytearray, bytearray, int, int]:
             data_start = 4 + addr_bytes * 2
             data = bytes.fromhex(line[data_start:data_start + data_len * 2])
 
-            if USER_CONST_DATA_TOP <= address <= USER_CONST_DATA_BOTTOM:
-                offset = address - USER_CONST_DATA_TOP
-                data_flash[offset:offset + len(data)] = data
-                data_bytes_written += len(data)
-                continue
-
             if USER_PROGRAM_TOP <= address <= USER_PROGRAM_BOTTOM + 1:
                 offset = address - USER_PROGRAM_TOP
                 code_flash[offset:offset + len(data)] = data
                 code_bytes_written += len(data)
 
-    return code_flash, data_flash, code_bytes_written, data_bytes_written
+    return code_flash, code_bytes_written
 
 
 def sign_ecdsa(data: bytes, key_path: Path) -> bytes:
@@ -235,7 +224,7 @@ def verify_ecdsa(data: bytes, signature: bytes, key_path: Path) -> bool:
         return False
 
 
-def build_rsu(code_flash: bytearray, data_flash: bytearray, key_path: Path, seq_no: int) -> bytes:
+def build_rsu(code_flash: bytearray, key_path: Path, seq_no: int) -> bytes:
     user_prog_size = USER_PROGRAM_BOTTOM - USER_PROGRAM_TOP + 1
     exec_addr = USER_PROGRAM_BOTTOM - 3
 
@@ -263,28 +252,19 @@ def build_rsu(code_flash: bytearray, data_flash: bytearray, key_path: Path, seq_
     rsu += SIG_TYPE + b"\x00" * (32 - len(SIG_TYPE))
     rsu += struct.pack("<I", len(signature))
     rsu += signature + b"\x00" * (256 - len(signature))
-    rsu += struct.pack("<I", 1)
-    rsu += struct.pack("<I", USER_CONST_DATA_TOP)
-    rsu += struct.pack("<I", USER_CONST_DATA_BOTTOM)
+    rsu += struct.pack("<III", 0, 0xFFFFFFFF, 0xFFFFFFFF)
     rsu += b"\x00" * 200
 
     rsu += descriptor
     rsu += code_flash[:user_prog_size]
 
-    const_data_size = USER_CONST_DATA_BOTTOM - USER_CONST_DATA_TOP + 1
-    data_flash_block = bytearray(b"\xFF" * DATA_FLASH_PAD_SIZE)
-    data_flash_block[:const_data_size] = data_flash[:const_data_size]
-    rsu += data_flash_block
-
     return bytes(rsu)
 
 
-def build_rtos_ota_payload(code_flash: bytearray, data_flash: bytearray, data_bytes_written: int) -> bytes:
+def build_rtos_ota_payload(code_flash: bytearray) -> bytes:
     user_prog_size = USER_PROGRAM_BOTTOM - USER_PROGRAM_TOP + 1
 
     entries = [(USER_PROGRAM_TOP, user_prog_size)]
-    if data_bytes_written > 0:
-        entries.append((USER_CONST_DATA_TOP, USER_CONST_DATA_BOTTOM - USER_CONST_DATA_TOP + 1))
 
     descriptor = bytearray(b"\xFF" * RSU_DESCRIPTOR_SIZE)
     struct.pack_into("<I", descriptor, 0, len(entries))
@@ -295,8 +275,6 @@ def build_rtos_ota_payload(code_flash: bytearray, data_flash: bytearray, data_by
     payload = bytearray()
     payload += descriptor
     payload += code_flash[:user_prog_size]
-    if data_bytes_written > 0:
-        payload += data_flash[:USER_CONST_DATA_BOTTOM - USER_CONST_DATA_TOP + 1]
     return bytes(payload)
 
 
@@ -336,21 +314,19 @@ def main() -> int:
     print()
     print("Parsing MOT file...")
 
-    code_flash, data_flash, code_written, data_written = parse_mot_file(args.mot)
+    code_flash, code_written = parse_mot_file(args.mot)
     user_prog_size = USER_PROGRAM_BOTTOM - USER_PROGRAM_TOP + 1
-    const_data_size = USER_CONST_DATA_BOTTOM - USER_CONST_DATA_TOP + 1
 
     print(f"  Code flash: {code_written:,} bytes written")
-    print(f"  Data flash: {data_written:,} bytes written")
+    print("  Data flash: omitted (provisioned separately)")
     print(
-        f"  Image size: code={user_prog_size:,} bytes ({user_prog_size/1024:.0f} KB), "
-        f"data={const_data_size:,} bytes ({const_data_size/1024:.0f} KB)"
+        f"  Image size: code={user_prog_size:,} bytes ({user_prog_size/1024:.0f} KB)"
     )
 
     if args.format == "legacy-full-rsu":
-        output_data = build_rsu(code_flash, data_flash, args.key, args.seq_no)
+        output_data = build_rsu(code_flash, args.key, args.seq_no)
     else:
-        output_data = build_rtos_ota_payload(code_flash, data_flash, data_written)
+        output_data = build_rtos_ota_payload(code_flash)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(output_data)

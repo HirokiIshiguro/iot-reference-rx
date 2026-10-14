@@ -83,6 +83,30 @@ class UartDownloadErrorTests(unittest.TestCase):
                 self.assertIn("callback error. 4.", output.getvalue())
                 self.assertNotIn("TX only, no RX", output.getvalue())
 
+    def test_strict_success_requires_fresh_install_and_integrity_markers(self):
+        for installed, verified, expected in ((True, True, 0), (False, True, 1),
+                                              (True, False, 1), (False, False, 1)):
+            with self.subTest(installed=installed, verified=verified), tempfile.TemporaryDirectory() as directory:
+                image = Path(directory) / "fixture.rsu"
+                image.write_bytes(b"fixture")
+                lines = []
+                if installed:
+                    lines.append(b"completed installing firmware.")
+                if verified:
+                    lines.append(b"bank1(temporary area) on code flash integrity check...OK")
+                lines += [b"software reset...", b"jump to user program"]
+                downloader = subject.UartDownloader("unused", 921600, 5, strict_success=True)
+                port = FakeSerial([b"\r\n".join(lines) + b"\r\n"], True)
+                downloader.open_port = lambda: setattr(downloader, "ser", port)
+                downloader.trigger_reset = lambda: None
+                output = io.StringIO()
+                with patch.object(subject.time, "sleep"), contextlib.redirect_stdout(output):
+                    self.assertEqual(expected, downloader.download(image))
+                self.assertFalse(port.is_open)
+                self.assertNotIn("Const data:        YES", output.getvalue())
+                if expected:
+                    self.assertIn("Missing firmware-install completion", output.getvalue())
+
     def test_32k_progress_is_consumed_before_the_next_block_is_sent(self):
         class Receiver(FakeSerial):
             def __init__(self):

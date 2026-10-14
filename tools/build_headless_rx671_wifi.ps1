@@ -1,13 +1,13 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studioc.exe",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
     [int]$E2StudioTimeoutSeconds = 180,
     [string]$OtaImageVersion = "",
     [string]$Make = "",
     [string]$CcrxBin = "",
     [string]$SourceProvenanceFile = "",
     [string]$Python = 'python',
-    [string]$Workspace = "C:\iotref-rx671-wifi-ws",
+    [string]$Workspace = "C:\ai\codex\ws\iotref-rx671-wifi-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx671_wifi_e2studio_build.log"),
     [string]$WifiConfigFile = "",
     [string]$AwsIotConfigDir = "",
@@ -63,6 +63,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "rx_e2studio_cli.ps1")
 Set-StrictMode -Version Latest
 
 function ConvertFrom-OtaImageVersion {
@@ -126,10 +127,12 @@ $effectiveOtaImageVersion = if ($null -ne $otaImageVersionParts) {
 $expectedOtaImageMarker = "RX671_OTA_IMAGE_VERSION=$effectiveOtaImageVersion"
 
 $projectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
+Initialize-RxBuildDependencies -ProjectRoot $projectRoot
+Assert-RxCommonKernel -ProjectRoot $projectRoot
 $projectName = "aws_wifi_rx671_ek"
 $projectDir = Join-Path $projectRoot "Projects\$projectName\e2studio_ccrx"
 $whdDir = Join-Path $projectRoot "Projects\$projectName\external\wifi-host-driver"
-$whdPatch = Join-Path $projectRoot "Projects\$projectName\external\patches\whd-v1.70.0-ccrx-portability.patch"
+$whdManifest = Join-Path $PSScriptRoot "whd_source_manifest.json"
 $type1ynBlobStageScript = Join-Path $projectRoot "Projects\$projectName\external\type1yn-blobs\stage_type1yn_blobs.ps1"
 $cproject = Join-Path $projectDir ".cproject"
 $localJoinConfig = Join-Path $projectDir "src\whd_join_config_local.h"
@@ -240,19 +243,8 @@ foreach ($submodulePath in $submodulePaths) {
 }
 }
 
-if (-not (Test-Path -LiteralPath $whdPatch)) {
-    throw "WHD patch not found: $whdPatch"
-}
-
 if (-not (Test-Path -LiteralPath $type1ynBlobStageScript)) {
     throw "Type 1YN blob staging script not found: $type1ynBlobStageScript"
-}
-
-function Test-GitApply {
-    param([string[]]$Arguments)
-
-    & git @Arguments *> $null
-    return ($LASTEXITCODE -eq 0)
 }
 
 function ConvertTo-CStringLiteral {
@@ -1106,135 +1098,93 @@ function Restore-TrackedProjectSnapshot {
     return $restored.ToArray()
 }
 
+
 function Invoke-E2StudioHeadlessBuild {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$Executable,
-        [Parameter(Mandatory = $true)]
-        [string]$WorkspacePath,
-        [Parameter(Mandatory = $true)]
-        [string]$ProjectPath,
-        [Parameter(Mandatory = $true)]
-        [string]$BuildTarget,
-        [Parameter(Mandatory = $true)]
-        [string]$OutputLog
+        [Parameter(Mandatory = $true)][string]$Executable,
+        [Parameter(Mandatory = $true)][string]$WorkspacePath,
+        [Parameter(Mandatory = $true)][string]$ProjectPath,
+        [Parameter(Mandatory = $true)][string]$BuildTarget,
+        [Parameter(Mandatory = $true)][string]$OutputLog
+    )
+    return Invoke-RxE2StudioBuild -Executable $Executable -WorkspacePath $WorkspacePath `
+        -ProjectPaths @($ProjectPath) -BuildTargets @($BuildTarget) `
+        -OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds -AllowTimeoutExitCode
+}
+
+function Assert-PristineWhdInputs {
+    param(
+        [Parameter(Mandatory = $true)][string]$DependencyRoot,
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [switch]$GitFree
     )
 
-    $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = $Executable
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.CreateNoWindow = $true
-
-    foreach ($arg in @(
-        "-nosplash",
-        "-application",
-        "org.eclipse.cdt.managedbuilder.core.headlessbuild",
-        "-data",
-        $WorkspacePath,
-        "-import",
-        $ProjectPath,
-        "-cleanBuild",
-        $BuildTarget
-    )) {
-        [void]$psi.ArgumentList.Add($arg)
+    $dependency = [IO.Path]::GetFullPath($DependencyRoot).TrimEnd('\')
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+    if (($manifest.schema_version -ne 1) -or
+        ($manifest.upstream_commit -notmatch '^[0-9a-f]{40}$')) {
+        throw 'WHD origin manifest schema or upstream commit is invalid.'
     }
-
-    $proc = [System.Diagnostics.Process]::Start($psi)
-    $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
-    $stderrTask = $proc.StandardError.ReadToEndAsync()
-    $timedOut = -not $proc.WaitForExit($E2StudioTimeoutSeconds * 1000)
-    if ($timedOut) {
-        Write-Warning "e2 studio headless build timed out after $E2StudioTimeoutSeconds seconds; terminating it before the explicit make fallback."
-        try {
-            $proc.Kill($true)
-        } catch {
-            Write-Warning "Could not terminate the e2 studio process tree: $($_.Exception.Message)"
+    if (-not $GitFree) {
+        $gitRoot = & git -c "safe.directory=$dependency" -C $dependency rev-parse --show-toplevel
+        if ($LASTEXITCODE -ne 0 -or
+            [IO.Path]::GetFullPath($gitRoot).TrimEnd('\') -ne $dependency) {
+            throw 'WHD dependency Git root is unavailable or belongs to another repository.'
+        }
+        $head = & git -c "safe.directory=$dependency" -C $dependency rev-parse HEAD
+        if ($LASTEXITCODE -ne 0 -or $head -ne $manifest.upstream_commit) {
+            throw 'WHD dependency pin differs from the origin byte manifest.'
+        }
+        $status = @(& git -c "safe.directory=$dependency" -C $dependency status --porcelain=v1 --untracked-files=all --ignore-submodules=none)
+        if ($LASTEXITCODE -ne 0 -or $status.Count -ne 0) {
+            throw 'WHD original sources changed; preserve and inspect the working tree.'
         }
     }
-    $proc.WaitForExit()
-    $stdoutTask.Wait()
-    $stderrTask.Wait()
 
-    $outputChunks = @($stdoutTask.Result, $stderrTask.Result) | Where-Object { -not [string]::IsNullOrEmpty($_) }
-    $logText = [string]::Join([Environment]::NewLine, $outputChunks)
-    try {
-        [System.IO.File]::WriteAllText($OutputLog, $logText, [System.Text.UTF8Encoding]::new($false))
-    } catch {
-        Write-Warning "Could not write e2 studio build log '$OutputLog': $($_.Exception.Message)"
-        $fallbackLog = "$OutputLog.codex.log"
-        [System.IO.File]::WriteAllText($fallbackLog, $logText, [System.Text.UTF8Encoding]::new($false))
-        Write-Warning "Wrote captured e2 studio build log to '$fallbackLog' instead."
+    $expected = @{}
+    foreach ($property in $manifest.files_sha256.PSObject.Properties) {
+        $relative = $property.Name
+        if ([IO.Path]::IsPathRooted($relative) -or $relative -match '(^|/)\.\.(/|$)' -or
+            $relative -match '\\' -or $property.Value -notmatch '^[0-9a-f]{64}$') {
+            throw 'WHD origin manifest contains an invalid file path or digest.'
+        }
+        $expected[$relative] = $property.Value
     }
-    if (-not [string]::IsNullOrEmpty($logText)) {
-        Write-Host $logText
+    if ($expected.Count -eq 0) { throw 'WHD origin manifest contains no files.' }
+    $seen = @{}
+    $directories = [Collections.Generic.Stack[string]]::new()
+    $directories.Push($dependency)
+    while ($directories.Count -gt 0) {
+        $current = $directories.Pop()
+        foreach ($entry in Get-ChildItem -LiteralPath $current -Force) {
+            if ($entry.Name -eq '.git') { continue }
+            if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw 'WHD dependency contains a linked file or directory.'
+            }
+            if ($entry.PSIsContainer) { $directories.Push($entry.FullName); continue }
+            $relative = $entry.FullName.Substring($dependency.Length + 1).Replace('\', '/')
+            if (-not $expected.ContainsKey($relative)) {
+                throw "WHD dependency contains an unrecorded file: $relative"
+            }
+            $digest = (Get-FileHash -LiteralPath $entry.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($digest -ne $expected[$relative]) {
+                throw "WHD dependency differs from upstream bytes: $relative"
+            }
+            $seen[$relative] = $true
+        }
     }
-
-    if ($timedOut) {
-        return 124
-    }
-    return $proc.ExitCode
+    if ($seen.Count -ne $expected.Count) { throw 'WHD dependency is missing an upstream file.' }
 }
 
-$whdPatchSnapshots = @{}
-$whdPatchWorkspace = $null
-$whdApplyRoot = $whdDir
+Assert-PristineWhdInputs -DependencyRoot $whdDir -ManifestPath $whdManifest -GitFree:([bool]$SourceProvenanceFile)
 try {
-if ($SourceProvenanceFile) {
-    # Copied Git pointers may refer to another worktree or a missing path.
-    # Check the approved patch inputs in a neutral temporary directory and
-    # restore the source copy's original dependency bytes after each build.
-    $whdPatchWorkspace = Join-Path ([IO.Path]::GetTempPath()) ('rx671-whd-patch-' + [guid]::NewGuid().ToString('N'))
-    New-Item -ItemType Directory -Path $whdPatchWorkspace | Out-Null
-    $patchPaths = [regex]::Matches([IO.File]::ReadAllText($whdPatch), '(?m)^diff --git a/(\S+) b/(\S+)\r?$')
-    if ($patchPaths.Count -eq 0) { throw 'WHD patch has no reviewed file paths.' }
-    foreach ($entry in $patchPaths) {
-        $relative = $entry.Groups[1].Value
-        if ($relative -ne $entry.Groups[2].Value -or $relative -match '(^|/)\.\.(/|$)' -or
-            [IO.Path]::IsPathRooted($relative)) { throw 'WHD patch path is outside the selected dependency.' }
-        $originalPath = [IO.Path]::GetFullPath((Join-Path $whdDir $relative))
-        if (-not $originalPath.StartsWith($whdDir.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
-            throw 'WHD patch file is outside the selected dependency.'
-        }
-        $whdPatchSnapshots[$originalPath] = [IO.File]::ReadAllBytes($originalPath)
-        $stagedPath = Join-Path $whdPatchWorkspace $relative
-        New-Item -ItemType Directory -Force -Path (Split-Path $stagedPath -Parent) | Out-Null
-        [IO.File]::WriteAllBytes($stagedPath, $whdPatchSnapshots[$originalPath])
-    }
-    $whdApplyRoot = $whdPatchWorkspace
-}
-$gitApplyWhitespaceArgs = @("--ignore-space-change", "--ignore-whitespace")
-$gitApplyBaseArgs = @('-c', "safe.directory=$whdApplyRoot", '-C', $whdApplyRoot, 'apply')
-if ($SourceProvenanceFile) { $gitApplyBaseArgs += '--no-index' }
-$reverseCheckArgs = $gitApplyBaseArgs + $gitApplyWhitespaceArgs + @("--reverse", "--check", $whdPatch)
-$forwardCheckArgs = $gitApplyBaseArgs + $gitApplyWhitespaceArgs + @("--check", $whdPatch)
-
-if (Test-GitApply $reverseCheckArgs) {
-    Write-Host "WHD patch is already applied."
-} elseif (Test-GitApply $forwardCheckArgs) {
-    Write-Host "Applying WHD patch..."
-    & git @gitApplyBaseArgs @gitApplyWhitespaceArgs $whdPatch
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to apply WHD patch."
-    }
-} else {
-    throw "WHD patch state is neither clean nor applied. Check submodule status: $whdDir"
-}
-
-if ($SourceProvenanceFile) {
-    foreach ($originalPath in $whdPatchSnapshots.Keys) {
-        $relative = [IO.Path]::GetRelativePath($whdDir, $originalPath)
-        [IO.File]::WriteAllBytes($originalPath, [IO.File]::ReadAllBytes((Join-Path $whdPatchWorkspace $relative)))
-    }
-}
 Write-Host "Staging Type 1YN WHD blobs..."
 & $type1ynBlobStageScript
 if ($LASTEXITCODE -ne 0) {
     throw "Type 1YN blob staging failed with exit code $LASTEXITCODE"
 }
 
-Remove-DirectoryBestEffort -Path $Workspace -Label "workspace"
+Remove-RxE2Workspace -Path $Workspace
 
 $hardwareDebug = Join-Path $projectDir "HardwareDebug"
 Remove-DirectoryBestEffort -Path $hardwareDebug -Label "HardwareDebug"
@@ -1615,16 +1565,7 @@ foreach ($extension in @(".mot", ".abs", ".map")) {
 Write-Host "RX671 Wi-Fi build completed successfully."
 }
 finally {
-    foreach ($originalPath in $whdPatchSnapshots.Keys) {
-        [IO.File]::WriteAllBytes($originalPath, $whdPatchSnapshots[$originalPath])
-    }
-    if ($null -ne $whdPatchWorkspace -and (Test-Path -LiteralPath $whdPatchWorkspace)) {
-        $tempPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
-        $fullPatchWorkspace = [IO.Path]::GetFullPath($whdPatchWorkspace)
-        if (-not $fullPatchWorkspace.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase) -or
-            (Split-Path $fullPatchWorkspace -Leaf) -notlike 'rx671-whd-patch-*') {
-            throw 'Refusing to remove a WHD patch directory outside the temporary root.'
-        }
-        Remove-Item -LiteralPath $fullPatchWorkspace -Recurse -Force
-    }
+    # Never restore or rewrite an upstream dependency. A mismatch is evidence
+    # to preserve and investigate, including when the build itself failed.
+    Assert-PristineWhdInputs -DependencyRoot $whdDir -ManifestPath $whdManifest -GitFree:([bool]$SourceProvenanceFile)
 }

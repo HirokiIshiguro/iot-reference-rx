@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Build traceable RX671 dual-bank OTA baseline and candidate artifacts.
 
-The checked-in RX671 Wi-Fi project intentionally remains a normal linear-mode
-runtime image.  This helper applies the OTA linker/BSP/FWUP settings only while
-building each image, records the effective inputs, and restores every touched
-source file byte-for-byte even when a build fails.
+The checked-in RX671 Wi-Fi project uses the common dual-bank application
+layout. This helper adds temporary image/version settings, records the effective
+inputs, and restores every touched source file even when a build fails.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 
 PROFILE_NAME = "rx671-dual-bank-ota-v1"
-PROVISIONER_PROFILE_NAME = "rx671-bank-single-ota-provisioner-v1"
+PROVISIONER_PROFILE_NAME = "rx671-bank-dual-ota-provisioner-v2"
 OTA_SDIO_RUN_CLOCK_DIV = "SDHI_DIV_8"
 OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES = (
     "RX671_EK_SDIO_RUN_CLOCK_DIV",
@@ -63,16 +62,20 @@ LOCAL_JOIN_CONFIG_RELATIVE = Path("src/whd_join_config_local.h")
 WHD_SUBMODULE_RELATIVE = Path(
     "Projects/aws_wifi_rx671_ek/external/wifi-host-driver"
 )
-WHD_PATCH_RELATIVE = Path(
-    "Projects/aws_wifi_rx671_ek/external/patches/"
-    "whd-v1.70.0-ccrx-portability.patch"
-)
 WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES = (
     "RX671_EK_WIFI_SSID",
     "RX671_EK_WIFI_PASSPHRASE",
     "RX671_EK_WIFI_PASSWORD",
 )
 FORMAL_INPUT_SUBMODULES = (
+    Path("Middleware/FreeRTOS-Plus-CLI"),
+    Path("Middleware/freertos_plus"),
+    Path("Middleware/3rdparty/tinycbor"),
+    Path("Middleware/3rdparty/tinycrypt"),
+    Path("Middleware/Renesas/rx-driver-package"),
+    Path("Middleware/Renesas/rm_littlefs_rx"),
+    Path("Middleware/Renesas/rm_rtos_abstraction_rx"),
+    Path("Middleware/Renesas/r_sdio_rx"),
     Path("Middleware/3rdparty/littlefs"),
     Path("Middleware/3rdparty/mbedtls"),
     Path("Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk"),
@@ -106,7 +109,6 @@ PROFILE_PATHS = (
     Path(".cproject"),
     Path("src/frtos_config/r_fwup_config.h"),
     Path("src/smc_gen/r_config/r_bsp_config.h"),
-    Path("src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h"),
 )
 PROVENANCE_PROJECT_PATHS = (
     Path(".cproject"),
@@ -144,6 +146,10 @@ OTA_START_VALUE = (
     "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2,"
     "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300,"
     "EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC"
+)
+PROVISIONER_START_VALUE = OTA_START_VALUE.replace(
+    "EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC",
+    "EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC",
 )
 ROM_MAPPING_ANCHOR = (
     '<listOptionValue builtIn="false" value="D_8=R_8"/>'
@@ -225,26 +231,7 @@ def make_ota_cproject(
         raise ValueError(
             ".cproject contains a persistent SDIO high-speed clock override"
         )
-    text = _replace_once(
-        text,
-        'modes="bank.single"',
-        'modes="bank.dual"',
-        ".cproject bank mode",
-    )
-    if ROM_MAPPING_PFRAM2 in text:
-        raise ValueError(".cproject already contains the OTA PFRAM2 mapping")
-    text = _replace_once(
-        text,
-        ROM_MAPPING_ANCHOR,
-        ROM_MAPPING_ANCHOR + "\n\t\t\t\t\t\t\t\t\t" + ROM_MAPPING_PFRAM2,
-        ".cproject ROM mapping",
-    )
-    text = _replace_once(
-        text,
-        f'value="{NORMAL_START_VALUE}"',
-        f'value="{OTA_START_VALUE}"',
-        ".cproject linker start",
-    )
+    _require_dual_layout(text)
     defines = (
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MAJOR={version.major}"/>',
         f'<listOptionValue builtIn="false" value="-define=APP_VERSION_MINOR={version.minor}"/>',
@@ -307,8 +294,12 @@ def make_ota_cproject(
 
 
 def make_provisioner_cproject(text: str) -> str:
-    if 'modes="bank.single"' not in text or 'modes="bank.dual"' in text:
-        raise ValueError("provisioner requires the checked-in bank.single project")
+    _require_dual_layout(text)
+    text = _replace_once(
+        text, f'value="{OTA_START_VALUE}"',
+        f'value="{PROVISIONER_START_VALUE}"',
+        ".cproject standalone dual provisioner vector",
+    )
     if "RX671_OTA_PROVISIONER_ENABLE" in text:
         raise ValueError(".cproject contains a persistent OTA provisioner define")
     # The one-shot provisioner deliberately does not create the asynchronous
@@ -335,21 +326,26 @@ def make_provisioner_cproject(text: str) -> str:
 
 
 def make_ota_bank_config(text: str, label: str) -> str:
-    return _replace_once(
-        text,
-        "#define BSP_CFG_CODE_FLASH_BANK_MODE    (1)",
-        "#define BSP_CFG_CODE_FLASH_BANK_MODE    (0)",
-        label,
-    )
+    matches = re.findall(r"^\s*#define\s+BSP_CFG_CODE_FLASH_BANK_MODE\s+\((\d+)\)", text, re.M)
+    if matches != ["0"]:
+        raise ValueError(label + ": expected the canonical dual-bank configuration")
+    return text
 
 
 def make_ota_fwup_config(text: str) -> str:
-    return _replace_once(
-        text,
-        "#define FWUP_CFG_AREA_SIZE                          (0x00100000U)",
-        "#define FWUP_CFG_AREA_SIZE                          (0x000C0000U)",
-        "r_fwup_config.h install area size",
-    )
+    matches = re.findall(r"^\s*#define\s+FWUP_CFG_AREA_SIZE\s+\((0x[0-9A-Fa-f]+)U\)", text, re.M)
+    if len(matches) != 1 or int(matches[0], 16) != 0xC0000:
+        raise ValueError("r_fwup_config.h: expected the canonical dual-bank install area")
+    return text
+
+
+def _require_dual_layout(text: str) -> None:
+    if text.count('modes="bank.dual"') != 1 or 'modes="bank.single"' in text:
+        raise ValueError("profile requires the checked-in dual-bank project")
+    if text.count(ROM_MAPPING_PFRAM2) != 1:
+        raise ValueError("profile requires one PFRAM2=RPFRAM2 RAM mapping")
+    if text.count(f'value="{OTA_START_VALUE}"') != 1:
+        raise ValueError("profile requires the canonical dual-bank application layout")
 
 
 class TemporaryOtaProfile:
@@ -370,9 +366,6 @@ class TemporaryOtaProfile:
         bsp = self.snapshots[
             Path("src/smc_gen/r_config/r_bsp_config.h")
         ].decode("utf-8")
-        reference = self.snapshots[
-            Path("src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h")
-        ].decode("utf-8")
         (self.project_dir / ".cproject").write_text(
             make_ota_cproject(cproject, version, tls_version),
             encoding="utf-8",
@@ -383,14 +376,6 @@ class TemporaryOtaProfile:
         )
         (self.project_dir / "src/smc_gen/r_config/r_bsp_config.h").write_text(
             make_ota_bank_config(bsp, "r_bsp_config.h bank mode"),
-            encoding="utf-8",
-            newline="",
-        )
-        (
-            self.project_dir
-            / "src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h"
-        ).write_text(
-            make_ota_bank_config(reference, "r_bsp_config_reference.h bank mode"),
             encoding="utf-8",
             newline="",
         )
@@ -407,7 +392,7 @@ class TemporaryOtaProfile:
 
 
 class TemporaryProvisionerProfile:
-    """Apply the credential-only bank.single profile and restore .cproject."""
+    """Apply the standalone dual-bank signer profile and restore .cproject."""
 
     def __init__(self, project_dir: Path):
         self.path = project_dir / ".cproject"
@@ -697,102 +682,24 @@ class TemporaryWifiCredentialIsolation:
             self.path.write_bytes(self.original)
 
 
-class TemporaryWhdPatchIsolation:
-    """Restore the known WHD portability patch after a headless build."""
+class PristineWhdInputs:
+    """Check the original WHD sources before and after building without edits."""
 
     def __init__(self, repo_root: Path):
         self.submodule = repo_root / WHD_SUBMODULE_RELATIVE
-        self.patch = repo_root / WHD_PATCH_RELATIVE
-        self.patch_is_temporary = False
-        self.snapshots: dict[Path, bytes] = {}
 
-    def _check(self, *, reverse: bool) -> bool:
-        command = [
-            "git",
-            "-C",
-            str(self.submodule),
-            "apply",
-            "--ignore-space-change",
-            "--ignore-whitespace",
-        ]
-        if reverse:
-            command.append("--reverse")
-        command.extend(("--check", str(self.patch)))
-        return subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-        ).returncode == 0
-
-    def __enter__(self) -> "TemporaryWhdPatchIsolation":
-        status = _git(
-            self.submodule,
-            "status",
-            "--porcelain=v1",
-            "--untracked-files=all",
-            "--ignore-submodules=none",
-        )
+    def _check(self) -> None:
+        status = _git(self.submodule, "status", "--porcelain=v1",
+                      "--untracked-files=all", "--ignore-submodules=none")
         if status:
-            raise RuntimeError("WHD submodule must be clean before OTA build")
-        if self._check(reverse=False):
-            self.patch_is_temporary = True
-            patch_text = self.patch.read_text(encoding="utf-8")
-            relative_paths = sorted(
-                {
-                    Path(match)
-                    for match in re.findall(
-                        r"^\+\+\+ b/(.+)$",
-                        patch_text,
-                        flags=re.MULTILINE,
-                    )
-                    if match != "/dev/null"
-                }
-            )
-            if not relative_paths:
-                raise RuntimeError("WHD portability patch contains no files")
-            for relative in relative_paths:
-                target = self.submodule / relative
-                if not target.is_file():
-                    raise RuntimeError(
-                        f"WHD portability patch input is missing: {relative}"
-                    )
-                self.snapshots[relative] = target.read_bytes()
-        elif self._check(reverse=True):
-            self.patch_is_temporary = False
-        else:
-            raise RuntimeError(
-                "WHD portability patch is neither applicable nor committed"
-            )
+            raise RuntimeError("WHD original sources changed; preserve and inspect the working tree")
+
+    def __enter__(self) -> "PristineWhdInputs":
+        self._check()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        status = _git(
-            self.submodule,
-            "status",
-            "--porcelain=v1",
-            "--untracked-files=all",
-            "--ignore-submodules=none",
-        )
-        if not status:
-            return
-        if not self.patch_is_temporary or not self.snapshots:
-            raise RuntimeError(
-                "WHD submodule contains changes other than the expected "
-                "temporary portability patch"
-            )
-        for relative, content in self.snapshots.items():
-            (self.submodule / relative).write_bytes(content)
-        remaining = _git(
-            self.submodule,
-            "status",
-            "--porcelain=v1",
-            "--untracked-files=all",
-            "--ignore-submodules=none",
-        )
-        if remaining:
-            raise RuntimeError(
-                "WHD submodule did not return to its clean gitlink state"
-            )
+        self._check()
 
 
 def _copy_build_outputs(project_dir: Path, artifact_dir: Path) -> dict[str, Path]:
@@ -888,7 +795,7 @@ def _build_provisioner(
     restore_local_config = build_environment.get("CI", "").lower() != "true"
 
     with TemporaryProvisionerProfile(project_dir):
-        with TemporaryWhdPatchIsolation(repo_root):
+        with PristineWhdInputs(repo_root):
             with TemporaryWifiCredentialIsolation(
                 local_join_config,
                 restore_existing=restore_local_config,
@@ -925,7 +832,7 @@ def _build_provisioner(
             "schema_version": 1,
             "profile": PROVISIONER_PROFILE_NAME,
             "source_sha": _git(repo_root, "rev-parse", "HEAD"),
-            "bank_mode": "bank.single",
+            "bank_mode": "bank.dual",
             "credentials_embedded": False,
             "sha256": {
                 path.name: sha256(path)
@@ -1133,7 +1040,7 @@ def _build_one(
     build_environment = ota_build_environment()
     restore_local_config = build_environment.get("CI", "").lower() != "true"
     local_join_config = project_dir / LOCAL_JOIN_CONFIG_RELATIVE
-    with TemporaryWhdPatchIsolation(repo_root):
+    with PristineWhdInputs(repo_root):
         with TemporaryWifiCredentialIsolation(
             local_join_config,
             restore_existing=restore_local_config,
@@ -1315,7 +1222,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--e2studio-timeout-seconds", type=int, default=600)
     parser.add_argument("--provisioner-only", action="store_true",
-                        help="Build only the credential-free linear provisioner and public signer material; no board or AWS operation")
+                        help="Build only the credential-free dual-bank provisioner and public signer material; no board or AWS operation")
     parser.add_argument(
         "--allow-dirty",
         action="store_true",

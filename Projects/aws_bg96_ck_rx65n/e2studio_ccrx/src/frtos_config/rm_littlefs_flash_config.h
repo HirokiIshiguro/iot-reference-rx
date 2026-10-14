@@ -17,10 +17,10 @@
  *********************************************************************************************************************/
 #include "rm_littlefs_df_rx65n.h"
 
-#define LFS_FLASH_READ_SIZE				(1)
+#define LFS_FLASH_READ_SIZE				(4)
 #define LFS_FLASH_PROGRAM_SIZE			(4)
 #define LFS_FLASH_BLOCK_SIZE			(128)
-#define LFS_FLASH_BLOCK_COUNT			(70)
+#define LFS_FLASH_BLOCK_COUNT			(64)
 /*
  * Keep LittleFS/KV storage away from the CK-RX65N V1 sample bootloader const-data
  * install area. The bootloader uses the lower 16KB of Data Flash during UART/OTA

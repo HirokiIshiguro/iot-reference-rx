@@ -43,6 +43,7 @@
     #include MBEDTLS_CONFIG_FILE
 #endif
 #include "threading_alt.h"
+#include "mbedtls/threading.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ssl.h"
 
@@ -116,8 +117,9 @@ void mbedtls_platform_mutex_init( mbedtls_threading_mutex_t * pMutex )
 
     /* Create a statically-allocated recursive FreeRTOS mutex. Some TSIP-backed
      * mbedTLS paths can re-enter the shared TSIP mutex from the same task. */
-    pMutex->mutexHandle = xSemaphoreCreateRecursiveMutexStatic( &( pMutex->mutexStorage ) );
-    configASSERT( pMutex->mutexHandle != NULL );
+    pMutex->mutex = xSemaphoreCreateRecursiveMutexStatic( &( pMutex->mutexStorage ) );
+    pMutex->is_valid = (pMutex->mutex != NULL) ? 1 : 0;
+    configASSERT( pMutex->is_valid == 1 );
 }
 
 /*-----------------------------------------------------------*/
@@ -127,13 +129,19 @@ void mbedtls_platform_mutex_init( mbedtls_threading_mutex_t * pMutex )
  *
  * @param[in] pMutex mbedtls mutex handle.
  *
- * @note This function is an empty stub as nothing needs to be done to free
- * a statically allocated FreeRTOS mutex.
+ * @note FreeRTOS releases the queue state and retains statically supplied storage.
  */
 void mbedtls_platform_mutex_free( mbedtls_threading_mutex_t * pMutex )
 {
-    /* Nothing needs to be done to free a statically-allocated FreeRTOS mutex. */
-    ( void ) pMutex;
+    if (pMutex != NULL)
+    {
+        if (pMutex->is_valid == 1)
+        {
+            vSemaphoreDelete(pMutex->mutex);
+        }
+        pMutex->is_valid = 0;
+        pMutex->mutex = NULL;
+    }
 }
 
 /*-----------------------------------------------------------*/
@@ -149,17 +157,21 @@ int mbedtls_platform_mutex_lock( mbedtls_threading_mutex_t * pMutex )
 {
     BaseType_t mutexStatus = 0;
 
+    if ((pMutex == NULL) || (pMutex->is_valid != 1))
+    {
+        return MBEDTLS_ERR_THREADING_BAD_INPUT_DATA;
+    }
     configASSERT( pMutex != NULL );
 
     /* mutexStatus is not used if asserts are disabled. */
     ( void ) mutexStatus;
 
     /* This function should never fail if the mutex is initialized. */
-    mutexStatus = xSemaphoreTakeRecursive( pMutex->mutexHandle, pdMS_TO_TICKS( 5000 ) );
+    mutexStatus = xSemaphoreTakeRecursive( pMutex->mutex, pdMS_TO_TICKS( 5000 ) );
     if( pdTRUE != mutexStatus )
     {
         char message[160];
-        TaskHandle_t holder = xSemaphoreGetMutexHolder( pMutex->mutexHandle );
+        TaskHandle_t holder = xSemaphoreGetMutexHolder( pMutex->mutex );
         const char * holderName = ( NULL != holder ) ? pcTaskGetName( holder ) : "none";
         const char * currentName = ( taskSCHEDULER_NOT_STARTED != xTaskGetSchedulerState() ) ? pcTaskGetName( NULL ) : "none";
 
@@ -167,12 +179,12 @@ int mbedtls_platform_mutex_lock( mbedtls_threading_mutex_t * pMutex )
                            sizeof( message ),
                            "MBEDTLS:MUTEX timeout mutex=0x%08lx handle=0x%08lx holder=%s current=%s\r\n",
                            ( unsigned long ) pMutex,
-                           ( unsigned long ) pMutex->mutexHandle,
+                           ( unsigned long ) pMutex->mutex,
                            holderName,
                            currentName );
         vOutputString( message );
 
-        mutexStatus = xSemaphoreTakeRecursive( pMutex->mutexHandle, portMAX_DELAY );
+        mutexStatus = xSemaphoreTakeRecursive( pMutex->mutex, portMAX_DELAY );
     }
     configASSERT( mutexStatus == pdTRUE );
 
@@ -192,12 +204,16 @@ int mbedtls_platform_mutex_unlock( mbedtls_threading_mutex_t * pMutex )
 {
     BaseType_t mutexStatus = 0;
 
+    if ((pMutex == NULL) || (pMutex->is_valid != 1))
+    {
+        return MBEDTLS_ERR_THREADING_BAD_INPUT_DATA;
+    }
     configASSERT( pMutex != NULL );
     /* mutexStatus is not used if asserts are disabled. */
     ( void ) mutexStatus;
 
     /* This function should never fail if the mutex is initialized. */
-    mutexStatus = xSemaphoreGiveRecursive( pMutex->mutexHandle );
+    mutexStatus = xSemaphoreGiveRecursive( pMutex->mutex );
     configASSERT( mutexStatus == pdTRUE );
 
     return 0;

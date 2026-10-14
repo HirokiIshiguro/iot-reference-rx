@@ -194,8 +194,13 @@ e_fwup_err_t ota_flash_read_function(uint32_t buf_addr, uint32_t src_addr, uint3
  *********************************************************************************************************************/
 e_fwup_err_t ota_bank_swap_function(void)
 {
-    LogInfo( ("ota_bank_swap_function: defer startup bank change to bootloader") );
-    return (FWUP_SUCCESS);
+    uint32_t saved_psw = R_BSP_GET_PSW();
+    flash_err_t err;
+
+    R_BSP_InterruptsDisable();
+    err = R_FLASH_Control(FLASH_CMD_BANK_TOGGLE, NULL);
+    R_BSP_SET_PSW(saved_psw);
+    return (FLASH_SUCCESS == err) ? FWUP_SUCCESS : FWUP_ERR_FLASH;
 }
 /**********************************************************************************************************************
  End of function ota_bank_swap_function

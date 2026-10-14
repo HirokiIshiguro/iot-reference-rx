@@ -12,7 +12,8 @@
 extern "C" {
 #endif
 
-#include "platform.h"
+/* Keep this configuration header free of BSP/RTOS includes.  The upstream
+ * recorder controls their include order through its kernel and hardware ports. */
 
 #ifndef TRACEALYZER_CPU_LOAD_LOW_NOISE
 #define TRACEALYZER_CPU_LOAD_LOW_NOISE 1

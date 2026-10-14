@@ -24,6 +24,7 @@ from test_selection import parse_test_ids
 from check_idt_report import check_report
 from ota_witness import UartWitness
 from flash_failure import raise_if_flash_failed
+from pkcs11_source_view import create_source_view
 from targets import get_target, target_ids, target_fingerprint, load_manifest
 from cleanup_budget import (NATIVE_CLEANUP_SECONDS, NATIVE_TERMINATE_SECONDS, NATIVE_KILL_SECONDS,
                             BRIDGE_SHUTDOWN_SECONDS, REMOTE_TERMINATE_SECONDS, REMOTE_KILL_SECONDS,
@@ -353,6 +354,12 @@ def main():
         (run_dir / folder).mkdir()
     temporary_sources = run_dir / "source"
     temporary_sources.mkdir()
+    if args.group == "FullPKCS11_Core":
+        # FRQ's selector edits target only this product configuration facade.
+        # Full original dependencies are supplied separately to the callback.
+        source_view = run_dir / "pkcs11-sdk-source"
+        create_source_view(source, source_view)
+        userdata["sourcePath"] = str(source_view)
     config_path = idt_root / "configs/config.json"
     package_lock = open(idt_root / ".codex-prototype.lock", "a+b")
     bridge = process = None

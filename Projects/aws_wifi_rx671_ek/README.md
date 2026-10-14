@@ -7,7 +7,7 @@ The first committed state intentionally starts from the proven WHD bring-up
 tree:
 
 - EK-RX671 SDHI + in-house `r_sdio_rx`
-- Infineon WHD v1.70.0 through a project-local submodule
+- Infineon WHD v1.70.0 through a fixed project-local submodule revision
 - Type 1YN firmware boot, MAC read, AP scan, WPA2-PSK JOIN, FreeRTOS+TCP, and
   AWS IoT MQTT smoke verified on hardware
 - No AP credentials committed; Type 1YN WHD blob source revisions are pinned as
@@ -20,10 +20,9 @@ The e2 studio project name is `aws_wifi_rx671_ek`.
 | Path | Purpose |
 |---|---|
 | `e2studio_ccrx/` | EK-RX671 e2 studio CCRX application project |
-| `external/wifi-host-driver/` | WHD v1.70.0 submodule |
+| `external/wifi-host-driver/` | Fixed WHD submodule revision; CC-RX portability is maintained in the purpose-specific fork |
 | `external/type1yn-blobs/` | Pinned source submodules and ignored staging for Type 1YN firmware/NVRAM/CLM blobs |
-| `external/patches/whd-v1.70.0-ccrx-portability.patch` | Required WHD CC-RX/SDIO patch |
-| `apply_whd_patch.ps1` | Helper to re-apply the WHD patch after submodule checkout |
+| `apply_whd_patch.ps1` | Retired entry point; directs callers to the fixed submodule build |
 
 ## Current Status
 
@@ -236,7 +235,7 @@ change the RX671 project-local WHD port layer.
 ## Build
 
 Use the headless build helper from the repository root. It initializes the
-required submodules, applies the WHD CC-RX patch if needed, validates/stages the
+required fixed submodules, checks pristine WHD inputs, validates/stages the
 Type 1YN firmware/NVRAM/CLM blobs, and builds the e2 studio project:
 
 ```powershell
@@ -567,8 +566,8 @@ CI sets that workspace to
 repository-independent path keeps generated e2 studio metadata outside
 OneDrive and avoids Windows path-length sensitivity.
 
-The helper snapshots `.cproject`, the FWUP configuration, and both generated
-BSP bank-mode files before applying the profile. It restores every snapshot
+The helper snapshots `.cproject`, the FWUP configuration, and the product-owned
+BSP bank-mode configuration before applying the profile. It restores every snapshot
 byte-for-byte after success or failure and rejects a formal provenance build
 from a dirty source tree or a dirty/mismatched input submodule. OTA builds
 enable KVS-backed WHD JOIN without compiling a value, explicitly disable local
@@ -618,7 +617,9 @@ The first network goal is DHCP over Wi-Fi after WHD JOIN.
 
 Implementation steps:
 
-1. Keep WHD source unmodified except for the tracked external patch.
+1. Keep the WHD submodule checkout pristine. Maintain CC-RX portability changes
+   in the [dedicated fork](https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver),
+   and update the consumer gitlink after the fork review and merge.
 2. Add a project-local FreeRTOS+TCP `NetworkInterface` implementation for WHD.
 3. Map WHD RX packet callbacks into `eNetworkRxEvent`.
 4. Map `xNetworkInterfaceOutput()` into WHD packet TX.
