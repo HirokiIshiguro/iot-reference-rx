@@ -605,7 +605,17 @@ idt_ci_contract:
     - hw-sakura-vps
     - cap-internet
   variables:
-    GIT_SUBMODULE_STRATEGY: "none"
+    # Host tests read the original Kernel/Unity/SDK and three boot chip headers.
+    # Keep this source-only job on the exact six root gitlinks, without recursion.
+    GIT_SUBMODULE_STRATEGY: normal
+    GIT_SUBMODULE_DEPTH: "1"
+    GIT_SUBMODULE_PATHS: >-
+      Middleware/FreeRTOS/FreeRTOS-Kernel
+      Test/Unity
+      Test/FreeRTOS-Libraries-Integration-Tests
+      Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader
+      Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader
+      Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/lib/rx_bootloader
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
@@ -664,6 +674,7 @@ idt_ci_contract:
         tools.ci.tests.test_freertos_assert_profiles \
         tools.ci.tests.test_rx65n_managed_build_profiles \
         tools.ci.tests.test_idt_nested_dependency_initialization \
+        tools.ci.tests.test_idt_unit_dependencies \
         tools.ci.tests.test_bg96_static_provisioning.StaticProvisioningContractTests \
         tools.ci.tests.test_rx_e2studio_cli \
         tools.ci.tests.test_rx72n_fwup_prm_contract \

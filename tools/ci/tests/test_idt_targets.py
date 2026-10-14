@@ -14,6 +14,7 @@ from unittest.mock import patch
 from tools.idt.targets import (get_target, target_fingerprint, device_template, target_ids,
                                hardware_end_state_status)
 from tools.idt.prepare_target_network import network_values, prepare
+from tools.idt import pkcs11_source_view
 
 ROOT = Path(__file__).resolve().parents[3]
 BUILD_SCRIPT = ROOT / "tools/idt/build_transport.sh"
@@ -153,8 +154,32 @@ class BuildPackagingArgumentTests(unittest.TestCase):
         # compiler, cloud service or device is accessed by this regression test.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / "source with spaces"
+            original_source = root / "original inputs with spaces"
+            original_source.mkdir()
+            for relative in pkcs11_source_view.CONFIG_FILES:
+                path = original_source / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"/* Public product-only packaging fixture. */\n")
+            original_files = {p.relative_to(original_source).as_posix(): p.read_bytes()
+                              for p in original_source.rglob("*") if p.is_file()}
+            runtime = root / "run-test" / "execution"
+            views = runtime / "source"
+            views.mkdir(parents=True)
+            source_view = views / "native view with spaces"
+            pkcs11_source_view.create_source_view(original_source, source_view)
+            selection_text = pkcs11_source_view.FACADE
+            for group in pkcs11_source_view.GROUPS:
+                if group not in {"Full_PKCS11_Capabilities", "Full_PKCS11_NoObject"}:
+                    selection_text = selection_text.replace("    RUN_TEST_GROUP( " + group,
+                                                            "\t\t//RUN_TEST_GROUP( " + group)
+            (source_view / pkcs11_source_view.FACADE_FILE).write_bytes(selection_text.encode("utf-8"))
+            self.assertEqual("NoObject", pkcs11_source_view.selected_group(source_view)["argument"])
+            # The packaging fixture stubs build/routing operations. Their real
+            # pristine source bindings are covered by source-view tests.
+            source = runtime / "prepared build with spaces"
             source.mkdir()
+            provenance = runtime / "public-provenance-fixture.json"
+            provenance.write_text("{}\n", encoding="utf-8")
             bin_dir = root / "bin"
             bin_dir.mkdir()
             capture = root / "arguments.jsonl"
@@ -162,9 +187,23 @@ class BuildPackagingArgumentTests(unittest.TestCase):
                 "wslpath": '#!/bin/sh\nprintf "%s\\n" "$2"\n',
                 "pwsh": "#!/bin/sh\nexit 0\n",
                 "linux-python": (
-                    "#!/usr/bin/env python3\nimport pathlib,subprocess,sys\n"
+                    "#!/usr/bin/env python3\nimport json,os,pathlib,subprocess,sys\n"
+                    "if sys.argv[1] == '-c':\n"
+                    " sys.exit(subprocess.call([sys.executable, *sys.argv[1:]]))\n"
                     "if pathlib.Path(sys.argv[1]).name == 'targets.py':\n"
                     f" sys.exit(subprocess.call([sys.executable, {str(ROOT / 'tools/idt/targets.py')!r}, *sys.argv[2:]]))\n"
+                    "if pathlib.Path(sys.argv[1]).name == 'pkcs11_source_view.py':\n"
+                    " action=sys.argv[2]; args=sys.argv[3:]\n"
+                    " def value(flag): return args[args.index(flag)+1]\n"
+                    " assert value('--view') == os.environ['IDT_TEST_NATIVE_VIEW']\n"
+                    " assert value('--runtime') == os.environ['IDT_RUNTIME_DIR']\n"
+                    " assert value('--target') == os.environ['IDT_TARGET']\n"
+                    " if action == 'prepare':\n"
+                    "  assert value('--source') == os.environ['IDT_SOURCE_PATH']\n"
+                    "  assert value('--provenance') == os.environ['IDT_PROVENANCE_FILE']\n"
+                    "  print(json.dumps({'build_source':os.environ['IDT_TEST_PREPARED_SOURCE'], 'selection':{'argument':'NoObject'}}))\n"
+                    " else: assert action == 'record'\n"
+                    " sys.exit(0)\n"
                 ),
                 "windows-python": (
                     "#!/usr/bin/env python3\nimport json,os,sys\n"
@@ -180,15 +219,16 @@ class BuildPackagingArgumentTests(unittest.TestCase):
                        IDT_LINUX_PYTHON=str(bin_dir / "linux-python"),
                        IDT_WINDOWS_PWSH=str(bin_dir / "pwsh"),
                        IDT_WINDOWS_PYTHON=str(bin_dir / "windows-python"),
-                       IDT_RUNTIME_DIR=str(root / "run-test" / "execution"),
+                       IDT_RUNTIME_DIR=str(runtime), IDT_SOURCE_PATH=str(original_source),
+                       IDT_TEST_NATIVE_VIEW=str(source_view), IDT_TEST_PREPARED_SOURCE=str(source),
                        IDT_WORKSPACE_ROOT="C:/idt-test", IDT_E2STUDIO_CLI="C:/inert/e2studioc.exe",
-                       IDT_PROVENANCE_FILE="C:/inert/provenance.json", IDT_SCOPE="pkcs11",
+                       IDT_PROVENANCE_FILE=str(provenance), IDT_SCOPE="pkcs11",
                        IDT_TEST_ARGUMENTS=str(capture))
             for target_id in target_ids():
                 with self.subTest(target=target_id):
                     capture.unlink(missing_ok=True)
                     env['IDT_TARGET'] = target_id
-                    completed = subprocess.run(['bash', str(BUILD_SCRIPT), str(source)], env=env,
+                    completed = subprocess.run(['bash', str(BUILD_SCRIPT), str(source_view)], env=env,
                                                capture_output=True, text=True, timeout=15)
                     self.assertEqual(0, completed.returncode, completed.stderr)
                     calls = [json.loads(line) for line in capture.read_text().splitlines()]
@@ -200,6 +240,11 @@ class BuildPackagingArgumentTests(unittest.TestCase):
                         expected = source / 'artifacts/idt/build_transport' / f"{target['artifact_basename']}.{extension}"
                         self.assertEqual(ntpath.normpath(str(expected)), ntpath.normpath(actual))
                     self.assertEqual(str(source / target['signing_key']), calls[0][calls[0].index('--key') + 1])
+                    after = {p.relative_to(original_source).as_posix(): p.read_bytes()
+                             for p in original_source.rglob("*") if p.is_file()}
+                    self.assertEqual(original_files, after)
+                    self.assertEqual(selection_text.encode("utf-8"),
+                                     (source_view / pkcs11_source_view.FACADE_FILE).read_bytes())
 
 
 if __name__ == "__main__":

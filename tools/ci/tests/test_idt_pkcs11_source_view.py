@@ -66,6 +66,20 @@ class Pkcs11SourceViewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "supported native Core selection"):
             view.selected_group(self.native)
 
+    def test_facade_lf_contract_does_not_require_python310_write_text_api(self):
+        # Emulate only the Python 3.9 write_text signature. Path.open already
+        # supports newline in 3.9; actual interpreter coverage remains in CI.
+        original_write = Path.write_text
+        def legacy_write(path, data, encoding=None, errors=None):
+            return original_write(path, data, encoding=encoding, errors=errors)
+        destination = self.runtime / "source" / "python39-contract"
+        with patch.object(Path, "write_text", legacy_write):
+            view.create_source_view(self.source, destination)
+        body = (destination / view.FACADE_FILE).read_bytes()
+        self.assertEqual(view.FACADE.encode("utf-8"), body)
+        self.assertNotIn(b"\r", body)
+        self.assertEqual(self.original, (self.source / manifest.PKCS11_RUNNER_FILE).read_bytes())
+
     def test_both_native_core_selections_bind_owned_config_and_original_test_bytes(self):
         for argument, groups, cases in (("StartFinish", [view.GROUPS[0], view.GROUPS[1]], 6),
                                        ("NoObject", [view.GROUPS[1], view.GROUPS[2]], 5)):

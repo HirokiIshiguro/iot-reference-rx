@@ -60,8 +60,8 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         cls.console = (ROOT / "Demos/cli/UARTCommandConsole.c").read_text(
             encoding="utf-8"
         )
-        cls.freertos_cli = (
-            ROOT / "Middleware/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c"
+        cls.cli_boundary = (
+            ROOT / "Demos/cli/config_command_value.h"
         ).read_text(encoding="utf-8")
         cls.freertos_helper = (
             PROJECT / "src/application/startup/freertos_helper.c"
@@ -467,8 +467,6 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
         self.assertIn('"conf sethex wifipass "', self.console)
         self.assertIn("A blank line must never repeat a credential command", self.console)
         self.assertIn("prvSecureZero(cInputString", self.console)
-        self.assertIn("xWriteBufferLen - 1U", self.freertos_cli)
-        self.assertIn("pcWriteBuffer[xWriteBufferLen - 1U] = '\\0'", self.freertos_cli)
         self.assertIn("WHD_JOIN_USE_KVS", self.whd_config)
         self.assertIn("xReadEntry(KVS_WIFI_SSID", self.whd)
         self.assertIn("xReadEntry(KVS_WIFI_PASSPHRASE", self.whd)
@@ -533,10 +531,28 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             "#if RX671_OTA_PROVISIONER_ENABLE == 1",
             self.console,
         )
-        self.assertIn(
-            "#if RX671_OTA_PROVISIONER_ENABLE == 1",
-            self.freertos_cli,
+
+    def test_uart_output_is_bounded_at_owned_public_cli_boundary(self) -> None:
+        # Output handling belongs to the caller of the pristine OSS interpreter.
+        self.assertIn('#include "config_command_value.h"', self.console)
+        self.assertRegex(
+            self.console,
+            r"FreeRTOS_CLIProcessCommand\(cInputString,\s*pcOutputString,\s*"
+            r"configCOMMAND_INT_MAX_OUTPUT_SIZE\s*-\s*1U\)",
         )
+        process = self.console.index("xReturned = FreeRTOS_CLIProcessCommand(")
+        terminate = self.console.index("Cli_TerminateOutput(", process)
+        send = self.console.index("vSerialPutString(", terminate)
+        clear = self.console.index(
+            "memset(pcOutputString, '\\0', configCOMMAND_INT_MAX_OUTPUT_SIZE)",
+            send,
+        )
+        self.assertLess(process, terminate)
+        self.assertLess(terminate, send)
+        self.assertLess(send, clear)
+        self.assertIn("(unsigned short)outputLength", self.console[send:clear])
+        self.assertIn("buffer[capacity - 1U] = '\\0'", self.cli_boundary)
+        self.assertIn("return strlen(buffer)", self.cli_boundary)
 
 
 if __name__ == "__main__":

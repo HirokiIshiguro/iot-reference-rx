@@ -66,7 +66,8 @@ def create_source_view(source: Path, destination: Path) -> None:
         path.write_bytes(_bytes(source, relative))
     facade = destination / FACADE_FILE
     facade.parent.mkdir(parents=True, exist_ok=True)
-    facade.write_text(FACADE, encoding="utf-8", newline="\n")
+    with facade.open("w", encoding="utf-8", newline="\n") as output:
+        output.write(FACADE)
     (destination / MARKER_FILE).write_text(json.dumps({"schema_version": 1,
         "purpose": "product-owned-native-pkcs11-selection"}) + "\n", encoding="utf-8")
 

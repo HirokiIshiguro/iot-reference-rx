@@ -451,7 +451,7 @@ function Get-IdtNumericDefine {
 }
 $expectedAreaSize = switch ($Target) {
     'rx72n-ethernet' { 0x1C0000 }
-    'rx65n-bg96' { 0xF0000 }
+    'rx65n-bg96' { 0xC0000 }
     'rx671-wifi' { 0xC0000 }
 }
 $fwupAreaSize = Get-IdtNumericDefine $fwupText 'FWUP_CFG_AREA_SIZE'
