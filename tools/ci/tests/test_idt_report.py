@@ -409,7 +409,9 @@ class IdtCiContractTests(unittest.TestCase):
         job = self.blocks["idt_ci_contract"]
         for setting in (
             'CI_PIPELINE_SOURCE == "merge_request_event"',
-            'GIT_SUBMODULE_STRATEGY: "none"', "- .gitlab-ci.yml",
+            "stage: dependency_check", "- os-linux",
+            "GIT_SUBMODULE_STRATEGY: normal", 'GIT_SUBMODULE_DEPTH: "1"',
+            "- .gitlab-ci.yml",
             "- tools/idt/**/*", "- tools/ci/tests/test_idt_report.py",
             'python3 -m venv "$idt_ci_venv"',
             '"$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-ci.txt',
@@ -419,8 +421,36 @@ class IdtCiContractTests(unittest.TestCase):
             "tools.ci.tests.test_idt_stop",
             "tools.ci.tests.test_idt_ota_witness", "tools.ci.tests.test_idt_selection",
             "tools.idt.ota_aws_signers_tests", "tools.idt.ota_support_tests",
+            "tools.ci.tests.test_idt_unit_dependencies",
         ):
             self.assertIn(setting, job)
+        paths = re.search(r"(?m)^    GIT_SUBMODULE_PATHS: >-\n((?:      [^\n]+\n)+)", job)
+        self.assertIsNotNone(paths)
+        selected = paths.group(1).split()
+        required = {
+            "Middleware/FreeRTOS/FreeRTOS-Kernel",
+            "Test/Unity", "Test/FreeRTOS-Libraries-Integration-Tests",
+            "Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader",
+            "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader",
+            "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/lib/rx_bootloader",
+        }
+        self.assertEqual(required, set(selected))
+        self.assertEqual(len(required), len(selected))
+        for forbidden in (
+            "GIT_SUBMODULE_STRATEGY: recursive", "--recursive", "--remote",
+            "extends: .aws_cli_windows_job",
+            'RUN_RX_IDT: "true"', 'RUN_RX72N_IDT: "true"',
+            'SKIP_HW_TESTS: "false"',
+        ):
+            self.assertFalse(forbidden in job, "Source-only job contains " + forbidden)
+        script = job.split("  script:\n", 1)[1]
+        # changes filters may mention builders; the executable script may not run them.
+        for forbidden in (
+            "git submodule update", "git clone", "Initialize-RxBuildDependencies",
+            "build_headless_", "tools/idt/run_idt.py", "tools/idt/run_transport.py",
+            "rfp-cli ", "aws.exe ",
+        ):
+            self.assertFalse(forbidden in script, "Source-only script contains " + forbidden)
         self.assertNotIn("--user", job)
 
     def test_explicit_idt_checks_host_before_run_and_logs_no_aws_identity(self):

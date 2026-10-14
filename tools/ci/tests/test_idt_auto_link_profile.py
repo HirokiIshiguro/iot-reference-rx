@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[3]
 BUILDER = ROOT / "tools/build_rx72n_idt_transport.ps1"
+MATRIX = ROOT / "tools/test_build_rx_idt.ps1"
 PWSH = shutil.which("pwsh")
 PROJECTS = {"rx72n-ethernet": "aws_ether_rx72n_envision_kit",
             "rx65n-bg96": "aws_bg96_ck_rx65n", "rx671-wifi": "aws_wifi_rx671_ek"}
@@ -25,13 +26,14 @@ def quote(value):
 
 @unittest.skipUnless(os.name == "nt" and PWSH, "Native builder requires Windows PowerShell 7")
 class IdtAutoLinkProfileTests(unittest.TestCase):
-    def invoke(self, folder, mutation=""):
+    def invoke(self, folder, mutation="", report_mutation=""):
         script = folder / "profile.ps1"
         script.write_text(r'''
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $root=''' + quote(ROOT) + r'''
 $builder=''' + quote(BUILDER) + r'''
+$matrix=''' + quote(MATRIX) + r'''
 $output=''' + quote(folder) + r'''
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($builder,[ref]$tokens,[ref]$errors)
@@ -46,7 +48,21 @@ $first=$body.IndexOf('$testSources = [ordered]@{')
 $last=$body.IndexOf('$appVersion = [ordered]@{}',$first)
 if($first -lt 0 -or $last -le $first) { throw 'Production group selection is missing' }
 $groupSelection=[scriptblock]::Create($body.Substring($first,$last-$first))
+$first=$body.IndexOf('if ($ValidateOnly) {')
+$last=$body.IndexOf('New-Item -ItemType Directory -Force -Path $idtOutput',$first)
+if($first -lt 0 -or $last -le $first) { throw 'Production validation report is missing' }
+$reportProducer=[scriptblock]::Create($body.Substring($first,$last-$first))
+$matrixBody=[IO.File]::ReadAllText($matrix)
+$first=$matrixBody.IndexOf('$expectedVariable =')
+$last=$matrixBody.IndexOf('$count++',$first)
+if($first -lt 0 -or $last -le $first) { throw 'Production report consumer is missing' }
+$reportConsumer=[scriptblock]::Create($matrixBody.Substring($first,$last-$first))
+$first=$body.IndexOf('$repositoryVariables = @(')
+$last=$body.IndexOf('$includeOption =',$first)
+if($first -lt 0 -or $last -le $first) { throw 'Production repository-root selection is missing' }
+$repositorySelection=[scriptblock]::Create($body.Substring($first,$last-$first))
 $idtRoot=Join-Path $output 'owned-parameters'
+$parameterRoot=$idtRoot
 [void](New-Item -ItemType Directory -Force -Path (Join-Path $idtRoot 'Test/include'))
 $parameters=@'
 #define PKCS11_TEST_RSA_KEY_SUPPORT 0
@@ -63,6 +79,7 @@ $targets=@{'rx72n-ethernet'='aws_ether_rx72n_envision_kit';'rx65n-bg96'='aws_bg9
 $reports=@()
 foreach($target in $targets.Keys) {
     foreach($TestGroup in @('Transport','DeviceAdvisor','OTAE2E','PKCS11','OTAPAL')) {
+        $idtRoot=$parameterRoot
         . $groupSelection
         if($target -ne 'rx72n-ethernet' -and $TestGroup -in @('Transport','DeviceAdvisor','OTAE2E')) {
             $testSources['rx_idt_network.c']='Test/ports/rx_idt_network.c'
@@ -73,7 +90,10 @@ foreach($target in $targets.Keys) {
         $toolchainBefore=@($cprojectXml.SelectNodes('//toolChain') | ForEach-Object {$_.GetAttribute('superClass')}) -join '|'
         $optionsBefore=@($cprojectXml.SelectNodes('//toolChain/tool/option') | ForEach-Object {$_.OuterXml}) -join '|'
         ''' + mutation + r'''
-        Add-IdtSelectedSources $projectXml $cprojectXml $testSources 'AWS_IOT_MCU_ROOT' $root
+        $idtRoot=$root
+        $idtProject=$project
+        . $repositorySelection
+        Add-IdtSelectedSources $projectXml $cprojectXml $testSources $repositoryVariable $resolvedRepositoryRoot
         if((@($cprojectXml.SelectNodes('//toolChain') | ForEach-Object {$_.GetAttribute('superClass')}) -join '|') -cne $toolchainBefore -or
            (@($cprojectXml.SelectNodes('//toolChain/tool/option') | ForEach-Object {$_.OuterXml}) -join '|') -cne $optionsBefore) {
             throw 'Source selection altered toolchain/stdlib/include/define/link options'
@@ -81,6 +101,15 @@ foreach($target in $targets.Keys) {
         $name=$target+'-'+$TestGroup
         $projectXml.Save((Join-Path $output ($name+'.project.xml')))
         $cprojectXml.Save((Join-Path $output ($name+'.cproject.xml')))
+        $ValidateOnly=$true
+        $ValidationReportFile=Join-Path $output ($name+'.report.json')
+        $targetSha256='host-fixture'
+        $pkcs11Selection=$null
+        $profileName='host-source-selection-fixture'
+        & $reportProducer
+        $validated=[IO.File]::ReadAllText($ValidationReportFile)|ConvertFrom-Json
+        ''' + report_mutation + r'''
+        . $reportConsumer
         $reports+=@{target=$target;group=$TestGroup;sources=$testSources;source_entry='IdtTestSources';link_policy='generated'}
     }
 }
@@ -120,6 +149,14 @@ $reports|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $output 'pr
                     self.assertFalse(dedicated[0].get("excluding"))
                     self.assertFalse(any(x.get("superClass", "").endswith("noneLinkageOrderList")
                                          for x in metadata.iter("option")))
+                    report_data = json.loads((folder / (name + ".report.json")).read_text(
+                        encoding="utf-8-sig"))
+                    self.assertEqual(report_data["repository_variable"], "AWS_IOT_MCU_ROOT")
+                    self.assertIs(report_data["compiler_invoked"], False)
+                    self.assertEqual(set(report_data["source_links"]), set(report["sources"]))
+                    if report["group"] == "Transport":
+                        self.assertEqual(len(report_data["source_links"]),
+                                         7 if report["target"] == "rx72n-ethernet" else 8)
 
     def test_custom_order_manual_list_and_conflicting_source_selection_are_rejected(self):
         mutations = {
@@ -134,6 +171,45 @@ $reports|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $output 'pr
                 result = self.invoke(Path(temporary), mutation)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertRegex(result.stderr, r"IDT (?:requires|source)")
+
+    def test_report_consumer_rejects_missing_old_alias_wrong_root_and_compile_claim(self):
+        mutations = {
+            "missing_alias": "$validated.PSObject.Properties.Remove('repository_variable')",
+            "old_alias": "$validated.repository_variable='AWS_IOT_MCU_REPO_ROOT'",
+            "missing_compiler_claim": "$validated.PSObject.Properties.Remove('compiler_invoked')",
+            "missing_source_links": "$validated.PSObject.Properties.Remove('source_links')",
+            "compile_claim": "$validated.compiler_invoked=$true",
+            "wrong_root": "($validated.source_links.PSObject.Properties|Select-Object -First 1).Value.resolved_path=Join-Path $output 'outside-source.c'",
+            "old_uri": "($validated.source_links.PSObject.Properties|Select-Object -First 1).Value.location_uri='AWS_IOT_MCU_REPO_ROOT/Test/ports/rx72n_idt_platform.c'",
+        }
+        for label, mutation in mutations.items():
+            with self.subTest(report=label), tempfile.TemporaryDirectory(prefix="idt-report-invalid-") as temporary:
+                result = self.invoke(Path(temporary), report_mutation=mutation)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertRegex(result.stderr, r"IDT source|property.*cannot be found")
+
+
+class IdtRepositoryVariableMetadataTests(unittest.TestCase):
+    def test_all_five_apps_use_the_common_repository_root_alias_and_uris(self):
+        projects = (*PROJECTS.values(), "aws_bg96_ck_rx65n_tsip",
+                    "aws_ether_rx72n_envision_kit_tsip")
+        for name in projects:
+            with self.subTest(project=name):
+                description = ET.parse(ROOT / "Projects" / name / "e2studio_ccrx/.project").getroot()
+                variables = description.findall("variableList/variable")
+                root_variables = [v for v in variables
+                                  if v.findtext("value") == "$%7BPARENT-3-PROJECT_LOC%7D"]
+                self.assertEqual(len(root_variables), 1)
+                self.assertEqual(root_variables[0].findtext("name"), "AWS_IOT_MCU_ROOT")
+                root_links = [link for link in description.findall("linkedResources/link")
+                              if link.findtext("locationURI", "").startswith("AWS_IOT_MCU")]
+                self.assertTrue(root_links)
+                for link in root_links:
+                    uri = link.findtext("locationURI")
+                    self.assertTrue(uri.startswith("AWS_IOT_MCU_ROOT/"), uri)
+                    relative = Path(uri.removeprefix("AWS_IOT_MCU_ROOT/"))
+                    self.assertNotIn("..", relative.parts)
+                    self.assertTrue((ROOT / relative).exists(), uri)
 
 
 if __name__ == "__main__":

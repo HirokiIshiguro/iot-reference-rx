@@ -95,7 +95,7 @@ try {
             & $builder -ProjectRoot $root -Target $target -TestGroup $group -Python $Python `
                 -ProvenanceFile $provenances[$target] -ValidateOnly -ValidationReportFile $validationReport
             $validated = [IO.File]::ReadAllText($validationReport) | ConvertFrom-Json
-            $expectedVariable = $(if ($target -eq 'rx65n-bg96') { 'AWS_IOT_MCU_REPO_ROOT' } else { 'AWS_IOT_MCU_ROOT' })
+            $expectedVariable = 'AWS_IOT_MCU_ROOT'
             if ($validated.repository_variable -ne $expectedVariable -or $validated.compiler_invoked -ne $false) {
                 throw 'IDT source links select the wrong repository root or claim compilation.'
             }
