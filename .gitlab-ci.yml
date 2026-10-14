@@ -662,6 +662,8 @@ idt_ci_contract:
         tools.ci.tests.test_common_kernel \
         tools.ci.tests.test_freertos_assert_profiles \
         tools.ci.tests.test_rx65n_managed_build_profiles \
+        tools.ci.tests.test_idt_nested_dependency_initialization \
+        tools.ci.tests.test_bg96_static_provisioning.StaticProvisioningContractTests \
         tools.ci.tests.test_rx_e2studio_cli \
         tools.ci.tests.test_rx72n_fwup_prm_contract \
         tools.ci.tests.test_idt_rfp_process \
@@ -3767,8 +3769,6 @@ build_rx65n_bg96_ota:
 
       $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
       $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\$rx65nBg96AppProject\e2studio_ccrx"
-      python tools/patch_bg96_aws_iot_mcu.py patch --aws-root "$appRoot" --backup "$artifactDir\aws_dev_mode_key_provisioning.c.orig"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       python tools/configure_bg96_mqtt_credentials.py --app-dir "$appRoot" --marker "$artifactDir\mqtt_credentials_configured" --require --tls-backend "$env:RX65N_BG96_TLS_BACKEND"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       python tools/build_bg96_ota_candidate.py `
@@ -3798,11 +3798,6 @@ build_rx65n_bg96_ota:
       }
 
       Write-Host "Using locally generated RX65N BG96 OTA code signer certificate and customCodeSigning signature."
-  after_script:
-    - $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\build_rx65n_bg96_ota"
-    - $rx65nBg96AppProject = if ($env:RX65N_BG96_TLS_BACKEND -eq "tsip") { "aws_bg96_ck_rx65n_tsip" } else { "aws_bg96_ck_rx65n" }
-    - $appRoot = Join-Path $env:CI_PROJECT_DIR "Projects\$rx65nBg96AppProject\e2studio_ccrx"
-    - python tools/patch_bg96_aws_iot_mcu.py restore --aws-root "$appRoot" --backup "$artifactDir\aws_dev_mode_key_provisioning.c.orig"
   artifacts:
     when: always
     paths:

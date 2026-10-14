@@ -940,6 +940,10 @@ void prvMQTTAgentTask(void *pvParameters)
     pcThingName = clientcredentialIOT_THING_NAME;
     pcBrokerEndpoint = clientcredentialMQTT_BROKER_ENDPOINT;
     pcRootCA = (char *)democonfigROOT_CA_PEM;
+#elif defined(BG96_CI_MQTT_CREDENTIALS)
+    pcThingName = democonfigCLIENT_IDENTIFIER;
+    pcBrokerEndpoint = democonfigMQTT_BROKER_ENDPOINT;
+    pcRootCA = (char *)democonfigROOT_CA_PEM;
 #else
     /* Load broker endpoint and thing name for client connection, from the key store. */
     thingnameLength = prvGetCacheEntryLength(KVS_CORE_THING_NAME);

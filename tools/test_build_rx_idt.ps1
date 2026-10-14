@@ -14,6 +14,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = (Resolve-Path -LiteralPath $ProjectRoot).Path
+. (Join-Path $PSScriptRoot 'rx_e2studio_cli.ps1')
+# Runner's normal submodule strategy updates only the top-level pins. Resolve
+# their reviewed nested pins before the pristine-source capture guard runs.
+Initialize-RxBuildDependencies -ProjectRoot $root
 $builder = Join-Path $PSScriptRoot 'build_rx72n_idt_transport.ps1'
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('idt-builder-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporary | Out-Null

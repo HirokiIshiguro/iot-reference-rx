@@ -39,7 +39,6 @@ $useTsipTls13ZeroRttConfig = $useTls13ZeroRttConfig -and ($normalizedTlsBackend 
 $bootProject = Join-Path $projectRoot "Projects\boot_loader_ck_rx65n\e2studio_ccrx"
 $appProject = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx"
 $lanbenchTls13ZeroRttConfigHeader = Join-Path $projectRoot "Demos\include\lanbench_tls13_0rtt_config.h"
-$patchBackup = Join-Path $projectRoot "artifacts\rx65n_bg96_aws_dev_mode_key_provisioning.c.orig"
 
 foreach ($projectDir in @($bootProject, $appProject)) {
     if (-not (Test-Path (Join-Path $projectDir ".project"))) {
@@ -519,7 +518,6 @@ if (-not (Test-Path (Join-Path $projectRoot "Middleware\FreeRTOS\FreeRTOS-Kernel
     throw "Root shared FreeRTOS submodules are not initialized."
 }
 
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $patchBackup) | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logFile) | Out-Null
 if (Test-Path $logFile) {
     Remove-Item -Force $logFile
@@ -558,7 +556,6 @@ $lanbenchConfigHeaderSnapshot = if ($lanbenchConfigHeaderExisted) {
 } else {
     $null
 }
-$patchApplied = $false
 
 try {
     if ($useSoftwareTls13ZeroRttConfig) {
@@ -577,9 +574,6 @@ try {
         Write-Host "CK-RX65N BG96 generated build files are ready."
         return
     }
-
-    python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") patch --aws-root $projectRoot --backup $patchBackup
-    $patchApplied = $true
 
     $bootBuildDir = Join-Path $bootProject "HardwareDebug"
     $appBuildDir = Join-Path $appProject "HardwareDebug"
@@ -611,9 +605,6 @@ try {
     Write-Host "  app         .abs: $appAbs"
 }
 finally {
-    if ($patchApplied) {
-        python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") restore --aws-root $projectRoot --backup $patchBackup
-    }
     Restore-ProjectMetadata $metadataSnapshots
     if ($lanbenchConfigHeaderExisted) {
         [System.IO.File]::WriteAllBytes($lanbenchTls13ZeroRttConfigHeader, $lanbenchConfigHeaderSnapshot)

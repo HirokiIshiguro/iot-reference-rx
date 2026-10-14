@@ -243,5 +243,10 @@
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/3rdparty/TraceRecorderSource</locationURI>
 		</link>
+		<link>
+			<name>TraceProduct</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Common/ports/trace_recorder</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

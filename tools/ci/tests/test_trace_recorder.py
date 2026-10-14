@@ -60,13 +60,35 @@ class TraceMetadataTests(unittest.TestCase):
                 includes = [x.get("value") for o in metadata.iter("option")
                     if o.get("superClass") == "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.include"
                     for x in o.findall("listOptionValue")]
-                facade = '"${workspace_loc:/${ProjName}/Common/ports/trace_recorder/freertos_wrap}"'
+                facade = '"${workspace_loc:/${ProjName}/TraceProduct/freertos_wrap}"'
                 kernel = '"${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Kernel/include}"'
                 self.assertLess(includes.index(facade), includes.index(kernel))
                 self.assertFalse(any((project / "src/TraceRecorder").rglob("*.c")))
                 self.assertFalse(any((project / "src/tracealyzer_recorder").rglob("*.c")))
                 config = (project / "src/frtos_config/FreeRTOSConfig.h").read_text(encoding="utf-8")
                 self.assertRegex(config, r"#define\s+CONFIG_USE_PERCEPIO_TRACE_RECORDER\s+1\b")
+
+    def test_product_config_alias_avoids_the_actual_common_ports_filter(self):
+        for name in PROJECTS:
+            with self.subTest(project=name):
+                project = ROOT / "Projects" / name / "e2studio_ccrx"
+                description = ET.parse(project / ".project").getroot()
+                links = description.findall("linkedResources/link[name='TraceProduct']")
+                self.assertEqual(len(links), 1)
+                self.assertEqual(links[0].findtext("locationURI"),
+                                 "AWS_IOT_MCU_ROOT/Common/ports/trace_recorder")
+                filters = description.findall("filteredResources/filter")
+                self.assertFalse(any((f.findtext("name") or "").startswith("TraceProduct") for f in filters))
+                common_filters = [f for f in filters if f.findtext("name") == "Common"]
+                self.assertTrue(any("name-matches-false-true-ports" in
+                                    (f.findtext("matcher/arguments") or "") for f in common_filters))
+                metadata = ET.parse(project / ".cproject").getroot()
+                includes = [x.get("value") for o in metadata.iter("option")
+                    if o.get("superClass") == "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.include"
+                    for x in o.findall("listOptionValue")]
+                for leaf in ("config", "freertos_wrap"):
+                    self.assertIn('"${workspace_loc:/${ProjName}/TraceProduct/' + leaf + '}"', includes)
+                    self.assertFalse(any("Common/ports/trace_recorder/" + leaf in value for value in includes))
 
     def test_startup_initializes_before_objects_and_starts_all_main_profiles(self):
         for name in PROJECTS:
