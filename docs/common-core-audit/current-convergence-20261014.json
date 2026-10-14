@@ -2143,5 +2143,183 @@
     "mixed_branch_specific_error_id_confirmed": false,
     "E0562220": "Generic differing mode type; no evidence that the historical branch choice was caused by this exact diagnostic",
     "E0562330": "Relocation-size overflow may include unreachable branch targets; does not itself establish mixed library/app branch settings"
+  },
+  "on_chip_ram_classification": {
+    "recorded_on": "2026-10-15",
+    "correction": "The region beginning at00800000 is on-chip expansion RAM. The previous SDRAM description was incorrect; source and linker layout are unchanged.",
+    "scope": "Regular on-chip RAM and expansion RAM; standby RAM and ECC RAM are excluded from these totals.",
+    "regions": {
+      "RX671": {
+        "low_ram": {
+          "start": "00000000",
+          "end_inclusive": "0005FFFF",
+          "bytes": 393216
+        },
+        "expansion_ram": null,
+        "total_bytes": 393216
+      },
+      "RX65N": {
+        "low_ram": {
+          "start": "00000000",
+          "end_inclusive": "0003FFFF",
+          "bytes": 262144
+        },
+        "expansion_ram": {
+          "start": "00800000",
+          "end_inclusive": "0085FFFF",
+          "bytes": 393216
+        },
+        "total_bytes": 655360
+      },
+      "RX72N": {
+        "low_ram": {
+          "start": "00000000",
+          "end_inclusive": "0007FFFF",
+          "bytes": 524288
+        },
+        "expansion_ram": {
+          "start": "00800000",
+          "end_inclusive": "0087FFFF",
+          "bytes": 524288
+        },
+        "total_bytes": 1048576
+      }
+    },
+    "official_sources": [
+      {
+        "url": "https://www.renesas.com/en/document/mat/ck-rx65n-v1-users-manual",
+        "document": "R20UT5100EG0110 Rev.1.10",
+        "page": 5,
+        "supports": "CK-RX65N V1 MCU identity and640KiB SRAM"
+      },
+      {
+        "url": "https://www.renesas.cn/zh/document/apn/rx65n-group-target-board-rx65n-led-blink-control-program",
+        "document": "R20AN0464EJ0100 Rev.1.00",
+        "page": 5,
+        "figure": "4-1",
+        "supports": "RX65N noncontiguous RAM ranges"
+      },
+      {
+        "url": "https://www.renesas.com/en/document/dst/rx72n-group-datasheet",
+        "document": "R01DS0343EJ0120 Rev.1.20",
+        "pages": [
+          1,
+          3
+        ],
+        "supports": "RX72N low512KiB and expansion512KiB; expansion range00800000..0087FFFF"
+      },
+      {
+        "url": "https://www.renesas.com/en/document/dst/rx671-group-datasheet-rev100",
+        "document": "R01DS0373EJ0120 Rev.1.20",
+        "supports": "RX671384KiB RAM capacity"
+      }
+    ]
+  },
+  "rx65n_ci11365_ram_snapshot": {
+    "recorded_on": "2026-10-15",
+    "project": "aws_bg96_ck_rx65n",
+    "backend": "software",
+    "source_sha": "edf8d844dc0f4ed68b6350f43e063fd87d97832c",
+    "pipeline": 11365,
+    "job": 71061,
+    "job_url": "https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71061",
+    "abs_sha256": "9aa5ba2a92bbf0284cfe33753b65eb5631b438c73dcba937a68e2185f183252e",
+    "evidence": "Actual ELF ABS section addresses and sizes; MAP not available in this artifact.",
+    "ram_regions": [
+      {
+        "range": "on_chip_ram",
+        "start": "00000000",
+        "limit_exclusive": "00040000",
+        "highest_end_exclusive": "000106DC",
+        "tail_free_bytes": 194852,
+        "sections": [
+          {
+            "name": "SU",
+            "address": "00000004",
+            "size": 4096
+          },
+          {
+            "name": "SI",
+            "address": "00001004",
+            "size": 1024
+          },
+          {
+            "name": "R_1",
+            "address": "00001404",
+            "size": 8609
+          },
+          {
+            "name": "B_2",
+            "address": "000035A6",
+            "size": 8
+          },
+          {
+            "name": "R",
+            "address": "000035B0",
+            "size": 53240
+          },
+          {
+            "name": "RPFRAM2",
+            "address": "000105A8",
+            "size": 308
+          }
+        ]
+      },
+      {
+        "range": "on_chip_expansion_ram",
+        "start": "00800000",
+        "limit_exclusive": "00860000",
+        "highest_end_exclusive": "0085B194",
+        "tail_free_bytes": 20076,
+        "sections": [
+          {
+            "name": "B",
+            "address": "00800000",
+            "size": 43636
+          },
+          {
+            "name": "B_1",
+            "address": "0080AA74",
+            "size": 329502
+          },
+          {
+            "name": "R_2",
+            "address": "0085B192",
+            "size": 2
+          }
+        ]
+      }
+    ],
+    "heaps": {
+      "BSP_library_heap": {
+        "symbol": "__$s_heap_area",
+        "address": "0080699C",
+        "size": 8192,
+        "section": "B"
+      },
+      "FreeRTOS_heap": {
+        "symbol": "__$ucHeap",
+        "address": "00810296",
+        "size": 262144,
+        "section": "B_1"
+      }
+    },
+    "trace_recorder": {
+      "symbol": "__$xRecorderData",
+      "address": "00803364",
+      "bytes": 12932
+    },
+    "trace_control_task_stack": {
+      "symbol": "__$stackTzCtrl",
+      "address": "00802A14",
+      "bytes": 2048
+    },
+    "expansion_static_tail_free_bytes": 20076,
+    "static_tail_free_definition": "Exclusive region limit minus the highest allocated section end; excludes runtime free space within reserved heaps.",
+    "dynamic_heap_headroom_bytes": null,
+    "stack_high_water_mark_bytes": null,
+    "runtime_ram_access_observed": false,
+    "qualification": "Static placement in the documented on-chip RAM ranges; runtime allocation headroom and real-device RAM operation remain unverified.",
+    "historical_snapshot_relation": "Separate from the previous five-image flash_static_image_snapshot; its source, options and addresses are not reused."
   }
 }

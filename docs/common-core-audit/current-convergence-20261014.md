@@ -60,7 +60,7 @@ RX671はsoftware app 1個、RX65N／RX72Nはsoftware・TSIP app各2個です。�
 | IRQ / assert / threading設定 | app IRQ1/MAX4、共通assert/allocator定義、LFS_THREADSAFE無効 | adapterの公開API＋製品mutex。TSIP用configとtransportだけbackend差 |
 | Flash RAM写像 | 全8に`PFRAM2=RPFRAM2`、CF_RUN_FROM_ROM=1/dualでもconfig busy wait専用helperをRAM配置 | 宣言8と実image5を分ける。一般Flash関数が全部RAMにあるという意味ではない |
 | vector / Code Flash開始 | app vectorはFFFBFF80/FFFBFFFC、bootはFFFFFF80/FFFFFFFC。app開始RX671/RX65N=FFF00300、RX72N=FFE00300、boot=FFFC0000 | roleとMCUのbank容量による配置差。通常appとstandalone provisionerを混同しない |
-| RAM / heap / buffer配置 | FreeRTOS app heap RX671=256KiB、RX65N=256KiB、RX72N software=320KiB/TSIP=368KiB。BSP library heapはapp=8KiB/boot=1KiB。RX72NにはSDRAM/LCD/Ethernet buffer sections | FreeRTOS heap等はRAM容量・backend・周辺機能に対応する許容差。BSP heapの役割別値は3 MCUで共通 |
+| RAM / heap / buffer配置 | FreeRTOS app heap RX671=256KiB、RX65N=256KiB、RX72N software=320KiB/TSIP=368KiB。BSP library heapはapp=8KiB/boot=1KiB。RX65N／RX72Nは内蔵拡張RAMを使用し、RX72NにはLCD/Ethernet buffer sections | FreeRTOS heap等はRAM容量・backend・周辺機能に対応する許容差。BSP heapの役割別値は3 MCUで共通 |
 | ISA / FPU / TFU | app/bootともRX671/RX72N=RXv3/DPFPU、RX65N=RXv2/single FPU。RX72NだけTFU | RX671 bootの旧RXv2 subsetを同MCU appと同値へ変更。MCU能力差を保持 |
 | branch width | 全8 branch=24へ統一 | ユーザーの最終決定。公式default24を正式Common enumで明示し、compilerと標準library generatorの共通optionを1か所で指定 |
 | link input order | 全8 e2 studio標準自動順（`useCustomLinkageOrder=false`）へ統一 | ユーザー決定。旧manual object/library listを撤去。source selection・生成標準library・明示section配置を使用 |
@@ -120,6 +120,27 @@ branchの未指定defaultは24です。[公式option説明](https://tool-support
 RX65Nのfresh生成ではsoftware 74/74・TSIP 76/76 compiler responseに公式Cellular `source/include/private`が入り、`cellular_internal.h`／`cellular_common_internal.h`欠落は解消しました。その後のsoftware診断buildはlinkまで成功しましたが、最新のbranch／入力順／診断統一後の結果はまだありません。build成功を正常起動・通信・OTA・IDT完了と扱いません。
 
 旧main／旧native imageのIDT結果、既知MQTT version不一致のNG、今回WIPの結果は別のsource snapshotです。現WIPを「全環境検証済み」へ変更するには、残るimage build、保守鍵投入、native groups、OTA MQTT 3case、試験終了処理を各実機で確認する必要があります。
+
+### 内蔵RAM照合（2026-10-15追補）
+
+`00800000`から始まる領域の呼称を内蔵拡張RAMへ訂正しました。通常RAMと内蔵拡張RAMの容量・範囲は次のとおりです。standby RAMやECC RAMはこの容量表の集計に含めていません。
+
+| MCU | 低位の内蔵RAM | 内蔵拡張RAM | 合計 |
+|---|---|---|---|
+| RX671 | `00000000–0005FFFF`、384KiB | — | 384KiB |
+| RX65N | `00000000–0003FFFF`、256KiB | `00800000–0085FFFF`、384KiB | 640KiB |
+| RX72N | `00000000–0007FFFF`、512KiB | `00800000–0087FFFF`、512KiB | 1MiB |
+
+CK-RX65N V1の搭載MCU・640KiB SRAMは[公式board manual](https://www.renesas.com/en/document/mat/ck-rx65n-v1-users-manual) `R20UT5100EG0110 Rev.1.10` p5、RX65Nの非連続なRAM範囲は[公式memory map](https://www.renesas.cn/zh/document/apn/rx65n-group-target-board-rx65n-led-blink-control-program) `R20AN0464EJ0100 Rev.1.00` p5/Fig.4-1で照合しました。RX72Nは[公式datasheet](https://www.renesas.com/en/document/dst/rx72n-group-datasheet) `R01DS0343EJ0120 Rev.1.20` p1/p3、RX671の容量は[公式datasheet](https://www.renesas.com/en/document/dst/rx671-group-datasheet-rev100) `R01DS0373EJ0120 Rev.1.20`で確認しています。
+
+[CI job #71061](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71061)のRX65N software appは、source [`edf8d844`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/edf8d844dc0f4ed68b6350f43e063fd87d97832c)による新しい静的配置のsnapshotです。ABS SHA-256は`9aa5ba2a92bbf0284cfe33753b65eb5631b438c73dcba937a68e2185f183252e`です。以下の数値は実ABSのsectionから算出しました。
+
+| RX65N appの領域 | sectionの最大終端（exclusive） | 領域終端（exclusive） | 終端までの静的未配置領域 |
+|---|---|---|---|
+| 低位の内蔵RAM | `000106DC` | `00040000` | 194,852B |
+| 内蔵拡張RAM | `0085B194` | `00860000` | **20,076B** |
+
+TraceRecorder本体12,932B、control task stack2,048B、BSP library heap8,192B、FreeRTOS heap262,144Bは、このappの内蔵拡張RAM内に配置されています。20,076Bはsection配置後の末尾余白です。予約heap内の動的な使用余裕・stack high-water markは未測定で、実機でのRAMアクセス動作も未検証です。従来の5 image証跡とは取得source・option・addressを分けて扱います。
 
 ### 参照する現ファイル
 

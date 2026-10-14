@@ -659,6 +659,7 @@ idt_ci_contract:
         tools.ci.tests.test_build_public_signer_provisioner \
         tools.ci.tests.test_idt_pkcs11_adapter \
         tools.ci.tests.test_idt_pkcs11_source_view \
+        tools.ci.tests.test_idt_auto_link_profile \
         tools.ci.tests.test_common_kernel \
         tools.ci.tests.test_freertos_assert_profiles \
         tools.ci.tests.test_rx65n_managed_build_profiles \

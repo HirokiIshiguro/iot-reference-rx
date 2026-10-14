@@ -340,6 +340,74 @@ function Get-IdtLinkerOptions {
     return $options
 }
 
+function Add-IdtSelectedSources {
+    param([System.Xml.XmlDocument]$ProjectMetadata,
+          [System.Xml.XmlDocument]$BuildMetadata,
+          [System.Collections.IDictionary]$Sources,
+          [string]$RepositoryVariable, [string]$SourceRoot)
+
+    $order = @($BuildMetadata.SelectNodes("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.useCustomLinkageOrder']"))
+    $manual = @($BuildMetadata.SelectNodes("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.noneLinkageOrderList']"))
+    if ($order.Count -ne 1 -or $order[0].GetAttribute('value') -ne 'false' -or $manual.Count -ne 0) {
+        throw 'IDT requires the reviewed generated input order without a manual linkage list.'
+    }
+    $resources = $ProjectMetadata.SelectSingleNode('/projectDescription/linkedResources')
+    $entries = @($BuildMetadata.SelectNodes('//sourceEntries'))
+    if (-not $resources -or $entries.Count -ne 1 -or $Sources.Count -eq 0) { throw 'Missing unique IDT source-selection metadata.' }
+    $rootEntries = @($entries[0].SelectNodes("entry[@kind='sourcePath' and @name='']"))
+    if ($rootEntries.Count -ne 1) { throw 'Expected one default project source entry.' }
+    if ($ProjectMetadata.SelectSingleNode("/projectDescription/linkedResources/link[name='IdtTestSources' or starts-with(name, 'IdtTestSources/')]") -or
+        $entries[0].SelectSingleNode("entry[@name='IdtTestSources' or starts-with(@name, 'IdtTestSources/')]") -or
+        $ProjectMetadata.SelectSingleNode("/projectDescription/filteredResources/filter[name='IdtTestSources' or starts-with(name, 'IdtTestSources/')]") -or
+        @($rootEntries[0].GetAttribute('excluding').Split('|') | Where-Object { $_ -eq 'IdtTestSources/' }).Count -ne 0) {
+        throw 'IDT source selection is already present or filtered; concurrent/pre-existing metadata mutation.'
+    }
+    $sourcePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($sourceName in $Sources.Keys) {
+        $relative = [string]$Sources[$sourceName]
+        if ([IO.Path]::GetFileName($relative) -cne $sourceName -or
+            $ProjectMetadata.SelectSingleNode("/projectDescription/linkedResources/link[name='$sourceName']")) {
+            throw "IDT source basename is mismatched or already linked: $sourceName"
+        }
+        $physical = [IO.Path]::GetFullPath((Join-Path $SourceRoot $relative))
+        if (-not $physical.StartsWith($SourceRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $physical -PathType Leaf) -or -not $sourcePaths.Add($physical)) {
+            throw "IDT source link is missing, duplicated or outside the selected source tree: $sourceName"
+        }
+    }
+    # A pure Eclipse virtual folder exposes exactly the selected source files.
+    # No complete Test/ directory, extra stdlib provider or manual object list
+    # enters the managed build. CDT generates these objects and links them.
+    $folder = $ProjectMetadata.CreateElement('link')
+    foreach ($field in @('name', 'type', 'locationURI')) {
+        $element = $ProjectMetadata.CreateElement($field)
+        $element.InnerText = switch ($field) {
+            'name' { 'IdtTestSources' }; 'type' { '2' }; 'locationURI' { 'virtual:/virtual' }
+        }
+        [void]$folder.AppendChild($element)
+    }
+    [void]$resources.AppendChild($folder)
+    foreach ($sourceName in $Sources.Keys) {
+        $link = $ProjectMetadata.CreateElement('link')
+        foreach ($field in @('name', 'type', 'locationURI')) {
+            $element = $ProjectMetadata.CreateElement($field)
+            $element.InnerText = switch ($field) {
+                'name' { 'IdtTestSources/' + $sourceName }; 'type' { '1' }
+                'locationURI' { $RepositoryVariable + '/' + $Sources[$sourceName] }
+            }
+            [void]$link.AppendChild($element)
+        }
+        [void]$resources.AppendChild($link)
+    }
+    $exclusions = @($rootEntries[0].GetAttribute('excluding').Split('|') | Where-Object { $_ }) + 'IdtTestSources/'
+    $rootEntries[0].SetAttribute('excluding', ($exclusions -join '|'))
+    $entry = $BuildMetadata.CreateElement('entry')
+    $entry.SetAttribute('flags', 'VALUE_WORKSPACE_PATH')
+    $entry.SetAttribute('kind', 'sourcePath')
+    $entry.SetAttribute('name', 'IdtTestSources')
+    [void]$entries[0].AppendChild($entry)
+}
+
 $linkedResources = $projectXml.SelectSingleNode('/projectDescription/linkedResources')
 $repositoryVariables = @($projectXml.SelectNodes('/projectDescription/variableList/variable') |
     Where-Object { $_.SelectSingleNode('value').InnerText -eq '$%7BPARENT-3-PROJECT_LOC%7D' })
@@ -354,8 +422,7 @@ $defineOption = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesas
 if (-not $defineOption) {
     $defineOption = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.userBefore']")
 }
-$linkOption = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.noneLinkageOrderList']")
-if (-not $linkedResources -or -not $includeOption -or -not $defineOption -or -not $linkOption) {
+if (-not $linkedResources -or -not $includeOption -or -not $defineOption) {
     throw "$Target project metadata does not match the expected CCRX HardwareDebug layout."
 }
 $targetDefine = 'IDT_TARGET_' + $Target.ToUpperInvariant().Replace('-', '_') + '=1'
@@ -396,30 +463,7 @@ if ((Get-IdtNumericDefine $bspText 'BSP_CFG_CODE_FLASH_BANK_MODE') -ne 0 -or
     throw "$Target requires the reviewed dual-bank/ECDSA FWUP profile with area size $expectedAreaSize."
 }
 
-foreach ($sourceName in $testSources.Keys) {
-    if ($projectXml.SelectSingleNode("/projectDescription/linkedResources/link[name='$sourceName']")) {
-        throw "IDT source is already linked; concurrent/pre-existing metadata mutation: $sourceName"
-    }
-    $linkedSource = [IO.Path]::GetFullPath((Join-Path $resolvedRepositoryRoot $testSources[$sourceName]))
-    if (-not $linkedSource.StartsWith($idtRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -or
-        -not (Test-Path -LiteralPath $linkedSource -PathType Leaf)) {
-        throw "IDT source link does not resolve inside the selected source tree: $sourceName"
-    }
-    $link = $projectXml.CreateElement('link')
-    foreach ($field in @('name', 'type', 'locationURI')) {
-        $element = $projectXml.CreateElement($field)
-        switch ($field) {
-            'name' { $element.InnerText = $sourceName }
-            'type' { $element.InnerText = '1' }
-            'locationURI' { $element.InnerText = $repositoryVariable + '/' + $testSources[$sourceName] }
-        }
-        [void]$link.AppendChild($element)
-    }
-    [void]$linkedResources.AppendChild($link)
-    # Link name must also match the physical basename: the Renesas plugin
-    # regenerates linker options using the link, but the compiler uses the file.
-    Add-OptionValue $linkOption ('".\' + [System.IO.Path]::GetFileNameWithoutExtension($testSources[$sourceName]) + '.obj"')
-}
+Add-IdtSelectedSources $projectXml $cprojectXml $testSources $repositoryVariable $resolvedRepositoryRoot
 foreach ($include in $testIncludes) {
     Add-OptionValue $includeOption ('"' + (Join-Path $idtRoot $include) + '"')
 }
@@ -486,13 +530,15 @@ if ($ValidateOnly) {
         $sourceLinks = [ordered]@{}
         foreach ($sourceName in $testSources.Keys) {
             $sourceLinks[$sourceName] = [ordered]@{
-                location_uri = $projectXml.SelectSingleNode("/projectDescription/linkedResources/link[name='$sourceName']/locationURI").InnerText
+                location_uri = $projectXml.SelectSingleNode("/projectDescription/linkedResources/link[name='IdtTestSources/$sourceName']/locationURI").InnerText
+                virtual_path = 'IdtTestSources/' + $sourceName
                 resolved_path = [IO.Path]::GetFullPath((Join-Path $resolvedRepositoryRoot $testSources[$sourceName]))
             }
         }
         [ordered]@{ target_id=$Target; target_sha256=$targetSha256; group=$TestGroup;
                     repository_variable=$repositoryVariable; source_links=$sourceLinks;
                     pkcs11_selection=$pkcs11Selection;
+                    source_entry='IdtTestSources'; link_input_policy='generated';
                     qualification='not-established'; compiler_invoked=$false } |
             ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ValidationReportFile -Encoding UTF8
     }
