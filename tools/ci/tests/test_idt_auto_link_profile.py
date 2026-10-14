@@ -2,7 +2,8 @@
 
 These are host XML/source-selection fixtures, not Eclipse generation or MCU builds.
 """
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import configparser
 import json
 import os
 import shutil
@@ -17,7 +18,6 @@ MATRIX = ROOT / "tools/test_build_rx_idt.ps1"
 PWSH = shutil.which("pwsh")
 PROJECTS = {"rx72n-ethernet": "aws_ether_rx72n_envision_kit",
             "rx65n-bg96": "aws_bg96_ck_rx65n", "rx671-wifi": "aws_wifi_rx671_ek"}
-GROUPS = ("Transport", "DeviceAdvisor", "OTAE2E", "PKCS11", "OTAPAL")
 
 
 def quote(value):
@@ -48,11 +48,19 @@ $first=$body.IndexOf('$testSources = [ordered]@{')
 $last=$body.IndexOf('$appVersion = [ordered]@{}',$first)
 if($first -lt 0 -or $last -le $first) { throw 'Production group selection is missing' }
 $groupSelection=[scriptblock]::Create($body.Substring($first,$last-$first))
+$first=$body.IndexOf("if (`$TestGroup -eq 'PKCS11' -and -not `$Pkcs11Group) {")
+$last=$body.IndexOf('$idtRoot =',$first)
+if($first -lt 0 -or $last -le $first) { throw 'Production PKCS11 selection is missing' }
+$pkcsSelection=[scriptblock]::Create($body.Substring($first,$last-$first))
 $first=$body.IndexOf('if ($ValidateOnly) {')
 $last=$body.IndexOf('New-Item -ItemType Directory -Force -Path $idtOutput',$first)
 if($first -lt 0 -or $last -le $first) { throw 'Production validation report is missing' }
 $reportProducer=[scriptblock]::Create($body.Substring($first,$last-$first))
 $matrixBody=[IO.File]::ReadAllText($matrix)
+$first=$matrixBody.IndexOf('$groups = [ordered]@{')
+$last=$matrixBody.IndexOf('$flags =',$first)
+if($first -lt 0 -or $last -le $first) { throw 'Production metadata profile plan is missing' }
+. ([scriptblock]::Create($matrixBody.Substring($first,$last-$first)))
 $first=$matrixBody.IndexOf('$expectedVariable =')
 $last=$matrixBody.IndexOf('$count++',$first)
 if($first -lt 0 -or $last -le $first) { throw 'Production report consumer is missing' }
@@ -78,7 +86,11 @@ $parameters=@'
 $targets=@{'rx72n-ethernet'='aws_ether_rx72n_envision_kit';'rx65n-bg96'='aws_bg96_ck_rx65n';'rx671-wifi'='aws_wifi_rx671_ek'}
 $reports=@()
 foreach($target in $targets.Keys) {
-    foreach($TestGroup in @('Transport','DeviceAdvisor','OTAE2E','PKCS11','OTAPAL')) {
+    foreach($profile in $metadataProfiles) {
+        $TestGroup=$profile.group
+        $group=$TestGroup
+        $Pkcs11Group=$profile.pkcs11_group
+        . $pkcsSelection
         $idtRoot=$parameterRoot
         . $groupSelection
         if($target -ne 'rx72n-ethernet' -and $TestGroup -in @('Transport','DeviceAdvisor','OTAE2E')) {
@@ -98,19 +110,18 @@ foreach($target in $targets.Keys) {
            (@($cprojectXml.SelectNodes('//toolChain/tool/option') | ForEach-Object {$_.OuterXml}) -join '|') -cne $optionsBefore) {
             throw 'Source selection altered toolchain/stdlib/include/define/link options'
         }
-        $name=$target+'-'+$TestGroup
+        $name=$target+'-'+$profile.name
         $projectXml.Save((Join-Path $output ($name+'.project.xml')))
         $cprojectXml.Save((Join-Path $output ($name+'.cproject.xml')))
         $ValidateOnly=$true
         $ValidationReportFile=Join-Path $output ($name+'.report.json')
         $targetSha256='host-fixture'
-        $pkcs11Selection=$null
         $profileName='host-source-selection-fixture'
         & $reportProducer
         $validated=[IO.File]::ReadAllText($ValidationReportFile)|ConvertFrom-Json
         ''' + report_mutation + r'''
         . $reportConsumer
-        $reports+=@{target=$target;group=$TestGroup;sources=$testSources;source_entry='IdtTestSources';link_policy='generated'}
+        $reports+=@{target=$target;group=$TestGroup;profile=$profile.name;pkcs11_group=$Pkcs11Group;sources=$testSources;source_entry='IdtTestSources';link_policy='generated'}
     }
 }
 $reports|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $output 'profiles.json') -Encoding utf8
@@ -118,16 +129,17 @@ $reports|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $output 'pr
         return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(script)],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
-    def test_all_fifteen_profiles_select_only_their_virtual_file_sources(self):
+    def test_all_eighteen_profiles_select_only_their_virtual_file_sources(self):
         with tempfile.TemporaryDirectory(prefix="idt-auto-link-") as temporary:
             folder = Path(temporary)
             result = self.invoke(folder)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             reports = json.loads((folder / "profiles.json").read_text(encoding="utf-8-sig"))
-            self.assertEqual(len(reports), 15)
+            self.assertEqual(len(reports), 18)
+            self.assertEqual(len({(r["target"], r["profile"]) for r in reports}), 18)
             for report in reports:
                 with self.subTest(target=report["target"], group=report["group"]):
-                    name = report["target"] + "-" + report["group"]
+                    name = report["target"] + "-" + report["profile"]
                     description = ET.parse(folder / (name + ".project.xml")).getroot()
                     metadata = ET.parse(folder / (name + ".cproject.xml")).getroot()
                     links = description.findall("linkedResources/link")
@@ -157,6 +169,21 @@ $reports|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $output 'pr
                     if report["group"] == "Transport":
                         self.assertEqual(len(report_data["source_links"]),
                                          7 if report["target"] == "rx72n-ethernet" else 8)
+                    if report["group"] == "PKCS11":
+                        selection = report["pkcs11_group"]
+                        expected = ({"definition": 1, "native_test_id": "Full_PKCS11_StartFinish",
+                                     "assertion_cases": 6, "groups": ["Full_PKCS11_StartFinish", "Full_PKCS11_Capabilities"]}
+                                    if selection == "StartFinish" else
+                                    {"definition": 2, "native_test_id": "Full_PKCS11_NoObject",
+                                     "assertion_cases": 5, "groups": ["Full_PKCS11_Capabilities", "Full_PKCS11_NoObject"]})
+                        self.assertIn(selection, ("StartFinish", "NoObject"))
+                        self.assertEqual(report_data["pkcs11_selection"], expected)
+                    else:
+                        self.assertIsNone(report_data["pkcs11_selection"])
+            for target in PROJECTS:
+                self.assertEqual({r["pkcs11_group"] for r in reports
+                                  if r["target"] == target and r["group"] == "PKCS11"},
+                                 {"StartFinish", "NoObject"})
 
     def test_custom_order_manual_list_and_conflicting_source_selection_are_rejected(self):
         mutations = {
@@ -188,8 +215,50 @@ $reports|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $output 'pr
                 self.assertNotEqual(result.returncode, 0, result.stdout)
                 self.assertRegex(result.stderr, r"IDT source|property.*cannot be found")
 
+    def test_report_consumer_rejects_wrong_pkcs11_native_group_or_case_count(self):
+        mutations = {
+            "definition": "$validated.pkcs11_selection.definition=0",
+            "native_id": "$validated.pkcs11_selection.native_test_id='Full_PKCS11_Invalid'",
+            "groups": "$validated.pkcs11_selection.groups=@('Full_PKCS11_StartFinish')",
+            "cases": "$validated.pkcs11_selection.assertion_cases=0",
+        }
+        for label, mutation in mutations.items():
+            with self.subTest(selection=label), tempfile.TemporaryDirectory(prefix="idt-pkcs-report-invalid-") as temporary:
+                result = self.invoke(Path(temporary), report_mutation=
+                    "if($TestGroup -eq 'PKCS11') { " + mutation + " }")
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn("explicitly selected native group", result.stderr)
+
 
 class IdtRepositoryVariableMetadataTests(unittest.TestCase):
+    """Alias/URI declarations only; borrowed leaf presence/bytes belong to SourceMatrix."""
+
+    @classmethod
+    def setUpClass(cls):
+        description = configparser.ConfigParser(interpolation=None)
+        description.read(ROOT / ".gitmodules", encoding="utf-8")
+        cls.declared_links = {description[section]["path"] for section in description.sections()}
+        index = subprocess.check_output(["git", "ls-files", "--stage", "-z"], cwd=ROOT).decode("utf-8")
+        cls.entries = {}
+        for entry in index.split("\0"):
+            if entry:
+                metadata, path = entry.split("\t", 1)
+                mode, pin, stage = metadata.split()
+                if stage != "0":
+                    raise AssertionError("Unmerged source index cannot define a root URI contract")
+                cls.entries[path] = (mode, pin)
+        tree = subprocess.check_output(["git", "ls-tree", "-r", "-z", "HEAD"], cwd=ROOT).decode("utf-8")
+        cls.head_links = {}
+        for entry in tree.split("\0"):
+            if entry:
+                metadata, path = entry.split("\t", 1)
+                mode, kind, pin = metadata.split()
+                if mode == "160000" and kind == "commit":
+                    cls.head_links[path] = pin
+        index_links = {path: pin for path, (mode, pin) in cls.entries.items() if mode == "160000"}
+        if set(index_links) != cls.declared_links or index_links != cls.head_links:
+            raise AssertionError("Declared gitlinks must match tracked index mode/pins and HEAD")
+
     def test_all_five_apps_use_the_common_repository_root_alias_and_uris(self):
         projects = (*PROJECTS.values(), "aws_bg96_ck_rx65n_tsip",
                     "aws_ether_rx72n_envision_kit_tsip")
@@ -207,9 +276,87 @@ class IdtRepositoryVariableMetadataTests(unittest.TestCase):
                 for link in root_links:
                     uri = link.findtext("locationURI")
                     self.assertTrue(uri.startswith("AWS_IOT_MCU_ROOT/"), uri)
-                    relative = Path(uri.removeprefix("AWS_IOT_MCU_ROOT/"))
-                    self.assertNotIn("..", relative.parts)
-                    self.assertTrue((ROOT / relative).exists(), uri)
+                    scope = repository_uri_scope(ROOT, uri, self.entries,
+                                                 self.declared_links, self.head_links)
+                    self.assertIn(scope, ("tracked-owner", "registered-gitlink-leaf-unobserved"))
+
+
+def repository_uri_scope(root, uri, entries, declared_links, head_links):
+    """Classify the declared boundary without claiming any borrowed leaf bytes."""
+    prefix = "AWS_IOT_MCU_ROOT/"
+    if not uri.startswith(prefix):
+        raise AssertionError("Wrong repository alias")
+    relative = PurePosixPath(uri[len(prefix):])
+    if relative.is_absolute() or not relative.parts or ".." in relative.parts or "\\" in str(relative):
+        raise AssertionError("Invalid root-relative URI")
+    root = root.resolve()
+    destination = root / str(relative)
+    try:
+        destination.resolve().relative_to(root)
+    except ValueError as error:
+        raise AssertionError("Resolved URI leaves the source root") from error
+    path = str(relative)
+    gitlink = next((entry for entry, (mode, _) in entries.items() if mode == "160000"
+                    and (path == entry or path.startswith(entry + "/"))), None)
+    if gitlink is not None:
+        if gitlink not in declared_links or entries[gitlink][1] != head_links.get(gitlink):
+            raise AssertionError("Undeclared gitlink or index/HEAD pin mismatch")
+        return "registered-gitlink-leaf-unobserved"
+    if not destination.exists() or not any(
+            mode != "160000" and (entry == path or entry.startswith(path + "/"))
+            for entry, (mode, _) in entries.items()):
+        raise AssertionError("Missing or untracked owner path")
+    return "tracked-owner"
+
+
+class IdtRepositoryUriBoundaryTests(unittest.TestCase):
+    def test_registered_uninitialized_gitlink_is_a_declaration_not_a_leaf_presence_proof(self):
+        with tempfile.TemporaryDirectory(prefix="idt-uri-") as temporary:
+            root = Path(temporary).resolve()
+            entries = {"Middleware/vendor": ("160000", "a" * 40)}
+            self.assertEqual(repository_uri_scope(root, "AWS_IOT_MCU_ROOT/Middleware/vendor/src",
+                entries, {"Middleware/vendor"}, {"Middleware/vendor": "a" * 40}),
+                "registered-gitlink-leaf-unobserved")
+            self.assertFalse((root / "Middleware/vendor/src").exists())
+
+    def test_missing_owner_undeclared_gitlink_and_changed_pin_are_rejected(self):
+        with tempfile.TemporaryDirectory(prefix="idt-uri-invalid-") as temporary:
+            root = Path(temporary).resolve()
+            with self.assertRaisesRegex(AssertionError, "Missing or untracked owner"):
+                repository_uri_scope(root, "AWS_IOT_MCU_ROOT/Common/missing.c",
+                    {"Common/missing.c": ("100644", "b" * 40)}, set(), {})
+            entries = {"Middleware/vendor": ("160000", "a" * 40)}
+            with self.assertRaisesRegex(AssertionError, "Undeclared gitlink"):
+                repository_uri_scope(root, "AWS_IOT_MCU_ROOT/Middleware/vendor/src",
+                    entries, set(), {"Middleware/vendor": "a" * 40})
+            with self.assertRaisesRegex(AssertionError, "pin mismatch"):
+                repository_uri_scope(root, "AWS_IOT_MCU_ROOT/Middleware/vendor/src",
+                    entries, {"Middleware/vendor"}, {"Middleware/vendor": "b" * 40})
+            for uri in ("AWS_IOT_MCU_REPO_ROOT/Common/file.c", "AWS_IOT_MCU_ROOT/../outside"):
+                with self.subTest(uri=uri), self.assertRaises(AssertionError):
+                    repository_uri_scope(root, uri, {}, set(), {})
+
+    def test_resolved_owner_symlink_cannot_leave_the_source_root(self):
+        with tempfile.TemporaryDirectory(prefix="idt-uri-symlink-") as temporary:
+            base = Path(temporary).resolve()
+            base.relative_to(Path(tempfile.gettempdir()).resolve())
+            root = base / "source"
+            outside = base / "outside"
+            root.mkdir()
+            outside.mkdir()
+            (outside / "file.c").write_text("fixture", encoding="utf-8")
+            link = root / "owned"
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except OSError:
+                if os.name != "nt":
+                    raise
+                # NTFS junction creation does not require the symbolic-link privilege.
+                subprocess.run(["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(outside)],
+                    capture_output=True, check=True, timeout=10)
+            with self.assertRaisesRegex(AssertionError, "leaves the source root"):
+                repository_uri_scope(root, "AWS_IOT_MCU_ROOT/owned/file.c",
+                    {"owned/file.c": ("100644", "b" * 40)}, set(), {})
 
 
 if __name__ == "__main__":
