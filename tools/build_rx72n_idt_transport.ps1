@@ -556,15 +556,8 @@ try {
             -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds
     }
     elseif ($Target -eq 'rx65n-bg96') {
-        # The production BG96 helper otherwise reuses existing makefiles and
-        # misses this run's added sources/defines. Regenerate them every run.
-        foreach ($project in @($idtProject, $idtBootProject)) {
-            $buildDirectory = [IO.Path]::GetFullPath((Join-Path $project 'HardwareDebug'))
-            if (-not $buildDirectory.StartsWith($idtRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                throw 'Generated build directory is outside the source tree.'
-            }
-            if (Test-Path -LiteralPath $buildDirectory) { Remove-Item -LiteralPath $buildDirectory -Recurse -Force }
-        }
+        # The BG96 helper always regenerates build inputs from this run's
+        # .project/.cproject profile, including added native sources/defines.
         & (Join-Path $PSScriptRoot 'build_headless_rx65n_bg96.ps1') `
             -ProjectRoot $idtRoot -E2Studio $E2Studio -Workspace $idtWorkspace `
             -TlsBackend software -RequireTlsVersion '' -LogFile $buildLog `

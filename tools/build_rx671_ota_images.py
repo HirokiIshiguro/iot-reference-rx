@@ -88,7 +88,7 @@ FORMAL_INPUT_SUBMODULES = (
     Path("Middleware/FreeRTOS/coreMQTT"),
     Path("Middleware/FreeRTOS/coreMQTT-Agent"),
     Path("Middleware/FreeRTOS/corePKCS11"),
-    Path("Projects/aws_wifi_rx671_ek/external/TraceRecorderSource"),
+    Path("Middleware/3rdparty/TraceRecorderSource"),
     Path(
         "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/"
         "sources/cyw-fmac-nvram"

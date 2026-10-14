@@ -28,6 +28,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "public_signer_provisioner.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "event_groups.h"
+
+EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 /* Logging includes. */
 #include "iot_logging_task.h"
@@ -147,6 +150,7 @@ extern void vRegisterSampleCLICommands (void);
  *********************************************************************************************************************/
 void main_task(void)
 {
+    (void)xTraceEnable(TRC_START);
 #if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
     vRunPublicSignerProvisioner(NULL);
 #else
@@ -258,6 +262,9 @@ void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
+
+    xStartDemoEventGroup = xEventGroupCreate();
+    configASSERT( xStartDemoEventGroup != NULL );
 
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     vTsipMbedtlsThreadingCompatInit();

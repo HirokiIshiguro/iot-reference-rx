@@ -695,7 +695,7 @@
                 <gridItem id="BSP_CFG_USER_STACK_ENABLE" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_USTACK_BYTES" selectedIndex="0x1000"/>
                 <gridItem id="BSP_CFG_ISTACK_BYTES" selectedIndex="0x400"/>
-                <gridItem id="BSP_CFG_HEAP_BYTES" selectedIndex="0x8000"/>
+                <gridItem id="BSP_CFG_HEAP_BYTES" selectedIndex="0x2000"/>
                 <gridItem id="BSP_CFG_IO_LIB_ENABLE" selectedIndex="1"/>
                 <gridItem id="BSP_CFG_USER_CHARGET_ENABLED" selectedIndex="0"/>
                 <gridItem id="BSP_CFG_USER_CHARGET_FUNCTION" selectedIndex="my_sw_charget_function"/>
@@ -802,7 +802,7 @@
                 <gridItem id="configUSE_STREAM_BUFFERS" selectedIndex="1"/>
                 <gridItem id="configSUPPORT_STATIC_ALLOCATION" selectedIndex="1"/>
                 <gridItem id="configSUPPORT_DYNAMIC_ALLOCATION" selectedIndex="1"/>
-                <gridItem id="configTOTAL_HEAP_SIZE_N" selectedIndex="224"/>
+                <gridItem id="configTOTAL_HEAP_SIZE_N" selectedIndex="256"/>
                 <gridItem id="configTOTAL_HEAP_SIZE" selectedIndex="( size_t ) ( configTOTAL_HEAP_SIZE_N * 1024 )"/>
                 <gridItem id="configAPPLICATION_ALLOCATED_HEAP" selectedIndex="0"/>
                 <gridItem id="configSTACK_ALLOCATION_FROM_SEPARATE_HEAP" selectedIndex="0"/>

@@ -7,6 +7,9 @@
 #include "cellular_api.h"
 extern const CellularCommInterface_t Bg96_CommInterface;
 CellularHandle_t Bg96_GetHandle(void);
+/* Supply a copied IPv4 PDN profile before the first Connect2AP(). An active
+ * modem session rejects changes. Without this call the board defaults apply. */
+bool Bg96_SetRuntimePdnConfig(const CellularPdnConfig_t * config);
 bool Connect2AP(void);
 void Bg96_NetworkCleanup(void);
 bool Bg96_CommSetRuntimeBaud(void);

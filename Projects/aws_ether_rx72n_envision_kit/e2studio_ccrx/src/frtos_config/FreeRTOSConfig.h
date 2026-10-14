@@ -65,6 +65,9 @@
 #define configAPPLICATION_ALLOCATED_HEAP           1
 #define configMAX_TASK_NAME_LEN                    (12)
 #define configUSE_TRACE_FACILITY                   1
+#ifndef CONFIG_USE_PERCEPIO_TRACE_RECORDER
+#define CONFIG_USE_PERCEPIO_TRACE_RECORDER     1
+#endif
 #define configTICK_TYPE_WIDTH_IN_BITS    TICK_TYPE_WIDTH_32_BITS
 #define configIDLE_SHOULD_YIELD                    1
 #define configUSE_CO_ROUTINES                      0
@@ -138,17 +141,14 @@ void vConfigureTimerForRunTimeStats( void );
 #define INCLUDE_vTaskPrioritySet                1
 #define INCLUDE_uxTaskPriorityGet               1
 #define INCLUDE_vTaskDelete                     1
-#define INCLUDE_vTaskCleanUpResources           0
 #define INCLUDE_vTaskSuspend                    1
 #define INCLUDE_vTaskDelayUntil                 1
 #define INCLUDE_vTaskDelay                      1
 #define INCLUDE_uxTaskGetStackHighWaterMark     1
 #define INCLUDE_xTaskGetSchedulerState          1
-#define INCLUDE_xTimerGetTimerTaskHandle        0
 #define INCLUDE_xTaskGetIdleTaskHandle          0
 #define INCLUDE_xQueueGetMutexHolder            1
 #define INCLUDE_eTaskGetState                   1
-#define INCLUDE_xEventGroupSetBitsFromISR       1
 #define INCLUDE_xTimerPendFunctionCall          1
 #define INCLUDE_xTaskGetCurrentTaskHandle       1
 #define INCLUDE_xTaskAbortDelay                 1
@@ -162,19 +162,9 @@ void vConfigureTimerForRunTimeStats( void );
  * functions. */
 #define configUSE_STATS_FORMATTING_FUNCTIONS    1
 
-#if defined(ENABLE_UNIT_TESTS) || defined(FREERTOS_ENABLE_UNIT_TESTS)
-/* unity testing */
-#define configASSERT( x ) do { if( ( x ) == 0 ) TEST_ABORT(); } while( 0 )
-#elif defined(CONFIG_FREERTOS_ASSERT_DISABLE) || defined(NDEBUG)
-/* Disable Assert call for release builds. */
-#define configASSERT( x ) ( ( void ) 0 )
-#else /* CONFIG_FREERTOS_ASSERT_FAIL_ABORT or nothing */
-/* Assert call defined for debug builds. */
+/* Keep kernel assertions enabled in every application build profile. */
 extern void vAssertCalled( void );
-#define configASSERT( x )    do{((x) ? (void)0: \
-		(fprintf(stderr,"ASSERTION FAILED: "#x" FILE %s,LINE %d FUNC %s \n", \
-		__FILE__,__LINE__,__func__),vAssertCalled(),(void)0));}while( 0 )
-#endif
+#define configASSERT( x ) do { if( ( x ) == 0 ) vAssertCalled(); } while( 0 )
 
 /* The function that implements FreeRTOS printf style output, and the macro
  * that maps the configPRINTF() macros to that function. */
@@ -298,7 +288,8 @@ uint32_t ulRand(void);
 #define configPLATFORM_NAME    "RenesasRX65N"
 
 /* Header required for the tracealyzer recorder library. */
-//#include "trcRecorder.h"
+/* Common/ports/trace_recorder/freertos_wrap/FreeRTOS.h installs public Trace hooks
+ * after the original RX port types exist. Keep the original Kernel unchanged. */
 
 /* When the FIT configurator or the Smart Configurator is used, platform.h has to be used. */
 #define configINCLUDE_PLATFORM_H_INSTEAD_OF_IODEFINE_H  1

@@ -435,40 +435,6 @@ function Clear-GeneratedBuildFiles {
     }
 }
 
-function Reset-ManagedBuildFilesOnMbedTlsConfigDrift {
-    $expectedConfig = if ($useSoftwareTls13ZeroRttConfig) {
-        "aws_mbedtls_config_tls13_0rtt.h"
-    } elseif ($useTsipTls13ZeroRttConfig) {
-        "aws_mbedtls_config_with_tsip13_0rtt.h"
-    } elseif ($useTsipTls13Config) {
-        "aws_mbedtls_config_with_tsip13.h"
-    } elseif ($normalizedTlsBackend -eq "tsip") {
-        "aws_mbedtls_config_with_tsip.h"
-    } else {
-        "aws_mbedtls_config.h"
-    }
-    $hardwareDebug = Join-Path $appProject "HardwareDebug"
-    if (-not (Test-Path -LiteralPath $hardwareDebug)) {
-        return
-    }
-
-    $commandFiles = Get-ChildItem -Path $hardwareDebug -Recurse -Include "cSubCommand.tmp", "cDepSubCommand.tmp" -File -ErrorAction SilentlyContinue
-    if (-not $commandFiles) {
-        return
-    }
-
-    $configMatches = Select-String -Path $commandFiles.FullName -Pattern 'MBEDTLS_CONFIG_FILE=<"aws_mbedtls_config(_with_tsip13_0rtt|_with_tsip13|_with_tsip|_tls13_0rtt)?\.h">' -ErrorAction SilentlyContinue
-    if (-not $configMatches) {
-        return
-    }
-
-    $unexpected = $configMatches | Where-Object { $_.Line -notmatch [regex]::Escape($expectedConfig) } | Select-Object -First 1
-    if ($unexpected) {
-        Write-Host "Generated build files use a different mbed TLS config; regenerating. Expected: $expectedConfig"
-        Clear-GeneratedBuildFiles
-    }
-}
-
 function Invoke-E2StudioManagedBuild {
     Remove-RxE2Workspace -Path $workspace
     Write-Host "=== CK-RX65N BG96 e2studio-cli managed build file generation ==="
@@ -482,13 +448,10 @@ function Invoke-E2StudioManagedBuild {
 }
 
 function Ensure-ManagedBuildFiles {
-    $missing = Get-MissingManagedBuildFiles
-    if ($missing.Count -eq 0) {
-        return
-    }
-
-    Write-Host "Generated HardwareDebug makefiles are missing:"
-    $missing | ForEach-Object { Write-Host "  $_" }
+    # Generated make/response files are a cache of .project/.cproject. A file's
+    # existence cannot prove its source selection, include paths or flags match
+    # the current normal/Fleet/native profile. Regenerate from metadata each run.
+    Clear-GeneratedBuildFiles
     Invoke-E2StudioManagedBuild
 
     $missing = Get-MissingManagedBuildFiles
@@ -578,7 +541,7 @@ if ($busyBoxBin) {
     Write-Host "Using e2 studio BusyBox tools: $busyBoxBin"
 }
 if ($workspace) {
-    Write-Host "Workspace parameter is unused for direct make builds: $workspace"
+    Write-Host "e2studio-cli workspace: $workspace"
 }
 
 $metadataSnapshots = Save-ProjectMetadata @($bootProject, $appProject)
@@ -600,17 +563,14 @@ $patchApplied = $false
 try {
     if ($useSoftwareTls13ZeroRttConfig) {
         Enable-SoftwareTls13ZeroRttBuild
-        Clear-GeneratedBuildFiles
     }
     elseif ($useTsipTls13ZeroRttConfig) {
         Enable-TsipTls13ZeroRttBuild
-        Clear-GeneratedBuildFiles
     }
     elseif ($useTsipTls13Config) {
         Use-MbedTlsConfigFile -ProjectDir $appProject -ConfigFile "aws_mbedtls_config_with_tsip13.h"
     }
 
-    Reset-ManagedBuildFilesOnMbedTlsConfigDrift
     Ensure-ManagedBuildFiles
     Restore-ReviewedLinkerLayout $reviewedLinkerLayouts
     if ($PrepareBuildFilesOnly) {

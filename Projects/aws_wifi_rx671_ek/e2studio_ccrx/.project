@@ -179,21 +179,6 @@
 			<locationURI>PARENT-1-PROJECT_LOC/external/wifi-host-driver/External</locationURI>
 		</link>
 		<link>
-			<name>trace_recorder/include</name>
-			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/external/TraceRecorderSource/include</locationURI>
-		</link>
-		<link>
-			<name>trace_recorder/kernelports/FreeRTOS/include</name>
-			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/external/TraceRecorderSource/kernelports/FreeRTOS/include</locationURI>
-		</link>
-		<link>
-			<name>trace_recorder/streamports/Jlink_RTT/include</name>
-			<type>2</type>
-			<locationURI>PARENT-1-PROJECT_LOC/external/TraceRecorderSource/streamports/Jlink_RTT/include</locationURI>
-		</link>
-		<link>
 			<name>Vendor/r_bsp</name>
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_bsp/r_bsp_vx.xx/r_bsp</locationURI>
@@ -252,6 +237,11 @@
 			<name>Vendor/rm_rtos_abstraction_rx</name>
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx_vx.xx/rm_rtos_abstraction_rx</locationURI>
+		</link>
+		<link>
+			<name>TraceRecorder</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/3rdparty/TraceRecorderSource</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

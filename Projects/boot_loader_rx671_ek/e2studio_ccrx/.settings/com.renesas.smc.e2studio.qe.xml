@@ -100,7 +100,7 @@
             <Setting id="BSP_CFG_INTERNAL_EXPANSION_BUS_PRIORITY" value="0"/>
             <Setting id="BSP_CFG_USER_EXIT_CRITICAL_FUNCTION" value="my_exit_critical_function"/>
             <Setting id="BSP_CFG_USER_LOCKING_TYPE" value="bsp_lock_t"/>
-            <Setting id="BSP_CFG_HEAP_BYTES" value="0x8000"/>
+            <Setting id="BSP_CFG_HEAP_BYTES" value="0x400"/>
             <Setting id="BSP_CFG_HOCO_TRIMMING_ENABLE" value="0"/>
             <Setting id="BSP_CFG_FIT_IPL_MAX" value="0xF"/>
             <Setting id="BSP_CFG_BOOTLOADER_PROJECT" value="1"/>

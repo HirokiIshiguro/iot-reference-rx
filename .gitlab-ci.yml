@@ -306,10 +306,6 @@ variables:
 
 workflow:
   rules:
-    # Temporary: publish Issue170's incomplete migration for review without
-    # launching the normal MR hardware lane. Remove before final validation.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "codex/170-common-core-convergence" && $CI_MERGE_REQUEST_TITLE =~ /^Draft:/'
-      when: never
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
@@ -341,7 +337,7 @@ workflow:
         RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
       when: always
     # Validate this multi-target change without taking any physical bench.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-idt-/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-(idt-|common-core-)/'
       variables:
         PIPELINE_PROFILE: "mr-idt-targets"
         RUN_RX65N_BG96_BUILD: "true"
@@ -658,11 +654,14 @@ idt_ci_contract:
         tools.ci.tests.test_idt_rx671_provision \
         tools.ci.tests.test_idt_public_signer_provision \
         tools.ci.tests.test_idt_public_signer_integration \
+        tools.ci.tests.test_idt_ci_contract \
         tools.ci.tests.test_prepare_public_signer \
         tools.ci.tests.test_build_public_signer_provisioner \
         tools.ci.tests.test_idt_pkcs11_adapter \
         tools.ci.tests.test_idt_pkcs11_source_view \
         tools.ci.tests.test_common_kernel \
+        tools.ci.tests.test_freertos_assert_profiles \
+        tools.ci.tests.test_rx65n_managed_build_profiles \
         tools.ci.tests.test_rx_e2studio_cli \
         tools.ci.tests.test_rx72n_fwup_prm_contract \
         tools.ci.tests.test_idt_rfp_process \

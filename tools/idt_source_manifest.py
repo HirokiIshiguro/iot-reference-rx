@@ -33,11 +33,11 @@ COMMON = (
     "Middleware/Renesas/rx-driver-package", "Middleware/Renesas/rm_littlefs_rx",
     "Middleware/Renesas/rm_rtos_abstraction_rx", "Middleware/Renesas/r_sdio_rx",
     "Middleware/Renesas/r_simple_graphic_rx", "Middleware/Renesas/r_simple_glcdc_config_rx",
+    "Middleware/3rdparty/TraceRecorderSource",
 )
 TEST = ("Test/Unity", "Test/FreeRTOS-Libraries-Integration-Tests")
 WIFI = (
     "Projects/aws_wifi_rx671_ek/external/wifi-host-driver",
-    "Projects/aws_wifi_rx671_ek/external/TraceRecorderSource",
     "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/firmware-wifi-host-driver",
     "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/wifi-resources",
     "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/cyw-fmac-nvram",

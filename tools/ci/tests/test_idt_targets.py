@@ -113,6 +113,21 @@ class NetworkInputTests(unittest.TestCase):
             network_values(get_target("rx65n-bg96"), {"AWS_IOT_CELLULAR_APN_CK_RX65N_01": "unit.invalid",
                            "AWS_IOT_CELLULAR_APN_AUTH_CK_RX65N_01": "99"})
 
+    def test_cellular_public_pdn_byte_limits_before_build_or_hardware(self):
+        target = get_target("rx65n-bg96")
+        for variable, limit in (("AWS_IOT_CELLULAR_APN_CK_RX65N_01", 64),
+                                ("AWS_IOT_CELLULAR_APN_USER_CK_RX65N_01", 32),
+                                ("AWS_IOT_CELLULAR_APN_PASS_CK_RX65N_01", 32)):
+            environment = {"AWS_IOT_CELLULAR_APN_CK_RX65N_01": "unit.invalid",
+                           variable: "x" * limit}
+            network_values(target, environment)
+            for oversized in ("x" * (limit + 1), "あ" * (limit // 3 + 1)):
+                environment[variable] = oversized
+                with self.subTest(variable=variable, bytes=len(oversized.encode("utf-8"))):
+                    with self.assertRaisesRegex(ValueError, "public API byte limit") as raised:
+                        network_values(target, environment)
+                    self.assertNotIn(oversized, str(raised.exception))
+
     def test_original_checkout_refused_before_network_injection(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

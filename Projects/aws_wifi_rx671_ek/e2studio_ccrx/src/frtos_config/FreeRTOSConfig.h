@@ -440,7 +440,7 @@
  * number of the failing assert (for example, "vAssertCalled( __FILE__, __LINE__ )"
  * or it can simple disable interrupts and sit in a loop to halt all execution
  * on the failing line for viewing in a debugger. */
-/* Assert call defined for debug builds. */
+/* Keep kernel assertions enabled in every application build profile. */
 extern void vAssertCalled( void );
 #define configASSERT( x ) do { if( ( x ) == 0 ) vAssertCalled(); } while( 0 )
 
@@ -480,7 +480,6 @@ extern void vOutputString( const char * pcMessage );
 #define INCLUDE_uxTaskPriorityGet              1
 #define INCLUDE_vTaskDelete                    1
 #define INCLUDE_vTaskSuspend                   1
-#define INCLUDE_xResumeFromISR                 1
 #define INCLUDE_vTaskDelayUntil                1
 #define INCLUDE_vTaskDelay                     1
 #define INCLUDE_xTaskGetSchedulerState         1
@@ -488,9 +487,8 @@ extern void vOutputString( const char * pcMessage );
 #define INCLUDE_uxTaskGetStackHighWaterMark    1
 #define INCLUDE_xTaskGetIdleTaskHandle         0
 #define INCLUDE_eTaskGetState                  1
-#define INCLUDE_xEventGroupSetBitFromISR       1
-#define INCLUDE_xTimerPendFunctionCall         0
-#define INCLUDE_xTaskAbortDelay                0
+#define INCLUDE_xTimerPendFunctionCall         1
+#define INCLUDE_xTaskAbortDelay                1
 #define INCLUDE_xTaskGetHandle                 0
 #define INCLUDE_xTaskResumeFromISR             1
 #define INCLUDE_xQueueGetMutexHolder           1

@@ -277,9 +277,8 @@ def prepare_source(value, target=None):
     key = private_input(os.environ["IDT_OTA_SIGNING_KEY_FILE"], runtime)
     cert = private_input(os.environ["IDT_OTA_SIGNER_CERT_FILE"], runtime)
     signer = load_signer(key, cert)
-    if target["id"] != DEFAULT_TARGET:
-        verify_bootloader_signer(source, target, signer, runtime=runtime,
-                                 source_sha=os.environ.get("IDT_SOURCE_SHA"), environ=os.environ)
+    verify_bootloader_signer(source, target, signer, runtime=runtime,
+                             source_sha=os.environ.get("IDT_SOURCE_SHA"), environ=os.environ)
     header = ("/* Generated inside private IDT runtime; do not publish. */\n"
               "#ifndef IDT_OTA_SIGNER_H\n#define IDT_OTA_SIGNER_H\n"
               "#define IDT_OTA_IMAGE_ID " + json.dumps(secrets.token_hex(16)) + "\n"

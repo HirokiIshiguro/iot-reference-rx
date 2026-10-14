@@ -28,6 +28,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "public_signer_provisioner.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "event_groups.h"
+
+EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 /* Logging includes. */
 #include "iot_logging_task.h"
@@ -230,6 +233,10 @@ static void prvRunIdtProfile( void )
         prvIdtStop( "IDT_PORT_FATAL: transport test task creation failed\r\n" );
     }
 #else
+#if ( ENABLE_OTA_UPDATE_DEMO == 1 ) || ( OTA_E2E_TEST_ENABLED == 1 )
+    xStartDemoEventGroup = xEventGroupCreate();
+    configASSERT( xStartDemoEventGroup != NULL );
+#endif
     xSetMQTTAgentState( MQTT_AGENT_STATE_INITIALIZED );
     vStartMQTTAgent( appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY );
 #if ( ENABLE_OTA_UPDATE_DEMO == 1 )
@@ -252,6 +259,7 @@ static void prvRunIdtProfile( void )
  *********************************************************************************************************************/
 void main_task(void)
 {
+    (void)xTraceEnable(TRC_START);
 #if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
     vRunPublicSignerProvisioner(NULL);
 #else
@@ -364,6 +372,9 @@ void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
+
+    xStartDemoEventGroup = xEventGroupCreate();
+    configASSERT( xStartDemoEventGroup != NULL );
 
     /* Start logging task. */
     xLoggingTaskInitialize(mainLOGGING_TASK_STACK_SIZE,

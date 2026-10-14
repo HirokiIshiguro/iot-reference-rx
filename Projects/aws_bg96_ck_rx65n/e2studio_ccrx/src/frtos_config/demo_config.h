@@ -405,6 +405,10 @@
  */
 #define ENABLE_CREDENTIAL_BY_CLI    (1)
 
+/* Renesas reference demo event bit: release PubSub after the OTA job/version
+ * path permits normal startup. This is not an r_fwup status or bank setting. */
+#define SELF_TEST_PASSED             ((EventBits_t)(1U))
+
 /*
  * Minimal direct BG96 probe on CK-RX65N-V1:
  * - J20 / SCI5 remains the log console.

@@ -213,6 +213,7 @@ static BaseType_t xDisplayInitialized = pdFALSE;
  *********************************************************************************************************************/
 void main_task(void *pvParameters)
 {
+    (void)xTraceEnable(TRC_START);
 #if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
     (void)pvParameters;
     vRunPublicSignerProvisioner(NULL);
@@ -230,7 +231,7 @@ void main_task(void *pvParameters)
 
     prvMiscInitialization();
     UserInitialization();
-    (void) xTraceEnable(TRC_START_FROM_HOST);
+
     prvDisplayInitialize();
     prvDisplayWrite("FreeRTOS init\r\n");
 

@@ -48,6 +48,11 @@ def network_values(target, environ=None):
         values["IDT_CELLULAR_APN_AUTH"] = values["IDT_CELLULAR_APN_AUTH"] or "0"
         if values["IDT_CELLULAR_APN_AUTH"] not in {"0", "1", "2"}:
             raise ValueError("Cellular APN authentication must be 0, 1 or 2")
+        # Pristine Cellular public defaults reserve one additional NUL byte.
+        for macro, limit in (("IDT_CELLULAR_APN", 64), ("IDT_CELLULAR_APN_USER", 32),
+                             ("IDT_CELLULAR_APN_PASSWORD", 32)):
+            if len(values[macro].encode("utf-8")) > limit:
+                raise ValueError("Cellular network input exceeds its public API byte limit")
     if any(any(c in v for c in "\r\n\0") for v in values.values()):
         raise ValueError("Network inputs must be single-line strings")
     return values

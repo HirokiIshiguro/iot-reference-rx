@@ -110,6 +110,11 @@
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx_vx.xx/rm_rtos_abstraction_rx</locationURI>
 		</link>
+		<link>
+			<name>TraceRecorder</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/3rdparty/TraceRecorderSource</locationURI>
+		</link>
 	</linkedResources>
 	<filteredResources>
 		<filter>

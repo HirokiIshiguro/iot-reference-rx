@@ -457,7 +457,7 @@
             <Setting id="FLASH_CFG_CODE_FLASH_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_BGO" value="1"/>
         </Segment>
-        <Segment component="FreeRTOS_Kernel202406.01-LTS-rx-1.1.1" id="FreeRTOS_Kernel" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0" id="FreeRTOS_Kernel" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
     </Segment>
     <Segment id="Clock">
         <Setting id="PCLKD" value="60000.0"/>

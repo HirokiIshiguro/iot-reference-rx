@@ -3,6 +3,9 @@
 #define PRODUCT_CELLULAR_CONFIG_H
 #include "FreeRTOS.h"
 #include "bg96_board_config.h"
+#if defined(__CCRX__)
+#include "strtok_r.h"
+#endif
 #define CELLULAR_NUM_SOCKET_MAX 6U
 #define CELLULAR_PDN_CONTEXT_ID 1U
 #define CELLULAR_CONFIG_DEFAULT_RAT CELLULAR_RAT_CATM1

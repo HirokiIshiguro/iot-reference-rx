@@ -451,6 +451,7 @@ static void start_freertos_tcp_after_join(void)
 
 void main_task(void *pvParameters)
 {
+    (void)xTraceEnable(TRC_START);
 #if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
     (void)pvParameters;
     vRunPublicSignerProvisioner(R_SCI_PinSet_SCI6);
@@ -467,7 +468,6 @@ void main_task(void *pvParameters)
 
     (void)pvParameters;
 
-    (void)xTraceEnable(TRC_START);
 
     /* Bring up the SCI6 debug console (COM port @ 921600 8N1, P00/P01). */
     debug_uart_init();

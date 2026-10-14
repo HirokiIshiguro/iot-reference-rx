@@ -343,7 +343,7 @@ class IdtCiContractTests(unittest.TestCase):
         guard = conditions[1]
         expected = (
             '$CI_PIPELINE_SOURCE == "merge_request_event" && '
-            '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-idt-/'
+            '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-(idt-|common-core-)/'
         )
         self.assertEqual(OPT_IN, conditions[0])
         self.assertEqual(expected, guard)
@@ -358,17 +358,22 @@ class IdtCiContractTests(unittest.TestCase):
         # Evaluate the real rule's equality clauses across event/draft/branch cases.
         clauses = re.findall(r'\$([A-Z_]+) == "([^"]+)"', guard)
         self.assertEqual(1, len(clauses))
+        branch_pattern = guard.split(' =~ /', 1)[1][:-1].replace('\\/', '/')
         def selected(event, draft, branch):
             variables = {"CI_PIPELINE_SOURCE": event, "CI_MERGE_REQUEST_DRAFT": draft,
                          "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME": branch}
             return all(variables[name] == value for name, value in clauses) and bool(
-                re.match(r"^((codex|claude)/)?[0-9]+-idt-", branch))
+                re.match(branch_pattern, branch))
         self.assertTrue(selected("merge_request_event", "true", "codex/161-idt-rx671-rx65n-ci"))
         self.assertTrue(selected("merge_request_event", "false", "codex/161-idt-rx671-rx65n-ci"))
+        self.assertTrue(selected("merge_request_event", "true", "codex/170-common-core-convergence"))
+        self.assertTrue(selected("merge_request_event", "false", "codex/170-common-core-convergence"))
         for event, draft, branch in (
             ("merge_request_event", "true", "another-idt-target-validation"),
             ("web", "true", "codex/161-idt-rx671-rx65n-ci"), ("api", "true", "codex/161-idt-rx671-rx65n-ci"),
             ("push", "true", "codex/161-idt-rx671-rx65n-ci"), ("parent_pipeline", "true", "codex/161-idt-rx671-rx65n-ci"),
+            ("push", "true", "codex/170-common-core-convergence"),
+            ("web", "true", "codex/170-common-core-convergence"),
         ):
             with self.subTest(event=event, draft=draft, branch=branch):
                 self.assertFalse(selected(event, draft, branch))
@@ -433,7 +438,8 @@ class IdtCiContractTests(unittest.TestCase):
         binding = "$idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }"
         self.assertLess(job.index(binding), job.index("tools/idt/check_host.py"))
         self.assertIn("$env:IDT_TARGET = $idtTarget", job)
-        self.assertEqual(2, job.count('--target "$idtTarget"'))
+        self.assertEqual(3, job.count('--target "$idtTarget"'))
+        self.assertIn('tools/idt/prepare_public_signer.py --source "$env:CI_PROJECT_DIR" --target "$idtTarget"', job)
 
 
 if __name__ == "__main__":

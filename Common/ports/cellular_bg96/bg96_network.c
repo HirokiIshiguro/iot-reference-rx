@@ -6,8 +6,30 @@
 
 static CellularHandle_t moduleHandle;
 static bool pdnReady;
+static bool runtimePdnConfigured;
+static CellularPdnConfig_t runtimePdnConfig;
 
 CellularHandle_t Bg96_GetHandle(void) { return moduleHandle; }
+
+bool Bg96_SetRuntimePdnConfig(const CellularPdnConfig_t * config)
+{
+    if ((config == NULL) || (moduleHandle != NULL) ||
+        (config->pdnContextType != CELLULAR_PDN_CONTEXT_IPV4) ||
+        ((config->pdnAuthType != CELLULAR_PDN_AUTH_NONE) &&
+         (config->pdnAuthType != CELLULAR_PDN_AUTH_PAP) &&
+         (config->pdnAuthType != CELLULAR_PDN_AUTH_CHAP) &&
+         (config->pdnAuthType != CELLULAR_PDN_AUTH_PAP_OR_CHAP)) ||
+        (config->apnName[0] == '\0') ||
+        (memchr(config->apnName, '\0', sizeof(config->apnName)) == NULL) ||
+        (memchr(config->username, '\0', sizeof(config->username)) == NULL) ||
+        (memchr(config->password, '\0', sizeof(config->password)) == NULL))
+    {
+        return false;
+    }
+    runtimePdnConfig = *config;
+    runtimePdnConfigured = true;
+    return true;
+}
 
 void Bg96_NetworkCleanup(void)
 {
@@ -48,11 +70,18 @@ bool Connect2AP(void)
     } while ((xTaskGetTickCount() - began) < pdMS_TO_TICKS(60000U));
     if ((status != CELLULAR_SUCCESS) || (sim.simCardState != CELLULAR_SIM_CARD_READY))
     { Bg96_NetworkCleanup(); return false; }
-    pdn.pdnContextType = CELLULAR_PDN_CONTEXT_IPV4;
-    pdn.pdnAuthType = (CellularPdnAuthType_t)BG96_PDN_AUTH_TYPE;
-    strncpy(pdn.apnName, BG96_APN_NAME, sizeof(pdn.apnName) - 1U);
-    strncpy(pdn.username, BG96_APN_USER, sizeof(pdn.username) - 1U);
-    strncpy(pdn.password, BG96_APN_PASSWORD, sizeof(pdn.password) - 1U);
+    if (runtimePdnConfigured)
+    {
+        pdn = runtimePdnConfig;
+    }
+    else
+    {
+        pdn.pdnContextType = CELLULAR_PDN_CONTEXT_IPV4;
+        pdn.pdnAuthType = (CellularPdnAuthType_t)BG96_PDN_AUTH_TYPE;
+        strncpy(pdn.apnName, BG96_APN_NAME, sizeof(pdn.apnName) - 1U);
+        strncpy(pdn.username, BG96_APN_USER, sizeof(pdn.username) - 1U);
+        strncpy(pdn.password, BG96_APN_PASSWORD, sizeof(pdn.password) - 1U);
+    }
     status = Cellular_SetPdnConfig(moduleHandle, CELLULAR_PDN_CONTEXT_ID, &pdn);
     if (status != CELLULAR_SUCCESS) { Bg96_NetworkCleanup(); return false; }
     began = xTaskGetTickCount();

@@ -16,7 +16,7 @@ MQTT = ROOT / "Middleware/FreeRTOS/coreMQTT/source"
 
 @unittest.skipUnless(GCC or MSVC, "Host C compiler required; no MCU build is performed")
 class ProductApiTests(unittest.TestCase):
-    def compile_run(self, source, headers=None, extra_sources=(), extra_includes=()):
+    def compile_run(self, source, headers=None, extra_sources=(), extra_includes=(), extra_defines=()):
         with tempfile.TemporaryDirectory(prefix="product-api-") as temporary:
             directory = Path(temporary)
             for name, body in (headers or {}).items():
@@ -32,6 +32,7 @@ class ProductApiTests(unittest.TestCase):
                              "-Werror=incompatible-pointer-types", "-DMQTT_DO_NOT_USE_CUSTOM_CONFIG",
                              "-DMQTT_AGENT_DO_NOT_USE_CUSTOM_CONFIG", "-I" + str(directory), "-I" + str(ROOT)]
                 arguments += ["-I" + str(path) for path in extra_includes]
+                arguments += ["-D" + value for value in extra_defines]
                 arguments += [str(main), *map(str, extra_sources), "-o", str(output)]
             else:
                 setup = MSVC.parents[6] / "Auxiliary/Build/vcvars64.bat"
@@ -53,11 +54,14 @@ class ProductApiTests(unittest.TestCase):
                              "/DMQTT_DO_NOT_USE_CUSTOM_CONFIG", "/DMQTT_AGENT_DO_NOT_USE_CUSTOM_CONFIG",
                              "/I" + str(directory), "/I" + str(ROOT)]
                 arguments += ["/I" + str(path) for path in extra_includes]
+                arguments += ["/D" + value for value in extra_defines]
                 arguments += [str(main), *map(str, extra_sources), "/Fe:" + str(output), "/Fo:" + str(directory) + os.sep]
             result = subprocess.run(arguments, capture_output=True, text=True, encoding="utf-8", errors="replace",
                                     cwd=directory, env=environment, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            subprocess.run([str(output)], capture_output=True, check=True, timeout=10)
+            executed = subprocess.run([str(output)], capture_output=True, text=True,
+                                      encoding="utf-8", errors="replace", timeout=10)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
 
     def test_conf_value_and_uart_output_boundaries(self):
         self.compile_run(r'''

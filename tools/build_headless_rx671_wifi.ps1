@@ -207,7 +207,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectDir ".project"))) {
 
 $submodulePaths = @(
     "Projects/$projectName/external/wifi-host-driver",
-    "Projects/$projectName/external/TraceRecorderSource",
+    "Middleware/3rdparty/TraceRecorderSource",
     "Projects/$projectName/external/type1yn-blobs/sources/firmware-wifi-host-driver",
     "Projects/$projectName/external/type1yn-blobs/sources/wifi-resources",
     "Projects/$projectName/external/type1yn-blobs/sources/cyw-fmac-nvram",
