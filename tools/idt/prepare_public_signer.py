@@ -1,9 +1,11 @@
-"""Prepare four reviewed public signer inputs for a native IDT run.
+"""Prepare four reviewed public signer inputs for a signed RX boot transaction.
 
 The source checkout must be clean. Output is a new private directory outside
 the checkout; stdout contains only the four environment-variable paths as JSON.
 Compiler/certificate-tool output remains in private local logs. No hardware or
 cloud operation is provided by this helper.
+Native IDT retains its reviewed development signer; normal CI may explicitly
+select the signer used for its application package.
 """
 from __future__ import annotations
 
@@ -60,11 +62,11 @@ def _source_state(source):
     return values[1]
 
 
-def _public_from_development_key(source, target):
+def _public_from_development_key(source, target, signing_key=None):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec
-    path = _file(source/target["signing_key"]).resolve(strict=True)
-    if not path.is_relative_to(source):
+    path = _file(source/target["signing_key"] if signing_key is None else signing_key).resolve(strict=True)
+    if signing_key is None and not path.is_relative_to(source):
         raise RuntimeError("Development signing key must remain inside its reviewed source checkout")
     try:
         key = serialization.load_pem_private_key(path.read_bytes(), password=None)
@@ -97,7 +99,7 @@ def _cleanup_public_outputs(output, build):
 
 
 def prepare(source: Path, target_id: str, output: Path, workspace: Path, python: str,
-            environ=None) -> dict[str, str]:
+            environ=None, *, signing_key=None) -> dict[str, str]:
     """Generate a complete native input set; override handling belongs to the caller."""
     environment = os.environ if environ is None else environ
     source = _unlinked(source).resolve(strict=True)
@@ -131,7 +133,7 @@ def prepare(source: Path, target_id: str, output: Path, workspace: Path, python:
         # producer output; private compiler logs never enter that set.
         shutil.copyfile(mot, output/"public_signer_provisioner.mot")
         shutil.copyfile(manifest_path, output/"public_signer_provisioner_manifest.json")
-        key_path, public = _public_from_development_key(source, target)
+        key_path, public = _public_from_development_key(source, target, signing_key)
         (output/"signer.pub.pem").write_bytes(public)
         command = [python, str(_file(source/"tools/generate_signer_cert.py")),
                    "--key", str(key_path), "--out", str(output/"signer.crt.pem")]
@@ -142,7 +144,7 @@ def prepare(source: Path, target_id: str, output: Path, workspace: Path, python:
             raise RuntimeError("Public signer certificate tool failed; private logs are retained")
         paths = {variable: str(_file(output/filename)) for filename, variable in controller.ENVIRONMENT_INPUTS.items()}
         checked = controller.validate_prepared_signer(source, output, target, source_sha, environ=paths)
-        _, public = _public_from_development_key(source, target)
+        _, public = _public_from_development_key(source, target, signing_key)
         from cryptography.hazmat.primitives import serialization
         spki = serialization.load_pem_public_key(public).public_bytes(serialization.Encoding.DER,
                                       serialization.PublicFormat.SubjectPublicKeyInfo)
@@ -163,9 +165,12 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--python", default=sys.executable)
+    parser.add_argument("--signing-key", type=Path,
+                        help="Explicit normal-CI signer; omitted for the reviewed native-IDT development key")
     args=parser.parse_args(argv)
     try:
-        paths=prepare(args.source,args.target,args.output,args.workspace,args.python)
+        paths=prepare(args.source,args.target,args.output,args.workspace,args.python,
+                      signing_key=args.signing_key)
     except Exception:
         print("Public signer preparation failed; inspect the requested private output directory.",file=sys.stderr)
         return 1

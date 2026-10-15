@@ -27,15 +27,21 @@ class IdtHostProfileTests(unittest.TestCase):
         self.assertEqual("D:\\Windows\\System32\\OpenSSH\\ssh.exe", profile["windows_ssh"])
         self.assertEqual("D:\\Programs\\PowerShell\\7\\pwsh.exe", profile["windows_powershell"])
         self.assertEqual("C:\\ai\\codex\\ws", profile["workspace_root"])
+        self.assertEqual("e2studio-cli.exe", Path(profile["e2studio_cli"].replace("\\", "/")).name)
 
     def test_profile_controls_selected_distribution_and_tools_with_legacy_override(self):
         profile = self.profile({"wsl_distribution": "IDT-Ubuntu", "wsl_python": "/mnt/c/ai/codex/tools/venvs/linux/bin/python",
-            "e2studio_cli": "D:\\Renesas\\e2studioc.exe"}, {"E2STUDIO_CLI": "D:\\CI\\e2studioc.exe"})
+            "e2studio_cli": "D:\\Renesas\\e2studio-cli.exe"}, {"E2STUDIO_CLI": "D:\\CI\\e2studio-cli.exe"})
         self.assertEqual("IDT-Ubuntu", profile["wsl_distribution"])
         self.assertEqual("/mnt/c/ai/codex/tools/venvs/linux/bin/python", profile["wsl_python"])
-        self.assertEqual("D:\\CI\\e2studioc.exe", profile["e2studio_cli"])
+        self.assertEqual("D:\\CI\\e2studio-cli.exe", profile["e2studio_cli"])
         selected = load_host_profile(environ={"RX72N_IDT_HOST_PROFILE": str(self.path)})
-        self.assertEqual("D:\\Renesas\\e2studioc.exe", selected["e2studio_cli"])
+        self.assertEqual("D:\\Renesas\\e2studio-cli.exe", selected["e2studio_cli"])
+
+    def test_legacy_launchers_are_rejected_before_runtime_preflight(self):
+        for name in ("e2studioc.exe", "e2studio.exe"):
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "e2studio-cli.exe"):
+                self.profile({"e2studio_cli": "D:\\Renesas\\" + name})
 
     def test_profile_cannot_override_board_identity_or_embed_credential_keys(self):
         for key in ("uart", "board_hostname", "rfp_tool", "AWS_ACCESS_KEY_ID", "secret_key"):

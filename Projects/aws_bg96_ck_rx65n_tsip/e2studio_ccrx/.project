@@ -51,6 +51,11 @@
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware</locationURI>
 		</link>
 		<link>
+			<name>CellularPlatform</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Demo/FreeRTOS_Cellular_Interface_Windows_Simulator/Common</locationURI>
+		</link>
+		<link>
 			<name>src/application_code/include</name>
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Demos/include</locationURI>

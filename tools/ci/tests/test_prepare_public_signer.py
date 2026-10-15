@@ -50,7 +50,7 @@ class PreparePublicSignerTests(unittest.TestCase):
         fixture.source_sha=sha
         return fixture
 
-    def production_mocks(self,fixture,*,missing=None,formal=True,certificate=None):
+    def production_mocks(self,fixture,*,missing=None,formal=True,certificate=None,signing_key=None):
         def build(source,target_id,output,workspace,python):
             self.assertEqual(fixture.source,source);self.assertEqual(fixture.target["id"],target_id)
             self.assertEqual(fixture.workspace,workspace);self.assertEqual("fixture-python",python)
@@ -66,7 +66,7 @@ class PreparePublicSignerTests(unittest.TestCase):
             if command[0]=="git":return self.real_run(command,**kwargs)
             self.assertEqual("fixture-python",command[0])
             self.assertEqual(fixture.source/"tools/generate_signer_cert.py",Path(command[1]))
-            self.assertEqual(fixture.source/fixture.target["signing_key"],Path(command[command.index("--key")+1]))
+            self.assertEqual(signing_key or fixture.source/fixture.target["signing_key"],Path(command[command.index("--key")+1]))
             output=Path(command[command.index("--out")+1])
             kwargs["stdout"].write(b"SYNTHETIC PRIVATE CERTIFICATE TOOL DIAGNOSTIC\n")
             if missing!="certificate":
@@ -109,6 +109,18 @@ class PreparePublicSignerTests(unittest.TestCase):
         with patch.object(helper.producer,"build") as compiler,self.assertRaises(FileExistsError):
             helper.prepare(fixture.source,fixture.target["id"],fixture.output,fixture.workspace,"fixture-python",environ={})
         compiler.assert_not_called();self.assertEqual("preserved",preserved.read_text())
+
+    def test_explicit_normal_signer_selects_only_that_key_and_exports_public_files(self):
+        fixture=self.fixture()
+        selected=fixture.root/"explicit-normal-signing-key.pem"
+        shutil.copyfile(fixture.source/fixture.target["signing_key"],selected)
+        build,run=self.production_mocks(fixture,signing_key=selected)
+        with patch.object(helper.producer,"build",side_effect=build),patch.object(helper.subprocess,"run",side_effect=run):
+            paths=helper.prepare(fixture.source,fixture.target["id"],fixture.output,fixture.workspace,
+                                 "fixture-python",environ={},signing_key=selected)
+        self.assertNotIn(str(selected),paths.values())
+        self.assertEqual(set(helper.controller.ENVIRONMENT_INPUTS.values()),set(paths))
+        self.assertTrue(selected.is_file())
 
     def test_formal_false_missing_artifacts_and_certificate_mismatch_leave_no_public_input_set(self):
         for case in ("formal","mot","manifest","certificate","certificate_mismatch"):

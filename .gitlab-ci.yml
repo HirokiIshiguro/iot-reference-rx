@@ -676,6 +676,11 @@ idt_ci_contract:
         tools.ci.tests.test_rx65n_managed_build_profiles \
         tools.ci.tests.test_idt_nested_dependency_initialization \
         tools.ci.tests.test_idt_unit_dependencies \
+        tools.ci.tests.test_rx72n_tsip_driver \
+        tools.ci.tests.test_normal_boot \
+        tools.ci.tests.test_normal_boot_ci_contract \
+        tools.ci.tests.test_bg96_bootloader_download \
+        tools.ci.tests.test_bg96_ota_prepare \
         tools.ci.tests.test_bg96_static_provisioning.StaticProvisioningContractTests \
         tools.ci.tests.test_rx_e2studio_cli \
         tools.ci.tests.test_rx72n_fwup_prm_contract \
@@ -1751,7 +1756,7 @@ build_rx65n_bg96:
       optional: true
   script:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
-    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
@@ -2679,7 +2684,7 @@ build_rx72n_ether_fleet:
         exit 1
       fi
       echo "Acquired shared RX72N hardware lock for pipeline ${CI_PIPELINE_ID}, job ${CI_JOB_ID}."
-    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx72n-ethernet'))"
+    - python3 -c "import os, sys; from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; target = get_target('rx72n-ethernet'); raise_if_rfp_unsafe(target); os.path.lexists(target['owner_file']) and sys.exit('Retained hardware owner requires inspection')"
 
 .rx65n_bg96_linux_hw_job:
   tags:
@@ -2700,7 +2705,7 @@ build_rx72n_ether_fleet:
         echo "CK-RX65N is owned by another hardware transaction"
         exit 1
       fi
-    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx65n-bg96'))"
+    - python3 -c "import os, sys; from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; target = get_target('rx65n-bg96'); raise_if_rfp_unsafe(target); os.path.lexists(target['owner_file']) and sys.exit('Retained hardware owner requires inspection')"
     - python3 -m venv .venv-pi
     - source .venv-pi/bin/activate
     - python -m pip install --quiet pyserial cryptography
@@ -2751,7 +2756,7 @@ build_rx72n_ether_fleet:
         exit 1
       fi
       echo "Acquired shared RX671 hardware lock for pipeline ${CI_PIPELINE_ID}, job ${CI_JOB_ID}."
-    - python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx671-wifi'))"
+    - python3 -c "import os, sys; from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; target = get_target('rx671-wifi'); raise_if_rfp_unsafe(target); os.path.lexists(target['owner_file']) and sys.exit('Retained hardware owner requires inspection')"
 
 .aws_cli_windows_job:
   tags:

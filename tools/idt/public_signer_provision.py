@@ -1,7 +1,7 @@
 """Validate and install public boot trust inside the caller's locked transaction.
 
 This module has no hardware command-line entry point. Bench/UART/RFP ownership,
-command supervision and final reset/quiet observations belong to rpi_flash.
+command supervision and final reset/quiet observations belong to the caller.
 Offline signature checks never establish runtime trust.
 """
 from __future__ import annotations
@@ -87,6 +87,12 @@ def _identity(target, source_sha):
 def policy_hashes(files, target):
     return {"rx_bootloader_config.h": _hash(files["public_signer_bootloader_config.h"]),
             CHIP_HEADERS[target["id"]]: _hash(files["public_signer_target.h"])}
+
+
+def chip_config(source, target):
+    boot = Path(source)/target["bootloader_project"]
+    local = boot/"src"/CHIP_HEADERS[target["id"]]
+    return local if local.exists() else boot/"lib/rx_bootloader/config"/CHIP_HEADERS[target["id"]]
 
 
 def _policy(path):
@@ -243,7 +249,7 @@ def validate_initial_rsu(files, target):
     return material._spki_sha256(public)
 
 
-def validate_bundle(files, target, source_sha):
+def validate_boot_trust(files, target, source_sha):
     plan = _prepared(files, target, source_sha)
     _, shift = LAYOUTS[target["id"]]
     bank0 = _srecords(files["bootloader.mot"], ((0xFFFC0000, 0xFFFFFFFF), *OPTIONS),
@@ -254,6 +260,11 @@ def validate_bundle(files, target, source_sha):
                      (mirror_start, *range(0xFFFFFF80-shift, 0x100000000-shift)))
     if bank1 != {address-shift: value for address, value in bank0.items() if address >= 0xFFFC0000}:
         raise RuntimeError("Bank1 bootloader is not the exact reviewed bank0 shift")
+    return plan
+
+
+def validate_bundle(files, target, source_sha):
+    plan = validate_boot_trust(files, target, source_sha)
     signer = validate_initial_rsu(files, target)
     return {**plan, "public_signer_spki_sha256": signer, "status": "not_run",
             "builtin_public_key_fallback": False, "private_credentials_used": False,
@@ -284,9 +295,7 @@ def source_inputs(source, runtime, target, source_sha, environ=None):
         files[name] = path
     source, here = Path(source), Path(__file__).resolve().parent
     boot = source / target["bootloader_project"]
-    chip = boot / "src" / CHIP_HEADERS[target["id"]]
-    if not chip.exists():
-        chip = boot / "lib/rx_bootloader/config" / CHIP_HEADERS[target["id"]]
+    chip = chip_config(source, target)
     files.update({"public_signer_provision.py": here/"public_signer_provision.py",
                   "public_signer_material.py": here/"public_signer_material.py",
                   "provision_rx671_ota.py": source/"tools/provision_rx671_ota.py",
@@ -363,13 +372,22 @@ def _download_command(download, root, target):
         raise RuntimeError("Strict UART downloader reset command differs from the reviewed target")
 
 
-def provision_and_install(root, target, source_sha, call, download, check_owner=None):
+def _checked_call(call, check_owner, command, timeout):
+    check_owner()
+    result = call(command, timeout=timeout)
+    if getattr(result, "returncode", None) != 0:
+        raise RuntimeError("Guarded public signer command did not return success")
+    check_owner()
+    return result
+
+
+def provision_boot_trust(root, target, source_sha, call, check_owner=None, *, artifact_dir=None):
+    """Install public boot trust; the caller keeps its lock through app install."""
     if not callable(call) or not callable(check_owner):
         raise RuntimeError("Public signer transaction requires guarded commands and ownership checks")
     root = Path(root)
-    files = {name: root/name for name in PUBLIC_SIGNER_INPUTS | {"bootloader.mot", "bootloader_bank1.mot", "idt_transport.rsu"}}
-    plan = validate_bundle(files, target, source_sha)
-    _download_command(download, root, target)
+    files = {name: root/name for name in PUBLIC_SIGNER_INPUTS | {"bootloader.mot", "bootloader_bank1.mot"}}
+    plan = validate_boot_trust(files, target, source_sha)
     host, provisioner = _tools_module("rx671_ota_host"), _tools_module("provision_rx671_ota")
     try:
         from . import cleanup_budget as budget
@@ -385,12 +403,7 @@ def provision_and_install(root, target, source_sha, call, download, check_owner=
                 rfp.program_command(root/"bootloader_bank1.mot", leave_reset=True)]
     phase, serial_opened = 0, False
     def checked_call(command, timeout):
-        check_owner()
-        result = call(command, timeout=timeout)
-        if getattr(result, "returncode", None) != 0:
-            raise RuntimeError("Guarded public signer command did not return success")
-        check_owner()
-        return result
+        return _checked_call(call, check_owner, command, timeout)
     def guarded(command, *, timeout, label):
         nonlocal phase
         if phase >= len(expected) or list(command) != expected[phase] or "-erase-chip" in command:
@@ -408,7 +421,22 @@ def provision_and_install(root, target, source_sha, call, download, check_owner=
         serial_opened = True
         seconds = getattr(budget, "PUBLIC_SIGNER_PROVISION_SECONDS", budget.RX671_SIGNER_PROVISION_SECONDS)
         return _DeadlineSerial(host.open_serial(port, baud), time.monotonic()+seconds, check_owner)
-    args = SimpleNamespace(artifact_dir=root/"public-signer-events", rfp_cli=rfp.executable,
+    events = Path(artifact_dir) if artifact_dir is not None else root/"public-signer-events"
+    if any(item.is_symlink() for item in (events, *events.parents)):
+        raise RuntimeError("Linked public signer event directory")
+    events.mkdir(parents=True, mode=0o700, exist_ok=True)
+    # Fail before chip erase if event storage is unavailable, including a
+    # read-only bundle. Normal callers supply a private directory outside it.
+    probe = events/(".write-check-"+str(os.getpid()))
+    descriptor = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(b"public-signer-event-storage\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+    finally:
+        probe.unlink()
+    args = SimpleNamespace(artifact_dir=events, rfp_cli=rfp.executable,
         rfp_device=rfp.device, rfp_tool=rfp.tool, rfp_interface=rfp.interface, rfp_speed=rfp.speed,
         rfp_auth_id=rfp.auth_id, rfp_timeout=budget.FLASH_RFP_COMMAND_SECONDS,
         provisioner_mot=root/"public_signer_provisioner.mot", bootloader_mot=root/"bootloader.mot",
@@ -429,6 +457,22 @@ def provision_and_install(root, target, source_sha, call, download, check_owner=
             summary.get("ota_install_area_erase_ranges") != [f"0x{a:08X}-0x{b:08X}" for a, b in ranges]):
         raise RuntimeError("Public signer CLI provisioning did not complete the actual reviewed transaction")
     guarded(expected[4], timeout=budget.FLASH_RFP_COMMAND_SECONDS, label="bank1 bootloader programming")
-    checked_call(download, budget.FLASH_DOWNLOAD_SECONDS)
+    return {**plan, "status": "public_boot_trust_prepared", "completed_steps": summary["completed_steps"],
+            "runtime_trust": "not_established_until_signed_application_install"}
+
+
+def provision_and_install(root, target, source_sha, call, download, check_owner=None):
+    if not callable(call) or not callable(check_owner):
+        raise RuntimeError("Public signer transaction requires guarded commands and ownership checks")
+    root = Path(root)
+    files = {name: root/name for name in PUBLIC_SIGNER_INPUTS | {"bootloader.mot", "bootloader_bank1.mot", "idt_transport.rsu"}}
+    plan = validate_bundle(files, target, source_sha)
+    _download_command(download, root, target)
+    provision_boot_trust(root, target, source_sha, call, check_owner)
+    try:
+        from . import cleanup_budget as budget
+    except ImportError:
+        import cleanup_budget as budget
+    _checked_call(call, check_owner, download, budget.FLASH_DOWNLOAD_SECONDS)
     return {**plan, "status": "provisioned_and_initial_image_installed",
             "runtime_trust": "signature_checked_by_bootloader_on_initial_install"}

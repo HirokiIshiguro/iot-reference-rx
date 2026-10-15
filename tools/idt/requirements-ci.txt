@@ -7,3 +7,5 @@ cryptography==46.0.5
 cffi==2.0.0
 pycparser==2.23
 typing-extensions==4.15.0
+# Mock Serial tests import the same BG96 UART helpers used on the bench.
+pyserial==3.5

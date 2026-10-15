@@ -1,0 +1,203 @@
+"""Install a normal signed application under the CI shell's inherited bench lease.
+
+The caller must hold canonical bench flock on FD 9 through subsequent credential
+provisioning/tests. This entry owns the global programmer lock through public
+trust preparation, signed install, reset, and a fresh one-second UART quiet test.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import secrets
+import shlex
+import signal
+import socket
+import stat
+import sys
+import tempfile
+import time
+
+try:
+    from . import normal_boot
+    from .idt import cleanup_budget as budget, public_signer_provision as trust, rfp_process
+    from .idt.targets import get_target, target_ids
+except ImportError:
+    import normal_boot
+    from idt import cleanup_budget as budget, public_signer_provision as trust, rfp_process
+    from idt.targets import get_target, target_ids
+
+
+def check_bench_lease(target, descriptor=9, *, owner=None):
+    if socket.gethostname() != target["hostname"]:
+        raise RuntimeError("Normal install host differs from the reviewed board identity")
+    path = Path(target["bench_lock"])
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+        raise RuntimeError("Linked bench lock is not accepted")
+    actual, expected = os.fstat(descriptor), path.stat()
+    if not stat.S_ISREG(actual.st_mode) or (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
+        raise RuntimeError("Normal install requires the canonical inherited bench descriptor")
+    # fdinfo reports locks attached to this open file description. Merely
+    # observing another process's lock on the same inode would not prove ownership.
+    info = Path(f"/proc/self/fdinfo/{descriptor}").read_text()
+    locks = [line.split() for line in info.splitlines() if line.startswith("lock:")]
+    if not any("FLOCK" in fields and "WRITE" in fields and "->" not in fields for fields in locks):
+        raise RuntimeError("Inherited bench descriptor does not own an exclusive flock")
+    if os.path.lexists(target["owner_file"]):
+        if owner is None or json.loads(trust._bytes(Path(target["owner_file"]))) != owner:
+            raise RuntimeError("A retained or different hardware owner blocks normal installation")
+    elif owner is not None:
+        raise RuntimeError("Normal install owner record disappeared during the transaction")
+    rfp_process.raise_if_rfp_unsafe(target)
+
+
+def check_devices(target):
+    if not stat.S_ISCHR(os.stat(target["uart"]).st_mode):
+        raise RuntimeError("Reviewed UART does not resolve to a character device")
+    matches = []
+    for node in Path("/sys/bus/usb/devices").iterdir():
+        try:
+            if ((node/"idVendor").read_text().strip() == "045b" and
+                    (node/"idProduct").read_text().strip() == "82a0"):
+                value = (node/"serial").read_text().strip()
+                matches.append(value.removeprefix("E2L:").strip())
+        except FileNotFoundError:
+            continue
+    if matches.count(target["e2lite"]) != 1:
+        raise RuntimeError("Reviewed E2 Lite USB identity is missing or ambiguous")
+
+
+def rfp_command(target):
+    return ["sudo", "-n", "/usr/local/bin/rfp-cli", "-device", target["rfp_device"],
+            "-tool", "e2l:"+target["e2lite"], "-if", "fine", "-speed", target["rfp_speed"],
+            "-auth", "id", "F"*32]
+
+
+def download_command(root, target):
+    command = [sys.executable, str(Path(__file__).with_name("test_uart_download_rx72n.py")),
+        "--rsu", str(root/"normal_app.rsu"), "--port", target["uart"], "--baud", str(target["baud"]),
+        "--timeout", "420", "--post-tx-wait", "120", "--wait-for-ready", "--ready-timeout",
+        "180" if target["id"] == "rx65n-bg96" else "90", "--ready-message", 'send "userprog.rsu" via UART.',
+        "--reset-cmd", shlex.join([*rfp_command(target), "-sig", "-run", "-noquery"]),
+        "--success-message", "jump to user program", "--success-timeout", "90", "--strict-success"]
+    if target["id"] in ("rx65n-bg96", "rx671-wifi"):
+        command += ["--ack-each-chunk", "--send-chunk-size", "32768", "--ack-prefix", "installing firmware..."]
+    return command
+
+
+def reset_and_quiet(target, call, check_owner):
+    import serial
+    check_owner()
+    call([*rfp_command(target), "-sig", "-reset", "-noquery"], timeout=budget.FLASH_ABORT_RESET_SECONDS)
+    with serial.Serial(target["uart"], target["baud"], timeout=0.1, exclusive=True) as observer:
+        observer.reset_input_buffer()
+        deadline, count = time.monotonic()+budget.END_STATE_QUIET_SECONDS, 0
+        while time.monotonic() < deadline:
+            check_owner()
+            count += len(observer.read(max(1, observer.in_waiting)))
+    if count:
+        raise RuntimeError("Normal install end-state failed: UART remained active after reset")
+    return {"reset_command_exit_zero": True, "fresh_uart_quiet_1s": True, "physical_reset_hold": "unverified"}
+
+
+def install(root, target, source_sha):
+    # All image/public signer validation precedes device or programmer access.
+    manifest = normal_boot.validate(root, target, source_sha)
+    import fcntl
+    owner = None
+    check_owner = lambda: check_bench_lease(target, owner=owner)
+    check_owner()
+    check_devices(target)
+    event_directory = Path(tempfile.mkdtemp(prefix="rx-normal-boot-events-"))
+    # The same production lock used by native IDT is held for this transaction.
+    lock = Path(target["rfp_lock"])
+    if lock.parent.is_symlink():
+        raise RuntimeError("Linked global programmer lock directory")
+    try:
+        lock.parent.mkdir(mode=0o1777, parents=True)
+        os.chmod(lock.parent, 0o1777)
+    except FileExistsError:
+        pass
+    try:
+        descriptor = os.open(lock, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o666)
+    except FileExistsError:
+        descriptor = os.open(lock, os.O_RDWR | os.O_NOFOLLOW)
+    else:
+        os.fchmod(descriptor, 0o666)
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        raise RuntimeError("Nonregular global programmer lock")
+    deadline = time.monotonic()+budget.flash_transaction_seconds(target["id"])
+    # The native bridge creates this same canonical file with O_EXCL. A failed
+    # end-state therefore blocks both normal and native-IDT reuse of the board.
+    owner_path = Path(target["owner_file"])
+    touched, owner_created, completed, end_state = False, False, False, None
+    def call(command, timeout=budget.FLASH_RFP_COMMAND_SECONDS, *, cleanup=False):
+        check_owner()
+        remaining = budget.FLASH_ABORT_RESET_SECONDS if cleanup else deadline-time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError("Normal install transaction deadline exhausted")
+        result = rfp_process.run_guarded(command, target=target, timeout=min(timeout, remaining))
+        check_owner()
+        return result
+    try:
+        lock_deadline = time.monotonic()+budget.FLASH_LOCK_WAIT_SECONDS
+        while True:
+            check_owner()
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= lock_deadline:
+                    raise RuntimeError("Global programmer lock timeout")
+                time.sleep(0.1)
+        check_owner()
+        owner_fd = os.open(owner_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        owner = {"profile": normal_boot.PROFILE, "pid": os.getpid(), "token": secrets.token_hex(16),
+                 "target_id": target["id"], "source_sha": source_sha}
+        with os.fdopen(owner_fd, "w", encoding="utf-8") as stream:
+            json.dump(owner, stream)
+            stream.flush(); os.fsync(stream.fileno())
+        owner_created = True
+        touched = True
+        trust.provision_boot_trust(root, target, source_sha, call, check_owner, artifact_dir=event_directory)
+        if normal_boot.validate(root, target, source_sha) != manifest:
+            raise RuntimeError("Normal install bundle changed during boot-trust preparation")
+        call(download_command(root, target), timeout=budget.FLASH_DOWNLOAD_SECONDS)
+        completed = True
+    finally:
+        try:
+            if touched:
+                end_state = reset_and_quiet(target, lambda command, timeout: call(command, timeout, cleanup=True), check_owner)
+                if owner_created:
+                    owner_path.unlink()
+        finally:
+            os.close(descriptor)
+    return {"schema_version": 1, "profile": normal_boot.PROFILE, "source_sha": source_sha,
+            "target_id": target["id"], "tls_backend": manifest["tls_backend"],
+            "signed_install_and_bootloader_handoff": completed,
+            "application_functional_test": "subsequent_normal_ci_provisioning_and_monitor",
+            "event_directory": str(event_directory), "end_state": end_state}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--bundle", type=Path, required=True)
+    parser.add_argument("--target", choices=target_ids(), required=True)
+    parser.add_argument("--source-sha", required=True)
+    args = parser.parse_args(argv)
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError("Normal hardware installation requires the reviewed Linux bench")
+    def interrupted(*_):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, interrupted)
+    # Preserve the supplied path until ordinary-file validation has rejected
+    # linked parent directories; resolving first would hide that information.
+    receipt = install(args.bundle.absolute(), get_target(args.target), args.source_sha)
+    print(json.dumps(receipt, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

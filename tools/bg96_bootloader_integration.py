@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import struct
 import subprocess
 import sys
 import time
@@ -21,7 +22,6 @@ CODE_FLASH_BLOCK_SIZE = 32768
 CODE_FLASH_BLOCKS = 24
 CODE_FLASH_SIZE = CODE_FLASH_BLOCK_SIZE * CODE_FLASH_BLOCKS
 CODE_FLASH_SIZE_KB = CODE_FLASH_SIZE // 1024
-DF_PAD_SIZE = CODE_FLASH_BLOCK_SIZE
 DEFAULT_READY_TIMEOUT_SECONDS = 180
 
 APP_START_MARKERS = (
@@ -695,11 +695,13 @@ def wait_for_ready_on_any(candidates: list[SerialCandidate], timeout: float) -> 
     return None
 
 
-def wait_for(port: serial.Serial, marker: str, timeout: float) -> bool:
+def wait_for(port: serial.Serial, marker: str, timeout: float, *, preserve_following: bool = False) -> bool:
     deadline = time.time() + timeout
     buffer = ""
     while time.time() < deadline:
-        chunk = port.read(port.in_waiting or 1)
+        # Final boot messages may already be followed by app startup output.
+        # Stop exactly at the requested marker instead of discarding its tail.
+        chunk = port.read(1 if preserve_following else (port.in_waiting or 1))
         if chunk:
             text = chunk.decode("utf-8", errors="replace")
             write_serial_text(text)
@@ -749,10 +751,19 @@ def send_block(port: serial.Serial, data: bytes, offset: int, size: int) -> None
     port.flush()
 
 
-def download_rsu(port: serial.Serial, rsu_path: Path, ready_observed: bool = False) -> None:
+def read_cf_only_rsu(rsu_path: Path) -> bytes:
     data = rsu_path.read_bytes()
     if len(data) != CODE_FLASH_SIZE:
         raise RuntimeError(f"unexpected RSU size for contiguous bootloader protocol: {len(data)}")
+    if data[:7] != b"Renesas":
+        raise RuntimeError("invalid RSU header magic")
+    if struct.unpack_from("<III", data, 0x12C) != (0, 0xFFFFFFFF, 0xFFFFFFFF):
+        raise RuntimeError("RSU must be Code Flash only: Data Flash flag must be 0 and addresses must be 0xFFFFFFFF")
+    return data
+
+
+def download_rsu(port: serial.Serial, rsu_path: Path, ready_observed: bool = False) -> None:
+    data = read_cf_only_rsu(rsu_path)
 
     if not ready_observed and not wait_for(port, READY, DEFAULT_READY_TIMEOUT_SECONDS):
         raise RuntimeError(f"bootloader ready message not observed: {READY}")
@@ -761,17 +772,14 @@ def download_rsu(port: serial.Serial, rsu_path: Path, ready_observed: bool = Fal
         send_block(port, data, block * CODE_FLASH_BLOCK_SIZE, CODE_FLASH_BLOCK_SIZE)
         kb = (block + 1) * (CODE_FLASH_BLOCK_SIZE // 1024)
         if block == CODE_FLASH_BLOCKS - 1:
-            if not wait_for(port, "bank1(temporary area) on code flash integrity check...OK", 180):
+            if not wait_for(port, "bank1(temporary area) on code flash integrity check...OK", 180,
+                            preserve_following=True):
                 raise RuntimeError("downloaded RSU did not pass bootloader integrity check")
             break
         if not wait_for(port, f"({kb}/{CODE_FLASH_SIZE_KB}KB)", 45):
             raise RuntimeError(f"timed out waiting for firmware progress {kb}/{CODE_FLASH_SIZE_KB}KB")
 
-    pad = b"\xff" * DF_PAD_SIZE
-    send_block(port, pad, 0, len(pad))
-    if not wait_for(port, "completed installing const data.", 180):
-        raise RuntimeError("data flash install did not complete")
-    if not wait_for(port, "swap bank", 180):
+    if not wait_for(port, "swap bank", 180, preserve_following=True):
         raise RuntimeError("bank swap was not observed")
 
 
@@ -982,6 +990,7 @@ def flash_bootloader(args: argparse.Namespace) -> None:
 
 def download_rsu_via_bootloader(args: argparse.Namespace) -> None:
     userprog_rsu = require_file(args.userprog_rsu, "userprog RSU")
+    read_cf_only_rsu(userprog_rsu)
     bootloader_mot = require_file(args.bootloader_mot, "bootloader MOT") if args.bootloader_mot else None
     candidates = open_serial_candidates(parse_probe_ports(args.uart_port), args.baud)
     try:
@@ -1045,6 +1054,7 @@ def verify_mqtt(args: argparse.Namespace) -> None:
 def full_integration(args: argparse.Namespace) -> None:
     bootloader_mot = require_file(args.bootloader_mot, "bootloader MOT")
     userprog_rsu = require_file(args.userprog_rsu, "userprog RSU")
+    read_cf_only_rsu(userprog_rsu)
 
     run_rfp(args, ["-erase-chip"])
 

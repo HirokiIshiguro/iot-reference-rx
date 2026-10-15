@@ -1,6 +1,6 @@
 # 共通化WIPの3環境比較（2026-10-14）
 
-版・共通app設定・OSS参照は3環境の共通rootへ移行しました。**共通化WIPであり、全環境のqualification完了を示しません。** RX65N softwareの診断buildは成功しましたが、以下の最新のbranch／link input順／診断出力設定より前の結果です。最終設定による全image再build、共通化後のnative／保守用provisioner、実機IDTには残件があります。
+版・共通app設定・OSS参照は3環境の共通rootへ移行しました。**共通化WIPであり、全環境のqualification完了を示しません。** 10月15日にnative Transport 3環境とboot 3環境の実link・Flash RAM copy・heap clear生成codeを確認しました。[最新linked image証拠](linked-image-evidence-20261015.md)を参照してください。本表内の旧imageや変更前flagsは記録時点のsnapshotです。通常5 appの最終build、正式保守provisioner、実機IDTには残件があります。
 
 対象は[Issue #170](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/170)、[Draft MR !223](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/223)の作業中treeです。公開済み基準は[WIP `65c59407`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/65c59407b0a4b0c9048ba8ed8c700b3841090b3d)で、本表にはその後のRX65N cold生成・Cellular include・TSIP key adapter選択、boot最適化、全8 branch／link順／診断出力統一の修正も含みます。後続commitで固定するまで、公開基準と作業中変更を区別します。
 
@@ -18,6 +18,7 @@ RX671はsoftware app 1個、RX65N／RX72Nはsoftware・TSIP app各2個です。�
 | Mbed TLS software | 3.6.4 | 3.6.4 | 3.6.4 | 共通submodule `Middleware/3rdparty/mbedtls` |
 | Mbed TLS TSIP | 共通rootには3.2.1派生を保持、TSIP appなし | 3.2.1派生 | 3.2.1派生 | backendごとの統一。software/TSIPを同版にはしていない |
 | Flash FIT / BSP | 5.31 / 7.71 | 5.31 / 7.71 | 5.31 / 7.71 | app/bootともRDP 1.50原本をVendor link参照。設定headerは製品側 |
+| TSIP FIT | 通常appでは未使用（共通RDP内は1.24） | 1.24 | 1.24 | 同じ公式RDP pin。RX72Nの旧custom hook selectorを撤去しSC/QEの72設定を同期。原本1010 file bytesを照合 |
 | bootloader pin | `231a0cc680525be3530a7bb64862d099e5a401ec` | 同左 | 同左 | 今回確認したmain pinを固定。「将来もlatest」を意味しない |
 | bootloader格納先 | `lib/rx_bootloader` | `lib/rx_bootloader` | `lib/rx_bootloader` | 各boot projectのsubmodule。同じpin、旧配置の本体コピーなし |
 | LittleFS | v2.11.3 / disk 2.1 | 同左 | 同左 | app/bootが同じroot submoduleを参照 |
@@ -82,7 +83,7 @@ RX671はsoftware app 1個、RX65N／RX72Nはsoftware・TSIP app各2個です。�
 
 全8の有効値と明示／plugin既定の区別は[公開option matrix](current-convergence-20261014.json)に収録しています。branch／入力順／診断出力の統一も設定へ反映しました。ignored生成物に残る過去の値と、新metadataの指定を区別し、cold生成でcompilerとlibrary generatorの両入力を確認します。
 
-2026-10-15のユーザー決定により、FreeRTOS解放時zero clearを全5 appで有効（`configHEAP_CLEAR_MEMORY_ON_FREE=1`）へ変更しました。これは設定値の反映確認であり、変更後の再buildや実機での解放領域のbyte消去を検証した結果ではありません。保存済みSC 8 file・MDF 14 file・QE 8 fileに同flagの別selector定義はありません。一方、SC descriptorは`FreeRTOSConfig.h`を生成対象に持つため、selector不在だけでは手動Generate後の保持を保証できません。実GUI Generateは未観測です。
+2026-10-15のユーザー決定により、FreeRTOS解放時zero clearを全5 appで有効（`configHEAP_CLEAR_MEMORY_ON_FREE=1`）へ変更しました。3環境nativeの変更後buildと実`vPortFree`のzero／`SSTR.B`を確認しました。実機での解放領域のbyte消去は未観測です。保存済みSC 8 file・MDF 14 file・QE 8 fileに同flagの別selector定義はありません。生成pluginが既存headerのMDF propertyだけを更新することも確認しましたが、実GUI Generateは未観測です。
 
 BSP library heapはRX671 appの32KiBを8KiB、RX671 bootの32KiBを1KiBへ変更し、他MCUと同値にしました。製品headerだけでなくSC selectorとQE metadataを更新しました。これらは予約設定値であり、実link後のheap section・RAM余裕やmalloc動作は再検証します。FreeRTOS heapはこの変更では増減していません。
 

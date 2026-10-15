@@ -32,7 +32,7 @@ def load_host_profile(
         "wsl_distribution": "Ubuntu",
         "wsl_python": "python3",
         "windows_powershell": str(programs / "PowerShell/7/pwsh.exe"),
-        "e2studio_cli": r"C:\Renesas\e2_studio_2026_04_2\eclipse\e2studioc.exe",
+        "e2studio_cli": r"C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
         "ccrx": r"C:\Program Files (x86)\Renesas\RX\3_7_0\bin\ccrx.exe",
         "windows_ssh": str(windows / "System32/OpenSSH/ssh.exe"),
         "windows_scp": str(windows / "System32/OpenSSH/scp.exe"),
@@ -55,6 +55,8 @@ def load_host_profile(
             raise ValueError("IDT host profile values must be nonempty single-line strings")
         if key not in {"wsl_distribution", "wsl_python"} and not PureWindowsPath(value).is_absolute():
             raise ValueError("IDT host paths must be absolute Windows paths")
+    if PureWindowsPath(profile["e2studio_cli"]).name.lower() != "e2studio-cli.exe":
+        raise ValueError("IDT builds require the e2studio-cli.exe project command launcher")
     for key in ("install_root", "runtime_root", "workspace_root"):
         base = r"C:\ai\codex\ws" if key == "workspace_root" else r"C:\ai\codex"
         if not _under(profile[key], base, allow_equal=key == "workspace_root"):

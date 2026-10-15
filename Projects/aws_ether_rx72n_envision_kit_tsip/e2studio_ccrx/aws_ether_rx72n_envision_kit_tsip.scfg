@@ -758,7 +758,7 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_tsip_rx">
-            <component description="依存モジュール: r_bsp バージョン 7.70&#10;Provides the Renesas v1.23 functions and an optional, default-disabled application hook for every REG_00H.B25 procedure-busy wait. Disabled and OS-less configurations retain the original polling behavior." detailDescription="SAFFTI custom derivative of the Renesas TSIP (Trusted Secure IP) driver v1.23." display="r_tsip_rx" id="r_tsip_rx1.24" version="1.24">
+            <component description="依存モジュール: r_bsp バージョン 7.30&#10;Support functions: AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA, ECC, Random number generate, Key management, secure boot/secure firmware update." detailDescription="TSIP(Trusted Secure IP) driver." display="r_tsip_rx" id="r_tsip_rx1.24" version="1.24">
                 <gridItem id="AES128" selectedIndex="1"/>
                 <gridItem id="AES128-ECB" selectedIndex="1"/>
                 <gridItem id="TSIP_AES_128_ECB_ENCRYPT" selectedIndex="1"/>
@@ -831,8 +831,6 @@
                 <gridItem id="TSIP_MULTI_THREADING" selectedIndex="1"/>
                 <gridItem id="TSIP_MULTI_THREADING_LOCK_FUNCTION" selectedIndex="user_lock_function"/>
                 <gridItem id="TSIP_MULTI_THREADING_UNLOCK_FUNCTION" selectedIndex="user_unlock_function"/>
-                <gridItem id="TSIP_CFG_WAIT_LOOP_HOOK_ENABLE" selectedIndex="0"/>
-                <gridItem id="TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION" selectedIndex="vTsipWaitLoopHook"/>
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
