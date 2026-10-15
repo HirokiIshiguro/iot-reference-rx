@@ -63,8 +63,7 @@ def validate(root, target, source_sha):
     if (manifest.get("schema_version") != 1 or manifest.get("profile") != PROFILE or
             manifest.get("source_sha") != source_sha or manifest.get("target_id") != target["id"] or
             manifest.get("target_sha256") != target_fingerprint(target) or
-            manifest.get("tls_backend") not in ("software", "tsip") or
-            (target["id"] == "rx671-wifi" and manifest.get("tls_backend") != "software")):
+            manifest.get("tls_backend") not in ("software", "tsip")):
         raise RuntimeError("Normal install source/target/backend/profile mismatch")
     # Parse public-only boundaries before hashing can read an unexpected PEM body.
     plan = trust.validate_boot_trust(files, target, source_sha)
@@ -86,7 +85,7 @@ def prepare(source, target_id, output, inputs, *, tls_backend="software"):
     source = _unlinked(source).resolve(strict=True)
     source_sha = _source_state(source)
     target = get_target(target_id)
-    if tls_backend not in ("software", "tsip") or (target_id == "rx671-wifi" and tls_backend != "software"):
+    if tls_backend not in ("software", "tsip"):
         raise RuntimeError("Unsupported normal application backend")
     output = _unlinked(output).resolve()
     if output.exists() or output.is_symlink():

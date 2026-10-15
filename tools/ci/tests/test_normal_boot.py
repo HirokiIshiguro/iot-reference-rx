@@ -40,6 +40,30 @@ class NormalBootTests(unittest.TestCase):
                 self.assertEqual(normal_boot.FILES | {"normal_install_manifest.json"}, {path.name for path in root.iterdir()})
                 self.assertFalse(any(b"PRIVATE KEY" in path.read_bytes() for path in root.iterdir()))
 
+    def test_rx671_tsip_app_keeps_real_signed_bytes_and_software_public_maintenance(self):
+        root, fixture, manifest = self.bundle("rx671-wifi", backend="tsip")
+        self.assertEqual("tsip", manifest["tls_backend"])
+        self.assertEqual(manifest, normal_boot.validate(root, fixture.target, SOURCE_SHA))
+        public_manifest = root/"public_signer_provisioner_manifest.json"
+        maintenance = json.loads(public_manifest.read_text(encoding="utf-8"))
+        self.assertEqual("software", maintenance["tls_backend"])
+        # App backend support must not permit a TSIP public-maintenance image.
+        public_manifest.write_text(json.dumps({**maintenance, "tls_backend": "tsip"}), encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "formal manifest/source/target/profile"):
+            normal_boot.validate(root, fixture.target, SOURCE_SHA)
+
+    def test_prepare_rejects_unsupported_backend_without_publishing_a_bundle(self):
+        root, fixture, _ = self.bundle()
+        inputs = {name: root/name for name in normal_boot.FILES
+                  if name not in {"public_signer_bootloader_config.h", "public_signer_target.h"}}
+        for index, backend in enumerate(("unsupported", "", None)):
+            output = self.root/("unsupported-backend-"+str(index))
+            with self.subTest(backend=backend), \
+                    patch("tools.idt.prepare_public_signer._source_state", return_value=SOURCE_SHA):
+                with self.assertRaisesRegex(RuntimeError, "Unsupported normal application backend"):
+                    normal_boot.prepare(ROOT, fixture.target["id"], output, inputs, tls_backend=backend)
+                self.assertFalse(output.exists())
+
     def test_direct_cli_prepares_real_synthetic_bundles_for_all_three_targets(self):
         # Execute the actual script from outside the checkout. Only Git state is
         # synthetic: no module preloading masks the script/package import path,
@@ -111,7 +135,7 @@ class NormalBootTests(unittest.TestCase):
     def test_manifest_backend_hash_and_claim_substitution_is_rejected(self):
         root, fixture, manifest = self.bundle()
         path = root/"normal_install_manifest.json"
-        mutations = [("tls_backend", "tsip"), ("files", {}), ("application", {"sequence": 2}),
+        mutations = [("tls_backend", "unsupported"), ("files", {}), ("application", {"sequence": 2}),
                      ("bootloader_policy_sha256", {}), ("public_signer_spki_sha256", "0"*64)]
         for field, value in mutations:
             with self.subTest(field=field):
