@@ -31,12 +31,14 @@ job定義の正本は[`.gitlab-ci.yml`](../.gitlab-ci.yml)、接続構成とツ�
 | 目的 | 変数 |
 |---|---|
 | ターゲット別scope | `RX72N_TEST_SCOPE` / `RX65N_BG96_TEST_SCOPE` / `RX671_WIFI_TEST_SCOPE` |
-| scope値 | `build` / `network` / `mqtt` / `ota` / `fleet` / `full` |
+| scope値 | `build` / `network` / `mqtt` / `ota` / `fleet` / `tls13_0rtt` / `full`（対象別） |
 | TLS backend | `RX72N_TLS_BACKEND` / `RX65N_BG96_TLS_BACKEND` = `software`または`tsip` |
 | TLS version gate | `*_REQUIRE_TLS_VERSION=TLSv1.3` |
 
 未指定ターゲットは`build`へ明示的に絞ってください。秘密情報の値はpipeline引数やjob logへ
 直接書かず、project CI/CD Variablesを使用します。
+
+RX65Nの旧`flash`／`download`／`app`／`provision` scopeは廃止しました。指定すると実機jobを起動せず、説明付きのエラーになります。`mqtt`／`ota`／`tls13_0rtt`の各試験jobは、同じbench lock内で公開鍵投入・dual boot・署名付きapp導入・APN／証明書投入から観測までを一括実行します。`full`は従来どおりOTAとFleetを対象にします。
 
 IDTは通常の`full`やnightlyには含めません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt-validation.md)を参照してください。
 
