@@ -310,7 +310,10 @@ class IdtCiContractTests(unittest.TestCase):
                             ("test_rx65n_bg96_idt", "rx65n-bg96"),
                             ("test_rx671_wifi_idt", "rx671-wifi")):
             block = self.blocks[job]
-            self.assertIn('extends: .rx_idt_job', block)
+            self.assertRegex(
+                block,
+                r"(?m)^  extends:(?: \.rx_idt_job$|\n(?:    - [^\n]+\n)*    - \.rx_idt_job$)",
+            )
             rules = re.findall(r"- if: '([^']+)'", block)
             self.assertIn('$RUN_RX_IDT == "true"', rules[0])
             self.assertIn('$IDT_TARGET == "' + target + '"', rules[0])
