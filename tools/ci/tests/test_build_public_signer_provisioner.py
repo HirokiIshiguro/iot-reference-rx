@@ -28,6 +28,21 @@ def image(target_id, source_sha=SOURCE_SHA, *, mde=b'\x8f\xff\xff\xff', bank=b'\
     return ''.join(records)
 
 class PublicSignerProfileTests(unittest.TestCase):
+    def test_profile_preserves_the_cdt_document_version_instruction(self):
+        from xml.dom import minidom, Node
+        for target_id in builder.BUILD_HELPERS:
+            with self.subTest(target=target_id):
+                path=ROOT/builder.get_target(target_id)['application_project']/'.cproject'
+                original=path.read_text(encoding='utf-8')
+                changed=builder.make_profile(original)
+                first=minidom.parseString(changed).firstChild
+                self.assertEqual(Node.PROCESSING_INSTRUCTION_NODE,first.nodeType)
+                self.assertEqual('fileVersion',first.target)
+                self.assertEqual('4.0.0',first.data)
+                self.assertEqual(original[:original.index('<cproject')],changed[:changed.index('<cproject')])
+                with self.assertRaisesRegex(ValueError,'fileVersion processing instruction'):
+                    builder.make_profile(original.replace('<?fileVersion 4.0.0?>',''))
+
     def test_three_dual_profiles_keep_payload_layout_and_move_only_vectors(self):
         for target_id in builder.BUILD_HELPERS:
             with self.subTest(target=target_id):

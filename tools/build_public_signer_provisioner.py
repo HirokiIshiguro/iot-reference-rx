@@ -184,7 +184,12 @@ def make_profile(text: str, source_sha: str = "0" * 40) -> str:
     ):
         ET.SubElement(options[0], "listOptionValue",
                       {"builtIn": "false", "value": "-define=" + define})
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(tree, encoding="unicode")
+    # CDT requires the fileVersion processing instruction as the document's
+    # first node. ElementTree drops top-level PIs; keep the original prolog.
+    prolog = text[:text.index("<cproject")]
+    if not re.search(r"<\?fileVersion\s+[^?]+\?>", prolog):
+        raise ValueError("Maintenance input requires the CDT fileVersion processing instruction")
+    return prolog + ET.tostring(tree, encoding="unicode")
 
 
 @contextmanager
