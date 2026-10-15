@@ -1212,7 +1212,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--e2studio",
         type=Path,
         default=Path(
-            "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studioc.exe"
+            "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe"
         ),
     )
     parser.add_argument(

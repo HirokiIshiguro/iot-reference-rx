@@ -37,6 +37,10 @@ class VersionTests(unittest.TestCase):
 
 
 class ProfileTests(unittest.TestCase):
+    def test_default_provisioner_uses_shared_cli_launcher(self) -> None:
+        args = builder.parse_args(["--provisioner-only"])
+        self.assertEqual(args.e2studio.name, "e2studio-cli.exe")
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.cproject = (PROJECT / ".cproject").read_text(encoding="utf-8")
