@@ -1,13 +1,16 @@
 """Normal signed-install validation and failure/ownership boundaries; no hardware."""
 import json
+from contextlib import ExitStack
+import itertools
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from tools import normal_boot, install_normal_boot as installer
 from tools.ci.tests.test_idt_public_signer_provision import Fixture, ROOT, SOURCE_SHA
@@ -29,6 +32,109 @@ class NormalBootTests(unittest.TestCase):
         with patch("tools.idt.prepare_public_signer._source_state", return_value=SOURCE_SHA):
             manifest = normal_boot.prepare(ROOT, target_id, output, inputs, tls_backend=backend)
         return output, fixture, manifest
+
+    def reset_only_transaction(self, *, return_code=0, uart_bytes=b""):
+        """Mock programmer/UART and Linux syscalls, retaining actual owner files."""
+        target = {**get_target("rx671-wifi"), "bench_lock": str(self.root/"bench.lock"),
+                  "rfp_lock": str(self.root/"rfp"/"global.lock"),
+                  "owner_file": str(self.root/"canonical-owner.json")}
+        events = self.root/"events"
+        events.mkdir()
+        clock = itertools.count(step=0.1)
+        observer = MagicMock()
+        observer.in_waiting = 0
+        observer.read.return_value = uart_bytes
+        serial = MagicMock()
+        serial.return_value.__enter__.return_value = observer
+        commands, owners = [], []
+        def guarded(command, **_):
+            commands.append(list(command))
+            owners.append(json.loads(Path(target["owner_file"]).read_text()))
+            return subprocess.CompletedProcess(command, return_code)
+        stack = ExitStack()
+        self.addCleanup(stack.close)
+        stack.enter_context(patch.dict(sys.modules, {"fcntl": SimpleNamespace(
+            LOCK_EX=2, LOCK_NB=4, flock=Mock())}))
+        stack.enter_context(patch.object(os, "O_NOFOLLOW", getattr(os, "O_NOFOLLOW", 0), create=True))
+        stack.enter_context(patch.object(os, "fchmod", Mock(), create=True))
+        stack.enter_context(patch.object(normal_boot, "validate", return_value={"tls_backend": "software"}))
+        stack.enter_context(patch.object(installer, "check_ci_identity"))
+        stack.enter_context(patch.object(installer, "check_bench_lease"))
+        stack.enter_context(patch.object(installer, "check_devices"))
+        stack.enter_context(patch.object(installer.tempfile, "mkdtemp", return_value=str(events)))
+        stack.enter_context(patch.object(installer.time, "monotonic", side_effect=lambda: next(clock)))
+        stack.enter_context(patch.object(installer.rfp_process, "run_guarded", side_effect=guarded))
+        stack.enter_context(patch("serial.Serial", serial))
+        prepare = stack.enter_context(patch.object(installer.trust, "provision_boot_trust"))
+        download = stack.enter_context(patch.object(installer, "download_command"))
+        return target, commands, owners, observer, serial, prepare, download
+
+    def test_reset_only_issues_only_reset_and_reports_no_image_replacement(self):
+        target, commands, owners, observer, _, prepare, download = self.reset_only_transaction()
+        receipt = installer.install(self.root, target, SOURCE_SHA, reset_only=True)
+        self.assertEqual([[*installer.rfp_command(target), "-sig", "-reset", "-noquery"]], commands)
+        prepare.assert_not_called()
+        download.assert_not_called()
+        observer.reset_input_buffer.assert_called_once()
+        self.assertTrue(observer.read.called, "A fresh quiet interval must actually be observed")
+        self.assertFalse(Path(target["owner_file"]).exists())
+        self.assertEqual(installer.RESET_ONLY_PROFILE, owners[0]["profile"])
+        self.assertEqual(SOURCE_SHA, owners[0]["validated_bundle_source_sha"])
+        self.assertNotIn("source_sha", owners[0])
+        self.assertEqual(installer.RESET_ONLY_PROFILE, receipt["profile"])
+        self.assertEqual(SOURCE_SHA, receipt["validated_bundle_source_sha"])
+        self.assertEqual("offline_reference_only", receipt["bundle_validation"])
+        self.assertEqual("not_reverified", receipt["current_image_signature"])
+        for field in ("code_flash_written", "data_flash_written", "image_replaced"):
+            self.assertIs(False, receipt[field])
+        self.assertNotIn("signed_install_and_bootloader_handoff", receipt)
+        self.assertNotIn("source_sha", receipt)
+        self.assertTrue(receipt["end_state"]["reset_command_exit_zero"])
+        self.assertTrue(receipt["end_state"]["fresh_uart_quiet_1s"])
+
+    def test_reset_only_retains_owner_when_reset_fails_without_opening_uart(self):
+        target, commands, _, _, serial, prepare, download = self.reset_only_transaction(return_code=7)
+        with self.assertRaisesRegex(RuntimeError, "did not return success"):
+            installer.install(self.root, target, SOURCE_SHA, reset_only=True)
+        self.assertEqual(1, len(commands))
+        self.assertTrue(Path(target["owner_file"]).exists())
+        serial.assert_not_called()
+        prepare.assert_not_called()
+        download.assert_not_called()
+
+    def test_reset_only_retains_owner_when_uart_is_not_quiet(self):
+        target, commands, _, observer, _, prepare, download = self.reset_only_transaction(uart_bytes=b"x")
+        with self.assertRaisesRegex(RuntimeError, "UART remained active"):
+            installer.install(self.root, target, SOURCE_SHA, reset_only=True)
+        self.assertEqual(1, len(commands))
+        self.assertTrue(observer.read.called)
+        self.assertTrue(Path(target["owner_file"]).exists())
+        prepare.assert_not_called()
+        download.assert_not_called()
+
+    def test_reset_only_still_rejects_tampered_signed_bundle_before_hardware_io(self):
+        root, fixture, _ = self.bundle()
+        app = root/"normal_app.rsu"
+        image = app.read_bytes()
+        app.write_bytes(image[:-1] + bytes([image[-1] ^ 1]))
+        with patch.object(installer, "check_bench_lease") as lease, \
+                patch.object(installer, "check_devices") as devices, \
+                patch.object(installer.rfp_process, "run_guarded") as programmer, \
+                patch("serial.Serial") as serial:
+            with self.assertRaises(RuntimeError):
+                installer.install(root, fixture.target, SOURCE_SHA, reset_only=True)
+            lease.assert_not_called()
+            devices.assert_not_called()
+            programmer.assert_not_called()
+            serial.assert_not_called()
+
+    def test_reset_only_cli_forwards_the_option_without_a_different_entrypoint(self):
+        with patch.object(installer.sys, "platform", "linux"), \
+                patch.object(installer.signal, "signal"), \
+                patch.object(installer, "install", return_value={"profile": installer.RESET_ONLY_PROFILE}) as install:
+            self.assertEqual(0, installer.main(["--bundle", str(self.root), "--target", "rx671-wifi",
+                                               "--source-sha", SOURCE_SHA, "--reset-only"]))
+            self.assertTrue(install.call_args.kwargs["reset_only"])
 
     def test_real_signed_bundles_and_exact_mirrors_for_all_three_targets(self):
         for target_id in normal_boot.trust.LAYOUTS:

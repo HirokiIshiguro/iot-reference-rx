@@ -3,6 +3,8 @@
 The caller must hold canonical bench flock on FD 9 through subsequent credential
 provisioning/tests. This entry owns the global programmer lock through public
 trust preparation, signed install, reset, and a fresh one-second UART quiet test.
+Reset-only mode validates the reference bundle and uses the same ownership and
+end-state checks without replacing the application or boot trust on the board.
 """
 from __future__ import annotations
 
@@ -27,6 +29,9 @@ except ImportError:
     import normal_boot
     from idt import cleanup_budget as budget, public_signer_provision as trust, rfp_process
     from idt.targets import get_target, target_ids
+
+
+RESET_ONLY_PROFILE = "rx-normal-reset-only-v1"
 
 
 def check_bench_lease(target, descriptor=9, *, owner=None):
@@ -124,7 +129,7 @@ def reset_and_quiet(target, call, check_owner):
     return {"reset_command_exit_zero": True, "fresh_uart_quiet_1s": True, "physical_reset_hold": "unverified"}
 
 
-def install(root, target, source_sha):
+def install(root, target, source_sha, reset_only=False):
     # All image/public signer validation precedes device or programmer access.
     manifest = normal_boot.validate(root, target, source_sha)
     check_ci_identity(target)
@@ -178,18 +183,20 @@ def install(root, target, source_sha):
                 time.sleep(0.1)
         check_owner()
         owner_fd = os.open(owner_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        owner = {"profile": normal_boot.PROFILE, "pid": os.getpid(), "token": secrets.token_hex(16),
-                 "target_id": target["id"], "source_sha": source_sha}
+        owner = {"profile": RESET_ONLY_PROFILE if reset_only else normal_boot.PROFILE,
+                 "pid": os.getpid(), "token": secrets.token_hex(16), "target_id": target["id"]}
+        owner["validated_bundle_source_sha" if reset_only else "source_sha"] = source_sha
         with os.fdopen(owner_fd, "w", encoding="utf-8") as stream:
             json.dump(owner, stream)
             stream.flush(); os.fsync(stream.fileno())
         owner_created = True
         touched = True
-        trust.provision_boot_trust(root, target, source_sha, call, check_owner, artifact_dir=event_directory)
-        if normal_boot.validate(root, target, source_sha) != manifest:
-            raise RuntimeError("Normal install bundle changed during boot-trust preparation")
-        trust._checked_call(call, check_owner, download_command(root, target), budget.FLASH_DOWNLOAD_SECONDS)
-        completed = True
+        if not reset_only:
+            trust.provision_boot_trust(root, target, source_sha, call, check_owner, artifact_dir=event_directory)
+            if normal_boot.validate(root, target, source_sha) != manifest:
+                raise RuntimeError("Normal install bundle changed during boot-trust preparation")
+            trust._checked_call(call, check_owner, download_command(root, target), budget.FLASH_DOWNLOAD_SECONDS)
+            completed = True
     finally:
         try:
             if touched:
@@ -198,6 +205,12 @@ def install(root, target, source_sha):
                     owner_path.unlink()
         finally:
             os.close(descriptor)
+    if reset_only:
+        return {"schema_version": 1, "profile": RESET_ONLY_PROFILE,
+                "validated_bundle_source_sha": source_sha, "target_id": target["id"],
+                "bundle_validation": "offline_reference_only",
+                "current_image_signature": "not_reverified", "code_flash_written": False,
+                "data_flash_written": False, "image_replaced": False, "end_state": end_state}
     return {"schema_version": 1, "profile": normal_boot.PROFILE, "source_sha": source_sha,
             "target_id": target["id"], "tls_backend": manifest["tls_backend"],
             "signed_install_and_bootloader_handoff": completed,
@@ -210,6 +223,8 @@ def main(argv=None):
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--target", choices=target_ids(), required=True)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--reset-only", action="store_true",
+                        help="Preserve the installed image and trust; verify reset and fresh UART quiet only")
     args = parser.parse_args(argv)
     if not sys.platform.startswith("linux"):
         raise RuntimeError("Normal hardware installation requires the reviewed Linux bench")
@@ -218,7 +233,8 @@ def main(argv=None):
     signal.signal(signal.SIGTERM, interrupted)
     # Preserve the supplied path until ordinary-file validation has rejected
     # linked parent directories; resolving first would hide that information.
-    receipt = install(args.bundle.absolute(), get_target(args.target), args.source_sha)
+    receipt = install(args.bundle.absolute(), get_target(args.target), args.source_sha,
+                      reset_only=args.reset_only)
     print(json.dumps(receipt, sort_keys=True))
     return 0
 
