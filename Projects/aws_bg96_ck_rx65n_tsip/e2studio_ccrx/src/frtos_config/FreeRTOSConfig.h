@@ -27,7 +27,7 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
-#define configHEAP_CLEAR_MEMORY_ON_FREE    0
+#define configHEAP_CLEAR_MEMORY_ON_FREE    1
 
 
 /* Unity includes. */

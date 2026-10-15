@@ -22,9 +22,8 @@
 #define LFS_FLASH_BLOCK_SIZE			(128)
 #define LFS_FLASH_BLOCK_COUNT			(64)
 /*
- * Keep LittleFS/KV storage away from the CK-RX65N V1 sample bootloader const-data
- * install area. The bootloader uses the lower 16KB of Data Flash during UART/OTA
- * install, so place the runtime filesystem in the upper 16KB.
+ * The application and bootloader share this 8 KiB LittleFS region from the
+ * start of Data Flash. Code-Flash-only UART/OTA installation preserves it.
  */
 #define RM_LITTLEFS_FLASH_DATA_START	FLASH_DF_BLOCK_0_MACRO
 

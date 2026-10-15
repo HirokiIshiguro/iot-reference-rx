@@ -66,7 +66,7 @@ SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認�
 ## IoT Device Tester（IDT）
 
 IDTの明示CI入口は3ターゲットに対応します。`RUN_RX_IDT=true`、`IDT_TARGET`、`IDT_SCOPE`で選択します。
-通常push / MRではnative IDTを起動しません。MRでは単体検査、3ターゲットの実行計画、15構成のソース選択を確認します。
+通常push / MRではnative IDTを起動しません。MRでは単体検査、3ターゲットの実行計画、18構成のソース選択を確認します。
 
 | 環境 | `IDT_TARGET` | native CI job | 実機IDTの証跡 |
 |---|---|---|---|

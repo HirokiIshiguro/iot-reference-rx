@@ -27,6 +27,7 @@ RX671はsoftware app 1個、RX65N／RX72Nはsoftware・TSIP app各2個です。�
 | OS共通値 | minimal stack=768、TLS slots=3、32bit tick、daemon startup hook=0 | 同左 | 同左 | heap/CPU port等の許容差は後表 |
 | FreeRTOS heap / SC表示 | 256KiB | software/TSIPとも256KiB | software320KiB / TSIP368KiB | 実heapを維持し、5 appの保存SC selectorと一致。MCU容量／backendによる許容差 |
 | FreeRTOS assert | 常時有効 | 同左 | 同左 | 非unit製品appは`vAssertCalled`経由のcritical-loop。unitの既存`TEST_ABORT`優先は維持 |
+| FreeRTOS解放時zero clear | 1 | software／TSIPとも1 | software／TSIPとも1 | 全5 appの`configHEAP_CLEAR_MEMORY_ON_FREE=1`を静的照合。bootはFreeRTOS未使用のため対象外。実解放後のbyte消去は未観測 |
 | BSP標準library heap | app=8KiB / boot=1KiB | 同左 | 同左 | ユーザー決定。全8 BSP config・SC selector・QE metadataが一致。FreeRTOS heapは別枠 |
 | CF / DF BGO | 1 / 1 | 1 / 1 | 1 / 1 | 全8 Flash config／SC宣言。実機BGO完了は未観測 |
 | ROM命令cache | 1 | 1 | 1 | ユーザー決定。全8 BSP configとSCが一致。実registerは未読取り |
@@ -80,6 +81,8 @@ RX671はsoftware app 1個、RX65N／RX72Nはsoftware・TSIP app各2個です。�
 | RX72N | RXv3 / FPU / DPFPU有効 / TFU intrinsic / gopt有効 / linkall | `-isa=rxv3 -fpu -dpfpu -tfu=intrinsic` | RX72NのTFUを使用 |
 
 全8の有効値と明示／plugin既定の区別は[公開option matrix](current-convergence-20261014.json)に収録しています。branch／入力順／診断出力の統一も設定へ反映しました。ignored生成物に残る過去の値と、新metadataの指定を区別し、cold生成でcompilerとlibrary generatorの両入力を確認します。
+
+2026-10-15のユーザー決定により、FreeRTOS解放時zero clearを全5 appで有効（`configHEAP_CLEAR_MEMORY_ON_FREE=1`）へ変更しました。これは設定値の反映確認であり、変更後の再buildや実機での解放領域のbyte消去を検証した結果ではありません。保存済みSC 8 file・MDF 14 file・QE 8 fileに同flagの別selector定義はありません。一方、SC descriptorは`FreeRTOSConfig.h`を生成対象に持つため、selector不在だけでは手動Generate後の保持を保証できません。実GUI Generateは未観測です。
 
 BSP library heapはRX671 appの32KiBを8KiB、RX671 bootの32KiBを1KiBへ変更し、他MCUと同値にしました。製品headerだけでなくSC selectorとQE metadataを更新しました。これらは予約設定値であり、実link後のheap section・RAM余裕やmalloc動作は再検証します。FreeRTOS heapはこの変更では増減していません。
 

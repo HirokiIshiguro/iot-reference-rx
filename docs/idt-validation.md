@@ -32,7 +32,7 @@ Wi-Fi / APNは既存のターゲット専用CI変数からprivate runtimeへ渡�
 失敗・ERROR・SKIPをPASSへ書き換えず、LTS / manifest / vendor suiteを変更しません。
 
 MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検査、`idt_target_plans`は3ターゲットの計画を保存します。
-`idt_source_matrix`はWindows runnerで3ターゲット×5groupの実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
+`idt_source_matrix`はWindows runnerで、Transport、DeviceAdvisor、OTAE2E、PKCS11 StartFinish、PKCS11 NoObject、OTAPALの6構成×3ターゲット＝18構成について、実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
 過去のローカル15構成compile成功は保存されたsourceに対する結果として保持し、このMRのclean SHA・runner・実機の合格へ流用しません。
 
 ### 実機scopeの準備条件

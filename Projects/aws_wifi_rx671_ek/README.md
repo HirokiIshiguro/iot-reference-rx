@@ -27,9 +27,9 @@ The e2 studio project name is `aws_wifi_rx671_ek`.
 ## Current Status
 
 The project is the maintained EK-RX671 + Type 1YN Wi-Fi software baseline.
-The checked-in e2 studio project remains a normal linear `bank.single`
-application, while the OTA helper temporarily produces a credential-only
-provisioner and signed dual-bank baseline/candidate images. TSIP and TLS 1.3
+The checked-in e2 studio application and maintenance provisioners use
+`bank.dual`. The OTA helper builds the credential-only provisioner and signed
+baseline/candidate images within this dual-bank configuration. TSIP and TLS 1.3
 OTA remain separate milestones.
 
 Known verified baseline:
@@ -344,14 +344,15 @@ manual override/debug runs, but they are not required for the normal build.
 
 ## RX671 OTA artifact build
 
-The checked-in e2 studio project remains the normal linear,
-`bank.single` application. A normal build therefore keeps its existing
-1 MiB FWUP area and linker layout; do not save the OTA-only settings into the
-project.
+The checked-in e2 studio project uses `bank.dual` and
+`BSP_CFG_CODE_FLASH_BANK_MODE=0`. Each 1 MiB bank has a 768 KiB application
+install area and reserves its final 256 KiB for the boot loader. The normal
+application uses exception/reset vectors `0xFFFBFF80` / `0xFFFBFFFC`.
 
-The dedicated artifact helper temporarily applies the following OTA profile:
+The dedicated artifact helper selects the role and version settings below,
+retaining and validating the checked-in dual-bank layout:
 
-- a credential-only `bank.single` provisioner with
+- a credential-only `bank.dual` provisioner with
   `RX671_OTA_PROVISIONER_ENABLE=1`; this image initializes LittleFS/KVS and
   leaves SCI6 exclusively in the shared `conf set` / `commit` CLI;
 - `bank.dual` and `BSP_CFG_CODE_FLASH_BANK_MODE=0`;
@@ -405,12 +406,14 @@ do not create the provisioner CLI task.
 
 ### Provisioner-to-boot-loader handoff boundary
 
-The credential-only provisioner is a normal `bank.single` image, so its code
-occupies the same two Code Flash install areas whose first bytes the dual-bank
-boot loader interprets as lifecycle state. Programming only the boot-loader MOT
-does not erase provisioner records outside the MOT. Without an explicit handoff,
-the boot loader therefore sees non-blank, unknown lifecycle bytes and attempts
-an integrity check on the provisioner instead of requesting the baseline RSU.
+The earlier `bank.single` provisioner placed code across the two install areas,
+leaving non-blank lifecycle bytes when only the boot-loader MOT was programmed.
+This is a historical failure mode. The current standalone `bank.dual`
+provisioner reuses application Code Flash and temporarily places its exception/
+reset vectors at `0xFFFFFF80` / `0xFFFFFFFC` for first boot.
+
+The handoff still erases both install areas to remove provisioner and prior
+application records before the boot loader examines lifecycle state.
 
 After the LittleFS/KVS commit and before programming the boot loader, the host
 uses RFP `-range` with `-erase` for exactly these two 768 KiB install areas:
@@ -575,7 +578,7 @@ Wi-Fi/AWS configuration, remove Wi-Fi credential variables from the child
 build environment, and reject outputs containing a configured Wi-Fi
 credential. Outputs are confined to `build/rx671-ota/` and
 include the boot loader, baseline/candidate MOT, ABS, MAP and signed RSU files,
-the bank.single provisioner MOT/ABS/MAP, signer certificate and public key,
+the bank.dual provisioner MOT/ABS/MAP, signer certificate and public key,
 effective configuration snapshots, SHA-256 provenance, and layout-analysis
 reports. The candidate directory also contains
 `aws_wifi_rx671_ek.ota.bin` (the full RSU after its 0x200-byte header) and
@@ -628,5 +631,5 @@ Implementation steps:
    is stable.
 
 TSIP remains a separate sibling project. The existing RX671 boot-loader sibling
-is consumed by the OTA artifact and hardware flow, while the checked-in Wi-Fi
-application itself remains a linear `bank.single` project.
+is consumed by the OTA artifact and hardware flow. The checked-in Wi-Fi
+application, OTA images, and maintenance provisioners all use `bank.dual`.

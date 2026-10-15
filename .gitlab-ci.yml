@@ -665,6 +665,7 @@ idt_ci_contract:
         tools.ci.tests.test_idt_public_signer_provision \
         tools.ci.tests.test_idt_public_signer_integration \
         tools.ci.tests.test_idt_ci_contract \
+        tools.ci.tests.test_idt_windows_checkout \
         tools.ci.tests.test_prepare_public_signer \
         tools.ci.tests.test_build_public_signer_provisioner \
         tools.ci.tests.test_idt_pkcs11_adapter \
@@ -684,6 +685,21 @@ idt_ci_contract:
         tools.ci.tests.test_uart_download_errors \
         tools.idt.ota_aws_signers_tests \
         tools.idt.ota_support_tests -v
+
+# Keep original dependency blob bytes, including their intentional CRLF files.
+# A fresh checkout avoids reusing source bytes made under a different EOL policy.
+# Root .gitattributes still controls this project's explicit CRLF source files.
+# Higher-precedence CI variable overrides are outside this job-local policy.
+.rx_windows_canonical_checkout:
+  variables:
+    GIT_STRATEGY: "clone"
+    GIT_CONFIG_COUNT: "3"
+    GIT_CONFIG_KEY_0: "core.longpaths"
+    GIT_CONFIG_VALUE_0: "true"
+    GIT_CONFIG_KEY_1: "core.autocrlf"
+    GIT_CONFIG_VALUE_1: "false"
+    GIT_CONFIG_KEY_2: "core.eol"
+    GIT_CONFIG_VALUE_2: "lf"
 
 .rx_idt_job:
   stage: test
@@ -774,7 +790,9 @@ test_rx65n_bg96_idt:
     - when: never
 
 test_rx671_wifi_idt:
-  extends: .rx_idt_job
+  extends:
+    - .rx_idt_job
+    - .rx_windows_canonical_checkout
   rules:
     - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx671-wifi"'
       when: on_success
@@ -817,6 +835,7 @@ idt_target_plans:
     expire_in: 30 days
 
 idt_source_matrix:
+  extends: .rx_windows_canonical_checkout
   stage: dependency_check
   tags:
     - exec-shell
@@ -1792,6 +1811,7 @@ build_rx65n_bg96:
     expire_in: 7 days
 
 build_rx671_wifi:
+  extends: .rx_windows_canonical_checkout
   stage: build
   tags:
     - exec-shell
@@ -1900,6 +1920,7 @@ build_rx671_wifi_fleet:
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx671_wifi_fleet_rules
+    - .rx_windows_canonical_checkout
   script:
     - Write-Host "=== Build encrypted EK-RX671 Type 1YN software Fleet image ==="
     - python -m pip install --user cryptography
@@ -2143,6 +2164,7 @@ build_rx671_bootloader:
     expire_in: 7 days
 
 package_rx671_ota_artifacts:
+  extends: .rx_windows_canonical_checkout
   stage: package
   tags:
     - exec-shell
