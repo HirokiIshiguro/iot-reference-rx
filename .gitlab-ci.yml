@@ -166,6 +166,7 @@ variables:
   RX72N_FLEET_POLICY_NAME: "rx72n-envision-kit-policy"
   RX72N_SKIP_HW_TESTS: "false"
   RX72N_SKIP_OTA_TESTS: "false"
+  # Hardware CI runs on the RPi Linux bench only; obsolete selections fail visibly.
   RX72N_HW_RUNNER_PLATFORM: "linux"
   RX72N_REQUIRE_TLS_VERSION: ""
   RX72N_DEVICE_RESOURCE_GROUP: "rx72n-device-01"
@@ -6053,143 +6054,6 @@ cleanup_rx65n_bg96_fleet:
       - artifacts/cleanup_rx65n_bg96_fleet/
     expire_in: 7 days
 
-flash_rx72n_ether_windows:
-  stage: flash
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
-  resource_group: rx72n-envision-kit-local
-  needs:
-    - build_rx72n_ether
-  rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
-      when: on_success
-    - when: never
-  script:
-    - Write-Host "=== Flash RX72N boot_loader and download app RSU ==="
-    - pip install pyserial --quiet
-    - if (-not $env:RFP_TOOL) { Write-Error "RFP_TOOL not set"; exit 1 }
-    - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\flash_rx72n_ether_windows"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-      $resetCmd = '"{0}" -device RX72x -tool {1} -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
-        $env:RFP_CLI, $env:RFP_TOOL, $env:RFP_SPEED, $env:RFP_AUTH
-
-      & "$env:RFP_CLI" -device RX72x -tool $env:RFP_TOOL -if fine -speed $env:RFP_SPEED `
-        -auth id $env:RFP_AUTH -erase-chip -noquery
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      & "$env:RFP_CLI" -device RX72x -tool $env:RFP_TOOL -if fine -speed $env:RFP_SPEED `
-        -auth id $env:RFP_AUTH `
-        -p "$env:CI_PROJECT_DIR\Projects\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\boot_loader_rx72n_envision_kit.mot" `
-        -v -run -noquery
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      python tools/test_uart_download_rx72n.py `
-        --rsu "$env:CI_PROJECT_DIR\rx72n_app.rsu" `
-        --port $env:UART_PORT `
-        --baud $env:UART_BAUD_RATE `
-        --timeout 420 `
-        --post-tx-wait 120 `
-        --diag `
-        --wait-for-ready `
-        --ready-timeout 90 `
-        --reset-cmd $resetCmd `
-        2>&1 | Tee-Object -FilePath "$artifactDir\flash_rx72n.log"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  artifacts:
-    when: always
-    paths:
-      - artifacts/flash_rx72n_ether_windows/
-    expire_in: 7 days
-
-provision_rx72n_ether_mqtt_windows:
-  stage: provision
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
-  resource_group: rx72n-envision-kit-local
-  needs:
-    - build_rx72n_ether
-    - flash_rx72n_ether_windows
-  rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
-      when: on_success
-    - when: never
-  script:
-    - Write-Host "=== Provision RX72N AWS IoT credentials ==="
-    - pip install pyserial --quiet
-    - if (-not $env:RX72N_DEVICE_ID) { Write-Error "RX72N_DEVICE_ID not set"; exit 1 }
-    - if (-not $env:AWS_IOT_ENDPOINT) { Write-Error "AWS_IOT_ENDPOINT not set"; exit 1 }
-    - if (-not $env:AWS_CLIENT_CERT_RX72N_02) { Write-Error "AWS_CLIENT_CERT_RX72N_02 not set"; exit 1 }
-    - if (-not $env:AWS_PRIVATE_KEY_RX72N_02) { Write-Error "AWS_PRIVATE_KEY_RX72N_02 not set"; exit 1 }
-    - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\provision_rx72n_ether_mqtt_windows"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-      $resetCmd = '"{0}" -device RX72x -tool {1} -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
-        $env:RFP_CLI, $env:RFP_TOOL, $env:RFP_SPEED, $env:RFP_AUTH
-
-      python tools/provision_rx72n.py `
-        --port $env:UART_PORT `
-        --baud $env:UART_BAUD_RATE `
-        --thing-name $env:RX72N_DEVICE_ID `
-        --endpoint $env:AWS_IOT_ENDPOINT `
-        --cert $env:AWS_CLIENT_CERT_RX72N_02 `
-        --key $env:AWS_PRIVATE_KEY_RX72N_02 `
-        --codesigner-cert "$env:CI_PROJECT_DIR\rx72n_codesign_cert.pem" `
-        --format `
-        --reset-cmd $resetCmd `
-        --reset-after-open `
-        --boot-wait 12 `
-        --cli-timeout 25 `
-        2>&1 | Tee-Object -FilePath "$artifactDir\provision_rx72n.log"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  artifacts:
-    when: always
-    paths:
-      - artifacts/provision_rx72n_ether_mqtt_windows/
-    expire_in: 7 days
-
-test_rx72n_ether_mqtt_windows:
-  stage: test
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
-  resource_group: rx72n-envision-kit-local
-  needs:
-    - build_rx72n_ether
-    - flash_rx72n_ether_windows
-    - provision_rx72n_ether_mqtt_windows
-  rules:
-    - if: '$RUN_RX72N_HW_TESTS == "true" && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "windows" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
-      when: on_success
-    - when: never
-  script:
-    - Write-Host "=== Verify RX72N MQTT baseline ==="
-    - pip install pyserial --quiet
-    - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\test_rx72n_ether_mqtt_windows"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-      python -m serial.tools.list_ports -v 2>&1 | Tee-Object -FilePath "$artifactDir\serial_ports.txt"
-      $resetCmd = '"{0}" -device RX72x -tool {1} -if fine -speed {2} -auth id {3} -sig -run -noquery' -f `
-        $env:RFP_CLI, $env:RFP_TOOL, $env:RFP_SPEED, $env:RFP_AUTH
-
-      python tools/test_mqtt_rx72n.py `
-        --log-port $env:UART_PORT `
-        --log-baud $env:UART_BAUD_RATE `
-        --timeout 180 `
-        --reset-cmd $resetCmd `
-        2>&1 | Tee-Object -FilePath "$artifactDir\test_mqtt_rx72n.log"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  artifacts:
-    when: always
-    paths:
-      - artifacts/test_rx72n_ether_mqtt_windows/
-    expire_in: 7 days
-
 build_rx72n_ether_mqtt_candidate:
   stage: build
   tags:
@@ -6722,3 +6586,21 @@ cleanup_rx72n_ether_ota:
       - artifacts/create_rx72n_ether_ota/
       - artifacts/cleanup_rx72n_ether_ota/
     expire_in: 7 days
+
+# Reject old Windows-direct selections instead of silently skipping hardware jobs.
+validate_rx72n_hw_platform:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-windows
+    - ccrx
+    - $RX72N_BUILD_RUNNER_TAG
+  variables:
+    GIT_STRATEGY: none
+    GIT_SUBMODULE_STRATEGY: none
+  rules:
+    - if: '$RX72N_HW_RUNNER_PLATFORM != "linux"'
+      when: on_success
+    - when: never
+  script:
+    - throw 'RX72N_HW_RUNNER_PLATFORM supports linux only; Windows direct hardware CI has been retired.'
