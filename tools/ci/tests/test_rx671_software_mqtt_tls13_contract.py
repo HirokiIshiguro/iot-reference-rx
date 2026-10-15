@@ -53,16 +53,17 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         self.assertIn("(-not $environmentCredentialsConfigured)", self.build)
         self.assertIn('AWS IoT config source: environment', self.build)
 
-    def test_e2studio_wait_is_bounded_and_keeps_the_make_fallback(self) -> None:
+    def test_e2studio_wait_is_bounded_and_make_requires_a_completed_run(self) -> None:
         adapter = (ROOT / "tools/rx_e2studio_cli.ps1").read_text(encoding="utf-8")
         self.assertIn("[int]$E2StudioTimeoutSeconds = 180", self.build)
         self.assertIn("return Invoke-RxE2StudioBuild", self.build)
         self.assertIn(
-            "-TimeoutSeconds $E2StudioTimeoutSeconds -AllowTimeoutExitCode", self.build
+            "-OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds", self.build
         )
+        self.assertNotIn("-AllowTimeoutExitCode", self.build)
         self.assertIn("$timedOut = -not $process.WaitForExit([int]$remainingMs)", adapter)
         self.assertIn("$process.Kill($true)", adapter)
-        self.assertIn("if ($AllowTimeoutExitCode) { return 124 }", adapter)
+        self.assertNotIn("return 124", adapter)
         self.assertIn("Invoke-MakeTarget", self.build)
 
     def test_nightly_has_a_dedicated_tls13_mqtt_row(self) -> None:

@@ -46,3 +46,20 @@ raw log、map、ABS、生成command、比較JSONは`C:\ai\codex\tmp\ccrx-symbol-
 build前のapp `.cproject` SHA-256は`bf852ffafca41d069b31ec09d77fd6b7c1daa6f0640299de8471999793e5e38f`、出力app ABSは`692b8245e537932df74d2f5889c746baea2e137739f0f98588ccd5c99fdf4484`、boot ABSは`c0dea2701bd6a0e3094b603e65e45d78f506676101b178b1386d1e4e61e5186a`です。
 
 privateログ・全入力metadata hash・生成物manifest・RAM照合JSONは`C:\ai\codex\tmp\common170-rx72sw-cold-cdt-20261015\run-20261015-174631`に保存しました。開始前のmetadataとRunner ID 3の`paused=false`へ復元したことも確認しました。
+
+## RX65N通常software appとbootの起動経路比較
+
+CI #11380のnative job #71155は、RX72N成功後にRX65N bootの`No Config matched`で停止しました。同じログにはRCCorePluginの初期化例外もあります。host共通排他を使用した状態でも再発しており、根本原因は未確定です。一方、通常RX65Nのjob #71161と署名付きnormal bundleのjob #71158は成功しました。
+
+続いて通常RX65Nの同じソース・6 metadataを使い、旧Renesas `project import/build`分離経路と、同じe2studio-cliから標準CDTを1 JVMで呼ぶ経路をcold buildで比較しました。結果は両方ともapp／bootのABS・MAP・MOT生成成功でした。今回は構成認識エラーを再現できていないため、nativeの停止原因を解消したとは判断しません。
+
+| 通常RX65N比較 | Renesas分離経路 | 標準CDT 1 JVM |
+|---|---|---|
+| 返却code／生成物 | 0／両project成功 | 0／両project成功 |
+| MAP削除symbol: app／boot | 2,019／147 | 2,019／147 |
+| No Config／plugin null | いずれもなし | いずれもなし |
+| workspace保存警告 | あり | なし |
+
+比較は旧helper `ce8d3cdd`と、標準CDT試作helper SHA-256 `a468c5813bc6a97a52d42c472223e3158b7ad4c667d68881635df659b3e4b5f6`を使用しました。後続のstream待機上限・timeout時の厳格停止処理は、この比較後の修正であり別のmock試験・CIで検証します。比較前の標準CDT試作版ではWindows host cohort 399件成功（39 skip）。その後の待機上限修正を含むcohortは400件成功（39 skip）で、追加したcallerの例外・metadata復元・入力拒否試験も確認しています。
+
+全ログ・metadata hash・生成物manifestは`C:\ai\codex\tmp\common170-rx65-cli-route-ab-20261015\run-20261015-185048`に保存し、19:07:13 JSTにmetadataとRunner ID 3の受付状態を復元しました。実機I/Oは行っていません。

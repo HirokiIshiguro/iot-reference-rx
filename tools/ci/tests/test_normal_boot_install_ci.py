@@ -37,7 +37,20 @@ def installation(body):
 
 class NormalBootInstallCiTests(unittest.TestCase):
     def test_include_and_matching_bundle_artifact_dependencies(self):
-        self.assertTrue(CI.startswith("include:\n  - local: /tools/ci/normal_boot_jobs.yml\n"))
+        includes = CI.split("include:\n", 1)[1].split("\nstages:\n", 1)[0]
+        self.assertEqual(includes.count("  - local: /tools/ci/normal_boot_jobs.yml\n"), 1)
+        entries = []
+        for entry in re.split(r"(?m)^  - ", includes):
+            fields = {}
+            for line in entry.splitlines():
+                key, separator, value = line.strip().partition(":")
+                if separator:
+                    fields[key] = value.strip()
+            entries.append(fields)
+        remote = [entry for entry in entries if entry.get("project") == "oss/infra/hardware-config"]
+        self.assertEqual(len(remote), 1)
+        self.assertEqual(remote[0].get("file"), "/templates/windows_ccrx_host_lease.yml")
+        self.assertRegex(remote[0].get("ref", ""), r"^[0-9a-f]{40}$")
         for name,(suffix,target) in JOBS.items():
             with self.subTest(job=name):
                 body=job(name)

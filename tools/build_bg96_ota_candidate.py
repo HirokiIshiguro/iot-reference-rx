@@ -63,7 +63,7 @@ def run_logged(
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"build command timed out after {timeout} seconds: {' '.join(command)}") from exc
     if timeout_exit_code is not None and result.returncode == timeout_exit_code:
-        raise RuntimeError(f"e2studio-cli import/build timed out: {' '.join(command)}")
+        raise RuntimeError(f"e2studio-cli import/build timed out or stopped before a safe completed run: {' '.join(command)}")
     if result.returncode != 0 and not allow_nonzero_exit:
         raise RuntimeError(f"build command failed with exit {result.returncode}: {' '.join(command)}")
     if result.returncode != 0:
@@ -179,7 +179,7 @@ def resolve_e2studio_cli(e2studio_cli: Path) -> Path:
     if not e2studio_cli.exists():
         raise RuntimeError(f"e2 studio executable not found: {e2studio_cli}")
     if e2studio_cli.name.lower() != "e2studio-cli.exe":
-        raise RuntimeError("RX builds require the e2studio-cli.exe project command launcher")
+        raise RuntimeError("RX builds require the e2studio-cli.exe command launcher")
     return e2studio_cli.resolve()
 
 
@@ -204,8 +204,8 @@ def run_e2studio_managed_build(
         "-TimeoutSeconds", str(timeout),
     ]
     try:
-        # The adapter enforces the original IDE budget and kills its process
-        # tree. Give the wrapper time to restore metadata before an outer stop.
+        # Code 124 is terminal for timeouts, unsafe adapter exceptions or failed
+        # metadata restoration. Give cleanup time before the outer deadline.
         run_logged(command, app_dir, log, os.environ.copy(), timeout + 30,
                    allow_nonzero_exit=True, timeout_exit_code=124)
     finally:

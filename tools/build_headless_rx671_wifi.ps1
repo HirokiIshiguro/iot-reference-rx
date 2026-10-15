@@ -1109,7 +1109,7 @@ function Invoke-E2StudioHeadlessBuild {
     )
     return Invoke-RxE2StudioBuild -Executable $Executable -WorkspacePath $WorkspacePath `
         -ProjectPaths @($ProjectPath) -BuildTargets @($BuildTarget) `
-        -OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds -AllowTimeoutExitCode
+        -OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds
 }
 
 function Assert-PristineWhdInputs {

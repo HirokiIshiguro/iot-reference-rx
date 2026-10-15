@@ -106,7 +106,8 @@ class SingleProjectWrapperTests(unittest.TestCase):
     def test_cold_workspace_exact_project_and_metadata_restoration_on_all_exits(self):
         workspace_root = Path("C:/ai/codex/ws")
         workspace_root.mkdir(parents=True, exist_ok=True)
-        for mode, expected_exit in (("success", 0), ("build-error", 23), ("timeout", 124), ("throw", 1)):
+        for mode, expected_exit in (("success", 0), ("build-error", 23), ("timeout", 124), ("throw", 124),
+                                    ("restore-error", 124), ("bad-path", 124), ("overlap", 124), ("bad-timeout", 124)):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory(prefix="bg96-cli-mock-", dir=workspace_root) as temporary:
                 base = Path(temporary)
                 wrapper = base / WRAPPER.name
@@ -120,7 +121,15 @@ function Invoke-RxE2StudioBuild {
     if ([IO.File]::ReadAllText((Join-Path $p '.cproject')) -ne 'PARENT-TSIP13-PROFILE') { throw 'Parent TLS profile lost.' }
     @{ targets=@($BuildTargets); timeout=$TimeoutSeconds; allow_timeout=[bool]$AllowTimeoutExitCode } | ConvertTo-Json | Set-Content -LiteralPath $OutputLog
     foreach($file in @('.project','.cproject','fixture.rcpc')) { [IO.File]::WriteAllText((Join-Path $p $file),'IDE MUTATION') }
-    switch($env:BG96_CLI_FIXTURE_MODE) { 'throw' { throw 'Fixture import failure' }; 'build-error' { return 23 }; 'timeout' { return 124 } }
+    switch($env:BG96_CLI_FIXTURE_MODE) {
+        'throw' { throw 'Fixture import failure' }
+        'build-error' { return 23 }
+        'timeout' { return 124 }
+        'restore-error' {
+            $script:fixtureLock = [IO.File]::Open((Join-Path $p '.project'), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+            return 0
+        }
+    }
     return 0
 }
 ''', encoding="utf-8")
@@ -135,15 +144,25 @@ function Invoke-RxE2StudioBuild {
                 (workspace/"stale").touch()
                 log = base/"calls.json"
                 result = subprocess.run([PWSH,"-NoProfile","-NonInteractive","-File",str(wrapper),
-                    "-Executable","fixture-e2studio-cli.exe","-Workspace",str(workspace),"-ProjectPath",str(project),
-                    "-OutputLog",str(log),"-TimeoutSeconds","11"], env=dict(os.environ,BG96_CLI_FIXTURE_MODE=mode),
+                    "-Executable","fixture-e2studio-cli.exe","-Workspace",str(project if mode == "overlap" else workspace),
+                    "-ProjectPath",str(base/"missing" if mode == "bad-path" else project),
+                    "-OutputLog",str(log),"-TimeoutSeconds","0" if mode == "bad-timeout" else "11"], env=dict(os.environ,BG96_CLI_FIXTURE_MODE=mode),
                     capture_output=True,text=True,encoding="utf-8",errors="replace",timeout=20)
                 self.assertEqual(result.returncode, expected_exit, result.stderr)
+                if mode in ("bad-path", "overlap", "bad-timeout"):
+                    self.assertFalse(log.exists(), "pre-launch rejection must not invoke the IDE")
+                    for name, original in snapshots.items():
+                        self.assertEqual((project/name).read_bytes(), original)
+                    continue
                 calls=json.loads(log.read_text(encoding="utf-8-sig"))
                 self.assertEqual(calls["targets"],["actual.ota.project/HardwareDebug"])
                 self.assertEqual(calls["timeout"],11)
-                self.assertTrue(calls["allow_timeout"])
+                self.assertFalse(calls["allow_timeout"])
                 for name, original in snapshots.items():
+                    if mode == "restore-error" and name == ".project":
+                        self.assertEqual((project/name).read_bytes(), b"IDE MUTATION")
+                        self.assertIn("metadata restoration failed", result.stderr)
+                        continue
                     self.assertEqual((project/name).read_bytes(),original)
 
 

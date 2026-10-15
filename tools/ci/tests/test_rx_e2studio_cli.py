@@ -1,10 +1,12 @@
 """Exercise RX launcher orchestration without an IDE or firmware build."""
 import os
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 
 
@@ -30,27 +32,61 @@ class RxCliProcessTests(unittest.TestCase):
 using System;
 using System.IO;
 using System.Threading;
+using System.Diagnostics;
 public class Launcher {
     public static int Main(string[] args) {
+        if (args.Length == 1 && args[0] == "--fixture-child") {
+            Thread.Sleep(30000);
+            return 0;
+        }
+        if (args.Length == 1 && args[0] == "--fixture-middle") {
+            var grandchild = Process.Start(new ProcessStartInfo(
+                Process.GetCurrentProcess().MainModule.FileName, "--fixture-child") {
+                UseShellExecute = false, CreateNoWindow = true
+            });
+            File.WriteAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_CHILD_PID"), grandchild.Id.ToString());
+            return 0;
+        }
         File.AppendAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_ARGUMENTS"),
             String.Join("|", args) + "\n");
         Console.WriteLine("RAW_TOOL_OUTPUT_SENTINEL");
         string mode = Environment.GetEnvironmentVariable("RXCLI_FIXTURE_MODE");
-        if (mode == "delay") Thread.Sleep(700);
-        if (mode == "reject" && args[4] == "import") {
+        int importFlag = Array.IndexOf(args, "-import");
+        int buildFlag = Array.IndexOf(args, "-build");
+        if (mode == "delay-child") {
+            var child = Process.Start(new ProcessStartInfo(
+                Process.GetCurrentProcess().MainModule.FileName, "--fixture-child") {
+                UseShellExecute = false, CreateNoWindow = true
+            });
+            File.WriteAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_CHILD_PID"), child.Id.ToString());
+        }
+        if (mode == "orphan-pipe") {
+            var middle = Process.Start(new ProcessStartInfo(
+                Process.GetCurrentProcess().MainModule.FileName, "--fixture-middle") {
+                UseShellExecute = false, CreateNoWindow = true
+            });
+            if (!middle.WaitForExit(1000)) return 90;
+            Thread.Sleep(200);
+            File.WriteAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_EXIT_MARKER"), "0");
+            return 0;
+        }
+        if (mode == "delay" || mode == "delay-child") Thread.Sleep(2000);
+        if (mode == "reject" && importFlag >= 0) {
             Console.WriteLine("Project: file:/fixture can't be found");
             return 0;
         }
         if (mode == "warning") Console.WriteLine(
             "Warning: NLS unused message: failedReadDuringWrite in: org.eclipse.core.internal.filesystem.messages");
-        if (mode == "build-error" && args[4] == "build") return 23;
-        if (mode == "no-config" && args[4] == "build") {
-            Console.WriteLine("No Config matched " + args[5] + ". Skipping...");
+        if (mode == "build-error" && buildFlag >= 0) return 23;
+        if (mode == "no-config" && buildFlag >= 0) {
+            File.WriteAllText(Path.Combine(args[importFlag + 1], ".cproject"), "AFTER_HEADLESS");
+            string workspace = args[Array.IndexOf(args, "-data") + 1];
+            Directory.CreateDirectory(Path.Combine(workspace, ".metadata"));
+            File.WriteAllText(Path.Combine(workspace, ".metadata", ".log"), "WORKSPACE_DIAGNOSTIC");
+            Console.WriteLine("No Config matched " + args[buildFlag + 1] + ". Skipping...");
             Console.WriteLine("Build completed successfully");
             return 0;
         }
-        if (mode == "no-config" && args[4] == "import")
-            File.WriteAllText(Path.Combine(args[5], ".cproject"), "AFTER_IMPORT");
         return 0;
     }
 }
@@ -64,11 +100,16 @@ public class Launcher {
             (project / ".project").write_text(
                 "<projectDescription><name>" + name + "</name></projectDescription>", encoding="utf-8")
             (project / ".cproject").write_text("EFFECTIVE_" + name, encoding="utf-8")
+            (project / (name + ".rcpc")).write_text("GENERATED_INPUT", encoding="utf-8")
             cls.projects.append(project)
 
     @classmethod
     def tearDownClass(cls):
         cls.temporary.cleanup()
+
+    def setUp(self):
+        for project in self.projects:
+            (project / ".cproject").write_text("EFFECTIVE_" + project.name, encoding="utf-8")
 
     def invoke(self, mode="success", timeout=5, allow_timeout=False, targets=None):
         calls = self.directory / (self._testMethodName + ".arguments")
@@ -84,10 +125,19 @@ public class Launcher {
             + (" -AllowTimeoutExitCode" if allow_timeout else "")
             + "; Write-Output ('RESULT=' + $result)"
         )
-        environment = dict(os.environ, RXCLI_FIXTURE_MODE=mode, RXCLI_FIXTURE_ARGUMENTS=str(calls))
-        result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", code],
-                                capture_output=True, text=True, encoding="utf-8", errors="replace",
-                                env=environment, timeout=20)
+        environment = dict(os.environ, RXCLI_FIXTURE_MODE=mode, RXCLI_FIXTURE_ARGUMENTS=str(calls),
+                           RXCLI_FIXTURE_CHILD_PID=str(self.directory / (self._testMethodName + ".child-pid")),
+                           RXCLI_FIXTURE_EXIT_MARKER=str(self.directory / (self._testMethodName + ".exit-marker")))
+        # File capture lets the harness wait for pwsh itself. The orphan fixture
+        # can also inherit outer standard handles, which must not make Python's
+        # own communicate() wait for the fixture grandchild to close a pipe.
+        stdout_path = self.directory / (self._testMethodName + ".stdout")
+        stderr_path = self.directory / (self._testMethodName + ".stderr")
+        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+            result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", code],
+                                    stdout=stdout, stderr=stderr, env=environment, timeout=20)
+        result.stdout = stdout_path.read_text(encoding="utf-8", errors="replace")
+        result.stderr = stderr_path.read_text(encoding="utf-8", errors="replace")
         return result, calls, log
 
     def test_imports_precede_exact_configuration_builds(self):
@@ -95,9 +145,13 @@ public class Launcher {
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("RESULT=0", result.stdout)
         rows = [line.split("|") for line in calls.read_text().splitlines()]
-        self.assertEqual([row[4] for row in rows], ["import", "import", "build", "build"])
-        self.assertEqual([row[5] for row in rows[2:]], [r"^a\.project/HardwareDebug$", r"^b\.project/HardwareDebug$"])
-        self.assertTrue(all(row[:2] == ["-nosplash", "-data"] and row[3] == "project" for row in rows))
+        self.assertEqual(1, len(rows))
+        self.assertEqual(rows[0], [
+            "-nosplash", "-data", str(self.directory / "workspace"), "-application",
+            "org.eclipse.cdt.managedbuilder.core.headlessbuild",
+            "-import", str(self.projects[0]), "-import", str(self.projects[1]),
+            "-build", r"^a\.project/HardwareDebug$", "-build", r"^b\.project/HardwareDebug$",
+        ])
 
     def test_raw_tool_output_stays_in_log(self):
         result, _, log = self.invoke()
@@ -105,7 +159,7 @@ public class Launcher {
         self.assertNotIn("RAW_TOOL_OUTPUT_SENTINEL", result.stdout + result.stderr)
         self.assertIn("RAW_TOOL_OUTPUT_SENTINEL", log.read_text(encoding="utf-8"))
 
-    def test_zero_exit_import_rejection_stops_build(self):
+    def test_zero_exit_import_rejection_is_rejected(self):
         result, calls, _ = self.invoke("reject")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("was rejected", result.stderr)
@@ -115,22 +169,25 @@ public class Launcher {
         result, calls, _ = self.invoke("build-error")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("RESULT=23", result.stdout)
-        self.assertEqual(len(calls.read_text().splitlines()), 3)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
 
-    def test_zero_exit_with_no_configuration_stops_before_other_project_build(self):
+    def test_zero_exit_with_no_configuration_preserves_private_snapshots(self):
         result, calls, log = self.invoke("no-config")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("build was rejected", result.stderr)
-        self.assertEqual(len(calls.read_text().splitlines()), 3)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
         self.assertIn("No Config matched", log.read_text(encoding="utf-8"))
         lines = log.read_text(encoding="utf-8").splitlines()
         diagnostic = Path(next(line.split(": ",1)[1] for line in lines if line.startswith("Private import metadata diagnostics: ")))
         try:
             snapshots = json.loads((diagnostic/"index.json").read_text(encoding="utf-8"))
-            self.assertEqual(["before-imports","after-import-1","after-import-2"], [item["phase"] for item in snapshots])
+            self.assertEqual(["before-imports", "after-headless-run"], [item["phase"] for item in snapshots])
             source = str(self.projects[0]/".cproject")
             self.assertEqual("EFFECTIVE_a.project",(diagnostic/snapshots[0]["files"][source]).read_text())
-            self.assertEqual("AFTER_IMPORT",(diagnostic/snapshots[1]["files"][source]).read_text())
+            self.assertEqual("AFTER_HEADLESS",(diagnostic/snapshots[1]["files"][source]).read_text())
+            rcpc = str(self.projects[0] / (self.projects[0].name + ".rcpc"))
+            self.assertEqual("GENERATED_INPUT", (diagnostic/snapshots[0]["files"][rcpc]).read_text())
+            self.assertEqual("WORKSPACE_DIAGNOSTIC", (diagnostic / "workspace.log").read_text())
         finally:
             self.assertEqual(diagnostic.parent,Path(tempfile.gettempdir()))
             self.assertTrue(diagnostic.name.startswith("rx-e2-import-"))
@@ -141,16 +198,109 @@ public class Launcher {
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("RESULT=0", result.stdout)
 
-    def test_timeout_returns_124_only_when_fallback_allowed(self):
-        result, calls, _ = self.invoke("delay", timeout=1, allow_timeout=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("RESULT=124", result.stdout)
-        self.assertLess(len(calls.read_text().splitlines()), 4)
+    def test_timeout_is_terminal_even_with_compatibility_switch(self):
+        result, calls, log = self.invoke("delay", timeout=1, allow_timeout=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("import/build timed out", result.stderr)
+        self.assertNotIn("RESULT=124", result.stdout)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+        self.assertIn("RAW_TOOL_OUTPUT_SENTINEL", log.read_text(encoding="utf-8"))
+        self.assertNotIn("RAW_TOOL_OUTPUT_SENTINEL", result.stdout + result.stderr)
+
+    @contextmanager
+    def fixture_child(self):
+        import ctypes
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        kernel.QueryFullProcessImageNameW.argtypes = [
+            wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD),
+        ]
+        kernel.QueryFullProcessImageNameW.restype = wintypes.BOOL
+        kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+        kernel.TerminateProcess.restype = wintypes.BOOL
+        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+
+        def running(pid):
+            handle = kernel.OpenProcess(0x1000, False, pid)
+            if not handle:
+                return False
+            try:
+                code = wintypes.DWORD()
+                if not kernel.GetExitCodeProcess(handle, ctypes.byref(code)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                return code.value == 259
+            finally:
+                kernel.CloseHandle(handle)
+
+        child_file = self.directory / (self._testMethodName + ".child-pid")
+        try:
+            yield child_file, running
+        finally:
+            if child_file.is_file():
+                pid = int(child_file.read_text())
+                # Keep one handle for identity verification and termination so
+                # PID reuse cannot redirect cleanup to an unrelated process.
+                handle = kernel.OpenProcess(0x1000 | 0x0001 | 0x00100000, False, pid)
+                if handle:
+                    try:
+                        image = ctypes.create_unicode_buffer(32768)
+                        length = wintypes.DWORD(len(image))
+                        if not kernel.QueryFullProcessImageNameW(handle, 0, image, ctypes.byref(length)):
+                            raise ctypes.WinError(ctypes.get_last_error())
+                        self.assertEqual(Path(image.value).resolve(), self.executable.resolve())
+                        code = wintypes.DWORD()
+                        if not kernel.GetExitCodeProcess(handle, ctypes.byref(code)):
+                            raise ctypes.WinError(ctypes.get_last_error())
+                        if code.value == 259:
+                            if not kernel.TerminateProcess(handle, 1):
+                                raise ctypes.WinError(ctypes.get_last_error())
+                            self.assertEqual(0, kernel.WaitForSingleObject(handle, 10000))
+                    finally:
+                        kernel.CloseHandle(handle)
+
+    def test_timeout_terminates_the_owned_launcher_child(self):
+        with self.fixture_child() as (child_file, running):
+            result, calls, log = self.invoke("delay-child", timeout=1, allow_timeout=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("RESULT=124", result.stdout)
+            self.assertIn("import/build timed out", result.stderr)
+            self.assertIn("RAW_TOOL_OUTPUT_SENTINEL", log.read_text(encoding="utf-8"))
+            self.assertNotIn("RAW_TOOL_OUTPUT_SENTINEL", result.stdout + result.stderr)
+            self.assertEqual(1, len(calls.read_text().splitlines()))
+            self.assertTrue(child_file.is_file(), "fixture must spawn its owned child before timeout")
+            pid = int(child_file.read_text())
+            deadline = time.monotonic() + 3
+            while running(pid) and time.monotonic() < deadline:
+                time.sleep(0.03)
+            self.assertFalse(running(pid), "owned child survived the timed-out launcher")
+
+    def test_orphan_pipe_after_zero_exit_fails_within_global_budget(self):
+        with self.fixture_child() as (child_file, running):
+            result, calls, log = self.invoke("orphan-pipe", timeout=1, allow_timeout=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("output drain timed out", result.stderr)
+            self.assertNotIn("RESULT=124", result.stdout)
+            self.assertEqual(1, len(calls.read_text().splitlines()))
+            marker = self.directory / (self._testMethodName + ".exit-marker")
+            self.assertEqual("0", marker.read_text(encoding="utf-8"))
+            # The fixture launcher exited before the deadline; its orphan still
+            # owns the pipe. Failure must arrive within the remaining 1s budget.
+            self.assertLess(time.time() - marker.stat().st_mtime, 1.0)
+            self.assertTrue(running(int(child_file.read_text())), "fixture orphan must still hold the pipe")
+            self.assertIn("Output drain timed out", log.read_text(encoding="utf-8"))
 
     def test_strict_timeout_throws(self):
-        result, _, _ = self.invoke("delay", timeout=1)
+        result, _, log = self.invoke("delay", timeout=1)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("timed out", result.stderr)
+        self.assertIn("import/build timed out", result.stderr)
+        self.assertIn("RAW_TOOL_OUTPUT_SENTINEL", log.read_text(encoding="utf-8"))
+        self.assertNotIn("RAW_TOOL_OUTPUT_SENTINEL", result.stdout + result.stderr)
 
     def test_unimported_build_target_is_rejected_before_process(self):
         result, calls, _ = self.invoke(targets=["other/HardwareDebug"])

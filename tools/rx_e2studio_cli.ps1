@@ -1,5 +1,5 @@
 # Shared RX project import/build adapter for the Renesas command-line launcher.
-# e2studio-cli uses project subcommands, rather than Eclipse -application flags.
+# Import every project, then build exact configurations in one standard CDT JVM.
 
 function Remove-RxE2Workspace {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -43,6 +43,7 @@ function Invoke-RxE2StudioBuild {
         [Parameter(Mandatory = $true)][string[]]$BuildTargets,
         [Parameter(Mandatory = $true)][string]$OutputLog,
         [ValidateRange(1, 2147483)][int]$TimeoutSeconds = 600,
+        # Accepted for caller compatibility; timeouts never permit make fallback.
         [switch]$AllowTimeoutExitCode
     )
 
@@ -51,7 +52,7 @@ function Invoke-RxE2StudioBuild {
     }
     $tool = (Resolve-Path -LiteralPath $Executable -ErrorAction Stop).Path
     if ((Split-Path -Leaf $tool) -ine 'e2studio-cli.exe') {
-        throw 'RX builds require the e2studio-cli.exe project command launcher.'
+        throw 'RX builds require the e2studio-cli.exe command launcher.'
     }
     $workspace = [IO.Path]::GetFullPath($WorkspacePath)
     $log = [IO.Path]::GetFullPath($OutputLog)
@@ -59,7 +60,7 @@ function Invoke-RxE2StudioBuild {
     $utf8 = [Text.UTF8Encoding]::new($false)
     [IO.File]::WriteAllText($log, '', $utf8)
 
-    $commands = [Collections.Generic.List[object]]::new()
+    $importArguments = [Collections.Generic.List[string]]::new()
     $projectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($project in $ProjectPaths) {
         $path = (Resolve-Path -LiteralPath $project -ErrorAction Stop).Path
@@ -74,8 +75,10 @@ function Invoke-RxE2StudioBuild {
             -not $projectNames.Add($name.InnerText)) {
             throw 'e2 studio project names must be non-empty and unique.'
         }
-        $commands.Add(@{ phase = 'import'; arguments = @('project', 'import', $path) })
+        [void]$importArguments.Add('-import')
+        [void]$importArguments.Add($path)
     }
+    $buildArguments = [Collections.Generic.List[string]]::new()
     foreach ($target in $BuildTargets) {
         $parts = $target.Split('/')
         if ($parts.Count -ne 2 -or -not $projectNames.Contains($parts[0]) -or
@@ -85,9 +88,10 @@ function Invoke-RxE2StudioBuild {
         # CLI selectors accept regular expressions. Quote an exact project and
         # configuration so a name containing punctuation cannot select siblings.
         $selector = '^' + [regex]::Escape($target) + '$'
-        $commands.Add(@{ phase = 'build'; arguments = @('project', 'build', $selector) })
+        [void]$buildArguments.Add('-build')
+        [void]$buildArguments.Add($selector)
     }
-    if ($commands.Count -eq 0 -or $BuildTargets.Count -eq 0) {
+    if ($projectNames.Count -eq 0 -or $BuildTargets.Count -eq 0) {
         throw 'At least one RX project and build target are required.'
     }
 
@@ -109,80 +113,84 @@ function Invoke-RxE2StudioBuild {
     & $captureMetadata 'before-imports'
 
     $timer = [Diagnostics.Stopwatch]::StartNew()
-    foreach ($command in $commands) {
-        $remainingMs = [Math]::Floor(($TimeoutSeconds * 1000.0) - $timer.Elapsed.TotalMilliseconds)
-        if ($remainingMs -le 0) {
-            if ($AllowTimeoutExitCode) { return 124 }
-            throw "e2studio-cli import/build timed out after $TimeoutSeconds seconds. See $log"
-        }
-        $arguments = @('-nosplash', '-data', $workspace) + $command.arguments
-        $psi = [Diagnostics.ProcessStartInfo]::new()
-        $psi.FileName = $tool
-        $psi.UseShellExecute = $false
-        $psi.CreateNoWindow = $true
-        $psi.RedirectStandardOutput = $true
-        $psi.RedirectStandardError = $true
-        foreach ($argument in $arguments) { [void]$psi.ArgumentList.Add($argument) }
-        [IO.File]::AppendAllText($log, '+ e2studio-cli ' + ($arguments -join ' ') + [Environment]::NewLine, $utf8)
-        Write-Host "e2studio-cli project $($command.phase); output: $log"
-        $process = [Diagnostics.Process]::Start($psi)
-        $stdout = $process.StandardOutput.ReadToEndAsync()
-        $stderr = $process.StandardError.ReadToEndAsync()
-        $timedOut = -not $process.WaitForExit([int]$remainingMs)
-        if ($timedOut) {
-            try { $process.Kill($true) }
-            catch { throw "Could not terminate timed-out e2studio-cli: $($_.Exception.Message)" }
-            if (-not $process.WaitForExit(10000)) {
-                throw 'Timed-out e2studio-cli is still running; make fallback is unsafe.'
-            }
-        }
-        $process.WaitForExit()
-        $stdout.Wait()
-        $stderr.Wait()
-        $text = [string]::Join([Environment]::NewLine, @($stdout.Result, $stderr.Result))
-        [IO.File]::AppendAllText($log, $text + [Environment]::NewLine, $utf8)
-        if ($command.phase -eq 'import') {
-            & $captureMetadata ('after-import-' + $importSnapshots.Count)
-        }
-        if ($timedOut) {
-            if ($AllowTimeoutExitCode) { return 124 }
-            throw "e2studio-cli import/build timed out after $TimeoutSeconds seconds. See $log"
-        }
-        if ($text -match '(?im)^No Config matched\b') {
-            try {
-                $diagnostics = Join-Path ([IO.Path]::GetTempPath()) ('rx-e2-import-' + [guid]::NewGuid().ToString('N'))
-                [void](New-Item -ItemType Directory -Path $diagnostics)
-                $index = [Collections.Generic.List[object]]::new()
-                for ($number = 0; $number -lt $importSnapshots.Count; $number++) {
-                    $snapshot = $importSnapshots[$number]
-                    $folder = Join-Path $diagnostics ([string]$number)
-                    [void](New-Item -ItemType Directory -Path $folder)
-                    $mapping = @{}
-                    foreach ($path in @($snapshot.files.Keys | Sort-Object)) {
-                        $filename = [string]$mapping.Count + '-' + [IO.Path]::GetFileName($path)
-                        [IO.File]::WriteAllBytes((Join-Path $folder $filename), $snapshot.files[$path])
-                        $mapping[$path] = [string]$number + '/' + $filename
-                    }
-                    [void]$index.Add(@{ phase = $snapshot.phase; files = $mapping })
-                }
-                [IO.File]::WriteAllText((Join-Path $diagnostics 'index.json'), (ConvertTo-Json -InputObject @($index.ToArray()) -Depth 5), $utf8)
-                $workspaceLog = Join-Path $workspace '.metadata/.log'
-                if (Test-Path -LiteralPath $workspaceLog -PathType Leaf) {
-                    Copy-Item -LiteralPath $workspaceLog -Destination (Join-Path $diagnostics 'workspace.log')
-                }
-                [IO.File]::AppendAllText($log, 'Private import metadata diagnostics: ' + $diagnostics + [Environment]::NewLine, $utf8)
-            } catch {
-                [IO.File]::AppendAllText($log, 'Could not preserve import metadata diagnostics.' + [Environment]::NewLine, $utf8)
-            }
-        }
-        # The installed launcher returns zero even when an import path cannot
-        # be found or no workspace was supplied. Reject those command failures.
-        if ($text -match '(?im)^(?:Command requires a workspace\.|Project: .+ can\x27t be found|Unknown command\b|Error importing\b|Import failed\b|No Config matched\b)') {
-            throw "e2studio-cli $($command.phase) was rejected. See $log"
-        }
-        if ($process.ExitCode -ne 0) { return $process.ExitCode }
+    $remainingMs = [Math]::Floor(($TimeoutSeconds * 1000.0) - $timer.Elapsed.TotalMilliseconds)
+    if ($remainingMs -le 0) {
+        throw "e2studio-cli import/build timed out after $TimeoutSeconds seconds. See $log"
     }
-    return 0
+    $arguments = @('-nosplash', '-data', $workspace, '-application',
+        'org.eclipse.cdt.managedbuilder.core.headlessbuild') +
+        $importArguments.ToArray() + $buildArguments.ToArray()
+    $psi = [Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $tool
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    foreach ($argument in $arguments) { [void]$psi.ArgumentList.Add($argument) }
+    [IO.File]::AppendAllText($log, '+ e2studio-cli ' + ($arguments -join ' ') + [Environment]::NewLine, $utf8)
+    Write-Host "e2studio-cli headless import/build; output: $log"
+    $process = [Diagnostics.Process]::Start($psi)
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    $timedOut = -not $process.WaitForExit([int]$remainingMs)
+    if ($timedOut) {
+        try { $process.Kill($true) }
+        catch { throw "Could not terminate timed-out e2studio-cli: $($_.Exception.Message)" }
+        if (-not $process.WaitForExit(10000)) {
+            throw 'Timed-out e2studio-cli is still running; make fallback is unsafe.'
+        }
+    }
+    # An exited launcher can leave an orphan holding its output pipes. Drain
+    # both streams only within the remaining import/build budget, never forever.
+    # After a timeout kill, allow a bounded grace to retain the terminated tool's
+    # private output; this never permits a make fallback.
+    $drainWaitMs = if ($timedOut) { 5000 } else {
+        [Math]::Max(0, [Math]::Floor(($TimeoutSeconds * 1000.0) - $timer.Elapsed.TotalMilliseconds))
+    }
+    $streams = [Threading.Tasks.Task]::WhenAll([Threading.Tasks.Task[]]@($stdout, $stderr))
+    if (-not $streams.Wait([int]$drainWaitMs)) {
+        [IO.File]::AppendAllText($log, 'Output drain timed out; make fallback is unsafe.' + [Environment]::NewLine, $utf8)
+        throw "e2studio-cli output drain timed out after $TimeoutSeconds seconds; make fallback is unsafe. See $log"
+    }
+    $text = [string]::Join([Environment]::NewLine, @($stdout.Result, $stderr.Result))
+    [IO.File]::AppendAllText($log, $text + [Environment]::NewLine, $utf8)
+    & $captureMetadata 'after-headless-run'
+    if ($timedOut) {
+        throw "e2studio-cli import/build timed out after $TimeoutSeconds seconds. See $log"
+    }
+    if ($text -match '(?im)^No Config matched\b') {
+        try {
+            $diagnostics = Join-Path ([IO.Path]::GetTempPath()) ('rx-e2-import-' + [guid]::NewGuid().ToString('N'))
+            [void](New-Item -ItemType Directory -Path $diagnostics)
+            $index = [Collections.Generic.List[object]]::new()
+            for ($number = 0; $number -lt $importSnapshots.Count; $number++) {
+                $snapshot = $importSnapshots[$number]
+                $folder = Join-Path $diagnostics ([string]$number)
+                [void](New-Item -ItemType Directory -Path $folder)
+                $mapping = @{}
+                foreach ($path in @($snapshot.files.Keys | Sort-Object)) {
+                    $filename = [string]$mapping.Count + '-' + [IO.Path]::GetFileName($path)
+                    [IO.File]::WriteAllBytes((Join-Path $folder $filename), $snapshot.files[$path])
+                    $mapping[$path] = [string]$number + '/' + $filename
+                }
+                [void]$index.Add(@{ phase = $snapshot.phase; files = $mapping })
+            }
+            [IO.File]::WriteAllText((Join-Path $diagnostics 'index.json'), (ConvertTo-Json -InputObject @($index.ToArray()) -Depth 5), $utf8)
+            $workspaceLog = Join-Path $workspace '.metadata/.log'
+            if (Test-Path -LiteralPath $workspaceLog -PathType Leaf) {
+                Copy-Item -LiteralPath $workspaceLog -Destination (Join-Path $diagnostics 'workspace.log')
+            }
+            [IO.File]::AppendAllText($log, 'Private import metadata diagnostics: ' + $diagnostics + [Environment]::NewLine, $utf8)
+        } catch {
+            [IO.File]::AppendAllText($log, 'Could not preserve import metadata diagnostics.' + [Environment]::NewLine, $utf8)
+        }
+    }
+    # The installed launcher returns zero even when an import path cannot
+    # be found or no workspace was supplied. Reject those command failures.
+    if ($text -match '(?im)^(?:Command requires a workspace\.|Project: .+ can\x27t be found|Unknown command\b|Error importing\b|Import failed\b|No Config matched\b)') {
+        throw "e2studio-cli headless build was rejected. See $log"
+    }
+    return $process.ExitCode
 }
 
 # CLI and legacy Crypto come from monorepos; their selected source directories

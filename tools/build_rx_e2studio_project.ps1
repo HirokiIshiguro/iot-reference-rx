@@ -3,10 +3,18 @@ param(
     [Parameter(Mandatory = $true)][string]$Workspace,
     [Parameter(Mandatory = $true)][string]$ProjectPath,
     [Parameter(Mandatory = $true)][string]$OutputLog,
-    [ValidateRange(1, 2147483)][int]$TimeoutSeconds = 600
+    [int]$TimeoutSeconds = 600
 )
 
+trap {
+    # Pre-launch validation must also stop Python's optional make fallback.
+    [Console]::Error.WriteLine($_.Exception.Message)
+    exit 124
+}
 $ErrorActionPreference = 'Stop'
+if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 2147483) {
+    throw 'The e2 studio timeout must be between 1 and 2147483 seconds.'
+}
 . (Join-Path $PSScriptRoot 'rx_e2studio_cli.ps1')
 $project = (Resolve-Path -LiteralPath $ProjectPath).Path.TrimEnd('\', '/')
 $workspacePath = [IO.Path]::GetFullPath($Workspace).TrimEnd('\', '/')
@@ -31,14 +39,25 @@ foreach ($file in @('.project', '.cproject')) {
 foreach ($file in Get-ChildItem -LiteralPath $project -Filter '*.rcpc' -File) {
     $snapshots[$file.FullName] = [IO.File]::ReadAllBytes($file.FullName)
 }
+$result = 124
 try {
     Remove-RxE2Workspace -Path $workspacePath
     $result = Invoke-RxE2StudioBuild -Executable $Executable -WorkspacePath $workspacePath `
         -ProjectPaths @($project) -BuildTargets @("$($name.InnerText)/HardwareDebug") `
-        -OutputLog $OutputLog -TimeoutSeconds $TimeoutSeconds -AllowTimeoutExitCode
+        -OutputLog $OutputLog -TimeoutSeconds $TimeoutSeconds
+} catch {
+    # Python callers permit ordinary completed build failures to validate make
+    # output. An adapter exception must remain terminal for those callers.
+    [Console]::Error.WriteLine($_.Exception.Message)
+    $result = 124
 } finally {
     foreach ($path in $snapshots.Keys) {
-        [IO.File]::WriteAllBytes($path, $snapshots[$path])
+        try {
+            [IO.File]::WriteAllBytes($path, $snapshots[$path])
+        } catch {
+            [Console]::Error.WriteLine('e2 studio metadata restoration failed: ' + $path)
+            $result = 124
+        }
     }
 }
 exit $result
