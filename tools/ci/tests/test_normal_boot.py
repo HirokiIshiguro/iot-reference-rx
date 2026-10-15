@@ -81,6 +81,18 @@ class NormalBootTests(unittest.TestCase):
                 path.write_text(json.dumps({**manifest, field: value}))
                 with self.assertRaises(RuntimeError): normal_boot.validate(root, fixture.target, SOURCE_SHA)
 
+    def test_physical_ci_overrides_are_checked_instead_of_ignored(self):
+        for target_id, prefix in (("rx72n-ethernet","RX72N_LINUX_"),
+                                  ("rx65n-bg96","RX65N_BG96_"), ("rx671-wifi","RX671_WIFI_")):
+            target = get_target(target_id)
+            installer.check_ci_identity(target,{})
+            installer.check_ci_identity(target,{prefix+"UART_PORT":target["uart"],
+                                               prefix+"RFP_TOOL":"e2l:"+target["e2lite"]})
+            for variable, value in ((prefix+"UART_PORT","/dev/other-board"),
+                                    (prefix+"RFP_TOOL","e2l:OTHER"), (prefix+"UART_BAUD_RATE","115200")):
+                with self.subTest(target=target_id,variable=variable), self.assertRaisesRegex(RuntimeError,variable):
+                    installer.check_ci_identity(target,{variable:value})
+
     def test_source_changes_never_leave_a_usable_normal_manifest(self):
         _, fixture, _ = self.bundle()
         inputs = {name: fixture.files[name] for name in normal_boot.FILES
@@ -102,6 +114,13 @@ class NormalBootTests(unittest.TestCase):
             normal_boot.trust.provision_boot_trust(root,fixture.target,SOURCE_SHA,call,Mock(),artifact_dir=blocked)
         call.assert_not_called()
         self.assertEqual("preserve",blocked.read_text())
+
+    def test_failed_reset_cannot_claim_zero_exit_or_open_uart_observer(self):
+        with patch("serial.Serial") as observer:
+            with self.assertRaisesRegex(RuntimeError,"did not return success"):
+                installer.reset_and_quiet(get_target("rx671-wifi"),
+                    Mock(return_value=subprocess.CompletedProcess([],7)),Mock())
+        observer.assert_not_called()
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Real inherited flock evidence requires Linux")
     def test_real_fdinfo_distinguishes_owned_descriptor_from_same_inode_without_lock(self):
@@ -149,6 +168,14 @@ class NormalBootTests(unittest.TestCase):
             receipt = installer.install(root,target,SOURCE_SHA)
             self.assertTrue(receipt["signed_install_and_bootloader_handoff"])
             prepare.assert_called_once(); self.assertFalse(owner.exists())
+        with patch.object(normal_boot,"validate",return_value={"tls_backend":"software"}), \
+                patch.object(installer,"check_bench_lease"), patch.object(installer,"check_devices"), \
+                patch.object(installer.trust,"provision_boot_trust"), \
+                patch.object(installer.rfp_process,"run_guarded",return_value=subprocess.CompletedProcess([],7)), \
+                patch.object(installer,"reset_and_quiet",side_effect=reset):
+            with self.assertRaisesRegex(RuntimeError,"did not return success"):
+                installer.install(root,target,SOURCE_SHA)
+            self.assertFalse(owner.exists())
         with patch.object(normal_boot,"validate",return_value={"tls_backend":"software"}), \
                 patch.object(installer,"check_bench_lease"), patch.object(installer,"check_devices"), \
                 patch.object(installer.trust,"provision_boot_trust",side_effect=RuntimeError("write failure")), \

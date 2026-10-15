@@ -91,6 +91,23 @@ function Invoke-RxE2StudioBuild {
         throw 'At least one RX project and build target are required.'
     }
 
+    # Keep import-time metadata in memory. Parent helpers restore source files
+    # in finally; only a rejected configuration persists these private snapshots.
+    $importSnapshots = [Collections.Generic.List[object]]::new()
+    $captureMetadata = {
+        param([string]$Phase)
+        $files = @{}
+        foreach ($project in $ProjectPaths) {
+            foreach ($file in Get-ChildItem -LiteralPath $project -File -Force) {
+                if ($file.Name -in @('.project', '.cproject') -or $file.Extension -eq '.rcpc') {
+                    $files[$file.FullName] = [IO.File]::ReadAllBytes($file.FullName)
+                }
+            }
+        }
+        [void]$importSnapshots.Add(@{ phase = $Phase; files = $files })
+    }
+    & $captureMetadata 'before-imports'
+
     $timer = [Diagnostics.Stopwatch]::StartNew()
     foreach ($command in $commands) {
         $remainingMs = [Math]::Floor(($TimeoutSeconds * 1000.0) - $timer.Elapsed.TotalMilliseconds)
@@ -124,13 +141,43 @@ function Invoke-RxE2StudioBuild {
         $stderr.Wait()
         $text = [string]::Join([Environment]::NewLine, @($stdout.Result, $stderr.Result))
         [IO.File]::AppendAllText($log, $text + [Environment]::NewLine, $utf8)
+        if ($command.phase -eq 'import') {
+            & $captureMetadata ('after-import-' + $importSnapshots.Count)
+        }
         if ($timedOut) {
             if ($AllowTimeoutExitCode) { return 124 }
             throw "e2studio-cli import/build timed out after $TimeoutSeconds seconds. See $log"
         }
+        if ($text -match '(?im)^No Config matched\b') {
+            try {
+                $diagnostics = Join-Path ([IO.Path]::GetTempPath()) ('rx-e2-import-' + [guid]::NewGuid().ToString('N'))
+                [void](New-Item -ItemType Directory -Path $diagnostics)
+                $index = [Collections.Generic.List[object]]::new()
+                for ($number = 0; $number -lt $importSnapshots.Count; $number++) {
+                    $snapshot = $importSnapshots[$number]
+                    $folder = Join-Path $diagnostics ([string]$number)
+                    [void](New-Item -ItemType Directory -Path $folder)
+                    $mapping = @{}
+                    foreach ($path in @($snapshot.files.Keys | Sort-Object)) {
+                        $filename = [string]$mapping.Count + '-' + [IO.Path]::GetFileName($path)
+                        [IO.File]::WriteAllBytes((Join-Path $folder $filename), $snapshot.files[$path])
+                        $mapping[$path] = [string]$number + '/' + $filename
+                    }
+                    [void]$index.Add(@{ phase = $snapshot.phase; files = $mapping })
+                }
+                [IO.File]::WriteAllText((Join-Path $diagnostics 'index.json'), (ConvertTo-Json -InputObject @($index.ToArray()) -Depth 5), $utf8)
+                $workspaceLog = Join-Path $workspace '.metadata/.log'
+                if (Test-Path -LiteralPath $workspaceLog -PathType Leaf) {
+                    Copy-Item -LiteralPath $workspaceLog -Destination (Join-Path $diagnostics 'workspace.log')
+                }
+                [IO.File]::AppendAllText($log, 'Private import metadata diagnostics: ' + $diagnostics + [Environment]::NewLine, $utf8)
+            } catch {
+                [IO.File]::AppendAllText($log, 'Could not preserve import metadata diagnostics.' + [Environment]::NewLine, $utf8)
+            }
+        }
         # The installed launcher returns zero even when an import path cannot
         # be found or no workspace was supplied. Reject those command failures.
-        if ($text -match '(?im)^(?:Command requires a workspace\.|Project: .+ can\x27t be found|Unknown command\b|Error importing\b|Import failed\b)') {
+        if ($text -match '(?im)^(?:Command requires a workspace\.|Project: .+ can\x27t be found|Unknown command\b|Error importing\b|Import failed\b|No Config matched\b)') {
             throw "e2studio-cli $($command.phase) was rejected. See $log"
         }
         if ($process.ExitCode -ne 0) { return $process.ExitCode }

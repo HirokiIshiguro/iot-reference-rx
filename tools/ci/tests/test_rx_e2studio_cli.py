@@ -1,5 +1,6 @@
 """Exercise RX launcher orchestration without an IDE or firmware build."""
 import os
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,6 +44,13 @@ public class Launcher {
         if (mode == "warning") Console.WriteLine(
             "Warning: NLS unused message: failedReadDuringWrite in: org.eclipse.core.internal.filesystem.messages");
         if (mode == "build-error" && args[4] == "build") return 23;
+        if (mode == "no-config" && args[4] == "build") {
+            Console.WriteLine("No Config matched " + args[5] + ". Skipping...");
+            Console.WriteLine("Build completed successfully");
+            return 0;
+        }
+        if (mode == "no-config" && args[4] == "import")
+            File.WriteAllText(Path.Combine(args[5], ".cproject"), "AFTER_IMPORT");
         return 0;
     }
 }
@@ -55,6 +63,7 @@ public class Launcher {
             project.mkdir()
             (project / ".project").write_text(
                 "<projectDescription><name>" + name + "</name></projectDescription>", encoding="utf-8")
+            (project / ".cproject").write_text("EFFECTIVE_" + name, encoding="utf-8")
             cls.projects.append(project)
 
     @classmethod
@@ -107,6 +116,25 @@ public class Launcher {
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("RESULT=23", result.stdout)
         self.assertEqual(len(calls.read_text().splitlines()), 3)
+
+    def test_zero_exit_with_no_configuration_stops_before_other_project_build(self):
+        result, calls, log = self.invoke("no-config")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("build was rejected", result.stderr)
+        self.assertEqual(len(calls.read_text().splitlines()), 3)
+        self.assertIn("No Config matched", log.read_text(encoding="utf-8"))
+        lines = log.read_text(encoding="utf-8").splitlines()
+        diagnostic = Path(next(line.split(": ",1)[1] for line in lines if line.startswith("Private import metadata diagnostics: ")))
+        try:
+            snapshots = json.loads((diagnostic/"index.json").read_text(encoding="utf-8"))
+            self.assertEqual(["before-imports","after-import-1","after-import-2"], [item["phase"] for item in snapshots])
+            source = str(self.projects[0]/".cproject")
+            self.assertEqual("EFFECTIVE_a.project",(diagnostic/snapshots[0]["files"][source]).read_text())
+            self.assertEqual("AFTER_IMPORT",(diagnostic/snapshots[1]["files"][source]).read_text())
+        finally:
+            self.assertEqual(diagnostic.parent,Path(tempfile.gettempdir()))
+            self.assertTrue(diagnostic.name.startswith("rx-e2-import-"))
+            shutil.rmtree(diagnostic)
 
     def test_nonfatal_plugin_warning_is_not_import_failure(self):
         result, _, _ = self.invoke("warning")

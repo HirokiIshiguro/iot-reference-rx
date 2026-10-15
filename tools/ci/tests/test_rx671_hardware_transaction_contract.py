@@ -41,25 +41,23 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         job = job_block(self.ci, "test_rx671_wifi", "test_rx72n_ether_mqtt")
 
         ordered_tokens = (
-            'mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"',
-            "Atomic RX671 reflash before UART observation",
-            "-erase-chip -reset -noquery",
+            "Atomic RX671 signed normal install before UART observation",
+            "tools/install_normal_boot.py",
             'initial_chip_erase.log',
             'if [ "$status" -ne 0 ]',
-            "-p -v -reset -noquery",
             "tools/ci/test_rx671_wifi_uart.py",
         )
         positions = [job.index(token) for token in ordered_tokens]
         self.assertEqual(positions, sorted(positions))
 
-    def test_normal_flash_clears_bank_state_before_linear_programming(self) -> None:
+    def test_normal_flash_uses_signed_bundle_and_preserves_command_failure(self) -> None:
         job = job_block(self.ci, "flash_rx671_wifi", "flash_rx72n_ether")
-        erase = job.index("-erase-chip -reset -noquery")
-        program = job.index("-p -v -reset -noquery")
-        self.assertLess(job.index('if [ ! -f "$mot" ]'), erase)
-        self.assertLess(erase, program)
-        self.assertIn('exit "$status"', job[erase:program])
-        self.assertEqual(2, job.count('-t "$RX671_WIFI_RFP_TOOL"'))
+        install = job.index("tools/install_normal_boot.py")
+        self.assertIn('--bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx671"', job)
+        self.assertIn('--target rx671-wifi', job)
+        self.assertIn('exit "$status"', job[install:])
+        self.assertNotIn('-erase-chip', job)
+        self.assertNotIn('-p -v -reset -noquery', job)
 
     def test_both_split_jobs_extend_the_locked_template(self) -> None:
         flash = job_block(self.ci, "flash_rx671_wifi", "flash_rx72n_ether")

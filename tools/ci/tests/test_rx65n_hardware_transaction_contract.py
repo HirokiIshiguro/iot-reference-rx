@@ -37,8 +37,7 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertIn("- job: prepare_rx65n_bg96_mqtt_credentials", job)
 
         ordered_tokens = (
-            "--action flash-bootloader",
-            "--action download-rsu",
+            "tools/install_normal_boot.py",
             "--action provision-mqtt",
             "tools/provision_tsip_over_uart.py",
             "--action reset-app",
@@ -92,8 +91,7 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertNotIn("- job: download_rx65n_bg96_app", needs)
 
         ordered_tokens = (
-            "--action flash-bootloader",
-            "--action download-rsu",
+            "tools/install_normal_boot.py",
             "--action provision-mqtt",
             "tools/provision_tsip_over_uart.py",
             "tools/bg96_ota_prepare.py",

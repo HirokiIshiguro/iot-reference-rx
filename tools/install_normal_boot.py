@@ -68,6 +68,28 @@ def check_devices(target):
         raise RuntimeError("Reviewed E2 Lite USB identity is missing or ambiguous")
 
 
+def check_ci_identity(target, environ=None):
+    """Reject a physical override rather than silently using another CI bench."""
+    environment = os.environ if environ is None else environ
+    prefixes = {"rx72n-ethernet": "RX72N_LINUX_", "rx65n-bg96": "RX65N_BG96_", "rx671-wifi": "RX671_WIFI_"}
+    prefix = prefixes[target["id"]]
+    expected = {prefix+"UART_PORT": target["uart"], prefix+"UART_BAUD_RATE": str(target["baud"]),
+                prefix+"RFP_TOOL": "e2l:"+target["e2lite"]}
+    if target["id"] == "rx72n-ethernet":
+        expected.update({"RFP_SPEED":target["rfp_speed"], "RFP_AUTH":"F"*32})
+    else:
+        expected.update({prefix+"RFP_DEVICE":target["rfp_device"], prefix+"RFP_INTERFACE":"fine",
+                         prefix+"RFP_SPEED":target["rfp_speed"], prefix+"RFP_AUTH_ID":"F"*32})
+    if target["id"] == "rx65n-bg96" and not environment.get(prefix+"UART_PORT"):
+        expected["COMMAND_PORT"] = target["uart"]
+    if target["id"] == "rx671-wifi":
+        expected[prefix+"E2OB_SERIAL"] = target["e2lite"]
+    for name, value in expected.items():
+        actual = environment.get(name)
+        if actual and actual != value:
+            raise RuntimeError("Normal install physical CI override differs from reviewed target: "+name)
+
+
 def rfp_command(target):
     return ["sudo", "-n", "/usr/local/bin/rfp-cli", "-device", target["rfp_device"],
             "-tool", "e2l:"+target["e2lite"], "-if", "fine", "-speed", target["rfp_speed"],
@@ -89,7 +111,8 @@ def download_command(root, target):
 def reset_and_quiet(target, call, check_owner):
     import serial
     check_owner()
-    call([*rfp_command(target), "-sig", "-reset", "-noquery"], timeout=budget.FLASH_ABORT_RESET_SECONDS)
+    trust._checked_call(call, check_owner, [*rfp_command(target), "-sig", "-reset", "-noquery"],
+                        budget.FLASH_ABORT_RESET_SECONDS)
     with serial.Serial(target["uart"], target["baud"], timeout=0.1, exclusive=True) as observer:
         observer.reset_input_buffer()
         deadline, count = time.monotonic()+budget.END_STATE_QUIET_SECONDS, 0
@@ -104,6 +127,7 @@ def reset_and_quiet(target, call, check_owner):
 def install(root, target, source_sha):
     # All image/public signer validation precedes device or programmer access.
     manifest = normal_boot.validate(root, target, source_sha)
+    check_ci_identity(target)
     import fcntl
     owner = None
     check_owner = lambda: check_bench_lease(target, owner=owner)
@@ -164,7 +188,7 @@ def install(root, target, source_sha):
         trust.provision_boot_trust(root, target, source_sha, call, check_owner, artifact_dir=event_directory)
         if normal_boot.validate(root, target, source_sha) != manifest:
             raise RuntimeError("Normal install bundle changed during boot-trust preparation")
-        call(download_command(root, target), timeout=budget.FLASH_DOWNLOAD_SECONDS)
+        trust._checked_call(call, check_owner, download_command(root, target), budget.FLASH_DOWNLOAD_SECONDS)
         completed = True
     finally:
         try:

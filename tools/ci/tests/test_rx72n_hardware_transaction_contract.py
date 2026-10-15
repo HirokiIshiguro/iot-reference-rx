@@ -99,8 +99,7 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         self.assertNotIn("- provision_rx72n_ether_mqtt", job)
 
         ordered_tokens = (
-            "-erase-chip",
-            "tools/test_uart_download_rx72n.py",
+            "tools/install_normal_boot.py",
             "tools/provision_rx72n.py",
             "tools/test_mqtt_rx72n.py",
         )
@@ -121,8 +120,7 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         self.assertIn("--no-reset-after", job)
 
         ordered_tokens = (
-            "-erase-chip",
-            "tools/test_uart_download_rx72n.py",
+            "tools/install_normal_boot.py",
             "tools/provision_rx72n.py",
             "tools/provision_tsip_over_uart.py",
             "tools/test_ota.py",
