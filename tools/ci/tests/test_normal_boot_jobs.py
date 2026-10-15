@@ -16,7 +16,9 @@ TEXT = (ROOT / "tools/ci/normal_boot_jobs.yml").read_text(encoding="utf-8")
 PWSH = shutil.which("pwsh")
 TARGETS = {"rx72n": ("rx72n-ethernet", "build_rx72n_ether"),
            "rx65n": ("rx65n-bg96", "build_rx65n_bg96"),
-           "rx671": ("rx671-wifi", "build_rx671_wifi")}
+           "rx671": ("rx671-wifi", "build_rx671_wifi"),
+           "rx72n_fleet": ("rx72n-ethernet", "build_rx72n_ether_fleet"),
+           "rx65n_fleet": ("rx65n-bg96", "build_rx65n_bg96_fleet")}
 
 
 def block(name):
@@ -44,10 +46,15 @@ class NormalBootJobsTests(unittest.TestCase):
         for suffix, (target, build) in TARGETS.items():
             with self.subTest(target=target):
                 body = block("package_normal_boot_" + suffix)
-                self.assertIn("rules: !reference [" + build + ", rules]", body)
+                rule_source = ".rx65n_bg96_fleet_rules" if suffix == "rx65n_fleet" else build
+                self.assertIn("rules: !reference [" + rule_source + ", rules]", body)
                 self.assertIn("- job: " + build + "\n      artifacts: true", body)
                 self.assertEqual(variables("package_normal_boot_" + suffix)["NORMAL_BOOT_TARGET"], target)
                 self.assertNotIn("RUN_", body)
+                board = suffix.split("_", 1)[0]
+                runner = {"rx72n": "RX72N_BUILD_RUNNER_TAG", "rx65n": "RX65N_BG96_BUILD_RUNNER_TAG", "rx671": "RX671_WIFI_BUILD_RUNNER_TAG"}[board]
+                self.assertIn("tags: [exec-shell, os-windows, ccrx, $" + runner + "]", body)
+                self.assertNotIn("NORMAL_BOOT_RUNNER_TAG", body)
 
     def test_publication_is_exact_api_output_allowlist_without_private_logs(self):
         body = script()
@@ -74,9 +81,11 @@ class NormalBootJobsTests(unittest.TestCase):
         self.assertLess(script().index("_source_state"),script().index("$privateRoot ="))
 
     @unittest.skipUnless(PWSH, "PowerShell is required for the package script fixture")
-    def test_normal_inputs_survive_producer_rebuild_for_all_five_profiles(self):
+    def test_product_inputs_survive_producer_rebuild_for_all_profiles(self):
         profiles = [("rx72n", "software"), ("rx72n", "tsip"),
-                    ("rx65n", "software"), ("rx65n", "tsip"), ("rx671", "software")]
+                    ("rx65n", "software"), ("rx65n", "tsip"), ("rx671", "software"),
+                    ("rx72n_fleet", "software"), ("rx72n_fleet", "tsip"),
+                    ("rx65n_fleet", "software"), ("rx65n_fleet", "tsip")]
         for suffix, backend in profiles:
             with self.subTest(target=suffix, backend=backend), \
                     tempfile.TemporaryDirectory(prefix="normal-package-", dir=ROOT.parent) as temporary:

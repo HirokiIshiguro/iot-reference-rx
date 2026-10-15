@@ -2,11 +2,6 @@
 .normal_boot_package:
   extends: .rx_windows_canonical_checkout
   stage: build
-  tags:
-    - exec-shell
-    - os-windows
-    - ccrx
-    - $NORMAL_BOOT_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   script:
     - |
@@ -77,13 +72,13 @@
 
 package_normal_boot_rx72n:
   extends: .normal_boot_package
+  tags: [exec-shell, os-windows, ccrx, $RX72N_BUILD_RUNNER_TAG]
   needs:
     - job: build_rx72n_ether
       artifacts: true
   rules: !reference [build_rx72n_ether, rules]
   variables:
     NORMAL_BOOT_TARGET: rx72n-ethernet
-    NORMAL_BOOT_RUNNER_TAG: $RX72N_BUILD_RUNNER_TAG
     NORMAL_BOOT_SIGNING_KEY_VARIABLE: RX72N_SIGNING_KEY
     NORMAL_BOOT_BACKEND_VARIABLE: RX72N_TLS_BACKEND
     NORMAL_BOOT_RSU: rx72n_app.rsu
@@ -93,13 +88,13 @@ package_normal_boot_rx72n:
 
 package_normal_boot_rx65n:
   extends: .normal_boot_package
+  tags: [exec-shell, os-windows, ccrx, $RX65N_BG96_BUILD_RUNNER_TAG]
   needs:
     - job: build_rx65n_bg96
       artifacts: true
   rules: !reference [build_rx65n_bg96, rules]
   variables:
     NORMAL_BOOT_TARGET: rx65n-bg96
-    NORMAL_BOOT_RUNNER_TAG: $RX65N_BG96_BUILD_RUNNER_TAG
     NORMAL_BOOT_SIGNING_KEY_VARIABLE: RX65N_BG96_SIGNING_KEY
     NORMAL_BOOT_BACKEND_VARIABLE: RX65N_BG96_TLS_BACKEND
     NORMAL_BOOT_RSU: artifacts/build_rx65n_bg96/aws_bg96_ck_rx65n.rsu
@@ -108,12 +103,154 @@ package_normal_boot_rx65n:
 
 package_normal_boot_rx671:
   extends: .normal_boot_package
+  tags: [exec-shell, os-windows, ccrx, $RX671_WIFI_BUILD_RUNNER_TAG]
   needs:
     - job: build_rx671_wifi
       artifacts: true
   rules: !reference [build_rx671_wifi, rules]
   variables:
     NORMAL_BOOT_TARGET: rx671-wifi
-    NORMAL_BOOT_RUNNER_TAG: $RX671_WIFI_BUILD_RUNNER_TAG
     NORMAL_BOOT_APP_MOT: artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot
     NORMAL_BOOT_ARTIFACT_DIR: artifacts/normal_boot_rx671
+
+package_normal_boot_rx72n_fleet:
+  extends: .normal_boot_package
+  tags: [exec-shell, os-windows, ccrx, $RX72N_BUILD_RUNNER_TAG]
+  needs:
+    - job: build_rx72n_ether_fleet
+      artifacts: true
+  rules: !reference [build_rx72n_ether_fleet, rules]
+  variables:
+    NORMAL_BOOT_TARGET: rx72n-ethernet
+    NORMAL_BOOT_SIGNING_KEY_VARIABLE: RX72N_SIGNING_KEY
+    NORMAL_BOOT_BACKEND_VARIABLE: RX72N_TLS_BACKEND
+    NORMAL_BOOT_RSU: rx72n_app.rsu
+    NORMAL_BOOT_BOOT0: Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot
+    NORMAL_BOOT_BOOT1: Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot
+    NORMAL_BOOT_ARTIFACT_DIR: artifacts/normal_boot_rx72n_fleet
+
+package_normal_boot_rx65n_fleet:
+  extends: .normal_boot_package
+  tags: [exec-shell, os-windows, ccrx, $RX65N_BG96_BUILD_RUNNER_TAG]
+  needs:
+    - job: build_rx65n_bg96_fleet
+      artifacts: true
+  rules: !reference [.rx65n_bg96_fleet_rules, rules]
+  variables:
+    NORMAL_BOOT_TARGET: rx65n-bg96
+    NORMAL_BOOT_SIGNING_KEY_VARIABLE: RX65N_BG96_SIGNING_KEY
+    NORMAL_BOOT_BACKEND_VARIABLE: RX65N_BG96_TLS_BACKEND
+    NORMAL_BOOT_RSU: artifacts/build_rx65n_bg96_fleet/aws_bg96_ck_rx65n_fleet.rsu
+    NORMAL_BOOT_BOOT0: artifacts/build_rx65n_bg96_fleet/boot_loader_ck_rx65n.mot
+    NORMAL_BOOT_ARTIFACT_DIR: artifacts/normal_boot_rx65n_fleet
+
+# Fleet embeds claim credentials. Reuse the matching public boot inputs, sign
+# the exact authenticated Fleet MOT privately, and publish only an encrypted set.
+package_normal_boot_rx671_fleet:
+  extends: .rx_windows_canonical_checkout
+  stage: build
+  tags:
+    - exec-shell
+    - os-windows
+    - ccrx
+    - $RX671_WIFI_BUILD_RUNNER_TAG
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  needs:
+    - job: package_normal_boot_rx671
+      artifacts: true
+    - job: build_rx671_wifi_fleet
+      artifacts: true
+  rules: !reference [.rx671_wifi_fleet_rules, rules]
+  script:
+    - |
+      $ErrorActionPreference = 'Stop'
+      foreach ($id in @($env:CI_PIPELINE_ID, $env:CI_JOB_ID)) {
+        if ($id -notmatch '^[1-9][0-9]*$') { throw 'Invalid Fleet package identity.' }
+      }
+      python -m pip install --user cryptography
+      if ($LASTEXITCODE -ne 0) { throw 'Fleet cryptography dependency installation failed.' }
+      $source = $env:CI_PROJECT_DIR
+      python -c "import os, sys; from pathlib import Path; from tools.idt.prepare_public_signer import _source_state; sys.exit(0 if _source_state(Path(os.environ['CI_PROJECT_DIR'])) == os.environ['CI_COMMIT_SHA'] else 'Fleet source SHA mismatch')"
+      if ($LASTEXITCODE -ne 0) { throw 'Fleet package source must be clean and matching.' }
+      $privateRoot = "C:/ai/codex/tmp/rx671-fleet-package-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
+      if (Test-Path -LiteralPath $privateRoot) { throw 'Fleet private output already exists.' }
+      New-Item -ItemType Directory -Path $privateRoot | Out-Null
+      try {
+        $claimKey = ''
+        foreach ($name in @('RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE', 'RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM', 'AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02', 'AWS_FLEET_CLAIM_PRIVATE_KEY')) {
+          $value = [Environment]::GetEnvironmentVariable($name)
+          if (-not [string]::IsNullOrWhiteSpace($value)) { $claimKey = $value; break }
+        }
+        if ([string]::IsNullOrWhiteSpace($claimKey)) { throw 'Fleet artifact key is not configured.' }
+        $env:RX671_FLEET_ARTIFACT_SECRET = $claimKey
+        $claimKey = ''; $value = ''
+        $inputRoot = Join-Path $source 'artifacts/build_rx671_wifi_fleet'
+        $metadata = Get-Content -LiteralPath (Join-Path $inputRoot 'manifest.json') -Raw | ConvertFrom-Json
+        $context = "rx671-fleet-v1:${env:CI_PIPELINE_ID}:${env:CI_COMMIT_SHA}"
+        if ($metadata.format -cne 'rx671-fleet-encrypted-artifact-v1' -or
+            [string]$metadata.pipeline_id -cne $env:CI_PIPELINE_ID -or
+            $metadata.commit_sha -cne $env:CI_COMMIT_SHA -or $metadata.encryption_context -cne $context) {
+          throw 'Fleet build manifest identity mismatch.'
+        }
+        $encrypted = Join-Path $inputRoot 'aws_wifi_rx671_ek_fleet.mot.enc'
+        if ((Get-FileHash -LiteralPath $encrypted -Algorithm SHA256).Hash.ToLowerInvariant() -cne $metadata.encrypted_mot_sha256) {
+          throw 'Fleet ciphertext hash mismatch.'
+        }
+        $mot = Join-Path $privateRoot 'fleet.mot'
+        python tools/ci/protect_secret_artifact.py decrypt --input "$encrypted" --output "$mot" --secret-env RX671_FLEET_ARTIFACT_SECRET --context "$context"
+        if ($LASTEXITCODE -ne 0) { throw 'Fleet artifact authentication failed.' }
+        if ((Get-FileHash -LiteralPath $mot -Algorithm SHA256).Hash.ToLowerInvariant() -cne $metadata.plaintext_mot_sha256) {
+          throw 'Fleet plaintext hash mismatch.'
+        }
+        $targets = (Get-Content -LiteralPath (Join-Path $source 'tools/idt/targets.json') -Raw | ConvertFrom-Json).targets
+        $key = Join-Path $source $targets.'rx671-wifi'.signing_key
+        $rsu = Join-Path $privateRoot 'fleet.rsu'
+        python tools/build_rx671_fwup_v2_rsu.py --mot "$mot" --key "$key" --output "$rsu"
+        if ($LASTEXITCODE -ne 0) { throw 'Fleet signed application generation failed.' }
+        $base = Join-Path $source 'artifacts/normal_boot_rx671'
+        $bundle = Join-Path $privateRoot 'bundle'
+        python tools/prepare_normal_boot.py --source "$source" --target rx671-wifi --output "$bundle" --tls-backend software `
+          --rsu "$rsu" --bootloader (Join-Path $base 'bootloader.mot') --bootloader-bank1 (Join-Path $base 'bootloader_bank1.mot') `
+          --provisioner-mot (Join-Path $base 'public_signer_provisioner.mot') `
+          --provisioner-manifest (Join-Path $base 'public_signer_provisioner_manifest.json') `
+          --signer-cert (Join-Path $base 'signer.crt.pem') --signer-public-key (Join-Path $base 'signer.pub.pem')
+        if ($LASTEXITCODE -ne 0) { throw 'Fleet normal-install bundle validation failed.' }
+        python tools/ci/protected_normal_bundle.py pack --bundle "$bundle" `
+          --output (Join-Path $source 'artifacts/normal_boot_rx671_fleet') --target rx671-wifi `
+          --source-sha "$env:CI_COMMIT_SHA" --pipeline-id "$env:CI_PIPELINE_ID" --secret-env RX671_FLEET_ARTIFACT_SECRET
+        if ($LASTEXITCODE -ne 0) { throw 'Fleet bundle protection failed.' }
+      } finally {
+        $env:RX671_FLEET_ARTIFACT_SECRET = ''; $claimKey = ''; $value = ''
+        # This newly owned tree has only flat bundle files and the two inputs.
+        # Do not recursively delete an unchecked or replaced directory.
+        $resolvedPrivate = [IO.Path]::GetFullPath($privateRoot)
+        if (-not $resolvedPrivate.StartsWith('C:\ai\codex\tmp\rx671-fleet-package-', [StringComparison]::OrdinalIgnoreCase) -or
+            (Get-Item -LiteralPath $privateRoot).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) {
+          throw 'Fleet private output ownership changed; retained for inspection.'
+        }
+        $privateBundle = Join-Path $privateRoot 'bundle'
+        if (Test-Path -LiteralPath $privateBundle) {
+          $entries = @(Get-ChildItem -LiteralPath $privateBundle -Force)
+          if ((Get-Item -LiteralPath $privateBundle).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint) -or
+              @($entries | Where-Object {$_.PSIsContainer -or $_.Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)}).Count) {
+            throw 'Unexpected Fleet bundle entries; private output retained.'
+          }
+          foreach ($entry in $entries) { Remove-Item -LiteralPath $entry.FullName -Force }
+          Remove-Item -LiteralPath $privateBundle -Force
+        }
+        foreach ($name in @('fleet.mot', 'fleet.rsu')) {
+          $path = Join-Path $privateRoot $name
+          if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
+        }
+        if (@(Get-ChildItem -LiteralPath $privateRoot -Force).Count) {
+          throw 'Unexpected private outputs; Fleet staging retained.'
+        }
+        Remove-Item -LiteralPath $privateRoot -Force
+      }
+  artifacts:
+    paths:
+      - artifacts/normal_boot_rx671_fleet/bundle.zip.enc
+      - artifacts/normal_boot_rx671_fleet/manifest.json
+    expire_in: 7 days

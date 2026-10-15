@@ -40,6 +40,10 @@ job定義の正本は[`.gitlab-ci.yml`](../.gitlab-ci.yml)、接続構成とツ�
 
 RX65Nの旧`flash`／`download`／`app`／`provision` scopeは廃止しました。指定すると実機jobを起動せず、説明付きのエラーになります。`mqtt`／`ota`／`tls13_0rtt`の各試験jobは、同じbench lock内で公開鍵投入・dual boot・署名付きapp導入・APN／証明書投入から観測までを一括実行します。`full`は従来どおりOTAとFleetを対象にします。
 
+Fleetも3環境とも試験job内で署名付きの専用appを一括導入し、資格情報を投入してから観測します。RX72NのTLS 1.3 0-RTT試験も同じ導入経路を使います。RX671 Fleetはclaim資格情報をfirmwareに含むため、一括導入bundle全体を暗号化して受け渡し、RPiのcheckout外に作る専用一時領域だけで復号します。終了時は同じbench lock内で通常appへ復元し、復元に成功してから一時領域を削除します。所有権が残留している場合や復元に失敗した場合は再書込み・削除を停止し、復旧用の一時領域と失敗記録を残します。
+
+RX671 Fleetの時間上限は全体3時間、主処理140分、`after_script`の復元30分です。復元時のbench lock待ちは60秒で打ち切り、一括導入の共通時間予算を別に確保します。[GitLabの時間上限設定](https://docs.gitlab.com/ci/runners/configure_runners/#set-script-and-after_script-timeouts)に従い、主処理と復元の合計をjob全体の上限より短くしています。
+
 IDTは通常の`full`やnightlyには含めません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt-validation.md)を参照してください。
 
 ## 実機とAWSの安全境界

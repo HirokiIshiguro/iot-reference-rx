@@ -668,6 +668,9 @@ idt_ci_contract:
         tools.ci.tests.test_idt_windows_checkout \
         tools.ci.tests.test_prepare_public_signer \
         tools.ci.tests.test_build_public_signer_provisioner \
+        tools.ci.tests.test_protected_normal_bundle \
+        tools.ci.tests.test_cleanup_rx671_fleet_runtime \
+        tools.ci.tests.test_rx671_fleet_finish_ci \
         tools.ci.tests.test_idt_pkcs11_adapter \
         tools.ci.tests.test_idt_pkcs11_source_view \
         tools.ci.tests.test_idt_auto_link_profile \
@@ -3057,58 +3060,6 @@ smoke_rx671_bootloader_manual:
       - artifacts/smoke_rx671_bootloader/
     expire_in: 7 days
 
-flash_rx72n_ether:
-  stage: flash
-  extends: .rx72n_linux_hw_job
-  needs:
-    - job: build_rx72n_ether
-      artifacts: true
-    - job: cleanup_rx72n_ether_ota_jobs
-      artifacts: false
-      optional: true
-  rules:
-    # MQTT/OTA baseline scopes run flash + provision + test atomically in
-    # test_rx72n_ether_mqtt. Keep this standalone path only for the 0-RTT job.
-    - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE == "tls13_0rtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
-      when: on_success
-    - when: never
-  script:
-    - echo "=== Flash RX72N boot_loader and download app RSU on Linux runner ==="
-    - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx72n_ether"
-      mkdir -p "$artifact_dir"
-      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
-
-      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
-        -auth id "$RFP_AUTH" -erase-chip -noquery
-
-      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
-        -auth id "$RFP_AUTH" \
-        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot" \
-        -v -noquery
-
-      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
-        -auth id "$RFP_AUTH" \
-        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot" \
-        -v -noquery
-
-      python tools/test_uart_download_rx72n.py \
-        --rsu "$CI_PROJECT_DIR/rx72n_app.rsu" \
-        --port "$RX72N_LINUX_UART_PORT" \
-        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --timeout 420 \
-        --post-tx-wait 120 \
-        --diag \
-        --wait-for-ready \
-        --ready-timeout 90 \
-        --reset-cmd "$reset_cmd" \
-        2>&1 | tee "$artifact_dir/flash_rx72n.log"
-  artifacts:
-    when: always
-    paths:
-      - artifacts/flash_rx72n_ether/
-    expire_in: 7 days
-
 prepare_rx65n_bg96_mqtt_credentials:
   stage: credential_prepare
   extends:
@@ -4049,171 +4000,6 @@ cleanup_rx65n_bg96_mqtt_credentials:
       - artifacts/prepare_rx65n_bg96_mqtt_credentials/
     expire_in: 7 days
 
-flash_rx72n_ether_fleet:
-  stage: fleet_flash
-  extends: .rx72n_linux_hw_job
-  needs:
-    - job: build_rx72n_ether_fleet
-      artifacts: true
-    - job: test_rx72n_ether_ota
-      artifacts: true
-      optional: true
-  rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
-      when: on_success
-    - when: never
-  script:
-    - echo "=== Flash RX72N Fleet Provisioning image on Linux runner ==="
-    - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx72n_ether_fleet"
-      mkdir -p "$artifact_dir"
-      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
-
-      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
-        -auth id "$RFP_AUTH" -erase-chip -noquery
-
-      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
-        -auth id "$RFP_AUTH" \
-        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot" \
-        -v -noquery
-
-      "$RX72N_LINUX_RFP_CLI" -device RX72x -tool "$RX72N_LINUX_RFP_TOOL" -if fine -speed "$RFP_SPEED" \
-        -auth id "$RFP_AUTH" \
-        -p "$CI_PROJECT_DIR/Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot" \
-        -v -noquery
-
-      python tools/test_uart_download_rx72n.py \
-        --rsu "$CI_PROJECT_DIR/rx72n_app.rsu" \
-        --port "$RX72N_LINUX_UART_PORT" \
-        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --timeout 420 \
-        --post-tx-wait 120 \
-        --diag \
-        --wait-for-ready \
-        --ready-timeout 90 \
-        --reset-cmd "$reset_cmd" \
-        2>&1 | tee "$artifact_dir/flash_rx72n_fleet.log"
-  artifacts:
-    when: always
-    paths:
-      - artifacts/flash_rx72n_ether_fleet/
-    expire_in: 7 days
-
-provision_rx72n_ether_mqtt:
-  stage: provision
-  extends: .rx72n_linux_hw_job
-  needs:
-    - build_rx72n_ether
-    - flash_rx72n_ether
-  rules:
-    # MQTT/OTA baseline scopes provision inside test_rx72n_ether_mqtt while
-    # that job owns the RX72N resource. The 0-RTT path retains this job.
-    - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE == "tls13_0rtt" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
-      when: on_success
-    - when: never
-  script:
-    - echo "=== Provision RX72N AWS IoT credentials on Linux runner ==="
-    - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_ether_mqtt"
-      mkdir -p "$artifact_dir"
-      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
-
-      shadow_args=()
-      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
-        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
-      fi
-
-      provision_args=(
-        --port "$RX72N_LINUX_UART_PORT"
-        --baud "$RX72N_LINUX_UART_BAUD_RATE"
-        --thing-name "$RX72N_DEVICE_ID"
-        --endpoint "$AWS_IOT_ENDPOINT"
-        --cert "$AWS_CLIENT_CERT_RX72N_02"
-        --key "$AWS_PRIVATE_KEY_RX72N_02"
-        --codesigner-cert "$CI_PROJECT_DIR/rx72n_codesign_cert.pem"
-        --format
-        --reset-cmd "$reset_cmd"
-        --reset-after-open
-        --boot-wait 12
-        --cli-timeout 25
-        --attempts 3
-        --no-reset
-      )
-      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
-        provision_args+=(--skip-private-key)
-      fi
-
-      python tools/provision_rx72n.py "${provision_args[@]}" "${shadow_args[@]}" \
-        2>&1 | tee "$artifact_dir/provision_rx72n.log"
-      status="${PIPESTATUS[0]}"
-      if [ "$status" -ne 0 ]; then
-        exit "$status"
-      fi
-
-      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
-        python tools/provision_tsip_over_uart.py \
-          --target rx72n \
-          --port "$RX72N_LINUX_UART_PORT" \
-          --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-          --chunk-size "${RX72N_TSIP_PROVISION_CHUNK_SIZE}" \
-          --timeout "${RX72N_TSIP_PROVISION_TIMEOUT_SECONDS}" \
-          --no-enter-cli \
-          --reset-after \
-          2>&1 | tee "$artifact_dir/provision_tsip.log"
-        status="${PIPESTATUS[0]}"
-      fi
-      exit "$status"
-  artifacts:
-    when: always
-    paths:
-      - artifacts/provision_rx72n_ether_mqtt/
-    expire_in: 7 days
-
-provision_rx72n_ether_fleet:
-  stage: fleet_provision
-  extends: .rx72n_linux_hw_job
-  needs:
-    - build_rx72n_ether_fleet
-    - flash_rx72n_ether_fleet
-  rules:
-    - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
-      when: on_success
-    - when: never
-  script:
-    - echo "=== Provision RX72N fleet claim credentials on Linux runner ==="
-    - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_ether_fleet"
-      mkdir -p "$artifact_dir"
-      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
-
-      shadow_args=()
-      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
-        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
-      fi
-
-      python tools/provision_rx72n.py \
-        --fleet-provisioning \
-        --port "$RX72N_LINUX_UART_PORT" \
-        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
-        --endpoint "$AWS_IOT_ENDPOINT" \
-        --template-name "$AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02" \
-        --claim-cert "$AWS_FLEET_CLAIM_CERT_RX72N_02" \
-        --claim-key "$AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02" \
-        --format \
-        --no-reset \
-        --reset-cmd "$reset_cmd" \
-        --reset-after-open \
-        --boot-wait 12 \
-        --cli-timeout 25 \
-        --attempts 3 \
-        "${shadow_args[@]}" \
-        2>&1 | tee "$artifact_dir/provision_rx72n_fleet.log"
-  artifacts:
-    when: always
-    paths:
-      - artifacts/provision_rx72n_ether_fleet/
-    expire_in: 7 days
-
 cleanup_rx72n_ether_ota_jobs:
   stage: pre_test_cleanup
   extends: .aws_cli_windows_job
@@ -4786,151 +4572,78 @@ cleanup_rx671_wifi_ota:
 
 test_rx671_wifi_fleet:
   stage: fleet_test
+  timeout: 3 hours
+  variables:
+    # Allow both bounded installs, the existing bench wait and observer, then
+    # reserve recovery time independently of the main script timeout.
+    RUNNER_SCRIPT_TIMEOUT: "140m"
+    RUNNER_AFTER_SCRIPT_TIMEOUT: "30m"
   extends:
     - .rx671_wifi_linux_hw_job
     - .rx671_wifi_fleet_rules
   needs:
-    - job: build_rx671_wifi
+    - job: package_normal_boot_rx671
       artifacts: true
-    - job: build_rx671_wifi_fleet
+    - job: package_normal_boot_rx671_fleet
       artifacts: true
   script:
-    - echo "=== Verify EK-RX671 Type 1YN software Fleet Provisioning atomically ==="
-    - python -m pip install --quiet cryptography
+    - echo "=== Verify signed encrypted RX671 Fleet image atomically ==="
     - |
+      set -o pipefail
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_fleet"
-      runtime_dir="$CI_PROJECT_DIR/.rx671-fleet-runtime"
-      encrypted_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi_fleet/aws_wifi_rx671_ek_fleet.mot.enc"
-      fleet_mot="$runtime_dir/aws_wifi_rx671_ek_fleet.mot"
-      park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
-      manifest="$CI_PROJECT_DIR/artifacts/build_rx671_wifi_fleet/manifest.json"
-      mkdir -p "$artifact_dir" "$runtime_dir"
-      chmod 700 "$runtime_dir"
-
-      for path in "$encrypted_mot" "$park_mot" "$manifest"; do
-        if [ ! -f "$path" ]; then
-          echo "Required RX671 Fleet artifact is missing: $path" >&2
-          exit 1
-        fi
+      normal_bundle="$CI_PROJECT_DIR/artifacts/normal_boot_rx671"
+      for id in "$CI_PIPELINE_ID" "$CI_JOB_ID"; do
+        if ! [[ "$id" =~ ^[1-9][0-9]*$ ]]; then echo "Invalid Fleet run identity." >&2; exit 1; fi
       done
-      if [ ! -e "$RX671_WIFI_UART_PORT" ]; then
-        echo "Expected EK-RX671 SCI6 UART is not visible: $RX671_WIFI_UART_PORT" >&2
-        exit 1
-      fi
-
-      # Recover safely from a previously canceled Fleet job before handling
-      # the credential-bearing image. This also clears stale Data Flash.
-      echo "=== Preflight park EK-RX671 on Fleet-claim-free network image ===" | tee "$artifact_dir/preflight_park.log"
-      "$RX671_WIFI_LINUX_RFP_CLI" \
-        -d "$RX671_WIFI_RFP_DEVICE" \
-        -t "$RX671_WIFI_RFP_TOOL" \
-        -if "$RX671_WIFI_RFP_INTERFACE" \
-        -s "$RX671_WIFI_RFP_SPEED" \
-        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-        -erase-chip -noquery \
-        2>&1 | tee -a "$artifact_dir/preflight_park.log"
-      status=${PIPESTATUS[0]}
-      if [ "$status" -ne 0 ]; then exit "$status"; fi
-      "$RX671_WIFI_LINUX_RFP_CLI" \
-        -d "$RX671_WIFI_RFP_DEVICE" \
-        -t "$RX671_WIFI_RFP_TOOL" \
-        -if "$RX671_WIFI_RFP_INTERFACE" \
-        -s "$RX671_WIFI_RFP_SPEED" \
-        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-        -p -v -reset -noquery "$park_mot" \
-        2>&1 | tee -a "$artifact_dir/preflight_park.log"
-      status=${PIPESTATUS[0]}
-      if [ "$status" -ne 0 ]; then exit "$status"; fi
-      touch "$artifact_dir/preflight_parked.ok"
-
-      claim_key="${RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE:-${RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM:-${AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02:-${AWS_FLEET_CLAIM_PRIVATE_KEY:-}}}}"
-      if [ -z "$claim_key" ]; then
-        echo "RX671 Fleet claim private key variable is unavailable." >&2
-        exit 1
-      fi
-
-      # Replace this removal-only trap with the board-parking trap immediately
-      # before the Fleet image is flashed.
-      trap 'unset RX671_FLEET_ARTIFACT_SECRET claim_key; rm -f "$fleet_mot"' EXIT
-      export RX671_FLEET_ARTIFACT_SECRET="$claim_key"
-      expected_context="rx671-fleet-v1:$CI_PIPELINE_ID:$CI_COMMIT_SHA"
-      context="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["encryption_context"])' "$manifest")"
-      if [ "$context" != "$expected_context" ]; then
-        echo "RX671 Fleet artifact context does not match this pipeline and commit." >&2
-        exit 1
-      fi
-      python tools/ci/protect_secret_artifact.py decrypt \
-        --input "$encrypted_mot" \
-        --output "$fleet_mot" \
-        --secret-env RX671_FLEET_ARTIFACT_SECRET \
-        --context "$context"
-      unset RX671_FLEET_ARTIFACT_SECRET claim_key
-      chmod 600 "$fleet_mot"
-
-      expected_sha="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["plaintext_mot_sha256"])' "$manifest")"
-      actual_sha="$(sha256sum "$fleet_mot" | awk '{print $1}')"
-      if [ "$actual_sha" != "$expected_sha" ]; then
-        echo "Decrypted RX671 Fleet MOT digest does not match the build manifest." >&2
-        exit 1
-      fi
-      printf '%s  %s\n' "$actual_sha" "aws_wifi_rx671_ek_fleet.mot" > "$artifact_dir/decrypted_mot.sha256"
-
-      park_board() {
+      runtime_dir="/tmp/rx671-fleet-$CI_PIPELINE_ID-$CI_JOB_ID"
+      umask 077
+      mkdir -p "$artifact_dir"
+      mkdir "$runtime_dir"
+      printf '%s:%s:%s\n' "$CI_PIPELINE_ID" "$CI_JOB_ID" "$CI_COMMIT_SHA" > "$runtime_dir/.owner"
+      cleanup_runtime() {
+        python3 tools/ci/cleanup_rx671_fleet_runtime.py --runtime "$runtime_dir" \
+          --pipeline-id "$CI_PIPELINE_ID" --job-id "$CI_JOB_ID" --source-sha "$CI_COMMIT_SHA"
+      }
+      finish_fleet() {
         original_status=$?
         trap - EXIT
         set +e
-        echo "=== Park EK-RX671 on Fleet-claim-free network image ===" | tee "$artifact_dir/park.log"
-        "$RX671_WIFI_LINUX_RFP_CLI" \
-          -d "$RX671_WIFI_RFP_DEVICE" \
-          -t "$RX671_WIFI_RFP_TOOL" \
-          -if "$RX671_WIFI_RFP_INTERFACE" \
-          -s "$RX671_WIFI_RFP_SPEED" \
-          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-          -erase-chip -noquery \
-          2>&1 | tee -a "$artifact_dir/park.log"
-        erase_status=${PIPESTATUS[0]}
-        "$RX671_WIFI_LINUX_RFP_CLI" \
-          -d "$RX671_WIFI_RFP_DEVICE" \
-          -t "$RX671_WIFI_RFP_TOOL" \
-          -if "$RX671_WIFI_RFP_INTERFACE" \
-          -s "$RX671_WIFI_RFP_SPEED" \
-          -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-          -p -v -reset -noquery "$park_mot" \
-          2>&1 | tee -a "$artifact_dir/park.log"
-        park_status=${PIPESTATUS[0]}
-        rm -f "$fleet_mot"
-        if [ "$erase_status" -ne 0 ] || [ "$park_status" -ne 0 ]; then
-          echo "Failed to park EK-RX671 after Fleet test." >&2
-          if [ "$original_status" -eq 0 ]; then
+        unset RX671_FLEET_ARTIFACT_SECRET claim_key
+        if [ -f "$artifact_dir/fleet_flash_started.ok" ] && [ ! -f "$artifact_dir/parked.ok" ]; then
+          if python3 -c "import os,sys; from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; t=get_target('rx671-wifi'); raise_if_rfp_unsafe(t); os.path.lexists(t['owner_file']) and sys.exit('Retained owner; normal restore skipped')"; then
+            python3 tools/install_normal_boot.py --bundle "$normal_bundle" --target rx671-wifi --source-sha "$CI_COMMIT_SHA" \
+              2>&1 | tee "$artifact_dir/park.log"
+            park_status=${PIPESTATUS[0]}
+            if [ "$park_status" -eq 0 ]; then touch "$artifact_dir/parked.ok"; else original_status=1; fi
+          else
             original_status=1
           fi
+        fi
+        if [ ! -f "$artifact_dir/fleet_flash_started.ok" ] || [ -f "$artifact_dir/parked.ok" ]; then
+          cleanup_runtime || original_status=1
         else
-          touch "$artifact_dir/parked.ok"
+          echo "Fleet private staging retained: $runtime_dir" >&2
+          touch "$artifact_dir/park_failed"
         fi
         exit "$original_status"
       }
-      trap park_board EXIT
-
-      echo "=== Erase stale Data Flash and flash exact encrypted-build artifact ==="
+      trap finish_fleet EXIT
+      claim_key="${RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM_FILE:-${RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM:-${AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02:-${AWS_FLEET_CLAIM_PRIVATE_KEY:-}}}}"
+      if [ -z "$claim_key" ]; then echo "Fleet artifact key is unavailable." >&2; exit 1; fi
+      export RX671_FLEET_ARTIFACT_SECRET="$claim_key"
+      python3 tools/ci/protected_normal_bundle.py unpack \
+        --artifact "$CI_PROJECT_DIR/artifacts/normal_boot_rx671_fleet" --output "$runtime_dir/fleet-bundle" \
+        --target rx671-wifi --source-sha "$CI_COMMIT_SHA" --pipeline-id "$CI_PIPELINE_ID" \
+        --secret-env RX671_FLEET_ARTIFACT_SECRET
+      unpack_status=$?
+      unset RX671_FLEET_ARTIFACT_SECRET claim_key
+      if [ "$unpack_status" -ne 0 ]; then exit "$unpack_status"; fi
+      # Validate both complete sets before the first erase or program command.
+      python3 -c "import os; from pathlib import Path; from tools.normal_boot import validate; from tools.idt.targets import get_target; validate(Path(os.environ['CI_PROJECT_DIR'])/'artifacts/normal_boot_rx671',get_target('rx671-wifi'),os.environ['CI_COMMIT_SHA'])"
+      validation_status=$?
+      if [ "$validation_status" -ne 0 ]; then exit "$validation_status"; fi
       touch "$artifact_dir/fleet_flash_started.ok"
-      "$RX671_WIFI_LINUX_RFP_CLI" \
-        -d "$RX671_WIFI_RFP_DEVICE" \
-        -t "$RX671_WIFI_RFP_TOOL" \
-        -if "$RX671_WIFI_RFP_INTERFACE" \
-        -s "$RX671_WIFI_RFP_SPEED" \
-        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-        -erase-chip -noquery \
-        2>&1 | tee "$artifact_dir/erase.log"
-      status=${PIPESTATUS[0]}
-      if [ "$status" -ne 0 ]; then exit "$status"; fi
-
-      "$RX671_WIFI_LINUX_RFP_CLI" \
-        -d "$RX671_WIFI_RFP_DEVICE" \
-        -t "$RX671_WIFI_RFP_TOOL" \
-        -if "$RX671_WIFI_RFP_INTERFACE" \
-        -s "$RX671_WIFI_RFP_SPEED" \
-        -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-        -p -v -reset -noquery "$fleet_mot" \
+      python3 tools/install_normal_boot.py --bundle "$runtime_dir/fleet-bundle" --target rx671-wifi --source-sha "$CI_COMMIT_SHA" \
         2>&1 | tee "$artifact_dir/flash.log"
       status=${PIPESTATUS[0]}
       if [ "$status" -ne 0 ]; then exit "$status"; fi
@@ -4961,64 +4674,41 @@ test_rx671_wifi_fleet:
       exit "$test_status"
   after_script:
     - |
-      # GitLab sends cancellation directly to the script shell, so its EXIT
-      # trap is not sufficient by itself. after_script runs in a fresh shell
-      # and provides a second, idempotent claim-credential removal/park path.
+      # Cancellation may bypass EXIT; reacquire the same reviewed bench FD9.
       set +e
       set -o pipefail
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx671_wifi_fleet"
-      runtime_dir="$CI_PROJECT_DIR/.rx671-fleet-runtime"
-      fleet_mot="$runtime_dir/aws_wifi_rx671_ek_fleet.mot"
-      park_mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"
+      for id in "$CI_PIPELINE_ID" "$CI_JOB_ID"; do
+        if ! [[ "$id" =~ ^[1-9][0-9]*$ ]]; then exit 1; fi
+      done
+      runtime_dir="/tmp/rx671-fleet-$CI_PIPELINE_ID-$CI_JOB_ID"
       mkdir -p "$artifact_dir"
-      rm -f "$fleet_mot"
-
-      if [ -f "$artifact_dir/parked.ok" ]; then
-        echo "RX671 Fleet after_script: board already parked." | tee "$artifact_dir/after_script_park.log"
-      elif [ -f "$artifact_dir/preflight_parked.ok" ] && [ ! -f "$artifact_dir/fleet_flash_started.ok" ]; then
-        echo "RX671 Fleet after_script: preflight park is still authoritative; Fleet flash never started." | tee "$artifact_dir/after_script_park.log"
-        touch "$artifact_dir/parked.ok"
-      elif [ ! -f "$park_mot" ]; then
-        echo "RX671 Fleet after_script: claim-free park image is unavailable." | tee "$artifact_dir/after_script_park.log" >&2
-        touch "$artifact_dir/after_script_park_failed"
-      else
-        exec 8>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"
-        if ! flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 8; then
-          echo "RX671 Fleet after_script: hardware lock is unavailable." >&2
+      if [ -f .venv-pi/bin/activate ]; then source .venv-pi/bin/activate; fi
+      if [ -f "$artifact_dir/fleet_flash_started.ok" ] && [ ! -f "$artifact_dir/parked.ok" ]; then
+        exec 9>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"
+        # Recovery never waits an hour for another owner: retain the runtime
+        # if a one-minute lock wait cannot acquire this bench.
+        if ! flock -w 60 9; then
           touch "$artifact_dir/after_script_park_failed"
-        elif ! python3 -c "from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; raise_if_rfp_unsafe(get_target('rx671-wifi'))"; then
-          echo "RX671 Fleet after_script: unverified RFP termination; park skipped." >&2
+        elif ! python3 -c "import os,sys; from tools.idt.targets import get_target; from tools.idt.rfp_process import raise_if_rfp_unsafe; t=get_target('rx671-wifi'); raise_if_rfp_unsafe(t); os.path.lexists(t['owner_file']) and sys.exit('Retained owner; normal restore skipped')"; then
           touch "$artifact_dir/after_script_park_failed"
         else
-          echo "=== after_script: park EK-RX671 on claim-free network image ===" | tee "$artifact_dir/after_script_park.log"
-          "$RX671_WIFI_LINUX_RFP_CLI" \
-            -d "$RX671_WIFI_RFP_DEVICE" \
-            -t "$RX671_WIFI_RFP_TOOL" \
-            -if "$RX671_WIFI_RFP_INTERFACE" \
-            -s "$RX671_WIFI_RFP_SPEED" \
-            -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-            -erase-chip -noquery \
-            2>&1 | tee -a "$artifact_dir/after_script_park.log"
-          erase_status=${PIPESTATUS[0]}
-          "$RX671_WIFI_LINUX_RFP_CLI" \
-            -d "$RX671_WIFI_RFP_DEVICE" \
-            -t "$RX671_WIFI_RFP_TOOL" \
-            -if "$RX671_WIFI_RFP_INTERFACE" \
-            -s "$RX671_WIFI_RFP_SPEED" \
-            -auth id "$RX671_WIFI_RFP_AUTH_ID" \
-            -p -v -reset -noquery "$park_mot" \
-            2>&1 | tee -a "$artifact_dir/after_script_park.log"
-          park_status=${PIPESTATUS[0]}
-          if [ "$erase_status" -eq 0 ] && [ "$park_status" -eq 0 ]; then
+          python3 tools/install_normal_boot.py --bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx671" \
+            --target rx671-wifi --source-sha "$CI_COMMIT_SHA" 2>&1 | tee "$artifact_dir/after_script_park.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -eq 0 ]; then
             touch "$artifact_dir/parked.ok" "$artifact_dir/after_script_parked.ok"
           else
-            echo "RX671 Fleet after_script: failed to park the board." | tee -a "$artifact_dir/after_script_park.log" >&2
             touch "$artifact_dir/after_script_park_failed"
           fi
         fi
       fi
-      rm -f "$fleet_mot"
-      rmdir "$runtime_dir" 2>/dev/null || true
+      if [ ! -f "$artifact_dir/fleet_flash_started.ok" ] || [ -f "$artifact_dir/parked.ok" ]; then
+        python3 tools/ci/cleanup_rx671_fleet_runtime.py --runtime "$runtime_dir" \
+          --pipeline-id "$CI_PIPELINE_ID" --job-id "$CI_JOB_ID" --source-sha "$CI_COMMIT_SHA"
+      else
+        echo "Fleet private staging retained: $runtime_dir" >&2
+      fi
   artifacts:
     when: always
     paths:
@@ -5253,8 +4943,7 @@ test_rx72n_ether_tls13_0rtt:
   extends: .rx72n_linux_hw_job
   needs:
     - build_rx72n_ether
-    - flash_rx72n_ether
-    - provision_rx72n_ether_mqtt
+    - package_normal_boot_rx72n
   rules:
     - if: '$RX72N_SKIP_HW_TESTS != "true" && $RX72N_TEST_SCOPE == "tls13_0rtt" && $RX72N_TLS_BACKEND == "tsip" && $RX72N_TLS13_0RTT_ENABLE == "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_CLIENT_CERT_RX72N_02 && $AWS_PRIVATE_KEY_RX72N_02'
       when: on_success
@@ -5345,6 +5034,69 @@ test_rx72n_ether_tls13_0rtt:
         exit 1
       fi
 
+      artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_tls13_0rtt"
+      mkdir -p "$artifact_dir"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      # One resource_group job must own the full flash -> provision -> test
+      # transaction. Separate jobs can be individually serialized yet still
+      # interleave with another pipeline and erase the freshly provisioned
+      # data flash before this test starts.
+      echo "=== Atomic step 1/3: install signed normal application and public boot trust ==="
+      python3 tools/install_normal_boot.py \
+        --bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx72n" \
+        --target rx72n-ethernet \
+        --source-sha "$CI_COMMIT_SHA" \
+        2>&1 | tee "$artifact_dir/flash_rx72n.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+
+      echo "=== Atomic step 2/3: provision credentials ==="
+      shadow_args=()
+      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
+        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
+      fi
+
+      provision_args=(
+        --port "$RX72N_LINUX_UART_PORT"
+        --baud "$RX72N_LINUX_UART_BAUD_RATE"
+        --thing-name "$RX72N_DEVICE_ID"
+        --endpoint "$AWS_IOT_ENDPOINT"
+        --cert "$AWS_CLIENT_CERT_RX72N_02"
+        --key "$AWS_PRIVATE_KEY_RX72N_02"
+        --reset-cmd "$reset_cmd"
+        --reset-after-open
+        --boot-wait 12
+        --cli-timeout 25
+        --attempts 3
+        --no-reset
+      )
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        provision_args+=(--skip-private-key)
+      fi
+
+      python tools/provision_rx72n.py "${provision_args[@]}" "${shadow_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_rx72n.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+
+      if [ "${RX72N_TLS_BACKEND}" = "tsip" ]; then
+        python tools/provision_tsip_over_uart.py \
+          --target rx72n \
+          --port "$RX72N_LINUX_UART_PORT" \
+          --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+          --chunk-size "${RX72N_TSIP_PROVISION_CHUNK_SIZE}" \
+          --timeout "${RX72N_TSIP_PROVISION_TIMEOUT_SECONDS}" \
+          --no-enter-cli \
+          --reset-after \
+          2>&1 | tee "$artifact_dir/provision_tsip.log"
+        status="${PIPESTATUS[0]}"
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+      fi
+
+      echo "=== Atomic step 3/3: verify TLS 1.3 resumption and 0-RTT ==="
       timeout "${LANBENCH_MBEDTLS_0RTT_TIMEOUT_SECONDS:-480}" \
       python3 -u tools/test_lanbench_tls13_0rtt_rx72n.py \
         --port "$RX72N_LINUX_UART_PORT" \
@@ -5365,14 +5117,57 @@ test_rx72n_ether_fleet:
   stage: fleet_test
   extends: .rx72n_linux_hw_job
   needs:
-    - build_rx72n_ether_fleet
-    - flash_rx72n_ether_fleet
-    - provision_rx72n_ether_fleet
+    - job: package_normal_boot_rx72n_fleet
+      artifacts: true
+    - job: build_rx72n_ether_fleet
+      artifacts: true
+    - job: test_rx72n_ether_ota
+      artifacts: false
+      optional: true
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $RX72N_HW_RUNNER_PLATFORM == "linux" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
+    - echo "=== Install signed Fleet application and public boot trust ==="
+    - |
+      install_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_fleet/install"
+      mkdir -p "$install_dir"
+      python3 tools/install_normal_boot.py \
+        --bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx72n_fleet" \
+        --target rx72n-ethernet --source-sha "$CI_COMMIT_SHA" \
+        2>&1 | tee "$install_dir/install.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+    - echo "=== Provision RX72N fleet claim credentials on Linux runner ==="
+    - |
+      artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx72n_ether_fleet"
+      mkdir -p "$artifact_dir"
+      reset_cmd="$RX72N_LINUX_RFP_CLI -device RX72x -tool $RX72N_LINUX_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
+
+      shadow_args=()
+      if [ -n "${RX72N_LINUX_COMMAND_PORT:-}" ]; then
+        shadow_args+=(--shadow-port "$RX72N_LINUX_COMMAND_PORT" --shadow-baud "$RX72N_LINUX_COMMAND_BAUD_RATE" --shadow-name cn8)
+      fi
+
+      python tools/provision_rx72n.py \
+        --fleet-provisioning \
+        --port "$RX72N_LINUX_UART_PORT" \
+        --baud "$RX72N_LINUX_UART_BAUD_RATE" \
+        --endpoint "$AWS_IOT_ENDPOINT" \
+        --template-name "$AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02" \
+        --claim-cert "$AWS_FLEET_CLAIM_CERT_RX72N_02" \
+        --claim-key "$AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02" \
+        --no-reset \
+        --reset-cmd "$reset_cmd" \
+        --reset-after-open \
+        --boot-wait 12 \
+        --cli-timeout 25 \
+        --attempts 3 \
+        "${shadow_args[@]}" \
+        2>&1 | tee "$artifact_dir/provision_rx72n_fleet.log"
+      status="${PIPESTATUS[0]}"
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
     - echo "=== Verify RX72N fleet provisioning on Linux runner ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_fleet"
@@ -5396,6 +5191,7 @@ test_rx72n_ether_fleet:
     when: always
     paths:
       - artifacts/test_rx72n_ether_fleet/
+      - artifacts/provision_rx72n_ether_fleet/
     expire_in: 7 days
 
 debug_rx72n_ether_fleet_current_app:
@@ -5483,60 +5279,31 @@ cleanup_rx72n_ether_fleet:
       - artifacts/cleanup_rx72n_ether_fleet/
     expire_in: 7 days
 
-flash_rx65n_bg96_fleet:
-  stage: fleet_flash
+test_rx65n_bg96_fleet:
+  stage: fleet_test
   extends:
     - .rx65n_bg96_linux_hw_job
     - .rx65n_bg96_fleet_rules
   needs:
+    - job: package_normal_boot_rx65n_fleet
+      artifacts: true
     - job: build_rx65n_bg96_fleet
       artifacts: true
     - job: cleanup_rx65n_bg96_ota
       artifacts: false
       optional: true
   script:
-    - echo "=== Flash CK-RX65N BG96 bootloader for Fleet Provisioning ==="
+    - echo "=== Install signed Fleet application and public boot trust ==="
     - |
-      artifact_dir="$CI_PROJECT_DIR/artifacts/flash_rx65n_bg96_fleet"
-      mkdir -p "$artifact_dir"
-      actual_host="$(hostname)"
-      if [ -n "${RX65N_BG96_RUNNER_HOSTNAME:-}" ] && ! printf '%s' "${actual_host}" | grep -Fq "${RX65N_BG96_RUNNER_HOSTNAME}"; then
-        echo "This job must run on ${RX65N_BG96_RUNNER_HOSTNAME}*, but it was scheduled on ${actual_host}." >&2
-        exit 1
-      fi
-
-      rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
-      python3 tools/bg96_bootloader_integration.py \
-        --action flash-bootloader \
-        --bootloader-mot "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96_fleet/boot_loader_ck_rx65n.mot" \
-        --uart-port "unused" \
-        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
-        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
-        --rfp-tool "${rfp_tool}" \
-        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
-        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
-        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
-        2>&1 | tee "$artifact_dir/flash_fleet_bootloader.log"
+      install_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_fleet/install"
+      mkdir -p "$install_dir"
+      python3 tools/install_normal_boot.py \
+        --bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx65n_fleet" \
+        --target rx65n-bg96 --source-sha "$CI_COMMIT_SHA" \
+        2>&1 | tee "$install_dir/install.log"
       status="${PIPESTATUS[0]}"
-      exit "$status"
-  artifacts:
-    when: always
-    paths:
-      - artifacts/flash_rx65n_bg96_fleet/
-    expire_in: 7 days
-
-provision_rx65n_bg96_fleet:
-  stage: fleet_provision
-  extends:
-    - .rx65n_bg96_linux_hw_job
-    - .rx65n_bg96_fleet_rules
-  needs:
-    - job: build_rx65n_bg96_fleet
-      artifacts: true
-    - job: flash_rx65n_bg96_fleet
-      artifacts: true
-  script:
-    - echo "=== Download and provision CK-RX65N BG96 Fleet Provisioning image ==="
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
+    - echo "=== Provision CK-RX65N BG96 Fleet credentials ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/provision_rx65n_bg96_fleet"
       mkdir -p "$artifact_dir"
@@ -5548,48 +5315,10 @@ provision_rx65n_bg96_fleet:
 
       uart_port="${RX65N_BG96_UART_PORT:-${COMMAND_PORT:-}}"
       rfp_tool="${RX65N_BG96_RFP_TOOL:-e2l:OBE110020}"
-      python3 tools/bg96_bootloader_integration.py \
-        --action download-rsu \
-        --bootloader-mot "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96_fleet/boot_loader_ck_rx65n.mot" \
-        --userprog-rsu "$CI_PROJECT_DIR/artifacts/build_rx65n_bg96_fleet/aws_bg96_ck_rx65n_fleet.rsu" \
-        --selected-uart-out "$artifact_dir/selected_uart_port.txt" \
-        --uart-port "${uart_port}" \
-        --ready-timeout "${RX65N_BG96_BOOTLOADER_READY_TIMEOUT_SECONDS}" \
-        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
-        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
-        --rfp-tool "${rfp_tool}" \
-        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
-        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
-        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
-        2>&1 | tee "$artifact_dir/download_fleet_rsu.log"
-      status="${PIPESTATUS[0]}"
-      if [ "$status" -ne 0 ]; then
-        exit "$status"
-      fi
-
-      if [ -f "$artifact_dir/selected_uart_port.txt" ]; then
-        uart_port="$(tr -d '\r\n' < "$artifact_dir/selected_uart_port.txt")"
-      fi
       if [ -z "$uart_port" ]; then
-        echo "RX65N BG96 UART port was not selected." >&2
-        exit 1
+        uart_port="$(python3 -c "from tools.idt.targets import get_target; print(get_target('rx65n-bg96')['uart'])")"
       fi
-
-      python3 tools/bg96_bootloader_integration.py \
-        --action run-app \
-        --uart-port "${uart_port}" \
-        --app-startup-timeout "${RX65N_BG96_APP_STARTUP_TIMEOUT_SECONDS}" \
-        --rfp-cli "${RX65N_BG96_LINUX_RFP_CLI}" \
-        --rfp-device "${RX65N_BG96_RFP_DEVICE}" \
-        --rfp-tool "${rfp_tool}" \
-        --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
-        --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
-        --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
-        2>&1 | tee "$artifact_dir/run_fleet_app.log"
-      status="${PIPESTATUS[0]}"
-      if [ "$status" -ne 0 ]; then
-        exit "$status"
-      fi
+      printf '%s\n' "$uart_port" > "$artifact_dir/selected_uart_port.txt"
 
       python3 tools/bg96_bootloader_integration.py \
         --action provision-fleet \
@@ -5605,22 +5334,7 @@ provision_rx65n_bg96_fleet:
         --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
         2>&1 | tee "$artifact_dir/provision_fleet.log"
       status="${PIPESTATUS[0]}"
-      exit "$status"
-  artifacts:
-    when: always
-    paths:
-      - artifacts/provision_rx65n_bg96_fleet/
-    expire_in: 7 days
-
-test_rx65n_bg96_fleet:
-  stage: fleet_test
-  extends:
-    - .rx65n_bg96_linux_hw_job
-    - .rx65n_bg96_fleet_rules
-  needs:
-    - job: provision_rx65n_bg96_fleet
-      artifacts: true
-  script:
+      if [ "$status" -ne 0 ]; then exit "$status"; fi
     - echo "=== Verify CK-RX65N BG96 Fleet Provisioning ==="
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx65n_bg96_fleet"
@@ -5649,7 +5363,7 @@ test_rx65n_bg96_fleet:
       python tools/test_fleet_rx72n.py \
         --label "CK-RX65N BG96" \
         --log-port "$uart_port" \
-        --log-baud "$UART_BAUD_RATE" \
+        --log-baud "$RX65N_BG96_UART_BAUD_RATE" \
         --timeout "$RX65N_BG96_FLEET_TEST_TIMEOUT_SECONDS" \
         --app-reset-retries "$RX65N_BG96_APP_RESET_RETRIES" \
         --reset-cmd "$reset_cmd" \
@@ -5662,6 +5376,7 @@ test_rx65n_bg96_fleet:
     when: always
     paths:
       - artifacts/test_rx65n_bg96_fleet/
+      - artifacts/provision_rx65n_bg96_fleet/
     expire_in: 7 days
 
 cleanup_rx65n_bg96_fleet:

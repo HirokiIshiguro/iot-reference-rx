@@ -167,6 +167,15 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertNotIn(".rx65n_bg96_linux_hw_job", creator)
         self.assertNotIn("parked.ok", creator)
 
+    def test_fleet_owns_signed_installation_provisioning_and_observation(self) -> None:
+        job = job_block(self.ci, "test_rx65n_bg96_fleet")
+        ordered = ("tools/install_normal_boot.py", "--action provision-fleet", "tools/test_fleet_rx72n.py")
+        positions = [job.index(token) for token in ordered]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("package_normal_boot_rx65n_fleet", job)
+        self.assertNotIn("--action download-rsu", job)
+        self.assertNotIn("--action flash-bootloader", job)
+
     def test_software_tsip_and_tls_version_boundaries_are_preserved(self) -> None:
         job = job_block(
             self.ci, "test_rx65n_bg96_mqtt", "test_rx65n_bg96_tls13_0rtt"
