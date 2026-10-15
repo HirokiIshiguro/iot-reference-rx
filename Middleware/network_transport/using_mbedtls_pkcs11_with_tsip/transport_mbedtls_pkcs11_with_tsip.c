@@ -64,9 +64,6 @@
 #include "pkcs11.h"
 #include "core_pki_utils.h"
 
-/* Mbedtls with TSIP */
-#include "key_write.h"
-
 /* strnlen includes for CC-RX compiler. */
 #if defined(__CCRX__)
 #include "strnlen.h"
