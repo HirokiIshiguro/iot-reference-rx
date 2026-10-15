@@ -685,10 +685,7 @@ void vAssignCredentials(void)
     pValue = keyCLIENT_PRIVATE_KEY_PEM;
     xprvWriteCacheEntry(strlen("key"), "key", strlen(pValue), pValue);
 
-    /* Write code signing certificate */
-    pValue = otapalconfigCODE_SIGNING_CERTIFICATE;
-    xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pValue), pValue);
-
+    /* Signing trust is provisioned separately by the public maintenance flow. */
     /* Write root CA */
     pValue = democonfigROOT_CA_PEM;
     xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pValue), pValue);

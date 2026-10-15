@@ -792,14 +792,7 @@ BaseType_t vAssignCredentials(void)
     }
 #endif
 
-    /* Write code signing certificate */
-    pValue = otapalconfigCODE_SIGNING_CERTIFICATE;
-    xStoreResult = xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pValue), pValue);
-    if( xStoreResult < 0 )
-    {
-        return pdFALSE;
-    }
-
+    /* Signing trust is provisioned separately by the public maintenance flow. */
     /* Write root CA */
     pValue = democonfigROOT_CA_PEM;
     xStoreResult = xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pValue), pValue);

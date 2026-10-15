@@ -688,6 +688,7 @@ idt_ci_contract:
         tools.ci.tests.test_idt_rx671_provision \
         tools.ci.tests.test_idt_public_signer_provision \
         tools.ci.tests.test_idt_public_signer_integration \
+        tools.ci.tests.test_tls_metadata_preserves_signing_trust \
         tools.ci.tests.test_idt_ci_contract \
         tools.ci.tests.test_idt_windows_checkout \
         tools.ci.tests.test_prepare_public_signer \

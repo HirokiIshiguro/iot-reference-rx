@@ -289,13 +289,7 @@ static BaseType_t prvRefreshAwsCredentialMetadata(void)
         }
     }
 
-    pcValue = (char *)otapalconfigCODE_SIGNING_CERTIFICATE;
-    lStoreResult = xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pcValue), pcValue);
-    if (lStoreResult < 0)
-    {
-        return pdFALSE;
-    }
-
+    /* Signing trust is provisioned separately by the public maintenance flow. */
     pcValue = (char *)democonfigROOT_CA_PEM;
     lStoreResult = xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pcValue), pcValue);
     if (lStoreResult < 0)
