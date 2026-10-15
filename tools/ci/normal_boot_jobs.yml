@@ -1,9 +1,11 @@
 # Public normal-install bundles are prepared after normal images are retained.
 .normal_boot_package:
+  timeout: 3 hours
   extends: .rx_windows_canonical_checkout
   stage: build
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   script:
+    - !reference [.windows_ccrx_host_lease, script]
     - |
       $ErrorActionPreference = 'Stop'
       python -m pip install --user cryptography

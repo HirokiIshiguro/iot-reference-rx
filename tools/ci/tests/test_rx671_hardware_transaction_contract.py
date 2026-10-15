@@ -34,9 +34,9 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
             '"/tmp/ek-rx671-rpi1-hardware.lock"',
             self.ci,
         )
-        self.assertIn('exec 9>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"', template)
+        self.assertIn('exec 9>>"${RX671_WIFI_HARDWARE_LOCK_PATH}"', template)
         self.assertIn(
-            'flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
+            'flock -w "${RX671_WIFI_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
             template,
         )
         self.assertGreater(
@@ -331,7 +331,7 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         self.assertNotIn("-erase-chip", job)
         self.assertNotIn("aws_wifi_rx671_ek_fleet.mot.enc", job)
         self.assertIn('runtime_dir="/tmp/rx671-fleet-$CI_PIPELINE_ID-$CI_JOB_ID"', job)
-        self.assertIn('exec 9>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"', job)
+        self.assertIn('exec 9>>"${RX671_WIFI_HARDWARE_LOCK_PATH}"', job)
         self.assertIn("raise_if_rfp_unsafe", job)
         self.assertIn("Retained owner; normal restore skipped", job)
         self.assertIn("cleanup_rx671_fleet_runtime.py", job)

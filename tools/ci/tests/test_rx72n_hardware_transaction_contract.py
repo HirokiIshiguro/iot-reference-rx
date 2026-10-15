@@ -35,9 +35,9 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
             '"/tmp/e2lite-rfp-cli.lock.d/rx72n-device-01.lock"',
             self.ci,
         )
-        self.assertIn('exec 9>>"${RX72N_RPI1_HARDWARE_LOCK_PATH}"', template)
+        self.assertIn('exec 9>>"${RX72N_HARDWARE_LOCK_PATH}"', template)
         self.assertIn(
-            'flock -w "${RX72N_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
+            'flock -w "${RX72N_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
             template,
         )
         self.assertGreater(

@@ -25,12 +25,15 @@ import xml.etree.ElementTree as ET
 try:
     from . import public_signer_provision as controller
     from .targets import get_target
+except ImportError:
+    import public_signer_provision as controller
+    from targets import get_target
+
+try:
     from .. import build_public_signer_provisioner as producer
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     import build_public_signer_provisioner as producer
-    import public_signer_provision as controller
-    from targets import get_target
 
 
 def _unlinked(path):

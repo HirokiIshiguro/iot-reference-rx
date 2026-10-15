@@ -40,6 +40,43 @@ class NormalBootTests(unittest.TestCase):
                 self.assertEqual(normal_boot.FILES | {"normal_install_manifest.json"}, {path.name for path in root.iterdir()})
                 self.assertFalse(any(b"PRIVATE KEY" in path.read_bytes() for path in root.iterdir()))
 
+    def test_direct_cli_prepares_real_synthetic_bundles_for_all_three_targets(self):
+        # Execute the actual script from outside the checkout. Only Git state is
+        # synthetic: no module preloading masks the script/package import path,
+        # and every firmware, public-PEM, manifest and signature check is real.
+        startup = self.root/"synthetic-python-startup"
+        startup.mkdir()
+        (startup/"sitecustomize.py").write_text(
+            "import subprocess\n"
+            "def synthetic_git(arguments, *args, **kwargs):\n"
+            "    if arguments[0] == 'git' and arguments[-2:] == ['rev-parse', 'HEAD']:\n"
+            f"        return subprocess.CompletedProcess(arguments, 0, {SOURCE_SHA!r} + '\\n', '')\n"
+            "    if arguments[0] == 'git' and arguments[-3:] == ['status', '--porcelain=v1', '--untracked-files=all']:\n"
+            "        return subprocess.CompletedProcess(arguments, 0, '', '')\n"
+            "    raise AssertionError('Unexpected subprocess: no build or hardware is permitted')\n"
+            "subprocess.run = synthetic_git\n", encoding="utf-8")
+        environment = {**os.environ, "PYTHONPATH": str(startup), "PYTHONDONTWRITEBYTECODE": "1"}
+        options = {"--rsu": "normal_app.rsu", "--bootloader": "bootloader.mot",
+                   "--bootloader-bank1": "bootloader_bank1.mot", "--provisioner-mot": "public_signer_provisioner.mot",
+                   "--provisioner-manifest": "public_signer_provisioner_manifest.json",
+                   "--signer-cert": "signer.crt.pem", "--signer-public-key": "signer.pub.pem"}
+        for target_id in normal_boot.trust.LAYOUTS:
+            with self.subTest(target=target_id):
+                original, fixture, expected = self.bundle(target_id)
+                output = self.root/(target_id+"-direct-cli")
+                command = [sys.executable, str(ROOT/"tools/prepare_normal_boot.py"),
+                           "--source", str(ROOT), "--target", target_id, "--output", str(output)]
+                for option, name in options.items():
+                    command.extend((option, str(original/name)))
+                completed = subprocess.run(command, cwd=self.root, env=environment, capture_output=True,
+                                           text=True, encoding="utf-8", timeout=30)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual({name: expected[name] for name in ("profile", "source_sha", "target_id", "tls_backend")},
+                                 json.loads(completed.stdout))
+                self.assertEqual(expected, normal_boot.validate(output, fixture.target, SOURCE_SHA))
+                self.assertEqual({path.name: normal_boot.file_hash(path) for path in original.iterdir()},
+                                 {path.name: normal_boot.file_hash(path) for path in output.iterdir()})
+
     def test_wrong_source_target_app_bytes_mirror_and_private_pem_fail_before_device_checks(self):
         root, fixture, _ = self.bundle()
         cases = [("normal_app.rsu", lambda raw: raw[:-1]+bytes([raw[-1]^1])),
