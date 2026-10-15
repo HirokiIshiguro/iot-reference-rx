@@ -181,7 +181,8 @@ def _prepared(files, target, source_sha):
         raise RuntimeError("Public signer provisioner manifest/hash mismatch")
     verification = metadata.get("credential_verification", {})
     if (not isinstance(verification, dict) or any(verification.get(name) is not True for name in
-            ("client_and_wifi_headers_empty", "local_overrides_absent", "injection_environment_removed", "private_pem_markers_absent")) or
+            ("client_and_wifi_headers_empty", "local_overrides_absent", "injection_environment_removed", "private_pem_payloads_absent")) or
+            verification.get("private_pem_scan_policy") != material.PRIVATE_PEM_SCAN_POLICY or
             verification.get("scope") != "embedded_client_claim_private_and_wifi_credentials"):
         raise RuntimeError("Public signer credential isolation is not verified")
     commands = metadata.get("effective_command_validation", {})
@@ -206,8 +207,8 @@ def _prepared(files, target, source_sha):
     runs = _runs(memory)
     if not any(marker in run for run in runs):
         raise RuntimeError("Public signer provisioner has no matching compiled source identity")
-    if any(re.search(br"-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----", run) for run in runs):
-        raise RuntimeError("Private credential material detected in public maintenance image")
+    for run in runs:
+        material.reject_private_pem_payloads(run)
     actual = {"reset_vector": f"0x{vector:08X}", "mde": "0xFFFFFF8F", "initial_bank": 0,
               "compiled_source_identity_verified": True, "code_flash_and_options_only": True}
     claims = metadata.get("image_validation")

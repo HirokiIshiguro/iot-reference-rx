@@ -176,5 +176,31 @@ class PreparePublicSignerTests(unittest.TestCase):
                 self.assertFalse((fixture.output/"build").exists())
                 for name in helper.controller.ENVIRONMENT_INPUTS:self.assertFalse((fixture.output/name).exists())
 
+    def test_post_build_validation_failure_retains_private_diagnostic_without_local_values(self):
+        fixture=self.fixture();build,run=self.production_mocks(fixture)
+        def failed_validation(*args,**kwargs):
+            build(*args,**kwargs)
+            directory=args[2]
+            (directory/"build-private.log").write_text("SYNTHETIC BUILD LOG")
+            (directory/"launcher-private.log").write_text("SYNTHETIC LAUNCHER LOG")
+            local_value="SYNTHETIC_VALUE_THAT_MUST_NOT_BE_CAPTURED"
+            raise RuntimeError("synthetic post-build image validation failed")
+        stdout,stderr=io.StringIO(),io.StringIO()
+        with patch.object(helper.producer,"build",side_effect=failed_validation), \
+                patch.object(helper.subprocess,"run",side_effect=run), \
+                patch.dict(os.environ,{variable:"" for variable in helper.controller.ENVIRONMENT_INPUTS.values()}), \
+                redirect_stdout(stdout),redirect_stderr(stderr):
+            status=helper.main(["--source",str(fixture.source),"--target",fixture.target["id"],
+                "--output",str(fixture.output),"--workspace",str(fixture.workspace),"--python","fixture-python"])
+        self.assertEqual(1,status);self.assertFalse(stdout.getvalue())
+        self.assertNotIn("synthetic post-build",stderr.getvalue())
+        diagnostic=(fixture.output/"failure-private.log").read_text()
+        self.assertIn("RuntimeError: synthetic post-build image validation failed",diagnostic)
+        self.assertNotIn("SYNTHETIC_VALUE_THAT_MUST_NOT_BE_CAPTURED",diagnostic)
+        self.assertEqual("SYNTHETIC BUILD LOG",(fixture.output/"failed-build-private.log").read_text())
+        self.assertEqual("SYNTHETIC LAUNCHER LOG",(fixture.output/"failed-launcher-private.log").read_text())
+        self.assertFalse((fixture.output/"build").exists())
+        for name in helper.controller.ENVIRONMENT_INPUTS:self.assertFalse((fixture.output/name).exists())
+
 
 if __name__=="__main__":unittest.main()

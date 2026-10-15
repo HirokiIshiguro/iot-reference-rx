@@ -141,6 +141,27 @@ class PublicSignerProfileTests(unittest.TestCase):
                 response.write_text(invalid,encoding='utf-8')
                 with self.assertRaises(RuntimeError):builder.validate_effective_commands(project,SOURCE_SHA,log)
 
+    def test_pem_parser_constants_are_allowed_but_payloads_and_truncation_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/'provisioner.mot'
+            for target in builder.BUILD_HELPERS:
+                for kind in (b'',b'RSA ',b'EC ',b'ENCRYPTED '):
+                    header=b'-----BEGIN '+kind+b'PRIVATE KEY-----'
+                    for suffix in (b'\0',b'\n\0',b'\r\n\0',b'',b'\n',b'\nU1lOVEhFVElD\n-----END PRIVATE KEY-----\0'):
+                        with self.subTest(target=target,kind=kind,suffix=suffix):
+                            content=header+suffix
+                            start=builder.CODE_FLASH_START[target]+0x2000
+                            # The marker crosses S-record boundaries; validation
+                            # must inspect reconstructed bytes, not ASCII MOT.
+                            path.write_text(image(target)+srecord(start,content[:12])+srecord(start+12,content[12:]),encoding='ascii')
+                            if suffix in (b'\0',b'\n\0',b'\r\n\0'):
+                                builder.validate_image(path,target,SOURCE_SHA)
+                            else:
+                                with self.assertRaisesRegex(RuntimeError,'Private PEM'):
+                                    builder.validate_image(path,target,SOURCE_SHA)
+                    with self.assertRaisesRegex(RuntimeError,'Private PEM'):
+                        builder.reject_private_pem_payloads(header+b'\0'+header+b'\nU1lOVEhFVElD\0')
+
     def test_build_proves_input_isolation_source_bound_mot_and_restores_on_failure(self):
         for target_id in builder.BUILD_HELPERS:
             for failure in (False,True,'stale'):

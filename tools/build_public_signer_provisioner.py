@@ -18,9 +18,11 @@ from typing import Mapping
 
 try:
     from .idt.targets import get_target, target_fingerprint
+    from .idt.public_signer_material import reject_private_pem_payloads, PRIVATE_PEM_SCAN_POLICY
     from .build_rx671_fwup_v2_rsu import _decode_srecord
 except ImportError:
     from idt.targets import get_target, target_fingerprint
+    from idt.public_signer_material import reject_private_pem_payloads, PRIVATE_PEM_SCAN_POLICY
     from build_rx671_fwup_v2_rsu import _decode_srecord
 
 
@@ -245,8 +247,8 @@ def validate_image(path: Path, target_id: str, source_sha: str) -> dict:
     runs.append(bytes(current))
     if not any(marker in data for data in runs):
         raise RuntimeError("Maintenance image has no matching compiled source identity")
-    if any(re.search(br"-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----", data) for data in runs):
-        raise RuntimeError("Private credential material detected in maintenance image")
+    for data in runs:
+        reject_private_pem_payloads(data)
     return {"reset_vector": f"0x{vector:08X}", "mde": "0xFFFFFF8F", "initial_bank": 0,
             "compiled_source_identity_verified": True, "code_flash_and_options_only": True}
 
@@ -313,8 +315,8 @@ def build(repo: Path, target_id: str, output: Path, workspace: Path, python: str
                 raise RuntimeError("Missing provisioner artifact: " + suffix)
             if source.stat().st_mtime_ns < started:
                 raise RuntimeError("Maintenance build returned a stale artifact: " + suffix)
-            if suffix in {"mot", "abs"} and re.search(br"-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----", source.read_bytes()):
-                raise RuntimeError("Private credential material detected in maintenance artifact")
+            if suffix in {"mot", "abs"}:
+                reject_private_pem_payloads(source.read_bytes())
             if suffix == "mot":
                 image = validate_image(source, target_id, source_sha)
             destination = output / source.name
@@ -338,7 +340,8 @@ def build(repo: Path, target_id: str, output: Path, workspace: Path, python: str
         "credential_injection_requested": False,
         "credentials_embedded": False,
         "credential_verification": {"client_and_wifi_headers_empty": True, "local_overrides_absent": True,
-                                    "injection_environment_removed": True, "private_pem_markers_absent": True,
+                                    "injection_environment_removed": True, "private_pem_payloads_absent": True,
+                                    "private_pem_scan_policy": PRIVATE_PEM_SCAN_POLICY,
                                     "scope": "embedded_client_claim_private_and_wifi_credentials"},
         "effective_input_sha256": effective,
         "effective_command_validation": commands,

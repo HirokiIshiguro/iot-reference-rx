@@ -8,6 +8,21 @@ import hashlib
 from pathlib import Path
 import re
 
+PRIVATE_PEM_SCAN_POLICY = "nul_terminated_header_literals_only"
+
+
+def reject_private_pem_payloads(data):
+    """Reject private PEM data while allowing Mbed TLS's header constants.
+
+    Pristine pkparse.c/pkwrite.c compile header-only C strings, optionally
+    including a newline. A payload, unterminated marker, or truncated object
+    must still fail; never include matched bytes in an error message.
+    """
+    for match in re.finditer(br"-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----", data):
+        if not data.startswith((b"\0", b"\n\0", b"\r\n\0"), match.end()):
+            raise RuntimeError("Private PEM payload or unterminated header detected in maintenance artifact")
+
+
 def public_signer(certificate_path, public_key_path, *, context="RX"):
     """Validate public-only PEM objects and return their matching P-256 key."""
     if context not in {"RX", "RX671"}:

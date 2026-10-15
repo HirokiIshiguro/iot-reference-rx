@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
+import traceback
 import xml.etree.ElementTree as ET
 
 try:
@@ -153,8 +154,15 @@ def prepare(source: Path, target_id: str, output: Path, workspace: Path, python:
         if _source_state(source) != source_sha:
             raise RuntimeError("Public signer source changed during preparation")
         return paths
-    except BaseException:
-        _cleanup_public_outputs(output, build)
+    except BaseException as error:
+        try:
+            # Keep post-build validation failures as well as compiler output.
+            # No locals are captured and this file never enters public inputs.
+            descriptor=os.open(output/"failure-private.log",os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            with os.fdopen(descriptor,"w",encoding="utf-8") as log:
+                log.writelines(traceback.TracebackException.from_exception(error,capture_locals=False).format())
+        finally:
+            _cleanup_public_outputs(output, build)
         raise
 
 

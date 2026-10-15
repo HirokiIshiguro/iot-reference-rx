@@ -75,7 +75,8 @@ class Fixture:
             "reset_vector_kind": "standalone_hardware_vector", "credentials_embedded": False,
             "credential_injection_requested": False,
             "credential_verification": {"client_and_wifi_headers_empty": True, "local_overrides_absent": True,
-                "injection_environment_removed": True, "private_pem_markers_absent": True,
+                "injection_environment_removed": True, "private_pem_payloads_absent": True,
+                "private_pem_scan_policy": controller.material.PRIVATE_PEM_SCAN_POLICY,
                 "scope": "embedded_client_claim_private_and_wifi_credentials"},
             "effective_command_validation": {"maintenance_compiler_defines_verified": True,
                 "standalone_vectors_verified": True, "flash_ram_mapping_verified": True},
@@ -203,6 +204,25 @@ class PublicSignerTests(unittest.TestCase):
             with self.subTest(records=len(records)):
                 fixture.change_records(records)
                 with self.assertRaises(RuntimeError):fixture.plan()
+
+    def test_pem_header_constants_do_not_hide_private_payloads_or_old_manifest_claims(self):
+        fixture=self.fixture(); original=fixture.records
+        header=b'-----BEGIN EC PRIVATE KEY-----'
+        for suffix in (b'\0',b'\n\0',b'\r\n\0',b'\nU1lOVEhFVElD\n-----END EC PRIVATE KEY-----\0',b''):
+            fixture.change_records(original+[(0xFFF03000,header+suffix)])
+            if suffix in (b'\0',b'\n\0',b'\r\n\0'):
+                fixture.plan()
+            else:
+                with self.assertRaisesRegex(RuntimeError,'Private PEM'):fixture.plan()
+        fixture.change_records(original)
+        for invalid in ({'private_pem_scan_policy':'any_header_allowed'},
+                        {'private_pem_payloads_absent':False},
+                        {'private_pem_payloads_absent':None,'private_pem_markers_absent':True}):
+            saved=fixture.metadata['credential_verification'].copy()
+            fixture.metadata['credential_verification'].update(invalid);fixture.write_metadata()
+            with self.assertRaisesRegex(RuntimeError,'credential isolation'):fixture.plan()
+            fixture.metadata['credential_verification']=saved
+        fixture.write_metadata()
 
     def test_mirror_substitution_and_rsu_signature_or_df_are_rejected(self):
         fixture=self.fixture()
