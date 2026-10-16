@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* FreeRTOS includes. */
 #include "public_signer_provisioner.h"
+#include "r_sci_rx_pinset.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "event_groups.h"
@@ -261,7 +262,7 @@ void main_task(void)
 {
     (void)xTraceEnable(TRC_START);
 #if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
-    vRunPublicSignerProvisioner(NULL);
+    vRunPublicSignerProvisioner(R_SCI_PinSet_SCI0);
 #else
 
 #if ( IDT_TEST_ENABLED == 1 )
