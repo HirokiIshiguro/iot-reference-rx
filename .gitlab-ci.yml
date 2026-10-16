@@ -629,12 +629,13 @@ idt_ci_contract:
     - hw-sakura-vps
     - cap-internet
   variables:
-    # Host tests read the original Kernel/Unity/SDK and three boot chip headers.
-    # Keep this source-only job on the exact six root gitlinks, without recursion.
+    # Host tests read the original Kernel/CLI/Unity/SDK and three boot chip headers.
+    # Keep this source-only job on the exact seven root gitlinks, without recursion.
     GIT_SUBMODULE_STRATEGY: normal
     GIT_SUBMODULE_DEPTH: "1"
     GIT_SUBMODULE_PATHS: >-
       Middleware/FreeRTOS/FreeRTOS-Kernel
+      Middleware/FreeRTOS-Plus-CLI
       Test/Unity
       Test/FreeRTOS-Libraries-Integration-Tests
       Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader
@@ -664,6 +665,8 @@ idt_ci_contract:
         - tools/test_build_rx_idt.ps1
         - tools/build_headless_rx*.ps1
         - tools/provision_rx671_ota.py
+        - Demos/cli/CLIcommands.c
+        - tools/ci/tests/test_public_signer_cli_commands.py
       when: on_success
     - when: never
   script:
@@ -693,6 +696,7 @@ idt_ci_contract:
         tools.ci.tests.test_idt_windows_checkout \
         tools.ci.tests.test_prepare_public_signer \
         tools.ci.tests.test_build_public_signer_provisioner \
+        tools.ci.tests.test_public_signer_cli_commands \
         tools.ci.tests.test_protected_normal_bundle \
         tools.ci.tests.test_cleanup_rx671_fleet_runtime \
         tools.ci.tests.test_rx671_fleet_finish_ci \

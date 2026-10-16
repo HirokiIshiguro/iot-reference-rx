@@ -337,6 +337,7 @@ void vRegisterSampleCLICommands( void )
 
 void vRegisterPublicSignerCLICommands(void)
 {
+    FreeRTOS_CLIRegisterCommand(&xFormat);
     FreeRTOS_CLIRegisterCommand(&xCommandConfig);
 }
 /**********************************************************************************************************************

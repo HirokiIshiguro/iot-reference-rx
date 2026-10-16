@@ -10,6 +10,10 @@ BOOT_PIN = "231a0cc680525be3530a7bb64862d099e5a401ec"
 REQUIRED = {
     "Middleware/FreeRTOS/FreeRTOS-Kernel": (
         "9b777ae5c5b8e9e456065a00294d1e5f5f9facf5", ("include/task.h",)),
+    "Middleware/FreeRTOS-Plus-CLI": (
+        "152cf36d6775bce6026a791845af12201aae703d", (
+            "FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c",
+            "FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI/FreeRTOS_CLI.h")),
     "Test/Unity": ("22777c4810de3e3a4cb521a05eca2752fccd00ea", (
         "src/unity.h", "src/unity.c", "extras/fixture/src/unity_fixture.h",
         "extras/fixture/src/unity_fixture.c", "extras/memory/src/unity_memory.c")),
@@ -22,7 +26,7 @@ REQUIRED = {
 
 
 class IdtUnitDependencyTests(unittest.TestCase):
-    def test_ci_initializes_only_the_six_root_dependencies_before_source_only_tests(self):
+    def test_ci_initializes_only_the_seven_root_dependencies_before_source_only_tests(self):
         text = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
         job = text[text.index("idt_ci_contract:\n"):text.index(".rx_idt_job:\n")]
         self.assertRegex(job, r"(?m)^  stage: dependency_check$")
