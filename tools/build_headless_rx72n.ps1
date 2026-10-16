@@ -145,9 +145,16 @@ try {
 
     $projectDirs = @($projectNames | ForEach-Object { Join-Path $projectRoot "$projectsPath\$_\e2studio_ccrx" })
     $buildTargets = @($projectNames | ForEach-Object { "$_/HardwareDebug" })
+    $expectedOutputs = @(
+        (Join-Path $projectDirs[0] 'HardwareDebug/boot_loader_rx72n_envision_kit.mot'),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.mot"),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.abs"),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.x"),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.map")
+    )
     $e2exit = Invoke-RxE2StudioBuild -Executable $E2Studio -WorkspacePath $workspace `
         -ProjectPaths $projectDirs -BuildTargets $buildTargets -OutputLog $logFile `
-        -TimeoutSeconds $E2StudioTimeoutSeconds
+        -TimeoutSeconds $E2StudioTimeoutSeconds -ExpectedOutputs $expectedOutputs
 
     Write-Host "e2studio exit code: $e2exit"
     $logLines = Get-Content $logFile -ErrorAction SilentlyContinue

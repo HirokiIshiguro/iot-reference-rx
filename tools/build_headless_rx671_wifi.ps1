@@ -1023,33 +1023,6 @@ function Add-PathEntry {
     }
 }
 
-function Invoke-MakeTarget {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$BuildDir,
-        [Parameter(Mandatory = $true)]
-        [string]$Target,
-        [switch]$Force
-    )
-
-    Write-Host "Invoking make target: $Target"
-    Push-Location $BuildDir
-    try {
-        $parallelJobs = [Math]::Max(1, [Math]::Min(24, [Environment]::ProcessorCount))
-        $makeArguments = @("-r", "--output-sync", "-j$parallelJobs")
-        if ($Force.IsPresent) {
-            $makeArguments += "-B"
-        }
-        $makeArguments += $Target
-        & $script:makeExe @makeArguments
-        if ($LASTEXITCODE -ne 0) {
-            throw "make target '$Target' failed with exit code $LASTEXITCODE"
-        }
-    } finally {
-        Pop-Location
-    }
-}
-
 function Test-ByteArrayEqual {
     param(
         [byte[]]$Left,
@@ -1109,7 +1082,8 @@ function Invoke-E2StudioHeadlessBuild {
     )
     return Invoke-RxE2StudioBuild -Executable $Executable -WorkspacePath $WorkspacePath `
         -ProjectPaths @($ProjectPath) -BuildTargets @($BuildTarget) `
-        -OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds
+        -OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds `
+        -ExpectedOutputs @("$ProjectPath/HardwareDebug/$projectName.mot", "$ProjectPath/HardwareDebug/$projectName.abs", "$ProjectPath/HardwareDebug/$projectName.map")
 }
 
 function Assert-PristineWhdInputs {
@@ -1428,9 +1402,9 @@ try {
 
     # Importing this Smart Configurator project can regenerate tracked source
     # files before the build starts. Preserve the checked-out source (including
-    # any caller edits), restore it after import, and force a canonical rebuild.
-    # .cproject is excluded because temporary CI defines must stay active until
-    # the final make invocation; it is restored separately in the finally block.
+    # any caller edits) for finally cleanup. Unexpected regeneration is terminal.
+    # .cproject has a separate caller-owned snapshot for finally cleanup. The
+    # shared adapter checks its effective post-profile bytes during the build.
     $repoProjectPath = "Projects/$projectName/e2studio_ccrx"
     if ($SourceProvenanceFile) {
         # IDT's copy has no usable Git root. Preserve the same IDE/SC inputs
@@ -1463,44 +1437,14 @@ try {
         -OutputLog $logFilePath
     Wait-RxBuildProcesses -Since $buildStart
 
-    $restoredGeneratedFiles = @(Restore-TrackedProjectSnapshot `
-        -Root $projectRoot `
-        -Snapshot $trackedProjectSnapshot)
-
+    # The shared adapter rejects CLI errors, source regeneration and stale or
+    # missing outputs. Never replace the failed build with a direct make run.
     $motOutput = Join-Path $hardwareDebug "$projectName.mot"
-    $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
-        ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
-    $canonicalRebuildCompleted = $false
-
-    if ($restoredGeneratedFiles.Count -gt 0) {
-        Write-Host "Smart Configurator regenerated $($restoredGeneratedFiles.Count) tracked file(s); restoring checked-out source and forcing a canonical rebuild."
-        foreach ($relativePath in $restoredGeneratedFiles) {
-            Write-Host "  restored: $relativePath"
-        }
-        Invoke-MakeTarget -BuildDir $hardwareDebug -Target "$projectName.mot" -Force
-        $canonicalRebuildCompleted = $true
-        $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
-            ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
-    }
-
-    if ((-not $canonicalRebuildCompleted) -and (($e2StudioExitCode -ne 0) -or (-not $motWasUpdated))) {
-        Write-Warning "e2 studio build returned exit code $e2StudioExitCode or did not refresh .mot through the default all target."
-        Write-Host "Ensuring the loadable image with an explicit .mot make target."
-        Invoke-MakeTarget -BuildDir $hardwareDebug -Target "$projectName.mot"
-        $motWasUpdated = (Test-Path -LiteralPath $motOutput) -and
-            ((Get-Item -LiteralPath $motOutput).LastWriteTime -ge $buildStart)
-    }
-
-    if (-not $motWasUpdated) {
-        throw "Expected .mot output was not refreshed: $motOutput"
-    } elseif ($e2StudioExitCode -ne 0) {
-        Write-Warning "e2 studio returned exit code $e2StudioExitCode, but .mot/.abs/.map were refreshed by the explicit make target."
-    }
 
     Assert-SRecordContainsAsciiMarker -Path $motOutput -Marker $expectedOtaImageMarker
 } finally {
     # Restore a developer-owned ignored header, or remove a header generated
-    # from CI variables. This must happen even when e2 studio or make fails.
+    # from CI variables. This must happen even when e2 studio fails.
     try {
         if ($generatedLocalJoinConfig) {
             if ($null -eq $localJoinConfigOriginalBytes) {

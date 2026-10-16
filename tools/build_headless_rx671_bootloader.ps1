@@ -47,7 +47,8 @@ function Invoke-E2StudioBuild {
     )
     return Invoke-RxE2StudioBuild -Executable $Executable -WorkspacePath $WorkspacePath `
         -ProjectPaths @($ProjectPath) -BuildTargets @("$projectName/HardwareDebug") `
-        -OutputLog $OutputLog -TimeoutSeconds $TimeoutSeconds
+        -OutputLog $OutputLog -TimeoutSeconds $TimeoutSeconds `
+        -ExpectedOutputs @("$ProjectPath/HardwareDebug/$projectName.mot", "$ProjectPath/HardwareDebug/$projectName.abs", "$ProjectPath/HardwareDebug/$projectName.map")
 }
 
 $projectRootPath = (Resolve-Path -LiteralPath $ProjectRoot).Path

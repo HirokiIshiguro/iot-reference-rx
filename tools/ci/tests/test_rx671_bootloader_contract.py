@@ -132,7 +132,7 @@ class Rx671BootloaderContractTests(unittest.TestCase):
     def test_manual_smoke_releases_reset_and_selects_key_state(self) -> None:
         ci = (REPO_ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
         job = ci.split("smoke_rx671_bootloader_manual:", 1)[1].split(
-            "\nflash_rx72n_ether:", 1
+            "\nprepare_rx65n_bg96_mqtt_credentials:", 1
         )[0]
         self.assertIn("-p -v -run -noquery", job)
         self.assertNotIn("-p -v -reset -noquery", job)

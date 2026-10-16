@@ -95,7 +95,7 @@ $result|ConvertTo-Json -Compress|Write-Output
             folder = Path(temporary)
             result = self.run_script(self.generation_harness(folder, fail=True), folder)
             self.assertNotEqual(0, result.returncode)
-            self.assertIn("makefile not found after e2 studio build", result.stderr)
+            self.assertIn("e2studio-cli returned 23; refusing a subsequent make build", result.stderr)
             self.assertFalse((folder / "app/HardwareDebug/makefile").exists())
 
     def test_fleet_profile_uses_metadata_and_restores_bytes_on_success_and_failure(self):

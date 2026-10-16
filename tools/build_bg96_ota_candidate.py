@@ -45,7 +45,6 @@ def run_logged(
     log,
     env: dict[str, str],
     timeout: int,
-    allow_nonzero_exit: bool = False,
     timeout_exit_code: int | None = None,
 ) -> None:
     print("+ " + " ".join(command))
@@ -64,18 +63,8 @@ def run_logged(
         raise RuntimeError(f"build command timed out after {timeout} seconds: {' '.join(command)}") from exc
     if timeout_exit_code is not None and result.returncode == timeout_exit_code:
         raise RuntimeError(f"e2studio-cli import/build timed out or stopped before a safe completed run: {' '.join(command)}")
-    if result.returncode != 0 and not allow_nonzero_exit:
-        raise RuntimeError(f"build command failed with exit {result.returncode}: {' '.join(command)}")
     if result.returncode != 0:
-        print(
-            "warning: build command returned "
-            f"exit {result.returncode}; continuing after generated file validation"
-        )
-        log.write(
-            "warning: build command returned "
-            f"exit {result.returncode}; continuing after generated file validation\n"
-        )
-        log.flush()
+        raise RuntimeError(f"build command failed with exit {result.returncode}: {' '.join(command)}")
 
 
 def e2studio_plugin_dir(e2studio_cli: Path) -> Path | None:
@@ -204,10 +193,10 @@ def run_e2studio_managed_build(
         "-TimeoutSeconds", str(timeout),
     ]
     try:
-        # Code 124 is terminal for timeouts, unsafe adapter exceptions or failed
-        # metadata restoration. Give cleanup time before the outer deadline.
+        # Every failed CLI invocation is terminal. The later version-specific
+        # direct make build is a separate planned step, never a CLI retry.
         run_logged(command, app_dir, log, os.environ.copy(), timeout + 30,
-                   allow_nonzero_exit=True, timeout_exit_code=124)
+                   timeout_exit_code=124)
     finally:
         if managed_log.is_file():
             log.write(managed_log.read_text(encoding="utf-8", errors="replace"))

@@ -442,7 +442,7 @@ function Invoke-E2StudioManagedBuild {
         -BuildTargets @('boot_loader_ck_rx65n/HardwareDebug', "$appProjectName/HardwareDebug") `
         -OutputLog $logFile -TimeoutSeconds $E2StudioTimeoutSeconds
     if ($exitCode -ne 0) {
-        Write-Warning "e2studio-cli returned $exitCode; validating generated makefiles before direct make."
+        throw "e2studio-cli returned $exitCode; refusing a subsequent make build."
     }
 }
 
@@ -575,6 +575,8 @@ try {
         return
     }
 
+    # This is the registered direct-make build after a successful CLI generation,
+    # not recovery from CLI failure. Shared adapter exceptions remain terminal.
     $bootBuildDir = Join-Path $bootProject "HardwareDebug"
     $appBuildDir = Join-Path $appProject "HardwareDebug"
     $normalizedBootMot = Join-Path $bootBuildDir "boot_loader_ck_rx65n.mot"

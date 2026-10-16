@@ -75,9 +75,24 @@ public class Launcher {
             Console.WriteLine("Project: file:/fixture can't be found");
             return 0;
         }
-        if (mode == "warning") Console.WriteLine(
-            "Warning: NLS unused message: failedReadDuringWrite in: org.eclipse.core.internal.filesystem.messages");
+        if (mode == "warning") {
+            Console.WriteLine("Warning: NLS unused message: failedReadDuringWrite in: org.eclipse.core.internal.filesystem.messages");
+            Console.WriteLine("fixture.c(1): W0520198: fixture warning");
+            Console.WriteLine("M0520001: fixture information");
+        }
         if (mode == "build-error" && buildFlag >= 0) return 23;
+        if (mode.StartsWith("typed-")) Console.WriteLine("fixture.c(1): " + mode.Substring(6) + ": fixture diagnostic");
+        if (mode == "source-drift") File.WriteAllText(Path.Combine(args[importFlag+1], ".cproject"), "UNEXPECTED_PROFILE");
+        if (mode == "new-source") File.WriteAllText(Path.Combine(args[importFlag+1], "src", "new-generated.c"), "UNEXPECTED_SOURCE");
+        if (mode == "deleted-source") File.Delete(Path.Combine(args[importFlag+1], "src", "fixture.c"));
+        string outputs = Environment.GetEnvironmentVariable("RXCLI_FIXTURE_OUTPUTS");
+        if (!String.IsNullOrEmpty(outputs) && mode != "missing-output") {
+            foreach (string output in outputs.Split('|')) {
+                Directory.CreateDirectory(Path.GetDirectoryName(output));
+                File.WriteAllText(output, mode == "empty-output" ? "" : "FRESH_OUTPUT");
+                if (mode == "stale-output") File.SetLastWriteTimeUtc(output, DateTime.UtcNow.AddDays(-1));
+            }
+        }
         if (mode == "no-config" && buildFlag >= 0) {
             File.WriteAllText(Path.Combine(args[importFlag + 1], ".cproject"), "AFTER_HEADLESS");
             string workspace = args[Array.IndexOf(args, "-data") + 1];
@@ -110,8 +125,12 @@ public class Launcher {
     def setUp(self):
         for project in self.projects:
             (project / ".cproject").write_text("EFFECTIVE_" + project.name, encoding="utf-8")
+            source = project / "src"
+            source.mkdir(exist_ok=True)
+            (source / "fixture.c").write_text("EXPECTED_SOURCE", encoding="utf-8")
+            (source / "new-generated.c").unlink(missing_ok=True)
 
-    def invoke(self, mode="success", timeout=5, allow_timeout=False, targets=None):
+    def invoke(self, mode="success", timeout=5, allow_timeout=False, targets=None, expected_outputs=None, preserve_calls=False):
         calls = self.directory / (self._testMethodName + ".arguments")
         log = self.directory / (self._testMethodName + ".log")
         targets = targets or ["a.project/HardwareDebug", "b.project/HardwareDebug"]
@@ -123,9 +142,12 @@ public class Launcher {
             + " -BuildTargets @(" + ",".join(map(literal, targets)) + ")"
             + " -OutputLog " + literal(log) + " -TimeoutSeconds " + str(timeout)
             + (" -AllowTimeoutExitCode" if allow_timeout else "")
+            + (" -ExpectedOutputs @(" + ",".join(map(literal, expected_outputs)) + ")" if expected_outputs else "")
             + "; Write-Output ('RESULT=' + $result)"
         )
-        environment = dict(os.environ, RXCLI_FIXTURE_MODE=mode, RXCLI_FIXTURE_ARGUMENTS=str(calls),
+        if not preserve_calls:
+            calls.unlink(missing_ok=True)
+        environment = dict(os.environ, RXCLI_FIXTURE_OUTPUTS="|".join(map(str, expected_outputs or [])), RXCLI_FIXTURE_MODE=mode, RXCLI_FIXTURE_ARGUMENTS=str(calls),
                            RXCLI_FIXTURE_CHILD_PID=str(self.directory / (self._testMethodName + ".child-pid")),
                            RXCLI_FIXTURE_EXIT_MARKER=str(self.directory / (self._testMethodName + ".exit-marker")))
         # File capture lets the harness wait for pwsh itself. The orphan fixture
@@ -165,11 +187,76 @@ public class Launcher {
         self.assertIn("was rejected", result.stderr)
         self.assertEqual(len(calls.read_text().splitlines()), 1)
 
-    def test_build_exit_code_reaches_artifact_validating_caller(self):
+    def test_build_exit_code_is_terminal(self):
         result, calls, _ = self.invoke("build-error")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("RESULT=23", result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("failed with exit code 23", result.stderr)
+        self.assertNotIn("RESULT=", result.stdout)
         self.assertEqual(len(calls.read_text().splitlines()), 1)
+
+    def test_zero_exit_typed_internal_error_error_and_fatal_are_terminal(self):
+        for diagnostic in ("C0520000", "E0520020", "F0520035"):
+            with self.subTest(diagnostic=diagnostic):
+                result, calls, log = self.invoke("typed-" + diagnostic)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("reported a compiler, assembler or linker error", result.stderr)
+                self.assertIn(diagnostic, log.read_text(encoding="utf-8"))
+                self.assertEqual(len(calls.read_text().splitlines()), 1)
+
+    def test_source_copy_profile_changes_new_and_deleted_sources_are_terminal(self):
+        for mode in ("source-drift", "new-source", "deleted-source"):
+            with self.subTest(mode=mode):
+                self.setUp()
+                result, calls, log = self.invoke(mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("changed project inputs unexpectedly", result.stderr)
+                detail = log.read_text(encoding="utf-8")
+                self.assertIn("Unexpected RX project input changes:", detail)
+                self.assertIn('"before_sha256":', detail)
+                self.assertIn('"after_sha256":', detail)
+                self.assertNotIn("UNEXPECTED_PROFILE", detail)
+                self.assertNotIn("UNEXPECTED_SOURCE", detail)
+                self.assertEqual(len(calls.read_text().splitlines()), 1)
+
+    def test_git_project_generated_source_cannot_become_next_run_baseline(self):
+        project = self.projects[0]
+        subprocess.run(["git", "init", "-q", str(project)], check=True, capture_output=True)
+        try:
+            (project / ".gitignore").write_text("HardwareDebug/\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(project), "add", ".project", ".cproject", "src", ".gitignore", project.name + ".rcpc"], check=True, capture_output=True)
+            result, calls, log = self.invoke("new-source")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("changed project inputs unexpectedly", result.stderr)
+            self.assertEqual(len(calls.read_text().splitlines()), 1)
+            self.assertTrue((project / "src/new-generated.c").is_file())
+            first_log = log.read_bytes()
+            second, second_calls, _ = self.invoke(preserve_calls=True)
+            self.assertNotEqual(second.returncode, 0)
+            self.assertIn("unregistered source inputs", second.stderr)
+            self.assertEqual(second_calls, calls)
+            self.assertEqual(log.read_bytes(), first_log, "preflight rejection must preserve the first drift evidence")
+            self.assertEqual(len(calls.read_text().splitlines()), 1, "second run must stop before the launcher")
+        finally:
+            # Git objects are readonly on Windows. Only this owned temporary
+            # fixture's .git is removed; no source repository is affected.
+            git_dir = project / ".git"
+            self.assertTrue(git_dir.resolve().is_relative_to(self.directory.resolve()))
+            for entry in git_dir.rglob("*"):
+                if entry.is_file():
+                    entry.chmod(0o666)
+            shutil.rmtree(git_dir)
+            (project / ".gitignore").unlink(missing_ok=True)
+
+    def test_declared_outputs_must_be_nonempty_and_fresh(self):
+        for mode in ("success", "missing-output", "empty-output", "stale-output"):
+            with self.subTest(mode=mode):
+                output = self.projects[0] / "HardwareDebug" / (mode + ".mot")
+                output.unlink(missing_ok=True)
+                result, calls, _ = self.invoke(mode, expected_outputs=[output])
+                self.assertEqual(result.returncode == 0, mode == "success", result.stderr)
+                if mode != "success":
+                    self.assertIn("Expected RX build output is", result.stderr)
+                self.assertEqual(len(calls.read_text().splitlines()), 1)
 
     def test_zero_exit_with_no_configuration_preserves_private_snapshots(self):
         result, calls, log = self.invoke("no-config")

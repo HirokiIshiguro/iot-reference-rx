@@ -3,11 +3,12 @@ param(
     [Parameter(Mandatory = $true)][string]$Workspace,
     [Parameter(Mandatory = $true)][string]$ProjectPath,
     [Parameter(Mandatory = $true)][string]$OutputLog,
-    [int]$TimeoutSeconds = 600
+    [int]$TimeoutSeconds = 600,
+    [string[]]$ExpectedOutputs = @()
 )
 
 trap {
-    # Pre-launch validation must also stop Python's optional make fallback.
+    # Pre-launch validation is terminal for every caller.
     [Console]::Error.WriteLine($_.Exception.Message)
     exit 124
 }
@@ -44,10 +45,9 @@ try {
     Remove-RxE2Workspace -Path $workspacePath
     $result = Invoke-RxE2StudioBuild -Executable $Executable -WorkspacePath $workspacePath `
         -ProjectPaths @($project) -BuildTargets @("$($name.InnerText)/HardwareDebug") `
-        -OutputLog $OutputLog -TimeoutSeconds $TimeoutSeconds
+        -OutputLog $OutputLog -TimeoutSeconds $TimeoutSeconds -ExpectedOutputs $ExpectedOutputs
 } catch {
-    # Python callers permit ordinary completed build failures to validate make
-    # output. An adapter exception must remain terminal for those callers.
+    # A failed CLI invocation is terminal; never continue with a make retry.
     [Console]::Error.WriteLine($_.Exception.Message)
     $result = 124
 } finally {

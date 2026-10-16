@@ -34,6 +34,59 @@ function Remove-RxProjectBuildDirectory {
     }
 }
 
+# Hash public source inputs only. Generated build directories and submodule
+# contents are not project-generation inputs. Keep caller-injected profiles as
+# the baseline; callers restore their intentional edits in finally.
+function Get-RxE2StudioProjectInputState {
+    param([string[]]$ProjectPaths, [string[]]$BuildDirectories, [string[]]$ExcludedPaths, [switch]$RejectUntracked)
+    $state = @{}
+    foreach ($project in $ProjectPaths) {
+        $root = (Resolve-Path -LiteralPath $project -ErrorAction Stop).Path.TrimEnd('\', '/')
+        $untracked = @{}
+        $gitFiles = @(& git -C $root ls-files --error-unmatch -- .project 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $gitFiles.Count -gt 0) {
+            $inventory = (@(& git -C $root ls-files -z --cached --others --exclude-standard -- .) -join "`n")
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate RX project source inputs.' }
+            $files = @($inventory -split "`0" | Where-Object { $_ } | ForEach-Object { Join-Path $root $_ })
+            if ($RejectUntracked) {
+                $others = (@(& git -C $root ls-files -z --others --exclude-standard -- .) -join "`n")
+                if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate unregistered RX source inputs.' }
+                foreach ($other in @($others -split "`0" | Where-Object { $_ })) {
+                    $untracked[[IO.Path]::GetFullPath((Join-Path $root $other))] = $true
+                }
+            }
+        } else {
+            # Source-copy IDT projects have no Git metadata. Do not descend into
+            # their supplied dependency trees or the disposable IDE workspace.
+            $files = [Collections.Generic.List[string]]::new()
+            $pending = [Collections.Generic.Stack[string]]::new()
+            $pending.Push($root)
+            while ($pending.Count -gt 0) {
+                foreach ($item in Get-ChildItem -LiteralPath $pending.Pop() -Force -ErrorAction Stop) {
+                    if ($item.PSIsContainer) {
+                        if ($item.Name -notin (@('.git', '.metadata', 'lib') + $BuildDirectories) -and
+                            -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                            $pending.Push($item.FullName)
+                        }
+                    } else { $files.Add($item.FullName) }
+                }
+            }
+        }
+        foreach ($path in $files) {
+            $full = [IO.Path]::GetFullPath($path)
+            $relative = [IO.Path]::GetRelativePath($root, $full)
+            if (($relative -split '[\\/]')[0] -in $BuildDirectories -or $full -in $ExcludedPaths) { continue }
+            if (Test-Path -LiteralPath $full -PathType Leaf) {
+                if ($RejectUntracked -and $untracked.ContainsKey($full)) {
+                    throw "RX project has unregistered source inputs; inspect or register before retrying: $full"
+                }
+                $state[$full] = (Get-FileHash -LiteralPath $full -Algorithm SHA256 -ErrorAction Stop).Hash
+            }
+        }
+    }
+    return $state
+}
+
 function Invoke-RxE2StudioBuild {
     [CmdletBinding()]
     param(
@@ -43,6 +96,7 @@ function Invoke-RxE2StudioBuild {
         [Parameter(Mandatory = $true)][string[]]$BuildTargets,
         [Parameter(Mandatory = $true)][string]$OutputLog,
         [ValidateRange(1, 2147483)][int]$TimeoutSeconds = 600,
+        [string[]]$ExpectedOutputs = @(),
         # Accepted for caller compatibility; timeouts never permit make fallback.
         [switch]$AllowTimeoutExitCode
     )
@@ -58,7 +112,6 @@ function Invoke-RxE2StudioBuild {
     $log = [IO.Path]::GetFullPath($OutputLog)
     [void](New-Item -ItemType Directory -Force -Path (Split-Path -Parent $log))
     $utf8 = [Text.UTF8Encoding]::new($false)
-    [IO.File]::WriteAllText($log, '', $utf8)
 
     $importArguments = [Collections.Generic.List[string]]::new()
     $projectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -94,6 +147,17 @@ function Invoke-RxE2StudioBuild {
     if ($projectNames.Count -eq 0 -or $BuildTargets.Count -eq 0) {
         throw 'At least one RX project and build target are required.'
     }
+
+    $buildDirectories = @($BuildTargets | ForEach-Object { ($_ -split '/')[1] })
+    $expected = @($ExpectedOutputs | ForEach-Object {
+        if (-not [IO.Path]::IsPathFullyQualified($_)) { throw 'Expected RX build outputs must use absolute paths.' }
+        [IO.Path]::GetFullPath($_)
+    })
+    $inputState = Get-RxE2StudioProjectInputState -ProjectPaths $ProjectPaths `
+        -BuildDirectories $buildDirectories -ExcludedPaths (@($log) + $expected) -RejectUntracked
+    # A preflight rejection must not overwrite the preceding failed run's log.
+    [IO.File]::WriteAllText($log, '', $utf8)
+    $buildStartUtc = [DateTime]::UtcNow
 
     # Keep import-time metadata in memory. Parent helpers restore source files
     # in finally; only a rejected configuration persists these private snapshots.
@@ -155,6 +219,25 @@ function Invoke-RxE2StudioBuild {
     $text = [string]::Join([Environment]::NewLine, @($stdout.Result, $stderr.Result))
     [IO.File]::AppendAllText($log, $text + [Environment]::NewLine, $utf8)
     & $captureMetadata 'after-headless-run'
+    $afterState = Get-RxE2StudioProjectInputState -ProjectPaths $ProjectPaths `
+        -BuildDirectories $buildDirectories -ExcludedPaths (@($log) + $expected)
+    $changed = @(@($inputState.Keys) + @($afterState.Keys) | Sort-Object -Unique | Where-Object {
+        -not $inputState.ContainsKey($_) -or -not $afterState.ContainsKey($_) -or
+        $inputState[$_] -ne $afterState[$_]
+    })
+    if ($changed.Count -gt 0) {
+        # Paths and hashes suffice; never print or archive source/header bodies.
+        $changes = @($changed | ForEach-Object {
+            [ordered]@{
+                path = $_
+                change = if (-not $inputState.ContainsKey($_)) { 'added' } elseif (-not $afterState.ContainsKey($_)) { 'deleted' } else { 'modified' }
+                before_sha256 = $inputState[$_]
+                after_sha256 = $afterState[$_]
+            }
+        })
+        [IO.File]::AppendAllText($log, 'Unexpected RX project input changes:' + [Environment]::NewLine +
+            (ConvertTo-Json -InputObject $changes -Depth 3 -Compress) + [Environment]::NewLine, $utf8)
+    }
     if ($timedOut) {
         throw "e2studio-cli import/build timed out after $TimeoutSeconds seconds. See $log"
     }
@@ -190,7 +273,28 @@ function Invoke-RxE2StudioBuild {
     if ($text -match '(?im)^(?:Command requires a workspace\.|Project: .+ can\x27t be found|Unknown command\b|Error importing\b|Import failed\b|No Config matched\b)') {
         throw "e2studio-cli headless build was rejected. See $log"
     }
-    return $process.ExitCode
+    if ($process.ExitCode -ne 0) {
+        throw "e2studio-cli failed with exit code $($process.ExitCode). See $log"
+    }
+    # The launcher can return zero after CC-RX/compiler/assembler/linker errors.
+    # CC-RX manual Table 10.1: C internal, E error, F fatal; W/M continue.
+    # Inspect diagnostic codes, not arbitrary words that may occur in warnings.
+    if ($text -match '(?im)\b[CEF]05\d{5}\b') {
+        throw "e2studio-cli reported a compiler, assembler or linker error. See $log"
+    }
+    if ($changed.Count -gt 0) {
+        throw "e2studio-cli changed project inputs unexpectedly; preserve the log and inspect before retrying. See $log"
+    }
+    foreach ($output in $expected) {
+        if (-not (Test-Path -LiteralPath $output -PathType Leaf)) {
+            throw "Expected RX build output is missing: $output"
+        }
+        $item = Get-Item -LiteralPath $output
+        if ($item.Length -eq 0 -or $item.LastWriteTimeUtc -lt $buildStartUtc) {
+            throw "Expected RX build output is empty or stale: $output"
+        }
+    }
+    return 0
 }
 
 # CLI and legacy Crypto come from monorepos; their selected source directories

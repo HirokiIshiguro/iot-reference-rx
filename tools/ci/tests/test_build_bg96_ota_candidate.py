@@ -47,14 +47,11 @@ class Bg96CandidateTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "e2studio-cli.exe"):
                 builder.resolve_e2studio_cli(console)
 
-    def test_adapter_timeout_is_terminal_but_other_exits_allow_makefile_validation(self):
+    def test_adapter_timeout_and_all_other_failed_exits_are_terminal(self):
         for code in (124, 23):
             with self.subTest(code=code), mock.patch.object(builder.subprocess, "run", return_value=SimpleNamespace(returncode=code)):
-                if code == 124:
-                    with self.assertRaisesRegex(RuntimeError, "timed out"):
-                        builder.run_logged(["fixture"], ROOT, io.StringIO(), {}, 30, True, 124)
-                else:
-                    builder.run_logged(["fixture"], ROOT, io.StringIO(), {}, 30, True, 124)
+                with self.assertRaisesRegex(RuntimeError, "timed out" if code == 124 else "failed with exit 23"):
+                    builder.run_logged(["fixture"], ROOT, io.StringIO(), {}, 30, timeout_exit_code=124)
 
     def test_parent_tls_version_and_make_flow_are_preserved_and_restored(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -115,7 +112,7 @@ class SingleProjectWrapperTests(unittest.TestCase):
                 actual_helper = str(ROOT/"tools/rx_e2studio_cli.ps1").replace("'", "''")
                 (base/"rx_e2studio_cli.ps1").write_text(". '"+actual_helper+"'\n"+r'''
 function Invoke-RxE2StudioBuild {
-    param($Executable, $WorkspacePath, $ProjectPaths, $BuildTargets, $OutputLog, $TimeoutSeconds, [switch]$AllowTimeoutExitCode)
+    param($Executable, $WorkspacePath, $ProjectPaths, $BuildTargets, $OutputLog, $TimeoutSeconds, $ExpectedOutputs, [switch]$AllowTimeoutExitCode)
     if (Test-Path -LiteralPath $WorkspacePath) { throw 'Workspace was not cold.' }
     $p=$ProjectPaths[0]
     if ([IO.File]::ReadAllText((Join-Path $p '.cproject')) -ne 'PARENT-TSIP13-PROFILE') { throw 'Parent TLS profile lost.' }

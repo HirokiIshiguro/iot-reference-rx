@@ -518,9 +518,9 @@
             <Setting id="ETHER_CFG_USE_PHY_ICS1894_32" value="0"/>
             <Setting id="ETHER_CFG_MODE_SEL" value="0"/>
             <Setting id="ETHER_CFG_LINK_PRESENT" value="0"/>
-            <Setting id="ETHER_CFG_EMAC_RX_DESCRIPTORS" value="1"/>
+            <Setting id="ETHER_CFG_EMAC_RX_DESCRIPTORS" value="2"/>
             <Setting id="ETHER_CFG_BUFSIZE" value="1536"/>
-            <Setting id="ETHER_CFG_EMAC_TX_DESCRIPTORS" value="1"/>
+            <Setting id="ETHER_CFG_EMAC_TX_DESCRIPTORS" value="2"/>
             <Setting id="ETHER_CFG_PHY_DELAY_RESET" value="0x00020000L"/>
             <Setting id="ETHER_CFG_CH1_PHY_ACCESS" value="1"/>
             <Setting id="ETHER_CFG_USE_PHY_KSZ8041NL" value="0"/>

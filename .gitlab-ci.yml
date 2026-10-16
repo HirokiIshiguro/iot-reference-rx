@@ -715,6 +715,7 @@ idt_ci_contract:
         tools.ci.tests.test_bg96_ota_prepare \
         tools.ci.tests.test_bg96_static_provisioning.StaticProvisioningContractTests \
         tools.ci.tests.test_rx_e2studio_cli \
+        tools.ci.tests.test_rx72n_network_defaults \
         tools.ci.tests.test_rx72n_fwup_prm_contract \
         tools.ci.tests.test_idt_rfp_process \
         tools.ci.tests.test_idt_cleanup_budget \
@@ -1672,7 +1673,7 @@ build_rx72n_ether:
     - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
-    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_hardware_transaction_contract tools.ci.tests.test_rx72n_tsip_trace_init tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_rx72n_fwup_prm_contract
+    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_hardware_transaction_contract tools.ci.tests.test_rx72n_tsip_trace_init tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_rx72n_fwup_prm_contract tools.ci.tests.test_rx_e2studio_cli
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
@@ -1745,6 +1746,28 @@ build_rx72n_ether:
       - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.abs
       - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.x
+    expire_in: 7 days
+
+# Cover the normal TSIP role too; its RAM/rings differ from the benchmark.
+# This lane compiles and packages files only and never selects a hardware scope.
+build_rx72n_tsip_common_core:
+  extends: build_rx72n_ether
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-idt-targets"'
+      when: on_success
+    - when: never
+  variables:
+    RX72N_TLS_BACKEND: "tsip"
+    RX72N_REQUIRE_TLS_VERSION: "TLSv1.2"
+    RX72N_TLS13_0RTT_ENABLE: "false"
+  artifacts:
+    when: always
+    paths:
+      - rx72n_e2studio_build.log
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.mot
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.abs
+      - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/*.map
     expire_in: 7 days
 
 prepare_lanbench_tls13_0rtt_server:

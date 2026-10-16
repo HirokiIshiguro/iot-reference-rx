@@ -46,6 +46,16 @@ RX671 Fleetの時間上限は全体3時間、主処理140分、`after_script`の
 
 IDTは通常の`full`やnightlyには含めません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt-validation.md)を参照してください。
 
+共通基盤MRのbuild-only profileでは、RX72Nの通常software appに加え、通常TSIP appも専用jobでビルドします。TSIP側のdescriptor・buffer変更後のリンク容量を確認するため、MAPもartifactへ保存します。実機scopeは追加しません。
+
+## ビルド失敗時の扱い
+
+e2studio-cliの異常終了、CC-RXのC／E／F診断、予期しないproject入力の追加・削除・変更を検出したら停止します。呼出側が宣言した必要出力について、欠落・空・当該build開始前の古いファイルも拒否します。W／M診断だけでは失敗にしません。
+
+RX671では、失敗後の救済make、強制再試行、生成変更を復元した後に再buildして成功扱いにする経路を廃止しました。ビルド前に意図して適用した一時profileは入力検査の基準に含め、終了時のfinallyで元に戻します。入力変更の診断はpathと変更前後のSHA-256を残し、header本文や秘密値はlogへ出しません。
+
+RX65Nの通常appにある、CLI成功後のリンカ設定調整と明示makeは予定された二段階処理です。CLI失敗後には進みません。native IDTの専用CDT経路も維持します。
+
 ## 実機とAWSの安全境界
 
 - feature pushはbuild-onlyとし、実機jobをMR / main / tag / focused / scheduleへ集約します。
