@@ -432,6 +432,7 @@ class IdtCiContractTests(unittest.TestCase):
         selected = paths.group(1).split()
         required = {
             "Middleware/FreeRTOS/FreeRTOS-Kernel",
+            "Middleware/FreeRTOS-Plus-CLI",
             "Test/Unity", "Test/FreeRTOS-Libraries-Integration-Tests",
             "Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader",
             "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader",
