@@ -105,6 +105,48 @@ class IdtFwupBankLayoutTests(unittest.TestCase):
                 for macro, value in checks:
                     self.assertEqual(numeric_define(config, macro), int(value, 0))
 
+    def test_tinycrypt_adapter_is_selected_only_by_bootloaders(self):
+        applications = (
+            "aws_bg96_ck_rx65n", "aws_bg96_ck_rx65n_tsip",
+            "aws_ether_rx72n_envision_kit", "aws_ether_rx72n_envision_kit_tsip",
+        )
+        for name in applications:
+            project = ROOT / "Projects" / name / "e2studio_ccrx"
+            with self.subTest(application=name):
+                resources = ET.parse(project / ".project")
+                for link in resources.findall(".//linkedResources/link"):
+                    self.assertNotIn("tinycrypt", link.findtext("name", ""))
+                    self.assertNotIn("tinycrypt", link.findtext("locationURI", ""))
+                sources = ET.parse(project / ".cproject").findall(
+                    ".//sourceEntries/entry")
+                for source in sources:
+                    self.assertNotIn("tinycrypt", source.get("name", ""))
+                # Both links to Common/ports must remain excluded from root
+                # recursion after the explicit adapter entry is removed.
+                roots = [source for source in sources if source.get("name") == ""]
+                self.assertEqual(len(roots), 1)
+                exclusions = roots[0].get("excluding", "").split("|")
+                self.assertIn("Common/ports/", exclusions)
+                self.assertIn("src/application_code/ports/", exclusions)
+        for target in self.targets.values():
+            project = ROOT / target["bootloader_project"]
+            with self.subTest(bootloader=project.parent.name):
+                links = {link.findtext("name"): link.findtext("locationURI")
+                         for link in ET.parse(project / ".project").findall(
+                             ".//linkedResources/link")}
+                self.assertIn("Vendor/tinycrypt", links)
+                self.assertTrue(links["src/tinycrypt_rx_port.c"].endswith(
+                    "/Common/ports/tinycrypt/tinycrypt_rx_port.c"))
+                sources = ET.parse(project / ".cproject").findall(
+                    ".//sourceEntries/entry")
+                self.assertIn("Vendor/tinycrypt/lib/source",
+                              [source.get("name") for source in sources])
+                selected_src = [source for source in sources
+                                if source.get("name") == "src"]
+                self.assertEqual(len(selected_src), 1)
+                self.assertNotIn("tinycrypt_rx_port.c",
+                                 selected_src[0].get("excluding", ""))
+
     def test_rx65n_old_area_would_overlap_the_common_bootloader(self):
         target = self.targets["rx65n-bg96"]
         main = int(target["bank_range_start"], 16)

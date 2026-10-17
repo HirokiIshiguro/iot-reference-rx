@@ -347,7 +347,6 @@
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/rm_rtos_abstraction_rx/src"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/ota_pal"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/rm_aws_pkcs11_pal_littlefs"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/tinycrypt"/>
 						<entry excluding="config/|docs/|extras/|include/|kernelports/|streamports/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder"/>
 						<entry excluding="config/|include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder/kernelports/FreeRTOS"/>
 						<entry excluding="config/|include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder/streamports/Jlink_RTT"/>

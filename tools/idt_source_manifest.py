@@ -47,7 +47,7 @@ BOOT = {
     "rx65n-bg96": "Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader",
     "rx671-wifi": "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader",
 }
-BOOT_RX671_SHA = "231a0cc680525be3530a7bb64862d099e5a401ec"
+BOOT_RX671_SHA = "8e19b0cdeeaab06f22fa0636f4cd469218edc6c1"
 
 PKCS11_RUNNER_FILE = "Test/FreeRTOS-Libraries-Integration-Tests/src/pkcs11/core_pkcs11_test.c"
 def dependency_paths(target_id: str) -> tuple[str, ...]:

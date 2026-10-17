@@ -15,7 +15,7 @@ from tools.ci.check_rx671_bootloader_layout import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROJECT = REPO_ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx"
 SUBMODULE = PROJECT / "lib" / "rx_bootloader"
-SUBMODULE_SHA = "231a0cc680525be3530a7bb64862d099e5a401ec"
+SUBMODULE_SHA = "8e19b0cdeeaab06f22fa0636f4cd469218edc6c1"
 
 
 def read(relative: str) -> str:
