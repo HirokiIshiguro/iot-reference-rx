@@ -1,7 +1,7 @@
 # Changelog
 
 safftiリリースで利用者から見える変更を、新しい順にまとめます。
-最初のsafftiタグは対応するRenesas公式タグとの差分、それ以降は直前のsafftiタグとの差分です。
+最初のsafftiタグはRenesas公式`v202406.04-LTS-rx-1.2.0`との差分、それ以降は直前のsafftiタグとの差分です。
 個別pipelineの一覧は[実機検証マトリクス](docs/validation-evidence.md)へ集約します。
 
 ## リリース一覧
@@ -139,8 +139,10 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 
 ### 最初のsafftiリリース
 
-- Renesas公式`v202406.01-LTS-rx-1.1.1`を基に、RX72N Envision Kit Ethernetの
+- Renesas公式`v202406.04-LTS-rx-1.2.0`を基に、RX72N Envision Kit Ethernetの
   application、dual-bank boot loader、Smart Configurator出力を追加しました。
+  1.2.0は[Issue #19](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/19)で取り込み、
+  タグ名の`v202406.01-LTS-rx-1.1.1`は取り込み前の基準版に由来します。
 - headless build、RFP flash、credential provisioning、MQTT、OTA、Fleet Provisioningを
   RX72N実機Runnerから実行できるようにしました。
 - RX72N 2 MiB dual-bank OTAの転送とflash処理を調整し、約26秒級を確認しました。
