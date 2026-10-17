@@ -1,6 +1,6 @@
 include:
   - project: oss/infra/hardware-config
-    ref: a61d6428e4b7aeef4994739b64700828e1eba599
+    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
     file: /templates/windows_ccrx_host_lease.yml
   - local: /tools/ci/normal_boot_jobs.yml
 
@@ -39,10 +39,10 @@ variables:
   # metadata from the previous 2025-12 release cannot leak into the build.
   E2STUDIO_CLI: "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe"
   E2STUDIO_CLI_BG96: "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe"
-  E2STUDIO_WORKSPACE: "C:/Temp/e2ws_iot_ref_rx72n_2026_04_2"
-  E2STUDIO_WORKSPACE_RX65N_BG96: "C:/Temp/e2ws_iot_ref_rx65n_bg96_2026_04_2"
-  # CC-RX/e2 studio processes share host-level temporary and tool state.
-  # Serialize every compiler build dispatched to the dedicated Windows runner.
+  E2STUDIO_WORKSPACE: "C:/ai/codex/ws/ci-rx72n-ether-${CI_PIPELINE_ID}-${CI_JOB_ID}"
+  E2STUDIO_WORKSPACE_RX65N_BG96: "C:/ai/codex/ws/ci-rx65n-bg96-${CI_PIPELINE_ID}-${CI_JOB_ID}"
+  # Participating CI builds retain their shared resource group and file lease.
+  # Normal app/boot workspaces are isolated by pipeline and job.
   WINDOWS_CCRX_BUILD_RESOURCE_GROUP: "ishiguro-pc-ccrx-e2studio-build"
   RX72N_E2STUDIO_TIMEOUT_SECONDS: "600"
   RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
@@ -237,9 +237,9 @@ variables:
   AWS_CLI_RUNNER_TAG: "aws-cli-ishiguro"
   RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
   RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
-  E2STUDIO_WORKSPACE_RX671_WIFI: "C:/Temp/e2ws_iot_ref_rx671_wifi_2026_04_2"
+  E2STUDIO_WORKSPACE_RX671_WIFI: "C:/ai/codex/ws/ci-rx671-wifi-${CI_PIPELINE_ID}-${CI_JOB_ID}"
   E2STUDIO_WORKSPACE_RX671_WIFI_FLEET: "C:/Temp/e2ws_iot_ref_rx671_wifi_fleet_2026_04_2"
-  E2STUDIO_WORKSPACE_RX671_BOOTLOADER: "C:/Temp/e2ws_iot_ref_rx671_bootloader_2026_04_2"
+  E2STUDIO_WORKSPACE_RX671_BOOTLOADER: "C:/ai/codex/ws/ci-rx671-boot-${CI_PIPELINE_ID}-${CI_JOB_ID}/e2ws_iot_ref_rx671_bootloader_2026_04_2"
   # Keep the generated e2 studio workspace short, outside OneDrive, and under
   # the repository-independent workspace root required by AGENTS.md.
   E2STUDIO_WORKSPACE_RX671_OTA: "C:/ai/codex/ws/iot-reference-rx-rx671-ota-2026-04-2"
