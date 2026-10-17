@@ -71,6 +71,7 @@
 
 /* jobs Library include. */
 #include "jobs.h"
+#include "ota_jobs_topic.h"
 
 /* OTA job parser include. */
 #include "job_parser.h"
@@ -309,7 +310,6 @@ const AppVersion32_t appFirmwareVersion =
  * @brief The topic filter that AWS IoT Jobs service publishes to
  * when a job is canceled.
  */
-const char *jobCancelTopic = "/cancellation_in_progress";
 
 /*
  * @brief The thing name used for creating OTA job topics.
@@ -768,12 +768,11 @@ static OtaPalJobDocProcessingResult_t receivedJobDocumentHandler(OtaJobEventData
         if (handled)
         {
             /* Populate the Jobs CANCELED event reserved topic ($aws/events/job/<jobId>/cancellation_in_progress) */
-            JobsStatus_t ret = Jobs_Events(jobEventTopicBuffer,
-                                           TOPIC_BUFFER_SIZE,
-                                           jobId,
-                                           (uint16_t)jobIdLength,
-                                           &jobEventTopicBufferLength);
-            if (JobsSuccess == ret)
+            bool topicReady = otaJobs_BuildCancellationTopic(jobEventTopicBuffer,
+                                                              sizeof(jobEventTopicBuffer),
+                                                              jobId, jobIdLength,
+                                                              &jobEventTopicBufferLength);
+            if (topicReady)
             {
                 /* SUBSCRIBE to the Jobs CANCELED event reserved topic ($aws/events/job/<jobId>/cancellation_in_progress) */
                 /* Make sure to subscribe to Events topic before mqtt-file-stream as a precaution against Job cancellation. */
@@ -1004,15 +1003,16 @@ bool otaDemo_handleIncomingMQTTMessage(char *topic,
         {
             /* The MQTT-agent gets an update in $aws/events topic. */
             /* Checks if a message comes from the $aws/events/job/<jobId>/cancellation_in_progress reserved topic. */
-            if ((NULL != strstr(topic, jobCancelTopic)) &&
-                (NULL != strstr(topic, JOBS_EVENTS_PREFIX)) &&
-                (NULL != strstr(topic, globalJobId)))
+            if ((globalJobId[0] != '\0') && (jobEventTopicBufferLength != 0U) &&
+                (topicLength == jobEventTopicBufferLength) &&
+                (memcmp(topic, jobEventTopicBuffer, topicLength) == 0))
             {
                 LogInfo(("The job is canceled\n"));
 
                 /* Send 'Canceled' event to OTA-agent. */
                 nextEvent.eventId = OtaAgentEventJobCanceled;
                 OtaSendEvent_FreeRTOS(&nextEvent);
+                handled = true;
             }
         }
         return handled;
@@ -1224,6 +1224,7 @@ static void processOTAEvents(void)
         {
             /* No current event and we have not received the new block
              * trying sending request for new block again */
+            nextBlockOffsetToRequest = currentBlockOffset;
             recvEventId = lastRecvEventId;
 
             /* It is likely that the network was disconnected and reconnected,

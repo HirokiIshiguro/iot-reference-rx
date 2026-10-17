@@ -1,0 +1,2325 @@
+{
+  "recorded_at": "2026-10-14T22:31:05+09:00",
+  "source_head": "65c59407b0a4b0c9048ba8ed8c700b3841090b3d",
+  "working_tree_uncommitted": true,
+  "scope": "Common-foundation WIP documentation; current metadata, previous source-selection/static-image checks, and unobserved hardware kept separate",
+  "current_metadata_projects": [
+    {
+      "project": "aws_bg96_ck_rx65n",
+      "role": "app",
+      "metadata": {
+        "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/.project": "b49eb368feb9ab12b66d672dea7e296a51e9194f91e7314a60539de6592bc181",
+        "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/.cproject": "51361b465c5c30462c489eb62cb533ff0926571f5895d05100979acf8d5f37b8",
+        "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/aws_bg96_ck_rx65n.scfg": "d8f4ce62dd58c93386d0b186cd483792d4ce6c3061674e2e526c5dee3543018d",
+        "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "c084da4cb47047c556399b60ec0061a1ec9cd3cb2a18807a660455d3a80690fa"
+      },
+      "product_config_sha256": {
+        "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "97b163dc6ce66cdee07e807980aa821392a8a5172acd56f12adf6c6203ed363f",
+        "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "7e3208e663b122fa39afa8749b2764bee25f415343dc579c3628072b5a20435e"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": null
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x2000)",
+          "sc_selected_index": "0x2000",
+          "qe_value": "0x2000"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv2",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv2",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": null,
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 74,
+        "flag_sets": [
+          [
+            "-isa=rxv2",
+            "-fpu",
+            "-branch=32",
+            "-goptimize"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratoraws_bg96_ck_rx65n.tmp",
+          "sha256": "c01d9738dcc2cc9a5e53dcf4580974e73661955c61706c9bb29ce2b9b95bb72a",
+          "flags": [
+            "-isa=rxv2",
+            "-fpu",
+            "-branch=32",
+            "-goptimize"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "aws_bg96_ck_rx65n_tsip",
+      "role": "app",
+      "metadata": {
+        "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/.project": "b8cab9742620ee5ff635c3014e417212361619b91d4357b3d473fdf4d04ea669",
+        "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/.cproject": "fecacb1bc1680aaca29a4c51fc3c86c68491c2ed444da37ff9466a348f05957a",
+        "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/aws_bg96_ck_rx65n_tsip.scfg": "d8f4ce62dd58c93386d0b186cd483792d4ce6c3061674e2e526c5dee3543018d",
+        "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "c084da4cb47047c556399b60ec0061a1ec9cd3cb2a18807a660455d3a80690fa"
+      },
+      "product_config_sha256": {
+        "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "97b163dc6ce66cdee07e807980aa821392a8a5172acd56f12adf6c6203ed363f",
+        "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "7e3208e663b122fa39afa8749b2764bee25f415343dc579c3628072b5a20435e"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": null
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x2000)",
+          "sc_selected_index": "0x2000",
+          "qe_value": "0x2000"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv2",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv2",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": null,
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 76,
+        "flag_sets": [
+          [
+            "-isa=rxv2",
+            "-fpu",
+            "-branch=32",
+            "-goptimize"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratoraws_bg96_ck_rx65n_tsip.tmp",
+          "sha256": "2a6d4f6a1503f8c0467b11c02dce7db7981167c5920acbd9d769f03e0bd02dcf",
+          "flags": [
+            "-isa=rxv2",
+            "-fpu",
+            "-branch=32",
+            "-goptimize"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "aws_ether_rx72n_envision_kit",
+      "role": "app",
+      "metadata": {
+        "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/.project": "a69672f8026b16b1cb2b1298a18e34c9b02afead6baec21f0d3b80520a1ff94f",
+        "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/.cproject": "7be6845ac849f1dd867bcb0835a532144deb130def020ea665a5e7734b44b0cf",
+        "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/aws_ether_rx72n_envision_kit.scfg": "5eea33c5f01f17c29bda1e349e79fd815397f38eec21d8a4f31228f14d652afd",
+        "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "744a7b6744a461f2dc26c48b3d40fd3be061ff9f8f202d3eac121390f794245c"
+      },
+      "product_config_sha256": {
+        "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "e684cd87c4ba8bd45874e5e0986e5bc09c554ec55de454dce34430741519f6b6",
+        "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "7e3208e663b122fa39afa8749b2764bee25f415343dc579c3628072b5a20435e"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": null
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x2000)",
+          "sc_selected_index": "0x2000",
+          "qe_value": "0x2000"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": null,
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 83,
+        "flag_sets": [
+          [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu",
+            "-branch=32",
+            "-goptimize",
+            "-tfu=intrinsic"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratoraws_ether_rx72n_envision_kit.tmp",
+          "sha256": "1fcdc5bb6152aefef76d268b64fb431e306e00a39899bd9aa2396e05abbc8c50",
+          "flags": [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu",
+            "-branch=32",
+            "-goptimize"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "aws_ether_rx72n_envision_kit_tsip",
+      "role": "app",
+      "metadata": {
+        "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/.project": "c4cfca06be7079b07af6109c3c8f60fa900881efca6a5696997f64773140069d",
+        "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/.cproject": "081ebb5cd54de7bedd26f98b4e42ba959cb31c7a5736ed4d446814bbce54a79b",
+        "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/aws_ether_rx72n_envision_kit_tsip.scfg": "5b2ddcaf4832d4378ac5ff613ee7422e850131fe4784d25a97cca38321a1b02f",
+        "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "684b3f2b4af1bbc40c66d7afaa7f1a193039b3986be82308ff6c8b534b235c71"
+      },
+      "product_config_sha256": {
+        "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "e684cd87c4ba8bd45874e5e0986e5bc09c554ec55de454dce34430741519f6b6",
+        "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "7e3208e663b122fa39afa8749b2764bee25f415343dc579c3628072b5a20435e"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": null
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x2000)",
+          "sc_selected_index": "0x2000",
+          "qe_value": "0x2000"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": null,
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 86,
+        "flag_sets": [
+          [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu",
+            "-branch=32",
+            "-goptimize",
+            "-tfu=intrinsic"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratoraws_ether_rx72n_envision_kit_tsip.tmp",
+          "sha256": "7eca5f2af52f14a7d80b7aec99c3acf3dc15077dfa31fc761f1dfc43b6258471",
+          "flags": [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu",
+            "-branch=32",
+            "-goptimize"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "aws_wifi_rx671_ek",
+      "role": "app",
+      "metadata": {
+        "Projects/aws_wifi_rx671_ek/e2studio_ccrx/.project": "0adabbdf99383c923575a45bf6cb1fbdbd842611c6521002c00e0e706bfd5d98",
+        "Projects/aws_wifi_rx671_ek/e2studio_ccrx/.cproject": "a90d966c2f36709089bcbc5c38ea569a745b8af81c85d7c065f244eef5158640",
+        "Projects/aws_wifi_rx671_ek/e2studio_ccrx/aws_wifi_rx671_ek.scfg": "8783777a1e7fee45885b02e4f6c073acd25945b9639f49af5819ed1d32112294",
+        "Projects/aws_wifi_rx671_ek/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "c7096186ce66329147dbd9729f58eebc381400d6d803ab0a67e998c588f5c0f5"
+      },
+      "product_config_sha256": {
+        "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "a4baec798efe368ae61557cf59bbf6684d69bede5018ba6f9e73a3b9e3019cad",
+        "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "630a30e69348415f762f59e18abff9f4778bae9fab3d95142bb6029a2c47a258"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": null
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x2000)",
+          "sc_selected_index": "0x2000",
+          "qe_value": "0x2000"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": null,
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 79,
+        "flag_sets": [
+          [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu",
+            "-goptimize"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratoraws_wifi_rx671_ek.tmp",
+          "sha256": "1515a93bcb174f08207e4228b9362abd968b167236240b55cf6a9a491a8e137e",
+          "flags": [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu",
+            "-goptimize"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "boot_loader_ck_rx65n",
+      "role": "boot",
+      "metadata": {
+        "Projects/boot_loader_ck_rx65n/e2studio_ccrx/.project": "88fc32ffb9f4fc5c8c5867072250b5d2e44c0f2073987b2f1070d975449402a8",
+        "Projects/boot_loader_ck_rx65n/e2studio_ccrx/.cproject": "e699c9aa3c16bfbb1a08b46feea7049eb30090afd45fca728b540027c402a6cd",
+        "Projects/boot_loader_ck_rx65n/e2studio_ccrx/boot_loader_ck_rx65n.scfg": "744aba00c8c5e26b33e73f70f4cc9357600fd7ed55817527f7b09e6ccc19242a",
+        "Projects/boot_loader_ck_rx65n/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "e2a373f5a67dc6336790a0c349583c2662b938a70aaf0587c9ee2d8c04682426"
+      },
+      "product_config_sha256": {
+        "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "f5bba4c56621fb2de92b674b07fc5f1ac365aaa3bedba3dbf7616f102905c526",
+        "Projects/boot_loader_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "630a30e69348415f762f59e18abff9f4778bae9fab3d95142bb6029a2c47a258"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": null
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x400)",
+          "sc_selected_index": "0x400",
+          "qe_value": "0x400"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv2",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv2",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": null
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 20,
+        "flag_sets": [
+          [
+            "-isa=rxv2",
+            "-fpu",
+            "-goptimize"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratorboot_loader_ck_rx65n.tmp",
+          "sha256": "66b6e03f772027b49001b9d8890a70fbe8227c49dab7886a7e41eeaf358cc323",
+          "flags": [
+            "-isa=rxv2",
+            "-fpu",
+            "-goptimize"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "boot_loader_rx671_ek",
+      "role": "boot",
+      "metadata": {
+        "Projects/boot_loader_rx671_ek/e2studio_ccrx/.project": "151c400db2d6909bc52ed46bf21c8d78247a41262fd8a4c034b967ef1a7a27a3",
+        "Projects/boot_loader_rx671_ek/e2studio_ccrx/.cproject": "3503ee0df811a254d058103cffaf47051d058196ab56fe0ab5c25fabc96b3f4f",
+        "Projects/boot_loader_rx671_ek/e2studio_ccrx/boot_loader_rx671_ek.scfg": "e426e1a31f8b3b5c90bf23172bde057a81cce181d5b18719e583e557aff81733",
+        "Projects/boot_loader_rx671_ek/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "5c1c86c07c094541fb38c52dd6f6f50f0724cfd7244888c69af5501bc246a5a0"
+      },
+      "product_config_sha256": {
+        "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "5fd1ec8333112f8d4d22d771495bc8320fad72598ddb67c6afe6f4bae900fac2",
+        "Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "630a30e69348415f762f59e18abff9f4778bae9fab3d95142bb6029a2c47a258"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": null
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x400)",
+          "sc_selected_index": "0x400",
+          "qe_value": "0x400"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": null
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 20,
+        "flag_sets": [
+          [
+            "-isa=rxv2",
+            "-fpu"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratorboot_loader_rx671_ek.tmp",
+          "sha256": "d18f49809e599995cd98e30efd460e02313ec060c61f5f2b93181ed68f33a4f4",
+          "flags": [
+            "-isa=rxv2",
+            "-fpu"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "boot_loader_rx72n_envision_kit",
+      "role": "boot",
+      "metadata": {
+        "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/.project": "9c9d16f2fb43780293e6a83b750e7fef721c0c3b74560347351a083334398e90",
+        "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/.cproject": "51aadab83bf618a0f490b74361a05758978a3dadf41ab945af9ddf3761c8108d",
+        "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/boot_loader_rx72n_envision_kit.scfg": "f2311a7c5c4d9b0382ad3f134d767a8e3e5c1a24a88675fb35f558790607c77a",
+        "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "e5ba1eab326449a375379fbe71a69a89effda23aa367275cac8cac20e231e665"
+      },
+      "product_config_sha256": {
+        "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h": "dbc72bb4d14570109245a636ef3b627548d53d792d95ae0721204c3345099f0d",
+        "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/smc_gen/r_config/r_flash_rx_config.h": "7e3208e663b122fa39afa8749b2764bee25f415343dc579c3628072b5a20435e"
+      },
+      "xml_valid": true,
+      "common_configuration": {
+        "BSP_CFG_ROM_CACHE_ENABLE": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "BSP_CFG_CODE_FLASH_BANK_MODE": {
+          "header": "(0)",
+          "sc_selected_index": "0"
+        },
+        "BSP_CFG_HEAP_BYTES": {
+          "header": "(0x400)",
+          "sc_selected_index": "0x400",
+          "qe_value": "0x400"
+        },
+        "FLASH_CFG_DATA_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_BGO": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        },
+        "FLASH_CFG_CODE_FLASH_RUN_FROM_ROM": {
+          "header": "(1)",
+          "sc_selected_index": "1"
+        }
+      },
+      "option_matrix": {
+        "common.option.isa": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.isa.rxv3",
+          "default_source": null
+        },
+        "common.option.floatIns": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.floatIns.yes",
+          "default_source": null
+        },
+        "common.option.doublePrecisionFPU": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "common.option.branch": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.branch.24bit",
+          "default_source": null
+        },
+        "common.option.cmd.console": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cmd.console.MULTI",
+          "default_source": null
+        },
+        "compiler.option.langFileC": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.langFileC.c99",
+          "default_source": null
+        },
+        "compiler.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.optimize.level2",
+          "default_source": null
+        },
+        "compiler.option.gOptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "assembler.option.goptimize": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.optimize": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all",
+          "default_source": null
+        },
+        "linker.option.checkSection": {
+          "declared": "true",
+          "effective": "true",
+          "default_source": null
+        },
+        "linker.option.show": {
+          "declared": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "effective": "com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all",
+          "default_source": null
+        },
+        "linker.option.showSymbol": {
+          "declared": null,
+          "effective": "false",
+          "default_source": "installed official CC-RX plugin.xml"
+        },
+        "linker.option.useCustomLinkageOrder": {
+          "declared": "false",
+          "effective": "false",
+          "default_source": null
+        }
+      },
+      "rom_ram_mapping": [
+        "PFRAM2=RPFRAM2"
+      ],
+      "existing_generated_compiler_response": {
+        "response_files": 24,
+        "flag_sets": [
+          [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu",
+            "-tfu=intrinsic"
+          ]
+        ],
+        "scope": "Diagnostic response files already on disk; final common branch/order/show policy was applied later. Regeneration and execution with the final metadata are separate checks"
+      },
+      "existing_generated_library_response": [
+        {
+          "file": "LibraryGeneratorboot_loader_rx72n_envision_kit.tmp",
+          "sha256": "3e6b25cd29ca09ff513da54d93efef5be032e696f3d263f7529b04adf3e2ef61",
+          "flags": [
+            "-isa=rxv3",
+            "-fpu",
+            "-dpfpu"
+          ]
+        }
+      ]
+    }
+  ],
+  "gitlinks": {
+    "Middleware/3rdparty/TraceRecorderSource": "2f888cb9e6240c88e33eacd5acd50555fb13fbf5",
+    "Middleware/3rdparty/littlefs": "6cb4e86540eca0d9ba62500a298385c9d863c8be",
+    "Middleware/3rdparty/mbedtls": "c765c831e5c2a0971410692f92f7a81d6ec65ec2",
+    "Middleware/3rdparty/mbedtls_with_TSIP": "6d8fb19d71cfdf17acbdf7382d65ec899e750118",
+    "Middleware/3rdparty/tinycbor": "d94ca09aa91f5b3c581527aa8bca179a82b79874",
+    "Middleware/3rdparty/tinycrypt": "cf24c907a61c01bc2c4e1ee0ae24457c27a840a2",
+    "Middleware/AWS/Device-Defender-for-AWS-IoT-embedded-sdk": "86582e258907e762948547c1826d44704908b403",
+    "Middleware/AWS/Device-Shadow-for-AWS-IoT-embedded-sdk": "a0cbd6e5ea4b4615f0d7f801be24e552a9658b42",
+    "Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk": "7691e8af27bd0a42b7fe2f21c8b3289fa037df17",
+    "Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk": "f09232966a558916253537fed68c07e529cd8f39",
+    "Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk": "b4ac78a0d5d4cff9b28a44f665067057e07be09f",
+    "Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c": "383ffeff43a80123e07cf8ca613d12ce680527b0",
+    "Middleware/FreeRTOS-Plus-CLI": "152cf36d6775bce6026a791845af12201aae703d",
+    "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface": "5d76e3b3099c3693f98ecc6e15bc62cca140f13f",
+    "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface-Reference-Quectel-BG96": "d2176422d3678cef0d7e7f983f2a491e61db492e",
+    "Middleware/FreeRTOS/FreeRTOS-Kernel": "9b777ae5c5b8e9e456065a00294d1e5f5f9facf5",
+    "Middleware/FreeRTOS/FreeRTOS-Plus-TCP": "c12361095aca68aeed858f45d14395fbffa92c0d",
+    "Middleware/FreeRTOS/backoffAlgorithm": "14f4c88b33dd554be30a00a312c88d3986d457d0",
+    "Middleware/FreeRTOS/coreHTTP": "3c4a5838658cd6d0ff8fb7c3a14e30baafcbcd28",
+    "Middleware/FreeRTOS/coreJSON": "cffa492da18c890181d64462f8af63992a69d3b0",
+    "Middleware/FreeRTOS/coreMQTT": "04845c6a8e5f9cf2d232f1c6e80baeb81302e690",
+    "Middleware/FreeRTOS/coreMQTT-Agent": "2338d00db41196e4a1fce4bc3ab32f907e77f871",
+    "Middleware/FreeRTOS/corePKCS11": "ccc78afee1716436cca832dd3d9388ead2ba05b0",
+    "Middleware/FreeRTOS/coreSNTP": "50f5f96f4c33b14c0358f404ff4ff2a29d422ad7",
+    "Middleware/Renesas/r_sdio_rx": "cc94efa0a37db72a6fede1bc651a891a0a6e8bec",
+    "Middleware/Renesas/r_simple_glcdc_config_rx": "ade52ca9b3869c4d80855ee41a1bf63db70695db",
+    "Middleware/Renesas/r_simple_graphic_rx": "a7c3d736eab56aa622caabe0715ba290e1136f49",
+    "Middleware/Renesas/rm_littlefs_rx": "60f93c8427ce88f70ea26aae7abc641f577a7765",
+    "Middleware/Renesas/rm_rtos_abstraction_rx": "5818cdfbda661d098fd028bf6975847d5af2c491",
+    "Middleware/Renesas/rx-driver-package": "bcc409d331b0bff68d4b09bf6fc41376f75d42bc",
+    "Middleware/freertos_plus": "a038063c3b0216e0b4d46d72425388a0c2938b13",
+    "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/cyw-fmac-nvram": "40a917f1a50f9e4df44a7ec63901771791d53f09",
+    "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/firmware-wifi-host-driver": "31247470af5b7d79b53458f51d06a89aa5fd41f6",
+    "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/wifi-resources": "e9b4a5bf07cb62736f1d420a75d27b45bc49d7bd",
+    "Projects/aws_wifi_rx671_ek/external/wifi-host-driver": "d5de9ee04e103d727d7ed529a008c24b9332c4e8",
+    "Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader": "231a0cc680525be3530a7bb64862d099e5a401ec",
+    "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader": "231a0cc680525be3530a7bb64862d099e5a401ec",
+    "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/lib/rx_bootloader": "231a0cc680525be3530a7bb64862d099e5a401ec",
+    "Test/FreeRTOS-Libraries-Integration-Tests": "0a0a92160a81c5cba008e472203513bd0cfb4c7a",
+    "Test/Unity": "22777c4810de3e3a4cb521a05eca2752fccd00ea",
+    "tools/provisioning": "1fadbdf0a6da41166a844e64b925dcaa56fe7593"
+  },
+  "official_tool_definition": {
+    "plugin": "com.renesas.cdt.managedbuild.renesas.ccrx_1.3.2.v20260309-0841.jar",
+    "plugin_xml_sha256": "408e9ca90e3761ea0de5eafc4a7f1ea87992246296d249f7980faaa6762e7937",
+    "compiler_optimize_default": "level2",
+    "compiler_endian_default": "little",
+    "dsp_assembler_endian_is_a_separate_option": true
+  },
+  "source_selection_check": {
+    "engine": "Installed Eclipse CDT CDataUtil.isExcluded and .project resource filters",
+    "scope": "All effective product-owned, linked Vendor and Middleware .c/.src/.s candidates",
+    "borrowed_test_tool_example_cbmc_proof_selection": 0,
+    "duplicate_physical_source_selection": 0,
+    "notes": "Earlier complete source-selection checks plus subsequent targeted TSIP key-adapter checks; current generated compiler responses provide separate evidence"
+  },
+  "shared_littlefs": {
+    "base_address": "0x00100000",
+    "region_size": 8192,
+    "read_size": 4,
+    "prog_size": 4,
+    "block_size": 128,
+    "block_count": 64,
+    "cache_size": 64,
+    "lookahead_size": 16,
+    "block_cycles": 500,
+    "filesystem_source": "Middleware/3rdparty/littlefs (same root submodule for app and boot)",
+    "mutex_mode": "product caller wrapper; upstream LFS_THREADSAFE disabled",
+    "gui_generate_observed": false,
+    "source_sha": "6cb4e86540eca0d9ba62500a298385c9d863c8be",
+    "source_release": "v2.11.3",
+    "format": "LFS_VERSION2.11 / LFS_DISK_VERSION2.1"
+  },
+  "sc_heap_selector_configuration": {
+    "projects": [
+      {
+        "project": "aws_wifi_rx671_ek",
+        "actual_heap_kib": 256,
+        "sc_effective_heap_kib": 256,
+        "qe_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "sc_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "kernel_version": "11.3.0",
+        "descriptor_header_only": true,
+        "mdf_default_used_only_without_saved_selection": [
+          "256"
+        ],
+        "saved_selection_present": true,
+        "sha256": {
+          "Projects/aws_wifi_rx671_ek/e2studio_ccrx/aws_wifi_rx671_ek.scfg": "8783777a1e7fee45885b02e4f6c073acd25945b9639f49af5819ed1d32112294",
+          "Projects/aws_wifi_rx671_ek/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "c7096186ce66329147dbd9729f58eebc381400d6d803ab0a67e998c588f5c0f5"
+        }
+      },
+      {
+        "project": "aws_bg96_ck_rx65n",
+        "actual_heap_kib": 256,
+        "sc_effective_heap_kib": 256,
+        "qe_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "sc_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "kernel_version": "11.3.0",
+        "descriptor_header_only": true,
+        "mdf_default_used_only_without_saved_selection": [
+          "256"
+        ],
+        "saved_selection_present": true,
+        "sha256": {
+          "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/aws_bg96_ck_rx65n.scfg": "d8f4ce62dd58c93386d0b186cd483792d4ce6c3061674e2e526c5dee3543018d",
+          "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "c084da4cb47047c556399b60ec0061a1ec9cd3cb2a18807a660455d3a80690fa"
+        }
+      },
+      {
+        "project": "aws_bg96_ck_rx65n_tsip",
+        "actual_heap_kib": 256,
+        "sc_effective_heap_kib": 256,
+        "qe_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "sc_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "kernel_version": "11.3.0",
+        "descriptor_header_only": true,
+        "mdf_default_used_only_without_saved_selection": [
+          "256"
+        ],
+        "saved_selection_present": true,
+        "sha256": {
+          "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/aws_bg96_ck_rx65n_tsip.scfg": "d8f4ce62dd58c93386d0b186cd483792d4ce6c3061674e2e526c5dee3543018d",
+          "Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "c084da4cb47047c556399b60ec0061a1ec9cd3cb2a18807a660455d3a80690fa"
+        }
+      },
+      {
+        "project": "aws_ether_rx72n_envision_kit",
+        "actual_heap_kib": 320,
+        "sc_effective_heap_kib": 320,
+        "qe_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "sc_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "kernel_version": "11.3.0",
+        "descriptor_header_only": true,
+        "mdf_default_used_only_without_saved_selection": [
+          "256"
+        ],
+        "saved_selection_present": true,
+        "sha256": {
+          "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/aws_ether_rx72n_envision_kit.scfg": "5eea33c5f01f17c29bda1e349e79fd815397f38eec21d8a4f31228f14d652afd",
+          "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "744a7b6744a461f2dc26c48b3d40fd3be061ff9f8f202d3eac121390f794245c"
+        }
+      },
+      {
+        "project": "aws_ether_rx72n_envision_kit_tsip",
+        "actual_heap_kib": 368,
+        "sc_effective_heap_kib": 368,
+        "qe_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "sc_kernel_component": "FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0",
+        "kernel_version": "11.3.0",
+        "descriptor_header_only": true,
+        "mdf_default_used_only_without_saved_selection": [
+          "256"
+        ],
+        "saved_selection_present": true,
+        "sha256": {
+          "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/aws_ether_rx72n_envision_kit_tsip.scfg": "5b2ddcaf4832d4378ac5ff613ee7422e850131fe4784d25a97cca38321a1b02f",
+          "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/.settings/com.renesas.smc.e2studio.qe.xml": "684b3f2b4af1bbc40c66d7afaa7f1a193039b3986be82308ff6c8b534b235c71"
+        }
+      }
+    ],
+    "scope": "Five app saved SC heap selections equal actual product configuration; QE points to the same current Kernel component. Mdf defaults apply only without a saved selection.",
+    "FreeRTOSConfig_written_by_this_metadata_task": false,
+    "gui_generate_observed": false
+  },
+  "flash_static_image_snapshot": [
+    {
+      "project": "aws_ether_rx72n_envision_kit",
+      "entry": 4292870912,
+      "rom_ram_mapping": "DEXRAM=REXRAM,PFRAM2=RPFRAM2,DEXRAM_2=REXRAM_2,D=R,D_8=R_8,DEXRAM_8=REXRAM_8,D_1=R_1,D_2=R_2,DEXRAM_1=REXRAM_1",
+      "onchip_ram_end": 524287,
+      "PFRAM2": {
+        "address": 4293486651,
+        "size": 316,
+        "type": 1
+      },
+      "RPFRAM2": {
+        "address": 459444,
+        "size": 316,
+        "type": 8
+      },
+      "vectors": {
+        "exception_address": 4294705024,
+        "reset_address": 4294705148,
+        "reset_value": 4292870912,
+        "MDE": 4294967183,
+        "BANKSEL": 4294967295,
+        "image_initial_bank": 0
+      },
+      "bsp_table_contains_flash_code_copy": false,
+      "dynamic_copy_or_execution_observed": false,
+      "flash_copy_path_status": "Live __$R_FlashCodeCopy ELF symbol; original R_FLASH_Open invokes it; hardware execution not observed",
+      "artifact_snapshot": "Captured before the 2026-10-14 boot optimization/ISA convergence; the boot addresses require re-link verification",
+      "artifacts": {
+        ".abs": {
+          "repo_relative_build_output": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/aws_ether_rx72n_envision_kit.abs",
+          "sha256": "dbc242a7cc3d9c68fd57ad6b79336c917162938d5167eb8690768dccb5ff9a0f"
+        },
+        ".map": {
+          "repo_relative_build_output": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/aws_ether_rx72n_envision_kit.map",
+          "sha256": "ea9a176f166d2c1e508796dcc734129a9d8f0e2fd4bc3b5e56650391455fce06"
+        },
+        ".mot": {
+          "repo_relative_build_output": "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/aws_ether_rx72n_envision_kit.mot",
+          "sha256": "b0364f9f3fea412d62ebaa17d71d9756a711f24f7483f3a53f6dcbfa94016c53"
+        }
+      },
+      "symbols": {
+        "flash_toggle_banksel_reg": {
+          "elf": [
+            {
+              "name": "_flash_toggle_banksel_reg",
+              "address": 459602,
+              "size": 158,
+              "binding": 1,
+              "type": 2,
+              "section_index": 7
+            }
+          ],
+          "map_live": {
+            "address": 459602,
+            "size": 158,
+            "section": "RPFRAM2",
+            "map_line": 1318
+          },
+          "map_deleted": null
+        },
+        "flash_write_faw_reg": {
+          "elf": [
+            {
+              "name": "__$flash_write_faw_reg",
+              "address": 459444,
+              "size": 158,
+              "binding": 0,
+              "type": 2,
+              "section_index": 7
+            }
+          ],
+          "map_live": {
+            "address": 459444,
+            "size": 158,
+            "section": "RPFRAM2",
+            "map_line": 1316
+          },
+          "map_deleted": null
+        },
+        "R_FlashCodeCopy": {
+          "elf": [
+            {
+              "name": "__$R_FlashCodeCopy",
+              "address": 4293420436,
+              "size": 21,
+              "binding": 0,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293420436,
+            "size": 21,
+            "section": "P",
+            "map_line": 8576
+          },
+          "map_deleted": null
+        },
+        "R_FLASH_Open": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Open",
+              "address": 4293420419,
+              "size": 17,
+              "binding": 1,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293420419,
+            "size": 17,
+            "section": "P",
+            "map_line": 8574
+          },
+          "map_deleted": null
+        },
+        "R_FLASH_Control": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Control",
+              "address": 4293420466,
+              "size": 3,
+              "binding": 1,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293420466,
+            "size": 3,
+            "section": "P",
+            "map_line": 8584
+          },
+          "map_deleted": null
+        },
+        "flash_wait_frdy": {
+          "elf": [
+            {
+              "name": "_flash_wait_frdy",
+              "address": 4293417815,
+              "size": 55,
+              "binding": 1,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293417815,
+            "size": 55,
+            "section": "P",
+            "map_line": 8528
+          },
+          "map_deleted": null
+        }
+      },
+      "static_copy_verification": {
+        "direct_open_to_copy_call": true,
+        "instruction": "smovf",
+        "rom_source": 4293486651,
+        "sram_destination": 459444,
+        "byte_count": 316
+      }
+    },
+    {
+      "project": "aws_ether_rx72n_envision_kit_tsip",
+      "entry": 4292870912,
+      "rom_ram_mapping": "DEXRAM=REXRAM,PFRAM2=RPFRAM2,DEXRAM_2=REXRAM_2,D=R,D_8=R_8,DEXRAM_8=REXRAM_8,D_1=R_1,D_2=R_2,DEXRAM_1=REXRAM_1",
+      "onchip_ram_end": 524287,
+      "PFRAM2": {
+        "address": 4293710377,
+        "size": 316,
+        "type": 1
+      },
+      "RPFRAM2": {
+        "address": 510584,
+        "size": 316,
+        "type": 8
+      },
+      "vectors": {
+        "exception_address": 4294705024,
+        "reset_address": 4294705148,
+        "reset_value": 4292870912,
+        "MDE": 4294967183,
+        "BANKSEL": 4294967295,
+        "image_initial_bank": 0
+      },
+      "bsp_table_contains_flash_code_copy": false,
+      "dynamic_copy_or_execution_observed": false,
+      "flash_copy_path_status": "Live __$R_FlashCodeCopy ELF symbol; original R_FLASH_Open invokes it; hardware execution not observed",
+      "artifact_snapshot": "Captured before the 2026-10-14 boot optimization/ISA convergence; the boot addresses require re-link verification",
+      "artifacts": {
+        ".abs": {
+          "repo_relative_build_output": "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/aws_ether_rx72n_envision_kit_tsip.abs",
+          "sha256": "a95aba1c0419cd419f2ff7a3a8a6391f7431e492bcd1761c26fe0edebfb491e1"
+        },
+        ".map": {
+          "repo_relative_build_output": "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/aws_ether_rx72n_envision_kit_tsip.map",
+          "sha256": "a103d10690eafe285447ab1fa8cd963165de39cb5d56512c9f097e13b7d3e2de"
+        },
+        ".mot": {
+          "repo_relative_build_output": "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/HardwareDebug/aws_ether_rx72n_envision_kit_tsip.mot",
+          "sha256": "7256868a311f4ebbe500bdda5ee75df6df5ff44d386fe8fdbc300398a7877b01"
+        }
+      },
+      "symbols": {
+        "flash_toggle_banksel_reg": {
+          "elf": [
+            {
+              "name": "_flash_toggle_banksel_reg",
+              "address": 510742,
+              "size": 158,
+              "binding": 1,
+              "type": 2,
+              "section_index": 7
+            }
+          ],
+          "map_live": {
+            "address": 510742,
+            "size": 158,
+            "section": "RPFRAM2",
+            "map_line": 1447
+          },
+          "map_deleted": null
+        },
+        "flash_write_faw_reg": {
+          "elf": [
+            {
+              "name": "__$flash_write_faw_reg",
+              "address": 510584,
+              "size": 158,
+              "binding": 0,
+              "type": 2,
+              "section_index": 7
+            }
+          ],
+          "map_live": {
+            "address": 510584,
+            "size": 158,
+            "section": "RPFRAM2",
+            "map_line": 1445
+          },
+          "map_deleted": null
+        },
+        "R_FlashCodeCopy": {
+          "elf": [
+            {
+              "name": "__$R_FlashCodeCopy",
+              "address": 4293504672,
+              "size": 21,
+              "binding": 0,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293504672,
+            "size": 21,
+            "section": "P",
+            "map_line": 9141
+          },
+          "map_deleted": null
+        },
+        "R_FLASH_Open": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Open",
+              "address": 4293504655,
+              "size": 17,
+              "binding": 1,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293504655,
+            "size": 17,
+            "section": "P",
+            "map_line": 9139
+          },
+          "map_deleted": null
+        },
+        "R_FLASH_Control": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Control",
+              "address": 4293504702,
+              "size": 3,
+              "binding": 1,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293504702,
+            "size": 3,
+            "section": "P",
+            "map_line": 9149
+          },
+          "map_deleted": null
+        },
+        "flash_wait_frdy": {
+          "elf": [
+            {
+              "name": "_flash_wait_frdy",
+              "address": 4293502051,
+              "size": 55,
+              "binding": 1,
+              "type": 2,
+              "section_index": 54
+            }
+          ],
+          "map_live": {
+            "address": 4293502051,
+            "size": 55,
+            "section": "P",
+            "map_line": 9093
+          },
+          "map_deleted": null
+        }
+      },
+      "static_copy_verification": {
+        "direct_open_to_copy_call": true,
+        "instruction": "smovf",
+        "rom_source": 4293710377,
+        "sram_destination": 510584,
+        "byte_count": 316
+      }
+    },
+    {
+      "project": "boot_loader_rx72n_envision_kit",
+      "entry": 4294705152,
+      "rom_ram_mapping": "D=R,D_1=R_1,D_2=R_2,D_8=R_8,PFRAM2=RPFRAM2,DEXRAM=REXRAM,DEXRAM_1=REXRAM_1,DEXRAM_2=REXRAM_2,DEXRAM_8=REXRAM_8",
+      "onchip_ram_end": 524287,
+      "PFRAM2": {
+        "address": 4294783133,
+        "size": 312,
+        "type": 1
+      },
+      "RPFRAM2": {
+        "address": 113592,
+        "size": 312,
+        "type": 8
+      },
+      "vectors": {
+        "exception_address": 4294967168,
+        "reset_address": 4294967292,
+        "reset_value": 4294705152,
+        "MDE": 4294967183,
+        "BANKSEL": 4294967295,
+        "image_initial_bank": 0
+      },
+      "bsp_table_contains_flash_code_copy": false,
+      "dynamic_copy_or_execution_observed": false,
+      "flash_copy_path_status": "Live __$R_FlashCodeCopy ELF symbol; original R_FLASH_Open invokes it; hardware execution not observed",
+      "artifact_snapshot": "Captured before the 2026-10-14 boot optimization/ISA convergence; the boot addresses require re-link verification",
+      "artifacts": {
+        ".abs": {
+          "repo_relative_build_output": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.abs",
+          "sha256": "315556e4640d08e3a2b68738a3cfb2a4e2f16070ecaa83e67ae191f666b3081f"
+        },
+        ".map": {
+          "repo_relative_build_output": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.map",
+          "sha256": "b1fbb2a3b852491dc7f26e3781317fc8896d4958de9f608dcc3e8bffeb7cfa2f"
+        },
+        ".mot": {
+          "repo_relative_build_output": "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot",
+          "sha256": "46a114d8c95266e8c5166297976070dd2de04aee8dd9226900a2299ada1be40d"
+        }
+      },
+      "symbols": {
+        "flash_toggle_banksel_reg": {
+          "elf": [
+            {
+              "name": "_flash_toggle_banksel_reg",
+              "address": 113748,
+              "size": 156,
+              "binding": 1,
+              "type": 2,
+              "section_index": 11
+            }
+          ],
+          "map_live": {
+            "address": 113748,
+            "size": 156,
+            "section": "RPFRAM2",
+            "map_line": 965
+          },
+          "map_deleted": {
+            "map_line": 3731,
+            "record": "0001bc54 0029(fffcbce5:P)"
+          }
+        },
+        "flash_write_faw_reg": {
+          "elf": [
+            {
+              "name": "__$flash_write_faw_reg",
+              "address": 113592,
+              "size": 156,
+              "binding": 0,
+              "type": 2,
+              "section_index": 11
+            }
+          ],
+          "map_live": {
+            "address": 113592,
+            "size": 156,
+            "section": "RPFRAM2",
+            "map_line": 963
+          },
+          "map_deleted": null
+        },
+        "R_FlashCodeCopy": {
+          "elf": [
+            {
+              "name": "__$R_FlashCodeCopy",
+              "address": 4294753570,
+              "size": 21,
+              "binding": 0,
+              "type": 2,
+              "section_index": 49
+            }
+          ],
+          "map_live": {
+            "address": 4294753570,
+            "size": 21,
+            "section": "P",
+            "map_line": 2116
+          },
+          "map_deleted": null
+        },
+        "R_FLASH_Open": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Open",
+              "address": 4294753550,
+              "size": 20,
+              "binding": 1,
+              "type": 2,
+              "section_index": 49
+            }
+          ],
+          "map_live": {
+            "address": 4294753550,
+            "size": 20,
+            "section": "P",
+            "map_line": 2114
+          },
+          "map_deleted": {
+            "map_line": 3871,
+            "record": "fffcbd0e 0043(fffce487:P)"
+          }
+        },
+        "R_FLASH_Control": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Control",
+              "address": 4294753607,
+              "size": 4,
+              "binding": 1,
+              "type": 2,
+              "section_index": 49
+            }
+          ],
+          "map_live": {
+            "address": 4294753607,
+            "size": 4,
+            "section": "P",
+            "map_line": 2126
+          },
+          "map_deleted": {
+            "map_line": 3896,
+            "record": "fffcbd47 0043(fffce4a9:P)"
+          }
+        },
+        "flash_wait_frdy": {
+          "elf": [
+            {
+              "name": "_flash_wait_frdy",
+              "address": 4294750555,
+              "size": 54,
+              "binding": 1,
+              "type": 2,
+              "section_index": 49
+            }
+          ],
+          "map_live": {
+            "address": 4294750555,
+            "size": 54,
+            "section": "P",
+            "map_line": 2062
+          },
+          "map_deleted": {
+            "map_line": 3776,
+            "record": "fffcb15b 0028(fffcb141:P)"
+          }
+        }
+      },
+      "static_copy_verification": {
+        "direct_open_to_copy_call": true,
+        "instruction": "smovf",
+        "rom_source": 4294783133,
+        "sram_destination": 113592,
+        "byte_count": 312
+      }
+    },
+    {
+      "project": "aws_wifi_rx671_ek",
+      "entry": 4293919488,
+      "rom_ram_mapping": "D=R,D_1=R_1,D_2=R_2,D_8=R_8,PFRAM2=RPFRAM2",
+      "onchip_ram_end": 393215,
+      "PFRAM2": {
+        "address": 4294253736,
+        "size": 308,
+        "type": 1
+      },
+      "RPFRAM2": {
+        "address": 385280,
+        "size": 308,
+        "type": 8
+      },
+      "vectors": {
+        "exception_address": 4294705024,
+        "reset_address": 4294705148,
+        "reset_value": 4293919488,
+        "MDE": 4294967183,
+        "BANKSEL": 4294967295,
+        "image_initial_bank": 0
+      },
+      "bsp_table_contains_flash_code_copy": false,
+      "dynamic_copy_or_execution_observed": false,
+      "flash_copy_path_status": "RX671 diagnostic profile disables OTA/provisioner/native entry paths; init/open/copy symbols discarded, no BSP PFRAM2 copy table; do not claim initialized RAM or inline copy",
+      "artifact_snapshot": "Captured before the 2026-10-14 boot optimization/ISA convergence; the boot addresses require re-link verification",
+      "artifacts": {
+        ".abs": {
+          "repo_relative_build_output": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.abs",
+          "sha256": "e7acc11a67ab825dc7592c0281c1fe83dde07f46ce27d40cb537510f5707ce9f"
+        },
+        ".map": {
+          "repo_relative_build_output": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.map",
+          "sha256": "855f7b9395641ad0e1362700bbd42865d57b6982cb1e19c6ec442d2585d1751d"
+        },
+        ".mot": {
+          "repo_relative_build_output": "Projects/aws_wifi_rx671_ek/e2studio_ccrx/HardwareDebug/aws_wifi_rx671_ek.mot",
+          "sha256": "a68a9a6593c86b5c2a8ca335ee1cbabd1fabdbdd959d6ef4bdb3831d93ed286e"
+        }
+      },
+      "symbols": {
+        "flash_toggle_banksel_reg": {
+          "elf": [
+            {
+              "name": "_flash_toggle_banksel_reg",
+              "address": 385434,
+              "size": 154,
+              "binding": 1,
+              "type": 2,
+              "section_index": 11
+            }
+          ],
+          "map_live": {
+            "address": 385434,
+            "size": 154,
+            "section": "RPFRAM2",
+            "map_line": 1671
+          },
+          "map_deleted": null
+        },
+        "flash_write_faw_reg": {
+          "elf": [
+            {
+              "name": "__$flash_write_faw_reg",
+              "address": 385280,
+              "size": 154,
+              "binding": 0,
+              "type": 2,
+              "section_index": 11
+            }
+          ],
+          "map_live": {
+            "address": 385280,
+            "size": 154,
+            "section": "RPFRAM2",
+            "map_line": 1669
+          },
+          "map_deleted": null
+        },
+        "R_FlashCodeCopy": {
+          "elf": [],
+          "map_live": null,
+          "map_deleted": {
+            "map_line": 12194,
+            "record": "15    func ,l"
+          }
+        },
+        "R_FLASH_Open": {
+          "elf": [],
+          "map_live": null,
+          "map_deleted": {
+            "map_line": 12196,
+            "record": "14    func ,g"
+          }
+        },
+        "R_FLASH_Control": {
+          "elf": [],
+          "map_live": null,
+          "map_deleted": {
+            "map_line": 12206,
+            "record": "4    func ,g"
+          }
+        },
+        "flash_wait_frdy": {
+          "elf": [
+            {
+              "name": "_flash_wait_frdy",
+              "address": 4294198876,
+              "size": 52,
+              "binding": 1,
+              "type": 2,
+              "section_index": 36
+            }
+          ],
+          "map_live": {
+            "address": 4294198876,
+            "size": 52,
+            "section": "P",
+            "map_line": 5469
+          },
+          "map_deleted": null
+        }
+      },
+      "static_copy_verification": {
+        "status": "OTA/native/provisioner initialization excluded from the RX671 diagnostic app profile",
+        "abs_live_open_or_copy_symbols": false,
+        "bsp_data_copy_table_contains_PFRAM2": false,
+        "inline_copy_proven": false,
+        "qualifies_ota_enabled_native_or_provisioner": false
+      }
+    },
+    {
+      "project": "boot_loader_rx671_ek",
+      "entry": 4294705152,
+      "rom_ram_mapping": "D=R,D_1=R_1,D_2=R_2,PFRAM2=RPFRAM2",
+      "onchip_ram_end": 393215,
+      "PFRAM2": {
+        "address": 4294773727,
+        "size": 312,
+        "type": 1
+      },
+      "RPFRAM2": {
+        "address": 139956,
+        "size": 312,
+        "type": 8
+      },
+      "vectors": {
+        "exception_address": 4294967168,
+        "reset_address": 4294967292,
+        "reset_value": 4294705152,
+        "MDE": 4294967183,
+        "BANKSEL": 4294967295,
+        "image_initial_bank": 0
+      },
+      "bsp_table_contains_flash_code_copy": false,
+      "dynamic_copy_or_execution_observed": false,
+      "flash_copy_path_status": "Live __$R_FlashCodeCopy ELF symbol; original R_FLASH_Open invokes it; hardware execution not observed",
+      "artifact_snapshot": "Captured before the 2026-10-14 boot optimization/ISA convergence; the boot addresses require re-link verification",
+      "artifacts": {
+        ".abs": {
+          "repo_relative_build_output": "Projects/boot_loader_rx671_ek/e2studio_ccrx/HardwareDebug/boot_loader_rx671_ek.abs",
+          "sha256": "72ba588d0854c1b8feb8f93148ca5427e75fd454bbe502244697af1da0c4f96a"
+        },
+        ".map": {
+          "repo_relative_build_output": "Projects/boot_loader_rx671_ek/e2studio_ccrx/HardwareDebug/boot_loader_rx671_ek.map",
+          "sha256": "ddfb13dc89fb93a67240018e097ba6ce84504c5065320fd7034cfbc3bec48868"
+        },
+        ".mot": {
+          "repo_relative_build_output": "Projects/boot_loader_rx671_ek/e2studio_ccrx/HardwareDebug/boot_loader_rx671_ek.mot",
+          "sha256": "17e53cf8d885ab6f55e841189cda3d9c3b31e01431b22b0ad9c539e3d793aeb9"
+        }
+      },
+      "symbols": {
+        "flash_toggle_banksel_reg": {
+          "elf": [
+            {
+              "name": "_flash_toggle_banksel_reg",
+              "address": 140112,
+              "size": 156,
+              "binding": 1,
+              "type": 2,
+              "section_index": 11
+            }
+          ],
+          "map_live": {
+            "address": 140112,
+            "size": 156,
+            "section": "RPFRAM2",
+            "map_line": 396
+          },
+          "map_deleted": null
+        },
+        "flash_write_faw_reg": {
+          "elf": [
+            {
+              "name": "__$flash_write_faw_reg",
+              "address": 139956,
+              "size": 156,
+              "binding": 0,
+              "type": 2,
+              "section_index": 11
+            }
+          ],
+          "map_live": {
+            "address": 139956,
+            "size": 156,
+            "section": "RPFRAM2",
+            "map_line": 394
+          },
+          "map_deleted": null
+        },
+        "R_FlashCodeCopy": {
+          "elf": [
+            {
+              "name": "__$R_FlashCodeCopy",
+              "address": 4294751263,
+              "size": 21,
+              "binding": 0,
+              "type": 2,
+              "section_index": 36
+            }
+          ],
+          "map_live": {
+            "address": 4294751263,
+            "size": 21,
+            "section": "P",
+            "map_line": 1382
+          },
+          "map_deleted": null
+        },
+        "R_FLASH_Open": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Open",
+              "address": 4294751243,
+              "size": 20,
+              "binding": 1,
+              "type": 2,
+              "section_index": 36
+            }
+          ],
+          "map_live": {
+            "address": 4294751243,
+            "size": 20,
+            "section": "P",
+            "map_line": 1380
+          },
+          "map_deleted": null
+        },
+        "R_FLASH_Control": {
+          "elf": [
+            {
+              "name": "_R_FLASH_Control",
+              "address": 4294751300,
+              "size": 4,
+              "binding": 1,
+              "type": 2,
+              "section_index": 36
+            }
+          ],
+          "map_live": {
+            "address": 4294751300,
+            "size": 4,
+            "section": "P",
+            "map_line": 1392
+          },
+          "map_deleted": null
+        },
+        "flash_wait_frdy": {
+          "elf": [
+            {
+              "name": "_flash_wait_frdy",
+              "address": 4294748291,
+              "size": 54,
+              "binding": 1,
+              "type": 2,
+              "section_index": 36
+            }
+          ],
+          "map_live": {
+            "address": 4294748291,
+            "size": 54,
+            "section": "P",
+            "map_line": 1328
+          },
+          "map_deleted": null
+        }
+      },
+      "static_copy_verification": {
+        "direct_open_to_copy_call": true,
+        "instruction": "smovf",
+        "rom_source": 4294773727,
+        "sram_destination": 139956,
+        "byte_count": 312
+      }
+    }
+  ],
+  "flash_original_source_refs": {
+    "bank_wait_loop": "r_flash_type4.c:455-533",
+    "faw_wait_loop": "r_flash_type4.c:381-442",
+    "copy_on_open": "r_flash_rx.c:121-200",
+    "bsp_data_table": "r_bsp/mcu/all/dbsct.c:66-88"
+  },
+  "qualification": {
+    "rx65n_software_diagnostic_link_before_final_policy": true,
+    "rx65n_all_application_links_after_final_policy": false,
+    "all_current_boot_relinks_after_optimization": false,
+    "all_native_images": false,
+    "all_provisioner_images": false,
+    "sc_gui_generate_observed": false,
+    "hardware_experiment_count": 0,
+    "runtime_flash_copy_pc_ram_or_bank_observed": false,
+    "full_firmware_build_success": false
+  },
+  "final_common_option_policy": {
+    "branch_width": "Explicit formal common.option.branch.24bit in all8; compiler and standard library generator share the same common-option metadata. The official default is24 and its enum emits no override; absence of branch32 must be verified after regeneration.",
+    "link_input_order": "Explicit useCustomLinkageOrder=false in all8; stale manual object/library lists removed",
+    "diagnostic_output": "show=all and cmd.console=MULTI in all8; individual show overrides removed; checkSection and warning output retained",
+    "compiler_optimization": "Level2 in all8; three boots explicit and five apps inherit official default2; compiler and assembler gopt enabled, linker optimization all",
+    "bsp_library_heap_bytes": {
+      "all_five_apps": 8192,
+      "all_three_boots": 1024,
+      "source": "BSP config / SC selector / QE metadata all aligned; FreeRTOS heap preserved"
+    }
+  },
+  "official_branch_and_library_notes": {
+    "manual": "R20UT3248EJ0114 Rev.1.14 supplied with CC-RX V3.07.00",
+    "manual_sha256": "40eec49a5b643a94a3b95a916fa17116fa195802838d96c3cfc8cab64fbab2f6",
+    "branch_definition_page": 148,
+    "library_generator_compiler_options_page": 321,
+    "same_microcontroller_options_requirement_page": 1024,
+    "same_options_url": "https://tool-support.renesas.com/autoupdate/support/onlinehelp/csp/V8.13.00/CS%2B.chm/Compiler-CCRX.chm/Output/ccrx11c0300y.html",
+    "branch_url": "https://tool-support.renesas.com/autoupdate/support/onlinehelp/csp/V8.13.00/CS%2B.chm/Compiler-CCRX.chm/Output/ccrx02c0501y0520.html",
+    "mixed_branch_specific_error_id_confirmed": false,
+    "E0562220": "Generic differing mode type; no evidence that the historical branch choice was caused by this exact diagnostic",
+    "E0562330": "Relocation-size overflow may include unreachable branch targets; does not itself establish mixed library/app branch settings"
+  },
+  "on_chip_ram_classification": {
+    "recorded_on": "2026-10-15",
+    "correction": "The region beginning at00800000 is on-chip expansion RAM. The previous SDRAM description was incorrect; source and linker layout are unchanged.",
+    "scope": "Regular on-chip RAM and expansion RAM; standby RAM and ECC RAM are excluded from these totals.",
+    "regions": {
+      "RX671": {
+        "low_ram": {
+          "start": "00000000",
+          "end_inclusive": "0005FFFF",
+          "bytes": 393216
+        },
+        "expansion_ram": null,
+        "total_bytes": 393216
+      },
+      "RX65N": {
+        "low_ram": {
+          "start": "00000000",
+          "end_inclusive": "0003FFFF",
+          "bytes": 262144
+        },
+        "expansion_ram": {
+          "start": "00800000",
+          "end_inclusive": "0085FFFF",
+          "bytes": 393216
+        },
+        "total_bytes": 655360
+      },
+      "RX72N": {
+        "low_ram": {
+          "start": "00000000",
+          "end_inclusive": "0007FFFF",
+          "bytes": 524288
+        },
+        "expansion_ram": {
+          "start": "00800000",
+          "end_inclusive": "0087FFFF",
+          "bytes": 524288
+        },
+        "total_bytes": 1048576
+      }
+    },
+    "official_sources": [
+      {
+        "url": "https://www.renesas.com/en/document/mat/ck-rx65n-v1-users-manual",
+        "document": "R20UT5100EG0110 Rev.1.10",
+        "page": 5,
+        "supports": "CK-RX65N V1 MCU identity and640KiB SRAM"
+      },
+      {
+        "url": "https://www.renesas.cn/zh/document/apn/rx65n-group-target-board-rx65n-led-blink-control-program",
+        "document": "R20AN0464EJ0100 Rev.1.00",
+        "page": 5,
+        "figure": "4-1",
+        "supports": "RX65N noncontiguous RAM ranges"
+      },
+      {
+        "url": "https://www.renesas.com/en/document/dst/rx72n-group-datasheet",
+        "document": "R01DS0343EJ0120 Rev.1.20",
+        "pages": [
+          1,
+          3
+        ],
+        "supports": "RX72N low512KiB and expansion512KiB; expansion range00800000..0087FFFF"
+      },
+      {
+        "url": "https://www.renesas.com/en/document/dst/rx671-group-datasheet-rev100",
+        "document": "R01DS0373EJ0120 Rev.1.20",
+        "supports": "RX671384KiB RAM capacity"
+      }
+    ]
+  },
+  "rx65n_ci11365_ram_snapshot": {
+    "recorded_on": "2026-10-15",
+    "project": "aws_bg96_ck_rx65n",
+    "backend": "software",
+    "source_sha": "edf8d844dc0f4ed68b6350f43e063fd87d97832c",
+    "pipeline": 11365,
+    "job": 71061,
+    "job_url": "https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71061",
+    "abs_sha256": "9aa5ba2a92bbf0284cfe33753b65eb5631b438c73dcba937a68e2185f183252e",
+    "evidence": "Actual ELF ABS section addresses and sizes; MAP not available in this artifact.",
+    "ram_regions": [
+      {
+        "range": "on_chip_ram",
+        "start": "00000000",
+        "limit_exclusive": "00040000",
+        "highest_end_exclusive": "000106DC",
+        "tail_free_bytes": 194852,
+        "sections": [
+          {
+            "name": "SU",
+            "address": "00000004",
+            "size": 4096
+          },
+          {
+            "name": "SI",
+            "address": "00001004",
+            "size": 1024
+          },
+          {
+            "name": "R_1",
+            "address": "00001404",
+            "size": 8609
+          },
+          {
+            "name": "B_2",
+            "address": "000035A6",
+            "size": 8
+          },
+          {
+            "name": "R",
+            "address": "000035B0",
+            "size": 53240
+          },
+          {
+            "name": "RPFRAM2",
+            "address": "000105A8",
+            "size": 308
+          }
+        ]
+      },
+      {
+        "range": "on_chip_expansion_ram",
+        "start": "00800000",
+        "limit_exclusive": "00860000",
+        "highest_end_exclusive": "0085B194",
+        "tail_free_bytes": 20076,
+        "sections": [
+          {
+            "name": "B",
+            "address": "00800000",
+            "size": 43636
+          },
+          {
+            "name": "B_1",
+            "address": "0080AA74",
+            "size": 329502
+          },
+          {
+            "name": "R_2",
+            "address": "0085B192",
+            "size": 2
+          }
+        ]
+      }
+    ],
+    "heaps": {
+      "BSP_library_heap": {
+        "symbol": "__$s_heap_area",
+        "address": "0080699C",
+        "size": 8192,
+        "section": "B"
+      },
+      "FreeRTOS_heap": {
+        "symbol": "__$ucHeap",
+        "address": "00810296",
+        "size": 262144,
+        "section": "B_1"
+      }
+    },
+    "trace_recorder": {
+      "symbol": "__$xRecorderData",
+      "address": "00803364",
+      "bytes": 12932
+    },
+    "trace_control_task_stack": {
+      "symbol": "__$stackTzCtrl",
+      "address": "00802A14",
+      "bytes": 2048
+    },
+    "expansion_static_tail_free_bytes": 20076,
+    "static_tail_free_definition": "Exclusive region limit minus the highest allocated section end; excludes runtime free space within reserved heaps.",
+    "dynamic_heap_headroom_bytes": null,
+    "stack_high_water_mark_bytes": null,
+    "runtime_ram_access_observed": false,
+    "qualification": "Static placement in the documented on-chip RAM ranges; runtime allocation headroom and real-device RAM operation remain unverified.",
+    "historical_snapshot_relation": "Separate from the previous five-image flash_static_image_snapshot; its source, options and addresses are not reused."
+  }
+}

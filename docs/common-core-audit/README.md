@@ -1,8 +1,12 @@
 # RX671・RX65N・RX72Nの共通基盤監査
 
-**共通基盤は現在揃っていません。** RX65Nはproject内の古いMiddlewareコピーを参照し、RX671・RX72Nが参照する共通submoduleとFreeRTOS／ライブラリの版が異なります。Flash FIT・BSP・bootloader pin・e2 studioの参照階層にも差があります。
+**以下は2026-10-07の移行前監査です。** 当時の共通基盤は揃っていませんでした。RX65Nはproject内の古いMiddlewareコピーを参照し、RX671・RX72Nが参照する共通submoduleとFreeRTOS／ライブラリの版が異なり、Flash FIT・BSP・bootloader pin・e2 studioの参照階層にも差がありました。
+
+現共通化WIPの版・設定・8 metadata・実build・未実機の区別は、[2026-10-14の3環境比較](current-convergence-20261014.md)を参照してください。「移行前に未整合」と「現在WIPで未検証」を混同しません。
 
 基準はGitLab main `44232ef62ea5be65161b95ae9741c6da555c7f3b`、確認日は2026-10-07です。[Issue #169](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/169)の依頼に基づく読み取り監査で、3環境の設定・依存を変更した結果ではありません。
+
+共通化WIP `65c59407` の参照先と確認限界は、[2026-10-14のsubmodule原本照合](submodule-conformance-20261014.md)を参照してください。以下は移行前の2026-10-07基準の記録です。
 
 | 項目 | RX671 | RX65N | RX72N |
 |---|---|---|---|

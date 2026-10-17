@@ -47,6 +47,8 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
+#define configRECORD_STACK_HIGH_ADDRESS    1
+
 /******************************************************************************/
 /******************************************************************************/
 /* Hardware description related definitions. **********************************/
@@ -153,7 +155,7 @@
  * (in words, not in bytes!).  The kernel does not use this constant for any other
  * purpose.  Demo applications use the constant to make the demos somewhat portable
  * across hardware architectures. */
-#define configMINIMAL_STACK_SIZE                   (( unsigned short ) 140)
+#define configMINIMAL_STACK_SIZE                   (768)
 
 /* configMAX_TASK_NAME_LEN sets the maximum length (in characters) of a task's
  * human readable name.  Includes the NULL terminator. */
@@ -204,7 +206,7 @@
  * storage.  configNUM_THREAD_LOCAL_STORAGE_POINTERS set the number of indexes in
  * the array.  See https://www.freertos.org/thread-local-storage-pointers.html
  * Defaults to 0 if left undefined. */
-#define configNUM_THREAD_LOCAL_STORAGE_POINTERS    0
+#define configNUM_THREAD_LOCAL_STORAGE_POINTERS    3
 
 /* When configUSE_MINI_LIST_ITEM is set to 0, MiniListItem_t and ListItem_t are
  * both the same. When configUSE_MINI_LIST_ITEM is set to 1, MiniListItem_t contains
@@ -438,7 +440,7 @@
  * number of the failing assert (for example, "vAssertCalled( __FILE__, __LINE__ )"
  * or it can simple disable interrupts and sit in a loop to halt all execution
  * on the failing line for viewing in a debugger. */
-/* Assert call defined for debug builds. */
+/* Keep kernel assertions enabled in every application build profile. */
 extern void vAssertCalled( void );
 #define configASSERT( x ) do { if( ( x ) == 0 ) vAssertCalled(); } while( 0 )
 
@@ -478,7 +480,6 @@ extern void vOutputString( const char * pcMessage );
 #define INCLUDE_uxTaskPriorityGet              1
 #define INCLUDE_vTaskDelete                    1
 #define INCLUDE_vTaskSuspend                   1
-#define INCLUDE_xResumeFromISR                 1
 #define INCLUDE_vTaskDelayUntil                1
 #define INCLUDE_vTaskDelay                     1
 #define INCLUDE_xTaskGetSchedulerState         1
@@ -486,9 +487,8 @@ extern void vOutputString( const char * pcMessage );
 #define INCLUDE_uxTaskGetStackHighWaterMark    1
 #define INCLUDE_xTaskGetIdleTaskHandle         0
 #define INCLUDE_eTaskGetState                  1
-#define INCLUDE_xEventGroupSetBitFromISR       1
-#define INCLUDE_xTimerPendFunctionCall         0
-#define INCLUDE_xTaskAbortDelay                0
+#define INCLUDE_xTimerPendFunctionCall         1
+#define INCLUDE_xTaskAbortDelay                1
 #define INCLUDE_xTaskGetHandle                 0
 #define INCLUDE_xTaskResumeFromISR             1
 #define INCLUDE_xQueueGetMutexHolder           1

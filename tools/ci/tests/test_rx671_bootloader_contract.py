@@ -15,7 +15,7 @@ from tools.ci.check_rx671_bootloader_layout import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROJECT = REPO_ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx"
 SUBMODULE = PROJECT / "lib" / "rx_bootloader"
-SUBMODULE_SHA = "c31bac703e1406e7a94d398b7bcad108b5e8fdce"
+SUBMODULE_SHA = "8e19b0cdeeaab06f22fa0636f4cd469218edc6c1"
 
 
 def read(relative: str) -> str:
@@ -32,10 +32,11 @@ class Rx671BootloaderContractTests(unittest.TestCase):
         self.assertIn('value="R5F5671EHxFB_DUAL"', cproject)
         self.assertIn('value="R5F5671E_DUAL"', cproject)
         self.assertIn(
-            "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P/0FFFC0000,"
+            "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2/0FFFC0000,"
             "EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC",
             cproject,
         )
+        self.assertIn('value="PFRAM2=RPFRAM2"', cproject)
         self.assertNotIn("DEXRAM", cproject)
         self.assertNotIn("BEXRAM", cproject)
 
@@ -131,7 +132,7 @@ class Rx671BootloaderContractTests(unittest.TestCase):
     def test_manual_smoke_releases_reset_and_selects_key_state(self) -> None:
         ci = (REPO_ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
         job = ci.split("smoke_rx671_bootloader_manual:", 1)[1].split(
-            "\nflash_rx72n_ether:", 1
+            "\nprepare_rx65n_bg96_mqtt_credentials:", 1
         )[0]
         self.assertIn("-p -v -run -noquery", job)
         self.assertNotIn("-p -v -reset -noquery", job)
@@ -159,7 +160,9 @@ class Rx671BootloaderContractTests(unittest.TestCase):
             "\turl = ../../../../experiment/embedded/mcu/renesas/rx/bootloader/submodule.git",
             gitmodules,
         )
-        self.assertIn(f'$expectedSubmoduleHead = "{SUBMODULE_SHA}"', helper)
+        self.assertIn("ls-tree HEAD -- $relativeSubmoduleGit", helper)
+        self.assertIn("$expectedSubmoduleHead = $Matches[1].ToLowerInvariant()", helper)
+        self.assertIn("$actualSubmoduleHead -ne $expectedSubmoduleHead", helper)
         head = subprocess.check_output(
             ["git", "-C", str(SUBMODULE), "rev-parse", "HEAD"], text=True
         ).strip()

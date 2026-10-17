@@ -1,7 +1,7 @@
 """Bounds shared by callbacks, the bench bridge and the Windows supervisor.
 
-The transaction deadline starts before acquiring the global RFP lock. RX671
-also prepares the signer using the production linear provisioning firmware.
+The transaction deadline starts before acquiring the global RFP lock. Every
+target prepares public signer trust through its standalone dual-bank firmware.
 An interrupted/failed transaction may reset for another 90 seconds while
 holding RFP. Since all boards share that lock, bridge shutdown allows the
 longest supported transaction regardless of its own selected target.
@@ -11,32 +11,20 @@ FLASH_LOCK_WAIT_SECONDS = 60
 FLASH_CONTROL_SECONDS = 15
 FLASH_RFP_COMMAND_SECONDS = 90
 FLASH_DOWNLOAD_SECONDS = 540
-RX671_SIGNER_PROVISION_SECONDS = 200
+PUBLIC_SIGNER_PROVISION_SECONDS = 200
+RX671_SIGNER_PROVISION_SECONDS = PUBLIC_SIGNER_PROVISION_SECONDS
 FLASH_TRANSACTION_PHASES = {
-    "rx72n-ethernet": {
-        "rfp_lock": FLASH_LOCK_WAIT_SECONDS,
-        "uart_control": 3 * FLASH_CONTROL_SECONDS,
-        "erase_and_bootloader_writes": 3 * FLASH_RFP_COMMAND_SECONDS,
-        "uart_download": FLASH_DOWNLOAD_SECONDS,
-        "final_reset_and_run": 2 * FLASH_RFP_COMMAND_SECONDS,
-    },
-    "rx65n-bg96": {
-        "rfp_lock": FLASH_LOCK_WAIT_SECONDS,
-        "uart_control": 3 * FLASH_CONTROL_SECONDS,
-        "erase_and_bootloader_writes": 3 * FLASH_RFP_COMMAND_SECONDS,
-        "uart_download": FLASH_DOWNLOAD_SECONDS,
-        "final_reset_and_run": 2 * FLASH_RFP_COMMAND_SECONDS,
-    },
-    "rx671-wifi": {
+    target: {
         "rfp_lock": FLASH_LOCK_WAIT_SECONDS,
         "uart_control": 3 * FLASH_CONTROL_SECONDS,
         "initial_chip_erase": FLASH_RFP_COMMAND_SECONDS,
-        "linear_provisioning_and_bootloader": 4 * FLASH_RFP_COMMAND_SECONDS,
-        "signer_provisioning_cli": RX671_SIGNER_PROVISION_SECONDS,
+        "dual_provisioning_and_bootloader": 4 * FLASH_RFP_COMMAND_SECONDS,
+        "signer_provisioning_cli": PUBLIC_SIGNER_PROVISION_SECONDS,
         "bank1_bootloader_write": FLASH_RFP_COMMAND_SECONDS,
         "uart_download": FLASH_DOWNLOAD_SECONDS,
         "final_reset_and_run": 2 * FLASH_RFP_COMMAND_SECONDS,
-    },
+    }
+    for target in ("rx72n-ethernet", "rx65n-bg96", "rx671-wifi")
 }
 FLASH_TRANSACTION_SECONDS = {target: sum(phases.values()) for target, phases in FLASH_TRANSACTION_PHASES.items()}
 FLASH_ABORT_RESET_SECONDS = 90

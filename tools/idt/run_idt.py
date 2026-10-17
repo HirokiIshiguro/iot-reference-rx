@@ -60,53 +60,48 @@ INSTALL = Path(r"C:\ai\codex\tools\aws-idt")
 RUNTIME = Path(r"C:\ai\codex\tmp\rx72n-idt")
 WSL = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32/wsl.exe"
 HOST: dict = {}
-RX671_BOOTSTRAP_INPUTS = {
-    "IDT_RX671_PROVISIONER_MOT_FILE": "rx671_provisioner.mot",
-    "IDT_RX671_PROVISIONER_MANIFEST_FILE": "rx671_provisioner_manifest.json",
-    "IDT_RX671_SIGNER_CERT_FILE": "rx671_signer.crt.pem",
-    "IDT_RX671_SIGNER_PUBLIC_KEY_FILE": "rx671_signer.pub.pem",
-}
+try:
+    from .public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_ENVIRONMENT_INPUTS
+except ImportError:
+    from public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_ENVIRONMENT_INPUTS
+PUBLIC_SIGNER_BOOTSTRAP_INPUTS = {variable: name for name, variable in PUBLIC_SIGNER_ENVIRONMENT_INPUTS.items()}
 
 
-def rx671_bootstrap_environment(inputs: Path, source_sha: str, environ=None) -> dict[str, str]:
+def public_signer_bootstrap_environment(inputs: Path, source_sha: str, target, environ=None) -> dict[str, str]:
     """Validate public bootstrap inputs before native/AWS setup, then copy them."""
     try:
-        from .rx671_provision import validate_public_signer_material, validate_prepared_signer
+        from .public_signer_provision import validate_public_signer_material, validate_prepared_signer
     except ImportError:
-        from rx671_provision import validate_public_signer_material, validate_prepared_signer
+        from public_signer_provision import validate_public_signer_material, validate_prepared_signer
     environment = os.environ if environ is None else environ
     original = {}
-    for variable in RX671_BOOTSTRAP_INPUTS:
+    for variable in PUBLIC_SIGNER_BOOTSTRAP_INPUTS:
         value = environment.get(variable)
         if not value:
-            raise RuntimeError("RX671 native IDT requires reviewed public bootstrap input: " + variable)
+            raise RuntimeError("Native IDT requires reviewed public bootstrap input: " + variable)
         raw = Path(value)
         if not raw.is_file() or any(path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction())
                                     for path in (raw, *raw.parents)):
-            raise RuntimeError("RX671 public bootstrap input must be a regular unlinked file: " + variable)
+            raise RuntimeError("Public bootstrap input must be a regular unlinked file: " + variable)
         original[variable] = raw.resolve(strict=True)
-    # Reject private PEM objects before any input can be copied into a runtime.
-    public_material = validate_public_signer_material(original["IDT_RX671_SIGNER_CERT_FILE"],
-                                                      original["IDT_RX671_SIGNER_PUBLIC_KEY_FILE"])
-    # Every initial build is packaged with the reviewed development key. Bind
-    # the public bootstrap signer before provisioning any native cloud resource.
+    public_material = validate_public_signer_material(original["IDT_PUBLIC_SIGNER_CERT_FILE"],
+                                                      original["IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE"])
     from cryptography.hazmat.primitives import serialization
-    public_path = (SOURCE / get_target("rx671-wifi")["signing_key"]).with_suffix(".publickey")
+    public_path = (SOURCE / target["signing_key"]).with_suffix(".publickey")
     reviewed_public = serialization.load_pem_public_key(public_path.read_bytes())
     reviewed_spki = reviewed_public.public_bytes(serialization.Encoding.DER,
                                                 serialization.PublicFormat.SubjectPublicKeyInfo)
     if public_material["public_signer_spki_sha256"] != hashlib.sha256(reviewed_spki).hexdigest():
-        raise RuntimeError("RX671 public bootstrap signer differs from the initial development package signer")
-    destination = inputs / "rx671-bootstrap"
+        raise RuntimeError("Public bootstrap signer differs from the initial development package signer")
+    destination = inputs / "public-signer-bootstrap"
     destination.mkdir(exist_ok=False)
     copied = {}
     try:
-        for variable, name in RX671_BOOTSTRAP_INPUTS.items():
+        for variable, name in PUBLIC_SIGNER_BOOTSTRAP_INPUTS.items():
             path = destination / name
             copied[variable] = str(path)
             shutil.copyfile(original[variable], path)
-        validate_prepared_signer(SOURCE, inputs.parent, get_target("rx671-wifi"), source_sha,
-                                 environ=copied)
+        validate_prepared_signer(SOURCE, inputs.parent, target, source_sha, environ=copied)
     except BaseException:
         for value in copied.values():
             Path(value).unlink(missing_ok=True)
@@ -373,7 +368,7 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     target = get_target() if target is None else target
     inputs = runtime / "inputs"
     inputs.mkdir()
-    bootstrap_environment = rx671_bootstrap_environment(inputs, provenance["source_sha"]) if target["id"] == "rx671-wifi" else {}
+    bootstrap_environment = public_signer_bootstrap_environment(inputs, provenance["source_sha"], target)
     root = install_idt("linux", credentials)
     private_path = inputs / "transport-private.pem"
     public_path = inputs / "transport-public.hex"
@@ -558,9 +553,9 @@ def main() -> int:
                 "Native cloud resource usage requires a separate approved cost/scope budget"]
         if target["id"] == "rx65n-bg96":
             plan["requirements"].append("BG96 normal CI and IDT must use the shared device transaction flock")
-        if target["id"] == "rx671-wifi" and args.scope != "preflight":
-            plan["requirements"].append("Same-source reviewed linear signer-only provisioner MOT/manifest and matching P-256 public signer certificate/key are required before native launch")
-            plan["required_public_bootstrap_inputs"] = list(RX671_BOOTSTRAP_INPUTS)
+        if args.scope != "preflight":
+            plan["requirements"].append("Same-source reviewed dual-bank signer-only provisioner MOT/manifest and matching P-256 public signer certificate/key are required before native launch")
+            plan["required_public_bootstrap_inputs"] = list(PUBLIC_SIGNER_BOOTSTRAP_INPUTS)
             if args.scope == "ota-mqtt":
                 plan["requirements"].append("Native OTA signer material, stored boot public signer and initial package signature must match; local checks do not establish runtime trust")
         write_json(args.output / "plan.json", plan)

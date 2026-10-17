@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and install RX671 initial public signer trust through its linear CLI.
+"""Validate and install RX671 initial public signer trust through its standalone dual-bank CLI.
 
 Planning/validation reads public signer files and firmware only. The actual
 transaction is called by rpi_flash while it holds the bench and RFP locks; this
@@ -24,7 +24,7 @@ except ImportError:
 
 
 RX671_INPUTS = frozenset((
-    'rx671_provision.py', 'provision_rx671_ota.py', 'rx671_ota_host.py',
+    'rx671_provision.py', 'public_signer_material.py', 'provision_rx671_ota.py', 'rx671_ota_host.py',
     'build_rx671_fwup_v2_rsu.py', 'rx671_provisioner.mot',
     'rx671_provisioner_manifest.json', 'rx671_signer.crt.pem', 'rx671_signer.pub.pem',
     'rx671_bootloader_config.h', 'rx671_target.h',
@@ -98,71 +98,19 @@ def _srecords(path, ranges, required):
 
 
 def public_signer(certificate_path, public_key_path):
-    """Validate public-only PEM objects and return their matching P-256 key."""
-    from cryptography import x509
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
-    def public_pem(path, label):
-        path = Path(path)
-        if path.is_symlink() or not path.is_file():
-            raise RuntimeError('Missing or symbolic link RX671 public signer input')
-        with path.open('rb', buffering=0) as stream:
-            # FileIO does not prefetch a private body behind the header. Read
-            # public lines only through the matching END marker; after that,
-            # reject on the first extra non-whitespace byte before its body.
-            first = stream.readline(80)
-            if first.rstrip(b'\r\n') != b'-----BEGIN ' + label + b'-----':
-                raise RuntimeError('RX671 signer input must contain exactly one public PEM object')
-            encoded = bytearray(first)
-            total = len(first)
-            ending = b'-----END ' + label + b'-----'
-            while True:
-                line = stream.readline(4097 - total)
-                total += len(line)
-                if total > 4096:
-                    raise RuntimeError('RX671 public signer PEM exceeds the provisioner CLI input limit')
-                if not line:
-                    raise RuntimeError('RX671 signer input must contain exactly one public PEM object')
-                content = line.rstrip(b'\r\n')
-                if content != ending and not re.fullmatch(b'[A-Za-z0-9+/=]*', content):
-                    raise RuntimeError('RX671 signer input must contain exactly one public PEM object')
-                encoded.extend(line)
-                if content == ending:
-                    break
-                if total == 4096:
-                    raise RuntimeError('RX671 public signer PEM exceeds the provisioner CLI input limit')
-            while True:
-                extra = stream.read(1)
-                if not extra:
-                    break
-                if extra not in b' \t\r\n\v\f':
-                    raise RuntimeError('RX671 signer input must contain exactly one public PEM object')
-                total += 1
-                if total > 4096:
-                    raise RuntimeError('RX671 public signer PEM exceeds the provisioner CLI input limit')
-            encoded = bytes(encoded).strip()
-            if len(encoded) >= 4096:
-                raise RuntimeError('RX671 public signer PEM exceeds the provisioner CLI input limit')
-        pattern = (b'-----BEGIN ' + label + b'-----\r?\n[A-Za-z0-9+/=\r\n]+\r?\n-----END '
-                   + label + b'-----')
-        if not re.fullmatch(pattern, encoded):
-            raise RuntimeError('RX671 signer input must contain exactly one public PEM object')
-        return encoded
-    certificate = x509.load_pem_x509_certificate(public_pem(certificate_path, b'CERTIFICATE'))
-    public = serialization.load_pem_public_key(public_pem(public_key_path, b'PUBLIC KEY'))
-    if not isinstance(public, ec.EllipticCurvePublicKey) or not isinstance(public.curve, ec.SECP256R1):
-        raise RuntimeError('RX671 initial signer must be ECDSA P-256')
-    def der(key):
-        return key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
-    if der(public) != der(certificate.public_key()):
-        raise RuntimeError('RX671 signer certificate and public key differ')
-    return public
+    return _material_module().public_signer(certificate_path, public_key_path, context='RX671')
 
 
 def _spki_sha256(public):
-    from cryptography.hazmat.primitives import serialization
-    return hashlib.sha256(public.public_bytes(serialization.Encoding.DER,
-                                             serialization.PublicFormat.SubjectPublicKeyInfo)).hexdigest()
+    return _material_module()._spki_sha256(public)
+
+
+def _material_module():
+    try:
+        from . import public_signer_material
+    except ImportError:
+        import public_signer_material
+    return public_signer_material
 
 
 def validate_public_signer_material(certificate_path, public_key_path):
@@ -186,12 +134,7 @@ def validate_public_signer(certificate_path, public_key_path, rsu_path):
             image[packager.RSU_HEADER_SIZE:packager.APPLICATION_START-packager.FWUP_AREA_START]
             != packager.build_descriptor()):
         raise RuntimeError('RX671 initial RSU header/descriptor policy mismatch')
-    try:
-        public.verify(utils.encode_dss_signature(int.from_bytes(signature[:32], 'big'),
-                                                 int.from_bytes(signature[32:], 'big')),
-                      image[packager.RSU_HEADER_SIZE:], ec.ECDSA(hashes.SHA256()))
-    except InvalidSignature:
-        raise RuntimeError('RX671 initial RSU does not match the provisioned public signer') from None
+    _material_module().verify_raw_p256(public, signature, image[packager.RSU_HEADER_SIZE:], context='RX671')
     return _spki_sha256(public)
 
 
@@ -203,16 +146,23 @@ def _validate_prepared_files(files, target, source_sha):
         raise RuntimeError('RX671 provisioner requires the exact IDT build source SHA')
     metadata = json.loads(_bytes(files['rx671_provisioner_manifest.json']))
     if (metadata.get('schema_version') != 1 or
-            metadata.get('profile') != 'rx671-bank-single-ota-provisioner-v1' or
-            metadata.get('bank_mode') != 'bank.single' or
+            metadata.get('profile') != 'rx671-bank-dual-ota-provisioner-v2' or
+            metadata.get('bank_mode') != 'bank.dual' or
             metadata.get('credentials_embedded') is not False or
             metadata.get('source_sha') != source_sha or
             metadata.get('sha256', {}).get('aws_wifi_rx671_ek.mot') != _hash(files['rx671_provisioner.mot'])):
-        raise RuntimeError('RX671 linear production provisioner manifest/hash/source mismatch')
+        raise RuntimeError('RX671 dual production provisioner manifest/hash/source mismatch')
     _policy(files['rx671_bootloader_config.h'], files['rx671_target.h'])
     options = ((0xFE7F5D00, 0xFE7F5D7F), (0xFE7F7D70, 0xFE7F7D9F))
-    _srecords(files['rx671_provisioner.mot'], ((0xFFE00000, 0xFFFFFFFF), *options),
-              range(0xFFFFFFFC, 0x100000000))
+    memory = _srecords(files['rx671_provisioner.mot'], ((0xFFF00000, 0xFFFFFFFF), *options),
+                       (*range(0xFFFFFFFC, 0x100000000), *range(0xFE7F5D00, 0xFE7F5D04),
+                        *range(0xFE7F5D20, 0xFE7F5D24)))
+    if (bytes(memory[p] for p in range(0xFE7F5D00, 0xFE7F5D04)) != bytes.fromhex('8FFFFFFF') or
+            bytes(memory[p] for p in range(0xFE7F5D20, 0xFE7F5D24)) != bytes.fromhex('FFFFFFFF')):
+        raise RuntimeError('RX671 provisioner requires dual-bank little-endian mode and initial bank0 options')
+    vector = int.from_bytes(bytes(memory[p] for p in range(0xFFFFFFFC, 0x100000000)), 'little')
+    if not 0xFFF00300 <= vector <= 0xFFFBFFFF:
+        raise RuntimeError('RX671 dual provisioner reset vector is outside its application area')
     return {
         'schema_version': 1, 'target_id': target['id'], 'target_sha256': target_fingerprint(target),
         'source_sha': source_sha,
@@ -228,7 +178,7 @@ def validate_prepared_signer(source, runtime, target, source_sha, environ=None):
 
     This proves only the intended public signer binding and provisioner inputs,
     never existing Data Flash contents. The flash transaction still has to run
-    the real linear CLI and verify the actual signed initial RSU.
+    the real dual-bank CLI and verify the actual signed initial RSU.
     """
     files = source_inputs(source, runtime, target, source_sha, environ)
     return _validate_prepared_files(files, target, source_sha)
@@ -254,7 +204,7 @@ def validate_bundle(files, target, source_sha):
         'builtin_public_key_fallback': False, 'private_credentials_used': False,
         'initial_state_reset': 'rfp_chip_erase_before_signer_provisioning',
         'data_flash_preserved_during_initialization': False,
-        'steps': ['erase_chip_and_clear_flash_options', 'program_linear_provisioner', 'run_linear_cli', 'format_littlefs',
+        'steps': ['erase_chip_and_clear_flash_options', 'program_dual_provisioner', 'run_dual_cli', 'format_littlefs',
                   'store_codesigncert_and_codesignpubkey', 'commit_littlefs',
                   'erase_install_ranges_preserving_data_flash', 'program_bootloader_bank0',
                   'program_bootloader_bank1', 'uart_install_signed_dualbank_application'],
@@ -282,6 +232,7 @@ def source_inputs(source, runtime, target, source_sha, environ=None):
     here = Path(__file__).resolve().parent
     files.update({
         'rx671_provision.py': here / 'rx671_provision.py',
+        'public_signer_material.py': here / 'public_signer_material.py',
         'provision_rx671_ota.py': source / 'tools/provision_rx671_ota.py',
         'rx671_ota_host.py': source / 'tools/rx671_ota_host.py',
         'build_rx671_fwup_v2_rsu.py': source / 'tools/build_rx671_fwup_v2_rsu.py',

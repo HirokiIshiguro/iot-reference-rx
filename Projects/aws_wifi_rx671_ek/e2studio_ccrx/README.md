@@ -198,14 +198,13 @@ non-Function/bring-up fallback counters remaining.
 
 ## Tracealyzer over J-Link RTT
 
-The project links Percepio's official TraceRecorderSource as a submodule at
-`../external/TraceRecorderSource`. Project-local configuration lives in
-`src/tracealyzer_config`; `src/tracealyzer_freertos_wrap` installs the
-Tracealyzer hooks after the RX FreeRTOS port types are visible to CC-RX.
-Small wrappers in `src/tracealyzer_recorder` compile only the Recorder core,
-FreeRTOS kernel port, and J-Link RTT stream port needed by this project.
+All five applications link the same pristine Percepio TraceRecorderSource at
+`Middleware/3rdparty/TraceRecorderSource`. Product configuration and the FreeRTOS
+include facade live in `Common/ports/trace_recorder`. The facade installs public
+recorder hooks after the original RX port types exist. The project selects the
+original recorder core, FreeRTOS port and J-Link RTT port directly (29 C sources).
 
-`main_task()` starts the recorder with `TRC_START`. This target-start mode is
+`main_task()` starts the recorder with `TRC_START` for every application profile. This target-start mode is
 intentional for the EK-RX671 automation path: the first CLI bring-up confirmed
 that the RTT control channel was visible and Tracealyzer CLI could write start
 commands to down-buffer 1, but `TRC_START_FROM_HOST` produced 0-byte PSF files

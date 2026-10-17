@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
-    [string]$Workspace = "C:\iotref-rx72n-fleet-ws",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
+    [string]$Workspace = "C:\ai\codex\ws\iotref-rx72n-fleet-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build_fleet.log"),
     [string]$FleetDemoId = "rx72n-02-fp",
     [int]$E2StudioTimeoutSeconds = 600,
@@ -10,9 +10,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "rx_e2studio_cli.ps1")
 Set-StrictMode -Version Latest
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
+Initialize-RxBuildDependencies -ProjectRoot $projectRoot
+Assert-RxCommonKernel -ProjectRoot $projectRoot
 $normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
 switch ($normalizedTlsBackend) {
     "software" { $appProjectName = "aws_ether_rx72n_envision_kit" }

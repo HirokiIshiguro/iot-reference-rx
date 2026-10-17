@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import unittest
+import re
 from pathlib import Path
+
+from tools.idt import cleanup_budget
 
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def job_block(ci: str, name: str, next_name: str) -> str:
-    return ci.split(f"{name}:\n", maxsplit=1)[1].split(
-        f"\n{next_name}:\n", maxsplit=1
-    )[0]
+def job_block(ci: str, name: str, next_name: str | None = None) -> str:
+    match = re.search(r"(?m)^" + re.escape(name) + r":\n", ci)
+    if match is None:
+        raise AssertionError("Missing CI job: " + name)
+    following = re.search(r"(?m)^[A-Za-z0-9_.-]+:[ \t]*\n", ci[match.end():])
+    end = match.end() + following.start() if following else len(ci)
+    return ci[match.start():end]
 
 
 class Rx671HardwareTransactionContractTests(unittest.TestCase):
@@ -28,9 +34,9 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
             '"/tmp/ek-rx671-rpi1-hardware.lock"',
             self.ci,
         )
-        self.assertIn('exec 9>>"${RX671_RPI1_HARDWARE_LOCK_PATH}"', template)
+        self.assertIn('exec 9>>"${RX671_WIFI_HARDWARE_LOCK_PATH}"', template)
         self.assertIn(
-            'flock -w "${RX671_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
+            'flock -w "${RX671_WIFI_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
             template,
         )
         self.assertGreater(
@@ -41,25 +47,23 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
         job = job_block(self.ci, "test_rx671_wifi", "test_rx72n_ether_mqtt")
 
         ordered_tokens = (
-            'mot="$CI_PROJECT_DIR/artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot"',
-            "Atomic RX671 reflash before UART observation",
-            "-erase-chip -reset -noquery",
+            "Atomic RX671 signed normal install before UART observation",
+            "tools/install_normal_boot.py",
             'initial_chip_erase.log',
             'if [ "$status" -ne 0 ]',
-            "-p -v -reset -noquery",
             "tools/ci/test_rx671_wifi_uart.py",
         )
         positions = [job.index(token) for token in ordered_tokens]
         self.assertEqual(positions, sorted(positions))
 
-    def test_normal_flash_clears_bank_state_before_linear_programming(self) -> None:
+    def test_normal_flash_uses_signed_bundle_and_preserves_command_failure(self) -> None:
         job = job_block(self.ci, "flash_rx671_wifi", "flash_rx72n_ether")
-        erase = job.index("-erase-chip -reset -noquery")
-        program = job.index("-p -v -reset -noquery")
-        self.assertLess(job.index('if [ ! -f "$mot" ]'), erase)
-        self.assertLess(erase, program)
-        self.assertIn('exit "$status"', job[erase:program])
-        self.assertEqual(2, job.count('-t "$RX671_WIFI_RFP_TOOL"'))
+        install = job.index("tools/install_normal_boot.py")
+        self.assertIn('--bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx671"', job)
+        self.assertIn('--target rx671-wifi', job)
+        self.assertIn('exit "$status"', job[install:])
+        self.assertNotIn('-erase-chip', job)
+        self.assertNotIn('-p -v -reset -noquery', job)
 
     def test_both_split_jobs_extend_the_locked_template(self) -> None:
         flash = job_block(self.ci, "flash_rx671_wifi", "flash_rx72n_ether")
@@ -316,6 +320,35 @@ class Rx671HardwareTransactionContractTests(unittest.TestCase):
                     f'RX671_TSIP_OTA_REQUIRE_TLS_VERSION: "{tls_version}"',
                     job,
                 )
+
+    def test_fleet_installs_signed_protected_bundle_and_restores_normal(self) -> None:
+        job = job_block(self.ci, "test_rx671_wifi_fleet", "cleanup_rx671_wifi_fleet")
+        self.assertIn("package_normal_boot_rx671_fleet", job)
+        self.assertIn("package_normal_boot_rx671", job)
+        main = job.split("trap finish_fleet EXIT", 1)[1].split("  after_script:", 1)[0]
+        positions = [main.index(token) for token in ("protected_normal_bundle.py unpack", "fleet_flash_started.ok", 'install_normal_boot.py --bundle "$runtime_dir/fleet-bundle"', "tools/test_fleet_rx72n.py")]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn("-erase-chip", job)
+        self.assertNotIn("aws_wifi_rx671_ek_fleet.mot.enc", job)
+        self.assertIn('runtime_dir="/tmp/rx671-fleet-$CI_PIPELINE_ID-$CI_JOB_ID"', job)
+        self.assertIn('exec 9>>"${RX671_WIFI_HARDWARE_LOCK_PATH}"', job)
+        self.assertIn("raise_if_rfp_unsafe", job)
+        self.assertIn("Retained owner; normal restore skipped", job)
+        self.assertIn("cleanup_rx671_fleet_runtime.py", job)
+
+    def test_fleet_reserves_time_for_bounded_normal_restore(self) -> None:
+        job = job_block(self.ci, "test_rx671_wifi_fleet")
+        main = int(re.search(r'RUNNER_SCRIPT_TIMEOUT: "(\d+)m"', job).group(1)) * 60
+        recovery = int(re.search(r'RUNNER_AFTER_SCRIPT_TIMEOUT: "(\d+)m"', job).group(1)) * 60
+        total = int(re.search(r'timeout: (\d+) hours', job).group(1)) * 3600
+        # Main: existing one-hour bench wait, install, 900s observer, restore.
+        transaction = cleanup_budget.flash_remote_seconds("rx671-wifi")
+        self.assertGreaterEqual(main, 3600 + 2 * transaction + 900)
+        # Recovery uses a short independent bench wait, then full restore.
+        after = job.split("  after_script:\n", 1)[1]
+        self.assertIn("flock -w 60 9", after)
+        self.assertGreaterEqual(recovery, 60 + transaction + 30)
+        self.assertGreater(total, main + recovery)
 
 
 if __name__ == "__main__":

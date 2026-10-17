@@ -68,7 +68,7 @@ void mqttWrapper_setThingName(char * thingName,
                             size_t thingNameLength)
 {
     configASSERT(thingNameLength <= MAX_THING_NAME_SIZE );
-    memcpy(globalThingName, thingName, MAX_THING_NAME_SIZE);
+    memcpy(globalThingName, thingName, thingNameLength);
     globalThingName[thingNameLength] = '\0';
     globalThingNameLength = thingNameLength;
 }
@@ -154,22 +154,20 @@ static void prvPublishCommandCallback(MQTTAgentCommandContext_t * pCmdCallbackCo
 static void prvUnsubscribeCommandCallback(MQTTAgentCommandContext_t * pCmdCallbackContext,
                                         MQTTAgentReturnInfo_t *     pReturnInfo)
 {
-    TaskHandle_t xTaskHandle                  = (struct tskTaskControlBlock *) pCmdCallbackContext->xTaskToNotify;
-    MQTTAgentSubscribeArgs_t * pSubscribeArgs = (MQTTAgentSubscribeArgs_t *) pCmdCallbackContext->pArgs;
+    TaskHandle_t xTaskHandle = pCmdCallbackContext->xTaskToNotify;
+    MQTTAgentSubscribeArgs_t * pSubscribeArgs = pCmdCallbackContext->pArgs;
 
-
+    configASSERT(NULL != pReturnInfo);
+    if (MQTTSuccess == pReturnInfo->returnCode)
+    {
+        /* Finish reading task-local arguments before waking their owner. */
+        vRemoveMQTTTopicFilterCallback(pSubscribeArgs->pSubscribeInfo->pTopicFilter,
+                                      pSubscribeArgs->pSubscribeInfo->topicFilterLength);
+    }
     if (NULL != xTaskHandle)
     {
-        uint32_t ulNotifyValue = MQTTSuccess; /* ( pxReturnInfo->returnCode & 0xFFFFFF ); */
-
-        (void) xTaskNotifyIndexed(xTaskHandle,
-                                MQTT_AGENT_NOTIFY_IDX,
-                                ulNotifyValue,
-                                eSetValueWithOverwrite);
-
-        /* Remove the topic filter callback */
-        vRemoveMQTTTopicFilterCallback(pSubscribeArgs->pSubscribeInfo->pTopicFilter,
-                                    pSubscribeArgs->pSubscribeInfo->topicFilterLength);
+        (void)xTaskNotifyIndexed(xTaskHandle, MQTT_AGENT_NOTIFY_IDX,
+                                (uint32_t)pReturnInfo->returnCode, eSetValueWithOverwrite);
     }
 }
 /******************************************************************************
@@ -205,6 +203,7 @@ bool mqttWrapper_publish(char *    topic,
          * descriptor can remain task-local. Keeping it local also allows
          * independent application tasks to publish through the agent safely. */
         MQTTPublishInfo_t pubInfo             = { 0 };
+        MQTTAgentPublishArgs_t publishArgs = { .pPublishInfo = &pubInfo, .pProperties = NULL };
         MQTTAgentContext_t *     xAgentHandle = &xGlobalMqttAgentContext;
 
         pubInfo.qos             = MQTTQoS0;
@@ -231,25 +230,19 @@ bool mqttWrapper_publish(char *    topic,
         (void)xTaskNotifyStateClearIndexed(NULL, MQTT_AGENT_NOTIFY_IDX);
 
         mqttStatus = MQTTAgent_Publish(xAgentHandle,
-                                    &pubInfo,
+                                    &publishArgs,
                                     &xCommandParams);
 
         if (MQTTSuccess == mqttStatus)
         {
             uint32_t ulNotifyValue = 0;
 
-            if (xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX,
-                                    0x0,
-                                    0xFFFFFFFF,
-                                    &ulNotifyValue,
-                                    portMAX_DELAY))
+            while (pdTRUE != xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX, 0U,
+                                                    UINT32_MAX, &ulNotifyValue, portMAX_DELAY))
             {
-                mqttStatus = (MQTTStatus_t) (ulNotifyValue & 0x00FFFFFF);
+                /* Arguments stay alive until the queued command completes. */
             }
-            else
-            {
-                mqttStatus = MQTTKeepAliveTimeout;
-            }
+            mqttStatus = (MQTTStatus_t)(ulNotifyValue & 0x00FFFFFFU);
         }
 
         success = (MQTTSuccess == mqttStatus);
@@ -373,6 +366,7 @@ bool mqttWrapper_unsubscribe(char * topic,
 
     xSubscribeArgs.pSubscribeInfo   = &xSubscribeInfo;
     xSubscribeArgs.numSubscriptions = 1;
+    xSubscribeArgs.pProperties = NULL;
 
     /* Complete an application defined context associated with this subscribe message.
      * This gets updated in the callback function so the variable must persist until
@@ -388,6 +382,7 @@ bool mqttWrapper_unsubscribe(char * topic,
         .pCmdCompleteCallbackContext = &xCommandContext,
     };
 
+    (void)xTaskNotifyStateClearIndexed(NULL, MQTT_AGENT_NOTIFY_IDX);
     MQTTStatus_t xCommandStatus = MQTTAgent_Unsubscribe(&xGlobalMqttAgentContext,
                                                         &xSubscribeArgs,
                                                         &xCommandParams);
@@ -396,18 +391,12 @@ bool mqttWrapper_unsubscribe(char * topic,
     {
         uint32_t ulNotifyValue = 0;
 
-        if (xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX,
-                                0x0,
-                                0xFFFFFFFF,
-                                &ulNotifyValue,
-                                portMAX_DELAY))
+        while (pdTRUE != xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX, 0U,
+                                                UINT32_MAX, &ulNotifyValue, portMAX_DELAY))
         {
-            xCommandStatus = (MQTTStatus_t) (ulNotifyValue & 0x00FFFFFF);
+            /* The agent still owns pointers into this task's stack. */
         }
-        else
-        {
-            xCommandStatus = MQTTKeepAliveTimeout;
-        }
+        xCommandStatus = (MQTTStatus_t)(ulNotifyValue & 0x00FFFFFFU);
     }
 
     return (MQTTSuccess == xCommandStatus);

@@ -122,10 +122,6 @@
 #define TSIP_MULTI_THREADING_LOCK_FUNCTION      (user_lock_function)
 #define TSIP_MULTI_THREADING_UNLOCK_FUNCTION    (user_unlock_function)
 
-/* SAFFTI extension: optional procedure-busy wait hook. */
-#define TSIP_CFG_WAIT_LOOP_HOOK_ENABLE           (0)
-#define TSIP_CFG_WAIT_LOOP_HOOK_FUNCTION         (vTsipWaitLoopHook)
-
 /* Key update. */
 #if defined BSP_MCU_RX231 || defined BSP_MCU_RX23W || defined BSP_MCU_RX26T || \
     defined BSP_MCU_RX66T || defined BSP_MCU_RX72T

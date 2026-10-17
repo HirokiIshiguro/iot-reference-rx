@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Build the signed FWUP v2 RSU image used by the RX671 dual-bank bootloader."""
+"""Build the legacy contiguous signed RSU used by the RX671 bootloader.
+
+The historical command/module filename is retained for existing CI and remote
+staging callers.  The full RSU format is the original sequence/start/end/reset/
+hardware-ID descriptor, not the r_fwup multi-segment format.  The whole area
+after the 0x200-byte header is signed, including the 0x100-byte descriptor.
+"""
 
 from __future__ import annotations
 
@@ -34,7 +40,7 @@ MAGIC_CODE = b"Renesas"
 IMAGE_FLAG_TESTING = 0xFE
 SIGNATURE_TYPE = b"sig-sha256-ecdsa"
 RAW_P256_SIGNATURE_SIZE = 64
-MAX_DESCRIPTOR_SEGMENTS = 31
+HARDWARE_ID = 9
 
 _SIGNATURE_TYPE_OFFSET = 0x08
 _SIGNATURE_SIZE_OFFSET = 0x28
@@ -178,18 +184,35 @@ def load_p256_private_key(key_path: Path) -> ec.EllipticCurvePrivateKey:
     return private_key
 
 
-def build_descriptor() -> bytes:
-    descriptor = bytearray(b"\xFF" * RSU_DESCRIPTOR_SIZE)
-    struct.pack_into("<I", descriptor, 0, 1)
-    struct.pack_into("<I", descriptor, 4, APPLICATION_START)
-    struct.pack_into("<I", descriptor, 8, APPLICATION_SIZE)
-
-    segment_end = APPLICATION_START + APPLICATION_SIZE
-    if segment_end > FWUP_AREA_END + 1:
-        raise ValueError(
-            f"FWUP segment exceeds the RX671 768 KiB area: end=0x{segment_end:08X}"
-        )
+def legacy_descriptor(application_start: int, application_end: int,
+                      sequence: int = 1, hardware_id: int = HARDWARE_ID) -> bytes:
+    """Serialize the original five-word RSU descriptor, independent of MCU."""
+    if (type(sequence) is not int or not 1 <= sequence <= 0xFFFFFFFF or
+            not 0 <= application_start <= application_end <= 0xFFFFFFFF or
+            not 0 <= hardware_id <= 0xFFFFFFFF):
+        raise ValueError("invalid legacy RSU sequence/address/hardware ID")
+    descriptor = bytearray(RSU_DESCRIPTOR_SIZE)
+    struct.pack_into("<IIIII", descriptor, 0, sequence, application_start,
+                     application_end, application_end - 3, hardware_id)
     return bytes(descriptor)
+
+
+def validate_legacy_descriptor(descriptor: bytes, application_start: int,
+                               application_end: int, *, sequence: int | None = None) -> int:
+    """Reject a segmented descriptor even if its ECDSA signature is valid."""
+    if len(descriptor) != RSU_DESCRIPTOR_SIZE:
+        raise ValueError("legacy RSU descriptor size mismatch")
+    actual_sequence, start, end, reset, hardware_id = struct.unpack_from("<IIIII", descriptor)
+    if (not 1 <= actual_sequence <= 0xFFFFFFFF or
+            (sequence is not None and actual_sequence != sequence) or
+            (start, end, reset, hardware_id) !=
+            (application_start, application_end, application_end - 3, HARDWARE_ID)):
+        raise ValueError("legacy RSU descriptor layout mismatch")
+    return actual_sequence
+
+
+def build_descriptor(sequence: int = 1) -> bytes:
+    return legacy_descriptor(APPLICATION_START, APPLICATION_END, sequence)
 
 
 def _sign_raw_p256(
@@ -247,7 +270,7 @@ def build_header(signature: bytes) -> bytes:
 
 
 def build_image(
-    payload: bytes, private_key: ec.EllipticCurvePrivateKey
+    payload: bytes, private_key: ec.EllipticCurvePrivateKey, sequence: int = 1
 ) -> bytes:
     if len(payload) != APPLICATION_SIZE:
         raise ValueError(
@@ -255,13 +278,13 @@ def build_image(
             f"got {len(payload)}"
         )
 
-    descriptor = build_descriptor()
+    descriptor = build_descriptor(sequence)
     signed_data = descriptor + payload
     signature = _sign_raw_p256(signed_data, private_key)
     image = build_header(signature) + signed_data
     if len(image) != FWUP_AREA_SIZE:
         raise RuntimeError(
-            f"RX671 FWUP image size mismatch: expected={FWUP_AREA_SIZE}, "
+            f"RX671 legacy RSU image size mismatch: expected={FWUP_AREA_SIZE}, "
             f"actual={len(image)}"
         )
     return image
@@ -285,7 +308,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Unencrypted ECDSA P-256 private key in PEM format",
     )
     parser.add_argument(
-        "--output", required=True, type=Path, help="Output signed FWUP v2 RSU"
+        "--output", required=True, type=Path, help="Output signed legacy contiguous RSU"
     )
     return parser.parse_args(argv)
 
@@ -299,11 +322,11 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, RuntimeError, ValueError) as exc:
         raise SystemExit(f"error: {exc}") from exc
 
-    print(f"Generated RX671 FWUP v2 RSU: {args.output}")
+    print(f"Generated RX671 legacy contiguous RSU: {args.output}")
     print(
         f"  size={len(image)} bytes, application="
         f"0x{APPLICATION_START:08X}-0x{APPLICATION_END:08X}, "
-        "segments=1, dataflash=disabled"
+        "format=legacy-full-rsu, sequence=1, dataflash=disabled"
     )
     return 0
 

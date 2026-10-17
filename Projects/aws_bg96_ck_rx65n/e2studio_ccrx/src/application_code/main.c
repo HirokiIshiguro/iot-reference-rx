@@ -25,8 +25,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 /* FreeRTOS includes. */
+#include "public_signer_provisioner.h"
+#include "r_sci_rx_pinset.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "event_groups.h"
+
+EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 /* Logging includes. */
 #include "iot_logging_task.h"
@@ -36,7 +41,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Demo includes */
 #include "aws_clientcredential.h"
-#include "r_cellular_if.h"
+#include "bg96_network.h"
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
@@ -73,7 +78,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     #include "tls13_0rtt_smoke.h"
 #endif
 
-st_cellular_ctrl_t cellular_ctrl;
+
 extern bool Connect2AP( void );
 
 bool ApplicationCounter (uint32_t xWaitTime);
@@ -229,6 +234,10 @@ static void prvRunIdtProfile( void )
         prvIdtStop( "IDT_PORT_FATAL: transport test task creation failed\r\n" );
     }
 #else
+#if ( ENABLE_OTA_UPDATE_DEMO == 1 ) || ( OTA_E2E_TEST_ENABLED == 1 )
+    xStartDemoEventGroup = xEventGroupCreate();
+    configASSERT( xStartDemoEventGroup != NULL );
+#endif
     xSetMQTTAgentState( MQTT_AGENT_STATE_INITIALIZED );
     vStartMQTTAgent( appmainMQTT_AGENT_TASK_STACK_SIZE, appmainMQTT_AGENT_TASK_PRIORITY );
 #if ( ENABLE_OTA_UPDATE_DEMO == 1 )
@@ -251,6 +260,11 @@ static void prvRunIdtProfile( void )
  *********************************************************************************************************************/
 void main_task(void)
 {
+    (void)xTraceEnable(TRC_START);
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+    vRunPublicSignerProvisioner(R_SCI_PinSet_SCI0);
+#else
+
 #if ( IDT_TEST_ENABLED == 1 )
     prvRunIdtProfile();
 #else
@@ -343,6 +357,7 @@ void main_task(void)
         vTaskSuspend(NULL);
     }
 #endif /* IDT_TEST_ENABLED */
+#endif /* PUBLIC_SIGNER_PROVISIONER_ENABLE */
 }
 /*****************************************************************************************
 End of function main_task
@@ -358,6 +373,9 @@ void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
+
+    xStartDemoEventGroup = xEventGroupCreate();
+    configASSERT( xStartDemoEventGroup != NULL );
 
     /* Start logging task. */
     xLoggingTaskInitialize(mainLOGGING_TASK_STACK_SIZE,
@@ -668,10 +686,7 @@ void vAssignCredentials(void)
     pValue = keyCLIENT_PRIVATE_KEY_PEM;
     xprvWriteCacheEntry(strlen("key"), "key", strlen(pValue), pValue);
 
-    /* Write code signing certificate */
-    pValue = otapalconfigCODE_SIGNING_CERTIFICATE;
-    xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pValue), pValue);
-
+    /* Signing trust is provisioned separately by the public maintenance flow. */
     /* Write root CA */
     pValue = democonfigROOT_CA_PEM;
     xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pValue), pValue);

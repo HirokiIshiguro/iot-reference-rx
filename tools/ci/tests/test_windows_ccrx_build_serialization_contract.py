@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import unittest
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -88,6 +88,31 @@ class WindowsCcrxBuildSerializationContractTests(unittest.TestCase):
                     'parallelizationNumber="optimal"',
                     project_file.read_text(encoding="utf-8"),
                 )
+
+    def test_normal_build_workspaces_are_job_scoped(self) -> None:
+        variables = {
+            "E2STUDIO_WORKSPACE": "build_rx72n_ether",
+            "E2STUDIO_WORKSPACE_RX65N_BG96": "build_rx65n_bg96",
+            "E2STUDIO_WORKSPACE_RX671_WIFI": "build_rx671_wifi",
+            "E2STUDIO_WORKSPACE_RX671_BOOTLOADER": "build_rx671_bootloader",
+        }
+        rendered = set()
+        for variable, job in variables.items():
+            match = re.search(rf'^  {variable}: "([^"]+)"$', self.ci, re.MULTILINE)
+            self.assertIsNotNone(match, variable)
+            template = match.group(1)
+            self.assertIn("${CI_PIPELINE_ID}", template)
+            self.assertIn("${CI_JOB_ID}", template)
+            self.assertIn(f"$env:{variable}", self.jobs[job])
+            for pipeline, job_id in (("123", "456"), ("123", "457"), ("124", "456")):
+                workspace = PureWindowsPath(template.replace("${CI_PIPELINE_ID}", pipeline)
+                                            .replace("${CI_JOB_ID}", job_id))
+                self.assertTrue(workspace.is_relative_to(PureWindowsPath("C:/ai/codex/ws")))
+                self.assertNotIn(workspace, rendered)
+                rendered.add(workspace)
+                if variable == "E2STUDIO_WORKSPACE_RX671_BOOTLOADER":
+                    # The helper's deletion guard intentionally retains this leaf.
+                    self.assertEqual("e2ws_iot_ref_rx671_bootloader_2026_04_2", workspace.name)
 
 
 if __name__ == "__main__":

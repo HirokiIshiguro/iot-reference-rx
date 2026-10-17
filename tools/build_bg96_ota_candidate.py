@@ -45,7 +45,7 @@ def run_logged(
     log,
     env: dict[str, str],
     timeout: int,
-    allow_nonzero_exit: bool = False,
+    timeout_exit_code: int | None = None,
 ) -> None:
     print("+ " + " ".join(command))
     log.write("+ " + " ".join(command) + "\n")
@@ -61,18 +61,10 @@ def run_logged(
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"build command timed out after {timeout} seconds: {' '.join(command)}") from exc
-    if result.returncode != 0 and not allow_nonzero_exit:
-        raise RuntimeError(f"build command failed with exit {result.returncode}: {' '.join(command)}")
+    if timeout_exit_code is not None and result.returncode == timeout_exit_code:
+        raise RuntimeError(f"e2studio-cli import/build timed out or stopped before a safe completed run: {' '.join(command)}")
     if result.returncode != 0:
-        print(
-            "warning: build command returned "
-            f"exit {result.returncode}; continuing after generated file validation"
-        )
-        log.write(
-            "warning: build command returned "
-            f"exit {result.returncode}; continuing after generated file validation\n"
-        )
-        log.flush()
+        raise RuntimeError(f"build command failed with exit {result.returncode}: {' '.join(command)}")
 
 
 def e2studio_plugin_dir(e2studio_cli: Path) -> Path | None:
@@ -172,12 +164,11 @@ def reset_generated_build_files_on_config_drift(app_dir: Path, expected_config: 
         clear_generated_build_files(app_dir)
 
 
-def resolve_e2studio_headless(e2studio_cli: Path) -> Path:
+def resolve_e2studio_cli(e2studio_cli: Path) -> Path:
     if not e2studio_cli.exists():
         raise RuntimeError(f"e2 studio executable not found: {e2studio_cli}")
-    console = e2studio_cli.resolve().parent / "e2studioc.exe"
-    if console.exists():
-        return console.resolve()
+    if e2studio_cli.name.lower() != "e2studio-cli.exe":
+        raise RuntimeError("RX builds require the e2studio-cli.exe command launcher")
     return e2studio_cli.resolve()
 
 
@@ -188,23 +179,28 @@ def run_e2studio_managed_build(
     log,
     timeout: int,
 ) -> None:
-    if workspace.exists():
-        shutil.rmtree(workspace)
-
+    executable = resolve_e2studio_cli(e2studio_cli)
+    wrapper = Path(__file__).with_name("build_rx_e2studio_project.ps1")
+    if not wrapper.is_file():
+        raise RuntimeError(f"RX project build wrapper not found: {wrapper}")
+    managed_log = Path(log.name).with_suffix(".e2studio.log").resolve()
     command = [
-        str(resolve_e2studio_headless(e2studio_cli)),
-        "--launcher.suppressErrors",
-        "-nosplash",
-        "-application",
-        "org.eclipse.cdt.managedbuilder.core.headlessbuild",
-        "-data",
-        str(workspace),
-        "-import",
-        str(app_dir),
-        "-build",
-        "all",
+        "pwsh", "-NoProfile", "-NonInteractive", "-File", str(wrapper),
+        "-Executable", str(executable),
+        "-Workspace", str(workspace.resolve()),
+        "-ProjectPath", str(app_dir.resolve()),
+        "-OutputLog", str(managed_log),
+        "-TimeoutSeconds", str(timeout),
     ]
-    run_logged(command, app_dir, log, os.environ.copy(), timeout, allow_nonzero_exit=True)
+    try:
+        # Every failed CLI invocation is terminal. The later version-specific
+        # direct make build is a separate planned step, never a CLI retry.
+        run_logged(command, app_dir, log, os.environ.copy(), timeout + 30,
+                   timeout_exit_code=124)
+    finally:
+        if managed_log.is_file():
+            log.write(managed_log.read_text(encoding="utf-8", errors="replace"))
+            log.flush()
 
 
 def build_environment(e2studio_cli: Path, ccrx_bin_arg: Path | None) -> dict[str, str]:

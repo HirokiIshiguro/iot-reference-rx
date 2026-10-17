@@ -1,4 +1,6 @@
-# RX72N EthernetのIDT検証
+# RX72N・RX65N・RX671のIDT検証
+
+3環境の実行入口と、対象SHAごとの検証結果を記録します。共通基盤の変更後は部品ビルド・host検証までを確認しており、新基盤の実機IDT PASSはまだ確認していません。
 
 ## 3ターゲットのCI入口
 
@@ -26,26 +28,37 @@ Wi-Fi / APNは既存のターゲット専用CI変数からprivate runtimeへ渡�
 
 `plan`はホストの版・依存と固定されたboard identityを計画へ記録するだけで、AWS、compiler、UART、flashを操作しません。
 `preflight`はnative `FreeRTOSVersion`を実行します。FreeRTOS `202604.00-LTS`とIDT 4.9.0 / FRQ_2.5.0の不一致はNGとして保持し、環境整備の失敗と区別します。
-MQTTもRX72N/RX671のcoreMQTT 5.0.2（MQTT 5）がsuiteのMQTT 3.1.1期待値と不一致です。RX65N/BG96はcoreMQTT 2.3.1（MQTT 3.1.1）ですが、protocol一致だけではnative合格とは判断しません。
+共通基盤のcoreMQTTは3ターゲットとも5.0.2（MQTT 5）へ統一しています。suiteのMQTT 3.1.1期待値との不一致はNGとして保持します。以前のRX65N/BG96の2.3.1による結果を新基盤のnative合格へ流用しません。
 失敗・ERROR・SKIPをPASSへ書き換えず、LTS / manifest / vendor suiteを変更しません。
 
 MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検査、`idt_target_plans`は3ターゲットの計画を保存します。
-`idt_source_matrix`はWindows runnerで3ターゲット×5groupの実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
+`idt_source_matrix`はWindows runnerで、Transport、DeviceAdvisor、OTAE2E、PKCS11 StartFinish、PKCS11 NoObject、OTAPALの6構成×3ターゲット＝18構成について、実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
 過去のローカル15構成compile成功は保存されたsourceに対する結果として保持し、このMRのclean SHA・runner・実機の合格へ流用しません。
 
 ### 実機scopeの準備条件
 
 固定target identityがapplication、bootloader、packager、UART、debugger、bench lockを選びます。
 共有CC-RX resource groupに加え、実機の既存lockと通常CIとの排他を確認します。
-RX671の独立したIDT初期書込みは、最初にRFPのchip eraseでCode Flash・Data Flash・flash optionを消去します。OTA後の起動バンク000からlinear provisionerを一括書込みすると、verify成功後も旧bootloaderを指す起動不良を実機で再現したためです（[#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)）。消去後は同じsourceのlinear provisionerでP-256公開signerをLittleFSへ再投入・commitし、その後の両bank書込みではData Flashを保持します。built-in fallbackは有効にしません。
-RX671の実機scopeでは、この公開bootstrap資料を既存production builderからCIが自動生成します。host-only preflightでは生成しません。既に確認した資料で置き換える場合は[4入力を一組で指定](../tools/idt/RX671_BOOTSTRAP.md)し、部分的な指定は拒否します。
-通常RX671 CIの独立したflashとUART観測前のatomic reflashも、chip eraseを別コマンドで完了してからlinear画像を書きます。同じ通常FWでもdual/000からの1回目は旧bootloaderのvectorが残り、同画像の2回目で正しい配置へ収束することを実機で確認しました。2回書けば成功することに依存せず、各書込みの開始状態を揃えます。初期Data Flashは消去され、通常FWの接続設定は通常ビルド／provision経路で用意します。
-OTAのbuild ledger / 起動witnessはターゲットとfingerprintを照合します。通常firmwareの復帰は既存flash / provision経路で確認します。
+全3環境の実機scopeは、[共通初期boot trust](../tools/idt/RX671_BOOTSTRAP.md)を用意してから実行します。CIは[prepare_public_signer.py](../tools/idt/prepare_public_signer.py)で公開署名鍵投入用MOT・正式manifest・公開証明書・公開鍵を自動生成します。確認済み資料で置き換える場合は`IDT_PUBLIC_SIGNER_PROVISIONER_MOT_FILE`、`IDT_PUBLIC_SIGNER_PROVISIONER_MANIFEST_FILE`、`IDT_PUBLIC_SIGNER_CERT_FILE`、`IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE`の4入力を全て指定してください。部分指定は拒否し、host-only preflightでは生成しません。
 
-終了時は既存RX72N CIと同じresetコマンド成功と、freshな1秒間のUART静止を確認します。
-RESET端子の電圧測定は実行条件に含めません。物理RESET Lowを測定したという記録は作りません。
-reset失敗、UART出力継続、privileged子processの終了が不明な場合は不合格とし、所有記録を保持して再利用を止めます。
-これは全IDT合格の条件緩和ではなく、終了時に実際に観測できる事実の記録です。
+共通profileは`rx-dual-public-signer-provisioner-v1`です。IDT buildと同じsource SHAの`formal=true`・`source_tree_dirty=false`を要求し、private outputはcheckout外に新規作成します。保守用MOTの実設定とsource識別子、公開P-256鍵の一致、bootloader policy、両bankの正確な配置を検査します。初期RSUは署名付きCode Flashのみとし、Data Flashを同梱しません。
+
+既存lockを保持して、独立したRFP chip eraseを完了後に保守用dual-bank MOTを起動します。実機source識別子を確認し、LittleFSをformatして公開署名鍵を保存・commitした後、Data Flashを保持して両bankのbootloaderと署名付きapplicationを導入します。`runtime_trust`は実署名検査と起動成功が確認できるまで`not_established`です。built-in fallbackは有効にしません。
+
+共通LittleFSは2.11.3、領域は`0x00100000`から8KiBです。RX72Nの旧開始位置とRX65N/RX72Nの旧容量からの変更により、初回formatと再provisionが必要です。今回の部品・host検証を実機の移行確認やIDT合格へ流用しません。OTAのbuild ledger / 起動識別子はターゲットとfingerprintを照合し、通常firmwareへの復帰は既存flash / provision経路で確認します。
+
+[共有予算](../tools/idt/cleanup_budget.py)は3環境ともtransaction 1565秒、公開鍵投入CLIは絶対上限200秒です。終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗、UART出力継続、privileged子processの終了不明では所有記録を保持して再利用を止めます。
+
+過去のRX671起動不良は、現行のdual-bank共通経路と区別して保存しています。
+
+<details>
+<summary>過去のlinear画像・起動bank調査</summary>
+
+OTA後の起動バンク000からlinear provisionerを一括書込みすると、verify成功後も旧bootloaderを指す起動不良を実機で再現しました（[#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)）。同じ通常FWでもdual/000からの1回目は旧bootloaderのvectorが残り、2回目で正しい配置へ収束することを確認しました。2回書込みに依存せず、chip eraseを別コマンドで先に完了してから書き込む経路を採用しています。
+
+これらは当時のsourceに対する調査結果です。現在は通常application・native application・bootloader・保守用provisionerをdual-bankへ統一し、新基盤の実機再検証は未完了です。
+
+</details>
 
 ## RX72Nの既存実測
 
@@ -207,7 +220,7 @@ CC-RXライセンスとリンク可能サイズは実際のfirmwareビルドで�
 
 CIでは`RX72N_IDT_RUNNER_TAG`と`AWS_CLI_RUNNER_TAG`を配備先tagへ、`RX72N_IDT_PYTHON`を専用venvの`python.exe`へ設定します。
 CC-RXのresource groupは同ホストの既存ビルドとの排他を維持します。
-`RX72N_IDT_POWERSHELL`と`E2STUDIO_CLI`はprofileより優先し、buildにはPowerShell 7と`e2studioc.exe`を使用します。
+`RX72N_IDT_POWERSHELL`と`E2STUDIO_CLI`はprofileより優先し、buildにはPowerShell 7と`e2studio-cli.exe`を使用します。
 Windows PowerShell 5.1はe2 studio終了コードを取得できなかったため対象外です。
 ホストを変えても、RPi #1のhostname、UART by-id、E2 Lite serial、共有lockは変更しません。
 
@@ -236,7 +249,7 @@ private runtimeと`<workspace_root>\idt-private-<run>`は、失敗解析とレ�
 private runtime内の`diagnostic-*`資料も同じ保持・削除対象です。
 
 試験用秘密鍵、注入済みsource / firmware、元のIDTログ、e2 studio workspaceはアクセスを制限したcheckout外の領域に保持します。
-試験後は共有lockを保持したままreset保持とUART静止を確認し、試験用AWS資源とRPiの一時firmwareを片付けます。
+試験後は共有lockを保持したままresetコマンド成功と新しい1秒間のUART静止を確認し、試験用AWS資源とRPiの一時firmwareを片付けます。
 通常運用へ戻す際は既存のflash / provision CIで通常firmwareと認証情報を再設定します。
 
 <details>

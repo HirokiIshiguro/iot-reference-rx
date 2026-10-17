@@ -8,7 +8,7 @@
 #include "task.h"
 #include "platform.h"
 #include "rx_idt_config.h"
-#include "r_fwup_config.h"
+#include "rx_ota_config.h"
 #include "test_execution_config.h"
 #include "test_param_config.h"
 #include "ota_pal_test.h"
@@ -26,25 +26,25 @@
 #if ( OTA_PAL_TEST_CERT_TYPE != OTA_ECDSA_SHA256 ) || ( OTA_PAL_USE_FILE_SYSTEM != 0 )
     #error "This RX PAL profile requires ECDSA-SHA256 and the direct-flash PAL."
 #endif
-#if ( FWUP_CFG_UPDATE_MODE != 0 ) || ( FWUP_CFG_FUNCTION_MODE != 1 ) || \
-    ( FWUP_CFG_SIGNATURE_VERIFICATION != 0 ) || ( BSP_CFG_CODE_FLASH_BANK_MODE != 0 )
+#if ( RX_OTA_CFG_UPDATE_MODE != 0 ) || ( RX_OTA_CFG_FUNCTION_MODE != 1 ) || \
+    ( RX_OTA_CFG_SIGNATURE_VERIFICATION != 0 ) || ( BSP_CFG_CODE_FLASH_BANK_MODE != 0 )
     #error "OTA PAL tests require the production ECDSA application dual-bank profile."
 #endif
 #if ( IDT_TARGET_RX72N_ETHERNET == 1 )
-    #if ( FWUP_CFG_MAIN_AREA_ADDR_L != 0xFFE00000U ) || \
-        ( FWUP_CFG_BUF_AREA_ADDR_L != 0xFFC00000U ) || ( FWUP_CFG_AREA_SIZE != 0x1C0000U )
+    #if ( RX_OTA_CFG_MAIN_AREA_ADDR_L != 0xFFE00000U ) || \
+        ( RX_OTA_CFG_BUF_AREA_ADDR_L != 0xFFC00000U ) || ( RX_OTA_CFG_AREA_SIZE != 0x1C0000U )
         #error "OTA PAL tests require the reviewed RX72N inactive-bank layout."
     #endif
     #define IDT_PAL_INACTIVE_REGION "FFC00000-FFDBFFFF"
 #elif ( IDT_TARGET_RX65N_BG96 == 1 )
-    #if ( FWUP_CFG_MAIN_AREA_ADDR_L != 0xFFF00000U ) || \
-        ( FWUP_CFG_BUF_AREA_ADDR_L != 0xFFE00000U ) || ( FWUP_CFG_AREA_SIZE != 0xF0000U )
+    #if ( RX_OTA_CFG_MAIN_AREA_ADDR_L != 0xFFF00000U ) || \
+        ( RX_OTA_CFG_BUF_AREA_ADDR_L != 0xFFE00000U ) || ( RX_OTA_CFG_AREA_SIZE != 0xC0000U )
         #error "OTA PAL tests require the reviewed RX65N inactive-bank layout."
     #endif
-    #define IDT_PAL_INACTIVE_REGION "FFE00000-FFEEFFFF"
+    #define IDT_PAL_INACTIVE_REGION "FFE00000-FFEBFFFF"
 #elif ( IDT_TARGET_RX671_WIFI == 1 )
-    #if ( FWUP_CFG_MAIN_AREA_ADDR_L != 0xFFF00000U ) || \
-        ( FWUP_CFG_BUF_AREA_ADDR_L != 0xFFE00000U ) || ( FWUP_CFG_AREA_SIZE != 0xC0000U )
+    #if ( RX_OTA_CFG_MAIN_AREA_ADDR_L != 0xFFF00000U ) || \
+        ( RX_OTA_CFG_BUF_AREA_ADDR_L != 0xFFE00000U ) || ( RX_OTA_CFG_AREA_SIZE != 0xC0000U )
         #error "OTA PAL tests require the reviewed RX671 768-KiB OTA inactive-bank profile."
     #endif
     #define IDT_PAL_INACTIVE_REGION "FFE00000-FFEBFFFF"

@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-    A["正規プロジェクト<br/>Linear / bank.single"] -->|"一時profile"| B["provisioner +<br/>baseline / candidate"]
+    A["正規プロジェクト<br/>Dual / bank.dual"] -->|"役割・版数profile"| B["dual provisioner +<br/>baseline / candidate"]
     B --> C["FWUP v2 RSU署名<br/>layout / provenance検査"]
     C --> D["runtime CSPをbuild入力としない<br/>formal artifact"]
     D --> E["SCI6 runtime provisioning<br/>LittleFS / Data Flash"]
@@ -16,11 +16,10 @@ flowchart LR
 固定フラッシュ配置、runtime CSPをbuild入力としない署名済み成果物、実行時
 provisioning、実機AWS OTAのCI証跡、および証明範囲を定義する。
 
-`Projects/aws_wifi_rx671_ek/e2studio_ccrx`の正規プロジェクトは、引き続きLinear
-mode / `bank.single`の通常アプリケーションである。OTA用設定をSmart
-Configuratorや`.cproject`へ恒久保存しない。OTA成果物生成時だけ
-`tools/build_rx671_ota_images.py`がdual-bank profileを一時適用し、処理の成否に
-かかわらず対象ファイルをバイト列単位（byte-for-byte）で復元する。
+`Projects/aws_wifi_rx671_ek/e2studio_ccrx`の正規プロジェクトは、通常ビルドから
+`bank.dual`を使用する。`tools/build_rx671_ota_images.py`はこの配置を検証したうえで、
+OTA用の役割・版数profileを一時適用する。保守用provisionerもdual-bankとし、
+処理の成否にかかわらず対象ファイルをバイト列単位（byte-for-byte）で復元する。
 
 package job単体は実機AWS OTA成功を証明しない。成果物生成、配置、provenance、
 署名の整合だけを検証する。
@@ -31,18 +30,20 @@ provisioning、OTA、cleanup jobを合わせて判定する。
 
 | 項目 | 正規プロジェクト / 通常ビルド | OTA成果物生成中だけ |
 |---|---|---|
-| CC-RX device mode | `bank.single` | `bank.dual` |
-| BSP bank mode | `BSP_CFG_CODE_FLASH_BANK_MODE=1` | `BSP_CFG_CODE_FLASH_BANK_MODE=0` |
-| FWUP area size | `0x00100000`（1 MiB） | `0x000C0000`（768 KiB） |
-| アプリ配置 | 従来のLinear配置 | main `0xFFF00000` + `0x300` = `0xFFF00300` |
-| WHD firmware / NVRAM / CLM | 従来の固定section | アプリに続く同一main image group |
-| RAM初期値section | 従来section | `PFRAM2=RPFRAM2`を追加し、`PFRAM2`をmain image groupへ含める |
+| CC-RX device mode | `bank.dual` | 同じ |
+| BSP bank mode | `BSP_CFG_CODE_FLASH_BANK_MODE=0` | 同じ |
+| FWUP area size | `0x000C0000`（768 KiB） | 同じ |
+| アプリ配置 | main `0xFFF00000` + `0x300` = `0xFFF00300` | 同じ |
+| WHD firmware / NVRAM / CLM | アプリに続く同一main image group | 同じ |
+| RAM初期値section | `PFRAM2=RPFRAM2`、`PFRAM2`はmain image group内 | 同じ |
 | image version | `demo_config.h`既定値 | `APP_VERSION_*`で`0.1.0` / `0.1.1`を明示 |
 | runtime | MQTT/Fleet/LANBENCHの通常分岐 | `RX671_OTA_RUNTIME_ENABLE=1`でMQTT Agent + OTA demoを自動起動 |
 | OTA download block | library既定値 | `4096` byte（8 KiB MQTT受信bufferにJSON/Base64応答も収容） |
 | SDHI run clock | `SDHI_DIV_2`（PCLKB 60 MHz / 2 = 30 MHz） | `SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8`（7.5 MHz） |
 
-別途、資格情報投入専用のprovisionerを正規`bank.single`配置で生成する。
+別途、資格情報投入専用のprovisionerを同じ`bank.dual`構成で生成する。
+初回に単独起動できるよう、その一時profileだけはexception/reset vectorを
+`0xFFFFFF80` / `0xFFFFFFFC`へ置く。通常appのvectorは`0xFFFBFF80` / `0xFFFBFFFC`である。
 `RX671_OTA_PROVISIONER_ENABLE=1`のときはWHD/IPを開始せず、LittleFS/KVS初期化後に
 共通CLIをSCI6へ常駐させる。`cert`、`key`、`thingname`、`endpoint`、
 `codesigncert`、`codesignpubkey`を`conf set` / `commit`で保存できる。Wi-Fiは
@@ -104,11 +105,11 @@ profileおよびOTA runtime profileではprovisioner CLI task自体を生成し�
 
 ### provisionerからbootloaderへのhandoff境界
 
-資格情報専用provisionerは通常の`bank.single` imageであり、dual-bank bootloaderが
-lifecycle stateを読む2個のinstall areaにもcodeを配置する。LittleFS/KVS commit後に
-bootloader MOTだけを書いても、そのMOTに含まれないprovisioner recordは消えない。
-この状態では両header先頭がblankではなく未知のlifecycle stateとなり、bootloaderは
-baseline RSUのUART受信へ進まず、provisioner codeを署名imageとして検証して停止する。
+旧`bank.single` provisionerでは、2個のinstall areaにcodeが残り、bootloader MOTだけを
+書くとheader先頭が未知のlifecycle stateとなってbaseline RSUの受信に進まない問題を
+確認した。これは過去のlinear profileでの記録である。現在のstandalone `bank.dual`
+provisionerもapp用Code Flashを使うため、LittleFS/KVS commit後のhandoffでは引き続き
+両install areaを消去し、provisionerと以前のappのrecordを除去してからlifecycle stateを読む。
 
 そのためhostはcommit成功後、bootloader MOT書込み前にRFPの複数`-range`と`-erase`を
 用いて、次の2領域だけを選択消去する。
@@ -336,9 +337,8 @@ IoT Job、S3 source、一時Thing / policyの不存在まで完了した。clean
 failed判定はcleanup前snapshotのJob executionが`IN_PROGRESS`だったためであり、
 後始末処理の失敗を意味しない。
 
-通常プロジェクトがLinear / `bank.single`であることと、OTA成果物がdual-bank
-配置であることは両立させる。前者は開発・ネットワーク試験の既存動作を維持し、
-後者はbootloaderが扱う署名対象の固定配置を作る。
+通常profileとOTA成果物profileは、いずれも同じdual-bank配置を使う。
+OTA helperは版数と実行時の役割を選択し、署名対象の固定配置を検証する。
 
 ## 3. 固定code flash配置
 
@@ -415,7 +415,7 @@ AWS cleanup境界として検証する。
 `tools/build_rx671_ota_images.py`は開始時に次の4ファイルをbytesとして保存する。
 
 1. `.cproject`
-2. `src/frtos_config/r_fwup_config.h`
+2. `src/frtos_config/rx_ota_config.h`
 3. `src/smc_gen/r_config/r_bsp_config.h`
 4. `src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h`
 
@@ -479,7 +479,7 @@ jobは同じ`build/rx671-ota/`を直接受け取り、firmwareのbuild後にSSID
 - `bootloader/`のMOT / ABS / MAP
 - `baseline-0.1.0/`と`candidate-0.1.1/`のMOT / ABS / MAP
 - 各versionのECDSA P-256署名済みFWUP v2 RSU
-- bank.single provisionerのMOT / ABS / MAP
+- bank.dual provisionerのMOT / ABS / MAP
 - signer certificateと公開鍵（秘密鍵はartifactへ収録しない）
 - candidateの`aws_wifi_rx671_ek.ota.bin`（full RSUの`0x200` byte以降）と、
   同payloadに対応するECDSA DER署名

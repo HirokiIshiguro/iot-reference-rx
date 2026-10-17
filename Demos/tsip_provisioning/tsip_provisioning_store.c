@@ -8,7 +8,7 @@
 
 #include "FreeRTOS.h"
 #include "lfs.h"
-#include "lfs_util_config.h"
+#include "lfs_common_data.h"
 #include "r_common_api_tsip.h"
 #include "r_tsip_rx_if.h"
 #include "tsip_provisioning_store.h"
@@ -76,7 +76,6 @@ static BaseType_t xRootCaTrustAnchorReady = pdFALSE;
 static uint8_t ucRootSignerBlob[ROOT_SIGNER_MAX_STORED_SIZE];
 static uint8_t ucClientPrivateBlob[CLIENT_PRIVATE_MAX_STORED_SIZE];
 
-extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
 extern tsip_rsa2048_private_key_index_t rsa2048_private_key;
 extern tsip_rsa2048_public_key_index_t rsa2048_public_key;
 
@@ -119,7 +118,7 @@ uint32_t ulTsipProvisioningGetStoredLength(TsipProvisioningSlot_t xSlot)
         return 0U;
     }
 
-    if (LFS_ERR_OK == lfs_stat(&RM_STDIO_LITTLEFS_CFG_LFS, xSlotInfo[xSlot].pcStorageName, &xFileInfo))
+    if (LFS_ERR_OK == LfsCommon_Stat(LfsCommon_GetLfs(), xSlotInfo[xSlot].pcStorageName, &xFileInfo))
     {
         return xFileInfo.size;
     }
@@ -144,7 +143,7 @@ void vTsipProvisioningEraseSlot(TsipProvisioningSlot_t xSlot)
 {
     if ((uint32_t)xSlot < (uint32_t)TSIP_PROVISIONING_SLOT_COUNT)
     {
-        (void)lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, xSlotInfo[xSlot].pcStorageName);
+        (void)LfsCommon_Remove(LfsCommon_GetLfs(), xSlotInfo[xSlot].pcStorageName);
     }
 }
 
@@ -254,20 +253,20 @@ static BaseType_t prvReadFile(const char * pcStorageName,
         return pdFALSE;
     }
 
-    if (LFS_ERR_OK != lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS, &xFile, pcStorageName, LFS_O_RDONLY))
+    if (LFS_ERR_OK != LfsCommon_FileOpen(LfsCommon_GetLfs(), &xFile, pcStorageName, LFS_O_RDONLY))
     {
         return pdFALSE;
     }
 
-    xFileSize = lfs_file_size(&RM_STDIO_LITTLEFS_CFG_LFS, &xFile);
+    xFileSize = LfsCommon_FileSize(LfsCommon_GetLfs(), &xFile);
     if ((xFileSize < 0) || ((uint32_t)xFileSize > ulBufferSize))
     {
-        (void)lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &xFile);
+        (void)LfsCommon_FileClose(LfsCommon_GetLfs(), &xFile);
         return pdFALSE;
     }
 
-    xReadSize = lfs_file_read(&RM_STDIO_LITTLEFS_CFG_LFS, &xFile, pucBuffer, (lfs_size_t)xFileSize);
-    (void)lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &xFile);
+    xReadSize = LfsCommon_FileRead(LfsCommon_GetLfs(), &xFile, pucBuffer, (lfs_size_t)xFileSize);
+    (void)LfsCommon_FileClose(LfsCommon_GetLfs(), &xFile);
 
     if (xReadSize != xFileSize)
     {
@@ -290,9 +289,9 @@ static BaseType_t prvWriteFile(const char * pcStorageName,
         return pdFALSE;
     }
 
-    (void)lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, pcStorageName);
+    (void)LfsCommon_Remove(LfsCommon_GetLfs(), pcStorageName);
 
-    if (LFS_ERR_OK != lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS,
+    if (LFS_ERR_OK != LfsCommon_FileOpen(LfsCommon_GetLfs(),
                                     &xFile,
                                     pcStorageName,
                                     LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT))
@@ -300,8 +299,8 @@ static BaseType_t prvWriteFile(const char * pcStorageName,
         return pdFALSE;
     }
 
-    xWriteSize = lfs_file_write(&RM_STDIO_LITTLEFS_CFG_LFS, &xFile, pucBuffer, ulBufferSize);
-    (void)lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &xFile);
+    xWriteSize = LfsCommon_FileWrite(LfsCommon_GetLfs(), &xFile, pucBuffer, ulBufferSize);
+    (void)LfsCommon_FileClose(LfsCommon_GetLfs(), &xFile);
 
     return (xWriteSize == (lfs_ssize_t)ulBufferSize) ? pdTRUE : pdFALSE;
 }

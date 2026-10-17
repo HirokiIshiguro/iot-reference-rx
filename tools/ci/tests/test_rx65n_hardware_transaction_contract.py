@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import unittest
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def job_block(ci: str, name: str, next_name: str) -> str:
-    return ci.split(f"{name}:\n", maxsplit=1)[1].split(
-        f"\n{next_name}:\n", maxsplit=1
-    )[0]
+def job_block(ci: str, name: str, next_name: str | None = None) -> str:
+    match = re.search(r"(?m)^" + re.escape(name) + r":\n", ci)
+    if match is None:
+        raise AssertionError("Missing CI job: " + name)
+    following = re.search(r"(?m)^[A-Za-z0-9_.-]+:[ \t]*\n", ci[match.end():])
+    end = match.end() + following.start() if following else len(ci)
+    return ci[match.start():end]
 
 
 class Rx65nHardwareTransactionContractTests(unittest.TestCase):
@@ -37,8 +41,7 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertIn("- job: prepare_rx65n_bg96_mqtt_credentials", job)
 
         ordered_tokens = (
-            "--action flash-bootloader",
-            "--action download-rsu",
+            "tools/install_normal_boot.py",
             "--action provision-mqtt",
             "tools/provision_tsip_over_uart.py",
             "--action reset-app",
@@ -92,8 +95,7 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
         self.assertNotIn("- job: download_rx65n_bg96_app", needs)
 
         ordered_tokens = (
-            "--action flash-bootloader",
-            "--action download-rsu",
+            "tools/install_normal_boot.py",
             "--action provision-mqtt",
             "tools/provision_tsip_over_uart.py",
             "tools/bg96_ota_prepare.py",
@@ -142,31 +144,37 @@ class Rx65nHardwareTransactionContractTests(unittest.TestCase):
             cleanup.index("tools/manage_ephemeral_iot_thing.py cleanup"),
         )
 
-    def test_mqtt_is_excluded_from_split_hardware_rules(self) -> None:
-        rule_blocks = (
-            job_block(
-                self.ci, ".rx65n_bg96_flash_rules", ".rx671_wifi_hardware_rules"
-            ),
-            job_block(
-                self.ci, ".rx65n_bg96_download_rules", ".rx65n_bg96_app_rules"
-            ),
-            job_block(
-                self.ci, ".rx65n_bg96_app_rules", ".rx65n_bg96_provision_rules"
-            ),
-            job_block(
-                self.ci,
-                ".rx65n_bg96_provision_rules",
-                ".rx65n_bg96_mqtt_rules",
-            ),
-            job_block(
-                self.ci,
-                ".rx65n_bg96_app_reset_rules",
-                ".rx65n_bg96_tls13_0rtt_rules",
-            ),
-        )
+    def test_tls_test_owns_installation_provisioning_and_observation(self) -> None:
+        job = job_block(self.ci, "test_rx65n_bg96_tls13_0rtt")
+        needs = job.split("\n  script:", 1)[0]
+        self.assertIn("- job: package_normal_boot_rx65n", needs)
+        self.assertIn("- job: prepare_rx65n_bg96_mqtt_credentials", needs)
+        ordered = ("tools/install_normal_boot.py", "--action provision-mqtt",
+                   "tools/provision_tsip_over_uart.py", "--action reset-app",
+                   "tools/test_lanbench_tls13_0rtt_rx72n.py")
+        positions = [job.index(token) for token in ordered]
+        self.assertEqual(positions, sorted(positions))
+        for obsolete in ("flash_rx65n_bg96", "download_rx65n_bg96_app", "run_rx65n_bg96_app",
+                         "provision_rx65n_bg96_mqtt", "reset_rx65n_bg96_app",
+                         "provision_rx65n_bg96_ota_signer"):
+            self.assertIsNone(re.search(r"(?m)^" + obsolete + r":\n", self.ci))
+            self.assertNotIn("- job: " + obsolete + "\n", self.ci)
+        guard = job_block(self.ci, "validate_rx65n_bg96_scope")
+        self.assertIn("/^(flash|download|app|provision)$/", guard)
+        self.assertIn("GIT_STRATEGY: none", guard)
+        self.assertIn("throw 'RX65N BG96 partial scopes are retired", guard)
+        creator = job_block(self.ci, "create_rx65n_bg96_ota")
+        self.assertNotIn(".rx65n_bg96_linux_hw_job", creator)
+        self.assertNotIn("parked.ok", creator)
 
-        for block in rule_blocks:
-            self.assertNotIn("mqtt", block)
+    def test_fleet_owns_signed_installation_provisioning_and_observation(self) -> None:
+        job = job_block(self.ci, "test_rx65n_bg96_fleet")
+        ordered = ("tools/install_normal_boot.py", "--action provision-fleet", "tools/test_fleet_rx72n.py")
+        positions = [job.index(token) for token in ordered]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("package_normal_boot_rx65n_fleet", job)
+        self.assertNotIn("--action download-rsu", job)
+        self.assertNotIn("--action flash-bootloader", job)
 
     def test_software_tsip_and_tls_version_boundaries_are_preserved(self) -> None:
         job = job_block(

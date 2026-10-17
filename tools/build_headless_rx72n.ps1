@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
-    [string]$Workspace = "C:\iotref-rx72n-ws",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
+    [string]$Workspace = "C:\ai\codex\ws\iotref-rx72n-ws",
     [string]$ProjectsPath = "Projects",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log"),
     [int]$E2StudioTimeoutSeconds = 600,
@@ -11,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "rx_e2studio_cli.ps1")
 Set-StrictMode -Version Latest
 
 if (-not (Test-Path $E2Studio)) {
@@ -18,6 +19,8 @@ if (-not (Test-Path $E2Studio)) {
 }
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
+Initialize-RxBuildDependencies -ProjectRoot $projectRoot
+Assert-RxCommonKernel -ProjectRoot $projectRoot
 $workspace = $Workspace
 $projectsPath = $ProjectsPath -replace "/", "\"
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
@@ -47,14 +50,12 @@ if (-not (Test-Path (Join-Path $projectRoot "Middleware\FreeRTOS\corePKCS11\sour
     throw "Git submodules not initialized recursively. Missing corePKCS11 pkcs11.h."
 }
 
-if (Test-Path $workspace) {
-    Remove-Item -Recurse -Force $workspace
-}
+Remove-RxE2Workspace -Path $workspace
 
 foreach ($projectName in $projectNames) {
     $hardwareDebug = Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx\HardwareDebug"
     if (Test-Path $hardwareDebug) {
-        Remove-Item -Recurse -Force $hardwareDebug
+        Remove-RxProjectBuildDirectory -ProjectPath (Split-Path -Parent $hardwareDebug)
         Write-Host "Cleared: $hardwareDebug"
     }
 
@@ -79,18 +80,6 @@ foreach ($projectName in $projectNames) {
         $metadataSnapshots[$projectFilePath] = [System.IO.File]::ReadAllBytes($projectFilePath)
     }
 }
-
-$imports = @()
-foreach ($projectName in $projectNames) {
-    $imports += @("-import", (Join-Path $projectRoot "$projectsPath\$projectName\e2studio_ccrx"))
-}
-
-$e2base = @(
-    "--launcher.suppressErrors",
-    "-nosplash",
-    "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
-    "-data", $workspace
-)
 
 Write-Host "=== RX72N import + build all ==="
 Write-Host "Workspace: $workspace"
@@ -140,76 +129,6 @@ function Find-Artifacts {
     }
 }
 
-function Convert-ToArgumentString {
-    param([string[]]$Arguments)
-
-    return (($Arguments | ForEach-Object {
-        $arg = [string]$_
-        if ($arg -match '[\s"]') {
-            '"' + ($arg -replace '"', '\"') + '"'
-        } else {
-            $arg
-        }
-    }) -join " ")
-}
-
-function Write-ProcessOutput {
-    param([string[]]$Paths)
-
-    foreach ($path in $Paths) {
-        if (Test-Path -LiteralPath $path) {
-            $lines = Get-Content -LiteralPath $path -ErrorAction SilentlyContinue
-            if ($lines) {
-                Add-Content -LiteralPath $logFile -Value $lines
-                $lines | ForEach-Object { Write-Host $_ }
-            }
-        }
-    }
-}
-
-function Stop-ProcessTree {
-    param([int]$ProcessId)
-
-    Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessId" -ErrorAction SilentlyContinue | ForEach-Object {
-        Stop-ProcessTree -ProcessId $_.ProcessId
-    }
-    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
-}
-
-function Invoke-E2StudioCli {
-    param([string[]]$Arguments)
-
-    Write-Host "+ $E2Studio $($Arguments -join ' ')"
-    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("iotref_rx72n_e2studio_" + [System.Guid]::NewGuid().ToString("N"))
-    $stdoutPath = "$tempBase.out"
-    $stderrPath = "$tempBase.err"
-    $process = Start-Process `
-        -FilePath $E2Studio `
-        -ArgumentList (Convert-ToArgumentString $Arguments) `
-        -RedirectStandardOutput $stdoutPath `
-        -RedirectStandardError $stderrPath `
-        -NoNewWindow `
-        -PassThru
-
-    try {
-        if (-not $process.WaitForExit($E2StudioTimeoutSeconds * 1000)) {
-            Stop-ProcessTree -ProcessId $process.Id
-            Write-ProcessOutput @($stdoutPath, $stderrPath)
-            throw "e2 studio CLI timed out after $E2StudioTimeoutSeconds seconds: $E2Studio $($Arguments -join ' ')"
-        }
-        # With redirected output, the timed overload can return before the
-        # Process object has refreshed its final state. Complete the wait and
-        # refresh explicitly so long builds do not yield a null ExitCode.
-        $process.WaitForExit()
-        $process.Refresh()
-        $exitCode = $process.ExitCode
-        Write-ProcessOutput @($stdoutPath, $stderrPath)
-        return $exitCode
-    }
-    finally {
-        Remove-Item -Force -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
-    }
-}
 
 try {
     Remove-Item -Force -LiteralPath $logFile -ErrorAction SilentlyContinue
@@ -224,21 +143,26 @@ try {
             -ConfigFile "aws_mbedtls_config_with_tsip13.h"
     }
 
-    $e2exit = Invoke-E2StudioCli (@() + $e2base + $imports + @("-build", "all"))
+    $projectDirs = @($projectNames | ForEach-Object { Join-Path $projectRoot "$projectsPath\$_\e2studio_ccrx" })
+    $buildTargets = @($projectNames | ForEach-Object { "$_/HardwareDebug" })
+    $expectedOutputs = @(
+        (Join-Path $projectDirs[0] 'HardwareDebug/boot_loader_rx72n_envision_kit.mot'),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.mot"),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.abs"),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.x"),
+        (Join-Path $projectDirs[1] "HardwareDebug/$appProjectName.map")
+    )
+    $e2exit = Invoke-RxE2StudioBuild -Executable $E2Studio -WorkspacePath $workspace `
+        -ProjectPaths $projectDirs -BuildTargets $buildTargets -OutputLog $logFile `
+        -TimeoutSeconds $E2StudioTimeoutSeconds -ExpectedOutputs $expectedOutputs
 
     Write-Host "e2studio exit code: $e2exit"
     $logLines = Get-Content $logFile -ErrorAction SilentlyContinue
     $logLineCount = if ($logLines) { $logLines.Count } else { 0 }
     Write-Host "Build log: $logLineCount lines"
 
-    if ($e2exit -ne 0) {
-        Write-Host "--- Build log (first 100 lines) ---"
-        $logLines | Select-Object -First 100 | ForEach-Object { Write-Host "  $_" }
-        Write-Host "--- Build log (error lines) ---"
-        $logLines | Where-Object { $_ -match '(?i)(error|fatal|cannot|failed|undefined)' } | Select-Object -First 50 | ForEach-Object { Write-Host "  $_" }
-    }
-    Write-Host "--- Build log tail ---"
-    Get-Content $logFile -Tail 30 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
+    # Compiler/CLI diagnostics remain in the build log; credential-bearing
+    # source lines must not be copied into the host console.
 
     $bootMot = Find-Artifacts "$projectsPath\boot_loader_rx72n_envision_kit\e2studio_ccrx\HardwareDebug\*.mot"
     $appMot = Find-Artifacts "$projectsPath\$appProjectName\e2studio_ccrx\HardwareDebug\*.mot"

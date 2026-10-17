@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -16,14 +17,12 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def job_block(ci: str, name: str, next_name: str | None = None) -> str:
-    block = ci.split(f"{name}:\n", maxsplit=1)[1]
-    if next_name is not None:
-        return block.split(f"\n{next_name}:\n", maxsplit=1)[0]
-    lines = block.splitlines()
-    for index, line in enumerate(lines):
-        if index and line and not line[0].isspace() and line.endswith(":"):
-            return "\n".join(lines[:index])
-    return block
+    match = re.search(r"(?m)^" + re.escape(name) + r":\n", ci)
+    if match is None:
+        raise AssertionError("Missing CI job: " + name)
+    following = re.search(r"(?m)^[A-Za-z0-9_.-]+:[ \t]*\n", ci[match.end():])
+    end = match.end() + following.start() if following else len(ci)
+    return ci[match.start():end]
 
 
 class OtaAwsEvidenceCiContractTests(unittest.TestCase):

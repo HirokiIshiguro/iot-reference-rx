@@ -58,7 +58,7 @@ dependencies:
       url: "https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk.git"
       path: "/Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk"
   - name: "coreMQTT-Agent"
-    version: "v1.3.1"
+    version: "v2.0.0"
     repository:
       type: "git"
       url: "https://github.com/FreeRTOS/coreMQTT-Agent.git"

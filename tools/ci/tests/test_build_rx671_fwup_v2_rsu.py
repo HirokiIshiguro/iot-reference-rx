@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib.util
 import struct
 import sys
@@ -88,13 +90,14 @@ class BuildTests(unittest.TestCase):
                 struct.unpack_from("<I", descriptor, 4)[0],
             )
             self.assertEqual(
-                builder.APPLICATION_SIZE,
+                builder.APPLICATION_END,
                 struct.unpack_from("<I", descriptor, 8)[0],
             )
             self.assertEqual(
-                b"\xFF" * (builder.RSU_DESCRIPTOR_SIZE - 12),
-                descriptor[12:],
+                (builder.RESET_VECTOR_ADDRESS, builder.HARDWARE_ID),
+                struct.unpack_from("<II", descriptor, 12),
             )
+            self.assertEqual(b"\0" * (builder.RSU_DESCRIPTOR_SIZE - 20), descriptor[20:])
             self.assertEqual(
                 b"\x10\x20\x30\x40",
                 image[builder.APPLICATION_START - builder.FWUP_AREA_START :
@@ -139,6 +142,37 @@ class BuildTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "outside RX671 application range"):
                 builder.build_from_files(mot, self._write_key(directory))
+
+    def test_legacy_descriptor_supports_all_targets_and_rejects_segmented_v2(self):
+        for start in (0xFFE00300, 0xFFF00300):
+            with self.subTest(start=hex(start)):
+                descriptor = builder.legacy_descriptor(start, 0xFFFBFFFF, 7)
+                self.assertEqual((7, start, 0xFFFBFFFF, 0xFFFBFFFC, 9),
+                                 struct.unpack_from("<IIIII", descriptor))
+                self.assertEqual(7, builder.validate_legacy_descriptor(descriptor, start, 0xFFFBFFFF))
+                with self.assertRaisesRegex(ValueError, "layout"):
+                    builder.validate_legacy_descriptor(descriptor, start, 0xFFFBFFFF, sequence=1)
+                old_v2 = bytearray(b"\xff" * 256)
+                struct.pack_into("<III", old_v2, 0, 1, start, 0xFFFC0000 - start)
+                with self.assertRaisesRegex(ValueError, "layout"):
+                    builder.validate_legacy_descriptor(bytes(old_v2), start, 0xFFFBFFFF)
+        for sequence in (0, -1, 0x100000000, True):
+            with self.subTest(sequence=sequence), self.assertRaises(ValueError):
+                builder.build_descriptor(sequence)
+
+    def test_entire_legacy_tail_including_metadata_is_signed_with_in_memory_key(self):
+        from cryptography.exceptions import InvalidSignature
+        key = ec.generate_private_key(ec.SECP256R1())
+        payload = b"\xff" * builder.APPLICATION_SIZE
+        image = builder.build_image(payload, key, sequence=9)
+        raw = image[0x2c:0x6c]
+        signature = utils.encode_dss_signature(int.from_bytes(raw[:32], "big"),
+                                               int.from_bytes(raw[32:], "big"))
+        key.public_key().verify(signature, image[0x200:], ec.ECDSA(hashes.SHA256()))
+        for offset in (0x200, 0x208, 0x210, 0x2ff, len(image) - 1):
+            changed = bytearray(image); changed[offset] ^= 1
+            with self.subTest(offset=hex(offset)), self.assertRaises(InvalidSignature):
+                key.public_key().verify(signature, bytes(changed[0x200:]), ec.ECDSA(hashes.SHA256()))
 
     def test_omits_known_rx671_option_setting_memory_records(self):
         with tempfile.TemporaryDirectory() as tmp:

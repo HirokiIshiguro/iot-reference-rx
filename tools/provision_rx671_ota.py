@@ -201,8 +201,9 @@ def _verify_value(
     )
 
 
-def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=None, serial_opener=None) -> dict:
-    """Run the linear provisioner, optionally storing only public signer trust.
+def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=None, serial_opener=None,
+              rfp_config=None, ready_source_sha: str | None = None) -> dict:
+    """Run the standalone dual-bank provisioner, optionally storing only public signer trust.
 
     IDT must establish boot trust before its first dual-bank application boot.
     That caller supplies a guarded runner while already owning UART and the
@@ -221,7 +222,11 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
     artifact_dir = args.artifact_dir.resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
     event_log = TimestampLog(artifact_dir / "provision-events.log")
-    rfp = RfpConfig(
+    if ready_source_sha is not None:
+        import re
+        if not signer_only or not re.fullmatch(r"[a-f0-9]{40}", ready_source_sha):
+            raise ValueError("Public maintenance source witness requires an exact source SHA")
+    rfp = rfp_config or RfpConfig(
         executable=args.rfp_cli,
         device=args.rfp_device,
         tool=args.rfp_tool,
@@ -242,12 +247,19 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
     try:
         serial_port.reset_input_buffer()
         serial_port.reset_output_buffer()
-        event_log.write("release provisioner after SCI6 is open\n")
+        event_log.write("release provisioner after the selected UART is open\n")
         execute(
             rfp.run_command(),
             label="provisioner run",
             timeout=args.rfp_timeout,
         )
+        if ready_source_sha is not None:
+            read_until(serial_port,
+                       success_tokens=(b"PUBLIC_SIGNER_PROVISIONER source_sha=" +
+                                       ready_source_sha.encode("ascii") + b"\r\n",),
+                       error_tokens=(b"PUBLIC_SIGNER_PROVISIONER ERROR", b"fatal error"),
+                       timeout=args.boot_timeout)
+            completed.append("maintenance_source_witness")
         enter_cli(serial_port, timeout=args.boot_timeout, char_delay=args.char_delay)
         completed.append("cli_ready")
 
@@ -323,8 +335,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
         serial_port.close()
 
     event_log.write(
-        "erase RX671 OTA install ranges 0xFFE00000-0xFFEBFFFF and "
-        "0xFFF00000-0xFFFBFFFF; preserve Data Flash, flash options, "
+        "erase selected OTA install ranges; preserve Data Flash, flash options, "
         "and both boot-loader regions\n"
     )
     execute(
@@ -354,8 +365,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
         "data_flash_preserved_during_rfp_operations": True,
         "ota_install_areas_erased_after_provisioning": True,
         "ota_install_area_erase_ranges": [
-            "0xFFE00000-0xFFEBFFFF",
-            "0xFFF00000-0xFFFBFFFF",
+            f"0x{start:08X}-0x{end:08X}" for start, end in rfp.install_ranges
         ],
         "pem_readback_performed": False,
         "wifi_passphrase_readback_performed": False,

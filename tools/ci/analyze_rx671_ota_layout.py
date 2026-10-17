@@ -38,7 +38,7 @@ LAYOUT_CONTRACT_NAME = "ota-layout-contract.json"
 PROVENANCE_CONFIG_PATHS = (
     ".cproject",
     LAYOUT_CONTRACT_NAME,
-    "src/frtos_config/r_fwup_config.h",
+    "src/frtos_config/rx_ota_config.h",
     "src/frtos_config/rm_littlefs_flash_config.h",
     "src/smc_gen/r_config/r_bsp_config.h",
     "src/sdio_host.c",
@@ -1318,31 +1318,13 @@ def _rsu_image_gate(
         errors.append("header reserved tailが0xFFではない")
 
     descriptor = image[FWUP_HEADER_SIZE:FWUP_APPLICATION_OFFSET]
-    segment_count, segment_start, segment_size = struct.unpack_from(
-        "<III", descriptor, 0
-    )
-    if segment_count != 1:
-        errors.append(f"descriptor segments={segment_count} (expected=1)")
-    if segment_start != FWUP_APPLICATION_START:
-        errors.append(
-            f"segment start=0x{segment_start:08X} "
-            f"(expected=0x{FWUP_APPLICATION_START:08X})"
-        )
-    if segment_size != FWUP_APPLICATION_SIZE:
-        errors.append(
-            f"segment size={segment_size} (expected={FWUP_APPLICATION_SIZE})"
-        )
-    if descriptor[12:] != b"\xFF" * (FWUP_DESCRIPTOR_SIZE - 12):
-        errors.append("descriptorの未使用領域が0xFFではない")
-    segment_end = segment_start + segment_size
-    if (
-        segment_start < FWUP_AREA_START + FWUP_APPLICATION_OFFSET
-        or segment_end > FWUP_AREA_START + FWUP_AREA_SIZE
-    ):
-        errors.append(
-            f"segmentが768 KiB install area外: "
-            f"0x{segment_start:08X}-0x{segment_end - 1:08X}"
-        )
+    sequence, app_start, app_end, reset_address, hardware_id = struct.unpack_from("<IIIII", descriptor)
+    if (sequence != 1 or app_start != FWUP_APPLICATION_START or
+            app_end != FWUP_AREA_START + FWUP_AREA_SIZE - 1 or
+            reset_address != app_end - 3 or hardware_id != 9):
+        errors.append("legacy descriptor sequence/start/end/reset/hardware ID不一致")
+    if descriptor[20:] != b"\x00" * (FWUP_DESCRIPTOR_SIZE - 20):
+        errors.append("legacy descriptorの未使用領域がzeroではない")
 
     marker = OTA_VERSION_MARKER_PREFIX + expected_version.encode("ascii") + b"\x00"
     marker_prefix_count = image.count(OTA_VERSION_MARKER_PREFIX)
@@ -1421,8 +1403,8 @@ def _rsu_image_gate(
     return Gate(
         "rsu_image",
         "PASS",
-        f"size={len(image)}; segment=0x{segment_start:08X}-"
-        f"0x{segment_end - 1:08X}; Data Flashなし; version={expected_version}; "
+        f"size={len(image)}; legacy application=0x{app_start:08X}-"
+        f"0x{app_end:08X}; Data Flashなし; version={expected_version}; "
         "descriptor+payload ECDSA P-256署名とprovenance一致",
     )
 
@@ -1437,7 +1419,7 @@ def analyze(
     gates: list[Gate] = []
     repo_root = project_dir.parents[2]
     cproject = project_dir / ".cproject"
-    fwup_config = project_dir / "src/frtos_config/r_fwup_config.h"
+    fwup_config = project_dir / "src/frtos_config/rx_ota_config.h"
     littlefs_config = project_dir / "src/frtos_config/rm_littlefs_flash_config.h"
     bsp_config = project_dir / "src/smc_gen/r_config/r_bsp_config.h"
     mcu_info = project_dir / "src/smc_gen/r_bsp/mcu/rx671/mcu_info.h"
@@ -1548,9 +1530,9 @@ def analyze(
     data_flash_size = _memory_size_for_selected_part(
         bsp_text, mcu_info_text, "BSP_DATA_FLASH_SIZE_BYTES"
     )
-    df_start = _macro(fwup_text, "FWUP_CFG_DF_ADDR_L")
-    df_block_size = _macro(fwup_text, "FWUP_CFG_DF_BLK_SIZE")
-    df_block_count = _macro(fwup_text, "FWUP_CFG_DF_NUM_BLKS")
+    df_start = _macro(fwup_text, "RX_OTA_CFG_DF_ADDR_L")
+    df_block_size = _macro(fwup_text, "RX_OTA_CFG_DF_BLK_SIZE")
+    df_block_count = _macro(fwup_text, "RX_OTA_CFG_DF_NUM_BLKS")
     df_base_match = re.search(
         r"\bFLASH_DF_BLOCK_0\s*=\s*(0[xX][0-9A-Fa-f]+)", flash_target_text
     )
@@ -1627,9 +1609,9 @@ def analyze(
         )
     )
 
-    main_start = _macro(fwup_text, "FWUP_CFG_MAIN_AREA_ADDR_L")
-    buffer_start = _macro(fwup_text, "FWUP_CFG_BUF_AREA_ADDR_L")
-    area_size = _macro(fwup_text, "FWUP_CFG_AREA_SIZE")
+    main_start = _macro(fwup_text, "RX_OTA_CFG_MAIN_AREA_ADDR_L")
+    buffer_start = _macro(fwup_text, "RX_OTA_CFG_BUF_AREA_ADDR_L")
+    area_size = _macro(fwup_text, "RX_OTA_CFG_AREA_SIZE")
     if None in (main_start, buffer_start, area_size):
         gates.append(Gate("fwup_partition", "UNKNOWN", "FWUP領域macroをすべて解析できません"))
         return gates
@@ -1869,7 +1851,7 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="map/MOT/provenanceの配置先。省略時は.cprojectのbuildPathを使用",
     )
-    parser.add_argument("--rsu", type=Path, help="検証するRX671 FWUP v2 RSU")
+    parser.add_argument("--rsu", type=Path, help="検証するRX671 legacy contiguous RSU")
     parser.add_argument(
         "--signer-certificate",
         type=Path,

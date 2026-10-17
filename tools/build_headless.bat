@@ -20,10 +20,10 @@ set "REPO_ROOT=%~1"
 if "%REPO_ROOT%"=="" set "REPO_ROOT=%~dp0.."
 
 set "E2STUDIO_CLI=%~2"
-if "%E2STUDIO_CLI%"=="" set "E2STUDIO_CLI=C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe"
+if "%E2STUDIO_CLI%"=="" set "E2STUDIO_CLI=C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe"
 
 set "WORKSPACE=%~3"
-if "%WORKSPACE%"=="" set "WORKSPACE=C:\iotref-rx72n-ws"
+if "%WORKSPACE%"=="" set "WORKSPACE=C:\ai\codex\ws\iotref-rx72n"
 set "BUILD_SCRIPT=%~dp0build_headless_rx72n.ps1"
 set "LOG_FILE=%REPO_ROOT%\rx72n_e2studio_build.log"
 

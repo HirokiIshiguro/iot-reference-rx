@@ -310,7 +310,10 @@ class IdtCiContractTests(unittest.TestCase):
                             ("test_rx65n_bg96_idt", "rx65n-bg96"),
                             ("test_rx671_wifi_idt", "rx671-wifi")):
             block = self.blocks[job]
-            self.assertIn('extends: .rx_idt_job', block)
+            self.assertRegex(
+                block,
+                r"(?m)^  extends:(?: \.rx_idt_job$|\n(?:    - [^\n]+\n)*    - \.rx_idt_job$)",
+            )
             rules = re.findall(r"- if: '([^']+)'", block)
             self.assertIn('$RUN_RX_IDT == "true"', rules[0])
             self.assertIn('$IDT_TARGET == "' + target + '"', rules[0])
@@ -343,7 +346,7 @@ class IdtCiContractTests(unittest.TestCase):
         guard = conditions[1]
         expected = (
             '$CI_PIPELINE_SOURCE == "merge_request_event" && '
-            '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-idt-/'
+            '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-(idt-|common-core-)/'
         )
         self.assertEqual(OPT_IN, conditions[0])
         self.assertEqual(expected, guard)
@@ -358,17 +361,22 @@ class IdtCiContractTests(unittest.TestCase):
         # Evaluate the real rule's equality clauses across event/draft/branch cases.
         clauses = re.findall(r'\$([A-Z_]+) == "([^"]+)"', guard)
         self.assertEqual(1, len(clauses))
+        branch_pattern = guard.split(' =~ /', 1)[1][:-1].replace('\\/', '/')
         def selected(event, draft, branch):
             variables = {"CI_PIPELINE_SOURCE": event, "CI_MERGE_REQUEST_DRAFT": draft,
                          "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME": branch}
             return all(variables[name] == value for name, value in clauses) and bool(
-                re.match(r"^((codex|claude)/)?[0-9]+-idt-", branch))
+                re.match(branch_pattern, branch))
         self.assertTrue(selected("merge_request_event", "true", "codex/161-idt-rx671-rx65n-ci"))
         self.assertTrue(selected("merge_request_event", "false", "codex/161-idt-rx671-rx65n-ci"))
+        self.assertTrue(selected("merge_request_event", "true", "codex/170-common-core-convergence"))
+        self.assertTrue(selected("merge_request_event", "false", "codex/170-common-core-convergence"))
         for event, draft, branch in (
             ("merge_request_event", "true", "another-idt-target-validation"),
             ("web", "true", "codex/161-idt-rx671-rx65n-ci"), ("api", "true", "codex/161-idt-rx671-rx65n-ci"),
             ("push", "true", "codex/161-idt-rx671-rx65n-ci"), ("parent_pipeline", "true", "codex/161-idt-rx671-rx65n-ci"),
+            ("push", "true", "codex/170-common-core-convergence"),
+            ("web", "true", "codex/170-common-core-convergence"),
         ):
             with self.subTest(event=event, draft=draft, branch=branch):
                 self.assertFalse(selected(event, draft, branch))
@@ -404,7 +412,9 @@ class IdtCiContractTests(unittest.TestCase):
         job = self.blocks["idt_ci_contract"]
         for setting in (
             'CI_PIPELINE_SOURCE == "merge_request_event"',
-            'GIT_SUBMODULE_STRATEGY: "none"', "- .gitlab-ci.yml",
+            "stage: dependency_check", "- os-linux",
+            "GIT_SUBMODULE_STRATEGY: normal", 'GIT_SUBMODULE_DEPTH: "1"',
+            "- .gitlab-ci.yml",
             "- tools/idt/**/*", "- tools/ci/tests/test_idt_report.py",
             'python3 -m venv "$idt_ci_venv"',
             '"$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-ci.txt',
@@ -414,8 +424,37 @@ class IdtCiContractTests(unittest.TestCase):
             "tools.ci.tests.test_idt_stop",
             "tools.ci.tests.test_idt_ota_witness", "tools.ci.tests.test_idt_selection",
             "tools.idt.ota_aws_signers_tests", "tools.idt.ota_support_tests",
+            "tools.ci.tests.test_idt_unit_dependencies",
         ):
             self.assertIn(setting, job)
+        paths = re.search(r"(?m)^    GIT_SUBMODULE_PATHS: >-\n((?:      [^\n]+\n)+)", job)
+        self.assertIsNotNone(paths)
+        selected = paths.group(1).split()
+        required = {
+            "Middleware/FreeRTOS/FreeRTOS-Kernel",
+            "Middleware/FreeRTOS-Plus-CLI",
+            "Test/Unity", "Test/FreeRTOS-Libraries-Integration-Tests",
+            "Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader",
+            "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader",
+            "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/lib/rx_bootloader",
+        }
+        self.assertEqual(required, set(selected))
+        self.assertEqual(len(required), len(selected))
+        for forbidden in (
+            "GIT_SUBMODULE_STRATEGY: recursive", "--recursive", "--remote",
+            "extends: .aws_cli_windows_job",
+            'RUN_RX_IDT: "true"', 'RUN_RX72N_IDT: "true"',
+            'SKIP_HW_TESTS: "false"',
+        ):
+            self.assertFalse(forbidden in job, "Source-only job contains " + forbidden)
+        script = job.split("  script:\n", 1)[1]
+        # changes filters may mention builders; the executable script may not run them.
+        for forbidden in (
+            "git submodule update", "git clone", "Initialize-RxBuildDependencies",
+            "build_headless_", "tools/idt/run_idt.py", "tools/idt/run_transport.py",
+            "rfp-cli ", "aws.exe ",
+        ):
+            self.assertFalse(forbidden in script, "Source-only script contains " + forbidden)
         self.assertNotIn("--user", job)
 
     def test_explicit_idt_checks_host_before_run_and_logs_no_aws_identity(self):
@@ -433,7 +472,8 @@ class IdtCiContractTests(unittest.TestCase):
         binding = "$idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }"
         self.assertLess(job.index(binding), job.index("tools/idt/check_host.py"))
         self.assertIn("$env:IDT_TARGET = $idtTarget", job)
-        self.assertEqual(2, job.count('--target "$idtTarget"'))
+        self.assertEqual(3, job.count('--target "$idtTarget"'))
+        self.assertIn('tools/idt/prepare_public_signer.py --source "$env:CI_PROJECT_DIR" --target "$idtTarget"', job)
 
 
 if __name__ == "__main__":

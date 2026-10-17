@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 /* C runtime includes. */
+#include "public_signer_provisioner.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -210,6 +211,12 @@ static BaseType_t xDisplayInitialized = pdFALSE;
  *********************************************************************************************************************/
 void main_task(void *pvParameters)
 {
+    (void)xTraceEnable(TRC_START);
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+    (void)pvParameters;
+    vRunPublicSignerProvisioner(NULL);
+#else
+
     int32_t xResults;
     int32_t xCacheInitResult = LFS_ERR_OK;
     int32_t Time2Wait = 10000;
@@ -397,6 +404,7 @@ void main_task(void *pvParameters)
     {
         vTaskSuspend(NULL);
     }
+#endif /* PUBLIC_SIGNER_PROVISIONER_ENABLE */
 }
 /*****************************************************************************************
 End of function main_task
@@ -833,14 +841,7 @@ BaseType_t vAssignCredentials(void)
         return pdFALSE;
     }
 
-    /* Write code signing certificate */
-    pValue = otapalconfigCODE_SIGNING_CERTIFICATE;
-    xStoreResult = xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pValue), pValue);
-    if( xStoreResult < 0 )
-    {
-        return pdFALSE;
-    }
-
+    /* Signing trust is provisioned separately by the public maintenance flow. */
     /* Write root CA */
     pValue = democonfigROOT_CA_PEM;
     xStoreResult = xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pValue), pValue);

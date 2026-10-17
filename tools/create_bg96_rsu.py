@@ -8,6 +8,11 @@ from pathlib import Path
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
+try:
+    from .build_rx671_fwup_v2_rsu import legacy_descriptor
+except ImportError:
+    from build_rx671_fwup_v2_rsu import legacy_descriptor
+
 
 BASE_ADDRESS = 0xFFF00000
 IMAGE_SIZE = 24 * 32768
@@ -33,7 +38,7 @@ def parse_args():
         default="bootloader-rsu",
         help=(
             "bootloader-rsu writes the full contiguous image expected by the UART bootloader. "
-            "rtos-ota-payload writes descriptor + image data for AWS IoT OTA PAL."
+            "rtos-ota-payload omits only the 0x200-byte header for AWS IoT OTA PAL."
         ),
     )
     return parser.parse_args()
@@ -103,11 +108,8 @@ def main():
     struct.pack_into("<I", image, 0x12C, 0)
     struct.pack_into("<I", image, 0x130, 0xFFFFFFFF)
     struct.pack_into("<I", image, 0x134, 0xFFFFFFFF)
-    struct.pack_into("<I", image, 0x200, args.sequence)
-    struct.pack_into("<I", image, 0x204, USER_START)
-    struct.pack_into("<I", image, 0x208, USER_END)
-    struct.pack_into("<I", image, 0x20C, USER_EXECUTION)
-    struct.pack_into("<I", image, 0x210, HARDWARE_ID)
+    image[HEADER_SIZE:USER_START - BASE_ADDRESS] = legacy_descriptor(
+        USER_START, USER_END, args.sequence, HARDWARE_ID)
 
     payload = bytes(image[HEADER_SIZE:])
     _, raw_sig = sign_payload(payload, args.key)
@@ -117,13 +119,7 @@ def main():
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if args.format == "rtos-ota-payload":
-        rtos_descriptor = bytearray()
-        rtos_descriptor += struct.pack("<I", 1)
-        rtos_descriptor += struct.pack("<I", USER_START)
-        rtos_descriptor += struct.pack("<I", USER_END - USER_START + 1)
-        rtos_descriptor += b"\xff" * 240
-        rtos_descriptor += struct.pack("<I", 1)
-        output = bytes(rtos_descriptor) + bytes(image[USER_START - BASE_ADDRESS:])
+        output = payload
         output_der_sig, output_raw_sig = sign_payload(output, args.key)
     else:
         output = bytes(image)

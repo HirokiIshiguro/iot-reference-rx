@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import unittest
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def job_block(ci: str, name: str, next_name: str) -> str:
-    return ci.split(f"{name}:\n", maxsplit=1)[1].split(
-        f"\n{next_name}:\n", maxsplit=1
-    )[0]
+def job_block(ci: str, name: str, next_name: str | None = None) -> str:
+    match = re.search(r"(?m)^" + re.escape(name) + r":\n", ci)
+    if match is None:
+        raise AssertionError("Missing CI job: " + name)
+    following = re.search(r"(?m)^[A-Za-z0-9_.-]+:[ \t]*\n", ci[match.end():])
+    end = match.end() + following.start() if following else len(ci)
+    return ci[match.start():end]
 
 
 class Rx72nHardwareTransactionContractTests(unittest.TestCase):
@@ -31,9 +35,9 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
             '"/tmp/e2lite-rfp-cli.lock.d/rx72n-device-01.lock"',
             self.ci,
         )
-        self.assertIn('exec 9>>"${RX72N_RPI1_HARDWARE_LOCK_PATH}"', template)
+        self.assertIn('exec 9>>"${RX72N_HARDWARE_LOCK_PATH}"', template)
         self.assertIn(
-            'flock -w "${RX72N_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
+            'flock -w "${RX72N_HARDWARE_LOCK_TIMEOUT_SECONDS}" 9',
             template,
         )
         self.assertGreater(
@@ -99,8 +103,7 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         self.assertNotIn("- provision_rx72n_ether_mqtt", job)
 
         ordered_tokens = (
-            "-erase-chip",
-            "tools/test_uart_download_rx72n.py",
+            "tools/install_normal_boot.py",
             "tools/provision_rx72n.py",
             "tools/test_mqtt_rx72n.py",
         )
@@ -121,8 +124,7 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         self.assertIn("--no-reset-after", job)
 
         ordered_tokens = (
-            "-erase-chip",
-            "tools/test_uart_download_rx72n.py",
+            "tools/install_normal_boot.py",
             "tools/provision_rx72n.py",
             "tools/provision_tsip_over_uart.py",
             "tools/test_ota.py",
@@ -164,15 +166,37 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
             cleanup.index("tools/manage_ephemeral_iot_thing.py cleanup"),
         )
 
-    def test_legacy_split_jobs_are_limited_to_0rtt(self) -> None:
-        flash = job_block(self.ci, "flash_rx72n_ether", "flash_rx65n_bg96")
-        provision = job_block(
-            self.ci, "provision_rx72n_ether_mqtt", "provision_rx72n_ether_fleet"
-        )
+    def test_legacy_split_jobs_are_removed(self) -> None:
+        for name in ("flash_rx72n_ether", "provision_rx72n_ether_mqtt"):
+            self.assertIsNone(re.search(r"(?m)^" + name + r":\n", self.ci))
 
-        for job in (flash, provision):
-            self.assertIn('RX72N_TEST_SCOPE == "tls13_0rtt"', job)
-            self.assertNotIn("/^(mqtt|ota|full|tls13_0rtt)$/", job)
+    def test_fleet_owns_signed_installation_provisioning_and_observation(self) -> None:
+        job = job_block(self.ci, "test_rx72n_ether_fleet")
+        positions = [job.index(token) for token in ("tools/install_normal_boot.py", "tools/provision_rx72n.py", "tools/test_fleet_rx72n.py")]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("package_normal_boot_rx72n_fleet", job)
+        self.assertNotIn("--format", job)
+        self.assertNotIn("-erase-chip", job)
+
+    def test_tls_test_owns_signed_installation_and_provisioning(self) -> None:
+        job = job_block(self.ci, "test_rx72n_ether_tls13_0rtt")
+        self.assertIn("- package_normal_boot_rx72n", job)
+        positions = [job.index(token) for token in ("tools/install_normal_boot.py", "tools/provision_rx72n.py", "tools/provision_tsip_over_uart.py", "tools/test_lanbench_tls13_0rtt_rx72n.py")]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn("- flash_rx72n_ether\n", job)
+        self.assertNotIn("- provision_rx72n_ether_mqtt\n", job)
+        self.assertIn('timeout "${LANBENCH_MBEDTLS_0RTT_TIMEOUT_SECONDS:-480}" \\\n      python3 -u tools/test_lanbench_tls13_0rtt_rx72n.py', job)
+
+
+    def test_tls_provision_failures_stop_before_observation(self) -> None:
+        job = job_block(self.ci, "test_rx72n_ether_tls13_0rtt")
+        self.assertNotIn("--format", job)
+        self.assertEqual(job.count("serial.tools.list_ports"), 1)
+        for filename, following in (("provision_rx72n.log", 'if [ "${RX72N_TLS_BACKEND}"'),
+                                    ("provision_tsip.log", "Atomic step 3/3")):
+            completion = job.split(filename + '"', 1)[1].split(following, 1)[0]
+            self.assertIn('status="${PIPESTATUS[0]}"', completion)
+            self.assertIn('if [ "$status" -ne 0 ]; then exit "$status"; fi', completion)
 
 
 if __name__ == "__main__":

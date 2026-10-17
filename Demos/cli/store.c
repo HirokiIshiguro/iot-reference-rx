@@ -30,6 +30,10 @@
 
 #include "aws_dev_mode_key_provisioning.h"
 #include "core_pkcs11_pal.h"
+#if CELLULAR_APN_KVS_ENABLE == 1
+#include "cellular_config.h"
+#include "cellular_config_defaults.h"
+#endif
 
 const char * keys[ KVS_NUM_KEYS ] = KVSTORE_KEYS;
 KeyValueStore_t gKeyValueStore = { 0 };
@@ -38,6 +42,24 @@ extern CK_RV vDevModeKeyPreProvisioning( const KeyValueStore_t * pKeystore,
                                          KVStoreKey_t ID,
                                          int32_t xvaluelength );
 BaseType_t xPending;
+
+#if CELLULAR_APN_KVS_ENABLE == 1
+static BaseType_t prvCellularValueValid( KVStoreKey_t key, const char * value, size_t length )
+{
+    size_t textLength = length;
+    size_t limit;
+    if( ( value == NULL ) || ( length == 0U ) ) { return pdFALSE; }
+    if( value[length - 1U] == '\0' ) { textLength--; }
+    if( memchr( value, '\0', textLength ) != NULL ) { return pdFALSE; }
+    if( key == KVS_CELLULAR_AP_AUTH_TYPE )
+    {
+        return ( textLength == 1U && value[0] >= '0' && value[0] <= '2' ) ? pdTRUE : pdFALSE;
+    }
+    limit = ( key == KVS_CELLULAR_AP_NAME ) ? CELLULAR_APN_MAX_SIZE :
+            ( key == KVS_CELLULAR_AP_USERID ) ? CELLULAR_PDN_USERNAME_MAX_SIZE : CELLULAR_PDN_PASSWORD_MAX_SIZE;
+    return ( textLength <= limit && ( key != KVS_CELLULAR_AP_NAME || textLength > 0U ) ) ? pdTRUE : pdFALSE;
+}
+#endif
 
 #if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 static inline void vClearDataBuffer( KVStoreKey_t key );
@@ -65,25 +87,25 @@ BaseType_t xprvWriteValueToImpl (KVStoreKey_t keyIndex, char *pucData, uint32_t 
 	lfs_file_t file;
 	lfs_ssize_t lfs_err;
 
-	lfs_err = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, (char *) keys[ keyIndex ]);
+	lfs_err = LfsCommon_Remove(LfsCommon_GetLfs(), (char *) keys[ keyIndex ]);
 
 	if ((LFS_ERR_NOENT != lfs_err) && (LFS_ERR_OK != lfs_err))
 	{
 		return -1;
 	}
 
-	lfs_err = lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS, &file, (char *) keys[ keyIndex ], LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
+	lfs_err = LfsCommon_FileOpen(LfsCommon_GetLfs(), &file, (char *) keys[ keyIndex ], LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
 
 	if (LFS_ERR_OK != lfs_err)
 	{
 		return -1;
 	}
 
-	lfs_err = lfs_file_write(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pucData, ulDataSize);
+	lfs_err = LfsCommon_FileWrite(LfsCommon_GetLfs(), &file, pucData, ulDataSize);
 	pvwrite +=ulDataSize;
 	vLfsSSizeToErr( &lfs_err, (lfs_ssize_t)ulDataSize );
 
-	lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+	LfsCommon_FileClose(LfsCommon_GetLfs(), &file);
 	return( lfs_err == LFS_ERR_OK );
 }
 
@@ -101,18 +123,18 @@ int32_t xprvReadValueFromImpl (KVStoreKey_t keyIndex,
 
 	lfs_file_t file;
 	lfs_ssize_t lfs_ret =
-		lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS,
+		LfsCommon_FileOpen(LfsCommon_GetLfs(),
 					  &file,
 					  (char *) keys[ keyIndex ],
 					  LFS_O_RDONLY);
 
-	lfs_ret = lfs_file_size(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+	lfs_ret = LfsCommon_FileSize(LfsCommon_GetLfs(), &file);
 
 	*ppucData = pvPortMalloc((size_t) lfs_ret);
 
 	if ((lfs_ret >= 0) && (NULL != *ppucData))
 	{
-		lfs_ret = lfs_file_read(&RM_STDIO_LITTLEFS_CFG_LFS, &file, *ppucData, (lfs_size_t) lfs_ret);
+		lfs_ret = LfsCommon_FileRead(LfsCommon_GetLfs(), &file, *ppucData, (lfs_size_t) lfs_ret);
 
 		if (lfs_ret >= 0)
 		{
@@ -123,7 +145,7 @@ int32_t xprvReadValueFromImpl (KVStoreKey_t keyIndex,
 	}
 	if( lfs_ret == LFS_ERR_OK )
 	{
-		lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+		LfsCommon_FileClose(LfsCommon_GetLfs(), &file);
 	}
 
 
@@ -140,7 +162,7 @@ int32_t xprvGetValueLengthFromImpl( KVStoreKey_t keyIndex)
 	size_t xLength = 0;
 	struct lfs_info xFileInfo = { 0 };
 
-	if( lfs_stat( &RM_STDIO_LITTLEFS_CFG_LFS, (char *) keys[ keyIndex ], &xFileInfo ) == LFS_ERR_OK )
+	if( LfsCommon_Stat( LfsCommon_GetLfs(), (char *) keys[ keyIndex ], &xFileInfo ) == LFS_ERR_OK )
 	{
 		xLength =  xFileInfo.size;
 	}
@@ -159,7 +181,7 @@ int32_t GetTotalLengthFromImpl()
     struct lfs_info xFileInfo = { 0 };
     for (uint32_t i = 0; i < KVS_NUM_KEYS; i++)
     {
-        if (lfs_stat (&RM_STDIO_LITTLEFS_CFG_LFS, (char*) keys[i], &xFileInfo) == LFS_ERR_OK)
+        if (LfsCommon_Stat (LfsCommon_GetLfs(), (char*) keys[i], &xFileInfo) == LFS_ERR_OK)
         {
             xLength += xFileInfo.size;
         }
@@ -188,6 +210,14 @@ int32_t xprvWriteCacheEntry(size_t KeyLength,
 	{
 		return xKey;
 	}
+
+#if CELLULAR_APN_KVS_ENABLE == 1
+    if( xKey >= KVS_CELLULAR_AP_NAME && xKey <= KVS_CELLULAR_AP_AUTH_TYPE &&
+        prvCellularValueValid( xKey, pvNewValue, ValueLength ) != pdTRUE )
+    {
+        return KVS_INVALID_KEY;
+    }
+#endif
 
 #if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 	if (((KVS_WIFI_SSID == xKey) && ((0U == ValueLength) || (32U < ValueLength))) ||
@@ -340,7 +370,7 @@ static inline void vReallocDataBuffer( KVStoreKey_t key,
 
 int32_t Filename2Handle( char * pcFileName,size_t KeyLength)
 {
-#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 0
+#if (RX671_WIFI_CREDENTIAL_KVS_ENABLE == 0) && (CELLULAR_APN_KVS_ENABLE == 0)
 	(void) KeyLength; /* String comparison to use the length of KVStore key */
 #endif
 	int32_t xHandle = -1;
@@ -349,7 +379,7 @@ int32_t Filename2Handle( char * pcFileName,size_t KeyLength)
     {
         for (uint32_t i = 0; i < KVS_NUM_KEYS; i++)
         {
-#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
+#if (RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1) || (CELLULAR_APN_KVS_ENABLE == 1)
             if ((KeyLength == strlen(CLIcmdkeys[i])) &&
                 (strncmp( pcFileName, CLIcmdkeys[i], KeyLength ) == 0))
 #else

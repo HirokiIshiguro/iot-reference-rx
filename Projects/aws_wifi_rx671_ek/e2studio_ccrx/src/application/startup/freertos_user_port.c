@@ -258,6 +258,8 @@ void Processing_Before_Start_Kernel(void)
 {
     BaseType_t ret;
 
+    (void)xTraceInitialize();
+
     /************** semaphore creation ***********************/
 
 
@@ -279,7 +281,7 @@ void Processing_Before_Start_Kernel(void)
     Kernel_Object_init();
 
     /************** task creation ****************************/
-    (void)xTraceInitialize();
+
 
     /* Main task. */
     ret = xTaskCreate(main_task, "MAIN_TASK", 1024, NULL, 3, NULL);

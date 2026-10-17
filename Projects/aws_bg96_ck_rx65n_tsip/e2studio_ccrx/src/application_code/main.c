@@ -25,8 +25,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 /* FreeRTOS includes. */
+#include "public_signer_provisioner.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "event_groups.h"
+
+EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 /* Logging includes. */
 #include "iot_logging_task.h"
@@ -36,7 +40,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Demo includes */
 #include "aws_clientcredential.h"
-#include "r_cellular_if.h"
+#include "bg96_network.h"
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
@@ -45,7 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     #include "tsip_provisioning_cli.h"
 #endif
 
-st_cellular_ctrl_t cellular_ctrl;
+
 extern bool Connect2AP( void );
 
 bool ApplicationCounter (uint32_t xWaitTime);
@@ -146,6 +150,11 @@ extern void vRegisterSampleCLICommands (void);
  *********************************************************************************************************************/
 void main_task(void)
 {
+    (void)xTraceEnable(TRC_START);
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+    vRunPublicSignerProvisioner(NULL);
+#else
+
     int32_t xResults;
     int32_t Time2Wait = 10000;
     extern void vRegisterSampleCLICommands (void);
@@ -237,6 +246,7 @@ void main_task(void)
     {
         vTaskSuspend(NULL);
     }
+#endif /* PUBLIC_SIGNER_PROVISIONER_ENABLE */
 }
 /*****************************************************************************************
 End of function main_task
@@ -252,6 +262,9 @@ void prvMiscInitialization(void)
 {
     /* Initialize UART for serial terminal. */
     CLI_Support_Settings();
+
+    xStartDemoEventGroup = xEventGroupCreate();
+    configASSERT( xStartDemoEventGroup != NULL );
 
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     vTsipMbedtlsThreadingCompatInit();
@@ -568,10 +581,7 @@ void vAssignCredentials(void)
     xprvWriteCacheEntry(strlen("key"), "key", strlen(pValue), pValue);
 #endif
 
-    /* Write code signing certificate */
-    pValue = otapalconfigCODE_SIGNING_CERTIFICATE;
-    xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pValue), pValue);
-
+    /* Signing trust is provisioned separately by the public maintenance flow. */
     /* Write root CA */
     pValue = democonfigROOT_CA_PEM;
     xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pValue), pValue);

@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studio-cli.exe",
-    [string]$Workspace = "C:\iotref-rx65n-bg96-ws",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
+    [string]$Workspace = "C:\ai\codex\ws\iotref-rx65n-bg96-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx65n_bg96_e2studio_build.log"),
     [int]$E2StudioTimeoutSeconds = 1800,
     [string]$Make = $env:RX65N_BG96_MAKE,
@@ -17,9 +17,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "rx_e2studio_cli.ps1")
 Set-StrictMode -Version Latest
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
+Initialize-RxBuildDependencies -ProjectRoot $projectRoot
+Assert-RxCommonKernel -ProjectRoot $projectRoot
 $workspace = $Workspace
 $logFile = [System.IO.Path]::GetFullPath($LogFile)
 $normalizedTlsBackend = $TlsBackend.ToLowerInvariant()
@@ -35,8 +38,7 @@ $useSoftwareTls13ZeroRttConfig = $useTls13ZeroRttConfig -and ($normalizedTlsBack
 $useTsipTls13ZeroRttConfig = $useTls13ZeroRttConfig -and ($normalizedTlsBackend -eq "tsip")
 $bootProject = Join-Path $projectRoot "Projects\boot_loader_ck_rx65n\e2studio_ccrx"
 $appProject = Join-Path $projectRoot "Projects\$appProjectName\e2studio_ccrx"
-$lanbenchTls13ZeroRttConfigHeader = Join-Path $appProject "Demos\include\lanbench_tls13_0rtt_config.h"
-$patchBackup = Join-Path $projectRoot "artifacts\rx65n_bg96_aws_dev_mode_key_provisioning.c.orig"
+$lanbenchTls13ZeroRttConfigHeader = Join-Path $projectRoot "Demos\include\lanbench_tls13_0rtt_config.h"
 
 foreach ($projectDir in @($bootProject, $appProject)) {
     if (-not (Test-Path (Join-Path $projectDir ".project"))) {
@@ -410,19 +412,6 @@ function Invoke-MakeBuild {
     Invoke-Tool -FilePath $makeExe -Arguments @("PATH=$env:Path", "-j2", $Target) -WorkingDirectory $BuildDir
 }
 
-function Resolve-E2StudioHeadless {
-    if (-not $E2Studio -or -not (Test-Path -LiteralPath $E2Studio)) {
-        throw "e2 studio executable not found: $E2Studio"
-    }
-
-    $resolved = (Resolve-Path -LiteralPath $E2Studio).Path
-    $baseDir = Split-Path -Parent $resolved
-    $console = Join-Path $baseDir "e2studioc.exe"
-    if (Test-Path -LiteralPath $console) {
-        return (Resolve-Path -LiteralPath $console).Path
-    }
-    return $resolved
-}
 
 function Get-MissingManagedBuildFiles {
     $missing = @()
@@ -439,76 +428,29 @@ function Clear-GeneratedBuildFiles {
     foreach ($projectDir in @($bootProject, $appProject)) {
         $hardwareDebug = Join-Path $projectDir "HardwareDebug"
         if (Test-Path -LiteralPath $hardwareDebug) {
-            Remove-Item -Recurse -Force -LiteralPath $hardwareDebug
+            Remove-RxProjectBuildDirectory -ProjectPath $projectDir
             Write-Host "Cleared generated build files: $hardwareDebug"
         }
     }
 }
 
-function Reset-ManagedBuildFilesOnMbedTlsConfigDrift {
-    $expectedConfig = if ($useSoftwareTls13ZeroRttConfig) {
-        "aws_mbedtls_config_tls13_0rtt.h"
-    } elseif ($useTsipTls13ZeroRttConfig) {
-        "aws_mbedtls_config_with_tsip13_0rtt.h"
-    } elseif ($useTsipTls13Config) {
-        "aws_mbedtls_config_with_tsip13.h"
-    } elseif ($normalizedTlsBackend -eq "tsip") {
-        "aws_mbedtls_config_with_tsip.h"
-    } else {
-        "aws_mbedtls_config.h"
-    }
-    $hardwareDebug = Join-Path $appProject "HardwareDebug"
-    if (-not (Test-Path -LiteralPath $hardwareDebug)) {
-        return
-    }
-
-    $commandFiles = Get-ChildItem -Path $hardwareDebug -Recurse -Include "cSubCommand.tmp", "cDepSubCommand.tmp" -File -ErrorAction SilentlyContinue
-    if (-not $commandFiles) {
-        return
-    }
-
-    $configMatches = Select-String -Path $commandFiles.FullName -Pattern 'MBEDTLS_CONFIG_FILE=<"aws_mbedtls_config(_with_tsip13_0rtt|_with_tsip13|_with_tsip|_tls13_0rtt)?\.h">' -ErrorAction SilentlyContinue
-    if (-not $configMatches) {
-        return
-    }
-
-    $unexpected = $configMatches | Where-Object { $_.Line -notmatch [regex]::Escape($expectedConfig) } | Select-Object -First 1
-    if ($unexpected) {
-        Write-Host "Generated build files use a different mbed TLS config; regenerating. Expected: $expectedConfig"
-        Clear-GeneratedBuildFiles
-    }
-}
-
 function Invoke-E2StudioManagedBuild {
-    $headless = Resolve-E2StudioHeadless
-    if ($workspace -and (Test-Path -LiteralPath $workspace)) {
-        Remove-Item -Recurse -Force -LiteralPath $workspace
+    Remove-RxE2Workspace -Path $workspace
+    Write-Host "=== CK-RX65N BG96 e2studio-cli managed build file generation ==="
+    $exitCode = Invoke-RxE2StudioBuild -Executable $E2Studio -WorkspacePath $workspace `
+        -ProjectPaths @($bootProject, $appProject) `
+        -BuildTargets @('boot_loader_ck_rx65n/HardwareDebug', "$appProjectName/HardwareDebug") `
+        -OutputLog $logFile -TimeoutSeconds $E2StudioTimeoutSeconds
+    if ($exitCode -ne 0) {
+        throw "e2studio-cli returned $exitCode; refusing a subsequent make build."
     }
-
-    Write-Host "=== CK-RX65N BG96 e2 studio managed build file generation ==="
-    Invoke-Tool `
-        -FilePath $headless `
-        -Arguments @(
-            "--launcher.suppressErrors",
-            "-nosplash",
-            "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
-            "-data", $workspace,
-            "-import", $bootProject,
-            "-import", $appProject,
-            "-build", "all"
-        ) `
-        -WorkingDirectory $projectRoot `
-        -AllowNonZeroExit
 }
 
 function Ensure-ManagedBuildFiles {
-    $missing = Get-MissingManagedBuildFiles
-    if ($missing.Count -eq 0) {
-        return
-    }
-
-    Write-Host "Generated HardwareDebug makefiles are missing:"
-    $missing | ForEach-Object { Write-Host "  $_" }
+    # Generated make/response files are a cache of .project/.cproject. A file's
+    # existence cannot prove its source selection, include paths or flags match
+    # the current normal/Fleet/native profile. Regenerate from metadata each run.
+    Clear-GeneratedBuildFiles
     Invoke-E2StudioManagedBuild
 
     $missing = Get-MissingManagedBuildFiles
@@ -572,11 +514,10 @@ function Restore-ReviewedLinkerLayout {
         Set-Content -LiteralPath ($logFile + '.linker-layout.json') -Encoding UTF8
 }
 
-if (-not (Test-Path (Join-Path $appProject "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h"))) {
-    throw "CK-RX65N BG96 project middleware is incomplete."
+if (-not (Test-Path (Join-Path $projectRoot "Middleware\FreeRTOS\FreeRTOS-Kernel\include\FreeRTOS.h"))) {
+    throw "Root shared FreeRTOS submodules are not initialized."
 }
 
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $patchBackup) | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logFile) | Out-Null
 if (Test-Path $logFile) {
     Remove-Item -Force $logFile
@@ -598,15 +539,16 @@ if ($busyBoxBin) {
     Write-Host "Using e2 studio BusyBox tools: $busyBoxBin"
 }
 if ($workspace) {
-    Write-Host "Workspace parameter is unused for direct make builds: $workspace"
+    Write-Host "e2studio-cli workspace: $workspace"
 }
 
 $metadataSnapshots = Save-ProjectMetadata @($bootProject, $appProject)
 $reviewedLinkerLayouts = @{}
-if ($PreserveLinkerLayout) {
-    foreach ($projectDir in @($bootProject, $appProject)) {
-        $reviewedLinkerLayouts[$projectDir] = Get-ReviewedLinkerLayout $projectDir
-    }
+# Normal and native builds both use the registered dual-bank/RAM layout.
+# PreserveLinkerLayout remains accepted by older callers; the layout is always
+# captured and restored into generated linker commands.
+foreach ($projectDir in @($bootProject, $appProject)) {
+    $reviewedLinkerLayouts[$projectDir] = Get-ReviewedLinkerLayout $projectDir
 }
 $lanbenchConfigHeaderExisted = Test-Path -LiteralPath $lanbenchTls13ZeroRttConfigHeader
 $lanbenchConfigHeaderSnapshot = if ($lanbenchConfigHeaderExisted) {
@@ -614,32 +556,27 @@ $lanbenchConfigHeaderSnapshot = if ($lanbenchConfigHeaderExisted) {
 } else {
     $null
 }
-$patchApplied = $false
 
 try {
     if ($useSoftwareTls13ZeroRttConfig) {
         Enable-SoftwareTls13ZeroRttBuild
-        Clear-GeneratedBuildFiles
     }
     elseif ($useTsipTls13ZeroRttConfig) {
         Enable-TsipTls13ZeroRttBuild
-        Clear-GeneratedBuildFiles
     }
     elseif ($useTsipTls13Config) {
         Use-MbedTlsConfigFile -ProjectDir $appProject -ConfigFile "aws_mbedtls_config_with_tsip13.h"
     }
 
-    Reset-ManagedBuildFilesOnMbedTlsConfigDrift
     Ensure-ManagedBuildFiles
-    if ($PreserveLinkerLayout) { Restore-ReviewedLinkerLayout $reviewedLinkerLayouts }
+    Restore-ReviewedLinkerLayout $reviewedLinkerLayouts
     if ($PrepareBuildFilesOnly) {
         Write-Host "CK-RX65N BG96 generated build files are ready."
         return
     }
 
-    python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") patch --aws-root $appProject --backup $patchBackup
-    $patchApplied = $true
-
+    # This is the registered direct-make build after a successful CLI generation,
+    # not recovery from CLI failure. Shared adapter exceptions remain terminal.
     $bootBuildDir = Join-Path $bootProject "HardwareDebug"
     $appBuildDir = Join-Path $appProject "HardwareDebug"
     $normalizedBootMot = Join-Path $bootBuildDir "boot_loader_ck_rx65n.mot"
@@ -670,9 +607,6 @@ try {
     Write-Host "  app         .abs: $appAbs"
 }
 finally {
-    if ($patchApplied) {
-        python (Join-Path $projectRoot "tools\patch_bg96_aws_iot_mcu.py") restore --aws-root $appProject --backup $patchBackup
-    }
     Restore-ProjectMetadata $metadataSnapshots
     if ($lanbenchConfigHeaderExisted) {
         [System.IO.File]::WriteAllBytes($lanbenchTls13ZeroRttConfigHeader, $lanbenchConfigHeaderSnapshot)

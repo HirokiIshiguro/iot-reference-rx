@@ -163,7 +163,7 @@ Configuration Options
       settings and choosing the Standard Library section. After that choose 'Contents' in e2 studio.
       This will present a list of modules that can be included. Uncheck the box for stdio.h.
    NOTE: This setting is available only when using CCRX and GNUC. */
-#define BSP_CFG_HEAP_BYTES              (0x8000)
+#define BSP_CFG_HEAP_BYTES              (0x2000)
 
 /* Initializes C input & output library functions.
    0 = Disable I/O library initialization in resetprg.c. If you are not using stdio then use this value.
@@ -646,7 +646,7 @@ Configuration Options
          Default setting of the bank mode is linear mode.
          If the dual bank function has not been incorporated in a device, this macro should be 1.
 */
-#define BSP_CFG_CODE_FLASH_BANK_MODE    (1)
+#define BSP_CFG_CODE_FLASH_BANK_MODE    (0)
 
 /* Select the startup bank of the program when dual bank function is in dual mode.
    0 = The address range of bank 1 from FFE00000h to FFEFFFFFh and bank 0 from FFF00000h to FFFFFFFFh. (default)

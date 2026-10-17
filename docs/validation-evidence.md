@@ -20,6 +20,8 @@ AWS IoT CoreはSessionTicketを発行しないため、TLS 1.3 resumption / 0-RT
 
 ## TLS 1.3 resumption / 0-RTT
 
+以下は旧構成での実測結果です。共通化後はTSIP版Mbed TLS 3.2.1のsubmoduleを直接参照し、利用側で3.6.4のコピー・本体改造を行っていた0-RTT試験経路を停止しています。通常TLS 1.3の経路は保持します。
+
 | 環境 | Resumption | 0-RTT |
 |---|:-:|:-:|
 | RX72N / software | [✓](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6496) | [✓](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13/-/pipelines/6496) |

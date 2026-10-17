@@ -7,6 +7,7 @@
 	<buildSpec>
 		<buildCommand>
 			<name>com.renesas.smc.ui.pgsupport.SCContentBuilder</name>
+			<triggers/>
 			<arguments>
 			</arguments>
 		</buildCommand>
@@ -33,4 +34,62 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>src/tinycrypt_rx_port.c</name>
+			<type>1</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Common/ports/tinycrypt/tinycrypt_rx_port.c</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_bsp</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_bsp/r_bsp_vx.xx/r_bsp</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_sci_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_sci_rx/r_sci_rx_vx.xx/r_sci_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_byteq</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_byteq/r_byteq_vx.xx/r_byteq</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_flash_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_flash_rx/r_flash_rx_vx.xx/r_flash_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_cmt_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_cmt_rx/r_cmt_rx_vx.xx/r_cmt_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/rm_rtos_abstraction_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx_vx.xx/rm_rtos_abstraction_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/rm_littlefs_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_littlefs_rx/rm_littlefs_rx_vx.xx/rm_littlefs_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/tinycrypt</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/3rdparty/tinycrypt</locationURI>
+		</link>
+		<link>
+			<name>Vendor/littlefs</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/3rdparty/littlefs</locationURI>
+		</link>
+	</linkedResources>
+	<variableList>
+		<variable>
+			<name>AWS_IOT_MCU_ROOT</name>
+			<value>$%7BPARENT-3-PROJECT_LOC%7D</value>
+		</variable>
+	</variableList>
 </projectDescription>

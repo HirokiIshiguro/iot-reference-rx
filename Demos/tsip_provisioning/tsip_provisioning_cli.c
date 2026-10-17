@@ -14,7 +14,7 @@
 #include "FreeRTOS_CLI.h"
 #include "aws_clientcredential.h"
 #include "demo_config.h"
-#include "lfs.h"
+#include "lfs_common_data.h"
 #include "store.h"
 #include "tsip_provisioning_cli.h"
 #include "tsip_provisioning_store.h"
@@ -289,13 +289,7 @@ static BaseType_t prvRefreshAwsCredentialMetadata(void)
         }
     }
 
-    pcValue = (char *)otapalconfigCODE_SIGNING_CERTIFICATE;
-    lStoreResult = xprvWriteCacheEntry(strlen("codesigncert"), "codesigncert", strlen(pcValue), pcValue);
-    if (lStoreResult < 0)
-    {
-        return pdFALSE;
-    }
-
+    /* Signing trust is provisioned separately by the public maintenance flow. */
     pcValue = (char *)democonfigROOT_CA_PEM;
     lStoreResult = xprvWriteCacheEntry(strlen("rootca"), "rootca", strlen(pcValue), pcValue);
     if (lStoreResult < 0)
@@ -413,7 +407,7 @@ static BaseType_t prvWriteTempChunk(const uint8_t * pucData,
     lfs_file_t file;
     lfs_ssize_t result;
 
-    result = lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS,
+    result = LfsCommon_FileOpen(LfsCommon_GetLfs(),
                            &file,
                            TSIPPROV_TEMP_FILE_NAME,
                            LFS_O_WRONLY | LFS_O_APPEND | LFS_O_CREAT);
@@ -422,8 +416,8 @@ static BaseType_t prvWriteTempChunk(const uint8_t * pucData,
         return pdFALSE;
     }
 
-    result = lfs_file_write(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pucData, ulDataLength);
-    (void)lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+    result = LfsCommon_FileWrite(LfsCommon_GetLfs(), &file, pucData, ulDataLength);
+    (void)LfsCommon_FileClose(LfsCommon_GetLfs(), &file);
 
     return (result == (lfs_ssize_t)ulDataLength) ? pdTRUE : pdFALSE;
 }
@@ -432,7 +426,7 @@ static BaseType_t prvCommitTempFile(const char * pcStorageName)
 {
     prvEraseFileIfExists(pcStorageName);
 
-    return (LFS_ERR_OK == lfs_rename(&RM_STDIO_LITTLEFS_CFG_LFS,
+    return (LFS_ERR_OK == LfsCommon_Rename(LfsCommon_GetLfs(),
                                      TSIPPROV_TEMP_FILE_NAME,
                                      pcStorageName)) ? pdTRUE : pdFALSE;
 }
@@ -441,7 +435,7 @@ static uint32_t prvGetStoredLength(const char * pcStorageName)
 {
     struct lfs_info fileInfo;
 
-    if (LFS_ERR_OK == lfs_stat(&RM_STDIO_LITTLEFS_CFG_LFS, pcStorageName, &fileInfo))
+    if (LFS_ERR_OK == LfsCommon_Stat(LfsCommon_GetLfs(), pcStorageName, &fileInfo))
     {
         return fileInfo.size;
     }
@@ -453,7 +447,7 @@ static void prvEraseFileIfExists(const char * pcStorageName)
 {
     lfs_ssize_t result;
 
-    result = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, pcStorageName);
+    result = LfsCommon_Remove(LfsCommon_GetLfs(), pcStorageName);
     (void)result;
 }
 

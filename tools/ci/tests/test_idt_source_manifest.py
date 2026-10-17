@@ -104,8 +104,8 @@ class DependencyProvenanceTests(unittest.TestCase):
         dependency = self.source / 'Test/FreeRTOS-Libraries-Integration-Tests'
         runner = self.source / manifest.PKCS11_RUNNER_FILE
         runner.parent.mkdir(parents=True)
-        # Replay the exact native comment/line-ending transformation observed
-        # in job70883, while keeping a separate untouched function in the hash.
+        # Capture original group-runner bytes. All subsequent changes must fail,
+        # including a native selector comment or line-ending change.
         groups = ('Full_PKCS11_StartFinish', 'Full_PKCS11_NoObject',
                   'Full_PKCS11_RSA', 'Full_PKCS11_EC')
         body = 'int unchanged(void) { return 7; }\r\nvoid runner(void) {\r\n'
@@ -120,50 +120,26 @@ class DependencyProvenanceTests(unittest.TestCase):
         destination, provenance = self.snapshot()
         return destination / manifest.PKCS11_RUNNER_FILE, destination, provenance, groups
 
-    def test_native_pkcs11_selection_is_scope_bound_and_read_only(self):
+    def test_native_pkcs11_selector_edits_are_rejected_and_preserved(self):
         runner, destination, provenance, groups = self.pkcs11_snapshot()
         original = runner.read_bytes()
         for selected in ('Full_PKCS11_StartFinish', 'Full_PKCS11_NoObject'):
-            native = original.decode('ascii').replace('\r\n', '\n')
-            for group in groups:
-                if group != selected:
-                    native = native.replace('    RUN_TEST_GROUP( ' + group + ' );',
-                                            '\t\t//RUN_TEST_GROUP( ' + group + ' );')
+            native = original.decode('ascii').replace('    RUN_TEST_GROUP( ' + selected + ' );',
+                                                     '    //RUN_TEST_GROUP( ' + selected + ' );')
             runner.write_bytes(native.encode('ascii'))
-            with self.assertRaisesRegex(ValueError, 'differs from captured'):
-                manifest.verify_dependency_provenance(destination, self.target, provenance)
-            with self.assertRaisesRegex(ValueError, 'differs from captured'):
-                manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='Transport')
-            manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
+            for scope in (None, 'Transport', 'PKCS11'):
+                with self.assertRaisesRegex(ValueError, 'differs from captured'):
+                    manifest.verify_dependency_provenance(destination, self.target, provenance, test_group=scope)
             self.assertEqual(native.encode('ascii'), runner.read_bytes())
-            missing = dict(provenance)
-            missing.pop('dependency_pkcs11_runner_sha256')
-            with self.assertRaisesRegex(ValueError, 'differs from captured'):
-                manifest.verify_dependency_provenance(destination, self.target, missing, test_group='PKCS11')
-            runner.write_bytes(native.replace('return 7', 'return 8').encode('ascii'))
-            with self.assertRaisesRegex(ValueError, 'differs from captured'):
-                manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
 
-    def test_pkcs11_unknown_or_noncore_selection_is_rejected(self):
+    def test_pkcs11_line_ending_changes_are_rejected(self):
         runner, destination, provenance, groups = self.pkcs11_snapshot()
-        original = runner.read_bytes().decode('ascii').replace('\r\n', '\n')
-        native = original
-        for group in groups:
-            if group != 'Full_PKCS11_RSA':
-                native = native.replace('    RUN_TEST_GROUP( ' + group + ' );',
-                                        '\t\t//RUN_TEST_GROUP( ' + group + ' );')
-        runner.write_bytes(native.encode('ascii'))
+        runner.write_bytes(runner.read_bytes().replace(b'\r\n', b'\n'))
         with self.assertRaisesRegex(ValueError, 'differs from captured'):
             manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
 
-    def test_pkcs11_cli_json_records_effective_selection(self):
+    def test_pkcs11_cli_json_reports_only_exact_original_bytes(self):
         runner, destination, provenance, groups = self.pkcs11_snapshot()
-        native = runner.read_text(encoding='ascii')
-        for group in groups:
-            if group != 'Full_PKCS11_NoObject':
-                native = native.replace('    RUN_TEST_GROUP( ' + group + ' );',
-                                        '\t\t//RUN_TEST_GROUP( ' + group + ' );')
-        runner.write_bytes(native.encode('ascii'))
         path = self.root / 'provenance.json'
         path.write_text(json.dumps(provenance), encoding='utf-8')
         result = subprocess.run([sys.executable, str(ROOT / 'tools/idt_source_manifest.py'),
@@ -171,32 +147,30 @@ class DependencyProvenanceTests(unittest.TestCase):
                                  '--provenance', str(path), '--test-group', 'PKCS11', '--json-output'],
                                 capture_output=True, text=True, check=True)
         evidence = json.loads(result.stdout)['pkcs11_runner']
-        self.assertEqual(['Full_PKCS11_NoObject'], evidence['enabled_groups'])
-        self.assertTrue(evidence['canonical_selection_used'])
-        self.assertEqual(hashlib.sha256(runner.read_bytes()).hexdigest(), evidence['effective_sha256'])
+        self.assertTrue(evidence['byte_verified'])
+        self.assertEqual(evidence['captured_sha256'], evidence['effective_sha256'])
+        self.assertNotIn('canonical_selection_used', evidence)
+        self.assertNotIn('enabled_groups', evidence)
+        self.assertNotIn('dependency_pkcs11_runner_sha256', provenance)
 
-    def test_pkcs11_invalid_structure_and_all_enabled_are_rejected(self):
+    def test_pkcs11_body_or_group_name_changes_are_rejected(self):
         runner, destination, provenance, groups = self.pkcs11_snapshot()
-        original = runner.read_bytes().decode('ascii').replace('\r\n', '\n')
-        for text in (original.replace('Full_PKCS11_EC', 'Unknown_PKCS11_Group'),
-                     original + 'RUN_TEST_GROUP( Full_PKCS11_EC );\n',
-                     original.replace('RUN_TEST_GROUP( Full_PKCS11_EC );', 'RUN_TEST_GROUP( Full_PKCS11_EC ); extra')):
-            runner.write_bytes(text.encode('ascii'))
-            with self.assertRaisesRegex(ValueError, 'selection structure'):
+        original = runner.read_bytes()
+        for changed in (original.replace(b'return 7', b'return 8'),
+                        original.replace(b'Full_PKCS11_EC', b'Unknown_PKCS11_Group'),
+                        original + b'RUN_TEST_GROUP( Full_PKCS11_EC );\n'):
+            runner.write_bytes(changed)
+            with self.assertRaisesRegex(ValueError, 'differs from captured'):
                 manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
-        # LF-only normalization must not authorize all four groups for Core.
-        runner.write_bytes(original.encode('ascii'))
-        with self.assertRaisesRegex(ValueError, 'differs from captured'):
-            manifest.verify_dependency_provenance(destination, self.target, provenance, test_group='PKCS11')
 
-    def test_dependency_selection_uses_bg96_self_contained_stack(self):
-        bg96 = manifest.dependency_paths(self.target)
-        self.assertEqual(set(manifest.TEST) | {manifest.BOOT[self.target]}, set(bg96))
-        self.assertTrue(set(manifest.COMMON).isdisjoint(bg96))
-        for target in ("rx72n-ethernet", "rx671-wifi"):
+    def test_all_targets_capture_the_common_root_libraries(self):
+        for target in ("rx65n-bg96", "rx72n-ethernet", "rx671-wifi"):
             with self.subTest(target=target):
                 selected = set(manifest.dependency_paths(target))
                 self.assertTrue(set(manifest.COMMON).issubset(selected))
+                self.assertTrue(set(manifest.TEST).issubset(selected))
+                self.assertIn(manifest.BOOT[target], selected)
+                self.assertIn('/lib/rx_bootloader', manifest.BOOT[target])
                 self.assertEqual(target == "rx671-wifi", set(manifest.WIFI).issubset(selected))
         with self.assertRaises(ValueError):
             manifest.dependency_paths("rx65n-ethernet")
@@ -242,7 +216,8 @@ class DependencyProvenanceTests(unittest.TestCase):
         # A copied .git pointer may reference a checkout that does not exist here.
         (destination / manifest.TEST[0] / ".git").write_text("gitdir: /not-present\n")
         with patch.object(manifest, "_git", side_effect=AssertionError("verification invoked Git")):
-            self.assertEqual(6, manifest.verify_dependency_provenance(destination, self.target, provenance))
+            self.assertEqual(2 * len(manifest.dependency_paths(self.target)),
+                             manifest.verify_dependency_provenance(destination, self.target, provenance))
 
     def test_content_added_or_removed_after_capture_is_rejected(self):
         provenance = self.capture()
@@ -324,15 +299,13 @@ class DependencyProvenanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.capture()
 
-    def test_uncommitted_reviewed_patch_bytes_are_captured(self):
-        # WHD may carry a reviewed forward patch; gitlink identity and content
-        # are independent checks, so capture must retain those exact bytes.
+    def test_modified_library_is_rejected_before_hash_capture(self):
         relative = manifest.TEST[0] + "/source.c"
-        patched = b"reviewed local patch\n"
+        patched = b"unexpected local patch\n"
         (self.source / relative).write_bytes(patched)
-        provenance = self.capture()
-        self.assertEqual(self.pins, provenance["submodule_shas"])
-        self.assertEqual(hashlib.sha256(patched).hexdigest(), provenance["dependency_files_sha256"][relative])
+        with self.assertRaisesRegex(ValueError, "original sources changed"):
+            self.capture()
+        self.assertEqual(patched, (self.source / relative).read_bytes())
 
     def test_rx671_boot_pin_must_match_reviewed_production_helper(self):
         target = "rx671-wifi"
@@ -431,67 +404,77 @@ class DependencyProvenanceTests(unittest.TestCase):
         self.assertIn("no Git/network action", result.stdout)
 
 
-@unittest.skipUnless(GIT, "Git apply is required for the WHD portability patch fixture")
-class GitFreeWhdPatchTests(unittest.TestCase):
+@unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required for the WHD byte gate")
+class GitFreeWhdOriginTests(unittest.TestCase):
     def setUp(self):
-        whd = ROOT / "Projects/aws_wifi_rx671_ek/external/wifi-host-driver"
-        self.patch = ROOT / "Projects/aws_wifi_rx671_ek/external/patches/whd-v1.70.0-ccrx-portability.patch"
-        pairs = re.findall(r"(?m)^diff --git a/(\S+) b/(\S+)$", self.patch.read_text(encoding="utf-8"))
-        self.assertTrue(pairs, "Reviewed WHD patch must have explicit target paths")
-        self.paths = []
-        for old, new in pairs:
-            self.assertEqual(old, new)
-            self.assertTrue(old.startswith("WiFi_Host_Driver/"))
-            self.assertNotIn("..", Path(old).parts)
-            if not (whd / old).is_file():
-                self.skipTest("Initialized WHD fixture is unavailable: " + old)
-            self.paths.append(old)
-        self.temporary = tempfile.TemporaryDirectory(prefix="idt-whd-patch-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="idt-whd-origin-")
         self.addCleanup(self.temporary.cleanup)
-        root = Path(self.temporary.name)
-        self.source = root / "native-copy" / "whd"
-        self.stage = root / "neutral-targets"
+        self.root = Path(self.temporary.name)
+        self.source = self.root / "native-copy" / "whd"
         self.source.mkdir(parents=True)
-        self.stage.mkdir()
-        # A native source copy may contain Git pointers with no referenced repo.
-        (self.source.parent / ".git").write_text("gitdir: " + (root / "absent.git").as_posix() + "\n")
-        for relative in self.paths:
-            for destination in (self.source, self.stage):
-                target = destination / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes((whd / relative).read_bytes())
-        self.original = {relative: (self.source / relative).read_bytes() for relative in self.paths}
-        if self.apply("--check").returncode:
-            reverse = self.apply("--reverse", "--check")
-            self.assertEqual(0, reverse.returncode, reverse.stderr)
-            result = self.apply("--reverse")
+        self.original = {"WiFi_Host_Driver/src/a.c": b"upstream source\n",
+                         "LICENSE.txt": b"upstream license\n"}
+        for relative, raw in self.original.items():
+            path = self.source / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+        # Source copies can carry an unusable Git pointer; byte verification
+        # neither reads that repository nor modifies the dependency.
+        (self.source / ".git").write_text("gitdir: absent.git\n", encoding="utf-8")
+        self.manifest_path = self.root / "origin.json"
+        self.manifest_path.write_text(json.dumps({"schema_version": 1,
+            "upstream_commit": "7" * 40,
+            "files_sha256": {name: hashlib.sha256(raw).hexdigest()
+                             for name, raw in self.original.items()}}), encoding="utf-8")
+
+    def check(self):
+        def ps(value):
+            return "'" + str(value).replace("'", "''") + "'"
+        helper = ROOT / "tools/build_headless_rx671_wifi.ps1"
+        script = f"""$ErrorActionPreference = 'Stop'
+$tokens = $null; $errors = $null
+$ast = [Management.Automation.Language.Parser]::ParseFile({ps(helper)}, [ref]$tokens, [ref]$errors)
+if ($errors.Count) {{ throw 'Helper has PowerShell syntax errors.' }}
+$function = $ast.Find({{param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Assert-PristineWhdInputs'}}, $true)
+Invoke-Expression $function.Extent.Text
+Assert-PristineWhdInputs -DependencyRoot {ps(self.source)} -ManifestPath {ps(self.manifest_path)} -GitFree
+"""
+        return subprocess.run([shutil.which("pwsh"), "-NoProfile", "-Command", script],
+            text=True, encoding="utf-8", errors="replace", capture_output=True)
+
+    def test_git_free_before_and_after_checks_preserve_all_origin_bytes(self):
+        for _ in range(2):
+            result = self.check()
             self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(self.original,
+                         {name: (self.source / name).read_bytes() for name in self.original})
 
-    def apply(self, *arguments):
-        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-        return subprocess.run([GIT, "-c", f"safe.directory={self.stage.as_posix()}",
-            "-C", str(self.stage), "apply", "--no-index", "--ignore-space-change",
-            "--ignore-whitespace", *arguments, str(self.patch)],
-            env=environment, text=True, encoding="utf-8", errors="replace", capture_output=True)
+    def test_post_build_change_is_rejected_and_preserved(self):
+        self.assertEqual(0, self.check().returncode)
+        target = self.source / next(iter(self.original))
+        target.write_bytes(b"unexpected modified source\n")
+        result = self.check()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("differs from upstream bytes", result.stderr)
+        self.assertEqual(b"unexpected modified source\n", target.read_bytes())
 
-    def test_reviewed_patch_forward_and_reverse_checks_use_only_staged_targets(self):
-        staged = {path.relative_to(self.stage).as_posix() for path in self.stage.rglob("*") if path.is_file()}
-        self.assertEqual(set(self.paths), staged)
-        self.assertEqual(0, self.apply("--check").returncode)
-        self.assertNotEqual(0, self.apply("--reverse", "--check").returncode)
-        result = self.apply()
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertNotEqual(0, self.apply("--check").returncode)
-        reverse = self.apply("--reverse", "--check")
-        self.assertEqual(0, reverse.returncode, reverse.stderr)
-        self.assertFalse((self.stage / ".git").exists())
-        self.assertEqual(self.original, {relative: (self.source / relative).read_bytes() for relative in self.paths})
+    def test_unrecorded_file_and_missing_origin_file_are_rejected(self):
+        extra = self.source / "unexpected.c"
+        extra.write_bytes(b"replacement body\n")
+        self.assertNotEqual(0, self.check().returncode)
+        extra.unlink()
+        (self.source / "LICENSE.txt").unlink()
+        result = self.check()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("missing an upstream file", result.stderr)
 
-    def test_unrecognized_whd_content_fails_both_patch_checks(self):
-        (self.stage / self.paths[0]).write_bytes(b"unrecognized WHD fixture\n")
-        self.assertNotEqual(0, self.apply("--check").returncode)
-        self.assertNotEqual(0, self.apply("--reverse", "--check").returncode)
-        self.assertEqual(self.original, {relative: (self.source / relative).read_bytes() for relative in self.paths})
+    def test_manifest_path_cannot_escape_dependency(self):
+        self.manifest_path.write_text(json.dumps({"schema_version": 1,
+            "upstream_commit": "7" * 40,
+            "files_sha256": {"../outside.c": "a" * 64}}), encoding="utf-8")
+        result = self.check()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("invalid file path", result.stderr)
 
 
 class OfflineSourcePlanTests(unittest.TestCase):
