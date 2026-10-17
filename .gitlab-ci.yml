@@ -465,7 +465,7 @@ workflow:
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.c
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.h
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/demo_config.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/r_fwup_config.h
+        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/rx_ota_config.h
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/rm_littlefs_flash_config.h
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/sdio_host.c
         - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h
@@ -688,6 +688,9 @@ idt_ci_contract:
         tools.ci.tests.test_idt_flash_failure \
         tools.ci.tests.test_idt_targets \
         tools.ci.tests.test_idt_source_manifest \
+        tools.ci.tests.test_idt_fwup_bank_layout \
+        tools.ci.tests.test_build_rx671_fwup_v2_rsu \
+        tools.ci.tests.test_analyze_rx671_ota_layout.RsuGateTests \
         tools.ci.tests.test_idt_rx671_provision \
         tools.ci.tests.test_idt_public_signer_provision \
         tools.ci.tests.test_idt_public_signer_integration \

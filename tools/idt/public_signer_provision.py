@@ -234,14 +234,11 @@ def validate_initial_rsu(files, target):
             struct.unpack_from("<I", image, 0x28)[0] != 64 or
             struct.unpack_from("<III", image, 0x12C) != (0, 0xFFFFFFFF, 0xFFFFFFFF)):
         raise RuntimeError("Initial RSU header/signature/raw Data Flash policy mismatch")
-    if target["id"] == "rx671-wifi":
-        if image[0x200:0x300] != _tools_module("build_rx671_fwup_v2_rsu").build_descriptor():
-            raise RuntimeError("Initial RX671 RSU descriptor layout mismatch")
-    else:
-        sequence, app, end, vector, hardware = struct.unpack_from("<IIIII", image, 0x200)
-        if (sequence != 1 or app != start+0x300 or end != 0xFFFBFFFF or
-                vector != 0xFFFBFFFC or hardware != 9):
-            raise RuntimeError("Initial legacy RSU descriptor layout mismatch")
+    try:
+        _tools_module("build_rx671_fwup_v2_rsu").validate_legacy_descriptor(
+            image[0x200:0x300], start + 0x300, 0xFFFBFFFF, sequence=1)
+    except ValueError as error:
+        raise RuntimeError("Initial legacy RSU descriptor layout mismatch") from error
     vector = int.from_bytes(image[0xFFFBFFFC-start:0xFFFC0000-start], "little")
     if not start+0x300 <= vector <= 0xFFFBFFFF:
         raise RuntimeError("Initial RSU application reset vector is outside its application")

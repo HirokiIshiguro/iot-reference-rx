@@ -32,7 +32,7 @@
 #else
 #error "Unsupported RX MCU for OTA PAL flash programming"
 #endif
-#include "r_fwup_config.h"
+#include "rx_ota_config.h"
 #include "r_common_api_flash.h"
 #include "store.h"
 #include "iot_crypto.h"
@@ -47,7 +47,7 @@
 /* Keep flash programming below OTA/MQTT so the next stream request is sent before programming starts. */
 #define OTA_FLASH_TASK_PRIORITY     (tskIDLE_PRIORITY)
 #define OTA_PAYLOAD_BASE_OFFSET     (0x200U)
-#define OTA_MAX_PAYLOAD_SIZE        (FWUP_CFG_AREA_SIZE - OTA_PAYLOAD_BASE_OFFSET)
+#define OTA_MAX_PAYLOAD_SIZE        (RX_OTA_CFG_AREA_SIZE - OTA_PAYLOAD_BASE_OFFSET)
 #define OTA_FLASH_PAD_VALUE         (0xFFU)
 #define OTA_HASH_READ_CHUNK_SIZE    (1024U)
 #define OTA_IMAGE_FLAG_TESTING      (0xFEU)
@@ -547,8 +547,8 @@ static BaseType_t prvValidatePayloadRange(uint32_t offset,
 
 static BaseType_t prvEraseBufferArea(void)
 {
-    uint32_t numBlocks = FWUP_CFG_AREA_SIZE / FWUP_CFG_CF_BLK_SIZE;
-    uint32_t eraseAddr = FWUP_CFG_BUF_AREA_ADDR_L + (FWUP_CFG_CF_BLK_SIZE * (numBlocks - 1U));
+    uint32_t numBlocks = RX_OTA_CFG_AREA_SIZE / RX_OTA_CFG_CF_BLK_SIZE;
+    uint32_t eraseAddr = RX_OTA_CFG_BUF_AREA_ADDR_L + (RX_OTA_CFG_CF_BLK_SIZE * (numBlocks - 1U));
     flash_err_t flashError;
 
     LogInfo(("prvEraseBufferArea: enter addr=%08x blocks=%u",
@@ -625,7 +625,7 @@ static void prvOtaFlashTask(void * pvParameters)
                 (void)memset(flashWriteBuffer, OTA_FLASH_PAD_VALUE, paddedLength);
                 (void)memcpy(flashWriteBuffer, xBlock.pData, xBlock.length);
 
-                if (pdTRUE != prvWriteFlashBlocking(FWUP_CFG_BUF_AREA_ADDR_L + OTA_PAYLOAD_BASE_OFFSET + xBlock.offset,
+                if (pdTRUE != prvWriteFlashBlocking(RX_OTA_CFG_BUF_AREA_ADDR_L + OTA_PAYLOAD_BASE_OFFSET + xBlock.offset,
                                                     flashWriteBuffer,
                                                     paddedLength))
                 {
@@ -652,7 +652,7 @@ static BaseType_t prvWriteImageHeader(AfrOtaJobDocumentFields_t * pFileContext,
     (void)memcpy(xHeader.sig, pRawSignature, MAX_SIG_LENGTH);
     (void)pFileContext;
 
-    return prvWriteFlashBlocking(FWUP_CFG_BUF_AREA_ADDR_L,
+    return prvWriteFlashBlocking(RX_OTA_CFG_BUF_AREA_ADDR_L,
                                  (const uint8_t *)&xHeader,
                                  OTA_PAYLOAD_BASE_OFFSET);
 }
@@ -677,7 +677,7 @@ static OtaPalStatus_t prvVerifyReceivedPayload(AfrOtaJobDocumentFields_t * pFile
     while (remaining > 0U)
     {
         uint32_t chunkSize = (remaining > OTA_HASH_READ_CHUNK_SIZE) ? OTA_HASH_READ_CHUNK_SIZE : remaining;
-        pReadAddr = (uint8_t *)(FWUP_CFG_BUF_AREA_ADDR_L + OTA_PAYLOAD_BASE_OFFSET + offset);
+        pReadAddr = (uint8_t *)(RX_OTA_CFG_BUF_AREA_ADDR_L + OTA_PAYLOAD_BASE_OFFSET + offset);
         CRYPTO_SignatureVerificationUpdate(pCryptoContext, (const uint8_t *)pReadAddr, chunkSize);
         offset += chunkSize;
         remaining -= chunkSize;

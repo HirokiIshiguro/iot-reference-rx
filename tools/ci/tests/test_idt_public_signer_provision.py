@@ -182,6 +182,27 @@ class PublicSignerTests(unittest.TestCase):
                 self.assertEqual(target_fingerprint(fixture.target),plan["target_sha256"])
                 self.assertFalse(plan["private_credentials_used"])
 
+    def test_validly_signed_segmented_v2_is_rejected_for_every_target(self):
+        from cryptography.hazmat.primitives.asymmetric import utils
+        from tools import normal_boot
+        for target_id in controller.LAYOUTS:
+            with self.subTest(target=target_id):
+                fixture = self.fixture(target_id)
+                start, _ = controller.LAYOUTS[target_id]
+                image = bytearray(fixture.files["idt_transport.rsu"].read_bytes())
+                image[0x200:0x300] = b"\xff" * 256
+                struct.pack_into("<III", image, 0x200, 1, start + 0x300, 0xFFFC0000 - start - 0x300)
+                r, s = utils.decode_dss_signature(fixture.key.sign(
+                    bytes(image[0x200:]), ec.ECDSA(hashes.SHA256())))
+                image[0x2c:0x6c] = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+                fixture.files["idt_transport.rsu"].write_bytes(image)
+                with self.assertRaisesRegex(RuntimeError, "legacy RSU descriptor"):
+                    controller.validate_initial_rsu(fixture.files, fixture.target)
+                with self.assertRaisesRegex(RuntimeError, "descriptor"):
+                    normal_boot.signed_application(
+                        {**fixture.files, "normal_app.rsu": fixture.files["idt_transport.rsu"]},
+                        fixture.target)
+
     def test_formal_source_target_and_isolation_claims_are_mandatory(self):
         fixture=self.fixture(); baseline=json.loads(json.dumps(fixture.metadata))
         mutations=[("source_sha","b"*40),("target_id","rx65n-bg96"),("target_sha256","0"*64),

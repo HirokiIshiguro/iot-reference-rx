@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Generate a Code Flash-only RELFWV2 RSU for the RX72N dual-bank bootloader.
+Generate a Code Flash-only legacy contiguous RSU for the RX72N bootloader.
 
-Unlike the r_fwup sample bootloader, this bootloader expects the RSU payload to
-contain the whole bank-1 user image area (excluding the 0x300-byte RSU header +
-descriptor) rather than sparse segments only.
+The historical script name remains an invocation compatibility entry point.
+There is no r_fwup/image-gen dependency or segmented image format.  Both the
+full UART RSU and the headerless OTA payload use the original five-word
+sequence/start/end/reset/hardware-ID descriptor and a complete padded app.
 
 The signed application payload preserves the UART RELFWV2 layout. Public signer
 trust and other persistent Data Flash contents are provisioned independently;
@@ -19,6 +20,11 @@ import struct
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    from .build_rx671_fwup_v2_rsu import legacy_descriptor
+except ImportError:
+    from build_rx671_fwup_v2_rsu import legacy_descriptor
 
 
 RSU_HEADER_SIZE = 0x200
@@ -134,7 +140,7 @@ def validate_prm_layout(layout: PrmLayout) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate Code Flash-only RELFWV2 RSU for the RX72N bootloader"
+        description="Generate a Code Flash-only legacy contiguous RSU for RX72N"
     )
     parser.add_argument("--mot", required=True, type=Path, help="Input Motorola S-record (.mot)")
     parser.add_argument("--prm", required=True, type=Path, help="PRM CSV (validated for compatibility)")
@@ -147,7 +153,7 @@ def parse_args() -> argparse.Namespace:
         default="legacy-full-rsu",
         help=(
             "Output format. legacy-full-rsu is for the UART bootloader. "
-            "rtos-ota-payload starts at the FWUP descriptor for AWS OTA PAL."
+            "rtos-ota-payload omits only the 0x200-byte header for AWS OTA PAL."
         ),
     )
     return parser.parse_args()
@@ -226,14 +232,9 @@ def verify_ecdsa(data: bytes, signature: bytes, key_path: Path) -> bool:
 
 def build_rsu(code_flash: bytearray, key_path: Path, seq_no: int) -> bytes:
     user_prog_size = USER_PROGRAM_BOTTOM - USER_PROGRAM_TOP + 1
-    exec_addr = USER_PROGRAM_BOTTOM - 3
-
-    descriptor = bytearray(RSU_DESCRIPTOR_SIZE)
-    struct.pack_into("<I", descriptor, 0, seq_no)
-    struct.pack_into("<I", descriptor, 4, USER_PROGRAM_TOP)
-    struct.pack_into("<I", descriptor, 8, USER_PROGRAM_BOTTOM)
-    struct.pack_into("<I", descriptor, 12, exec_addr)
-    struct.pack_into("<I", descriptor, 16, HW_ID)
+    if len(code_flash) != user_prog_size:
+        raise ValueError("RX72N application payload size mismatch")
+    descriptor = legacy_descriptor(USER_PROGRAM_TOP, USER_PROGRAM_BOTTOM, seq_no, HW_ID)
 
     signed_data = bytes(descriptor) + bytes(code_flash[:user_prog_size])
     print(
@@ -261,21 +262,11 @@ def build_rsu(code_flash: bytearray, key_path: Path, seq_no: int) -> bytes:
     return bytes(rsu)
 
 
-def build_rtos_ota_payload(code_flash: bytearray) -> bytes:
+def build_rtos_ota_payload(code_flash: bytearray, seq_no: int = 1) -> bytes:
     user_prog_size = USER_PROGRAM_BOTTOM - USER_PROGRAM_TOP + 1
-
-    entries = [(USER_PROGRAM_TOP, user_prog_size)]
-
-    descriptor = bytearray(b"\xFF" * RSU_DESCRIPTOR_SIZE)
-    struct.pack_into("<I", descriptor, 0, len(entries))
-    for index, (address, size) in enumerate(entries):
-        struct.pack_into("<I", descriptor, 4 + (index * 8), address)
-        struct.pack_into("<I", descriptor, 8 + (index * 8), size)
-
-    payload = bytearray()
-    payload += descriptor
-    payload += code_flash[:user_prog_size]
-    return bytes(payload)
+    if len(code_flash) != user_prog_size:
+        raise ValueError("RX72N application payload size mismatch")
+    return legacy_descriptor(USER_PROGRAM_TOP, USER_PROGRAM_BOTTOM, seq_no, HW_ID) + bytes(code_flash)
 
 
 def main() -> int:
@@ -326,7 +317,7 @@ def main() -> int:
     if args.format == "legacy-full-rsu":
         output_data = build_rsu(code_flash, args.key, args.seq_no)
     else:
-        output_data = build_rtos_ota_payload(code_flash)
+        output_data = build_rtos_ota_payload(code_flash, args.seq_no)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(output_data)

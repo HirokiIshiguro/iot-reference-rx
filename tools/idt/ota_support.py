@@ -346,7 +346,7 @@ def rx671_transfer_payload(rsu, key):
     if struct.unpack_from("<III", rsu, 0x12C) != (0, 0xFFFFFFFF, 0xFFFFFFFF):
         raise RuntimeError("RX671 OTA RSU must preserve application-owned Data Flash")
     payload = rsu[0x200:]
-    if struct.unpack_from("<III", payload) != (1, 0xFFF00300, 0xBFD00):
+    if struct.unpack_from("<IIIII", payload) != (1, 0xFFF00300, 0xFFFBFFFF, 0xFFFBFFFC, 9):
         raise RuntimeError("RX671 OTA RSU has an unexpected application descriptor")
     raw_signature = rsu[0x2C:0x6C]
     der_signature = utils.encode_dss_signature(int.from_bytes(raw_signature[:32], "big"),

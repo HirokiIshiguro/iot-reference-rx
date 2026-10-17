@@ -107,13 +107,13 @@ FORMAL_INPUT_SUBMODULES = (
 
 PROFILE_PATHS = (
     Path(".cproject"),
-    Path("src/frtos_config/r_fwup_config.h"),
+    Path("src/frtos_config/rx_ota_config.h"),
     Path("src/smc_gen/r_config/r_bsp_config.h"),
 )
 PROVENANCE_PROJECT_PATHS = (
     Path(".cproject"),
     Path(LAYOUT_CONTRACT_NAME),
-    Path("src/frtos_config/r_fwup_config.h"),
+    Path("src/frtos_config/rx_ota_config.h"),
     Path("src/frtos_config/rm_littlefs_flash_config.h"),
     Path("src/smc_gen/r_config/r_bsp_config.h"),
     Path("src/sdio_host.c"),
@@ -333,9 +333,9 @@ def make_ota_bank_config(text: str, label: str) -> str:
 
 
 def make_ota_fwup_config(text: str) -> str:
-    matches = re.findall(r"^\s*#define\s+FWUP_CFG_AREA_SIZE\s+\((0x[0-9A-Fa-f]+)U\)", text, re.M)
+    matches = re.findall(r"^\s*#define\s+RX_OTA_CFG_AREA_SIZE\s+\((0x[0-9A-Fa-f]+)U\)", text, re.M)
     if len(matches) != 1 or int(matches[0], 16) != 0xC0000:
-        raise ValueError("r_fwup_config.h: expected the canonical dual-bank install area")
+        raise ValueError("rx_ota_config.h: expected the canonical dual-bank install area")
     return text
 
 
@@ -360,7 +360,7 @@ class TemporaryOtaProfile:
 
     def apply(self, version: Version, tls_version: str = "TLSv1.2") -> None:
         cproject = self.snapshots[Path(".cproject")].decode("utf-8")
-        fwup = self.snapshots[Path("src/frtos_config/r_fwup_config.h")].decode(
+        fwup = self.snapshots[Path("src/frtos_config/rx_ota_config.h")].decode(
             "utf-8"
         )
         bsp = self.snapshots[
@@ -371,7 +371,7 @@ class TemporaryOtaProfile:
             encoding="utf-8",
             newline="",
         )
-        (self.project_dir / "src/frtos_config/r_fwup_config.h").write_text(
+        (self.project_dir / "src/frtos_config/rx_ota_config.h").write_text(
             make_ota_fwup_config(fwup), encoding="utf-8", newline=""
         )
         (self.project_dir / "src/smc_gen/r_config/r_bsp_config.h").write_text(

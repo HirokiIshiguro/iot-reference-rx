@@ -48,7 +48,7 @@ class ProfileTests(unittest.TestCase):
             PROJECT / "src/smc_gen/r_config/r_bsp_config.h"
         ).read_text(encoding="utf-8")
         cls.fwup = (
-            PROJECT / "src/frtos_config/r_fwup_config.h"
+            PROJECT / "src/frtos_config/rx_ota_config.h"
         ).read_text(encoding="utf-8")
         cls.dev_mode_provisioning = (
             ROOT
@@ -158,7 +158,7 @@ class ProfileTests(unittest.TestCase):
                     "#define BSP_CFG_CODE_FLASH_BANK_MODE    (1)", result
                 )
         fwup = builder.make_ota_fwup_config(self.fwup)
-        self.assertRegex(fwup, r"#define\s+FWUP_CFG_AREA_SIZE\s+\(0x0*C0000U\)")
+        self.assertRegex(fwup, r"#define\s+RX_OTA_CFG_AREA_SIZE\s+\(0x0*C0000U\)")
 
     def test_profile_restores_files_after_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

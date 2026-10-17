@@ -59,13 +59,11 @@ class IdtFwupBankLayoutTests(unittest.TestCase):
             self.assertEqual(boot_start, 0xFFFC0000)
             for project in projects:
                 with self.subTest(target=target, project=project.parent.name):
-                    config = (project / ("src/frtos_config/r_fwup_config.h"
-                        if target == "rx671-wifi" else
-                        "src/smc_gen/r_config/r_fwup_config.h")).read_text(
+                    config = (project / "src/frtos_config/rx_ota_config.h").read_text(
                             encoding="utf-8-sig")
-                    main = numeric_define(config, "FWUP_CFG_MAIN_AREA_ADDR_L")
-                    buffer = numeric_define(config, "FWUP_CFG_BUF_AREA_ADDR_L")
-                    area = numeric_define(config, "FWUP_CFG_AREA_SIZE")
+                    main = numeric_define(config, "RX_OTA_CFG_MAIN_AREA_ADDR_L")
+                    buffer = numeric_define(config, "RX_OTA_CFG_BUF_AREA_ADDR_L")
+                    area = numeric_define(config, "RX_OTA_CFG_AREA_SIZE")
                     self.assertEqual(main, int(mapping["bank_range_start"], 16))
                     self.assertEqual(buffer, main + int(mapping["bank_shift"], 16))
                     self.assertEqual(area, self.expected_areas[target])
@@ -76,6 +74,36 @@ class IdtFwupBankLayoutTests(unittest.TestCase):
                                      boot_start - 4)
                     self.assertEqual(int(mapping["bank_range_end"], 16),
                                      0xFFFFFFFF)
+
+    def test_no_application_or_boot_project_selects_the_fwup_module(self):
+        for name in (".project", ".cproject", "*.scfg"):
+            for path in (ROOT / "Projects").glob("*/e2studio_ccrx/" + name):
+                tree = ET.parse(path)
+                with self.subTest(path=path.relative_to(ROOT)):
+                    self.assertFalse(tree.findall(".//configuration[@name='r_fwup']"))
+                    for node in tree.iter():
+                        selected = node.get("name", "")
+                        self.assertFalse(selected.startswith("Vendor/r_fwup"))
+                        self.assertNotIn("/Vendor/r_fwup", node.get("value", ""))
+                        self.assertNotIn("ota_fwup_wrap_code", node.get("value", ""))
+                    for node in tree.findall(".//locationURI"):
+                        self.assertNotIn("/r_fwup/", node.text or "")
+
+    def test_native_pal_guard_uses_each_normal_application_layout(self):
+        source = (ROOT / "Test/ports/rx72n_idt_otapal.c").read_text(encoding="utf-8")
+        selectors = {"rx72n-ethernet": "IDT_TARGET_RX72N_ETHERNET",
+                     "rx65n-bg96": "IDT_TARGET_RX65N_BG96",
+                     "rx671-wifi": "IDT_TARGET_RX671_WIFI"}
+        for target, selector in selectors.items():
+            guard = re.search(r"#(?:if|elif) \( " + selector
+                              + r" == 1 \)(.*?)(?=#(?:elif|else))", source, re.S).group(1)
+            config = (ROOT / self.targets[target]["application_project"]
+                      / "src/frtos_config/rx_ota_config.h").read_text(encoding="utf-8")
+            with self.subTest(target=target):
+                checks = re.findall(r"(RX_OTA_CFG_[A-Z_]+) != (0x[0-9A-Fa-f]+)U", guard)
+                self.assertEqual(len(checks), 3)
+                for macro, value in checks:
+                    self.assertEqual(numeric_define(config, macro), int(value, 0))
 
     def test_rx65n_old_area_would_overlap_the_common_bootloader(self):
         target = self.targets["rx65n-bg96"]
@@ -89,9 +117,9 @@ class IdtFwupBankLayoutTests(unittest.TestCase):
         guard = self.builder.split("$fwupAreaSize =", 1)[1].split(
             "Add-IdtSelectedSources", 1)[0]
         for name, expected in (("BSP_CFG_CODE_FLASH_BANK_MODE", 0),
-                               ("FWUP_CFG_UPDATE_MODE", 0),
-                               ("FWUP_CFG_FUNCTION_MODE", 1),
-                               ("FWUP_CFG_SIGNATURE_VERIFICATION", 0)):
+                               ("RX_OTA_CFG_UPDATE_MODE", 0),
+                               ("RX_OTA_CFG_FUNCTION_MODE", 1),
+                               ("RX_OTA_CFG_SIGNATURE_VERIFICATION", 0)):
             self.assertRegex(guard, "'" + name + r"'\)\s*-ne\s*" + str(expected))
         self.assertIn("$fwupAreaSize -ne $expectedAreaSize", guard)
         self.assertIn("requires the reviewed dual-bank/ECDSA FWUP profile", guard)

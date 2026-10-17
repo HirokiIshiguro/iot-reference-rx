@@ -101,7 +101,7 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
             "src/frtos_config/demo_config.h",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
-            "src/frtos_config/r_fwup_config.h",
+            "src/frtos_config/rx_ota_config.h",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
             "src/frtos_config/rm_littlefs_flash_config.h",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/sdio_host.c",
@@ -140,7 +140,7 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
         for general_rx671_path in (
             "Projects/aws_wifi_rx671_ek/README.md",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/"
-            "src/frtos_config/r_fwup_config.h",
+            "src/frtos_config/rx_ota_config.h",
             "Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/sdio_host.c",
         ):
             self.assertNotIn(general_rx671_path, ota_rule)

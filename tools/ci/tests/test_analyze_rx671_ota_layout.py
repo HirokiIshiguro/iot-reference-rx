@@ -715,7 +715,7 @@ class RsuGateTests(unittest.TestCase):
             provenance_manifest_path=manifest_path,
         )
 
-    def test_accepts_strict_signed_single_segment_image(self):
+    def test_accepts_strict_signed_legacy_contiguous_image(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             rsu_path, certificate_path, manifest_path = self._fixture(root)
@@ -725,6 +725,36 @@ class RsuGateTests(unittest.TestCase):
         self.assertEqual("PASS", gate.status)
         self.assertIn("Data Flashなし", gate.detail)
         self.assertIn("version=1.2.3", gate.detail)
+
+    def test_rejects_old_segment_descriptor_even_with_valid_signature_and_hash(self):
+        import struct
+        from cryptography.hazmat.primitives.asymmetric import utils
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rsu_path, certificate_path, manifest_path = self._fixture(root)
+            image = bytearray(rsu_path.read_bytes())
+            image[0x200:0x300] = b"\xff" * 256
+            struct.pack_into("<III", image, 0x200, 1, rsu_builder.APPLICATION_START,
+                             rsu_builder.APPLICATION_SIZE)
+            key = ec.generate_private_key(ec.SECP256R1())
+            now = datetime.now(timezone.utc)
+            name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "old-v2-fixture")])
+            cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                    .public_key(key.public_key()).serial_number(2)
+                    .not_valid_before(now-timedelta(minutes=1)).not_valid_after(now+timedelta(days=1))
+                    .sign(key, hashes.SHA256()))
+            certificate_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+            r, s = utils.decode_dss_signature(key.sign(bytes(image[0x200:]), ec.ECDSA(hashes.SHA256())))
+            image[0x2c:0x6c] = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+            rsu_path.write_bytes(image)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for path in (rsu_path, certificate_path):
+                manifest["sha256"][path.relative_to(root).as_posix()] = layout._sha256(path)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            gate = self._gate(root, rsu_path, certificate_path, manifest_path)
+        self.assertEqual("FAIL", gate.status)
+        self.assertIn("legacy descriptor", gate.detail)
+        self.assertNotIn("ECDSA署名不一致", gate.detail)
 
     def test_rejects_signed_payload_tampering(self):
         with tempfile.TemporaryDirectory() as directory:

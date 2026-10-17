@@ -122,7 +122,8 @@ class Rx72nFwupPrmContractTests(unittest.TestCase):
         payload = rsu_builder.build_rtos_ota_payload(code)
         self.assertEqual(1, struct.unpack_from("<I", payload)[0])
         self.assertEqual(rsu_builder.USER_PROGRAM_TOP, struct.unpack_from("<I", payload, 4)[0])
-        self.assertEqual(len(code), struct.unpack_from("<I", payload, 8)[0])
+        self.assertEqual((rsu_builder.USER_PROGRAM_BOTTOM, rsu_builder.USER_PROGRAM_BOTTOM - 3, 9),
+                         struct.unpack_from("<III", payload, 8))
         self.assertNotIn(marker, payload)
         self.assertEqual(rsu_builder.RSU_DESCRIPTOR_SIZE + len(code), len(payload))
 

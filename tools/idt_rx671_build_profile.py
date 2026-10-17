@@ -30,8 +30,8 @@ def make_profile(project: Path, group: str, version: Version) -> dict[str, str]:
         files[".cproject"] = files[".cproject"].replace(
             "-define=RX671_OTA_RUNTIME_ENABLE=1", "-define=RX671_OTA_RUNTIME_ENABLE=0"
         )
-    files["src/frtos_config/r_fwup_config.h"] = make_ota_fwup_config(
-        files["src/frtos_config/r_fwup_config.h"]
+    files["src/frtos_config/rx_ota_config.h"] = make_ota_fwup_config(
+        files["src/frtos_config/rx_ota_config.h"]
     )
     for path in (
         "src/smc_gen/r_config/r_bsp_config.h",

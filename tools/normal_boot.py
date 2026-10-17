@@ -43,11 +43,11 @@ def signed_application(files, target):
     sequence = struct.unpack_from("<I", image, 0x200)[0]
     if not 1 <= sequence <= 0xFFFFFFFF:
         raise RuntimeError("Normal RSU sequence must be positive")
-    if target["id"] == "rx671-wifi":
-        if image[0x200:0x300] != trust._tools_module("build_rx671_fwup_v2_rsu").build_descriptor():
-            raise RuntimeError("Normal RX671 RSU descriptor mismatch")
-    elif struct.unpack_from("<IIII", image, 0x204) != (start + 0x300, 0xFFFBFFFF, 0xFFFBFFFC, 9):
-        raise RuntimeError("Normal RSU dual-bank descriptor mismatch")
+    try:
+        trust._tools_module("build_rx671_fwup_v2_rsu").validate_legacy_descriptor(
+            image[0x200:0x300], start + 0x300, 0xFFFBFFFF)
+    except ValueError as error:
+        raise RuntimeError("Normal RSU dual-bank descriptor mismatch") from error
     vector = int.from_bytes(image[0xFFFBFFFC-start:0xFFFC0000-start], "little")
     if not start + 0x300 <= vector <= 0xFFFBFFFF:
         raise RuntimeError("Normal RSU reset vector is outside its application")

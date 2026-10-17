@@ -136,15 +136,9 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c/source/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/3rdparty/tinycbor/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/coreJSON/source/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ota_fwup_wrap_code}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/OtaOverMqtt/ota_os}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/ota_pal}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Common/FreeRTOS_common/network_support}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src/tinycrypt/source}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src/base64}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src/tinycrypt/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_irq_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_irq_rx}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cmt_rx/src}&quot;"/>
@@ -213,11 +207,6 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_4}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_ether_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src/tinycrypt/source}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src/base64}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src/tinycrypt/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_fwup}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_irq_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_irq_rx}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cmt_rx/src}&quot;"/>
@@ -312,7 +301,6 @@
 
 						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_flash_rx/src"/>
 
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_fwup/src"/>
 
 						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_irq_rx/src"/>
 

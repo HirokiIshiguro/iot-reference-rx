@@ -2,7 +2,7 @@
 """
 Generate a PEM certificate from an OTA signing private key.
 
-The OTA image is signed by image-gen.py with a private key, while the device
+The OTA image is signed by the legacy RSU builder with a private key, while the device
 verifies the signature with a certificate stored in data flash. This helper
 keeps those inputs aligned by deriving a self-signed certificate from the same
 private key used for image generation.
@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument(
         "--key",
         required=True,
-        help="Path to a PEM private key used by image-gen.py",
+        help="Path to a PEM private key used for RSU signing",
     )
     parser.add_argument(
         "--out",

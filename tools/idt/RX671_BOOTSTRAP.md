@@ -31,6 +31,8 @@
 
 bootloaderはLittleFS公開鍵・ECDSA必須・built-in fallback無効・旧Data Flash鍵ストア無効・raw Data Flash install無効です。bank1の画像はbank0の正確なアドレス移動として確認します。ローカルの計画は`runtime_trust=not_established`を記録し、実機署名検査が完了するまで信頼設定済みとは扱いません。
 
+RSUは3環境とも従来の連続形式です。`0x200` byteのheaderに続く`0x100` byteのmetadataは、little endianの`sequence・application start・application end・reset vector address・hardware ID`の5語を持ち、残りのCode Flash領域を含めてheader以後の全byteをECDSA P-256/SHA-256で署名します。UARTはheader付き、OTA PALへの転送は同じ画像からheaderだけを除いたbyte列です。`r_fwup`の`count・address・size`形式、疎なsegment、raw Data Flashは使いません。既存CI・remote stagingとの呼出し互換のため残る`build_fwup_v2_rsu.py`と`build_rx671_fwup_v2_rsu.py`というファイル名は旧名で、生成する形式を示しません。生成器・初期trust検査・通常app検査・RX671 OTA検査はいずれも同じ従来形式を要求します。
+
 全3環境の共有領域は`0x00100000`から8KiB、littlefsは2.11.3です。RX72Nの旧開始位置とRX65N/RX72Nの旧容量から移行するため、初回formatと再provisionが必要です。既存設定がそのまま残るとは扱わず、実機での移行結果を記録してください。API・geometry・mutexのhost検証は[製品port](../../Common/littlefs_common/README.md)に記載しています。
 
 終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗・UART出力継続・privileged子processの終了不明では所有記録を保持して再利用を止めます。

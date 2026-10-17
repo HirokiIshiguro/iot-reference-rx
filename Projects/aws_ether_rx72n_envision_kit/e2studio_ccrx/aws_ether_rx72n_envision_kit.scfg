@@ -1213,57 +1213,6 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
-        <configuration inuse="true" name="r_fwup">
-            <component description="依存モジュール: r_flash_rx バージョン 4.80, 4.91, 5.10, 5.20, 5.22&#10;This module is a software library for implementing the firmware update function in user applications." detailDescription="FWUP Library" display="r_fwup" id="r_fwup2.06" version="2.06">
-                <gridItem id="FWUP_CFG_UPDATE_MODE" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_FUNCTION_MODE" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_MAIN_AREA_ADDR_L" selectedIndex="0xFFE00000U"/>
-                <gridItem id="FWUP_CFG_BUF_AREA_ADDR_L" selectedIndex="0xFFC00000U"/>
-                <gridItem id="FWUP_CFG_AREA_SIZE" selectedIndex="0x1C0000U"/>
-                <gridItem id="FWUP_CFG_CF_BLK_SIZE" selectedIndex="0x8000U"/>
-                <gridItem id="FWUP_CFG_CF_W_UNIT_SIZE" selectedIndex="128U"/>
-                <gridItem id="FWUP_CFG_EXT_BUF_AREA_ADDR_L" selectedIndex="0x00000U"/>
-                <gridItem id="FWUP_CFG_EXT_BUF_AREA_BLK_SIZE" selectedIndex="4096U"/>
-                <gridItem id="FWUP_CFG_DF_ADDR_L" selectedIndex="0x00100000"/>
-                <gridItem id="FWUP_CFG_DF_BLK_SIZE" selectedIndex="64U"/>
-                <gridItem id="FWUP_CFG_DF_NUM_BLKS" selectedIndex="512U"/>
-                <gridItem id="FWUP_CFG_FWUPV1_COMPATIBLE" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_SIGNATURE_VERIFICATION" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_PRINTF_DISABLE" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_USER_DISABLE_INTERRUPT_ENABLED" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_USER_DISABLE_INTERRUPT_FUNCTION" selectedIndex="my_disable_interrupt_function"/>
-                <gridItem id="FWUP_CFG_USER_ENABLE_INTERRUPT_ENABLED" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_USER_ENABLE_INTERRUPT_FUNCTION" selectedIndex="my_enable_interrupt_function"/>
-                <gridItem id="FWUP_CFG_USER_SOFTWARE_DELAY_ENABLED" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_USER_SOFTWARE_DELAY_FUNCTION" selectedIndex="my_software_delay_function"/>
-                <gridItem id="FWUP_CFG_USER_SOFTWARE_RESET_ENABLED" selectedIndex="0"/>
-                <gridItem id="FWUP_CFG_USER_SOFTWARE_RESET_FUNCTION" selectedIndex="my_software_reset_function"/>
-                <gridItem id="FWUP_CFG_USER_SHA256_INIT_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_SHA256_INIT_FUNCTION" selectedIndex="ota_sha256_init_function"/>
-                <gridItem id="FWUP_CFG_USER_SHA256_UPDATE_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_SHA256_UPDATE_FUNCTION" selectedIndex="ota_sha256_update_function"/>
-                <gridItem id="FWUP_CFG_USER_SHA256_FINAL_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_SHA256_FINAL_FUNCTION" selectedIndex="ota_sha256_final_function"/>
-                <gridItem id="FWUP_CFG_USER_VERIFY_ECDSA_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_VERIFY_ECDSA_FUNCTION" selectedIndex="ota_verify_ecdsa_function"/>
-                <gridItem id="FWUP_CFG_USER_GET_CRYPT_CONTEXT_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_GET_CRYPT_CONTEXT_FUNCTION" selectedIndex="ota_get_crypt_context_function"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_OPEN_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_OPEN_FUNCTION" selectedIndex="ota_flash_open_function"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_CLOSE_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_CLOSE_FUNCTION" selectedIndex="ota_flash_close_function"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_ERASE_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_ERASE_FUNCTION" selectedIndex="ota_flash_erase_function"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_WRITE_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_WRITE_FUNCTION" selectedIndex="ota_flash_write_function"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_READ_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_FLASH_READ_FUNCTION" selectedIndex="ota_flash_read_function"/>
-                <gridItem id="FWUP_CFG_USER_BANK_SWAP_ENABLED" selectedIndex="1"/>
-                <gridItem id="FWUP_CFG_USER_BANK_SWAP_FUNCTION" selectedIndex="ota_bank_swap_function"/>
-            </component>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
-        </configuration>
         <configuration inuse="true" name="r_irq_rx">
             <component description="依存モジュール: r_bsp バージョン 7.60&#10;This software provides a unified, abstracted interface for low-level handling of interrupt events from external pin interrupts. These events are mapped to the IRQ vectors." detailDescription="IRQ Driver" display="r_irq_rx" id="r_irq_rx4.91" version="4.91">
                 <gridItem id="IRQ0" selectedIndex="0"/>

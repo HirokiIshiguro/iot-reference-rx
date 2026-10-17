@@ -438,7 +438,7 @@ $linkerSection = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesa
 if (-not $linkerSection) { throw 'Missing target linker flash layout.' }
 $effectiveLinkerSection = $linkerSection.GetAttribute('value')
 $bspRelative = 'src/smc_gen/r_config/r_bsp_config.h'
-$fwupRelative = $(if ($Target -eq 'rx671-wifi') { 'src/frtos_config/r_fwup_config.h' } else { 'src/smc_gen/r_config/r_fwup_config.h' })
+$fwupRelative = 'src/frtos_config/rx_ota_config.h'
 $bspText = $(if ($null -ne $profileFiles) { $profileFiles.$bspRelative } else { [IO.File]::ReadAllText((Join-Path $idtProject $bspRelative)) })
 $fwupText = $(if ($null -ne $profileFiles) { $profileFiles.$fwupRelative } else { [IO.File]::ReadAllText((Join-Path $idtProject $fwupRelative)) })
 function Get-IdtNumericDefine {
@@ -454,11 +454,11 @@ $expectedAreaSize = switch ($Target) {
     'rx65n-bg96' { 0xC0000 }
     'rx671-wifi' { 0xC0000 }
 }
-$fwupAreaSize = Get-IdtNumericDefine $fwupText 'FWUP_CFG_AREA_SIZE'
+$fwupAreaSize = Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_AREA_SIZE'
 if ((Get-IdtNumericDefine $bspText 'BSP_CFG_CODE_FLASH_BANK_MODE') -ne 0 -or
-    (Get-IdtNumericDefine $fwupText 'FWUP_CFG_UPDATE_MODE') -ne 0 -or
-    (Get-IdtNumericDefine $fwupText 'FWUP_CFG_FUNCTION_MODE') -ne 1 -or
-    (Get-IdtNumericDefine $fwupText 'FWUP_CFG_SIGNATURE_VERIFICATION') -ne 0 -or
+    (Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_UPDATE_MODE') -ne 0 -or
+    (Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_FUNCTION_MODE') -ne 1 -or
+    (Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_SIGNATURE_VERIFICATION') -ne 0 -or
     $fwupAreaSize -ne $expectedAreaSize) {
     throw "$Target requires the reviewed dual-bank/ECDSA FWUP profile with area size $expectedAreaSize."
 }

@@ -91,11 +91,6 @@
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_sci_rx/r_sci_rx_vx.xx/r_sci_rx</locationURI>
 		</link>
 		<link>
-			<name>Vendor/r_fwup</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_fwup/r_fwup_vx.xx/r_fwup</locationURI>
-		</link>
-		<link>
 			<name>Vendor/r_irq_rx</name>
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_irq_rx/r_irq_rx_vx.xx/r_irq_rx</locationURI>

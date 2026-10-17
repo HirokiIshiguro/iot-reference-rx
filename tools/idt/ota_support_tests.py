@@ -347,7 +347,7 @@ class OtaSupportTests(unittest.TestCase):
                 reset_vector = app_start.to_bytes(4, "little")
                 mot.write_text(srecord(app_start, b"\x12\x34\x56\x78") +
                                srecord(0xFFFBFFFC, reset_vector), encoding="ascii")
-                for relative in (target["packager"], target["prm"]):
+                for relative in (target["packager"], target["prm"], "tools/build_rx671_fwup_v2_rsu.py"):
                     if relative:
                         destination = source / relative
                         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -368,7 +368,9 @@ class OtaSupportTests(unittest.TestCase):
                 payload = source / ota_support.payload_relative_path(target)
                 image = payload.read_bytes()
                 app_size = 0xFFFC0000 - app_start
-                self.assertEqual(struct.unpack_from("<III", image), (1, app_start, app_size))
+                self.assertEqual(struct.unpack_from("<IIIII", image),
+                                 (1, app_start, app_start + app_size - 1,
+                                  app_start + app_size - 4, 9))
                 self.assertEqual(len(image), 0x100 + app_size)
                 self.assertEqual(image[0x100:0x104], b"\x12\x34\x56\x78")
                 self.assertEqual(image[-4:], reset_vector)

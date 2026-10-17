@@ -81,11 +81,6 @@
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_tsip_rx_lib/r_tsip_rx_vx.xx/r_tsip_rx</locationURI>
 		</link>
 		<link>
-			<name>Vendor/r_fwup</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_fwup/r_fwup_vx.xx/r_fwup</locationURI>
-		</link>
-		<link>
 			<name>Vendor/r_bsp</name>
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_bsp/r_bsp_vx.xx/r_bsp</locationURI>

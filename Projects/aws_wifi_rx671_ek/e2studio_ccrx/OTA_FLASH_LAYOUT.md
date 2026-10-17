@@ -415,7 +415,7 @@ AWS cleanup境界として検証する。
 `tools/build_rx671_ota_images.py`は開始時に次の4ファイルをbytesとして保存する。
 
 1. `.cproject`
-2. `src/frtos_config/r_fwup_config.h`
+2. `src/frtos_config/rx_ota_config.h`
 3. `src/smc_gen/r_config/r_bsp_config.h`
 4. `src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h`
 
