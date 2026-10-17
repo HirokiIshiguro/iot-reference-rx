@@ -3,6 +3,7 @@ from pathlib import Path
 import unittest
 
 from tools.ci.tests import test_product_oss_api as host
+from tools.ci.tests.test_public_signer_cli_commands import _function
 
 ROOT = Path(__file__).resolve().parents[3]
 CELLULAR = ROOT / "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source"
@@ -11,6 +12,127 @@ PRODUCT = ROOT / "Common/ports/cellular_bg96"
 
 @unittest.skipUnless(host.GCC or host.MSVC, "Host C compiler required; no MCU build")
 class Bg96NativeNetworkTests(unittest.TestCase):
+    def test_actual_store_maps_preserve_bg96_keys_only_when_selected(self):
+        lookup = _function((ROOT / "Demos/cli/store.c").read_text(encoding="utf-8"),
+                           r"int32_t\s+Filename2Handle\s*\([^{};]*\)")
+        for enabled in (0, 1):
+            source = r'''
+#ifdef NDEBUG
+#error Assertions must remain enabled
+#endif
+#include <assert.h>
+#include "store.h"
+''' + lookup + r'''
+int main(void) {
+ const char *files[]=KVSTORE_KEYS;
+ const char *commands[]={"apn","apnuser","apnpass","apnauth"};
+ const char *oldFiles[]={"cellular_ap_name","cellular_ap_userid","cellular_ap_password","cellular_ap_auth_type"};
+ unsigned i;
+ for(i=0;i<4;i++) {
+   int32_t key=Filename2Handle((char *)commands[i],strlen(commands[i]));
+#if CELLULAR_APN_KVS_ENABLE
+   assert(key>=0 && strcmp(files[key],oldFiles[i])==0);
+#else
+   assert(key==KVS_INVALID_KEY);
+#endif
+ }
+ assert(Filename2Handle("apnuser-extra",13)==KVS_INVALID_KEY);
+ assert(Filename2Handle("apn",2)==KVS_INVALID_KEY);
+ return 0;
+}
+'''
+            host.ProductApiTests.compile_run(self, source, self.store_headers(),
+                                             extra_defines=["CELLULAR_APN_KVS_ENABLE=" + str(enabled)])
+
+    @staticmethod
+    def store_headers():
+        labels = ("DEVICE_CERTIFICATE_FOR_TLS", "DEVICE_PRIVATE_KEY_FOR_TLS", "DEVICE_PUBLIC_KEY_FOR_TLS",
+                  "CLAIM_CERTIFICATE", "CLAIM_PRIVATE_KEY")
+        return {"FreeRTOS.h": '#include <stddef.h>\n#include <stdint.h>\ntypedef int BaseType_t;\n#define pdTRUE 1\n#define pdFALSE 0\n',
+                "lfs_common_data.h": "", "lfs.h": "typedef int lfs_ssize_t;\n",
+                "store.h": "".join('#define pkcs11configLABEL_' + label + ' "' + label + '"\n' for label in labels) +
+                           '#include "Demos/cli/store.h"\n'}
+
+    def test_normal_persistent_pdn_and_native_override_use_actual_key_lookup(self):
+        store_source = (ROOT / "Demos/cli/store.c").read_text(encoding="utf-8")
+        lookup = _function(store_source, r"int32_t\s+Filename2Handle\s*\([^{};]*\)")
+        validation = _function(store_source, r"static\s+BaseType_t\s+prvCellularValueValid\s*\([^{};]*\)")
+        source = r'''
+#ifdef NDEBUG
+#error Assertions must remain enabled
+#endif
+#include <assert.h>
+#include <string.h>
+#include "task.h"
+#include "bg96_network.h"
+#include "store.h"
+#include "rx_idt_network.h"
+static char values[KVS_NUM_KEYS][128];static size_t lengths[KVS_NUM_KEYS];
+static unsigned tick,inits;static int shortRead;
+static CellularPdnConfig_t received;
+const CellularCommInterface_t Bg96_CommInterface={0};
+''' + lookup + validation + r'''
+size_t prvGetCacheEntryLength(KVStoreKey_t key) { return lengths[key]; }
+size_t xReadEntry(KVStoreKey_t key,void *out,size_t size) {
+ assert(size==lengths[key]);memcpy(out,values[key],size);return shortRead?size-1:size;
+}
+int32_t xprvWriteCacheEntry(size_t kl,char *name,size_t size,char *value) {
+ int32_t key=Filename2Handle(name,kl);
+ if(key<0 || !prvCellularValueValid((KVStoreKey_t)key,value,size))return KVS_INVALID_KEY;
+ assert(size<=128);memcpy(values[key],value,size);lengths[key]=size;return key;
+}
+BaseType_t KVStore_xCommitChanges(void) { return pdTRUE; }
+TickType_t xTaskGetTickCount(void) { return tick; }
+void vTaskDelay(TickType_t ticks) { tick+=ticks; }
+bool Bg96_CommSetRuntimeBaud(void) { return true; }
+CellularError_t Cellular_Init(CellularHandle_t *h,const CellularCommInterface_t *c) { assert(c==&Bg96_CommInterface);*h=(CellularHandle_t)1;inits++;return CELLULAR_SUCCESS; }
+CellularError_t Cellular_Cleanup(CellularHandle_t h) { (void)h;return CELLULAR_SUCCESS; }
+CellularError_t Cellular_ATCommandRaw(CellularHandle_t h,const char *p,const char *v,CellularATCommandType_t t,CellularATCommandResponseReceivedCallback_t c,void *d,uint16_t n) { (void)h;(void)p;(void)v;(void)t;(void)c;(void)d;(void)n;return CELLULAR_SUCCESS; }
+CellularError_t Cellular_GetSimCardStatus(CellularHandle_t h,CellularSimCardStatus_t *s) { (void)h;s->simCardState=CELLULAR_SIM_CARD_READY;return CELLULAR_SUCCESS; }
+CellularError_t Cellular_SetPdnConfig(CellularHandle_t h,uint8_t id,const CellularPdnConfig_t *p) { (void)h;assert(id==CELLULAR_PDN_CONTEXT_ID);received=*p;return CELLULAR_SUCCESS; }
+CellularError_t Cellular_GetServiceStatus(CellularHandle_t h,CellularServiceStatus_t *s) { (void)h;s->psRegistrationStatus=REGISTRATION_STATUS_REGISTERED_HOME;return CELLULAR_SUCCESS; }
+CellularError_t Cellular_ActivatePdn(CellularHandle_t h,uint8_t id) { (void)h;(void)id;return CELLULAR_SUCCESS; }
+CellularError_t Cellular_DeactivatePdn(CellularHandle_t h,uint8_t id) { (void)h;(void)id;return CELLULAR_SUCCESS; }
+static void save(KVStoreKey_t key,const char *value,size_t size) { assert(size<128);memcpy(values[key],value,size);lengths[key]=size; }
+int main(void) {
+ unsigned before;char longValue[128];
+ assert(Connect2AP() && strcmp(received.apnName,BG96_APN_NAME)==0);Bg96_NetworkCleanup();
+ save(KVS_CELLULAR_AP_NAME,"stored.invalid",14);save(KVS_CELLULAR_AP_USERID,"user",4);
+ save(KVS_CELLULAR_AP_PASSWORD,"password",8);save(KVS_CELLULAR_AP_AUTH_TYPE,"1",1);
+ assert(Connect2AP() && strcmp(received.apnName,"stored.invalid")==0);
+ assert(strcmp(received.username,"user")==0 && strcmp(received.password,"password")==0 && received.pdnAuthType==CELLULAR_PDN_AUTH_PAP);Bg96_NetworkCleanup();
+ save(KVS_CELLULAR_AP_USERID,"",1);save(KVS_CELLULAR_AP_PASSWORD,"",1);save(KVS_CELLULAR_AP_AUTH_TYPE,"2",2);
+ assert(Connect2AP() && received.username[0]==0 && received.password[0]==0 && received.pdnAuthType==CELLULAR_PDN_AUTH_CHAP);Bg96_NetworkCleanup();
+ before=inits;save(KVS_CELLULAR_AP_AUTH_TYPE,"3",1);assert(!Connect2AP() && inits==before);
+ save(KVS_CELLULAR_AP_AUTH_TYPE,"00",2);assert(!Connect2AP() && inits==before);
+ save(KVS_CELLULAR_AP_AUTH_TYPE,"0",1);memset(longValue,'a',sizeof(longValue));
+ save(KVS_CELLULAR_AP_NAME,longValue,sizeof(received.apnName)+1);assert(!Connect2AP() && inits==before);
+ save(KVS_CELLULAR_AP_NAME,"a\0b",3);assert(!Connect2AP() && inits==before);
+ save(KVS_CELLULAR_AP_NAME,"",1);assert(!Connect2AP() && inits==before);
+ save(KVS_CELLULAR_AP_NAME,"stored.invalid",15);shortRead=1;assert(!Connect2AP() && inits==before);shortRead=0;
+ assert(!prvCellularValueValid(KVS_CELLULAR_AP_AUTH_TYPE,"3",1));
+ assert(!prvCellularValueValid(KVS_CELLULAR_AP_NAME,longValue,CELLULAR_APN_MAX_SIZE+1));
+ assert(!prvCellularValueValid(KVS_CELLULAR_AP_USERID,longValue,CELLULAR_PDN_USERNAME_MAX_SIZE+1));
+ assert(!prvCellularValueValid(KVS_CELLULAR_AP_PASSWORD,longValue,CELLULAR_PDN_PASSWORD_MAX_SIZE+1));
+ assert(prvCellularValueValid(KVS_CELLULAR_AP_USERID,"",1));
+ assert(prvCellularValueValid(KVS_CELLULAR_AP_PASSWORD,"",1));
+ assert(xProvisionIdtNetworkCredentials()==pdTRUE);
+ save(KVS_CELLULAR_AP_NAME,"later.invalid",14);save(KVS_CELLULAR_AP_AUTH_TYPE,"3",1);
+ assert(Connect2AP() && strcmp(received.apnName,"native.invalid")==0 && received.pdnAuthType==CELLULAR_PDN_AUTH_NONE);
+ assert(received.username[0]==0 && received.password[0]==0);Bg96_NetworkCleanup();
+ return 0;
+}
+'''
+        headers = self.store_headers()
+        headers["FreeRTOS.h"] += 'typedef unsigned TickType_t;\n#define pdMS_TO_TICKS(x) (x)\n'
+        headers["task.h"] = '#include "FreeRTOS.h"\nTickType_t xTaskGetTickCount(void);void vTaskDelay(TickType_t);\n'
+        headers["platform.h"] = '#define BSP_MCU_RX65N 1\n'
+        headers["idt_network_config.h"] = '#define IDT_CELLULAR_APN "native.invalid"\n#define IDT_CELLULAR_APN_USER ""\n#define IDT_CELLULAR_APN_PASSWORD ""\n#define IDT_CELLULAR_APN_AUTH "0"\n'
+        host.ProductApiTests.compile_run(self, source, headers,
+            [PRODUCT / "bg96_network.c", ROOT / "Test/ports/rx_idt_network.c"],
+            [PRODUCT, CELLULAR / "include", CELLULAR / "interface", ROOT / "Test/ports"],
+            ["ENABLE_IDT_TRANSPORT_TEST=1", "IDT_TARGET_RX65N_BG96=1", "CELLULAR_APN_KVS_ENABLE=1"])
+
     def test_native_committed_profile_reaches_public_pdn_api(self):
         host.ProductApiTests.compile_run(self, r'''
 #include <assert.h>

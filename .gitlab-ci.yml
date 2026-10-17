@@ -667,6 +667,8 @@ idt_ci_contract:
         - tools/provision_rx671_ota.py
         - Demos/cli/CLIcommands.c
         - tools/ci/tests/test_public_signer_cli_commands.py
+        - Demos/OtaOverMqtt/OtaOverMqttDemo.c
+        - tools/ci/tests/test_ota_request_retry.py
       when: on_success
     - when: never
   script:
@@ -724,6 +726,7 @@ idt_ci_contract:
         tools.ci.tests.test_rx_e2studio_cli \
         tools.ci.tests.test_rx72n_network_defaults \
         tools.ci.tests.test_rx72n_fwup_prm_contract \
+        tools.ci.tests.test_ota_request_retry \
         tools.ci.tests.test_idt_rfp_process \
         tools.ci.tests.test_idt_cleanup_budget \
         tools.ci.tests.test_rfp_cli_locked \
@@ -1824,7 +1827,8 @@ build_rx65n_bg96:
   script:
     - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
-    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_normal_boot_jobs tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_normal_boot_jobs tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_idt_bg96_network
+    - if ($LASTEXITCODE -ne 0) { throw 'RX65N BG96 host regression tests failed.' }
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
@@ -1908,6 +1912,19 @@ build_rx65n_bg96:
       - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.mot
       - Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/HardwareDebug/*.abs
     expire_in: 7 days
+
+build_rx65n_tsip_common_core:
+  extends: build_rx65n_bg96
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-idt-targets"'
+      when: on_success
+    - when: never
+  variables:
+    RX65N_BG96_TLS_BACKEND: "tsip"
+    RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.2"
+    RX65N_BG96_TLS13_0RTT_ENABLE: "false"
+    RX65N_BG96_TEST_SCOPE: "build"
 
 build_rx671_wifi:
   timeout: 3 hours

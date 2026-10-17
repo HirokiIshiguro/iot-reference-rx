@@ -161,6 +161,7 @@
 									<listOptionValue builtIn="false" value="TSIP_RUNTIME_PROVISIONING_ENABLE"/>
 									<listOptionValue builtIn="false" value="CONFIG_MEDTLS_USE_AFR_MEMORY"/>
 									<listOptionValue builtIn="false" value="CONFIG_FREERTOS_ASSERT_FAIL_ABORT"/>
+									<listOptionValue builtIn="false" value="CELLULAR_APN_KVS_ENABLE=1"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_ERROR_C"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_ALLOW_PRIVATE_ACCESS"/>
 									<listOptionValue builtIn="false" value="__LITTLE_ENDIAN__"/>

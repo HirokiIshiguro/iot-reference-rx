@@ -94,6 +94,26 @@ class NormalBootCiContractTests(unittest.TestCase):
         self.assertIn("- os-windows", build)
         self.assertIn("tools.ci.tests.test_build_bg96_ota_candidate", build)
 
+    def test_bg96_persistent_keys_and_ota_loss_retries_are_checked_before_build(self):
+        build = job("build_rx65n_bg96")
+        self.assertIn("tools.ci.tests.test_idt_bg96_network", build)
+        self.assertLess(build.index("tools.ci.tests.test_idt_bg96_network"),
+                        build.index("RX65N BG96 host regression tests failed"))
+        self.assertLess(build.index("RX65N BG96 host regression tests failed"),
+                        build.index("python -m pip install"))
+        self.assertIn("$LASTEXITCODE -ne 0", build)
+        self.assertIn("tools.ci.tests.test_ota_request_retry", job("idt_ci_contract"))
+
+    def test_bg96_tsip_lane_is_source_only_and_uses_the_shared_compiler_lease(self):
+        lane = job("build_rx65n_tsip_common_core")
+        for text in ("extends: build_rx65n_bg96", "resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP",
+                     '$CI_PIPELINE_SOURCE == "merge_request_event"', '$PIPELINE_PROFILE == "mr-idt-targets"',
+                     'RX65N_BG96_TLS_BACKEND: "tsip"', 'RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.2"',
+                     'RX65N_BG96_TLS13_0RTT_ENABLE: "false"', 'RX65N_BG96_TEST_SCOPE: "build"'):
+            self.assertIn(text, lane)
+        self.assertNotIn("when: manual", lane)
+        self.assertNotIn("install_normal_boot.py", lane)
+
 
 if __name__ == "__main__":
     unittest.main()

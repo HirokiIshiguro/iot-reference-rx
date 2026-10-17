@@ -1224,6 +1224,7 @@ static void processOTAEvents(void)
         {
             /* No current event and we have not received the new block
              * trying sending request for new block again */
+            nextBlockOffsetToRequest = currentBlockOffset;
             recvEventId = lastRecvEventId;
 
             /* It is likely that the network was disconnected and reconnected,

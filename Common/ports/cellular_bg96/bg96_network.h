@@ -8,7 +8,8 @@
 extern const CellularCommInterface_t Bg96_CommInterface;
 CellularHandle_t Bg96_GetHandle(void);
 /* Supply a copied IPv4 PDN profile before the first Connect2AP(). An active
- * modem session rejects changes. Without this call the board defaults apply. */
+ * modem session rejects changes. Otherwise use persisted PDN fields when the
+ * BG96 KVS is selected, retaining board defaults for fields not stored. */
 bool Bg96_SetRuntimePdnConfig(const CellularPdnConfig_t * config);
 bool Connect2AP(void);
 void Bg96_NetworkCleanup(void);

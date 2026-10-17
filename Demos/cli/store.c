@@ -30,6 +30,10 @@
 
 #include "aws_dev_mode_key_provisioning.h"
 #include "core_pkcs11_pal.h"
+#if CELLULAR_APN_KVS_ENABLE == 1
+#include "cellular_config.h"
+#include "cellular_config_defaults.h"
+#endif
 
 const char * keys[ KVS_NUM_KEYS ] = KVSTORE_KEYS;
 KeyValueStore_t gKeyValueStore = { 0 };
@@ -38,6 +42,24 @@ extern CK_RV vDevModeKeyPreProvisioning( const KeyValueStore_t * pKeystore,
                                          KVStoreKey_t ID,
                                          int32_t xvaluelength );
 BaseType_t xPending;
+
+#if CELLULAR_APN_KVS_ENABLE == 1
+static BaseType_t prvCellularValueValid( KVStoreKey_t key, const char * value, size_t length )
+{
+    size_t textLength = length;
+    size_t limit;
+    if( ( value == NULL ) || ( length == 0U ) ) { return pdFALSE; }
+    if( value[length - 1U] == '\0' ) { textLength--; }
+    if( memchr( value, '\0', textLength ) != NULL ) { return pdFALSE; }
+    if( key == KVS_CELLULAR_AP_AUTH_TYPE )
+    {
+        return ( textLength == 1U && value[0] >= '0' && value[0] <= '2' ) ? pdTRUE : pdFALSE;
+    }
+    limit = ( key == KVS_CELLULAR_AP_NAME ) ? CELLULAR_APN_MAX_SIZE :
+            ( key == KVS_CELLULAR_AP_USERID ) ? CELLULAR_PDN_USERNAME_MAX_SIZE : CELLULAR_PDN_PASSWORD_MAX_SIZE;
+    return ( textLength <= limit && ( key != KVS_CELLULAR_AP_NAME || textLength > 0U ) ) ? pdTRUE : pdFALSE;
+}
+#endif
 
 #if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 static inline void vClearDataBuffer( KVStoreKey_t key );
@@ -188,6 +210,14 @@ int32_t xprvWriteCacheEntry(size_t KeyLength,
 	{
 		return xKey;
 	}
+
+#if CELLULAR_APN_KVS_ENABLE == 1
+    if( xKey >= KVS_CELLULAR_AP_NAME && xKey <= KVS_CELLULAR_AP_AUTH_TYPE &&
+        prvCellularValueValid( xKey, pvNewValue, ValueLength ) != pdTRUE )
+    {
+        return KVS_INVALID_KEY;
+    }
+#endif
 
 #if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
 	if (((KVS_WIFI_SSID == xKey) && ((0U == ValueLength) || (32U < ValueLength))) ||
@@ -340,7 +370,7 @@ static inline void vReallocDataBuffer( KVStoreKey_t key,
 
 int32_t Filename2Handle( char * pcFileName,size_t KeyLength)
 {
-#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 0
+#if (RX671_WIFI_CREDENTIAL_KVS_ENABLE == 0) && (CELLULAR_APN_KVS_ENABLE == 0)
 	(void) KeyLength; /* String comparison to use the length of KVStore key */
 #endif
 	int32_t xHandle = -1;
@@ -349,7 +379,7 @@ int32_t Filename2Handle( char * pcFileName,size_t KeyLength)
     {
         for (uint32_t i = 0; i < KVS_NUM_KEYS; i++)
         {
-#if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
+#if (RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1) || (CELLULAR_APN_KVS_ENABLE == 1)
             if ((KeyLength == strlen(CLIcmdkeys[i])) &&
                 (strncmp( pcFileName, CLIcmdkeys[i], KeyLength ) == 0))
 #else

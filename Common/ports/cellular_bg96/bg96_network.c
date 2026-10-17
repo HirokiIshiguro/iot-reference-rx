@@ -3,6 +3,9 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "bg96_network.h"
+#if CELLULAR_APN_KVS_ENABLE == 1
+#include "store.h"
+#endif
 
 static CellularHandle_t moduleHandle;
 static bool pdnReady;
@@ -10,6 +13,44 @@ static bool runtimePdnConfigured;
 static CellularPdnConfig_t runtimePdnConfig;
 
 CellularHandle_t Bg96_GetHandle(void) { return moduleHandle; }
+
+#if CELLULAR_APN_KVS_ENABLE == 1
+static bool prvReadPdnString(KVStoreKey_t key, char * value, size_t capacity)
+{
+    size_t length = prvGetCacheEntryLength(key);
+    const char * end;
+    if (length == 0U) { return true; } /* Preserve the board default when absent. */
+    if (length > capacity) { return false; }
+    memset(value, 0, capacity);
+    if (xReadEntry(key, value, length) != length) { return false; }
+    end = memchr(value, '\0', length);
+    if (end != NULL) { return end == value + length - 1U; }
+    if (length == capacity) { return false; }
+    value[length] = '\0';
+    return true;
+}
+
+static bool prvLoadPersistentPdn(CellularPdnConfig_t * config)
+{
+    char auth[3] = {0};
+    if (!prvReadPdnString(KVS_CELLULAR_AP_NAME, config->apnName, sizeof(config->apnName)) ||
+        !prvReadPdnString(KVS_CELLULAR_AP_USERID, config->username, sizeof(config->username)) ||
+        !prvReadPdnString(KVS_CELLULAR_AP_PASSWORD, config->password, sizeof(config->password))) { return false; }
+    if (config->apnName[0] == '\0') { return false; }
+    if (prvGetCacheEntryLength(KVS_CELLULAR_AP_AUTH_TYPE) != 0U)
+    {
+        if (!prvReadPdnString(KVS_CELLULAR_AP_AUTH_TYPE, auth, sizeof(auth)) ||
+            auth[0] < '0' || auth[0] > '2' || auth[1] != '\0') { return false; }
+        switch (auth[0])
+        {
+            case '0': config->pdnAuthType = CELLULAR_PDN_AUTH_NONE; break;
+            case '1': config->pdnAuthType = CELLULAR_PDN_AUTH_PAP; break;
+            default: config->pdnAuthType = CELLULAR_PDN_AUTH_CHAP; break;
+        }
+    }
+    return true;
+}
+#endif
 
 bool Bg96_SetRuntimePdnConfig(const CellularPdnConfig_t * config)
 {
@@ -50,6 +91,21 @@ bool Connect2AP(void)
     CellularError_t status;
     TickType_t began;
     if (pdnReady) { return true; }
+    if (runtimePdnConfigured)
+    {
+        pdn = runtimePdnConfig;
+    }
+    else
+    {
+        pdn.pdnContextType = CELLULAR_PDN_CONTEXT_IPV4;
+        pdn.pdnAuthType = (CellularPdnAuthType_t)BG96_PDN_AUTH_TYPE;
+        strncpy(pdn.apnName, BG96_APN_NAME, sizeof(pdn.apnName) - 1U);
+        strncpy(pdn.username, BG96_APN_USER, sizeof(pdn.username) - 1U);
+        strncpy(pdn.password, BG96_APN_PASSWORD, sizeof(pdn.password) - 1U);
+#if CELLULAR_APN_KVS_ENABLE == 1
+        if (!prvLoadPersistentPdn(&pdn)) { return false; }
+#endif
+    }
     status = Cellular_Init(&moduleHandle, &Bg96_CommInterface);
     if (status != CELLULAR_SUCCESS) { Bg96_NetworkCleanup(); return false; }
     /* Change the modem first; change the host only after the public API returns
@@ -70,18 +126,6 @@ bool Connect2AP(void)
     } while ((xTaskGetTickCount() - began) < pdMS_TO_TICKS(60000U));
     if ((status != CELLULAR_SUCCESS) || (sim.simCardState != CELLULAR_SIM_CARD_READY))
     { Bg96_NetworkCleanup(); return false; }
-    if (runtimePdnConfigured)
-    {
-        pdn = runtimePdnConfig;
-    }
-    else
-    {
-        pdn.pdnContextType = CELLULAR_PDN_CONTEXT_IPV4;
-        pdn.pdnAuthType = (CellularPdnAuthType_t)BG96_PDN_AUTH_TYPE;
-        strncpy(pdn.apnName, BG96_APN_NAME, sizeof(pdn.apnName) - 1U);
-        strncpy(pdn.username, BG96_APN_USER, sizeof(pdn.username) - 1U);
-        strncpy(pdn.password, BG96_APN_PASSWORD, sizeof(pdn.password) - 1U);
-    }
     status = Cellular_SetPdnConfig(moduleHandle, CELLULAR_PDN_CONTEXT_ID, &pdn);
     if (status != CELLULAR_SUCCESS) { Bg96_NetworkCleanup(); return false; }
     began = xTaskGetTickCount();
