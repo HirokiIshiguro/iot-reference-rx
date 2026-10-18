@@ -284,6 +284,7 @@ bool Connect2AP( void )
 	return  (CELLULAR_SUCCESS == ret);
 }
 
+#if CELLULAR_APN_KVS_ENABLE == 1
 static bool prvReadApString(KVStoreKey_t key, uint8_t * value, size_t capacity)
 {
     size_t length = prvGetCacheEntryLength(key);
@@ -298,16 +299,20 @@ static bool prvReadApString(KVStoreKey_t key, uint8_t * value, size_t capacity)
     value[length] = '\0';
     return true;
 }
+#endif
 
 static BaseType_t prvLoadCellularApConfig( st_cellular_ap_cfg_t * p_ap_cfg )
 {
+#if CELLULAR_APN_KVS_ENABLE == 1
     uint8_t auth[3] = {0};
+#endif
     if (p_ap_cfg == NULL) { return pdFALSE; }
     memset(p_ap_cfg, 0, sizeof(*p_ap_cfg));
     strncpy((char *)p_ap_cfg->ap_name, CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_NAME), sizeof(p_ap_cfg->ap_name)-1U);
     strncpy((char *)p_ap_cfg->ap_user_name, CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_USERID), sizeof(p_ap_cfg->ap_user_name)-1U);
     strncpy((char *)p_ap_cfg->ap_pass, CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_PASSWORD), sizeof(p_ap_cfg->ap_pass)-1U);
     p_ap_cfg->auth_type = CELLULAR_CFG_AUTH_TYPE;
+#if CELLULAR_APN_KVS_ENABLE == 1
     if (!prvReadApString(KVS_CELLULAR_AP_NAME, p_ap_cfg->ap_name, sizeof(p_ap_cfg->ap_name)) ||
         !prvReadApString(KVS_CELLULAR_AP_USERID, p_ap_cfg->ap_user_name, sizeof(p_ap_cfg->ap_user_name)) ||
         !prvReadApString(KVS_CELLULAR_AP_PASSWORD, p_ap_cfg->ap_pass, sizeof(p_ap_cfg->ap_pass)) ||
@@ -318,6 +323,7 @@ static BaseType_t prvLoadCellularApConfig( st_cellular_ap_cfg_t * p_ap_cfg )
             auth[0] < '0' || auth[0] > '2' || auth[1] != '\0') { return pdFALSE; }
         p_ap_cfg->auth_type = (e_cellular_auth_type_t)(auth[0] - '0');
     }
+#endif
     return pdTRUE;
 }
 

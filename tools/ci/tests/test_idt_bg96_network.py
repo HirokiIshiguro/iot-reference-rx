@@ -263,6 +263,59 @@ extern char fixtureApn[128],fixtureUser[128],fixturePassword[128],fixtureAuth[8]
             host.r_cellular_includes() + [ROOT / "Test/ports"],
             ["ENABLE_IDT_TRANSPORT_TEST=1", "IDT_TARGET_RX65N_BG96=1"])
 
+    def test_without_apn_kvs_uses_defaults_and_copied_runtime_profile(self):
+        headers = self.store_headers()
+        headers["FreeRTOS.h"] += 'typedef unsigned TickType_t;\n'
+        headers["task.h"] = '#include "FreeRTOS.h"\nvoid vTaskDelay(TickType_t);\n'
+        host.ProductApiTests.compile_run(self, r'''
+#ifdef NDEBUG
+#error Assertions must remain enabled
+#endif
+#include <assert.h>
+#include <string.h>
+#include "store.h"
+#include "r_cellular_network.h"
+static st_cellular_ap_cfg_t received;
+static unsigned opens,connections,closes;
+void vTaskDelay(TickType_t ticks) { (void)ticks; }
+e_cellular_err_t R_CELLULAR_Open(st_cellular_ctrl_t *const ctrl,const st_cellular_cfg_t *const config) {
+ (void)config;assert(ctrl==&cellular_ctrl);opens++;ctrl->system_state=CELLULAR_SYSTEM_OPEN;return CELLULAR_SUCCESS;
+}
+e_cellular_err_t R_CELLULAR_Close(st_cellular_ctrl_t *const ctrl) {
+ assert(ctrl==&cellular_ctrl);closes++;ctrl->system_state=CELLULAR_SYSTEM_CLOSE;return CELLULAR_SUCCESS;
+}
+e_cellular_err_t R_CELLULAR_SetOperator(st_cellular_ctrl_t *const ctrl,const uint8_t *const value) { (void)ctrl;(void)value;return CELLULAR_SUCCESS; }
+e_cellular_err_t R_CELLULAR_SetBand(st_cellular_ctrl_t *const ctrl,const uint8_t *const value) { (void)ctrl;(void)value;return CELLULAR_SUCCESS; }
+e_cellular_err_t R_CELLULAR_HardwareReset(st_cellular_ctrl_t *const ctrl) { (void)ctrl;return CELLULAR_SUCCESS; }
+e_cellular_err_t R_CELLULAR_CloseSocket(st_cellular_ctrl_t *const ctrl,const uint8_t no) { (void)ctrl;(void)no;return CELLULAR_SUCCESS; }
+e_cellular_err_t R_CELLULAR_APConnect(st_cellular_ctrl_t *const ctrl,const st_cellular_ap_cfg_t *const config) {
+ assert(ctrl==&cellular_ctrl && config);received=*config;connections++;ctrl->system_state=CELLULAR_SYSTEM_CONNECT;return CELLULAR_SUCCESS;
+}
+/* Deliberately supply no KVS API bodies: an accidental call must fail to link. */
+int main(void) {
+ st_cellular_ap_cfg_t runtime={0};
+ assert(CELLULAR_APN_KVS_ENABLE==0 && KVS_NUM_KEYS==KVS_TSIP_CLIENT_PRIKEY_ID+1);
+ assert(Connect2AP() && opens==1 && connections==1);
+ assert(!strcmp((char*)received.ap_name,CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_NAME)));
+ assert(!strcmp((char*)received.ap_user_name,CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_USERID)));
+ assert(!strcmp((char*)received.ap_pass,CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_PASSWORD)));
+ assert(received.auth_type==CELLULAR_CFG_AUTH_TYPE);
+ RCellular_NetworkCleanup();assert(closes==1 && !RCellular_IsOpen());
+ strcpy((char*)runtime.ap_name,"benchmark.invalid");strcpy((char*)runtime.ap_user_name,"bench");
+ strcpy((char*)runtime.ap_pass,"test-only");runtime.auth_type=CELLULAR_AUTH_TYPE_PAP;
+ assert(RCellular_SetRuntimeApConfig(&runtime));
+ memset(&runtime,0,sizeof(runtime));
+ assert(Connect2AP() && opens==2 && connections==2);
+ assert(!strcmp((char*)received.ap_name,"benchmark.invalid") && !strcmp((char*)received.ap_user_name,"bench"));
+ assert(!strcmp((char*)received.ap_pass,"test-only") && received.auth_type==CELLULAR_AUTH_TYPE_PAP);
+ assert(Connect2AP() && opens==2 && connections==2);
+ RCellular_NetworkCleanup();assert(closes==2 && !RCellular_IsOpen());
+ assert(Connect2AP() && !strcmp((char*)received.ap_name,"benchmark.invalid"));
+ RCellular_NetworkCleanup();return 0;
+}
+''', headers, [PRODUCT / "r_cellular_network.c"], host.r_cellular_includes(),
+            ["CELLULAR_APN_KVS_ENABLE=0"])
+
 
 if __name__ == "__main__":
     unittest.main()
