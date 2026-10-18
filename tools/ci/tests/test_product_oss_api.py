@@ -1,6 +1,7 @@
 """Product protocol and queued-argument tests against pristine Agent2 headers."""
 from pathlib import Path
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -249,6 +250,55 @@ int main(void) {
 }
 ''', headers, [ROOT / "Middleware/network_transport/sockets_wrapper/ports/cellular_ryz014a/sockets_wrapper.c"],
              r_cellular_includes() + [ROOT / "Middleware/network_transport/sockets_wrapper/include"])
+
+    def test_r_cellular_logging_macros_keep_normal_logs_and_disable_maintenance_side_effects(self):
+        source = r'''
+#include <assert.h>
+#include "logging_levels.h"
+static unsigned calls;
+static void RecordLog(const char *format,int value) { (void)format;(void)value;calls++; }
+#include "cellular_freertos.h"
+#if !defined(CELLULAR_LOG_ERROR) || !defined(CELLULAR_LOG_WARN) || !defined(CELLULAR_LOG_INFO) || !defined(CELLULAR_LOG_DEBUG)
+#error CELLULAR_LOG_macros_must_be_defined
+#endif
+int main(void) {
+ unsigned effects=0;
+ CELLULAR_LOG_ERROR(("fixture %d",++effects));CELLULAR_LOG_WARN(("fixture %d",++effects));
+ CELLULAR_LOG_INFO(("fixture %d",++effects));CELLULAR_LOG_DEBUG(("fixture %d",++effects));
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+ assert(CELLULAR_CFG_DEBUGLOG==0 && calls==0 && effects==0);
+#else
+ assert(CELLULAR_CFG_DEBUGLOG==4 && calls==4 && effects==4);
+#endif
+ return 0;
+}
+'''
+        for project in ("aws_bg96_ck_rx65n", "aws_bg96_ck_rx65n_tsip"):
+            config = Path("Projects") / project / "e2studio_ccrx/src/smc_gen/r_config/r_cellular_config.h"
+            headers = r_cellular_headers()
+            headers.update({
+                "r_cellular_config.h": '#include "' + config.as_posix() + '"\n',
+                "FreeRTOS.h": "#include <stddef.h>\n#include <stdint.h>\n",
+                "task.h": "",
+                "logging_levels.h": "#define LOG_NONE 0\n#define LOG_INFO 3\n",
+                "logging_stack.h": "#define LogError(x) RecordLog x\n#define LogWarn(x) RecordLog x\n#define LogInfo(x) RecordLog x\n#define LogDebug(x) RecordLog x\n",
+            })
+            includes = r_cellular_includes() + [RCELLULAR / "src/RTOS/include"]
+            with self.subTest(project=project, role="normal"):
+                self.compile_run(source, headers, extra_includes=includes)
+            maintenance_defines = ["PUBLIC_SIGNER_PROVISIONER_ENABLE=1", "LIBRARY_LOG_LEVEL=LOG_NONE"]
+            with self.subTest(project=project, role="maintenance"):
+                self.compile_run(source, headers, extra_includes=includes, extra_defines=maintenance_defines)
+            # The former unconditionally enabled setting must fail the same macro contract.
+            old_headers = dict(headers)
+            old_headers["r_cellular_config.h"], replacements = re.subn(
+                r"#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1\n.*?\n#endif",
+                "#define CELLULAR_CFG_DEBUGLOG (4)",
+                (ROOT / config).read_text(encoding="utf-8"), count=1, flags=re.S)
+            self.assertEqual(replacements, 1)
+            with self.subTest(project=project, role="old-maintenance-negative-control"):
+                with self.assertRaisesRegex(AssertionError, "CELLULAR_LOG_macros_must_be_defined"):
+                    self.compile_run(source, old_headers, extra_includes=includes, extra_defines=maintenance_defines)
 
     def test_product_jobs_topic_bounds_and_nonterminated_id(self):
         self.compile_run(r'''

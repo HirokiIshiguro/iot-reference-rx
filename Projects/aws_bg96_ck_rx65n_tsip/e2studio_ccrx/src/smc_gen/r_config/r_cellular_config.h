@@ -52,7 +52,11 @@
 #define CELLULAR_CFG_URC_CHARGET_ENABLED    (0)         /* Whether the callback function is invoked when a URC is received(0: No, 1: Yes)*/
 #define CELLULAR_CFG_URC_CHARGET_FUNCTION   my_sw_urc_charget_function  /* Name of the callback function to be invoked during ringline operation.*/
 
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+#define CELLULAR_CFG_DEBUGLOG               (0) /* Maintenance images disable driver logging. */
+#else
 #define CELLULAR_CFG_DEBUGLOG               (4) /* 0: OFF, 1: ERROR, 2: +WARN, 3: +INFO, 4: +DEBUG(AT command data) */
+#endif
                                                 /* This macro can be used with FreeRTOS logging task. https://www.freertos.org/logging.html */
 
 #define CELLULAR_CFG_RESET_SIGNAL_LOGIC     (1) /* 1: active high (in this case when user would use PMOD RYZ014A) 0: active low */
