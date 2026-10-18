@@ -10,10 +10,15 @@
 #include "task.h"
 #include "demo_config.h"
 #include "platform.h"
-#include "bg96_network.h"
+#include "r_cellular_network.h"
 #include "tcp_sockets_wrapper.h"
 #include "r_sci_rx_if.h"
 #include "r_sci_rx_pinset.h"
+
+#define BG96_APN_NAME                  CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_NAME)
+#define BG96_APN_USER                  CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_USERID)
+#define BG96_APN_PASSWORD              CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_PASSWORD)
+#define BG96_PDN_AUTH_TYPE             CELLULAR_CFG_AUTH_TYPE
 
 #define BG96_UART_BAUDRATE             (115200U)
 #define BG96_RX_QUEUE_LENGTH           (512U)
@@ -757,7 +762,7 @@ static void bg96_mqtt_at_probe(void)
     (void) bg96_command_wait_async("AT+QMTCLOSE=0\r", "+QMTCLOSE: 0,0", BG96_MQTT_CMD_TIMEOUT_MS);
 }
 
-static void bg96_official_cellular_smoke_test(void)
+static void bg96_r_cellular_smoke_test(void)
 {
     Socket_t socket = NULL;
     BaseType_t result;
@@ -768,14 +773,14 @@ static void bg96_official_cellular_smoke_test(void)
     }
     if (!Connect2AP())
     {
-        configPRINTF(("BG96 official Cellular: network connection failed\r\n"));
+        configPRINTF(("BG96 r_cellular: network connection failed\r\n"));
         return;
     }
     result = TCP_Sockets_Connect(&socket, BG96_TEST_BROKER_HOST,
                                  (uint16_t)BG96_TEST_BROKER_PORT, 5000U, 5000U);
-    configPRINTF(("BG96 official Cellular: TCP connect result=%d\r\n", (int)result));
+    configPRINTF(("BG96 r_cellular: TCP connect result=%d\r\n", (int)result));
     if (socket != NULL) { TCP_Sockets_Disconnect(socket); }
-    Bg96_NetworkCleanup();
+    RCellular_NetworkCleanup();
 }
 
 static bool bg96_configure_apn(void)
@@ -956,7 +961,7 @@ void bg96_probe_run(void)
         (void) bg96_command_timed("AT+QIACT=1\r", "OK", BG96_NETWORK_CMD_TIMEOUT_MS);
         (void) bg96_command("AT+QIACT?\r", "OK");
         (void) bg96_command("AT+CGPADDR=1\r", "+CGPADDR:");
-        bg96_official_cellular_smoke_test();
+        bg96_r_cellular_smoke_test();
         bg96_mqtt_at_probe();
     }
     else
