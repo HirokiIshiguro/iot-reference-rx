@@ -77,6 +77,7 @@
 #define CELLULAR_CFG_PFS_SET_VALUE          0x0BU
 #define CELLULAR_CFG_BG96_USE_HW_CTS        (0)
 #define CELLULAR_CFG_BG96_FLOW_CONTROL      (1)
+#define CELLULAR_CFG_BG96_RUNTIME_BAUDRATE  (921600)
 
 #define CELLULAR_CFG_RTS_PORT               J
 #define CELLULAR_CFG_RTS_PIN                3

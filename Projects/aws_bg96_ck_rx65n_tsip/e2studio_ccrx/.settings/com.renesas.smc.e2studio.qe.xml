@@ -44,7 +44,7 @@
         <Setting id="r_sci_rx" value="FIT"/>
         <Setting id="r_flash_rx" value="FIT"/>
         <Setting id="FreeRTOS_Kernel" value=""/>
-        <Segment component="r_cellular1.13.saffti-custom.3" id="r_cellular" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_cellular1.13.saffti-custom.4" id="r_cellular" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="CELLULAR_CFG_BG96_DTR_PIN" value="7"/>
             <Setting id="CELLULAR_CFG_BG96_PWRKEY_PIN" value="7"/>
             <Setting id="CELLULAR_CFG_RING_LINE_ACTIVE_TIME" value="1000"/>
@@ -59,6 +59,7 @@
             <Setting id="CELLULAR_CFG_DEBUGLOG" value="4"/>
             <Setting id="CELLULAR_CFG_BG96_USE_HW_CTS" value="0"/>
             <Setting id="CELLULAR_CFG_BG96_FLOW_CONTROL" value="1"/>
+            <Setting id="CELLULAR_CFG_BG96_RUNTIME_BAUDRATE" value="921600"/>
             <Setting id="CELLULAR_CFG_UPGRADE_TIME" value="60"/>
             <Setting id="CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL" value="1"/>
             <Setting id="CELLULAR_CFG_BG96_DTR_IDLE_LEVEL" value="1"/>
