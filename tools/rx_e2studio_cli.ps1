@@ -68,7 +68,9 @@ function Get-RxE2StudioProjectInputState {
                             -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
                             $pending.Push($item.FullName)
                         }
-                    } else { $files.Add($item.FullName) }
+                    # Generated RCPC sidecars follow the checkout's *.rcpc
+                    # ignore rule. The Git inventory still protects tracked RCPC.
+                    } elseif ($item.Extension -ine '.rcpc') { $files.Add($item.FullName) }
                 }
             }
         }
