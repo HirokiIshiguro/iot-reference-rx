@@ -58,6 +58,7 @@
             <Setting id="CELLULAR_CFG_AP_NAME" value="iot.truphone.com"/>
             <Setting id="CELLULAR_CFG_DEBUGLOG" value="4"/>
             <Setting id="CELLULAR_CFG_BG96_USE_HW_CTS" value="0"/>
+            <Setting id="CELLULAR_CFG_BG96_FLOW_CONTROL" value="1"/>
             <Setting id="CELLULAR_CFG_UPGRADE_TIME" value="60"/>
             <Setting id="CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL" value="1"/>
             <Setting id="CELLULAR_CFG_BG96_DTR_IDLE_LEVEL" value="1"/>
@@ -70,14 +71,14 @@
             <Setting id="CELLULAR_CFG_PIN_CODE" value=""/>
             <Setting id="CELLULAR_CFG_BG96_DTR_ENABLE" value="0"/>
             <Setting id="CELLULAR_CFG_IRQ_NUM" value="4"/>
-            <Setting id="CELLULAR_CFG_SCI_PRIORITY" value="6"/>
+            <Setting id="CELLULAR_CFG_SCI_PRIORITY" value="4"/>
             <Setting id="CELLULAR_CFG_RESET_PIN" value="5"/>
-            <Setting id="CELLULAR_CFG_RTS_PORT" value="0"/>
+            <Setting id="CELLULAR_CFG_RTS_PORT" value="J"/>
             <Setting id="CELLULAR_CFG_ATC_RETRY_CGATT" value="600"/>
             <Setting id="CELLULAR_CFG_URC_CHARGET_FUNCTION" value="my_sw_urc_charget_function"/>
             <Setting id="CELLULAR_CFG_AP_PASSWORD" value=""/>
             <Setting id="CELLULAR_CFG_BG96_POWER_ENABLE" value="0"/>
-            <Setting id="CELLULAR_CFG_RTS_PIN" value="2"/>
+            <Setting id="CELLULAR_CFG_RTS_PIN" value="3"/>
             <Setting id="CELLULAR_CFG_BG96_POWER_ENABLE_PORT" value="B"/>
             <Setting id="CELLULAR_CFG_URC_CHARGET_ENABLED" value="0"/>
             <Setting id="CELLULAR_CFG_AUTH_TYPE" value="2"/>
