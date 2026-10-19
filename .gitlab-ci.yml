@@ -671,6 +671,9 @@ idt_ci_contract:
         - tools/ci/tests/test_public_signer_cli_commands.py
         - Demos/OtaOverMqtt/OtaOverMqttDemo.c
         - tools/ci/tests/test_ota_request_retry.py
+        - Projects/aws_*/e2studio_ccrx/.cproject
+        - tools/ci/check_rx_context_restore.py
+        - tools/ci/tests/test_rx_context_restore.py
       when: on_success
     - when: never
   script:
@@ -714,6 +717,7 @@ idt_ci_contract:
         tools.ci.tests.test_idt_pkcs11_source_view \
         tools.ci.tests.test_idt_auto_link_profile \
         tools.ci.tests.test_common_kernel \
+        tools.ci.tests.test_rx_context_restore \
         tools.ci.tests.test_freertos_assert_profiles \
         tools.ci.tests.test_rx65n_managed_build_profiles \
         tools.ci.tests.test_idt_nested_dependency_initialization \

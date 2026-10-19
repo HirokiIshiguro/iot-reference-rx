@@ -236,6 +236,10 @@
 								</option>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.vect.1574995088" name="可変ベクタテーブルのアドレス未設定ベクタ番号に指定するアドレス (-vect)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.vect" value="_undefined_interrupt_source_isr" valueType="string"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.1891727034" name="最適化方法 (-nooptimize/-optimize)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize" value="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.optimize.all" valueType="enumerated"/>
+								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.samecodeForbid.rxContextRestore" name="Functions excluded from common code optimization (-samecode_forbid)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.samecodeForbid" valueType="stringList">
+									<listOptionValue builtIn="false" value="_xPortStartScheduler"/>
+									<listOptionValue builtIn="false" value="_vSoftwareInterruptISR"/>
+								</option>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.useCustomLinkageOrder.491382281" name="リンク順序のカスタマイズの使用" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.useCustomLinkageOrder" value="false" valueType="boolean"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.common170" name="Link map contents (-show=all)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show" value="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.show.all" valueType="enumerated"/>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.checkSection.common170" name="Check section placement" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.checkSection" value="true" valueType="boolean"/>
