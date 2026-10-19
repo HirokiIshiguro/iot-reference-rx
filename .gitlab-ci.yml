@@ -665,6 +665,8 @@ idt_ci_contract:
         - tools/test_build_rx_idt.ps1
         - tools/build_headless_rx*.ps1
         - tools/provision_rx671_ota.py
+        - tools/bg96_bootloader_integration.py
+        - tools/ci/tests/test_bg96_static_provisioning.py
         - Demos/cli/CLIcommands.c
         - tools/ci/tests/test_public_signer_cli_commands.py
         - Demos/OtaOverMqtt/OtaOverMqttDemo.c

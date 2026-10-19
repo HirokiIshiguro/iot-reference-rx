@@ -5,10 +5,16 @@ Mbed TLS libraries are used. Synthetic keys exist only inside the host process;
 no private key or environment credential is read, printed, or embedded here.
 """
 from pathlib import Path
+from contextlib import redirect_stdout
+from io import StringIO
+import os
 import re
 import subprocess
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 
+from tools import bg96_bootloader_integration as bg96
 from tools.ci.tests import test_product_oss_api as host
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -35,6 +41,87 @@ def function(text, name):
 
 
 class StaticProvisioningContractTests(unittest.TestCase):
+    def provision_store(self, action, *, skip_private_key=False):
+        """Model the CLI cache/commit boundary, including destructive format."""
+        original = {
+            "codesigncert": "fixture boot certificate",
+            "codesignpubkey": "fixture boot public key",
+            "cert": "old device certificate",
+            "key": "old device key",
+            "claimcert": "old claim certificate",
+            "claimkey": "old claim key",
+        }
+        persisted = dict(original)
+        cache = dict(original)
+        commands = []
+
+        def send_command(port, command, **kwargs):
+            commands.append(command)
+            if command == "format":
+                persisted.clear()
+                cache.clear()
+            elif command == "conf commit":
+                persisted.clear()
+                persisted.update(cache)
+            elif command.startswith("conf set "):
+                _, _, name, value = command.split(" ", 3)
+                cache[name] = value
+            else:
+                raise AssertionError("Unexpected fixture CLI command")
+
+        def send_pem(port, name, value, **kwargs):
+            cache[name] = value
+
+        environment = {
+            "BG96_AWS_IOT_ENDPOINT": "fixture.invalid",
+            "RX65N_BG96_AWS_IOT_THING_NAME": "fixture-thing",
+            "AWS_IOT_CERT": "new device certificate",
+            "AWS_IOT_PRIVKEY": "new device key",
+            "BG96_FLEET_PROVISIONING_TEMPLATE": "fixture-template",
+            "BG96_FLEET_CLAIM_CERT": "new claim certificate",
+            "BG96_FLEET_CLAIM_PRIVATE_KEY": "new claim key",
+            "BG96_CELLULAR_APN": "fixture-apn",
+        }
+        args = SimpleNamespace(skip_private_key=skip_private_key,
+            provision_cli_timeout=1, provision_char_delay=0,
+            provision_line_delay=0, no_reset_after_provision=True)
+        port = mock.Mock()
+        with mock.patch.dict(os.environ, environment, clear=True), \
+             mock.patch.object(bg96, "enter_cli_mode"), \
+             mock.patch.object(bg96, "send_cli_command", side_effect=send_command), \
+             mock.patch.object(bg96, "send_cli_pem", side_effect=send_pem), \
+             mock.patch.object(bg96, "run_rfp") as reset, \
+             redirect_stdout(StringIO()):
+            action(args, port)
+        reset.assert_not_called()
+        self.assertEqual(commands[-1], "conf commit")
+        self.assertEqual(persisted["apn"], "fixture-apn")
+        for name in ("codesigncert", "codesignpubkey"):
+            self.assertEqual(persisted.get(name), original[name], name)
+        return persisted, original
+
+    def test_mqtt_update_preserves_boot_trust_and_updates_device_credentials(self):
+        store, _ = self.provision_store(bg96.provision_mqtt_credentials)
+        self.assertEqual(store["endpoint"], "fixture.invalid")
+        self.assertEqual(store["thingname"], "fixture-thing")
+        self.assertEqual(store["cert"], "new device certificate")
+        self.assertEqual(store["key"], "new device key")
+
+    def test_tsip_mqtt_update_preserves_boot_trust_and_skips_plaintext_key(self):
+        store, original = self.provision_store(bg96.provision_mqtt_credentials,
+                                               skip_private_key=True)
+        self.assertEqual(store["endpoint"], "fixture.invalid")
+        self.assertEqual(store["thingname"], "fixture-thing")
+        self.assertEqual(store["cert"], "new device certificate")
+        self.assertEqual(store["key"], original["key"])
+
+    def test_fleet_update_preserves_boot_trust_and_updates_claim_credentials(self):
+        store, _ = self.provision_store(bg96.provision_fleet_credentials)
+        self.assertEqual(store["endpoint"], "fixture.invalid")
+        self.assertEqual(store["template"], "fixture-template")
+        self.assertEqual(store["claimcert"], "new claim certificate")
+        self.assertEqual(store["claimkey"], "new claim key")
+
     def test_no_active_build_or_ci_path_invokes_the_retired_source_writer(self):
         legacy = "patch_bg96_aws_iot_mcu.py"
         self.assertFalse((ROOT / "tools" / legacy).exists())
