@@ -147,6 +147,8 @@ variables:
   E2STUDIO_WORKSPACE_RX65N_BG96_FLEET: "C:/Temp/e2ws_iot_ref_rx65n_bg96_fleet"
   RX72N_DEVICE_ID: "rx72n-02"
   RUN_RX72N_BUILD: "true"
+  # API/Web opt-in: deliver and validate the RX72 normal bundle without installation.
+  RUN_RX72N_BUNDLE_VALIDATION: "false"
   # Legacy credential-injected RX72N MQTT candidate build. The current hardware
   # pipeline provisions credentials over UART, so keep this off unless a focused
   # pipeline explicitly needs the old RSU packaging path.

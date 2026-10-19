@@ -256,3 +256,69 @@ package_normal_boot_rx671_fleet:
       - artifacts/normal_boot_rx671_fleet/bundle.zip.enc
       - artifacts/normal_boot_rx671_fleet/manifest.json
     expire_in: 7 days
+
+# Runner needs delivers the same-pipeline bundle; this job never installs it.
+validate_normal_boot_rx72n:
+  extends: .rx72n_linux_hw_job
+  stage: package
+  timeout: 10 minutes
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    RX72N_RPI1_HARDWARE_LOCK_TIMEOUT_SECONDS: "0"
+  needs:
+    - job: package_normal_boot_rx72n
+      artifacts: true
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX72N_BUNDLE_VALIDATION == "true" && $RUN_RX72N_BUILD == "true" && $RX72N_TEST_SCOPE == "build" && $RX72N_SKIP_HW_TESTS == "true" && $RX72N_TLS_BACKEND == "software"'
+      when: on_success
+    - when: never
+  script:
+    - |
+      python3 - <<'PY'
+      import datetime
+      import hashlib
+      import json
+      import os
+      import socket
+      from pathlib import Path
+      from tools import normal_boot
+      from tools.idt.targets import get_target
+
+      project = Path(os.environ["CI_PROJECT_DIR"]).absolute()
+      bundle = project / "artifacts/normal_boot_rx72n"
+      source_sha = os.environ["CI_COMMIT_SHA"]
+      target = get_target("rx72n-ethernet")
+      if socket.gethostname() != target["hostname"]:
+          raise RuntimeError("Normal bundle validation must use the reviewed RX72 runner host")
+      manifest = normal_boot.validate(bundle, target, source_sha)
+      now = datetime.datetime.now(datetime.timezone.utc)
+      receipt = {
+          "schema_version": 1,
+          "status": "PASS",
+          "operation": "normal_bundle_validation_only",
+          "source_sha": source_sha,
+          "pipeline_id": int(os.environ["CI_PIPELINE_ID"]),
+          "consumer_job_id": int(os.environ["CI_JOB_ID"]),
+          "producer_job_name": "package_normal_boot_rx72n",
+          "producer_binding": "same-pipeline needs artifacts:true; exact producer ID must be recorded from the pipeline job plan",
+          "target_id": target["id"],
+          "target_sha256": manifest["target_sha256"],
+          "tls_backend": manifest["tls_backend"],
+          "checkout_path": str(project),
+          "bundle_path": str(bundle),
+          "manifest_sha256": hashlib.sha256((bundle / "normal_install_manifest.json").read_bytes()).hexdigest(),
+          "files_sha256": manifest["files"],
+          "validated_at_utc": now.isoformat(),
+          "probe_start_not_after_utc": (now + datetime.timedelta(minutes=30)).isoformat(),
+          "probe_authorized": False,
+          "revalidation_before_probe_required": True,
+      }
+      receipt_dir = project / "artifacts/validate_normal_boot_rx72n"
+      receipt_dir.mkdir(exist_ok=False)
+      (receipt_dir / "receipt.json").write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+      print("RX72 normal bundle validation PASS")
+      PY
+  artifacts:
+    paths:
+      - artifacts/validate_normal_boot_rx72n/receipt.json
+    expire_in: 1 day
