@@ -36,6 +36,7 @@ RESOURCE_LINKER_SYMBOLS = {
 PROVENANCE_MANIFEST_NAME = "ota-layout-provenance.json"
 LAYOUT_CONTRACT_NAME = "ota-layout-contract.json"
 PROVENANCE_CONFIG_PATHS = (
+    ".project",
     ".cproject",
     LAYOUT_CONTRACT_NAME,
     "src/frtos_config/rx_ota_config.h",
@@ -216,6 +217,27 @@ def _parse_start_anchors(value: str) -> dict[str, int]:
                 anchors[section] = address
         previous_end = match.end()
     return anchors
+
+
+def _linked_rdp_header(project_dir: Path, module: str, relative: str) -> Path:
+    project = ET.parse(project_dir / ".project").getroot()
+    aliases = project.findall("./variableList/variable[name='AWS_IOT_MCU_ROOT']")
+    if (len(aliases) != 1 or len(aliases[0].findall("value")) != 1
+            or aliases[0].findtext("value") != "$%7BPARENT-3-PROJECT_LOC%7D"):
+        raise ValueError("AWS_IOT_MCU_ROOT must identify the source repository root")
+    name = f"Vendor/{module}"
+    links = project.findall(f"./linkedResources/link[name='{name}']")
+    target = f"Middleware/Renesas/rx-driver-package/source/{module}/{module}_vx.xx/{module}"
+    if (len(links) != 1 or links[0].findtext("type") != "2"
+            or links[0].find("location") is not None
+            or len(links[0].findall("locationURI")) != 1
+            or links[0].findtext("locationURI") != f"AWS_IOT_MCU_ROOT/{target}"):
+        raise ValueError(f"{name} must have one canonical RDP linked-resource target")
+    repo_root = project_dir.parents[2].resolve()
+    header = (repo_root / target / relative).resolve()
+    if not header.is_relative_to(repo_root):
+        raise ValueError(f"{name} resolves outside the source repository")
+    return header
 
 
 def _parse_cproject(path: Path) -> tuple[str, Path, str, dict[str, int], dict[str, str]]:
@@ -1422,10 +1444,15 @@ def analyze(
     fwup_config = project_dir / "src/frtos_config/rx_ota_config.h"
     littlefs_config = project_dir / "src/frtos_config/rm_littlefs_flash_config.h"
     bsp_config = project_dir / "src/smc_gen/r_config/r_bsp_config.h"
-    mcu_info = project_dir / "src/smc_gen/r_bsp/mcu/rx671/mcu_info.h"
+    try:
+        mcu_info = _linked_rdp_header(project_dir, "r_bsp", "mcu/rx671/mcu_info.h")
+        flash_target = _linked_rdp_header(
+            project_dir, "r_flash_rx", "src/targets/rx671/r_flash_rx671.h"
+        )
+    except (ET.ParseError, OSError, ValueError) as exc:
+        return [Gate("source_inputs", "FAIL", f"Vendor設定解析失敗: {exc}")]
     resource_source = project_dir / "src/whd_port/whd_port_resource.c"
     sdio_host = project_dir / "src/sdio_host.c"
-    flash_target = project_dir / "src/smc_gen/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
     layout_contract = project_dir / LAYOUT_CONTRACT_NAME
     bootloader_config = (
         repo_root

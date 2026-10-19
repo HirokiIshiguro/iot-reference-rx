@@ -111,6 +111,7 @@ PROFILE_PATHS = (
     Path("src/smc_gen/r_config/r_bsp_config.h"),
 )
 PROVENANCE_PROJECT_PATHS = (
+    Path(".project"),
     Path(".cproject"),
     Path(LAYOUT_CONTRACT_NAME),
     Path("src/frtos_config/rx_ota_config.h"),

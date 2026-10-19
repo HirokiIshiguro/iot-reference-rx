@@ -150,15 +150,17 @@ TYPE1YN_FW_BLOB
 
 
 class GateTests(unittest.TestCase):
-    def test_runtime_default_stays_linear_until_ota_profile_is_applied(self):
+    def test_runtime_default_uses_dual_bank_without_ota_profile(self):
         repo_root = Path(__file__).resolve().parents[3]
         project_dir = repo_root / "Projects/aws_wifi_rx671_ek/e2studio_ccrx"
         with tempfile.TemporaryDirectory() as empty_build:
             gates = layout.analyze(project_dir, Path(empty_build))
         by_name = {gate.name: gate for gate in gates}
 
+        self.assertEqual("PASS", by_name["source_inputs"].status)
         self.assertEqual("UNKNOWN", by_name["bootloader_layout"].status)
         self.assertEqual("FAIL", by_name["mqtt_ota_buffer_fit"].status)
+        self.assertEqual("FAIL", by_name["ota_runtime_memory_profile"].status)
         self.assertEqual("FAIL", by_name["ota_sdio_run_clock"].status)
         self.assertEqual("PASS", by_name["rom_capacity"].status)
         self.assertEqual("PASS", by_name["fwup_data_flash_geometry"].status)
@@ -166,17 +168,113 @@ class GateTests(unittest.TestCase):
         self.assertEqual("PASS", by_name["data_flash_ownership_contract"].status)
         self.assertEqual("PASS", by_name["data_flash_non_overlap"].status)
         self.assertEqual("PASS", by_name["fwup_partition"].status)
-        self.assertEqual("FAIL", by_name["dual_bank_mode"].status)
-        self.assertEqual("FAIL", by_name["application_in_main_area"].status)
-        self.assertEqual("FAIL", by_name["static_image_single_area"].status)
-        self.assertEqual("FAIL", by_name["whd_resources_follow_application"].status)
+        self.assertEqual("PASS", by_name["dual_bank_mode"].status)
+        self.assertEqual("PASS", by_name["application_in_main_area"].status)
+        self.assertEqual("PASS", by_name["static_image_single_area"].status)
+        self.assertEqual("PASS", by_name["whd_resources_follow_application"].status)
         self.assertEqual("PASS", by_name["sdio_resource_addressing"].status)
-        self.assertEqual("FAIL", by_name["fwup_code_flash_layout"].status)
+        self.assertEqual("PASS", by_name["fwup_code_flash_layout"].status)
         self.assertEqual("UNKNOWN", by_name["artifact_provenance"].status)
+        self.assertEqual("UNKNOWN", by_name["rsu_image"].status)
         self.assertEqual("UNKNOWN", by_name["whd_blob_sizes"].status)
         self.assertEqual("UNKNOWN", by_name["ram_capacity"].status)
         self.assertEqual("UNKNOWN", by_name["map_image_single_area"].status)
         self.assertEqual("UNKNOWN", by_name["mot_image_single_area"].status)
+
+    def test_vendor_header_resolution_requires_one_canonical_root_link(self):
+        root_alias = "$%7BPARENT-3-PROJECT_LOC%7D"
+        target = ("AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/"
+                  "source/r_bsp/r_bsp_vx.xx/r_bsp")
+        for alias, locations in (
+            (root_alias, []),
+            (root_alias, [target, target]),
+            (root_alias, [target, None]),
+            (root_alias, [target + "/../other"]),
+            ("$%7BPARENT-4-PROJECT_LOC%7D", [target]),
+        ):
+            with self.subTest(alias=alias, locations=locations):
+                with tempfile.TemporaryDirectory() as directory:
+                    project = Path(directory) / "Projects/app/e2studio_ccrx"
+                    project.mkdir(parents=True)
+                    links = "".join(
+                        "<link><name>Vendor/r_bsp</name><type>2</type>"
+                        + ("<locationURI>" + location + "</locationURI>"
+                           if location is not None else "") + "</link>"
+                        for location in locations
+                    )
+                    (project / ".project").write_text(
+                        "<projectDescription><variableList><variable>"
+                        "<name>AWS_IOT_MCU_ROOT</name><value>" + alias
+                        + "</value></variable></variableList><linkedResources>"
+                        + links + "</linkedResources></projectDescription>",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(ValueError):
+                        layout._linked_rdp_header(
+                            project, "r_bsp", "mcu/rx671/mcu_info.h"
+                        )
+
+    def test_vendor_header_resolution_rejects_ambiguous_metadata_records(self):
+        source = ROOT / "Projects/aws_wifi_rx671_ek/e2studio_ccrx/.project"
+        for case in ("duplicate_alias", "duplicate_link", "alternate_location",
+                     "duplicate_value", "duplicate_uri"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                metadata = layout.ET.fromstring(source.read_text(encoding="utf-8"))
+                aliases = metadata.find("./variableList")
+                links = metadata.find("./linkedResources")
+                alias = aliases.find("variable[name='AWS_IOT_MCU_ROOT']")
+                link = links.find("link[name='Vendor/r_bsp']")
+                if case == "duplicate_alias":
+                    aliases.append(layout.ET.fromstring(
+                        "<variable><name>AWS_IOT_MCU_ROOT</name></variable>"))
+                elif case == "duplicate_link":
+                    links.append(layout.ET.fromstring(
+                        "<link><name>Vendor/r_bsp</name><type>2</type>"
+                        "<location>other</location></link>"))
+                elif case == "alternate_location":
+                    layout.ET.SubElement(link, "location").text = "other"
+                elif case == "duplicate_value":
+                    layout.ET.SubElement(alias, "value").text = alias.findtext("value")
+                elif case == "duplicate_uri":
+                    layout.ET.SubElement(link, "locationURI").text = link.findtext("locationURI")
+                project = Path(directory) / "Projects/app/e2studio_ccrx"
+                project.mkdir(parents=True)
+                layout.ET.ElementTree(metadata).write(project / ".project", encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    layout._linked_rdp_header(project, "r_bsp", "mcu/rx671/mcu_info.h")
+
+    def test_missing_vendor_project_fails_source_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "Projects/app/e2studio_ccrx"
+            project.mkdir(parents=True)
+            gates = layout.analyze(project)
+        self.assertEqual([("source_inputs", "FAIL")],
+                         [(gate.name, gate.status) for gate in gates])
+
+    def test_missing_vendor_headers_fail_source_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "Projects/app/e2studio_ccrx"
+            project.mkdir(parents=True)
+            (project / ".project").write_bytes(
+                (ROOT / "Projects/aws_wifi_rx671_ek/e2studio_ccrx/.project").read_bytes()
+            )
+            gates = layout.analyze(project)
+        self.assertEqual([("source_inputs", "FAIL")],
+                         [(gate.name, gate.status) for gate in gates])
+        self.assertIn("mcu_info.h", gates[0].detail)
+        self.assertIn("r_flash_rx671.h", gates[0].detail)
+
+    def test_vendor_headers_match_declared_project_mapping(self):
+        project = ROOT / "Projects/aws_wifi_rx671_ek/e2studio_ccrx"
+        for module, relative in (
+            ("r_bsp", "mcu/rx671/mcu_info.h"),
+            ("r_flash_rx", "src/targets/rx671/r_flash_rx671.h"),
+        ):
+            with self.subTest(module=module):
+                header = layout._linked_rdp_header(project, module, relative)
+                self.assertTrue(header.is_file())
+                self.assertTrue(header.is_relative_to(ROOT.resolve()))
+                self.assertNotIn("src/smc_gen", header.relative_to(ROOT).as_posix())
 
     def test_unknown_is_fail_safe_exit(self):
         self.assertEqual(0, layout.exit_code([layout.Gate("a", "PASS", "")]))
@@ -638,6 +736,21 @@ const unsigned char * c = g_type1yn_clm_blob;
                 expected_source_sha=source_sha,
             )
             self.assertEqual("PASS", valid.status)
+
+            project_metadata = project_dir / ".project"
+            original_metadata = project_metadata.read_bytes()
+            project_metadata.write_text("changed Vendor mapping", encoding="utf-8")
+            changed_mapping = layout._artifact_provenance_gate(
+                repo_root=repo_root,
+                project_dir=project_dir,
+                map_path=map_path,
+                mot_path=mot_path,
+                blob_paths=blob_paths,
+                expected_source_sha=source_sha,
+            )
+            self.assertEqual("FAIL", changed_mapping.status)
+            self.assertIn(".project", changed_mapping.detail)
+            project_metadata.write_bytes(original_metadata)
 
             map_path.write_text("stale map", encoding="utf-8")
             stale = layout._artifact_provenance_gate(
