@@ -127,7 +127,8 @@ volatile uint32_t g_sdio_host_portd_dscr2;
 /* CMD53 command words (index 53 = 0x35 plus the data-enable / direction bits
  * the perf project uses). Local to the perf project too; not exported by
  * r_sdhi_rx_if.h. */
-#define SDHI_CMD53_SINGLE_READ  (0x1c35UL)        /* CMD53 single read         */
+/* Match the pinned RDP SDC_SD_CMD53_R_BYTE command encoding. */
+#define SDHI_CMD53_SINGLE_READ  (0x5c35UL)        /* CMD53 byte read           */
 #define SDHI_CMD53_SINGLE_WRITE (0x0c35UL)        /* CMD53 single write        */
 #define SDHI_CMD53_BLOCK_READ   (0x7c35UL)        /* CMD53 multi-block read     */
 #define SDHI_CMD53_BLOCK_WRITE  (0x6c35UL)        /* CMD53 multi-block write    */
