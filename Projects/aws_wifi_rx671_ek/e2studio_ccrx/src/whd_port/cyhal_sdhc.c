@@ -56,6 +56,9 @@ static uint32_t g_cmd53_fail_log_count;
 static bool g_pre_cmd53_clocks_ready;
 static volatile bool g_sdio_bus_busy;
 static bool g_sdio_f2_byte_read_fault_injected;
+/* Diagnostic only; existing CMD53 bus ownership serializes this tuple.
+ * Slots: valid, block_mode, decoded count, HAL length. No payload/context. */
+static volatile uint32_t g_sdio_last_f2_read_gt8_ok[4];
 
 volatile uint32_t g_whd_sdio_sdhi_irq_count;
 volatile uint32_t g_whd_sdio_sdhi_irq_ignored_count;
@@ -563,7 +566,8 @@ static void sdio_log_cmd52_fail(bool write, uint8_t function, uint32_t address, 
 
 /* Diagnostic only: fixed fields from the first real F2 byte-read failure. */
 static void sdio_log_f2_byte_first_failure(uint8_t stage, uint32_t s1, uint32_t s2,
-                                           uint32_t er1, uint32_t er2, uint32_t r5)
+                                           uint32_t er1, uint32_t er2, uint32_t r5,
+                                           const uint32_t previous_f2_read_gt8[4])
 {
     char line[128];
     char * p = line;
@@ -580,6 +584,21 @@ static void sdio_log_f2_byte_first_failure(uint8_t stage, uint32_t s1, uint32_t 
     p = append_hex32(p, er2);
     p = append_text(p, " r5=");
     p = append_hex32(p, r5);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+
+    /* Same bounded buffer, only the existing once-per-boot final-failure path.
+     * This is a length-filtered F2 READ, not a decoded CONTROL remainder. */
+    p = line;
+    p = append_text(p, "sdio first_failure prev_f2read_gt8 valid=");
+    p = append_dec32(p, previous_f2_read_gt8[0]);
+    p = append_text(p, " blk=");
+    p = append_dec32(p, previous_f2_read_gt8[1]);
+    p = append_text(p, " cnt=");
+    p = append_dec32(p, previous_f2_read_gt8[2]);
+    p = append_text(p, " len=");
+    p = append_dec32(p, previous_f2_read_gt8[3]);
     p = append_text(p, "\r\n");
     *p = '\0';
     debug_puts(line);
@@ -850,6 +869,7 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
     uint32_t first_failure_er1 = 0U;
     uint32_t first_failure_er2 = 0U;
     uint32_t first_failure_r5 = 0U;
+    uint32_t first_failure_prev_f2_read_gt8[4] = {0U, 0U, 0U, 0U};
 
     (void)obj;
     (void)length;
@@ -920,6 +940,11 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
                                      &first_failure_s2, &first_failure_er1,
                                      &first_failure_er2, &first_failure_r5, NULL);
             first_failure_valid = true;
+            /* Preserve the previous actual success before retry can alter it. */
+            first_failure_prev_f2_read_gt8[0] = g_sdio_last_f2_read_gt8_ok[0];
+            first_failure_prev_f2_read_gt8[1] = g_sdio_last_f2_read_gt8_ok[1];
+            first_failure_prev_f2_read_gt8[2] = g_sdio_last_f2_read_gt8_ok[2];
+            first_failure_prev_f2_read_gt8[3] = g_sdio_last_f2_read_gt8_ok[3];
         }
     }
 #if (WHD_SDIO_CMD53_F2_BYTE_READ_RETRY > 0U)
@@ -955,6 +980,15 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
         }
     }
 #endif
+    if (ok && (!write) && (2U == function) && (length > 8U))
+    {
+        /* Final ok is the actual initial/retry host return, still bus-owned.
+         * Exclude header4/credit8; no SDPCM channel is inspected or inferred. */
+        g_sdio_last_f2_read_gt8_ok[1] = block_mode ? 1U : 0U;
+        g_sdio_last_f2_read_gt8_ok[2] = count;
+        g_sdio_last_f2_read_gt8_ok[3] = length;
+        g_sdio_last_f2_read_gt8_ok[0] = 1U;
+    }
     if ((!ok) && first_failure_valid && (!first_failure_reported))
     {
         first_failure_reported = true;
@@ -987,7 +1021,8 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
         {
             sdio_log_f2_byte_first_failure(first_failure_stage, first_failure_s1,
                                            first_failure_s2, first_failure_er1,
-                                           first_failure_er2, first_failure_r5);
+                                           first_failure_er2, first_failure_r5,
+                                           first_failure_prev_f2_read_gt8);
         }
         sdio_log_cmd53_fail(write, function, address, increment, block_mode, count, r5);
         whd_sdio_debug_break_hook(0x53000000UL | ((write ? 1UL : 0UL) << 16) | (uint32_t)function);
