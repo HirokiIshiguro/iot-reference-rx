@@ -1304,6 +1304,58 @@
             </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source" />
         </configuration>
+        <configuration inuse="true" name="r_cellular">
+            <component description="依存モジュール: r_bsp バージョン 7.10&#10;依存モジュール: r_sci_rx バージョン 4.30&#10;依存モジュール: r_irq_rx バージョン 4.00&#10;Use UART to control a Quectel BG96 cellular module and connect to the Internet. This package is based on Renesas r_cellular v1.13 and carries the BG96 adaptations validated by the CK-RX65N BG96 OTA sample: BG96 power/reset/status control, BG96 AT command mapping, high-speed UART handoff, UART flow control, and QIOPEN URC handling." detailDescription="Cellular Module control functions for Renesas RX MCUs with BG96 support." display="r_cellular" id="r_cellular1.13.saffti-custom.4" version="1.13.saffti-custom.4">
+                <gridItem id="CELLULAR_CFG_AP_NAME" selectedIndex="iot.truphone.com"/>
+                <gridItem id="CELLULAR_CFG_AP_USERID" selectedIndex=""/>
+                <gridItem id="CELLULAR_CFG_AP_PASSWORD" selectedIndex=""/>
+                <gridItem id="CELLULAR_CFG_PIN_CODE" selectedIndex=""/>
+                <gridItem id="CELLULAR_CFG_AUTH_TYPE" selectedIndex="2"/>
+                <gridItem id="CELLULAR_CFG_NETWORK_NOTIFY_LEVEL" selectedIndex="2"/>
+                <gridItem id="CELLULAR_CFG_ATC_RETRY_CGATT" selectedIndex="600"/>
+                <gridItem id="CELLULAR_CFG_EX_TIMEOUT" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_SCI_PRIORITY" selectedIndex="4"/>
+                <gridItem id="CELLULAR_CFG_SEMAPHORE_BLOCK_TIME" selectedIndex="15000"/>
+                <gridItem id="CELLULAR_CFG_PSM_PREPARATION_TIME" selectedIndex="100"/>
+                <gridItem id="CELLULAR_CFG_PSM_WAKEUP_LATENCY" selectedIndex="5000"/>
+                <gridItem id="CELLULAR_CFG_RING_LINE_ACTIVE_TIME" selectedIndex="1000"/>
+                <gridItem id="CELLULAR_CFG_UPGRADE_TIME" selectedIndex="60"/>
+                <gridItem id="CELLULAR_CFG_URC_CHARGET_ENABLED" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_URC_CHARGET_FUNCTION" selectedIndex="my_sw_urc_charget_function"/>
+                <gridItem id="CELLULAR_CFG_DEBUGLOG" selectedIndex="4"/>
+                <gridItem id="CELLULAR_CFG_RESET_SIGNAL_LOGIC" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_UART_SCI_CH" selectedIndex="6"/>
+                <gridItem id="CELLULAR_CFG_CTS_SW_CTRL" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_CTS_PORT" selectedIndex="18"/>
+                <gridItem id="CELLULAR_CFG_CTS_PIN" selectedIndex="3"/>
+                <gridItem id="CELLULAR_CFG_PFS_SET_VALUE" selectedIndex="0x0BU"/>
+                <gridItem id="CELLULAR_CFG_BG96_USE_HW_CTS" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_BG96_FLOW_CONTROL" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_BG96_RUNTIME_BAUDRATE" selectedIndex="3"/>
+                <gridItem id="CELLULAR_CFG_RTS_PORT" selectedIndex="18"/>
+                <gridItem id="CELLULAR_CFG_RTS_PIN" selectedIndex="3"/>
+                <gridItem id="CELLULAR_CFG_BG96_RTS_IDLE_LEVEL" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_RESET_PORT" selectedIndex="5"/>
+                <gridItem id="CELLULAR_CFG_RESET_PIN" selectedIndex="5"/>
+                <gridItem id="CELLULAR_CFG_BG96_PWRKEY_PORT" selectedIndex="B"/>
+                <gridItem id="CELLULAR_CFG_BG96_PWRKEY_PIN" selectedIndex="7"/>
+                <gridItem id="CELLULAR_CFG_BG96_PWRKEY_ACTIVE_LEVEL" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_BG96_STATUS_PORT" selectedIndex="B"/>
+                <gridItem id="CELLULAR_CFG_BG96_STATUS_PIN" selectedIndex="6"/>
+                <gridItem id="CELLULAR_CFG_BG96_STATUS_RUNNING_LEVEL" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE_PORT" selectedIndex="B"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE_PIN" selectedIndex="5"/>
+                <gridItem id="CELLULAR_CFG_BG96_POWER_ENABLE_ACTIVE_LEVEL" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_ENABLE" selectedIndex="0"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_PORT" selectedIndex="A"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_PIN" selectedIndex="7"/>
+                <gridItem id="CELLULAR_CFG_BG96_DTR_IDLE_LEVEL" selectedIndex="1"/>
+                <gridItem id="CELLULAR_CFG_IRQ_NUM" selectedIndex="4"/>
+            </component>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+            <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
+        </configuration>
     </tool>
     <tool id="System">
         <section id="ocd">

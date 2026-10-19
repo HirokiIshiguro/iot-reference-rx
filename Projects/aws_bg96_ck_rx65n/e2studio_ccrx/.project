@@ -51,11 +51,6 @@
 			<locationURI>AWS_IOT_MCU_ROOT/Middleware</locationURI>
 		</link>
 		<link>
-			<name>CellularPlatform</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Demo/FreeRTOS_Cellular_Interface_Windows_Simulator/Common</locationURI>
-		</link>
-		<link>
 			<name>src/application_code/include</name>
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Demos/include</locationURI>
@@ -64,6 +59,11 @@
 			<name>src/application_code/ports</name>
 			<type>2</type>
 			<locationURI>AWS_IOT_MCU_ROOT/Common/ports</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_cellular</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/r_cellular/r_cellular_vx.xx/r_cellular</locationURI>
 		</link>
 		<link>
 			<name>Vendor/r_byteq</name>

@@ -172,6 +172,8 @@ class DependencyProvenanceTests(unittest.TestCase):
                 self.assertIn(manifest.BOOT[target], selected)
                 self.assertIn('/lib/rx_bootloader', manifest.BOOT[target])
                 self.assertEqual(target == "rx671-wifi", set(manifest.WIFI).issubset(selected))
+                self.assertEqual(target == "rx65n-bg96", set(manifest.CELLULAR).issubset(selected))
+                self.assertFalse(any("FreeRTOS-Cellular-Interface" in path for path in selected))
         with self.assertRaises(ValueError):
             manifest.dependency_paths("rx65n-ethernet")
 

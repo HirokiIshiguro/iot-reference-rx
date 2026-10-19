@@ -69,6 +69,14 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sci_rx}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sci_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/r_cellular}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/include/ryz014}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/RTOS/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/at_command/ryz014/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/private/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/private/private_api/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_byteq}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_byteq/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx}&quot;"/>
@@ -132,13 +140,6 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_irq_rx/src}&quot;"/>
 																	<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_bsp}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Common/FreeRTOS_common/posix/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/cellular_bg96}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source/include/common}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source/include/private}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source/interface}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Cellular-Interface-Reference-Quectel-BG96/source}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/CellularPlatform}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/rm_littlefs_rx}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/rm_littlefs_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/rm_rtos_abstraction_rx}&quot;"/>
@@ -185,6 +186,14 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sci_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_pincfg}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/r_cellular}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/include/ryz014}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/RTOS/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/at_command/ryz014/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/private/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_cellular/src/private/private_api/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_byteq}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_irq_rx}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx}&quot;"/>
@@ -261,8 +270,11 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Common/FreeRTOS_common/compiler_support/ccrx/exit.c|Common/ports/|src/application_code/ports/|trash/|Common/FreeRTOS_common/network_support|Vendor/|src/smc_gen/r_byteq/|src/smc_gen/r_s12ad_rx/|src/smc_gen/r_tsip_rx/|src/smc_gen/r_fwup/|src/smc_gen/r_bsp/|src/smc_gen/r_sci_rx/|src/smc_gen/r_flash_rx/|src/smc_gen/r_irq_rx/|src/smc_gen/r_cellular/|Middleware/|CellularPlatform/|TraceRecorder/|src/tracealyzer_recorder/" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="Common/FreeRTOS_common/compiler_support/ccrx/exit.c|Common/ports/|src/application_code/ports/|trash/|Common/FreeRTOS_common/network_support|Vendor/|src/smc_gen/r_byteq/|src/smc_gen/r_s12ad_rx/|src/smc_gen/r_tsip_rx/|src/smc_gen/r_fwup/|src/smc_gen/r_bsp/|src/smc_gen/r_sci_rx/|src/smc_gen/r_flash_rx/|src/smc_gen/r_irq_rx/|src/smc_gen/r_cellular/|Middleware/||TraceRecorder/|src/tracealyzer_recorder/" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 
+						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_cellular/src"/>
+						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/r_cellular"/>
+						<entry excluding="TCP_socket_hook.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/network_transport/sockets_wrapper/ports/cellular_ryz014a"/>
 						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_byteq/src"/>
 
 						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_s12ad_rx/src"/>
@@ -308,15 +320,10 @@
 						<entry excluding="heap_1.c|heap_2.c|heap_3.c|heap_5.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Kernel/portable/MemMang"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/3rdparty/mbedtls/library"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/network_transport/using_mbedtls_pkcs11"/>
-						<entry excluding="include/|interface/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Cellular-Interface-Reference-Quectel-BG96/source"/>
-						<entry excluding="MutualAuthMQTTExample.c|cellular_setup.c|comm_if_windows.c|main.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="CellularPlatform"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/network_transport/sockets_wrapper/ports/cellular_bg96"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/rm_littlefs_rx/src"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/rm_rtos_abstraction_rx/src"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/ota_pal"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/rm_aws_pkcs11_pal_littlefs"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/cellular_bg96"/>
 						<entry excluding="config/|docs/|extras/|include/|kernelports/|streamports/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder"/>
 						<entry excluding="config/|include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder/kernelports/FreeRTOS"/>
 						<entry excluding="config/|include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder/streamports/Jlink_RTT"/>

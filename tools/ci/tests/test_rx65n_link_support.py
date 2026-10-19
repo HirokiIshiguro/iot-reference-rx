@@ -1,34 +1,13 @@
-"""RX65 CLI storage and POSIX tokenization work without the retired modem body."""
+"""RX65 CLI storage remains independent from the r_cellular driver's buffers."""
 from pathlib import Path
 import unittest
 from tools.ci.tests import test_product_oss_api as product_api
 
 ROOT=Path(__file__).resolve().parents[3]
-PORT=ROOT/"Common/ports/cellular_bg96"
 
 
 @unittest.skipUnless(product_api.GCC or product_api.MSVC,"Host C compiler required")
 class Rx65LinkSupportTests(unittest.TestCase):
-    def test_posix_tokens_interleave_skip_delimiters_and_use_at_save_pointer_alias(self):
-        product_api.ProductApiTests.compile_run(self,r'''
-#include <assert.h>
-#include <string.h>
-#include "strtok_r.h"
-int main(void) {
-    char first[]="::+QIURC: recv: 2::",second[]="one,two",empty[]=";;;",single[]="whole";
-    char *one=NULL,*two=NULL,*save=NULL,*token;
-    token=strtok_r(first,":",&one);assert(!strcmp(token,"+QIURC"));
-    assert(!strcmp(strtok_r(second,",",&two),"one"));
-    /* The upstream Cellular parser passes the current save pointer as input. */
-    token=strtok_r(one,": ",&one);assert(!strcmp(token,"recv"));
-    assert(!strcmp(strtok_r(NULL,",",&two),"two"));assert(!strtok_r(NULL,",",&two));
-    token=strtok_r(NULL,": ",&one);assert(!strcmp(token,"2"));assert(!strtok_r(NULL,": ",&one));
-    assert(!strtok_r(empty,";",&save));assert(!strtok_r(NULL,";",&save));
-    assert(!strcmp(strtok_r(single,"",&save),"whole"));assert(!strtok_r(NULL,"",&save));
-    save=NULL;assert(!strtok_r(NULL,",",&save));return 0;
-}
-''',extra_sources=(PORT/"strtok_r.c",),extra_includes=(PORT,))
-
     def test_both_rx65_init_objects_provide_independent_zeroed_cli_storage(self):
         for project in ("aws_bg96_ck_rx65n","aws_bg96_ck_rx65n_tsip"):
             with self.subTest(project=project):

@@ -83,8 +83,22 @@ public class Launcher {
         if (mode == "build-error" && buildFlag >= 0) return 23;
         if (mode.StartsWith("typed-")) Console.WriteLine("fixture.c(1): " + mode.Substring(6) + ": fixture diagnostic");
         if (mode == "source-drift") File.WriteAllText(Path.Combine(args[importFlag+1], ".cproject"), "UNEXPECTED_PROFILE");
+        if (mode == "project-drift") File.AppendAllText(Path.Combine(args[importFlag+1], ".project"), "\n");
+        if (mode == "scfg-drift") File.WriteAllText(Path.Combine(args[importFlag+1], "fixture.scfg"), "UNEXPECTED_SC_CONFIG");
+        if (mode == "generated-header-drift") File.WriteAllText(Path.Combine(args[importFlag+1], "smc_gen", "r_config", "r_bsp_config.h"), "UNEXPECTED_HEADER");
+        if (mode == "rcpc-named-header-drift") File.WriteAllText(Path.Combine(args[importFlag+1], "src", "profile.rcpc.h"), "UNEXPECTED_HEADER");
         if (mode == "new-source") File.WriteAllText(Path.Combine(args[importFlag+1], "src", "new-generated.c"), "UNEXPECTED_SOURCE");
         if (mode == "deleted-source") File.Delete(Path.Combine(args[importFlag+1], "src", "fixture.c"));
+        if (mode.StartsWith("rcpc-")) {
+            for (int i = 0; i < args.Length - 1; i++) {
+                if (args[i] != "-import") continue;
+                string project = args[i + 1];
+                string rcpc = Path.Combine(project, Path.GetFileName(project) + ".rcpc");
+                if (mode == "rcpc-modified") File.WriteAllText(rcpc, "REGENERATED_RCPC");
+                if (mode == "rcpc-deleted") File.Delete(rcpc);
+                if (mode == "rcpc-added") File.WriteAllText(Path.Combine(project, "src", "new-generated.rcpc"), "REGENERATED_RCPC");
+            }
+        }
         string outputs = Environment.GetEnvironmentVariable("RXCLI_FIXTURE_OUTPUTS");
         if (!String.IsNullOrEmpty(outputs) && mode != "missing-output") {
             foreach (string output in outputs.Split('|')) {
@@ -95,6 +109,7 @@ public class Launcher {
         }
         if (mode == "no-config" && buildFlag >= 0) {
             File.WriteAllText(Path.Combine(args[importFlag + 1], ".cproject"), "AFTER_HEADLESS");
+            File.WriteAllText(Path.Combine(args[importFlag + 1], Path.GetFileName(args[importFlag + 1]) + ".rcpc"), "AFTER_HEADLESS_RCPC");
             string workspace = args[Array.IndexOf(args, "-data") + 1];
             Directory.CreateDirectory(Path.Combine(workspace, ".metadata"));
             File.WriteAllText(Path.Combine(workspace, ".metadata", ".log"), "WORKSPACE_DIAGNOSTIC");
@@ -124,11 +139,20 @@ public class Launcher {
 
     def setUp(self):
         for project in self.projects:
+            (project / ".project").write_text(
+                "<projectDescription><name>" + project.name + "</name></projectDescription>", encoding="utf-8")
             (project / ".cproject").write_text("EFFECTIVE_" + project.name, encoding="utf-8")
+            (project / (project.name + ".rcpc")).write_text("GENERATED_INPUT", encoding="utf-8")
+            (project / "fixture.scfg").write_text("EXPECTED_SC_CONFIG", encoding="utf-8")
             source = project / "src"
             source.mkdir(exist_ok=True)
             (source / "fixture.c").write_text("EXPECTED_SOURCE", encoding="utf-8")
+            (source / "profile.rcpc.h").write_text("EXPECTED_HEADER", encoding="utf-8")
             (source / "new-generated.c").unlink(missing_ok=True)
+            (source / "new-generated.rcpc").unlink(missing_ok=True)
+            generated = project / "smc_gen" / "r_config"
+            generated.mkdir(parents=True, exist_ok=True)
+            (generated / "r_bsp_config.h").write_text("EXPECTED_HEADER", encoding="utf-8")
 
     def invoke(self, mode="success", timeout=5, allow_timeout=False, targets=None, expected_outputs=None, preserve_calls=False):
         calls = self.directory / (self._testMethodName + ".arguments")
@@ -204,7 +228,8 @@ public class Launcher {
                 self.assertEqual(len(calls.read_text().splitlines()), 1)
 
     def test_source_copy_profile_changes_new_and_deleted_sources_are_terminal(self):
-        for mode in ("source-drift", "new-source", "deleted-source"):
+        for mode in ("source-drift", "project-drift", "scfg-drift", "generated-header-drift",
+                     "rcpc-named-header-drift", "new-source", "deleted-source"):
             with self.subTest(mode=mode):
                 self.setUp()
                 result, calls, log = self.invoke(mode)
@@ -218,12 +243,62 @@ public class Launcher {
                 self.assertNotIn("UNEXPECTED_SOURCE", detail)
                 self.assertEqual(len(calls.read_text().splitlines()), 1)
 
-    def test_git_project_generated_source_cannot_become_next_run_baseline(self):
+    @contextmanager
+    def git_project(self, *, track_rcpc):
         project = self.projects[0]
         subprocess.run(["git", "init", "-q", str(project)], check=True, capture_output=True)
         try:
-            (project / ".gitignore").write_text("HardwareDebug/\n", encoding="utf-8")
-            subprocess.run(["git", "-C", str(project), "add", ".project", ".cproject", "src", ".gitignore", project.name + ".rcpc"], check=True, capture_output=True)
+            (project / ".gitignore").write_text("HardwareDebug/\n*.rcpc\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(project), "add", ".project", ".cproject", "src", "smc_gen",
+                            "fixture.scfg", ".gitignore"], check=True, capture_output=True)
+            if track_rcpc:
+                subprocess.run(["git", "-C", str(project), "add", "-f", project.name + ".rcpc"],
+                               check=True, capture_output=True)
+            yield project
+        finally:
+            # Git objects are readonly on Windows. Only this owned temporary
+            # fixture's .git is removed; no source repository is affected.
+            git_dir = project / ".git"
+            self.assertTrue(git_dir.resolve().is_relative_to(self.directory.resolve()))
+            for entry in git_dir.rglob("*"):
+                if entry.is_file():
+                    entry.chmod(0o666)
+            shutil.rmtree(git_dir)
+            (project / ".gitignore").unlink(missing_ok=True)
+
+    def test_source_copy_generated_rcpc_changes_are_not_source_drift(self):
+        for mode in ("rcpc-modified", "rcpc-added", "rcpc-deleted"):
+            with self.subTest(mode=mode):
+                self.setUp()
+                result, calls, log = self.invoke(mode)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("RESULT=0", result.stdout)
+                self.assertNotIn("Unexpected RX project input changes:", log.read_text(encoding="utf-8"))
+                self.assertEqual(len(calls.read_text().splitlines()), 1)
+
+    def test_git_ignored_rcpc_and_source_copy_have_same_drift_policy(self):
+        for mode in ("rcpc-modified", "rcpc-added", "rcpc-deleted"):
+            with self.subTest(mode=mode):
+                self.setUp()
+                with self.git_project(track_rcpc=False):
+                    result, calls, log = self.invoke(mode)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertNotIn("Unexpected RX project input changes:", log.read_text(encoding="utf-8"))
+                    self.assertEqual(len(calls.read_text().splitlines()), 1)
+
+    def test_git_tracked_rcpc_remains_protected_even_when_ignored(self):
+        for mode in ("rcpc-modified", "rcpc-deleted"):
+            with self.subTest(mode=mode):
+                self.setUp()
+                with self.git_project(track_rcpc=True) as project:
+                    result, calls, log = self.invoke(mode)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("changed project inputs unexpectedly", result.stderr)
+                    self.assertIn(project.name + ".rcpc", log.read_text(encoding="utf-8"))
+                    self.assertEqual(len(calls.read_text().splitlines()), 1)
+
+    def test_git_project_generated_source_cannot_become_next_run_baseline(self):
+        with self.git_project(track_rcpc=True) as project:
             result, calls, log = self.invoke("new-source")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("changed project inputs unexpectedly", result.stderr)
@@ -236,16 +311,6 @@ public class Launcher {
             self.assertEqual(second_calls, calls)
             self.assertEqual(log.read_bytes(), first_log, "preflight rejection must preserve the first drift evidence")
             self.assertEqual(len(calls.read_text().splitlines()), 1, "second run must stop before the launcher")
-        finally:
-            # Git objects are readonly on Windows. Only this owned temporary
-            # fixture's .git is removed; no source repository is affected.
-            git_dir = project / ".git"
-            self.assertTrue(git_dir.resolve().is_relative_to(self.directory.resolve()))
-            for entry in git_dir.rglob("*"):
-                if entry.is_file():
-                    entry.chmod(0o666)
-            shutil.rmtree(git_dir)
-            (project / ".gitignore").unlink(missing_ok=True)
 
     def test_declared_outputs_must_be_nonempty_and_fresh(self):
         for mode in ("success", "missing-output", "empty-output", "stale-output"):
@@ -274,6 +339,7 @@ public class Launcher {
             self.assertEqual("AFTER_HEADLESS",(diagnostic/snapshots[1]["files"][source]).read_text())
             rcpc = str(self.projects[0] / (self.projects[0].name + ".rcpc"))
             self.assertEqual("GENERATED_INPUT", (diagnostic/snapshots[0]["files"][rcpc]).read_text())
+            self.assertEqual("AFTER_HEADLESS_RCPC", (diagnostic/snapshots[1]["files"][rcpc]).read_text())
             self.assertEqual("WORKSPACE_DIAGNOSTIC", (diagnostic / "workspace.log").read_text())
         finally:
             self.assertEqual(diagnostic.parent,Path(tempfile.gettempdir()))
