@@ -561,6 +561,30 @@ static void sdio_log_cmd52_fail(bool write, uint8_t function, uint32_t address, 
     debug_puts(line);
 }
 
+/* Diagnostic only: fixed fields from the first real F2 byte-read failure. */
+static void sdio_log_f2_byte_first_failure(uint8_t stage, uint32_t s1, uint32_t s2,
+                                           uint32_t er1, uint32_t er2, uint32_t r5)
+{
+    char line[128];
+    char * p = line;
+
+    p = append_text(p, "sdio f2r-byte first_failure st=");
+    p = append_hex8(p, stage);
+    p = append_text(p, " s1=");
+    p = append_hex32(p, s1);
+    p = append_text(p, " s2=");
+    p = append_hex32(p, s2);
+    p = append_text(p, " er1=");
+    p = append_hex32(p, er1);
+    p = append_text(p, " er2=");
+    p = append_hex32(p, er2);
+    p = append_text(p, " r5=");
+    p = append_hex32(p, r5);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
 static void sdio_log_cmd53_fail(bool write, uint8_t function, uint32_t address, bool increment,
                                 bool block_mode, uint32_t count, uint32_t r5)
 {
@@ -816,6 +840,16 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
     uint32_t data0 = 0U;
     uint32_t result = 0U;
     bool ok;
+    /* The once-only claim is made while the existing bus lock is owned. */
+    static bool first_failure_reported;
+    bool first_failure_valid = false;
+    bool first_failure_emit = false;
+    uint8_t first_failure_stage = 0U;
+    uint32_t first_failure_s1 = 0U;
+    uint32_t first_failure_s2 = 0U;
+    uint32_t first_failure_er1 = 0U;
+    uint32_t first_failure_er2 = 0U;
+    uint32_t first_failure_r5 = 0U;
 
     (void)obj;
     (void)length;
@@ -879,6 +913,14 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
     {
         ok = sdio_host_cmd53(write, function, address, increment, block_mode,
                              (uint8_t *)data, count, &r5);
+        if ((!ok) && (!write) && (2U == function) && (!block_mode))
+        {
+            /* RAM-only getters: preserve the initial attempt before any retry. */
+            sdio_host_cmd53_diag_ext(&first_failure_stage, &first_failure_s1,
+                                     &first_failure_s2, &first_failure_er1,
+                                     &first_failure_er2, &first_failure_r5, NULL);
+            first_failure_valid = true;
+        }
     }
 #if (WHD_SDIO_CMD53_F2_BYTE_READ_RETRY > 0U)
     if ((!ok) && (!write) && (2U == function) && (!block_mode))
@@ -913,6 +955,11 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
         }
     }
 #endif
+    if ((!ok) && first_failure_valid && (!first_failure_reported))
+    {
+        first_failure_reported = true;
+        first_failure_emit = true;
+    }
     data0 = sdio_debug_data0(data, length);
     sdio_end_bus();
     sdio_sdhi_irq_rearm_after_bus();
@@ -936,6 +983,12 @@ cy_rslt_t cyhal_sdio_bulk_transfer(cyhal_sdio_t *obj, cyhal_transfer_t direction
     if (!ok)
     {
         g_whd_sdio_trace_frozen = 1U;
+        if (first_failure_emit)
+        {
+            sdio_log_f2_byte_first_failure(first_failure_stage, first_failure_s1,
+                                           first_failure_s2, first_failure_er1,
+                                           first_failure_er2, first_failure_r5);
+        }
         sdio_log_cmd53_fail(write, function, address, increment, block_mode, count, r5);
         whd_sdio_debug_break_hook(0x53000000UL | ((write ? 1UL : 0UL) << 16) | (uint32_t)function);
     }
