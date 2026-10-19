@@ -31,8 +31,7 @@
 #include "aws_dev_mode_key_provisioning.h"
 #include "core_pkcs11_pal.h"
 #if CELLULAR_APN_KVS_ENABLE == 1
-#include "cellular_config.h"
-#include "cellular_config_defaults.h"
+#include "r_cellular_if.h"
 #endif
 
 const char * keys[ KVS_NUM_KEYS ] = KVSTORE_KEYS;
@@ -55,8 +54,10 @@ static BaseType_t prvCellularValueValid( KVStoreKey_t key, const char * value, s
     {
         return ( textLength == 1U && value[0] >= '0' && value[0] <= '2' ) ? pdTRUE : pdFALSE;
     }
-    limit = ( key == KVS_CELLULAR_AP_NAME ) ? CELLULAR_APN_MAX_SIZE :
-            ( key == KVS_CELLULAR_AP_USERID ) ? CELLULAR_PDN_USERNAME_MAX_SIZE : CELLULAR_PDN_PASSWORD_MAX_SIZE;
+    /* Use the public driver's storage sizes, including its trailing NUL. */
+    limit = ( key == KVS_CELLULAR_AP_NAME ) ? sizeof( ( ( st_cellular_ap_cfg_t * ) 0 )->ap_name ) - 1U :
+            ( key == KVS_CELLULAR_AP_USERID ) ? sizeof( ( ( st_cellular_ap_cfg_t * ) 0 )->ap_user_name ) - 1U :
+            sizeof( ( ( st_cellular_ap_cfg_t * ) 0 )->ap_pass ) - 1U;
     return ( textLength <= limit && ( key != KVS_CELLULAR_AP_NAME || textLength > 0U ) ) ? pdTRUE : pdFALSE;
 }
 #endif

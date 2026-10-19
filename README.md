@@ -16,6 +16,9 @@ TSIP（ハードウェア暗号）をGitLab CIで検証します。
 | CK-RX65N V1 | BG96 Cellular | [software](Projects/aws_bg96_ck_rx65n/) / [TSIP](Projects/aws_bg96_ck_rx65n_tsip/) |
 | EK-RX671 | Murata Type 1YN Wi-Fi | [software](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls) / [TSIP](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls) |
 
+RX65N/BG96の通信実装は[`r_cellular`のBG96対応fork](docs/rx65n-cellular.md)です。
+FreeRTOS Cellular Interfaceへの移行は行いません。
+
 ## 代表性能
 
 ### 通信

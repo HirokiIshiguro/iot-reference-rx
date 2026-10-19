@@ -16,9 +16,6 @@
 [submodule "Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk"]
 	path = Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk
 	url = https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk.git
-[submodule "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface"]
-	path = Middleware/FreeRTOS/FreeRTOS-Cellular-Interface
-	url = https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface.git
 [submodule "Middleware/FreeRTOS/FreeRTOS-Kernel"]
 	path = Middleware/FreeRTOS/FreeRTOS-Kernel
 	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
@@ -138,6 +135,6 @@
 	path = Middleware/Renesas/r_simple_glcdc_config_rx
 	url = https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_simple_glcdc_config_rx/r_simple_glcdc_config_rx.git
 	shallow = true
-[submodule "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface-Reference-Quectel-BG96"]
-	path = Middleware/FreeRTOS/FreeRTOS-Cellular-Interface-Reference-Quectel-BG96
-	url = https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface-Reference-Quectel-BG96.git
+[submodule "Middleware/Renesas/r_cellular"]
+	path = Middleware/Renesas/r_cellular
+	url = https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular.git

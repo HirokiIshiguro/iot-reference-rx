@@ -241,7 +241,6 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
                 "Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk",
                 "Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk",
                 "Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c",
-                "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface",
                 "Middleware/FreeRTOS/FreeRTOS-Kernel",
                 "Middleware/FreeRTOS/FreeRTOS-Plus-TCP",
                 "Middleware/FreeRTOS/backoffAlgorithm",

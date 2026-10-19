@@ -45,12 +45,12 @@ dependencies:
       type: "git"
       url: "https://github.com/FreeRTOS/coreSNTP.git"
       path: "/Middleware/FreeRTOS/coreSNTP"
-  - name: "Cellular Interface"
-    version: "v1.4.2"
+  - name: "r_cellular (BG96 fork)"
+    version: "1.13.saffti-custom.4"
     repository:
       type: "git"
-      url: "https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface.git"
-      path: "/Middleware/FreeRTOS/FreeRTOS-Cellular-Interface"
+      url: "https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular.git"
+      path: "/Middleware/Renesas/r_cellular"
   - name: "SigV4"
     version: "v1.3.1"
     repository:

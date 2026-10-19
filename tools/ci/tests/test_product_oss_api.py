@@ -1,6 +1,7 @@
 """Product protocol and queued-argument tests against pristine Agent2 headers."""
 from pathlib import Path
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -12,6 +13,23 @@ MSVC = next(iter(sorted(Path("C:/Program Files/Microsoft Visual Studio").glob(
     "*/*/VC/Tools/MSVC/*/bin/Hostx64/x64/cl.exe"), reverse=True)), None) if os.name == "nt" else None
 AGENT = ROOT / "Middleware/FreeRTOS/coreMQTT-Agent/source/include"
 MQTT = ROOT / "Middleware/FreeRTOS/coreMQTT/source"
+RCELLULAR = ROOT / "Middleware/Renesas/r_cellular/r_cellular_vx.xx/r_cellular"
+
+
+def r_cellular_headers():
+    """Stub board/RTOS services while compiling the actual pinned public FIT API."""
+    return {
+        "r_bsp_config.h": "#ifndef FIXTURE_BSP_H\n#define FIXTURE_BSP_H\n#define BSP_CFG_RTOS_USED 1\ntypedef int sci_cb_evt_t;\ntypedef void *sci_hdl_t;\ntypedef void *irq_handle_t;\n#endif\n",
+        "r_cellular_config.h": '#include "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/smc_gen/r_config/r_cellular_config.h"\n',
+        "platform.h": "#define BSP_MCU_RX65N 1\n",
+        "semphr.h": "", "event_groups.h": "",
+        "logging_levels.h": "#define LOG_INFO 3\n", "logging_stack.h": "#define LogInfo(x) ((void)0)\n#define LogError(x) ((void)0)\n",
+        "user_tcp_hook_config.h": "#define USER_TCP_HOOK_ENABLED 0\n#define USER_RECONNECT_TRIES 1\n#define USER_CLOSE_SOCKET_TRIES 1\n#define USER_TCP_HOOK_FUNCTION SocketErrorHook\n",
+    }
+
+
+def r_cellular_includes():
+    return [RCELLULAR, RCELLULAR / "src/include", ROOT / "Common/ports/r_cellular"]
 
 
 @unittest.skipUnless(GCC or MSVC, "Host C compiler required; no MCU build is performed")
@@ -167,242 +185,120 @@ int main(void) {
         }, [ROOT / "Middleware/3rdparty/mbedtls_utils/mbedtls_bio_tcp_sockets_wrapper.c"],
            [ROOT / "Middleware/network_transport/sockets_wrapper/include", ROOT / "Middleware/3rdparty/mbedtls_utils"])
 
-    def test_bg96_official_socket_urc_drain_and_remote_close(self):
-        cellular = ROOT / "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source"
-        product = ROOT / "Common/ports/cellular_bg96"
+    def test_r_cellular_socket_api_timeouts_and_failure_cleanup(self):
+        headers = r_cellular_headers()
+        headers.update({
+            "FreeRTOS.h": r'''
+#ifndef FIXTURE_KERNEL_H
+#define FIXTURE_KERNEL_H
+#include <stddef.h>
+#include <stdint.h>
+#include <assert.h>
+typedef int BaseType_t;
+#define configASSERT(x) assert(x)
+void *pvPortMalloc(size_t);void vPortFree(void *);
+#endif
+''',
+            "task.h": "", "list.h": "", "core_pkcs11.h": "", "iot_crypto.h": "",
+            "logging_stack.h": "#define LogInfo(x) ((void)0)\n#define LogError(x) ((void)0)\n#define LogDebug(x) ((void)0)\n",
+        })
         self.compile_run(r'''
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
-#include "task.h"
-#include "event_groups.h"
-#include "bg96_network.h"
+#include "r_cellular_if.h"
 #include "tcp_sockets_wrapper.h"
-static unsigned tick,queries,opens,closes,waits;
-static int failOpen;
-static CellularSocketOpenCallback_t onOpen;
-static CellularSocketDataReadyCallback_t onData;
-static CellularSocketClosedCallback_t onClosed;
-static void * openCtx,*dataCtx,*closedCtx;
-static CellularSocketHandle_t opaque=(CellularSocketHandle_t)2;
-TickType_t xTaskGetTickCount(void) { return tick; }
-void vTaskDelay(TickType_t ticks) { tick+=ticks; }
-EventGroupHandle_t xEventGroupCreateStatic(StaticEventGroup_t * storage) { storage->bits=0;return storage; }
-EventBits_t xEventGroupSetBits(EventGroupHandle_t group,EventBits_t bits) { return group->bits|=bits; }
-EventBits_t xEventGroupClearBits(EventGroupHandle_t group,EventBits_t bits) { unsigned before=group->bits;group->bits&=~bits;return before; }
-EventBits_t xEventGroupGetBits(EventGroupHandle_t group) { return group->bits; }
-EventBits_t xEventGroupWaitBits(EventGroupHandle_t group,EventBits_t bits,BaseType_t clear,BaseType_t all,TickType_t timeout) {
-    (void)clear;(void)all;waits++;
-    if (!(group->bits&bits)) tick+=timeout;
-    return group->bits;
+st_cellular_ctrl_t cellular_ctrl;
+static unsigned created,closed,allocated,freed;
+static int failAllocation,failDns,failConnect,receiveResult=4,sendResult=4;
+void *pvPortMalloc(size_t size) { if(failAllocation)return NULL;allocated++;return malloc(size); }
+void vPortFree(void *value) { assert(value);freed++;free(value); }
+void CloseSocket(uint32_t no) { assert(no==1);closed++; }
+e_cellular_err_t SocketErrorHook(e_cellular_err_t error,bool reset) { (void)reset;return error; }
+int32_t R_CELLULAR_CreateSocket(st_cellular_ctrl_t *const ctrl,const uint8_t protocol,const uint8_t ip) {
+ assert(ctrl==&cellular_ctrl && protocol==CELLULAR_PROTOCOL_TCP && ip==CELLULAR_PROTOCOL_IPV4);created++;return 1;
 }
-CellularHandle_t Bg96_GetHandle(void) { return (CellularHandle_t)1; }
-CellularError_t Cellular_GetHostByName(CellularHandle_t h,uint8_t id,const char * host,char * address) {
-    (void)h;assert(id==1 && strcmp(host,"example.test")==0);strcpy(address,"192.0.2.1");return CELLULAR_SUCCESS;
+e_cellular_err_t R_CELLULAR_DnsQuery(st_cellular_ctrl_t *const ctrl,const uint8_t *const host,const uint8_t ip,st_cellular_ipaddr_t *const address) {
+ assert(ctrl==&cellular_ctrl && !strcmp((const char*)host,"example.test") && ip==CELLULAR_PROTOCOL_IPV4);
+ strcpy((char*)address->ipv4,"192.0.2.1");return failDns?CELLULAR_ERR_MODULE_COM:CELLULAR_SUCCESS;
 }
-CellularError_t Cellular_CreateSocket(CellularHandle_t h,uint8_t id,CellularSocketDomain_t domain,CellularSocketType_t type,CellularSocketProtocol_t protocol,CellularSocketHandle_t * result) {
-    (void)h;assert(id==1 && domain==CELLULAR_SOCKET_DOMAIN_AF_INET && type==CELLULAR_SOCKET_TYPE_STREAM && protocol==CELLULAR_SOCKET_PROTOCOL_TCP);*result=opaque;opens++;return CELLULAR_SUCCESS;
+e_cellular_err_t R_CELLULAR_ConnectSocket(st_cellular_ctrl_t *const ctrl,const uint8_t no,const uint8_t *const address,const uint16_t port) {
+ assert(ctrl==&cellular_ctrl && no==1 && !strcmp((const char*)address,"192.0.2.1") && port==8883);
+ return failConnect?CELLULAR_ERR_MODULE_COM:CELLULAR_SUCCESS;
 }
-CellularError_t Cellular_SocketRegisterSocketOpenCallback(CellularHandle_t h,CellularSocketHandle_t s,CellularSocketOpenCallback_t cb,void * ctx) {
-    (void)h;assert(s==opaque);onOpen=cb;openCtx=ctx;return CELLULAR_SUCCESS;
+int32_t R_CELLULAR_SendSocket(st_cellular_ctrl_t *const ctrl,const uint8_t no,const uint8_t *const data,const int32_t size,const uint32_t timeout) {
+ assert(ctrl==&cellular_ctrl && no==1 && size==4 && !memcmp(data,"DATA",4) && timeout==23);return sendResult;
 }
-CellularError_t Cellular_SocketRegisterDataReadyCallback(CellularHandle_t h,CellularSocketHandle_t s,CellularSocketDataReadyCallback_t cb,void * ctx) {
-    (void)h;assert(s==opaque);onData=cb;dataCtx=ctx;return CELLULAR_SUCCESS;
-}
-CellularError_t Cellular_SocketRegisterClosedCallback(CellularHandle_t h,CellularSocketHandle_t s,CellularSocketClosedCallback_t cb,void * ctx) {
-    (void)h;assert(s==opaque);onClosed=cb;closedCtx=ctx;return CELLULAR_SUCCESS;
-}
-CellularError_t Cellular_SocketSetSockOpt(CellularHandle_t h,CellularSocketHandle_t s,CellularSocketOptionLevel_t level,CellularSocketOption_t option,const uint8_t * value,uint32_t length) {
-    (void)h;(void)option;(void)value;assert(s==opaque && level==CELLULAR_SOCKET_OPTION_LEVEL_TRANSPORT && length==4);return CELLULAR_SUCCESS;
-}
-CellularError_t Cellular_SocketConnect(CellularHandle_t h,CellularSocketHandle_t s,CellularSocketAccessMode_t mode,const CellularSocketAddress_t * address) {
-    (void)h;assert(s==opaque && mode==CELLULAR_ACCESSMODE_BUFFER && address->port==8883 && address->ipAddress.ipAddressType==CELLULAR_IP_ADDRESS_V4);
-    onOpen(failOpen?CELLULAR_URC_SOCKET_OPEN_FAILED:CELLULAR_URC_SOCKET_OPENED,s,openCtx);return CELLULAR_SUCCESS;
-}
-CellularError_t Cellular_SocketClose(CellularHandle_t h,CellularSocketHandle_t s) {
-    (void)h;assert(s==opaque && onOpen==NULL && onData==NULL && onClosed==NULL);closes++;return CELLULAR_SUCCESS;
-}
-CellularError_t Cellular_SocketRecv(CellularHandle_t h,CellularSocketHandle_t s,uint8_t * data,uint32_t size,uint32_t * received) {
-    (void)h;assert(s==opaque && size==8);queries++;
-    if(queries<=2) { memcpy(data,"DATA",4);*received=4; } else *received=0;
-    return CELLULAR_SUCCESS;
-}
-CellularError_t Cellular_SocketSend(CellularHandle_t h,CellularSocketHandle_t s,const uint8_t * data,uint32_t size,uint32_t * sent) {
-    (void)h;assert(s==opaque && size==4 && memcmp(data,"DATA",4)==0);*sent=4;return CELLULAR_SUCCESS;
+int32_t R_CELLULAR_ReceiveSocket(st_cellular_ctrl_t *const ctrl,const uint8_t no,uint8_t *const data,const int32_t size,const uint32_t timeout) {
+ assert(ctrl==&cellular_ctrl && no==1 && size==8 && timeout==17);memcpy(data,"DATA",4);return receiveResult;
 }
 int main(void) {
-    Socket_t socket=NULL;char data[8];
-    assert(TCP_Sockets_Connect(&socket,"example.test",8883,10,10)==0 && socket);
-    assert(TCP_Sockets_Recv(socket,data,sizeof(data))==0 && queries==0 && tick==10);
-    onData(opaque,dataCtx);
-    assert(TCP_Sockets_Recv(socket,data,sizeof(data))==4 && queries==1);
-    assert(TCP_Sockets_Recv(socket,data,sizeof(data))==4 && queries==2);
-    assert(TCP_Sockets_Recv(socket,data,sizeof(data))==0 && queries==3);
-    assert(TCP_Sockets_Send(socket,"DATA",4)==4);
-    onClosed(opaque,closedCtx);
-    assert(TCP_Sockets_Recv(socket,data,sizeof(data))==TCP_SOCKETS_ERRNO_ECLOSED);
-    assert(TCP_Sockets_Send(socket,"DATA",4)==TCP_SOCKETS_ERRNO_ECLOSED);
-    TCP_Sockets_Disconnect(socket);assert(closes==1);
-    failOpen=1;
-    assert(TCP_Sockets_Connect(&socket,"example.test",8883,10,10)!=0 && socket==NULL && closes==2);
-    assert(opens==2);
-    return 0;
+ Socket_t socket=NULL;char bytes[8];unsigned before;
+ assert(TCP_Sockets_Connect(&socket,"example.test",8883,17,23)==0 && socket);
+ assert(TCP_Sockets_Recv(socket,bytes,sizeof(bytes))==4 && !memcmp(bytes,"DATA",4));
+ assert(TCP_Sockets_Send(socket,"DATA",4)==4);
+ receiveResult=CELLULAR_ERR_OTHER_API_RUNNING;assert(TCP_Sockets_Recv(socket,bytes,sizeof(bytes))==0);
+ sendResult=CELLULAR_ERR_NOT_CONNECT;assert(TCP_Sockets_Send(socket,"DATA",4)==0);
+ TCP_Sockets_Disconnect(socket);assert(closed==1 && allocated==freed);
+ failDns=1;before=closed;assert(TCP_Sockets_Connect(&socket,"example.test",8883,17,23)!=0 && !socket);
+ assert(closed==before+1 && allocated==freed);failDns=0;
+ failConnect=1;before=closed;assert(TCP_Sockets_Connect(&socket,"example.test",8883,17,23)!=0 && !socket);
+ assert(closed==before+1 && allocated==freed);failConnect=0;
+ failAllocation=1;before=closed;assert(TCP_Sockets_Connect(&socket,"example.test",8883,17,23)!=0 && !socket);
+ assert(closed==before+1 && allocated==freed && created==4);
+ return 0;
 }
-''', {
-            "FreeRTOS.h": r'''
-#ifndef FIXTURE_KERNEL_H
-#define FIXTURE_KERNEL_H
-#include <stddef.h>
-#include <stdint.h>
-typedef int BaseType_t;typedef unsigned TickType_t;
-#define pdTRUE 1
-#define pdFALSE 0
-#define portMAX_DELAY UINT32_MAX
-#define pdMS_TO_TICKS(x) (x)
-#define taskENTER_CRITICAL() ((void)0)
-#define taskEXIT_CRITICAL() ((void)0)
-#endif
-''',
-            "task.h": '#include "FreeRTOS.h"\nTickType_t xTaskGetTickCount(void);void vTaskDelay(TickType_t);\n',
-            "event_groups.h": r'''
-#ifndef FIXTURE_EVENTS_H
-#define FIXTURE_EVENTS_H
-#include "FreeRTOS.h"
-typedef unsigned EventBits_t;typedef struct {unsigned bits;} StaticEventGroup_t;
-typedef StaticEventGroup_t * EventGroupHandle_t;
-EventGroupHandle_t xEventGroupCreateStatic(StaticEventGroup_t *);
-EventBits_t xEventGroupGetBits(EventGroupHandle_t);
-EventBits_t xEventGroupSetBits(EventGroupHandle_t,EventBits_t);
-EventBits_t xEventGroupClearBits(EventGroupHandle_t,EventBits_t);
-EventBits_t xEventGroupWaitBits(EventGroupHandle_t,EventBits_t,BaseType_t,BaseType_t,TickType_t);
-#endif
-''',
-            "logging_levels.h": '#define LOG_INFO 3\n', "logging_stack.h": '',
-        }, [ROOT / "Middleware/network_transport/sockets_wrapper/ports/cellular_bg96/tcp_sockets_wrapper.c"],
-           [product, cellular / "include", cellular / "interface", cellular / "include/common",
-            ROOT / "Middleware/network_transport/sockets_wrapper/include"])
+''', headers, [ROOT / "Middleware/network_transport/sockets_wrapper/ports/cellular_ryz014a/sockets_wrapper.c"],
+             r_cellular_includes() + [ROOT / "Middleware/network_transport/sockets_wrapper/include"])
 
-    def test_bg96_comm_enables_cts_only_after_ifc_ack_and_detects_overflow(self):
-        cellular = ROOT / "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface/source"
-        product = ROOT / "Common/ports/cellular_bg96"
-        self.compile_run(r'''
+    def test_r_cellular_logging_macros_keep_normal_logs_and_disable_maintenance_side_effects(self):
+        source = r'''
 #include <assert.h>
-#include <string.h>
-#include "queue.h"
-#include "r_sci_rx_if.h"
-#include "bg96_network.h"
-FixturePort PORT5,PORTB,PORTJ,PORT0;FixtureMpc MPC;
-static unsigned tick,rate,cts,notifications,baudChanges;
-static void (*interruptHandler)(void *);
-struct Queue {uint8_t bytes[8192];unsigned used,read;};
-static struct Queue queue;
-TickType_t xTaskGetTickCount(void) { return tick; }
-void vTaskDelay(TickType_t t) { tick+=t; }
-QueueHandle_t xQueueCreate(unsigned length,unsigned item) { assert(length==8192 && item==1);memset(&queue,0,sizeof(queue));return &queue; }
-void vQueueDelete(QueueHandle_t q) { assert(q==&queue); }
-BaseType_t xQueueSendFromISR(QueueHandle_t q,const void * value,BaseType_t * wake) {
-    (void)wake;assert(q==&queue);if(q->used==8192)return 0;q->bytes[(q->read+q->used)%8192]=*(const uint8_t *)value;q->used++;return 1;
-}
-BaseType_t xQueueReceive(QueueHandle_t q,void * value,TickType_t timeout) {
-    assert(q==&queue);if(q->used==0){tick+=timeout;return 0;}*(uint8_t *)value=q->bytes[q->read++%8192];q->used--;return 1;
-}
-static void inject(const char * text) { while(*text){sci_cb_args_t args={SCI_EVT_RX_CHAR,(uint8_t)*text++};interruptHandler(&args);} }
-void R_BSP_RegisterProtectDisable(int n) {(void)n;}
-void R_BSP_RegisterProtectEnable(int n) {(void)n;}
-void R_SCI_PinSet_SCI6(void) {PORTJ.PMR.BIT.B3=1;}
-sci_err_t R_SCI_Open(int channel,int mode,sci_cfg_t * config,void (*cb)(void *),sci_hdl_t * result) {
-    (void)mode;assert(channel==SCI_CH6 && config->async.int_priority==4 && PORTJ.PMR.BIT.B3==0);
-    rate=config->async.baud_rate;interruptHandler=cb;*result=(void *)1;return SCI_SUCCESS;
-}
-sci_err_t R_SCI_Close(sci_hdl_t h) {assert(h==(void *)1);return SCI_SUCCESS;}
-sci_err_t R_SCI_Send(sci_hdl_t h,uint8_t * data,uint16_t length) {
-    assert(h==(void *)1);
-    if(length==3 && memcmp(data,"AT\r",3)==0) {if(rate==460800)inject("\r\nOK\r\n");}
-    else if(length==11 && memcmp(data,"AT+IFC=2,2\r",11)==0) {assert(cts==0);inject("\r\nOK\r\n");}
-    return SCI_SUCCESS;
-}
-sci_err_t R_SCI_Control(sci_hdl_t h,int command,void * argument) {
-    assert(h==(void *)1);
-    if(command==SCI_CMD_EN_CTS_IN){assert(PORTJ.PMR.BIT.B3==0);cts++;}
-    else {sci_baud_t * baud=argument;assert(command==SCI_CMD_CHANGE_BAUD && baud->rate==460800 && baud->pclk==64000000);baudChanges++;}
-    return SCI_SUCCESS;
-}
-static CellularCommInterfaceError_t receive(void * user,CellularCommInterfaceHandle_t handle) {
-    assert(user==(void *)3 && handle);notifications++;return IOT_COMM_INTERFACE_BUSY;
-}
+#include "logging_levels.h"
+static unsigned calls;
+static void RecordLog(const char *format,int value) { (void)format;(void)value;calls++; }
+#include "cellular_freertos.h"
+#if !defined(CELLULAR_LOG_ERROR) || !defined(CELLULAR_LOG_WARN) || !defined(CELLULAR_LOG_INFO) || !defined(CELLULAR_LOG_DEBUG)
+#error CELLULAR_LOG_macros_must_be_defined
+#endif
 int main(void) {
-    CellularCommInterfaceHandle_t handle;uint8_t bytes[64];uint32_t used;
-    PORTB.PIDR.BIT.B6=1;
-    assert(Bg96_CommInterface.open(receive,(void *)3,&handle)==IOT_COMM_INTERFACE_SUCCESS);
-    assert(rate==460800 && cts==0 && !Bg96_CommSetRuntimeBaud());
-    assert(Bg96_CommInterface.send(handle,(uint8_t *)"AT+IFC=2,2\r",11,100,&used)==IOT_COMM_INTERFACE_SUCCESS && used==11);
-    assert(cts==0);
-    assert(Bg96_CommInterface.recv(handle,bytes,sizeof(bytes),100,&used)==IOT_COMM_INTERFACE_SUCCESS && used==6);
-    assert(cts==1 && PORTJ.PMR.BIT.B3==1 && Bg96_CommSetRuntimeBaud() && baudChanges==1);
-    assert(notifications==6);
-    assert(Bg96_CommInterface.recv(handle,bytes,sizeof(bytes),10,&used)==IOT_COMM_INTERFACE_TIMEOUT && used==0);
-    for(unsigned i=0;i<8193;i++)inject("A");
-    assert(Bg96_CommInterface.recv(handle,bytes,sizeof(bytes),10,&used)==IOT_COMM_INTERFACE_DRIVER_ERROR);
-    assert(Bg96_CommInterface.close(handle)==IOT_COMM_INTERFACE_SUCCESS && PORTJ.PMR.BIT.B3==0);
-    return 0;
+ unsigned effects=0;
+ CELLULAR_LOG_ERROR(("fixture %d",++effects));CELLULAR_LOG_WARN(("fixture %d",++effects));
+ CELLULAR_LOG_INFO(("fixture %d",++effects));CELLULAR_LOG_DEBUG(("fixture %d",++effects));
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+ assert(CELLULAR_CFG_DEBUGLOG==0 && calls==0 && effects==0);
+#else
+ assert(CELLULAR_CFG_DEBUGLOG==4 && calls==4 && effects==4);
+#endif
+ return 0;
 }
-''', {
-            "FreeRTOS.h": r'''
-#ifndef FIXTURE_KERNEL_H
-#define FIXTURE_KERNEL_H
-#include <stddef.h>
-#include <stdint.h>
-typedef int BaseType_t;typedef unsigned TickType_t;
-#define pdTRUE 1
-#define pdFALSE 0
-#define pdPASS 1
-#define configMAX_SYSCALL_INTERRUPT_PRIORITY 4
-#define pdMS_TO_TICKS(x) (x)
-#define portYIELD_FROM_ISR(x) ((void)(x))
-#endif
-''',
-            "task.h": '#include "FreeRTOS.h"\nTickType_t xTaskGetTickCount(void);void vTaskDelay(TickType_t);\n',
-            "queue.h": r'''
-#ifndef FIXTURE_QUEUE_H
-#define FIXTURE_QUEUE_H
-#include "FreeRTOS.h"
-typedef struct Queue * QueueHandle_t;
-QueueHandle_t xQueueCreate(unsigned,unsigned);void vQueueDelete(QueueHandle_t);
-BaseType_t xQueueSendFromISR(QueueHandle_t,const void *,BaseType_t *);
-BaseType_t xQueueReceive(QueueHandle_t,void *,TickType_t);
-#endif
-''',
-            "platform.h": r'''
-#ifndef FIXTURE_PLATFORM_H
-#define FIXTURE_PLATFORM_H
-typedef struct {unsigned B2,B3,B5,B6,B7;} FixtureBits;
-typedef struct {FixtureBits BIT;} FixtureRegister;
-typedef struct {FixtureRegister PMR,PDR,PODR,PIDR;} FixturePort;
-typedef struct {unsigned BYTE;} FixturePfs;
-typedef struct {FixturePfs P55PFS,PB7PFS,PB6PFS,P02PFS;} FixtureMpc;
-extern FixturePort PORT5,PORTB,PORTJ,PORT0;extern FixtureMpc MPC;
-#define BSP_REG_PROTECT_MPC 1
-#define BSP_PCLKB_HZ 64000000
-void R_BSP_RegisterProtectDisable(int);void R_BSP_RegisterProtectEnable(int);
-#endif
-''',
-            "r_sci_rx_if.h": r'''
-#ifndef FIXTURE_SCI_H
-#define FIXTURE_SCI_H
-#include <stdint.h>
-#include "platform.h"
-typedef void * sci_hdl_t;typedef int sci_err_t;
-typedef struct {unsigned event;uint8_t byte;} sci_cb_args_t;
-typedef struct {struct {uint32_t baud_rate;unsigned clk_src,data_size,parity_en,parity_type,stop_bits,int_priority;} async;} sci_cfg_t;
-typedef struct {uint32_t pclk,rate;} sci_baud_t;
-enum {SCI_EVT_RX_CHAR=1,SCI_EVT_RXBUF_OVFL,SCI_CH6,SCI_MODE_ASYNC,SCI_CLK_INT,SCI_DATA_8BIT,SCI_PARITY_OFF,SCI_EVEN_PARITY,SCI_STOPBITS_1,SCI_ERR_INSUFFICIENT_SPACE,SCI_ERR_XCVR_BUSY,SCI_CMD_EN_CTS_IN,SCI_CMD_CHANGE_BAUD};
-#define SCI_SUCCESS 0
-sci_err_t R_SCI_Open(int,int,sci_cfg_t *,void (*)(void *),sci_hdl_t *);
-sci_err_t R_SCI_Close(sci_hdl_t);sci_err_t R_SCI_Send(sci_hdl_t,uint8_t *,uint16_t);sci_err_t R_SCI_Control(sci_hdl_t,int,void *);
-#endif
-''',
-            "r_sci_rx_pinset.h": 'void R_SCI_PinSet_SCI6(void);\n',
-        }, [product / "bg96_comm.c"],
-           [product, cellular / "include", cellular / "interface", cellular / "include/common"])
+'''
+        for project in ("aws_bg96_ck_rx65n", "aws_bg96_ck_rx65n_tsip"):
+            config = Path("Projects") / project / "e2studio_ccrx/src/smc_gen/r_config/r_cellular_config.h"
+            headers = r_cellular_headers()
+            headers.update({
+                "r_cellular_config.h": '#include "' + config.as_posix() + '"\n',
+                "FreeRTOS.h": "#include <stddef.h>\n#include <stdint.h>\n",
+                "task.h": "",
+                "logging_levels.h": "#define LOG_NONE 0\n#define LOG_INFO 3\n",
+                "logging_stack.h": "#define LogError(x) RecordLog x\n#define LogWarn(x) RecordLog x\n#define LogInfo(x) RecordLog x\n#define LogDebug(x) RecordLog x\n",
+            })
+            includes = r_cellular_includes() + [RCELLULAR / "src/RTOS/include"]
+            with self.subTest(project=project, role="normal"):
+                self.compile_run(source, headers, extra_includes=includes)
+            maintenance_defines = ["PUBLIC_SIGNER_PROVISIONER_ENABLE=1", "LIBRARY_LOG_LEVEL=LOG_NONE"]
+            with self.subTest(project=project, role="maintenance"):
+                self.compile_run(source, headers, extra_includes=includes, extra_defines=maintenance_defines)
+            # The former unconditionally enabled setting must fail the same macro contract.
+            old_headers = dict(headers)
+            old_headers["r_cellular_config.h"], replacements = re.subn(
+                r"#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1\n.*?\n#endif",
+                "#define CELLULAR_CFG_DEBUGLOG (4)",
+                (ROOT / config).read_text(encoding="utf-8"), count=1, flags=re.S)
+            self.assertEqual(replacements, 1)
+            with self.subTest(project=project, role="old-maintenance-negative-control"):
+                with self.assertRaisesRegex(AssertionError, "CELLULAR_LOG_macros_must_be_defined"):
+                    self.compile_run(source, old_headers, extra_includes=includes, extra_defines=maintenance_defines)
 
     def test_product_jobs_topic_bounds_and_nonterminated_id(self):
         self.compile_run(r'''

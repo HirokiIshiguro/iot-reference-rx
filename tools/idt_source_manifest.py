@@ -23,8 +23,6 @@ COMMON = (
     "Middleware/FreeRTOS/coreMQTT", "Middleware/FreeRTOS/coreMQTT-Agent",
     "Middleware/FreeRTOS/coreJSON", "Middleware/FreeRTOS/backoffAlgorithm",
     "Middleware/FreeRTOS/corePKCS11",
-    "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface",
-    "Middleware/FreeRTOS/FreeRTOS-Cellular-Interface-Reference-Quectel-BG96",
     "Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk",
     "Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk",
     "Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c",
@@ -36,6 +34,7 @@ COMMON = (
     "Middleware/3rdparty/TraceRecorderSource",
 )
 TEST = ("Test/Unity", "Test/FreeRTOS-Libraries-Integration-Tests")
+CELLULAR = ("Middleware/Renesas/r_cellular",)
 WIFI = (
     "Projects/aws_wifi_rx671_ek/external/wifi-host-driver",
     "Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/firmware-wifi-host-driver",
@@ -53,7 +52,9 @@ PKCS11_RUNNER_FILE = "Test/FreeRTOS-Libraries-Integration-Tests/src/pkcs11/core_
 def dependency_paths(target_id: str) -> tuple[str, ...]:
     if target_id not in BOOT:
         raise ValueError("Unknown IDT target")
-    return TEST + COMMON + (BOOT[target_id],) + (WIFI if target_id == "rx671-wifi" else ())
+    return (TEST + COMMON + (BOOT[target_id],)
+            + (WIFI if target_id == "rx671-wifi" else ())
+            + (CELLULAR if target_id == "rx65n-bg96" else ()))
 
 
 def _is_linked_dependency(path: Path) -> bool:

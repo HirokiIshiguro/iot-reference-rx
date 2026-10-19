@@ -41,7 +41,7 @@ EventGroupHandle_t xStartDemoEventGroup = NULL;
 
 /* Demo includes */
 #include "aws_clientcredential.h"
-#include "bg96_network.h"
+#include "r_cellular_network.h"
 #include "demo_config.h"
 #include "store.h"
 #include "mqtt_agent_task.h"
