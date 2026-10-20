@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
     [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
-    [int]$E2StudioTimeoutSeconds = 180,
+    [int]$E2StudioTimeoutSeconds = 300,
     [string]$OtaImageVersion = "",
     [string]$Make = "",
     [string]$CcrxBin = "",
