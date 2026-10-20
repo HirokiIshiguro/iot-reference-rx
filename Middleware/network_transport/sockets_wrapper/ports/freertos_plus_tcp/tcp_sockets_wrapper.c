@@ -577,7 +577,8 @@ int32_t TCP_Sockets_Recv(Socket_t xSocket,
  *********************************************************************************************************************/
 static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
                                         CK_SESSION_HANDLE *pxSession,
-                                        CK_FUNCTION_LIST_PTR_PTR ppxFunctionList)
+                                        CK_FUNCTION_LIST_PTR_PTR ppxFunctionList,
+                                        uint32_t *pOperation)
 {
     CK_RV xResult = CKR_OK;
     CK_C_GetFunctionList pxCkGetFunctionList = NULL;
@@ -587,6 +588,11 @@ static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
     static SemaphoreHandle_t xSessionLock = NULL;
     CK_ULONG ulCount = 0;
     CK_SLOT_ID *pxSlotIds = NULL;
+
+    if (NULL != pOperation)
+    {
+        *pOperation = TCP_RANDOM_OP_UNSPECIFIED;
+    }
 
     /* Check if one-time initialization of the lock is needed.*/
     portENTER_CRITICAL();
@@ -611,16 +617,28 @@ static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
          * requirements for accessing a crypto module. */
 
         pxCkGetFunctionList = C_GetFunctionList;
+        if (NULL != pOperation)
+        {
+            *pOperation = TCP_RANDOM_OP_GET_FUNCTION_LIST;
+        }
         xResult = pxCkGetFunctionList(&pxPkcs11FunctionList);
 
         if (CKR_OK == xResult)
         {
+            if (NULL != pOperation)
+            {
+                *pOperation = TCP_RANDOM_OP_TOKEN_INITIALIZE;
+            }
             xResult = xInitializePkcs11Token();
         }
 
         /* Get the crypto token slot count. */
         if (CKR_OK == xResult)
         {
+            if (NULL != pOperation)
+            {
+                *pOperation = TCP_RANDOM_OP_SLOT_COUNT;
+            }
             xResult = pxPkcs11FunctionList->C_GetSlotList(CK_TRUE,
                                                           NULL,
                                                           &ulCount);
@@ -629,6 +647,10 @@ static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
         /* Allocate memory to store the token slots. */
         if (CKR_OK == xResult)
         {
+            if (NULL != pOperation)
+            {
+                *pOperation = TCP_RANDOM_OP_SLOT_ALLOCATE;
+            }
             pxSlotIds = (CK_SLOT_ID *)pvPortMalloc(sizeof(CK_SLOT_ID) * ulCount);
 
             if (NULL == pxSlotIds)
@@ -640,6 +662,10 @@ static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
         /* Get all of the available private key slot identities. */
         if (CKR_OK == xResult)
         {
+            if (NULL != pOperation)
+            {
+                *pOperation = TCP_RANDOM_OP_SLOT_LIST;
+            }
             xResult = pxPkcs11FunctionList->C_GetSlotList(CK_TRUE,
                                                           pxSlotIds,
                                                           &ulCount);
@@ -648,6 +674,10 @@ static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
         /* Start a session with the PKCS#11 module. */
         if (CKR_OK == xResult)
         {
+            if (NULL != pOperation)
+            {
+                *pOperation = TCP_RANDOM_OP_SESSION_OPEN;
+            }
             xResult = pxPkcs11FunctionList->C_OpenSession(pxSlotIds[0],
                                                           CKF_SERIAL_SESSION,
                                                           NULL,
@@ -685,15 +715,26 @@ BaseType_t xApplicationGetRandomNumber(uint32_t *pulNumber)
     CK_FUNCTION_LIST_PTR pxPkcs11FunctionList = NULL;
     uint32_t ulRandomValue = 0;
     BaseType_t xReturn; /* Return pdTRUE if successful */
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+    uint32_t ulDiagnosticOperation = TCP_RANDOM_OP_UNSPECIFIED;
+#endif
 
     xResult = prvSocketsGetCryptoSession(&xSessionLock,
                                          &xPkcs11Session,
-                                         &pxPkcs11FunctionList);
+                                         &pxPkcs11FunctionList,
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+                                         &ulDiagnosticOperation);
+#else
+                                         NULL);
+#endif
 
     if (0 == xResult)
     {
         /* Request a sequence of cryptographically random byte values using
          * PKCS#11. */
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+        ulDiagnosticOperation = TCP_RANDOM_OP_GENERATE_RANDOM;
+#endif
         xResult = pxPkcs11FunctionList->C_GenerateRandom(xPkcs11Session,
                                                          (CK_BYTE_PTR)&ulRandomValue,
                                                          sizeof(ulRandomValue));
@@ -709,6 +750,11 @@ BaseType_t xApplicationGetRandomNumber(uint32_t *pulNumber)
     {
         xReturn = pdFALSE;
         *(pulNumber) = 0uL;
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+        TCP_Sockets_OnRandomFailure(TCP_CONNECT_BACKEND_FREERTOS_TCP,
+                                     ulDiagnosticOperation,
+                                     (uint32_t)xResult);
+#endif
     }
 
     return xReturn;
@@ -751,7 +797,8 @@ uint32_t ulApplicationGetNextSequenceNumber(uint32_t ulSourceAddress,
     /* Acquire a crypto session handle. */
     xResult = prvSocketsGetCryptoSession(&xSessionLock,
                                          &xPkcs11Session,
-                                         &pxPkcs11FunctionList);
+                                         &pxPkcs11FunctionList,
+                                         NULL);
 
     if (CKR_OK == xResult)
     {

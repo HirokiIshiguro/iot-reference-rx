@@ -29,6 +29,16 @@
 #define RX671_TCP_WIN_SEG_COUNT                   128
 #endif
 #define ipconfigTCP_WIN_SEG_COUNT                 RX671_TCP_WIN_SEG_COUNT
+/* Observation hook only. No DNS lookup, retry or timeout setting is changed.
+ * This marks the send attempt before sendto; it is not wire-delivery proof.
+ * Enabling requires a reviewed nonblocking application hook implementation.
+ */
+#include "tcp_connect_diagnostics.h"
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+#define iptraceSENDING_DNS_REQUEST() \
+    TCP_Sockets_OnDNSSendAttempt(TCP_CONNECT_BACKEND_FREERTOS_TCP)
+#endif
+
 #define ipconfigUSE_DNS                           1
 #define ipconfigUSE_DNS_CACHE                     1
 #define ipconfigUSE_LLMNR                         0

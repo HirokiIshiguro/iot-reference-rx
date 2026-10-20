@@ -84,4 +84,62 @@ static void tcp_sockets_report_connect_failure(uint32_t backend,
     writer(line);
 }
 
+/* Optional observation contract. Disabled by default in every backend.
+ * The hook is task context and must not block, alter task notifications, call
+ * network/RNG/PKCS APIs, or print secrets. The application owns any delivery.
+ * backend1 status is a PKCS#11 CK_RV. Opaque cellular/DA internal RNG state is
+ * not observable through their current API: they emit no synthetic event.
+ */
+#ifndef TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS
+#define TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS   (0)
+#endif
+
+#define TCP_RANDOM_OP_UNSPECIFIED              (0U)
+#define TCP_RANDOM_OP_GET_FUNCTION_LIST        (1U)
+#define TCP_RANDOM_OP_TOKEN_INITIALIZE         (2U)
+#define TCP_RANDOM_OP_SLOT_COUNT               (3U)
+#define TCP_RANDOM_OP_SLOT_ALLOCATE            (4U)
+#define TCP_RANDOM_OP_SLOT_LIST                (5U)
+#define TCP_RANDOM_OP_SESSION_OPEN             (6U)
+#define TCP_RANDOM_OP_GENERATE_RANDOM          (7U)
+
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+/* Opt-in application definitions are required before enabling this feature.
+ * No UART route or mutable observer state is provided by this header.
+ */
+void TCP_Sockets_OnRandomFailure(uint32_t backend,
+                                 uint32_t operation,
+                                 uint32_t status);
+void TCP_Sockets_OnDNSSendAttempt(uint32_t backend);
+#endif
+
+/* Fixed numeric failure row only; callers choose an appropriate task-owned
+ * writer. A hook must not use a blocking writer directly in the IP task.
+ */
+static void tcp_sockets_report_random_failure(uint32_t backend,
+                                              uint32_t operation,
+                                              uint32_t status,
+                                              uint32_t match,
+                                              TCPConnectDiagnosticWriter_t writer)
+{
+    char line[96];
+    char *out = line;
+
+    if ((0U == status) || (NULL == writer))
+    {
+        return;
+    }
+    out = tcp_sockets_diag_append_text(out, "TCP RNG failure context backend=");
+    out = tcp_sockets_diag_append_decimal(out, backend);
+    out = tcp_sockets_diag_append_text(out, " op=");
+    out = tcp_sockets_diag_append_decimal(out, operation);
+    out = tcp_sockets_diag_append_text(out, " status=");
+    out = tcp_sockets_diag_append_hex(out, status);
+    out = tcp_sockets_diag_append_text(out, " match=");
+    out = tcp_sockets_diag_append_decimal(out, (0U != match) ? 1U : 0U);
+    out = tcp_sockets_diag_append_text(out, "\r\n");
+    *out = '\0';
+    writer(line);
+}
+
 #endif

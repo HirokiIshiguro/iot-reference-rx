@@ -23,6 +23,7 @@
 #include "whd_join_config.h"
 #include "whd_bringup.h"
 #include "aws_iot_mqtt_smoke.h"
+#include "tcp_rng_dns_observation.h"
 #include "rx671_fleet_bootstrap.h"
 #include "rx671_fleet_config.h"
 #include "tcp_throughput_smoke.h"
@@ -287,6 +288,9 @@ static void idt_network_prepare(void)
     {
         idt_stop("IDT_PORT_FATAL: WHD station MAC unavailable\r\n");
     }
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+    tcp_rng_dns_observation_init();
+#endif
     if (pdPASS != FreeRTOS_IPInit(fallback_ip, netmask, gateway, dns, mac))
     {
         idt_stop("IDT_PORT_FATAL: FreeRTOS IP initialization failed\r\n");
@@ -419,6 +423,9 @@ static void start_freertos_tcp_after_join(void)
         return;
     }
 
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+    tcp_rng_dns_observation_init();
+#endif
     result = FreeRTOS_IPInit(fallback_ip, netmask, gateway, dns, mac);
     debug_puts((pdPASS == result) ? "FreeRTOS_IPInit OK\r\n" : "FreeRTOS_IPInit NG\r\n");
     if (pdPASS == result)

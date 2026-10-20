@@ -24,6 +24,7 @@
 #include "mbedtls/x509_crt.h"
 #include "mbedtls_bio_tcp_sockets_wrapper.h"
 #include "tcp_sockets_wrapper.h"
+#include "tcp_rng_dns_observation.h"
 #include "threading_alt.h"
 
 #include "aws_iot_config.h"
@@ -252,6 +253,9 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
     int ret;
     BaseType_t tcpConnectStatus;
     uint32_t tcpFailureStage = TCP_CONNECT_STAGE_NONE;
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+    TcpRngDnsConnectWindow_t observationWindow;
+#endif
 
     g_aws_iot_mqtt_tls_step = 1U;
     g_aws_iot_mqtt_entropy_source_count_after_init =
@@ -354,6 +358,9 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
     }
 
     g_aws_iot_mqtt_tls_step = 9U;
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+    tcp_rng_dns_observation_connect_begin(&observationWindow);
+#endif
     tcpConnectStatus =
         TCP_Sockets_ConnectWithContext(&p_tls->socket,
                                         AWS_IOT_ENDPOINT,
@@ -361,6 +368,9 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
                                         AWS_IOT_MQTT_TCP_RECV_TIMEOUT_MS,
                                         AWS_IOT_MQTT_TCP_SEND_TIMEOUT_MS,
                                         &tcpFailureStage);
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+    tcp_rng_dns_observation_connect_end(&observationWindow);
+#endif
     g_aws_iot_mqtt_tcp_connect_status = (uint32_t)tcpConnectStatus;
     if (0 != tcpConnectStatus)
     {
@@ -368,6 +378,10 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
                                            tcpFailureStage,
                                            (uint32_t)tcpConnectStatus,
                                            debug_puts);
+#if (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+        tcp_rng_dns_observation_report_failure(&observationWindow,
+                                               tcpConnectStatus, debug_puts);
+#endif
     }
     if (0U != g_aws_iot_mqtt_tcp_connect_status)
     {
