@@ -105,6 +105,26 @@ static void log_step_status(const char * label, int32_t status)
     debug_puts(line);
 }
 
+static void log_tls_failure_context(void)
+{
+    char line[96];
+    char * p = line;
+    const uint32_t phase = g_aws_iot_mqtt_tls_step;
+    const uint32_t tcp_valid = ((9U == phase) || (10U == phase)) ? 1U : 0U;
+
+    p = append_text(p, "AWS TLS failure context phase=");
+    p = append_dec32(p, phase);
+    p = append_text(p, " tcp_valid=");
+    p = append_dec32(p, tcp_valid);
+    p = append_text(p, " tcp=");
+    p = append_hex32(p, (0U != tcp_valid) ? g_aws_iot_mqtt_tcp_connect_status : 0U);
+    p = append_text(p, " tls=");
+    p = append_hex32(p, (uint32_t)g_aws_iot_mqtt_mbedtls_status);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
 static void log_tls_version(const mbedtls_ssl_context * p_ssl)
 {
     char line[64];
@@ -471,6 +491,10 @@ static void aws_iot_mqtt_task(void * p_parameters)
     tls_status = tls_connect(p_tls);
     g_aws_iot_mqtt_stack_high_water_after_tls = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
     g_aws_iot_mqtt_mbedtls_status = (int32_t)tls_status;
+    if (0 != tls_status)
+    {
+        log_tls_failure_context();
+    }
     log_step_status("AWS TLS", (int32_t)tls_status);
 
     if (0 == tls_status)
