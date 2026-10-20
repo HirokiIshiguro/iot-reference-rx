@@ -222,8 +222,20 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
                                uint32_t receiveTimeoutMs,
                                uint32_t sendTimeoutMs)
 {
+    return TCP_Sockets_ConnectWithContext(pTcpSocket, pHostName, port,
+                                          receiveTimeoutMs, sendTimeoutMs, NULL);
+}
+
+BaseType_t TCP_Sockets_ConnectWithContext(Socket_t *pTcpSocket,
+                               const char *pHostName,
+                               uint16_t port,
+                               uint32_t receiveTimeoutMs,
+                               uint32_t sendTimeoutMs,
+                                          uint32_t *pFailureStage)
+{
     Socket_t tcpSocket = FREERTOS_INVALID_SOCKET;
     BaseType_t socketStatus = 0;
+    uint32_t connectFailureStage = TCP_CONNECT_STAGE_NONE;
     struct freertos_sockaddr serverAddress = {0};
     TickType_t transportTimeout = 0;
 
@@ -235,6 +247,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
     if (FREERTOS_INVALID_SOCKET == tcpSocket)
     {
+        connectFailureStage = TCP_CONNECT_STAGE_SOCKET_CREATION;
         LogError(("Failed to create new socket."));
         socketStatus = FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR;
     }
@@ -260,6 +273,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
             if (0 != socketStatus)
             {
+                connectFailureStage = TCP_CONNECT_STAGE_SOCKET_CONFIGURATION;
                 LogError(("Failed to configure TCP window properties: ReturnCode=%d.", socketStatus));
             }
         }
@@ -283,6 +297,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 #endif /* defined( ipconfigIPv4_BACKWARD_COMPATIBLE ) && ( ipconfigIPv4_BACKWARD_COMPATIBLE == 0 ) */
 
         {
+            connectFailureStage = TCP_CONNECT_STAGE_ADDRESS_RESOLUTION;
             LogError(("Failed to connect to server: DNS resolution failed: Hostname=%s.",
                       pHostName));
             socketStatus = FREERTOS_SOCKETS_WRAPPER_NETWORK_ERROR;
@@ -302,11 +317,13 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
         /* Establish connection. */
         LogDebug(("Creating TCP Connection to %s.", pHostName));
+        connectFailureStage = TCP_CONNECT_STAGE_INITIAL_CONNECT;
         socketStatus = FreeRTOS_connect(tcpSocket, &serverAddress, sizeof(serverAddress));
 
         if (-pdFREERTOS_ERRNO_EWOULDBLOCK == socketStatus)
         {
             transportTimeout = (0U == receiveTimeoutMs) ? portMAX_DELAY : prvMillisecondsToTicks(receiveTimeoutMs);
+            connectFailureStage = TCP_CONNECT_STAGE_EXPLICIT_CONNECT_WAIT;
             socketStatus = prvWaitForConnect(tcpSocket, transportTimeout);
         }
 
@@ -359,6 +376,10 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
         LogInfo(("Established TCP connection with %s.", pHostName));
     }
 
+    if (NULL != pFailureStage)
+    {
+        *pFailureStage = (0 == socketStatus) ? TCP_CONNECT_STAGE_NONE : connectFailureStage;
+    }
     return socketStatus;
 }
 /**********************************************************************************************************************

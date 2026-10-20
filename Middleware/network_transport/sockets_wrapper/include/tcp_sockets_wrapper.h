@@ -35,6 +35,7 @@
 
 /* Standard includes. */
 #include <stdint.h>
+#include "tcp_connect_diagnostics.h"
 
 /* Logging related header files are required to be included in the following order:
  * 1. Include the header file "logging_levels.h".
@@ -110,6 +111,24 @@ BaseType_t TCP_Sockets_Connect (Socket_t * pTcpSocket,
                                 uint16_t port,
                                 uint32_t receiveTimeoutMs,
                                 uint32_t sendTimeoutMs);
+
+/**
+ * @brief Same connection operation with optional caller-owned stage output.
+ *
+ * Every normal return writes stage NONE on success, or the visible failure
+ * operation from TCP_CONNECT_STAGE_* on failure. Backend-internal stages are
+ * not guessed. The caller owns the output until this synchronous call returns.
+ * This extended API returns the original backend status and does not emit a
+ * diagnostic row. The legacy API passes NULL and retains its output behavior.
+ * Callers may report the context through the shared formatter and their own
+ * suitable writer; choosing a writer must preserve caller task state.
+ */
+BaseType_t TCP_Sockets_ConnectWithContext(Socket_t *pTcpSocket,
+                                          const char *pHostName,
+                                          uint16_t port,
+                                          uint32_t receiveTimeoutMs,
+                                          uint32_t sendTimeoutMs,
+                                          uint32_t *pFailureStage);
 
 /**
  * @brief End connection to server.

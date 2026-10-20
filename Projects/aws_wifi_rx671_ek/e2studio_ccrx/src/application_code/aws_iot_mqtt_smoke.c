@@ -250,6 +250,8 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
 {
     static const char personalisation[] = "rx671-1yn-aws-iot";
     int ret;
+    BaseType_t tcpConnectStatus;
+    uint32_t tcpFailureStage = TCP_CONNECT_STAGE_NONE;
 
     g_aws_iot_mqtt_tls_step = 1U;
     g_aws_iot_mqtt_entropy_source_count_after_init =
@@ -352,12 +354,21 @@ static int tls_connect(AwsIotMqttTlsContext_t * p_tls)
     }
 
     g_aws_iot_mqtt_tls_step = 9U;
-    g_aws_iot_mqtt_tcp_connect_status =
-        (uint32_t)TCP_Sockets_Connect(&p_tls->socket,
-                                      AWS_IOT_ENDPOINT,
-                                      (uint16_t)AWS_IOT_MQTT_PORT,
-                                      AWS_IOT_MQTT_TCP_RECV_TIMEOUT_MS,
-                                      AWS_IOT_MQTT_TCP_SEND_TIMEOUT_MS);
+    tcpConnectStatus =
+        TCP_Sockets_ConnectWithContext(&p_tls->socket,
+                                        AWS_IOT_ENDPOINT,
+                                        (uint16_t)AWS_IOT_MQTT_PORT,
+                                        AWS_IOT_MQTT_TCP_RECV_TIMEOUT_MS,
+                                        AWS_IOT_MQTT_TCP_SEND_TIMEOUT_MS,
+                                        &tcpFailureStage);
+    g_aws_iot_mqtt_tcp_connect_status = (uint32_t)tcpConnectStatus;
+    if (0 != tcpConnectStatus)
+    {
+        tcp_sockets_report_connect_failure(TCP_CONNECT_BACKEND_FREERTOS_TCP,
+                                           tcpFailureStage,
+                                           (uint32_t)tcpConnectStatus,
+                                           debug_puts);
+    }
     if (0U != g_aws_iot_mqtt_tcp_connect_status)
     {
         return -1;

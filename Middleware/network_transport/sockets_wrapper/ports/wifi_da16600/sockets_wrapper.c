@@ -209,7 +209,19 @@ BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
                                uint32_t receiveTimeoutMs,
                                uint32_t sendTimeoutMs)
 {
+    return TCP_Sockets_ConnectWithContext(pTcpSocket, pHostName, port,
+                                          receiveTimeoutMs, sendTimeoutMs, NULL);
+}
+
+BaseType_t TCP_Sockets_ConnectWithContext(Socket_t * pTcpSocket,
+                               const char * pHostName,
+                               uint16_t port,
+                               uint32_t receiveTimeoutMs,
+                               uint32_t sendTimeoutMs,
+                                          uint32_t *pFailureStage)
+{
     BaseType_t socketStatus = TCP_SOCKETS_ERRNO_NONE;
+    uint32_t connectFailureStage = TCP_CONNECT_STAGE_NONE;
     wifi_err_t ret;
     SSOCKETContextPtr_t pxContext = NULL;
     uint8_t socketId = 0;
@@ -223,15 +235,21 @@ BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
 
     if((s_sockets_num_allocated > WIFI_CFG_TCP_CREATABLE_SOCKETS) || (UINT8_MAX == socketId))
     {
+        connectFailureStage = TCP_CONNECT_STAGE_SOCKET_CREATION;
         LogError(("There is no available socket.\r\n"));
         socketStatus = NO_SOCKET_CREATION_ERROR;
         *pTcpSocket = NULL;
+        if (NULL != pFailureStage)
+        {
+            *pFailureStage = (0 == socketStatus) ? TCP_CONNECT_STAGE_NONE : connectFailureStage;
+        }
         return socketStatus;
     }
 
     ret = R_WIFI_DA16XXX_CreateSocket(socketId, WIFI_SOCKET_TYPE_TCP_CLIENT, 4);
     if(WIFI_SUCCESS != ret)
     {
+        connectFailureStage = TCP_CONNECT_STAGE_SOCKET_CREATION;
         LogError(("Failed to create WiFi sockets. %d\r\n", ret));
         socketStatus = NO_SOCKET_CREATION_ERROR;
     }
@@ -240,6 +258,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
         /* Allocate the internal context structure. */
         if (NULL == (pxContext = pvPortMalloc(sizeof(SSOCKETContext_t))))
         {
+            connectFailureStage = TCP_CONNECT_STAGE_SOCKET_CREATION;
             LogError(("Create malloc error\r\n"));
 
             /* Closing created socket */
@@ -262,6 +281,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
             ret = R_WIFI_DA16XXX_DnsQuery((uint8_t *)pHostName, ipAddress);
             if(WIFI_SUCCESS != ret)
             {
+                connectFailureStage = TCP_CONNECT_STAGE_ADDRESS_RESOLUTION;
                 LogError( ( "Failed to connect to server: DNS resolution failed: Hostname=%s.",
                             pHostName ) );
                 socketStatus = (BaseType_t) ret;
@@ -271,6 +291,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
 
     if (WIFI_SUCCESS == socketStatus)
     {
+        connectFailureStage = TCP_CONNECT_STAGE_INITIAL_CONNECT;
         ret = R_WIFI_DA16XXX_TcpConnect(pxContext->socket_no, ipAddress, port);
         if (WIFI_SUCCESS != ret)
         {
@@ -309,6 +330,10 @@ BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
     /* Set the socket. */
     *pTcpSocket = (Socket_t)pxContext;
 
+    if (NULL != pFailureStage)
+    {
+        *pFailureStage = (0 == socketStatus) ? TCP_CONNECT_STAGE_NONE : connectFailureStage;
+    }
     return socketStatus;
 }
 

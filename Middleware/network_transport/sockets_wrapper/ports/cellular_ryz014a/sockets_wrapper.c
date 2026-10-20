@@ -82,8 +82,20 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
                                 uint32_t receiveTimeoutMs,
                                 uint32_t sendTimeoutMs)
 {
+    return TCP_Sockets_ConnectWithContext(pTcpSocket, pHostName, port,
+                                          receiveTimeoutMs, sendTimeoutMs, NULL);
+}
+
+BaseType_t TCP_Sockets_ConnectWithContext(Socket_t *pTcpSocket,
+                                const char *pHostName,
+                                uint16_t port,
+                                uint32_t receiveTimeoutMs,
+                                uint32_t sendTimeoutMs,
+                                          uint32_t *pFailureStage)
+{
     xSOCKETContextPtr_t pxContext = NULL;
     BaseType_t socketStatus = 0;
+    uint32_t connectFailureStage = TCP_CONNECT_STAGE_NONE;
     st_cellular_ipaddr_t ip_addr = {0};
 
     configASSERT(NULL != pTcpSocket);
@@ -94,6 +106,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
     /* No socket created */
     if (0 >= socketStatus)
     {
+        connectFailureStage = TCP_CONNECT_STAGE_SOCKET_CREATION;
         LogError(("Failed to create new socket."));
 
         /* SocketStatus can be 0 in this case. */
@@ -107,6 +120,10 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
             (void)USER_TCP_HOOK_FUNCTION(socketStatus, FORCE_RESET);
         }
         *pTcpSocket = NULL;
+        if (NULL != pFailureStage)
+        {
+            *pFailureStage = (0 == socketStatus) ? TCP_CONNECT_STAGE_NONE : connectFailureStage;
+        }
         return socketStatus;
     }
     else
@@ -117,6 +134,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
         /* Failure on Malloc creation */
         if (NULL == pxContext)
         {
+            connectFailureStage = TCP_CONNECT_STAGE_SOCKET_CREATION;
             LogError(("Failed to allocate new socket context."));
 
             /* Due to created a socket , need to close it before going to TCP_Socket_Disconnect.
@@ -126,6 +144,10 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
             CloseSocket(socketStatus);
 
             *pTcpSocket = NULL;
+            if (NULL != pFailureStage)
+            {
+                *pFailureStage = (0 == MALLOC_SOCKET_CREATION_ERROR) ? TCP_CONNECT_STAGE_NONE : connectFailureStage;
+            }
             return MALLOC_SOCKET_CREATION_ERROR;
         }
         else
@@ -145,6 +167,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
 
         if ((CELLULAR_SUCCESS != socketStatus))
         {
+            connectFailureStage = TCP_CONNECT_STAGE_ADDRESS_RESOLUTION;
             LogError(("Failed to connect to server: DNS resolution failed: Hostname=%s.",
                         pHostName));
         }
@@ -154,6 +177,7 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
     {
         /* Establish connection. */
         LogDebug(("Creating TCP Connection to %s.", pHostName));
+        connectFailureStage = TCP_CONNECT_STAGE_INITIAL_CONNECT;
         socketStatus = R_CELLULAR_ConnectSocket(&cellular_ctrl, pxContext->socket_no, ip_addr.ipv4, port);
 
         if (CELLULAR_SUCCESS != socketStatus)
@@ -194,6 +218,10 @@ BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
     /* Set the socket. */
     *pTcpSocket = (Socket_t)pxContext;
 
+    if (NULL != pFailureStage)
+    {
+        *pFailureStage = (0 == socketStatus) ? TCP_CONNECT_STAGE_NONE : connectFailureStage;
+    }
     return socketStatus;
 }
 /**********************************************************************************************************************
