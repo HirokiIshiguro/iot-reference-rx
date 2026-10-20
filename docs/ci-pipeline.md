@@ -48,6 +48,18 @@ IDTは通常の`full`やnightlyには含めません。専用引数・対応範�
 
 共通基盤MRのbuild-only profileでは、RX72Nの通常software appに加え、通常TSIP appも専用jobでビルドします。TSIP側のdescriptor・buffer変更後のリンク容量を確認するため、MAPもartifactへ保存します。実機scopeは追加しません。
 
+## CC-RXのビルド並列数
+
+RX65N・RX72N・RX671のE2 studio projectは、`parallelBuildOn=true`と
+`parallelizationNumber=optimal`で実行環境に応じた並列数を選びます。
+通常RX65NとBG96 OTA候補の直接Makeも、実行環境の論理CPU数を取得して
+具体的な`-jN`を指定します。CPU数を取得できない場合の下限は1です。
+normal package、OTA、Fleetの派生profileは元projectの並列設定を引き継ぎます。
+
+これは1ジョブ内のcompiler並列化です。Windows host lease、`resource_group`、
+ジョブ専用workspaceによるビルドジョブ間の排他は維持します。
+並列数を増やした場合の短縮率はprojectによって異なるため、全体の所要時間は別に測定します。
+
 ## ビルド失敗時の扱い
 
 e2studio-cliの異常終了、CC-RXのC／E／F診断、予期しないproject入力の追加・削除・変更を検出したら停止します。呼出側が宣言した必要出力について、欠落・空・当該build開始前の古いファイルも拒否します。W／M診断だけでは失敗にしません。

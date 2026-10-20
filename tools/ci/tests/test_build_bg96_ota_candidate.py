@@ -84,18 +84,26 @@ class Bg96CandidateTests(unittest.TestCase):
             with mock.patch.object(builder, "parse_args", return_value=args), \
                  mock.patch.object(builder, "resolve_make", return_value=args.make), \
                  mock.patch.object(builder, "build_environment", return_value={}), \
+                 mock.patch.object(builder.os, "cpu_count", return_value=24), \
                  mock.patch.object(builder, "run_e2studio_managed_build", side_effect=managed) as ide, \
                  mock.patch.object(builder, "run_logged", side_effect=make) as make_run, \
                  mock.patch.object(builder, "run"):
                 self.assertEqual(builder.main(), 0)
                 self.assertEqual(ide.call_count, 1)
                 self.assertEqual([call.args[0][1:] for call in make_run.call_args_list],
-                                 [["clean"], ["-j2", "aws_bg96_ck_rx65n_tsip.mot"]])
+                                 [["clean"], ["-j24", "aws_bg96_ck_rx65n_tsip.mot"]])
                 self.assertEqual(config.read_bytes(), original_version)
                 self.assertEqual((app/".cproject").read_bytes(), original_profile)
                 # Existing generated makefiles still bypass the IDE phase.
                 self.assertEqual(builder.main(), 0)
                 self.assertEqual(ide.call_count, 1)
+                # Unknown CPU count stays bounded rather than emitting bare -j.
+                with mock.patch.object(builder.os, "cpu_count", return_value=None):
+                    self.assertEqual(builder.main(), 0)
+                self.assertEqual(make_run.call_args.args[0][1:],
+                                 ["-j1", "aws_bg96_ck_rx65n_tsip.mot"])
+                self.assertEqual(config.read_bytes(), original_version)
+                self.assertEqual((app/".cproject").read_bytes(), original_profile)
 
 
 @unittest.skipUnless(os.name == "nt" and PWSH, "Windows PowerShell 7 required")

@@ -324,7 +324,8 @@ def main() -> int:
         with log_path.open("a", encoding="utf-8", errors="replace") as log:
             app_build_dir = app_dir / "HardwareDebug"
             run_logged([str(make_exe), "clean"], app_build_dir, log, build_env, args.e2studio_timeout)
-            run_logged([str(make_exe), "-j2", f"{app_project_name}.mot"], app_build_dir, log, build_env, args.e2studio_timeout)
+            build_jobs = max(1, os.cpu_count() or 1)
+            run_logged([str(make_exe), f"-j{build_jobs}", f"{app_project_name}.mot"], app_build_dir, log, build_env, args.e2studio_timeout)
 
         if not app_mot.exists():
             raise RuntimeError(f"{app_project_name}.mot was not generated: {app_mot}")
