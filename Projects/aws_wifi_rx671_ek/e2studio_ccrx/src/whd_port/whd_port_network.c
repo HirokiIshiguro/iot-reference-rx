@@ -21,6 +21,98 @@
 #include "whd_port.h"
 #include "whd_bringup.h"
 #include "whd_wifi_api.h"
+#include "tcp_connect_diagnostics.h"
+
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+static volatile TCPDNSPathCounters_t g_dns_path_counters;
+
+/* Fixed direction bits only. No header/payload/identity is retained.
+ * Unsupported/malformed/VLAN/IPv6/fragmented forms are not DNS candidates.
+ * Strict bounds precede every access beyond the fixed Ethernet/IP prefix.
+ */
+static uint32_t prvDNSPathClassify(const uint8_t *frame, uint32_t length)
+{
+    uint32_t ihl;
+    uint32_t ip_length;
+    uint32_t udp_offset;
+    uint32_t udp_length;
+    uint32_t fragment;
+    uint32_t direction = 0U;
+
+    if ((NULL == frame) || (length < 34U))
+    {
+        return 0U;
+    }
+    if ((0x08U != frame[12]) || (0x00U != frame[13]) ||
+        (4U != (uint32_t)(frame[14] >> 4)))
+    {
+        return 0U;
+    }
+    ihl = (uint32_t)(frame[14] & 0x0FU) * 4U;
+    ip_length = ((uint32_t)frame[16] << 8) | (uint32_t)frame[17];
+    fragment = ((uint32_t)frame[20] << 8) | (uint32_t)frame[21];
+    if ((ihl < 20U) || (ihl > (length - 14U)) ||
+        (ip_length < (ihl + 8U)) || (ip_length > (length - 14U)) ||
+        (0U != (fragment & 0xBFFFU)) || (17U != frame[23]))
+    {
+        return 0U;
+    }
+    udp_offset = 14U + ihl;
+    udp_length = ((uint32_t)frame[udp_offset + 4U] << 8) |
+                 (uint32_t)frame[udp_offset + 5U];
+    if ((udp_length < 8U) || (udp_length > (ip_length - ihl)))
+    {
+        return 0U;
+    }
+    if ((0U == frame[udp_offset + 2U]) &&
+        (53U == frame[udp_offset + 3U]))
+    {
+        direction |= 1U;
+    }
+    if ((0U == frame[udp_offset]) && (53U == frame[udp_offset + 1U]))
+    {
+        direction |= 2U;
+    }
+    return direction;
+}
+
+/* WHD delivery and FreeRTOS output callbacks are task context. Classification
+ * runs outside the critical section. Added copy/critical timing is unmeasured.
+ */
+static void prvDNSPathCount(uint32_t candidate, volatile uint32_t *counter)
+{
+    if (0U != candidate)
+    {
+        taskENTER_CRITICAL();
+        if (0xFFFFFFFFUL == *counter)
+        {
+            g_dns_path_counters.saturated = 1U;
+        }
+        else
+        {
+            (*counter)++;
+        }
+        taskEXIT_CRITICAL();
+    }
+}
+
+uint32_t TCP_Sockets_GetDNSPathCounters(uint32_t backend,
+                                      TCPDNSPathCounters_t *counters)
+{
+    if ((TCP_CONNECT_BACKEND_FREERTOS_TCP != backend) || (NULL == counters))
+    {
+        return TCP_DNS_PATH_UNSUPPORTED;
+    }
+    taskENTER_CRITICAL();
+    counters->tx_handoff = g_dns_path_counters.tx_handoff;
+    counters->rx_ingress = g_dns_path_counters.rx_ingress;
+    counters->rx_ipqueue = g_dns_path_counters.rx_ipqueue;
+    counters->rx_drop = g_dns_path_counters.rx_drop;
+    counters->saturated = g_dns_path_counters.saturated;
+    taskEXIT_CRITICAL();
+    return TCP_DNS_PATH_COUNTERS_AVAILABLE;
+}
+#endif
 
 #define WHD_NETWORK_DEBUG_HEAD_BYTES    (64U)
 
@@ -209,6 +301,9 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
     uint8_t * p_data;
     uint16_t length;
     NetworkBufferDescriptor_t * p_network_buffer;
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+    uint32_t dns_candidate;
+#endif
 
     g_whd_network_rx_frames++;
     g_whd_network_rx_last_ifp = (uint32_t)(uintptr_t)ifp;
@@ -216,6 +311,10 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
 
     p_data = g_whd_port_buffer_funcs.whd_buffer_get_current_piece_data_pointer(buffer);
     length = g_whd_port_buffer_funcs.whd_buffer_get_current_piece_size(buffer);
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+    dns_candidate = prvDNSPathClassify(p_data, (uint32_t)length) & 2U;
+    prvDNSPathCount(dns_candidate, &g_dns_path_counters.rx_ingress);
+#endif
     g_whd_network_rx_last_p_data = (uint32_t)(uintptr_t)p_data;
     g_whd_network_rx_last_length = (uint32_t)length;
     if ((NULL != p_data) && (0U != length))
@@ -243,6 +342,9 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
 
     if ((NULL == p_data) || (0U == length) || (NULL == g_whd_network_interface))
     {
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+        prvDNSPathCount(dns_candidate, &g_dns_path_counters.rx_drop);
+#endif
         g_whd_network_rx_drop_not_ready++;
         g_whd_network_rx_dropped++;
         whd_port_buffer_release_from_network(buffer);
@@ -252,6 +354,9 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
     g_whd_network_rx_last_filter = (uint32_t)eConsiderFrameForProcessing(p_data);
     if (g_whd_network_rx_last_filter != (uint32_t)eProcessBuffer)
     {
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+        prvDNSPathCount(dns_candidate, &g_dns_path_counters.rx_drop);
+#endif
         g_whd_network_rx_drop_filter++;
         g_whd_network_rx_dropped++;
         whd_port_buffer_release_from_network(buffer);
@@ -262,6 +367,9 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
     g_whd_network_rx_last_network_buffer = (uint32_t)(uintptr_t)p_network_buffer;
     if (NULL == p_network_buffer)
     {
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+        prvDNSPathCount(dns_candidate, &g_dns_path_counters.rx_drop);
+#endif
         g_whd_network_rx_no_buffer++;
         whd_port_buffer_release_from_network(buffer);
         return;
@@ -281,6 +389,9 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
 
     if (NULL == p_network_buffer->pxEndPoint)
     {
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+        prvDNSPathCount(dns_candidate, &g_dns_path_counters.rx_drop);
+#endif
         g_whd_network_rx_drop_no_endpoint++;
         g_whd_network_rx_dropped++;
         vReleaseNetworkBufferAndDescriptor(p_network_buffer);
@@ -300,6 +411,9 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
         g_whd_network_rx_last_send_result = (uint32_t)send_result;
         if (send_result != pdPASS)
         {
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+            prvDNSPathCount(dns_candidate, &g_dns_path_counters.rx_drop);
+#endif
             g_whd_network_rx_drop_queue++;
             g_whd_network_rx_dropped++;
             vReleaseNetworkBufferAndDescriptor(p_network_buffer);
@@ -307,6 +421,9 @@ static void whd_port_network_process_ethernet_data(whd_interface_t ifp, whd_buff
         }
         else
         {
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+            prvDNSPathCount(dns_candidate, &g_dns_path_counters.rx_ipqueue);
+#endif
             g_whd_network_rx_to_ip++;
             iptraceNETWORK_INTERFACE_RECEIVE();
         }
@@ -381,6 +498,11 @@ static BaseType_t whd_freertos_network_output(NetworkInterface_t * px_interface,
                 memcpy(p_data, px_descriptor->pucEthernetBuffer, px_descriptor->xDataLength);
                 (void)g_whd_port_buffer_funcs.whd_buffer_set_size(whd_buffer,
                                                                   (unsigned short)px_descriptor->xDataLength);
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+                /* Handoff-site count only: WHD has a void return. */
+                prvDNSPathCount(prvDNSPathClassify(p_tx, (uint32_t)tx_length) & 1U,
+                                &g_dns_path_counters.tx_handoff);
+#endif
                 whd_network_send_ethernet_data(ifp, whd_buffer);
                 g_whd_network_tx_frames++;
                 result = pdTRUE;

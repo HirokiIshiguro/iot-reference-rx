@@ -55,6 +55,85 @@ static char *tcp_sockets_diag_append_hex(char *out, uint32_t value)
     return out;
 }
 
+/* Passive DNS-path capability. No DNS payload, identity or packet bytes are
+ * accepted by this public formatter. Counters are cumulative since boot, not
+ * query/window IDs or a coherent transaction. cap=0 is UNSUPPORTED: no counter
+ * values are written or reported. An opted-in application owns the provider.
+ * TX handoff is not wire-send success; RX/IP-queue counts are not DNS validity.
+ */
+#ifndef TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS
+#define TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS (0)
+#endif
+
+#define TCP_DNS_PATH_UNSUPPORTED              (0U)
+#define TCP_DNS_PATH_COUNTERS_AVAILABLE       (1U)
+
+typedef struct TCPDNSPathCounters
+{
+    uint32_t tx_handoff;
+    uint32_t rx_ingress;
+    uint32_t rx_ipqueue;
+    uint32_t rx_drop;
+    uint32_t saturated;
+} TCPDNSPathCounters_t;
+
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+uint32_t TCP_Sockets_GetDNSPathCounters(uint32_t backend,
+                                      TCPDNSPathCounters_t *counters);
+#else
+static uint32_t TCP_Sockets_GetDNSPathCounters(uint32_t backend,
+                                              TCPDNSPathCounters_t *counters)
+{
+    (void)backend;
+    (void)counters;
+    return TCP_DNS_PATH_UNSUPPORTED;
+}
+#endif
+
+/* Caller-selected task writer only. No UART from the adapter/IP task. This
+ * fixed row is emitted only by the existing explicit failure formatter below.
+ * Reads are reported cumulatively; concurrent progress and delivery loss mean
+ * absence, zero or relationships between fields do not establish a cause.
+ */
+static void tcp_sockets_report_dns_path(uint32_t backend,
+                                         char line[96],
+                                         TCPConnectDiagnosticWriter_t writer)
+{
+    TCPDNSPathCounters_t counters;
+    uint32_t capability;
+    char *out = line;
+
+    if ((NULL == writer) ||
+        (backend < TCP_CONNECT_BACKEND_FREERTOS_TCP) ||
+        (backend > TCP_CONNECT_BACKEND_WIFI_DA16600))
+    {
+        return;
+    }
+    capability = TCP_Sockets_GetDNSPathCounters(backend, &counters);
+    out = tcp_sockets_diag_append_text(out, "TCP DNS path backend=");
+    out = tcp_sockets_diag_append_decimal(out, backend);
+    out = tcp_sockets_diag_append_text(out, " cap=");
+    out = tcp_sockets_diag_append_decimal(out,
+             (TCP_DNS_PATH_COUNTERS_AVAILABLE == capability) ? 1U : 0U);
+    if (TCP_DNS_PATH_COUNTERS_AVAILABLE == capability)
+    {
+        out = tcp_sockets_diag_append_text(out, " tx=");
+        out = tcp_sockets_diag_append_decimal(out, counters.tx_handoff);
+        out = tcp_sockets_diag_append_text(out, " rx=");
+        out = tcp_sockets_diag_append_decimal(out, counters.rx_ingress);
+        out = tcp_sockets_diag_append_text(out, " ip=");
+        out = tcp_sockets_diag_append_decimal(out, counters.rx_ipqueue);
+        out = tcp_sockets_diag_append_text(out, " drop=");
+        out = tcp_sockets_diag_append_decimal(out, counters.rx_drop);
+        out = tcp_sockets_diag_append_text(out, " sat=");
+        out = tcp_sockets_diag_append_decimal(out,
+                  (0U != counters.saturated) ? 1U : 0U);
+    }
+    out = tcp_sockets_diag_append_text(out, "\r\n");
+    *out = '\0';
+    writer(line);
+}
+
 /* The numeric backend distinguishes status domains; status bits are not a
  * universal errno. Stage describes the public operation visible in this
  * wrapper, not an opaque vendor driver's internal state. No network identity
@@ -82,6 +161,7 @@ static void tcp_sockets_report_connect_failure(uint32_t backend,
     out = tcp_sockets_diag_append_text(out, "\r\n");
     *out = '\0';
     writer(line);
+    tcp_sockets_report_dns_path(backend, line, writer);
 }
 
 /* Optional observation contract. Disabled by default in every backend.
