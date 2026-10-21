@@ -60,7 +60,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Historical source fetch failed.' }
     & git -C $source worktree add --detach $oldRoot $oldSource *> $null
     if ($LASTEXITCODE -ne 0) { throw 'Historical worktree creation failed.' }
-    & git -C $oldRoot submodule update --init --jobs 4 *> $null
+    & git -C $oldRoot submodule update --init --recursive --jobs 4 *> $null
     if ($LASTEXITCODE -ne 0) { throw 'Historical pinned submodule initialization failed.' }
     & python $proofHelper pre --source $oldRoot --output (Join-Path $privateRoot 'public-prebuild-proof.json')
     if ($LASTEXITCODE -ne 0) { throw 'Historical source preflight failed.' }

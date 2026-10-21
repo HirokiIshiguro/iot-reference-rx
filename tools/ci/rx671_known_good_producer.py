@@ -88,6 +88,20 @@ def verify_source(root: Path, post: bool) -> dict:
                 raise RuntimeError("WHD changes are not exactly the historical helper patch paths")
         elif changed:
             raise RuntimeError("Historical submodule contains unexpected tracked changes")
+    # The original helper skips initialization once the top-level .git exists.
+    # Check the nested PKCS11 dependency before spending time in CC-RX, too.
+    pkcs = root / "Middleware/FreeRTOS/corePKCS11"
+    nested_relative = "source/dependency/3rdparty/pkcs11"
+    nested = pkcs / nested_relative
+    nested_pin = git(pkcs, "rev-parse", f"HEAD:{nested_relative}").decode().strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", nested_pin) or git(nested, "rev-parse", "HEAD").decode().strip() != nested_pin:
+        raise RuntimeError("Historical nested PKCS11 dependency is missing or differs from its parent pin")
+    git(nested, "diff", "--exit-code")
+    git(nested, "diff", "--cached", "--exit-code")
+    for header in ("pkcs11.h", "pkcs11t.h"):
+        relative = f"published/2-40-errata-1/{header}"
+        if not git(nested, "ls-files", "--error-unmatch", "--", relative).strip() or not (nested / relative).is_file():
+            raise RuntimeError("Required historical public PKCS11 header is missing")
     return {"submodule_pins": expected_pins, **public_inputs(root),
             "historical_whd_portability_patch_sha256": PATCH_SHA,
             "historical_whd_patch_check": "original-helper-reverse-check-and-exact-changed-path-set"}
