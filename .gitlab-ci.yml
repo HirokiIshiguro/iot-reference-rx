@@ -332,12 +332,8 @@ variables:
 
 workflow:
   rules:
-    # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
-    # Pipeline variables override workflow defaults; do not combine IDT
-    # with the existing board build, hardware, OTA or nightly scope inputs.
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && ($RUN_RX_IDT == "true" || $RUN_RX72N_IDT == "true")'
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
       variables:
-        PIPELINE_PROFILE: "idt"
         RUN_RX65N_BG96_BUILD: "false"
         RX65N_BG96_TEST_SCOPE: "build"
         RX65N_BG96_SKIP_HW_TESTS: "true"
@@ -350,10 +346,12 @@ workflow:
         RUN_RX72N_MULTI_TLS_TEST: "false"
         RUN_RX72N_OTA_TESTS: "false"
         RUN_RX72N_FLEET_TESTS: "false"
-        RUN_RX671_WIFI_BUILD: "false"
-        RX671_WIFI_TEST_SCOPE: "build"
-        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX_IDT: "false"
+        RUN_RX72N_IDT: "false"
+        RUN_RX671_WIFI_BUILD: "true"
         RUN_RX671_BOOTLOADER_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "network"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
         RUN_RX671_BOOTLOADER_SMOKE: "false"
         RUN_RX671_OTA_ARTIFACT_BUILD: "false"
         RUN_RX671_OTA_TEST: "false"
@@ -361,251 +359,9 @@ workflow:
         RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
         RUN_RX671_TSIP_FLEET_TEST: "false"
         RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+        LANBENCH_MBEDTLS_0RTT_AUTO_EC2: "false"
       when: always
-    # Validate this multi-target change without taking any physical bench.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-(idt-|common-core-)/'
-      variables:
-        PIPELINE_PROFILE: "mr-idt-targets"
-        RUN_RX65N_BG96_BUILD: "true"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX65N_BG96_SKIP_HW_TESTS: "true"
-        RUN_RX72N_BUILD: "true"
-        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
-        RX72N_TEST_SCOPE: "build"
-        RX72N_SKIP_HW_TESTS: "true"
-        RX72N_SKIP_OTA_TESTS: "true"
-        RUN_RX72N_HW_TESTS: "false"
-        RUN_RX72N_MULTI_TLS_TEST: "false"
-        RUN_RX72N_OTA_TESTS: "false"
-        RUN_RX72N_FLEET_TESTS: "false"
-        RUN_RX671_WIFI_BUILD: "true"
-        RX671_WIFI_TEST_SCOPE: "build"
-        RX671_WIFI_SKIP_HW_TESTS: "true"
-        RUN_RX671_BOOTLOADER_BUILD: "false"
-        RUN_RX671_BOOTLOADER_SMOKE: "false"
-        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
-        RUN_RX671_OTA_TEST: "false"
-        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
-        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
-        RUN_RX671_TSIP_FLEET_TEST: "false"
-        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
-      when: always
-    - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
-      when: always
-    - if: $CI_COMMIT_TAG
-      variables:
-        PIPELINE_PROFILE: "release"
-        RX65N_BG96_TEST_SCOPE: "full"
-        RX72N_TEST_SCOPE: "full"
-        RX671_WIFI_TEST_SCOPE: "network"
-      when: always
-    # BEGIN IDT DOCS WORKFLOW
-    # Only explicitly named docs/readme branches enter this candidate lane.
-    # The checker rejects mixed source/CI changes; ordinary feature MRs retain
-    # their normal validation even when they also update README.md.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-(readme|docs)-/'
-      changes:
-        - README.md
-        - docs/idt-validation.md
-        - docs/ota-performance.md
-        - docs/common-core-audit/**/*
-        - tools/ci/check_idt_docs.py
-        - tools/ci/tests/test_idt_docs.py
-      variables:
-        PIPELINE_PROFILE: "mr-idt-docs"
-        RUN_RX65N_BG96_BUILD: "false"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX65N_BG96_SKIP_HW_TESTS: "true"
-        RUN_RX72N_BUILD: "false"
-        RX72N_TEST_SCOPE: "build"
-        RX72N_SKIP_HW_TESTS: "true"
-        RUN_RX671_WIFI_BUILD: "false"
-        RX671_WIFI_TEST_SCOPE: "build"
-        RX671_WIFI_SKIP_HW_TESTS: "true"
-        RUN_RX671_BOOTLOADER_BUILD: "false"
-      when: always
-    # END IDT DOCS WORKFLOW
-    # Dependency-gate MRs validate the checker contract without touching any
-    # shared board. The contract job rejects any MR that mixes these files with
-    # board implementation changes, so this lane cannot suppress their normal
-    # build/hardware validation. Live child-repository alignment is exercised
-    # separately by a manual/API nightly_matrix pipeline.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - tools/ci/check_nightly_dependency_alignment.py
-        - tools/ci/nightly-dependency-targets.json
-        - tools/ci/tests/test_nightly_dependency_alignment.py
-        - tools/ci/tests/fixtures/nightly_dependency_alignment_run5.json
-        - tools/ci/tests/test_nightly_dependency_ci_contract.py
-        - tools/ci/tests/test_verify_dependency_gate_mr_scope.py
-        - tools/ci/verify_dependency_gate_mr_scope.py
-      variables:
-        PIPELINE_PROFILE: "mr-dependency-gate"
-        RUN_RX65N_BG96_BUILD: "false"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX65N_BG96_SKIP_HW_TESTS: "true"
-        RUN_RX72N_BUILD: "false"
-        RX72N_TEST_SCOPE: "build"
-        RX72N_SKIP_HW_TESTS: "true"
-        RUN_RX671_WIFI_BUILD: "false"
-        RX671_WIFI_TEST_SCOPE: "build"
-        RX671_WIFI_SKIP_HW_TESTS: "true"
-        RUN_RX671_BOOTLOADER_BUILD: "false"
-      when: always
-    # Shared RX671 application/build inputs affect both the normal network image
-    # and the signed OTA images. GitLab workflow rules are first-match, so keep a
-    # combined lane ahead of both narrower rules instead of letting either
-    # validation path suppress the other.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/.cproject
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/aws_wifi_rx671_ek.c
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/debug_uart.c
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/debug_uart.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application/startup/freertos_helper.c
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application/startup/freertos_user_port.c
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.c
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/application_code/ota_image_identity.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/demo_config.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/rx_ota_config.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/frtos_config/rm_littlefs_flash_config.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/sdio_host.c
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/smc_gen/r_config/r_bsp_config.h
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/src/whd_port/whd_port_resource.c
-        - Projects/aws_wifi_rx671_ek/external/patches/whd-v1.70.0-ccrx-portability.patch
-        - tools/build_headless_rx671_wifi.ps1
-      variables:
-        PIPELINE_PROFILE: "mr-rx671-ota-and-network"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX72N_TEST_SCOPE: "build"
-        RX671_WIFI_TEST_SCOPE: "network"
-        RX671_WIFI_SKIP_HW_TESTS: "false"
-        RUN_RX671_WIFI_BUILD: "true"
-        RUN_RX671_BOOTLOADER_BUILD: "true"
-        RUN_RX671_OTA_ARTIFACT_BUILD: "true"
-      when: always
-    # Match OTA-only inputs before the broad Projects/aws_wifi_rx671_ek rule
-    # below. This lane builds and validates signed artifacts only; it must not
-    # start the existing network/AWS hardware jobs on the shared RX671 EK.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/OTA_FLASH_LAYOUT.md
-        - Projects/aws_wifi_rx671_ek/e2studio_ccrx/ota-layout-contract.json
-        - tools/build_rx671_fwup_v2_rsu.py
-        - tools/build_rx671_ota_images.py
-        - tools/manage_rx671_ota_event_policy.py
-        - tools/plan_rx671_ota.py
-        - tools/provision_rx671_ota.py
-        - tools/rx671_ota_host.py
-        - tools/test_rx671_ota.py
-        - tools/ci/analyze_rx671_ota_layout.py
-        - tools/ci/tests/test_analyze_rx671_ota_layout.py
-        - tools/ci/tests/test_build_rx671_fwup_v2_rsu.py
-        - tools/ci/tests/test_build_rx671_ota_images.py
-        - tools/ci/tests/test_manage_rx671_ota_event_policy.py
-        - tools/ci/tests/test_plan_rx671_ota.py
-        - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
-        - tools/ci/tests/test_rx671_ota_build_profile_contract.py
-        - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
-        - tools/ci/tests/test_rx671_ota_host_tools.py
-        - tools/ci/tests/test_rx671_ota_runtime_profile_contract.py
-      variables:
-        PIPELINE_PROFILE: "mr-rx671-ota-artifacts"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX72N_TEST_SCOPE: "build"
-        RX671_WIFI_TEST_SCOPE: "build"
-        RX671_WIFI_SKIP_HW_TESTS: "true"
-        RUN_RX671_WIFI_BUILD: "false"
-        RUN_RX671_BOOTLOADER_BUILD: "true"
-        RUN_RX671_OTA_ARTIFACT_BUILD: "true"
-      when: always
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - Projects/aws_wifi_rx671_ek/**/*
-        - tools/build_headless_rx671_wifi.ps1
-        - tools/load_rx671_wifi_jlink.ps1
-        - tools/ci/test_rx671_wifi_uart.py
-        - tools/ci/tests/test_rx671_software_mqtt_tls13_contract.py
-        - tools/ci/tests/test_rx671_wifi_uart.py
-      variables:
-        PIPELINE_PROFILE: "mr-rx671"
-        # RX671 Wi-Fi work is validated on its own bench for now. Keep legacy
-        # RX65N/RX72N lanes at build coverage so unrelated hardware/DNS state
-        # does not block RX671-only SDIO/WHD changes.
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX72N_TEST_SCOPE: "build"
-        RX671_WIFI_TEST_SCOPE: "network"
-      when: always
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - Projects/boot_loader_rx671_ek/**/*
-        - tools/build_headless_rx671_bootloader.ps1
-        - tools/ci/check_rx671_bootloader_layout.py
-        - tools/ci/test_rx671_bootloader_uart.py
-        - tools/ci/tests/test_rx671_bootloader_contract.py
-      variables:
-        PIPELINE_PROFILE: "mr-rx671-bootloader"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX72N_TEST_SCOPE: "build"
-        RX671_WIFI_TEST_SCOPE: "build"
-      when: always
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      variables:
-        PIPELINE_PROFILE: "mr"
-        # MR standard keeps daily feedback short while covering both transports.
-        # OTA rows are delegated to the nightly matrix; unstable rows stay under
-        # the stabilizing gate until repeated schedule evidence is available.
-        RX65N_BG96_TEST_SCOPE: "mqtt"
-        RX72N_TEST_SCOPE: "mqtt"
-        RX671_WIFI_TEST_SCOPE: "build"
-      when: always
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $PIPELINE_PROFILE == "nightly_matrix"'
-      when: always
-    - if: '$CI_PIPELINE_SOURCE == "web"'
-      variables:
-        PIPELINE_PROFILE: "focused"
-      when: always
-    - if: '$CI_PIPELINE_SOURCE == "api"'
-      variables:
-        PIPELINE_PROFILE: "focused"
-      when: always
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      variables:
-        PIPELINE_PROFILE: "nightly_matrix"
-        RUN_RX65N_BG96_BUILD: "false"
-        RUN_RX72N_BUILD: "false"
-        RUN_RX671_WIFI_BUILD: "false"
-        RUN_RX671_BOOTLOADER_BUILD: "false"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX72N_TEST_SCOPE: "build"
-        RX671_WIFI_TEST_SCOPE: "build"
-      when: always
-    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
-      when: never
-    # Feature branch push pipelines are build-only. The merge request pipeline
-    # owns hardware sequences so independent push pipelines cannot interleave
-    # RX65N/BG96 OTA and Fleet images on the same board.
-    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
-      variables:
-        PIPELINE_PROFILE: "branch"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX72N_TEST_SCOPE: "build"
-        RX671_WIFI_TEST_SCOPE: "build"
-      when: always
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      variables:
-        PIPELINE_PROFILE: "main"
-        # Full coverage is provided by the nightly focused matrix schedule.
-        # Keep RX72N post-merge feedback build-only: its physical board is also
-        # shared with benchmark projects outside this GitLab project.
-        RX65N_BG96_TEST_SCOPE: "mqtt"
-        RX72N_TEST_SCOPE: "build"
-        RX671_WIFI_TEST_SCOPE: "network"
-      when: always
-    - if: $CI_COMMIT_BRANCH
-      when: always
-
+    - when: never
 idt_docs_check:
   stage: dependency_check
   tags:
@@ -2027,6 +1783,7 @@ build_rx671_wifi:
       }
     - Write-Host "BUILD EK-RX671 WIFI SUCCESS"
   artifacts:
+    access: maintainer
     when: always
     paths:
       - rx671_wifi_e2studio_build.log
@@ -6132,3 +5889,79 @@ validate_rx65n_bg96_scope:
     - when: never
   script:
     - throw 'RX65N BG96 partial scopes are retired; select build, mqtt, ota, fleet, tls13_0rtt, or full.'
+
+# Keep the ten normal bundle inputs unchanged. Add only a provenance sidecar.
+package_normal_boot_rx671:
+  artifacts:
+    access: maintainer
+    expire_in: 1 day
+  script:
+    - !reference [.normal_boot_package, script]
+    - 'python tools/ci/rx671_known_good_producer.py restore --source "$env:CI_PROJECT_DIR" --output "$env:CI_PROJECT_DIR/artifacts/normal_boot_rx671"'
+    - if ($LASTEXITCODE -ne 0) { throw 'Restore delivery provenance failed.' }
+# Dedicated temporary diagnostic branch; keep Draft and do not merge this workflow.
+kg_build_rx671_666:
+  extends: .rx_windows_canonical_checkout
+  stage: build
+  tags: [exec-shell, os-windows, ccrx, $RX671_WIFI_BUILD_RUNNER_TAG]
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  timeout: 3 hours
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
+      when: on_success
+    - when: never
+  script:
+    - !reference [.windows_ccrx_host_lease, script]
+    - '& tools/ci/build_rx671_known_good_control.ps1'
+  artifacts:
+    access: maintainer
+    paths:
+      - artifacts/kg_old_rx671/aws_wifi_rx671_ek.mot
+      - artifacts/kg_old_rx671/control_manifest.json
+    expire_in: 1 day
+
+kg_control_rx671:
+  extends: .rx671_wifi_linux_hw_job
+  stage: test
+  timeout: 30 minutes
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    RX671_WIFI_HARDWARE_LOCK_TIMEOUT_SECONDS: "0"
+  needs:
+    - job: kg_build_rx671_666
+      artifacts: true
+    - job: package_normal_boot_rx671
+      artifacts: true
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - |
+      set -eu
+      : "${KG_OLD_PRODUCER_JOB_ID:?Missing reviewed producer job ID}"
+      : "${KG_RESTORE_PRODUCER_JOB_ID:?Missing reviewed restore job ID}"
+      : "${KG_OLD_MANIFEST_SHA256:?Missing reviewed old manifest hash}"
+      : "${KG_RESTORE_PRODUCER_SHA256:?Missing reviewed restore producer hash}"
+      : "${KG_NORMAL_MANIFEST_SHA256:?Missing reviewed normal manifest hash}"
+      python3 tools/ci/rx671_known_good_control.py \
+        --old-root artifacts/kg_old_rx671 \
+        --restore-bundle artifacts/normal_boot_rx671 \
+        --receipt artifacts/kg_control/receipt.json \
+        --runtime-source 666d97f64eecc2451ec3b54ee101b5b53a603c51 \
+        --restore-source "$CI_COMMIT_SHA" \
+        --pipeline-id "$CI_PIPELINE_ID" --job-id "$CI_JOB_ID" \
+        --old-job-id "$KG_OLD_PRODUCER_JOB_ID" \
+        --restore-job-id "$KG_RESTORE_PRODUCER_JOB_ID" \
+        --old-manifest-sha256 "$KG_OLD_MANIFEST_SHA256" \
+        --restore-producer-sha256 "$KG_RESTORE_PRODUCER_SHA256" \
+        --normal-manifest-sha256 "$KG_NORMAL_MANIFEST_SHA256" \
+        --execute-reviewed-candidate
+  artifacts:
+    when: always
+    paths:
+      - artifacts/kg_control/receipt.json
+    expire_in: 1 day
