@@ -177,6 +177,28 @@ volatile uint32_t g_whd_network_fill_count;
 
 static NetworkInterface_t * g_whd_network_interface;
 
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+/* Reuse legacy counters without new increments, reset or saturation semantics.
+ * Individual volatile reads are not a coherent transaction or DNS window. */
+uint32_t TCP_Sockets_GetAdapterPathCounters(uint32_t backend,
+                                           TCPAdapterPathCounters_t *counters)
+{
+    if ((TCP_CONNECT_BACKEND_FREERTOS_TCP != backend) || (NULL == counters))
+    {
+        return TCP_DNS_PATH_UNSUPPORTED;
+    }
+    counters->tx_handoff = g_whd_network_tx_frames;
+    counters->tx_reject = g_whd_network_tx_drop_not_ready;
+    counters->tx_no_buffer = g_whd_network_tx_no_buffer;
+    counters->tx_no_data = g_whd_network_tx_drop_no_data;
+    counters->arp_tx = g_whd_network_tx_arp;
+    counters->arp_rx = g_whd_network_rx_arp;
+    counters->rx_ipqueue_all = g_whd_network_rx_to_ip;
+    counters->rx_queue_drop_all = g_whd_network_rx_drop_queue;
+    return TCP_DNS_PATH_COUNTERS_AVAILABLE;
+}
+#endif
+
 static void capture_head(volatile uint8_t * p_dst, volatile uint32_t * p_captured,
                          const uint8_t * p_src, uint16_t length)
 {

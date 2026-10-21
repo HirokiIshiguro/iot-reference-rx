@@ -90,6 +90,37 @@ static uint32_t TCP_Sockets_GetDNSPathCounters(uint32_t backend,
 }
 #endif
 
+/* Optional legacy adapter context, sharing the existing RX671 opt-in.
+ * Modulo-uint32 counters retain their existing reset/increment behavior; there
+ * is no saturation witness. nr includes invalid descriptor/buffer/length as
+ * well as not-ready. ARP tx/rx are EtherType-only, not validity/identity.
+ * ipall/qdall cover ALL protocols, not ARP-specific queue acceptance/drop.
+ * No per-query, coherent snapshot, field relationship or wire claim. */
+typedef struct TCPAdapterPathCounters
+{
+    uint32_t tx_handoff;
+    uint32_t tx_reject;
+    uint32_t tx_no_buffer;
+    uint32_t tx_no_data;
+    uint32_t arp_tx;
+    uint32_t arp_rx;
+    uint32_t rx_ipqueue_all;
+    uint32_t rx_queue_drop_all;
+} TCPAdapterPathCounters_t;
+
+#if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
+uint32_t TCP_Sockets_GetAdapterPathCounters(uint32_t backend,
+                                           TCPAdapterPathCounters_t *counters);
+#else
+static uint32_t TCP_Sockets_GetAdapterPathCounters(uint32_t backend,
+                                                  TCPAdapterPathCounters_t *counters)
+{
+    (void)backend;
+    (void)counters;
+    return TCP_DNS_PATH_UNSUPPORTED;
+}
+#endif
+
 /* Caller-selected task writer only. No UART from the adapter/IP task. This
  * fixed row is emitted only by the existing explicit failure formatter below.
  * Reads are reported cumulatively; concurrent progress and delivery loss mean
@@ -134,6 +165,64 @@ static void tcp_sockets_report_dns_path(uint32_t backend,
     writer(line);
 }
 
+/* Existing failure task only; reuse its 96-byte line and legacy scalars.
+ * Each maximum row, including CRLF and NUL, fits that buffer. */
+static void tcp_sockets_report_adapter_path(uint32_t backend,
+                                             char line[96],
+                                             TCPConnectDiagnosticWriter_t writer)
+{
+    TCPAdapterPathCounters_t counters;
+    uint32_t capability;
+    char *out;
+
+    if ((NULL == writer) ||
+        (backend < TCP_CONNECT_BACKEND_FREERTOS_TCP) ||
+        (backend > TCP_CONNECT_BACKEND_WIFI_DA16600))
+    {
+        return;
+    }
+    capability = TCP_Sockets_GetAdapterPathCounters(backend, &counters);
+    out = tcp_sockets_diag_append_text(line, "TCP adapter gates backend=");
+    out = tcp_sockets_diag_append_decimal(out, backend);
+    out = tcp_sockets_diag_append_text(out, " cap=");
+    out = tcp_sockets_diag_append_decimal(out,
+             (TCP_DNS_PATH_COUNTERS_AVAILABLE == capability) ? 1U : 0U);
+    if (TCP_DNS_PATH_COUNTERS_AVAILABLE == capability)
+    {
+        out = tcp_sockets_diag_append_text(out, " tx=");
+        out = tcp_sockets_diag_append_decimal(out, counters.tx_handoff);
+        out = tcp_sockets_diag_append_text(out, " nr=");
+        out = tcp_sockets_diag_append_decimal(out, counters.tx_reject);
+        out = tcp_sockets_diag_append_text(out, " nb=");
+        out = tcp_sockets_diag_append_decimal(out, counters.tx_no_buffer);
+        out = tcp_sockets_diag_append_text(out, " nd=");
+        out = tcp_sockets_diag_append_decimal(out, counters.tx_no_data);
+    }
+    out = tcp_sockets_diag_append_text(out, "\r\n");
+    *out = '\0';
+    writer(line);
+
+    out = tcp_sockets_diag_append_text(line, "TCP ARP path backend=");
+    out = tcp_sockets_diag_append_decimal(out, backend);
+    out = tcp_sockets_diag_append_text(out, " cap=");
+    out = tcp_sockets_diag_append_decimal(out,
+             (TCP_DNS_PATH_COUNTERS_AVAILABLE == capability) ? 1U : 0U);
+    if (TCP_DNS_PATH_COUNTERS_AVAILABLE == capability)
+    {
+        out = tcp_sockets_diag_append_text(out, " tx=");
+        out = tcp_sockets_diag_append_decimal(out, counters.arp_tx);
+        out = tcp_sockets_diag_append_text(out, " rx=");
+        out = tcp_sockets_diag_append_decimal(out, counters.arp_rx);
+        out = tcp_sockets_diag_append_text(out, " ipall=");
+        out = tcp_sockets_diag_append_decimal(out, counters.rx_ipqueue_all);
+        out = tcp_sockets_diag_append_text(out, " qdall=");
+        out = tcp_sockets_diag_append_decimal(out, counters.rx_queue_drop_all);
+    }
+    out = tcp_sockets_diag_append_text(out, "\r\n");
+    *out = '\0';
+    writer(line);
+}
+
 /* The numeric backend distinguishes status domains; status bits are not a
  * universal errno. Stage describes the public operation visible in this
  * wrapper, not an opaque vendor driver's internal state. No network identity
@@ -162,6 +251,7 @@ static void tcp_sockets_report_connect_failure(uint32_t backend,
     *out = '\0';
     writer(line);
     tcp_sockets_report_dns_path(backend, line, writer);
+    tcp_sockets_report_adapter_path(backend, line, writer);
 }
 
 /* Optional observation contract. Disabled by default in every backend.
