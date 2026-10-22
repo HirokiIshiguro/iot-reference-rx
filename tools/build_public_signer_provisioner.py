@@ -62,6 +62,132 @@ FORBIDDEN_DEFINES = ("WHD_JOIN_CONFIG_USE_LOCAL", "WHD_JOIN_USE_LOCAL_CONFIG", "
                      "ENABLE_IDT_PKCS11_TEST", "ENABLE_IDT_OTAPAL_TEST", "OTA_E2E_TEST_ENABLED")
 
 
+# Public diagnostics are finite enums/booleans. No exception message, path,
+# command, environment value, or captured output is a public field.
+PUBLIC_FAILURE_STAGES = frozenset({
+    "PREPARE_INPUTS", "PREPARE_PRODUCER", "PRODUCER_NATIVE_CHILD",
+    "PREPARE_MANIFEST", "PREPARE_COPY_INPUTS", "PREPARE_SIGNING_KEY",
+    "PREPARE_CERTIFICATE_TOOL", "PREPARE_VALIDATION", "PREPARE_SOURCE_RECHECK",
+    "PREPARE_FAILURE_LOG", "PREPARE_CLEANUP", "UNCLASSIFIED",
+})
+PUBLIC_COMPILER_CODES = ("F0520005", "E0520020", "E0520065", "E0562310")
+_PUBLIC_FAILURE_ATTRIBUTE = "_public_signer_failure_v1"
+
+
+PUBLIC_FAILURE_CONDITION_RULES = (
+    ("Maintenance image has no matching compiled source identity", False, "IMAGE_SOURCE_IDENTITY_MISMATCH"),
+    ("Missing effective maintenance compiler defines", False, "MAINTENANCE_DEFINES_MISSING"),
+    ("Maintenance build returned a stale artifact: ", True, "STALE_PROVISIONER_ARTIFACT"),
+    ("Missing provisioner artifact: ", True, "PROVISIONER_ARTIFACT_MISSING"),
+    ("Source revision changed during maintenance build", False, "SOURCE_CHANGED"),
+    ("Public signer source changed during preparation", False, "SOURCE_CHANGED"),
+    ("Public signer provisioner build failed; inspect private build logs", False, "NATIVE_CHILD_EXIT"),
+    ("Public signer producer did not return a formal matching source manifest", False, "PRODUCER_MANIFEST_MISMATCH"),
+    ("Cannot load the purpose-selected development signing key", False, "SIGNING_KEY_LOAD_FAILED"),
+    ("Public signer certificate tool failed; private logs are retained", False, "CERTIFICATE_TOOL_EXIT"),
+    ("Public signer output ownership changed during preparation", False, "OUTPUT_OWNERSHIP_CHANGED"),
+    ("Public signer build ownership changed during preparation", False, "BUILD_OWNERSHIP_CHANGED"),
+)
+PUBLIC_FAILURE_CONDITIONS = frozenset(
+    {"UNKNOWN", "NATIVE_CHILD_TIMEOUT"} | {rule[2] for rule in PUBLIC_FAILURE_CONDITION_RULES}
+)
+
+
+def _public_failure_condition(error, stage):
+    if stage == "PRODUCER_NATIVE_CHILD" and isinstance(error, subprocess.TimeoutExpired):
+        return "NATIVE_CHILD_TIMEOUT"
+    if not isinstance(error, RuntimeError):
+        return "UNKNOWN"
+    try:
+        message = str(error)  # In memory only; never retained in a public record.
+        for literal, prefix, condition in PUBLIC_FAILURE_CONDITION_RULES:
+            if (message.startswith(literal) if prefix else message == literal):
+                return condition
+    except BaseException:
+        pass
+    return "UNKNOWN"
+
+
+def _public_exception_category(error):
+    for kind, category in (
+        (PermissionError, "PERMISSION_DENIED"),
+        (FileNotFoundError, "INPUT_NOT_FOUND"),
+        (FileExistsError, "ALREADY_EXISTS"),
+        (subprocess.TimeoutExpired, "TIMEOUT"),
+        (TimeoutError, "TIMEOUT"),
+        (subprocess.CalledProcessError, "PROCESS_EXIT"),
+        (ValueError, "INVALID_VALUE"),
+        (TypeError, "INVALID_TYPE"),
+        (AssertionError, "ASSERTION"),
+        (OSError, "OS_ERROR"),
+        (RuntimeError, "RUNTIME_ERROR"),
+        (KeyboardInterrupt, "INTERRUPTED"),
+        (SystemExit, "SYSTEM_EXIT"),
+    ):
+        if isinstance(error, kind):
+            return category
+    return "OTHER_EXCEPTION"
+
+
+def remember_public_failure(error, stage, *, captured=(), native_child_failed=False):
+    """Annotate the same exception without changing failure/cleanup behavior."""
+    try:
+        prior = getattr(error, _PUBLIC_FAILURE_ATTRIBUTE, None)
+        if isinstance(prior, dict) and prior.get("stage") in PUBLIC_FAILURE_STAGES:
+            return
+        parts = tuple(part for part in captured if isinstance(part, (bytes, bytearray)))
+        presence = {
+            code: bool(native_child_failed and any(re.search(
+                rb"(?<![A-Za-z0-9_])" + code.encode("ascii") + rb"(?![A-Za-z0-9_])", part
+            ) for part in parts))
+            for code in PUBLIC_COMPILER_CODES
+        }
+        setattr(error, _PUBLIC_FAILURE_ATTRIBUTE, {
+            "stage": stage if stage in PUBLIC_FAILURE_STAGES else "UNCLASSIFIED",
+            "failure_condition": _public_failure_condition(error, stage),
+            "native_child_failed": native_child_failed is True,
+            "compiler_diagnostic_code_presence": presence,
+        })
+    except BaseException:
+        # Diagnostic failure must never replace the original exception.
+        pass
+
+
+@contextmanager
+def public_failure_stage(stage):
+    try:
+        yield
+    except BaseException as error:
+        remember_public_failure(error, stage)
+        raise
+
+
+def emit_public_failure(error, stream):
+    """Emit a rebuilt allowlisted record; never serialize the exception itself."""
+    try:
+        remember_public_failure(error, "PREPARE_INPUTS")
+        prior = getattr(error, _PUBLIC_FAILURE_ATTRIBUTE, {})
+        stage = prior.get("stage")
+        condition = prior.get("failure_condition")
+        native_failed = prior.get("native_child_failed") is True
+        presence = prior.get("compiler_diagnostic_code_presence", {})
+        record = {
+            "schema": "public-signer-failure-v2",
+            "stage": stage if stage in PUBLIC_FAILURE_STAGES else "UNCLASSIFIED",
+            "exception_category": _public_exception_category(error),
+            "failure_condition": condition if condition in PUBLIC_FAILURE_CONDITIONS else "UNKNOWN",
+            "native_child_failed": native_failed,
+            "compiler_diagnostic_code_presence": {
+                code: bool(native_failed and presence.get(code) is True)
+                for code in PUBLIC_COMPILER_CODES
+            },
+        }
+        print("PUBLIC_SIGNER_FAILURE " + json.dumps(record, sort_keys=True), file=stream)
+    except BaseException:
+        # Existing caller/error handling remains authoritative if stderr fails.
+        pass
+
+
 def isolated_environment(source: Mapping[str, str]) -> dict[str, str]:
     """Exclude injection/overrides, retaining legitimate compiler/license paths."""
     return {key: value for key, value in source.items() if not (
@@ -302,10 +428,20 @@ def build(repo: Path, target_id: str, output: Path, workspace: Path, python: str
         effective = {path.relative_to(repo).as_posix(): hashlib.sha256(body).hexdigest()
                      for path, body in isolation.effective.items()}
         effective[(project / ".cproject").relative_to(repo).as_posix()] = sha256(project / ".cproject")
-        result = subprocess.run(command, cwd=repo, capture_output=True, timeout=1800, env=environment)
+        try:
+            result = subprocess.run(command, cwd=repo, capture_output=True, timeout=1800, env=environment)
+        except BaseException as error:
+            timed_out = isinstance(error, subprocess.TimeoutExpired)
+            captured = (error.output, error.stderr) if timed_out else ()
+            remember_public_failure(error, "PRODUCER_NATIVE_CHILD", captured=captured,
+                                    native_child_failed=timed_out)
+            raise
         (output / "launcher-private.log").write_bytes(result.stdout + result.stderr)
         if result.returncode:
-            raise RuntimeError("Public signer provisioner build failed; inspect private build logs")
+            error = RuntimeError("Public signer provisioner build failed; inspect private build logs")
+            remember_public_failure(error, "PRODUCER_NATIVE_CHILD",
+                                    captured=(result.stdout, result.stderr), native_child_failed=True)
+            raise error
         isolation.validate()
         commands = validate_effective_commands(project, source_sha, output / "build-private.log")
         artifacts = {}

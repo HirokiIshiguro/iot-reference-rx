@@ -124,9 +124,11 @@ def prepare(source: Path, target_id: str, output: Path, workspace: Path, python:
         raise RuntimeError("Invalid public signer application project name")
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
     build = output/"build"
+    stage = "PREPARE_PRODUCER"
     try:
         with (output/"producer-private.log").open("w", encoding="utf-8") as log, redirect_stdout(log), redirect_stderr(log):
             metadata = producer.build(source, target_id, build, workspace, python)
+        stage = "PREPARE_MANIFEST"
         manifest_path = _file(build/"provisioner-manifest.json")
         manifest = json.loads(manifest_path.read_bytes())
         if (manifest != metadata or manifest.get("formal") is not True or
@@ -135,10 +137,13 @@ def prepare(source: Path, target_id: str, output: Path, workspace: Path, python:
         mot = _file(build/(name+".mot"))
         # A public native input set is copied only from the just-validated
         # producer output; private compiler logs never enter that set.
+        stage = "PREPARE_COPY_INPUTS"
         shutil.copyfile(mot, output/"public_signer_provisioner.mot")
         shutil.copyfile(manifest_path, output/"public_signer_provisioner_manifest.json")
+        stage = "PREPARE_SIGNING_KEY"
         key_path, public = _public_from_development_key(source, target, signing_key)
         (output/"signer.pub.pem").write_bytes(public)
+        stage = "PREPARE_CERTIFICATE_TOOL"
         command = [python, str(_file(source/"tools/generate_signer_cert.py")),
                    "--key", str(key_path), "--out", str(output/"signer.crt.pem")]
         with (output/"signer-tool-private.log").open("wb") as log:
@@ -146,6 +151,7 @@ def prepare(source: Path, target_id: str, output: Path, workspace: Path, python:
                                     env=producer.isolated_environment(environment), timeout=90)
         if result.returncode:
             raise RuntimeError("Public signer certificate tool failed; private logs are retained")
+        stage = "PREPARE_VALIDATION"
         paths = {variable: str(_file(output/filename)) for filename, variable in controller.ENVIRONMENT_INPUTS.items()}
         checked = controller.validate_prepared_signer(source, output, target, source_sha, environ=paths)
         _, public = _public_from_development_key(source, target, signing_key)
@@ -154,18 +160,22 @@ def prepare(source: Path, target_id: str, output: Path, workspace: Path, python:
                                       serialization.PublicFormat.SubjectPublicKeyInfo)
         if checked["public_signer_spki_sha256"] != hashlib.sha256(spki).hexdigest():
             raise RuntimeError("Prepared public signer differs from the initial development package signer")
+        stage = "PREPARE_SOURCE_RECHECK"
         if _source_state(source) != source_sha:
             raise RuntimeError("Public signer source changed during preparation")
         return paths
     except BaseException as error:
+        producer.remember_public_failure(error, stage)
         try:
             # Keep post-build validation failures as well as compiler output.
             # No locals are captured and this file never enters public inputs.
-            descriptor=os.open(output/"failure-private.log",os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-            with os.fdopen(descriptor,"w",encoding="utf-8") as log:
-                log.writelines(traceback.TracebackException.from_exception(error,capture_locals=False).format())
+            with producer.public_failure_stage("PREPARE_FAILURE_LOG"):
+                descriptor=os.open(output/"failure-private.log",os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                with os.fdopen(descriptor,"w",encoding="utf-8") as log:
+                    log.writelines(traceback.TracebackException.from_exception(error,capture_locals=False).format())
         finally:
-            _cleanup_public_outputs(output, build)
+            with producer.public_failure_stage("PREPARE_CLEANUP"):
+                _cleanup_public_outputs(output, build)
         raise
 
 
@@ -182,7 +192,10 @@ def main(argv=None):
     try:
         paths=prepare(args.source,args.target,args.output,args.workspace,args.python,
                       signing_key=args.signing_key)
-    except Exception:
+    except Exception as error:
+        # This runs after prepare's existing cleanup. Successful stdout and
+        # direct Python callers' exception behavior remain unchanged.
+        producer.emit_public_failure(error, sys.stderr)
         print("Public signer preparation failed; inspect the requested private output directory.",file=sys.stderr)
         return 1
     print(json.dumps(paths, sort_keys=True))

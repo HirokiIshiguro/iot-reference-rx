@@ -203,4 +203,188 @@ class PreparePublicSignerTests(unittest.TestCase):
         for name in helper.controller.ENVIRONMENT_INPUTS:self.assertFalse((fixture.output/name).exists())
 
 
+class PublicFailureDiagnosticTests(unittest.TestCase):
+    """Focused diagnostic-only cases; no campaign/native/credential fixture."""
+    def setUp(self):
+        self.addCleanup(patch.stopall)
+        patch.dict(os.environ, {}, clear=True).start()
+        for name in ("run", "check_output", "Popen"):
+            patch.object(subprocess, name, side_effect=AssertionError("Native boundary forbidden")).start()
+
+    def record(self, error, stage="PREPARE_PRODUCER", **kwargs):
+        helper.producer.remember_public_failure(error, stage, **kwargs)
+        out = io.StringIO()
+        helper.producer.emit_public_failure(error, out)
+        prefix, payload = out.getvalue().split(" ", 1)
+        self.assertEqual("PUBLIC_SIGNER_FAILURE", prefix)
+        record = json.loads(payload)
+        self.assertEqual({"schema", "stage", "exception_category", "failure_condition",
+                          "native_child_failed", "compiler_diagnostic_code_presence"}, set(record))
+        self.assertEqual("public-signer-failure-v2", record["schema"])
+        self.assertEqual(set(helper.producer.PUBLIC_COMPILER_CODES), set(record["compiler_diagnostic_code_presence"]))
+        self.assertTrue(all(type(value) is bool for value in record["compiler_diagnostic_code_presence"].values()))
+        return record, out.getvalue()
+
+    def test_known_unknown_and_prefix_conditions_retain_no_dynamic_text(self):
+        secret = "SYNTHETIC_SECRET /synthetic/owner/private.pem endpoint.invalid include-local.h"
+        cases = (
+            (RuntimeError("Maintenance image has no matching compiled source identity"), "IMAGE_SOURCE_IDENTITY_MISMATCH"),
+            (RuntimeError("Missing effective maintenance compiler defines"), "MAINTENANCE_DEFINES_MISSING"),
+            (RuntimeError("Maintenance build returned a stale artifact: " + secret), "STALE_PROVISIONER_ARTIFACT"),
+            (RuntimeError(secret + " Missing effective maintenance compiler defines"), "UNKNOWN"),
+            (PermissionError(secret), "UNKNOWN"),
+        )
+        for error, expected in cases:
+            with self.subTest(condition=expected):
+                record, output = self.record(error)
+                self.assertEqual(expected, record["failure_condition"])
+                for token in ("SYNTHETIC_SECRET", "private.pem", "endpoint.invalid", "include-local.h"):
+                    self.assertNotIn(token, output)
+
+    def test_native_exit_and_timeout_use_only_fixed_captured_code_presence(self):
+        secret = b"SYNTHETIC_SECRET /synthetic/private.pem endpoint.invalid"
+        error = RuntimeError("Public signer provisioner build failed; inspect private build logs")
+        record, output = self.record(error, "PRODUCER_NATIVE_CHILD", native_child_failed=True,
+            captured=(b"F0520005 " + secret, b"E9999999 E0520020"))
+        self.assertEqual("NATIVE_CHILD_EXIT", record["failure_condition"])
+        self.assertTrue(record["compiler_diagnostic_code_presence"]["F0520005"])
+        self.assertTrue(record["compiler_diagnostic_code_presence"]["E0520020"])
+        self.assertNotIn("E9999999", output)
+        timeout = subprocess.TimeoutExpired(["synthetic-child", secret.decode()], 1800,
+                                            output=b"E0562310 " + secret, stderr=b"E0520065")
+        record, output = self.record(timeout, "PRODUCER_NATIVE_CHILD", native_child_failed=True,
+                                     captured=(timeout.output, timeout.stderr))
+        self.assertEqual("NATIVE_CHILD_TIMEOUT", record["failure_condition"])
+        self.assertTrue(record["compiler_diagnostic_code_presence"]["E0562310"])
+        self.assertTrue(record["compiler_diagnostic_code_presence"]["E0520065"])
+        self.assertNotIn("SYNTHETIC_SECRET", output)
+        self.assertNotIn("private.pem", output)
+
+    def test_stage_annotation_and_log_cleanup_replacement_preserve_exception_identity(self):
+        original = RuntimeError("Maintenance image has no matching compiled source identity")
+        log_error = PermissionError("SYNTHETIC_SECRET")
+        cleanup_error = RuntimeError("Public signer build ownership changed during preparation")
+        for replacement, expected_stage, expected_condition in (
+            (None, "PREPARE_PRODUCER", "IMAGE_SOURCE_IDENTITY_MISMATCH"),
+            (log_error, "PREPARE_FAILURE_LOG", "UNKNOWN"),
+            (cleanup_error, "PREPARE_CLEANUP", "BUILD_OWNERSHIP_CHANGED"),
+        ):
+            with self.subTest(stage=expected_stage):
+                try:
+                    try:
+                        with helper.producer.public_failure_stage("PREPARE_PRODUCER"):
+                            raise original
+                    finally:
+                        if replacement is not None:
+                            with helper.producer.public_failure_stage(expected_stage):
+                                raise replacement
+                except BaseException as escaped:
+                    self.assertIs(replacement or original, escaped)
+                    record, _ = self.record(escaped)
+                    self.assertEqual(expected_stage, record["stage"])
+                    self.assertEqual(expected_condition, record["failure_condition"])
+
+    def test_prepare_manifest_failure_log_and_cleanup_precedence(self):
+        for mode in ("manifest", "failure_log", "cleanup"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                source = root / "source"
+                project = source / "synthetic_project"
+                project.mkdir(parents=True)
+                (project / ".project").write_text(
+                    "<projectDescription><name>synthetic</name></projectDescription>",
+                    encoding="utf-8",
+                )
+                output, workspace = root / "output", root / "workspace"
+                log_error = PermissionError("SYNTHETIC_SECRET")
+                cleanup_error = RuntimeError("Public signer build ownership changed during preparation")
+                calls = []
+
+                def fake_build(repo, target_id, build, selected_workspace, python):
+                    self.assertEqual(source, repo)
+                    build.mkdir()
+                    metadata = {"formal": False}
+                    (build / "provisioner-manifest.json").write_text(json.dumps(metadata), encoding="utf-8")
+                    return metadata
+
+                def fake_cleanup(selected_output, build):
+                    calls.append((selected_output, build, (output / "failure-private.log").exists()))
+                    if mode == "cleanup":
+                        raise cleanup_error
+
+                with patch.object(helper, "get_target", return_value={"application_project": "synthetic_project"}), \
+                        patch.object(helper, "_source_state", return_value="b" * 40), \
+                        patch.object(helper.producer, "build", side_effect=fake_build), \
+                        patch.object(helper, "_cleanup_public_outputs", side_effect=fake_cleanup):
+                    try:
+                        if mode == "failure_log":
+                            with patch.object(helper.os, "open", side_effect=log_error):
+                                helper.prepare(source, "synthetic-target", output, workspace, "synthetic-python", environ={})
+                        else:
+                            helper.prepare(source, "synthetic-target", output, workspace, "synthetic-python", environ={})
+                    except BaseException as error:
+                        escaped = error
+                    else:
+                        self.fail("Synthetic manifest failure did not escape")
+
+                self.assertEqual([(output, output / "build", mode != "failure_log")], calls)
+                if mode == "failure_log":
+                    self.assertIs(log_error, escaped)
+                    expected_stage, expected_condition = "PREPARE_FAILURE_LOG", "UNKNOWN"
+                elif mode == "cleanup":
+                    self.assertIs(cleanup_error, escaped)
+                    expected_stage, expected_condition = "PREPARE_CLEANUP", "BUILD_OWNERSHIP_CHANGED"
+                else:
+                    self.assertEqual("Public signer producer did not return a formal matching source manifest", str(escaped))
+                    expected_stage, expected_condition = "PREPARE_MANIFEST", "PRODUCER_MANIFEST_MISMATCH"
+                record, public_text = self.record(escaped)
+                self.assertEqual(expected_stage, record["stage"])
+                self.assertEqual(expected_condition, record["failure_condition"])
+                self.assertNotIn("SYNTHETIC_SECRET", public_text)
+                self.assertNotIn(str(root), public_text)
+
+    def test_failure_cli_emits_only_fixed_record_and_generic_message(self):
+        error = RuntimeError("SYNTHETIC_SECRET endpoint.invalid /synthetic/private.pem")
+        original_args = error.args
+        out, err = io.StringIO(), io.StringIO()
+        target = next(iter(helper.controller.LAYOUTS))
+        with patch.object(helper, "prepare", side_effect=error), redirect_stdout(out), redirect_stderr(err):
+            status = helper.main(["--source", "synthetic-source", "--target", target,
+                "--output", "synthetic-output", "--workspace", "synthetic-workspace"])
+        self.assertEqual(1, status)
+        self.assertEqual("", out.getvalue())
+        lines = err.getvalue().splitlines()
+        self.assertEqual(2, len(lines))
+        self.assertTrue(lines[0].startswith("PUBLIC_SIGNER_FAILURE "))
+        self.assertEqual("UNKNOWN", json.loads(lines[0].split(" ", 1)[1])["failure_condition"])
+        self.assertEqual("Public signer preparation failed; inspect the requested private output directory.", lines[1])
+        self.assertEqual(original_args, error.args)
+        for token in ("SYNTHETIC_SECRET", "endpoint.invalid", "private.pem"):
+            self.assertNotIn(token, err.getvalue())
+
+    def test_failure_emission_cannot_replace_original_exception(self):
+        error = RuntimeError("Missing effective maintenance compiler defines")
+        stream = Mock(); stream.write.side_effect = OSError("SYNTHETIC_SECRET")
+        with self.assertRaises(RuntimeError) as caught:
+            try:
+                raise error
+            except RuntimeError as original:
+                helper.producer.emit_public_failure(original, stream)
+                raise
+        self.assertIs(error, caught.exception)
+
+    def test_success_cli_stdout_and_stderr_unchanged(self):
+        paths = {"MOCK_PUBLIC_INPUT": "synthetic-public-output"}
+        out, err = io.StringIO(), io.StringIO()
+        target = next(iter(helper.controller.LAYOUTS))
+        with patch.object(helper, "prepare", return_value=paths) as prepared, \
+                redirect_stdout(out), redirect_stderr(err):
+            status = helper.main(["--source", "synthetic-source", "--target", target,
+                "--output", "synthetic-output", "--workspace", "synthetic-workspace"])
+        self.assertEqual(0, status)
+        self.assertEqual(json.dumps(paths, sort_keys=True) + "\n", out.getvalue())
+        self.assertEqual("", err.getvalue())
+        prepared.assert_called_once()
+
+
 if __name__=="__main__":unittest.main()
