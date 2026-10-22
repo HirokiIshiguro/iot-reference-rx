@@ -12,7 +12,17 @@ typedef struct TcpRngDnsConnectWindow
     TickType_t started_at;
     TickType_t finished_at;
     BaseType_t complete;
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+    TCPConnectNetworkSample_t network_before;
+    TCPConnectNetworkSample_t network_after;
+#endif
 } TcpRngDnsConnectWindow_t;
+
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+/* RX671-owned read-only epoch provider; RX72 can pass NULL to common capture. */
+void tcp_rng_dns_observation_get_rx_epoch(uint32_t backend,
+                                           TCPRxEpochSample_t *sample);
+#endif
 
 /* One static queue; call before FreeRTOS_IPInit. Repeated calls never reset it. */
 void tcp_rng_dns_observation_init(void);

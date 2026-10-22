@@ -254,6 +254,233 @@ static void tcp_sockets_report_connect_failure(uint32_t backend,
     tcp_sockets_report_adapter_path(backend, line, writer);
 }
 
+/* Optional before/after SAMPLED network state, not actual DNS-attempt state.
+ * Default off; no producer logs. Opaque transports remain cap=0. No address,
+ * MAC, endpoint pointer or identifier is accepted by these output structs. */
+#ifndef TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS
+/* Explicit EPOCH setting wins. Otherwise follow the already explicit RANDOM
+ * opt-in, without relying on its later default definition in this header. */
+#if defined(TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS) &&     (TCP_SOCKETS_ENABLE_RANDOM_DIAGNOSTICS == 1)
+#define TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS (1)
+#else
+#define TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS (0)
+#endif
+#endif
+
+#define TCP_SAMPLE_UNSUPPORTED                 (0U)
+#define TCP_SAMPLE_AVAILABLE                   (1U)
+#define TCP_ROUTE_SAMPLE_INVALID               (0U)
+#define TCP_ROUTE_SAMPLE_NO_DNS                (1U)
+#define TCP_ROUTE_SAMPLE_DNS_INDEX_INVALID     (2U)
+#define TCP_ROUTE_SAMPLE_ENDPOINT_LIMIT        (3U)
+#define TCP_ROUTE_SAMPLE_READY                 (4U)
+#define TCP_ROUTE_SAMPLE_NO_ROUTE              (0U)
+#define TCP_ROUTE_SAMPLE_DIRECT                (1U)
+#define TCP_ROUTE_SAMPLE_GATEWAY               (2U)
+#define TCP_ROUTE_SAMPLE_MAX_ENDPOINTS         (4U)
+
+typedef struct TCPRxEpochSample
+{
+    uint32_t capability;
+    uint32_t initialise_count;
+    uint32_t ready_count;
+    uint32_t link_up;
+} TCPRxEpochSample_t;
+
+typedef struct TCPRouteCacheSample
+{
+    uint32_t capability;
+    uint32_t state;
+    uint32_t dns_endpoint_up;
+    uint32_t route_kind;
+    uint32_t route_endpoint_up;
+    uint32_t cache_valid;
+} TCPRouteCacheSample_t;
+
+typedef struct TCPConnectNetworkSample
+{
+    TCPRxEpochSample_t epoch;
+    TCPRouteCacheSample_t route;
+} TCPConnectNetworkSample_t;
+
+typedef void (*TCPRxEpochSampleReader_t)(uint32_t backend,
+                                         TCPRxEpochSample_t *sample);
+
+static void tcp_sockets_clear_epoch_sample(TCPRxEpochSample_t *sample)
+{
+    if (NULL != sample)
+    {
+        sample->capability = TCP_SAMPLE_UNSUPPORTED;
+        sample->initialise_count = 0U;
+        sample->ready_count = 0U;
+        sample->link_up = 0U;
+    }
+}
+
+static void tcp_sockets_clear_route_sample(TCPRouteCacheSample_t *sample)
+{
+    if (NULL != sample)
+    {
+        sample->capability = TCP_SAMPLE_UNSUPPORTED;
+        sample->state = TCP_ROUTE_SAMPLE_INVALID;
+        sample->dns_endpoint_up = 0U;
+        sample->route_kind = TCP_ROUTE_SAMPLE_NO_ROUTE;
+        sample->route_endpoint_up = 0U;
+        sample->cache_valid = 0U;
+    }
+}
+
+/* All ports implement this API: FreeRTOS+TCP may sample; opaque ports cannot.
+ * Task context only; opt-in implementation performs bounded reads, no sends. */
+void TCP_Sockets_GetRouteCacheSample(uint32_t backend,
+                                     TCPRouteCacheSample_t *sample);
+
+/* Application owns before/after storage and may supply an epoch reader. RX72
+ * can use this same route API with NULL epoch reader. These are independent
+ * samples; no coherent pair, actual DNS-server selection or cause is claimed. */
+static void tcp_sockets_capture_network_sample(uint32_t backend,
+                                                 TCPConnectNetworkSample_t *sample,
+                                                 TCPRxEpochSampleReader_t reader)
+{
+    if (NULL == sample)
+    {
+        return;
+    }
+    tcp_sockets_clear_epoch_sample(&sample->epoch);
+    tcp_sockets_clear_route_sample(&sample->route);
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+    TCP_Sockets_GetRouteCacheSample(backend, &sample->route);
+    if ((backend == TCP_CONNECT_BACKEND_FREERTOS_TCP) && (NULL != reader))
+    {
+        reader(backend, &sample->epoch);
+    }
+#else
+    (void)backend;
+    (void)reader;
+#endif
+}
+
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+static void tcp_sockets_report_epoch_sample(uint32_t backend, uint32_t phase,
+                                             const TCPRxEpochSample_t *sample,
+                                             char line[96],
+                                             TCPConnectDiagnosticWriter_t writer)
+{
+    char *out = line;
+    out = tcp_sockets_diag_append_text(out, "TCP sampled epoch b=");
+    out = tcp_sockets_diag_append_decimal(out, backend);
+    out = tcp_sockets_diag_append_text(out, " p=");
+    out = tcp_sockets_diag_append_decimal(out, phase);
+    out = tcp_sockets_diag_append_text(out, " cap=");
+    if ((backend == TCP_CONNECT_BACKEND_FREERTOS_TCP) &&
+        (TCP_SAMPLE_AVAILABLE == sample->capability))
+    {
+        out = tcp_sockets_diag_append_text(out, "1 init=");
+        out = tcp_sockets_diag_append_hex(out, sample->initialise_count);
+        out = tcp_sockets_diag_append_text(out, " ready=");
+        out = tcp_sockets_diag_append_hex(out, sample->ready_count);
+        out = tcp_sockets_diag_append_text(out, " link=");
+        out = tcp_sockets_diag_append_decimal(out, (0U != sample->link_up) ? 1U : 0U);
+    }
+    else
+    {
+        out = tcp_sockets_diag_append_text(out, "0");
+    }
+    out = tcp_sockets_diag_append_text(out, "\r\n");
+    *out = '\0';
+    writer(line);
+}
+
+static void tcp_sockets_report_route_sample(uint32_t backend, uint32_t phase,
+                                             const TCPRouteCacheSample_t *sample,
+                                             char line[96],
+                                             TCPConnectDiagnosticWriter_t writer)
+{
+    char *out = line;
+    uint32_t state = sample->state;
+    out = tcp_sockets_diag_append_text(out, "TCP sampled route b=");
+    out = tcp_sockets_diag_append_decimal(out, backend);
+    out = tcp_sockets_diag_append_text(out, " p=");
+    out = tcp_sockets_diag_append_decimal(out, phase);
+    out = tcp_sockets_diag_append_text(out, " cap=");
+    if ((backend == TCP_CONNECT_BACKEND_FREERTOS_TCP) &&
+        (TCP_SAMPLE_AVAILABLE == sample->capability))
+    {
+        if ((state > TCP_ROUTE_SAMPLE_READY) ||
+            (sample->route_kind > TCP_ROUTE_SAMPLE_GATEWAY))
+        {
+            state = TCP_ROUTE_SAMPLE_INVALID;
+        }
+        out = tcp_sockets_diag_append_text(out, "1 state=");
+        out = tcp_sockets_diag_append_decimal(out, state);
+        if (TCP_ROUTE_SAMPLE_READY == state)
+        {
+            out = tcp_sockets_diag_append_text(out, " dnsup=");
+            out = tcp_sockets_diag_append_decimal(out,
+                     (0U != sample->dns_endpoint_up) ? 1U : 0U);
+            out = tcp_sockets_diag_append_text(out, " route=");
+            out = tcp_sockets_diag_append_decimal(out, sample->route_kind);
+            if (TCP_ROUTE_SAMPLE_NO_ROUTE != sample->route_kind)
+            {
+                out = tcp_sockets_diag_append_text(out, " up=");
+                out = tcp_sockets_diag_append_decimal(out,
+                         (0U != sample->route_endpoint_up) ? 1U : 0U);
+                out = tcp_sockets_diag_append_text(out, " cache=");
+                out = tcp_sockets_diag_append_decimal(out,
+                         (0U != sample->cache_valid) ? 1U : 0U);
+            }
+        }
+    }
+    else
+    {
+        out = tcp_sockets_diag_append_text(out, "0");
+    }
+    out = tcp_sockets_diag_append_text(out, "\r\n");
+    *out = '\0';
+    writer(line);
+}
+#endif
+
+/* Explicit failure-task call only. Reuses the caller's existing 96-byte row.
+ * phase0/1 mean before/after CONNECT, not per-request or per-packet snapshots.
+ * No subtraction is performed: existing epoch counts retain modulo semantics.
+ * No new row appears for success, feature-off, invalid backend or NULL writer. */
+static void tcp_sockets_report_sampled_network_failure(uint32_t backend,
+                                     const TCPConnectNetworkSample_t *before,
+                                     const TCPConnectNetworkSample_t *after,
+                                     uint32_t valid, uint32_t status,
+                                     char line[96],
+                                     TCPConnectDiagnosticWriter_t writer)
+{
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+    char *out;
+    if ((0U == status) || (NULL == writer) || (NULL == line) ||
+        (backend < TCP_CONNECT_BACKEND_FREERTOS_TCP) ||
+        (backend > TCP_CONNECT_BACKEND_WIFI_DA16600))
+    {
+        return;
+    }
+    out = tcp_sockets_diag_append_text(line, "TCP sampled window b=");
+    out = tcp_sockets_diag_append_decimal(out, backend);
+    out = tcp_sockets_diag_append_text(out, " valid=");
+    valid = ((1U == valid) && (NULL != before) && (NULL != after)) ? 1U : 0U;
+    out = tcp_sockets_diag_append_decimal(out, valid);
+    out = tcp_sockets_diag_append_text(out, "\r\n");
+    *out = '\0';
+    writer(line);
+    if (0U != valid)
+    {
+        tcp_sockets_report_epoch_sample(backend, 0U, &before->epoch, line, writer);
+        tcp_sockets_report_route_sample(backend, 0U, &before->route, line, writer);
+        tcp_sockets_report_epoch_sample(backend, 1U, &after->epoch, line, writer);
+        tcp_sockets_report_route_sample(backend, 1U, &after->route, line, writer);
+    }
+#else
+    (void)backend; (void)before; (void)after; (void)valid;
+    (void)status; (void)line; (void)writer;
+#endif
+}
+
 /* Optional observation contract. Disabled by default in every backend.
  * The hook is task context and must not block, alter task notifications, call
  * network/RNG/PKCS APIs, or print secrets. The application owns any delivery.

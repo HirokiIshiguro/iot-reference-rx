@@ -203,6 +203,14 @@ End of function CloseSocket
 
 /*-----------------------------------------------------------*/
 
+/* Opaque backend: no in-stack route/ARP inspection capability. */
+void TCP_Sockets_GetRouteCacheSample(uint32_t backend,
+                                     TCPRouteCacheSample_t *sample)
+{
+    (void)backend;
+    tcp_sockets_clear_route_sample(sample);
+}
+
 BaseType_t TCP_Sockets_Connect(Socket_t * pTcpSocket,
                                const char * pHostName,
                                uint16_t port,

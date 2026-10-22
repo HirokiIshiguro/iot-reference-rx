@@ -65,6 +65,14 @@ extern void vLoggingPrintf (const char *pcFormatString,
 #define SOCKET_T_TYPEDEFED
 #include "tcp_sockets_wrapper.h"
 
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+#include "FreeRTOS_ARP.h"
+#include "FreeRTOS_Routing.h"
+#if (ipconfigHAS_DEBUG_PRINTF != 0)
+#error Epoch_route_sampling_requires_debug_printf_disabled
+#endif
+#endif
+
 /* FreeRTOS includes. */
 #include "core_pkcs11.h"
 #include "iot_crypto.h"
@@ -216,6 +224,97 @@ static uint32_t prvResolveIPv4Address(const char *pHostName)
  *              : sendTimeoutMs
  * Return Value : .
  *********************************************************************************************************************/
+/* Read-only SAMPLED IPv4 configuration, not the destination of a past DNS
+ * request. No ARP resolution API, network packet, logging or allocation.
+ * The complete endpoint list is checked before any unbounded route getter.
+ * Current getters have no lock; keep this bounded read section task-only. */
+void TCP_Sockets_GetRouteCacheSample(uint32_t backend,
+                                     TCPRouteCacheSample_t *sample)
+{
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1) && \
+    (ipconfigUSE_IPv4 == 1) && (ipconfigARP_STORES_REMOTE_ADDRESSES == 0)
+    NetworkEndPoint_t *cursor;
+    uint32_t dns_address = 0U; /* transient RAM only, never in output structs */
+    uint32_t next_hop;
+    uint32_t count;
+    uint8_t index;
+#endif
+    if (NULL == sample)
+    {
+        return;
+    }
+    tcp_sockets_clear_route_sample(sample);
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1) && \
+    (ipconfigUSE_IPv4 == 1) && (ipconfigARP_STORES_REMOTE_ADDRESSES == 0)
+    if (backend != TCP_CONNECT_BACKEND_FREERTOS_TCP)
+    {
+        return;
+    }
+    sample->capability = TCP_SAMPLE_AVAILABLE;
+    taskENTER_CRITICAL();
+    cursor = FreeRTOS_FirstEndPoint(NULL);
+    for (count = 0U; (NULL != cursor) &&
+         (count < TCP_ROUTE_SAMPLE_MAX_ENDPOINTS); count++)
+    {
+        cursor = FreeRTOS_NextEndPoint(NULL, cursor);
+    }
+    if (NULL != cursor)
+    {
+        sample->state = TCP_ROUTE_SAMPLE_ENDPOINT_LIMIT;
+        goto sample_finished;
+    }
+    cursor = FreeRTOS_FirstEndPoint(NULL);
+    for (count = 0U; (NULL != cursor) &&
+         (count < TCP_ROUTE_SAMPLE_MAX_ENDPOINTS); count++)
+    {
+        if (0U == cursor->bits.bIPv6)
+        {
+            index = cursor->ipv4_settings.ucDNSIndex;
+            if (index >= ipconfigENDPOINT_DNS_ADDRESS_COUNT)
+            {
+                sample->state = TCP_ROUTE_SAMPLE_DNS_INDEX_INVALID;
+                goto sample_finished;
+            }
+            dns_address = cursor->ipv4_settings.ulDNSServerAddresses[index];
+            if ((0U != dns_address) && (FREERTOS_INADDR_BROADCAST != dns_address))
+            {
+                break;
+            }
+        }
+        cursor = FreeRTOS_NextEndPoint(NULL, cursor);
+    }
+    if (NULL == cursor)
+    {
+        sample->state = TCP_ROUTE_SAMPLE_NO_DNS;
+        goto sample_finished;
+    }
+    sample->state = TCP_ROUTE_SAMPLE_READY;
+    sample->dns_endpoint_up = (pdFALSE != FreeRTOS_IsEndPointUp(cursor)) ? 1U : 0U;
+    cursor = FreeRTOS_FindEndPointOnNetMask(dns_address);
+    if (NULL != cursor)
+    {
+        sample->route_kind = TCP_ROUTE_SAMPLE_DIRECT;
+        next_hop = dns_address;
+    }
+    else
+    {
+        cursor = FreeRTOS_FindGateWay((BaseType_t)ipTYPE_IPv4);
+        if (NULL == cursor)
+        {
+            goto sample_finished;
+        }
+        sample->route_kind = TCP_ROUTE_SAMPLE_GATEWAY;
+        next_hop = cursor->ipv4_settings.ulGatewayAddress;
+    }
+    sample->route_endpoint_up = (pdFALSE != FreeRTOS_IsEndPointUp(cursor)) ? 1U : 0U;
+    sample->cache_valid = (pdFALSE != xIsIPInARPCache(next_hop)) ? 1U : 0U;
+sample_finished:
+    taskEXIT_CRITICAL();
+#else
+    (void)backend;
+#endif
+}
+
 BaseType_t TCP_Sockets_Connect(Socket_t *pTcpSocket,
                                const char *pHostName,
                                uint16_t port,

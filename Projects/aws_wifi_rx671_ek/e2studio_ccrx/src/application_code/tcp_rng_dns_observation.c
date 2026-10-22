@@ -134,6 +134,12 @@ void tcp_rng_dns_observation_connect_begin(TcpRngDnsConnectWindow_t *window)
         window->started_at = xTaskGetTickCount();
         window->finished_at = window->started_at;
         window->complete = pdFALSE;
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+        tcp_sockets_capture_network_sample(TCP_CONNECT_BACKEND_FREERTOS_TCP,
+                  &window->network_before, tcp_rng_dns_observation_get_rx_epoch);
+        tcp_sockets_clear_epoch_sample(&window->network_after.epoch);
+        tcp_sockets_clear_route_sample(&window->network_after.route);
+#endif
     }
 }
 
@@ -143,6 +149,10 @@ void tcp_rng_dns_observation_connect_end(TcpRngDnsConnectWindow_t *window)
     {
         window->finished_at = xTaskGetTickCount();
         window->complete = pdTRUE;
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+        tcp_sockets_capture_network_sample(TCP_CONNECT_BACKEND_FREERTOS_TCP,
+                  &window->network_after, tcp_rng_dns_observation_get_rx_epoch);
+#endif
     }
 }
 
@@ -250,5 +260,11 @@ void tcp_rng_dns_observation_report_failure(const TcpRngDnsConnectWindow_t *wind
     out = tcp_sockets_diag_append_text(out, "\r\n");
     *out = '\0';
     writer(line);
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+    tcp_sockets_report_sampled_network_failure(TCP_CONNECT_BACKEND_FREERTOS_TCP,
+             (NULL != window) ? &window->network_before : NULL,
+             (NULL != window) ? &window->network_after : NULL,
+             valid, (uint32_t)status, line, writer);
+#endif
 }
 #endif

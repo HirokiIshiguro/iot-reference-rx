@@ -177,6 +177,30 @@ volatile uint32_t g_whd_network_fill_count;
 
 static NetworkInterface_t * g_whd_network_interface;
 
+#if (TCP_SOCKETS_ENABLE_EPOCH_ROUTE_DIAGNOSTICS == 1)
+/* Existing modulo counters only. This does not call WHD/PHY or reset counters.
+ * One bounded task critical section; no UART, queue or allocation. */
+void tcp_rng_dns_observation_get_rx_epoch(uint32_t backend,
+                                           TCPRxEpochSample_t *sample)
+{
+    if (NULL == sample)
+    {
+        return;
+    }
+    tcp_sockets_clear_epoch_sample(sample);
+    if (TCP_CONNECT_BACKEND_FREERTOS_TCP != backend)
+    {
+        return;
+    }
+    taskENTER_CRITICAL();
+    sample->initialise_count = g_whd_network_initialise_count;
+    sample->ready_count = g_whd_network_initialise_ready_count;
+    sample->link_up = g_whd_network_link_up;
+    taskEXIT_CRITICAL();
+    sample->capability = TCP_SAMPLE_AVAILABLE;
+}
+#endif
+
 #if (TCP_SOCKETS_ENABLE_DNS_PATH_DIAGNOSTICS == 1)
 /* Reuse legacy counters without new increments, reset or saturation semantics.
  * Individual volatile reads are not a coherent transaction or DNS window. */
