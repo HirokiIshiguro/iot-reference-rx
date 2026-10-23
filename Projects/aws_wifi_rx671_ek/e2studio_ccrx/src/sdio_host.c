@@ -705,8 +705,6 @@ static bool sdio_cmd53_read_bytes(uint8_t function, uint32_t address, bool incre
         return false;
     }
 
-    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_RESP, 0U);
-
     /* Wait for the receive buffer to fill (BRE = SDSTS2.RE). */
     g_cmd53_diag_stage = 2U;
     ok = sdhi_wait_status(0U, SDHI_SDIMSK2_RE, &sdsts1, &sdsts2);
@@ -721,7 +719,8 @@ static bool sdio_cmd53_read_bytes(uint8_t function, uint32_t address, bool incre
         sdhi_cmd53_force_stop(&sdsts2);
         return false;
     }
-    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, 0U,
+    /* Clear both statuses only after receive-buffer readiness was observed. */
+    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_RESP,
                                SDHI_SDIMSK2_RE | (relaxed_read_crc ? SDHI_SDSTS2_READ_CRC_ERR : 0U));
 
     byte_index = 0UL;
