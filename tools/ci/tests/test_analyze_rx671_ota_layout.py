@@ -150,15 +150,17 @@ TYPE1YN_FW_BLOB
 
 
 class GateTests(unittest.TestCase):
-    def test_runtime_default_stays_linear_until_ota_profile_is_applied(self):
+    def test_normal_signed_default_has_dual_bank_layout_without_ota_runtime_profile(self):
         repo_root = Path(__file__).resolve().parents[3]
         project_dir = repo_root / "Projects/aws_wifi_rx671_ek/e2studio_ccrx"
         with tempfile.TemporaryDirectory() as empty_build:
             gates = layout.analyze(project_dir, Path(empty_build))
         by_name = {gate.name: gate for gate in gates}
 
+        self.assertEqual("PASS", by_name["source_inputs"].status)
         self.assertEqual("UNKNOWN", by_name["bootloader_layout"].status)
         self.assertEqual("FAIL", by_name["mqtt_ota_buffer_fit"].status)
+        self.assertEqual("FAIL", by_name["ota_runtime_memory_profile"].status)
         self.assertEqual("FAIL", by_name["ota_sdio_run_clock"].status)
         self.assertEqual("PASS", by_name["rom_capacity"].status)
         self.assertEqual("PASS", by_name["fwup_data_flash_geometry"].status)
@@ -166,17 +168,20 @@ class GateTests(unittest.TestCase):
         self.assertEqual("PASS", by_name["data_flash_ownership_contract"].status)
         self.assertEqual("PASS", by_name["data_flash_non_overlap"].status)
         self.assertEqual("PASS", by_name["fwup_partition"].status)
-        self.assertEqual("FAIL", by_name["dual_bank_mode"].status)
-        self.assertEqual("FAIL", by_name["application_in_main_area"].status)
-        self.assertEqual("FAIL", by_name["static_image_single_area"].status)
-        self.assertEqual("FAIL", by_name["whd_resources_follow_application"].status)
+        self.assertEqual("PASS", by_name["dual_bank_mode"].status)
+        self.assertEqual("PASS", by_name["application_in_main_area"].status)
+        self.assertEqual("PASS", by_name["static_image_single_area"].status)
+        self.assertEqual("PASS", by_name["whd_resources_follow_application"].status)
         self.assertEqual("PASS", by_name["sdio_resource_addressing"].status)
-        self.assertEqual("FAIL", by_name["fwup_code_flash_layout"].status)
+        self.assertEqual("PASS", by_name["fwup_code_flash_layout"].status)
         self.assertEqual("UNKNOWN", by_name["artifact_provenance"].status)
+        self.assertEqual("UNKNOWN", by_name["rsu_image"].status)
         self.assertEqual("UNKNOWN", by_name["whd_blob_sizes"].status)
         self.assertEqual("UNKNOWN", by_name["ram_capacity"].status)
         self.assertEqual("UNKNOWN", by_name["map_image_single_area"].status)
         self.assertEqual("UNKNOWN", by_name["mot_image_single_area"].status)
+
+        self.assertEqual(1, layout.exit_code(gates))
 
     def test_unknown_is_fail_safe_exit(self):
         self.assertEqual(0, layout.exit_code([layout.Gate("a", "PASS", "")]))
