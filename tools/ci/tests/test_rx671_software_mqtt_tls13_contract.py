@@ -55,7 +55,7 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
 
     def test_e2studio_wait_is_bounded_and_failed_build_is_terminal(self) -> None:
         adapter = (ROOT / "tools/rx_e2studio_cli.ps1").read_text(encoding="utf-8")
-        self.assertIn("[int]$E2StudioTimeoutSeconds = 180", self.build)
+        self.assertIn("[int]$E2StudioTimeoutSeconds = 300", self.build)
         self.assertIn("return Invoke-RxE2StudioBuild", self.build)
         self.assertIn(
             "-OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds", self.build
