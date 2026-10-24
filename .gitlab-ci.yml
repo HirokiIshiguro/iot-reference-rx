@@ -330,6 +330,36 @@ variables:
 
 workflow:
   rules:
+    # Fresh current-LAN known-good comparison; all hardware is manual.
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
+      variables:
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX_IDT: "false"
+        RUN_RX72N_IDT: "false"
+        RUN_RX671_WIFI_BUILD: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "network"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+        LANBENCH_MBEDTLS_0RTT_AUTO_EC2: "false"
+      when: always
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
@@ -6124,3 +6154,79 @@ validate_rx65n_bg96_scope:
     - when: never
   script:
     - throw 'RX65N BG96 partial scopes are retired; select build, mqtt, ota, fleet, tls13_0rtt, or full.'
+
+# Keep normal bundle inputs unchanged; bind only the focused control's sidecar.
+package_normal_boot_rx671:
+  script:
+    - !reference [.normal_boot_package, script]
+    - |
+      if ($env:RUN_RX671_KNOWN_GOOD_CONTROL -eq 'true') {
+        python tools/ci/rx671_known_good_producer.py restore --source "$env:CI_PROJECT_DIR" --output "$env:CI_PROJECT_DIR/artifacts/normal_boot_rx671"
+        if ($LASTEXITCODE -ne 0) { throw 'Restore delivery provenance failed.' }
+      }
+
+kg_build_rx671_666:
+  extends: .rx_windows_canonical_checkout
+  stage: build
+  tags: [exec-shell, os-windows, ccrx, $RX671_WIFI_BUILD_RUNNER_TAG]
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  timeout: 3 hours
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
+      when: on_success
+    - when: never
+  script:
+    - !reference [.windows_ccrx_host_lease, script]
+    - '& tools/ci/build_rx671_known_good_control.ps1'
+  artifacts:
+    access: maintainer
+    paths:
+      - artifacts/kg_old_rx671/aws_wifi_rx671_ek.mot
+      - artifacts/kg_old_rx671/control_manifest.json
+    expire_in: 1 day
+
+kg_control_rx671:
+  extends: .rx671_wifi_linux_hw_job
+  stage: test
+  timeout: 30 minutes
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    RX671_WIFI_HARDWARE_LOCK_TIMEOUT_SECONDS: "0"
+  needs:
+    - job: kg_build_rx671_666
+      artifacts: true
+    - job: package_normal_boot_rx671
+      artifacts: true
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - |
+      set -eu
+      : "${KG_OLD_PRODUCER_JOB_ID:?Missing reviewed producer job ID}"
+      : "${KG_RESTORE_PRODUCER_JOB_ID:?Missing reviewed restore job ID}"
+      : "${KG_OLD_MANIFEST_SHA256:?Missing reviewed old manifest hash}"
+      : "${KG_RESTORE_PRODUCER_SHA256:?Missing reviewed restore producer hash}"
+      : "${KG_NORMAL_MANIFEST_SHA256:?Missing reviewed normal manifest hash}"
+      python3 tools/ci/rx671_known_good_control.py \
+        --old-root artifacts/kg_old_rx671 \
+        --restore-bundle artifacts/normal_boot_rx671 \
+        --receipt artifacts/kg666-current-lan-BASE4bf/receipt.json \
+        --runtime-source 666d97f64eecc2451ec3b54ee101b5b53a603c51 \
+        --restore-source "$CI_COMMIT_SHA" \
+        --pipeline-id "$CI_PIPELINE_ID" --job-id "$CI_JOB_ID" \
+        --old-job-id "$KG_OLD_PRODUCER_JOB_ID" \
+        --restore-job-id "$KG_RESTORE_PRODUCER_JOB_ID" \
+        --old-manifest-sha256 "$KG_OLD_MANIFEST_SHA256" \
+        --restore-producer-sha256 "$KG_RESTORE_PRODUCER_SHA256" \
+        --normal-manifest-sha256 "$KG_NORMAL_MANIFEST_SHA256" \
+        --execute-reviewed-candidate
+  artifacts:
+    when: always
+    paths:
+      - artifacts/kg666-current-lan-BASE4bf/receipt.json
+    expire_in: 1 day
