@@ -164,7 +164,6 @@ void vWifiRx671IpTraceDhcpStaticFallback(uint32_t ip_address)
     g_freertos_tcp_dhcp_ip = ip_address;
     g_freertos_tcp_dhcp_lease_acquired = 0U;
     g_freertos_tcp_dhcp_static_fallback = 1U;
-    debug_puts("FreeRTOS+TCP DHCP static fallback\r\n");
 }
 
 void vApplicationIPNetworkEventHook(eIPCallbackEvent_t event)
@@ -176,6 +175,13 @@ void vApplicationIPNetworkEventHook(eIPCallbackEvent_t event)
                                          (uint32_t *)&g_freertos_tcp_gateway,
                                          (uint32_t *)&g_freertos_tcp_dns);
         g_freertos_tcp_network_up = 1U;
+        /* The DHCP fallback trace runs inside taskENTER_CRITICAL(), where
+         * debug_uart deliberately drops TX. Report the state from this same
+         * task's network-up callback after that critical section has ended. */
+        if (0U != g_freertos_tcp_dhcp_static_fallback)
+        {
+            debug_puts("FreeRTOS+TCP DHCP static fallback\r\n");
+        }
         debug_puts("FreeRTOS+TCP network up\r\n");
     }
     else
