@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "upstream_repository": "https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver.git",
-  "upstream_commit": "d5de9ee04e103d727d7ed529a008c24b9332c4e8",
+  "upstream_commit": "825e78519c8becaaf388dd4845377ba22867b646",
   "origin_repository": "https://github.com/Infineon/wifi-host-driver.git",
   "origin_commit": "769c855507365e9828b02c81f1590d671f49661d",
-  "modification_purpose": "CC-RX packing syntax and private SDIO command encoding",
-  "reviewed_merge_request": "https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver/-/merge_requests/1",
+  "modification_purpose": "CC-RX packing syntax, private SDIO command encoding and caller WLAN sleep delay override",
+  "reviewed_merge_request": "https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver/-/merge_requests/2",
   "files_sha256": {
     ".gitignore": "be091810b9a0f91199ea4b81d84af819934cdff588c5c41c0e97fb1fbd0a4a9f",
     ".gitlab-ci.yml": "a47381b81debe19c25afc28c4199557a948667dfd0b88f9d5b0be4c91f0c7943",
@@ -81,7 +81,7 @@
     "WiFi_Host_Driver/src/bus_protocols/whd_bus.h": "2b87fecb7cfc756d22d6416c8ab1f0de4b016844dea8b4846e8b2dab04d73023",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_common.c": "706a905c4bd70a815ca29b319259579b4802220429d88a311d397d1cf8214392",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_common.h": "c613a1efd7fbe84654690a81d78c9af3ce54b067645cffd5e1df1559b554c8f8",
-    "WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h": "8599ed747c659c6fd336e8127321d7fd4a0dc04a50cc87e11d078d220f64267b",
+    "WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h": "7bbf60b8df6acb614c7e35bce065856f3a701681f57310559d5e4e06aa60fabf",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.c": "fe33ca005e52f3bf975c58f216e1681eee22b19411262d1fc3bac4e8181e40f0",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.h": "34cc01868cbd7829c8b0db0e952b7e54f5116ca12864c8ecb6b192481c03e8c5",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_wire.h": "e962aa72ca040c3e49378c4916a152f7f5fff18d51b51adcf21f29e6883e9463",
