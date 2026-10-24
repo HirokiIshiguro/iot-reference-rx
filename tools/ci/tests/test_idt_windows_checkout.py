@@ -15,6 +15,7 @@ WHD_BUILD_JOBS = {
     "build_rx671_wifi_fleet",
     "test_rx671_wifi_idt",
     "package_rx671_ota_artifacts",
+    "kg_build_rx671_666",
 }
 
 

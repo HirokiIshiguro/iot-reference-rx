@@ -330,36 +330,6 @@ variables:
 
 workflow:
   rules:
-    # Fresh current-LAN known-good comparison; all hardware is manual.
-    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
-      variables:
-        RUN_RX65N_BG96_BUILD: "false"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX65N_BG96_SKIP_HW_TESTS: "true"
-        RUN_RX72N_BUILD: "false"
-        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
-        RX72N_TEST_SCOPE: "build"
-        RX72N_SKIP_HW_TESTS: "true"
-        RX72N_SKIP_OTA_TESTS: "true"
-        RUN_RX72N_HW_TESTS: "false"
-        RUN_RX72N_MULTI_TLS_TEST: "false"
-        RUN_RX72N_OTA_TESTS: "false"
-        RUN_RX72N_FLEET_TESTS: "false"
-        RUN_RX_IDT: "false"
-        RUN_RX72N_IDT: "false"
-        RUN_RX671_WIFI_BUILD: "true"
-        RUN_RX671_BOOTLOADER_BUILD: "false"
-        RX671_WIFI_TEST_SCOPE: "network"
-        RX671_WIFI_SKIP_HW_TESTS: "true"
-        RUN_RX671_BOOTLOADER_SMOKE: "false"
-        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
-        RUN_RX671_OTA_TEST: "false"
-        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
-        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
-        RUN_RX671_TSIP_FLEET_TEST: "false"
-        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
-        LANBENCH_MBEDTLS_0RTT_AUTO_EC2: "false"
-      when: always
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
@@ -417,6 +387,36 @@ workflow:
         RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
         RUN_RX671_TSIP_FLEET_TEST: "false"
         RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
+    - if: '($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "focused" && $RUN_RX671_KNOWN_GOOD_CONTROL == "true"'
+      # Fresh current-LAN known-good comparison; all hardware is manual.
+      variables:
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX_IDT: "false"
+        RUN_RX72N_IDT: "false"
+        RUN_RX671_WIFI_BUILD: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "network"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+        LANBENCH_MBEDTLS_0RTT_AUTO_EC2: "false"
       when: always
     - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
       when: always
