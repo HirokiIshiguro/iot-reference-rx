@@ -237,7 +237,8 @@
 								</option>
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.150917174" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" value="SU,SI,R_1,B_2,R,B_FREERTOS_HEAP*,RPFRAM2/04,C_LITTLEFS_MANAGEMENT_AREA/00100000,C_FIRMWARE_UPDATE_CONTROL_BLOCK,C_FIRMWARE_UPDATE_CONTROL_BLOCK_MIRROR/00102000,C_USER_APPLICATION_AREA/00102300,B_ETHERNET_BUFFERS*,B_RX_DESC*,B_TX_DESC*,B,B_1,R_2,B_8,R_8,BEXRAM_1,REXRAM_1,BEXRAM_2,REXRAM_2,BEXRAM,REXRAM,BEXRAM_8,REXRAM_8,B_MULTI_TLS_HEAP*/0800000,B_FRAME_BUFFER_1/085E000,PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2/0FFE00300,EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC" valueType="string"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore.133132845" name="追加するオプション（すべての指定オプションの前に追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore" valueType="stringList">
-									<listOptionValue builtIn="false" value=""/>
+									<!-- Task stack restoration must remain inline; BSR would push onto the restored task stack. -->
+									<listOptionValue builtIn="false" value="-samecode_forbid=_xPortStartScheduler,_vSoftwareInterruptISR,_vTickISR"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userAfter.469663072" name="追加するオプション（すべての指定オプションの後ろに追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userAfter" valueType="stringList">
 									<listOptionValue builtIn="false" value=""/>
