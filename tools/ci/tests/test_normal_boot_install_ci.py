@@ -92,10 +92,18 @@ class NormalBootInstallCiTests(unittest.TestCase):
                 start=body.index("tools/install_normal_boot.py")
                 for step in steps:
                     self.assertGreater(body.index(step,start),start)
-        for name in ("test_rx72n_ether_mqtt","test_rx72n_ether_ota"):
-            self.assertIn("--format",job(name))
-            self.assertIn("--codesigner-cert",job(name))
-            self.assertIn("--reset-after-open",job(name))
+        # Normal MQTT updates client credentials without replacing the public
+        # trust already installed with its signed normal bundle. OTA retains
+        # its separately reviewed signing-material preparation.
+        mqtt=job("test_rx72n_ether_mqtt")
+        self.assertNotIn("--format",mqtt)
+        self.assertNotIn("--codesigner-cert",mqtt)
+        self.assertNotIn("--device-id",mqtt)
+        self.assertIn("--reset-after-open",mqtt)
+        ota=job("test_rx72n_ether_ota")
+        self.assertIn("--format",ota)
+        self.assertIn("--codesigner-cert",ota)
+        self.assertIn("--reset-after-open",ota)
 
     @unittest.skipUnless(os.name != "nt" and shutil.which("bash"), "Portable Bash fixture requires Linux")
     def test_installer_failure_status_stops_before_following_hardware_steps(self):

@@ -1674,6 +1674,7 @@ matrix_rx65n_bg96_tsip_tls13_resumption_0rtt:
 
 build_rx72n_ether:
   timeout: 3 hours
+  extends: .rx_windows_canonical_checkout
   stage: build
   tags:
     - exec-shell
@@ -1815,6 +1816,7 @@ prepare_lanbench_tls13_0rtt_server:
 
 build_rx65n_bg96:
   timeout: 3 hours
+  extends: .rx_windows_canonical_checkout
   stage: build
   tags:
     - exec-shell
