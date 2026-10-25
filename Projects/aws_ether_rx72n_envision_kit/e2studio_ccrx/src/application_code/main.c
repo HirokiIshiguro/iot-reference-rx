@@ -36,6 +36,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* Renesas includes. */
 #include "platform.h"
+#include "r_sci_rx_pinset.h"
 
 /* Logging includes. */
 #include "iot_logging_task.h"
@@ -214,7 +215,7 @@ void main_task(void *pvParameters)
     (void)xTraceEnable(TRC_START);
 #if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
     (void)pvParameters;
-    vRunPublicSignerProvisioner(NULL);
+    vRunPublicSignerProvisioner(R_SCI_PinSet_SCI7);
 #else
 
     int32_t xResults;

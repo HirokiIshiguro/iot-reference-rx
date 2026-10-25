@@ -493,7 +493,7 @@ def provision(args):
                 if not send_pem_command(ser, "codesigncert", args.codesigner_cert, args.char_delay, args.line_delay):
                     return 1
             else:
-                print("\nWARNING: No code signing certificate provided; OTA signature verification will fail")
+                print("\n--- Code signing trust unchanged; it must already be provisioned ---")
 
         if args.codesigner_public_key:
             print("\n--- Set bootloader code signing public key ---")
