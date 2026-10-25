@@ -656,6 +656,13 @@ static CK_RV prvSocketsGetCryptoSession(SemaphoreHandle_t *pxSessionLock,
  * Argument     : pulNumber
  * Return Value : .
  *********************************************************************************************************************/
+/* Status-only diagnostics: never retain the generated random value. */
+volatile uint32_t g_tcp_random_requests;
+volatile uint32_t g_tcp_random_successes;
+volatile uint32_t g_tcp_random_session_failures;
+volatile uint32_t g_tcp_random_generate_failures;
+volatile uint32_t g_tcp_random_last_ck_rv;
+
 BaseType_t xApplicationGetRandomNumber(uint32_t *pulNumber)
 {
     CK_RV xResult = 0;
@@ -665,6 +672,7 @@ BaseType_t xApplicationGetRandomNumber(uint32_t *pulNumber)
     uint32_t ulRandomValue = 0;
     BaseType_t xReturn; /* Return pdTRUE if successful */
 
+    g_tcp_random_requests++;
     xResult = prvSocketsGetCryptoSession(&xSessionLock,
                                          &xPkcs11Session,
                                          &pxPkcs11FunctionList);
@@ -676,11 +684,21 @@ BaseType_t xApplicationGetRandomNumber(uint32_t *pulNumber)
         xResult = pxPkcs11FunctionList->C_GenerateRandom(xPkcs11Session,
                                                          (CK_BYTE_PTR)&ulRandomValue,
                                                          sizeof(ulRandomValue));
+        if (0 != xResult)
+        {
+            g_tcp_random_generate_failures++;
+        }
     }
+    else
+    {
+        g_tcp_random_session_failures++;
+    }
+    g_tcp_random_last_ck_rv = (uint32_t)xResult;
 
     /* Check if any of the API calls failed. */
     if (0 == xResult)
     {
+        g_tcp_random_successes++;
         xReturn = pdTRUE;
         *(pulNumber) = ulRandomValue;
     }

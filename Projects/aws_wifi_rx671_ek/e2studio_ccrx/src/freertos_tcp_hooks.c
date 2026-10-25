@@ -9,6 +9,23 @@
 
 #include "debug_uart.h"
 
+extern volatile uint32_t g_tcp_random_requests;
+extern volatile uint32_t g_tcp_random_successes;
+extern volatile uint32_t g_tcp_random_session_failures;
+extern volatile uint32_t g_tcp_random_generate_failures;
+extern volatile uint32_t g_tcp_random_last_ck_rv;
+extern volatile uint32_t g_whd_network_rx_frames;
+extern volatile uint32_t g_whd_network_rx_to_ip;
+extern volatile uint32_t g_whd_network_rx_no_buffer;
+extern volatile uint32_t g_whd_network_rx_drop_not_ready;
+extern volatile uint32_t g_whd_network_rx_drop_filter;
+extern volatile uint32_t g_whd_network_rx_drop_no_endpoint;
+extern volatile uint32_t g_whd_network_rx_drop_queue;
+extern volatile uint32_t g_whd_network_tx_frames;
+extern volatile uint32_t g_whd_network_tx_no_buffer;
+extern volatile uint32_t g_whd_network_tx_drop_not_ready;
+extern volatile uint32_t g_whd_network_tx_drop_no_data;
+
 volatile uint32_t g_freertos_tcp_network_up;
 volatile uint32_t g_freertos_tcp_ip_address;
 volatile uint32_t g_freertos_tcp_netmask;
@@ -164,7 +181,74 @@ void vWifiRx671IpTraceDhcpStaticFallback(uint32_t ip_address)
     g_freertos_tcp_dhcp_ip = ip_address;
     g_freertos_tcp_dhcp_lease_acquired = 0U;
     g_freertos_tcp_dhcp_static_fallback = 1U;
-    debug_puts("FreeRTOS+TCP DHCP static fallback\r\n");
+}
+
+static void log_dhcp_path_counts(void)
+{
+    /* Called only by the IP task; avoid adding 192 bytes to its stack. */
+    static char line[192];
+    char * p = append_text(line, "RX671 DHCP RNG: req=");
+
+    /* These are task-context status snapshots, not an atomic event ledger.
+     * Do not include random bytes, packet headers, addresses or credentials. */
+    p = append_dec32(p, g_tcp_random_requests);
+    p = append_text(p, " ok=");
+    p = append_dec32(p, g_tcp_random_successes);
+    p = append_text(p, " session_fail=");
+    p = append_dec32(p, g_tcp_random_session_failures);
+    p = append_text(p, " generate_fail=");
+    p = append_dec32(p, g_tcp_random_generate_failures);
+    p = append_text(p, " ck=");
+    p = append_hex32(p, g_tcp_random_last_ck_rv);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+
+    p = append_text(line, "RX671 DHCP IP: rx=");
+    p = append_dec32(p, g_iptrace_network_input_count);
+    p = append_text(p, " tx=");
+    p = append_dec32(p, g_iptrace_network_output_count);
+    p = append_text(p, " rx_udp=");
+    p = append_dec32(p, g_iptrace_network_input_udp);
+    p = append_text(p, " tx_udp=");
+    p = append_dec32(p, g_iptrace_network_output_udp);
+    p = append_text(p, " hook=");
+    p = append_dec32(p, g_freertos_tcp_dhcp_hook_count);
+    p = append_text(p, " phase=");
+    p = append_dec32(p, g_freertos_tcp_dhcp_phase);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+
+    p = append_text(line, "RX671 DHCP WHD RX: frames=");
+    p = append_dec32(p, g_whd_network_rx_frames);
+    p = append_text(p, " to_ip=");
+    p = append_dec32(p, g_whd_network_rx_to_ip);
+    p = append_text(p, " no_buf=");
+    p = append_dec32(p, g_whd_network_rx_no_buffer);
+    p = append_text(p, " not_ready=");
+    p = append_dec32(p, g_whd_network_rx_drop_not_ready);
+    p = append_text(p, " filter=");
+    p = append_dec32(p, g_whd_network_rx_drop_filter);
+    p = append_text(p, " no_ep=");
+    p = append_dec32(p, g_whd_network_rx_drop_no_endpoint);
+    p = append_text(p, " queue=");
+    p = append_dec32(p, g_whd_network_rx_drop_queue);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+
+    p = append_text(line, "RX671 DHCP WHD TX: frames=");
+    p = append_dec32(p, g_whd_network_tx_frames);
+    p = append_text(p, " no_buf=");
+    p = append_dec32(p, g_whd_network_tx_no_buffer);
+    p = append_text(p, " not_ready=");
+    p = append_dec32(p, g_whd_network_tx_drop_not_ready);
+    p = append_text(p, " no_data=");
+    p = append_dec32(p, g_whd_network_tx_drop_no_data);
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
 }
 
 void vApplicationIPNetworkEventHook(eIPCallbackEvent_t event)
@@ -176,7 +260,15 @@ void vApplicationIPNetworkEventHook(eIPCallbackEvent_t event)
                                          (uint32_t *)&g_freertos_tcp_gateway,
                                          (uint32_t *)&g_freertos_tcp_dns);
         g_freertos_tcp_network_up = 1U;
+        /* The DHCP fallback trace runs inside taskENTER_CRITICAL(), where
+         * debug_uart deliberately drops TX. Report the state from this same
+         * task's network-up callback after that critical section has ended. */
+        if (0U != g_freertos_tcp_dhcp_static_fallback)
+        {
+            debug_puts("FreeRTOS+TCP DHCP static fallback\r\n");
+        }
         debug_puts("FreeRTOS+TCP network up\r\n");
+        log_dhcp_path_counts();
     }
     else
     {

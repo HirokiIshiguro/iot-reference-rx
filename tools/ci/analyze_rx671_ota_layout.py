@@ -1422,10 +1422,11 @@ def analyze(
     fwup_config = project_dir / "src/frtos_config/rx_ota_config.h"
     littlefs_config = project_dir / "src/frtos_config/rm_littlefs_flash_config.h"
     bsp_config = project_dir / "src/smc_gen/r_config/r_bsp_config.h"
-    mcu_info = project_dir / "src/smc_gen/r_bsp/mcu/rx671/mcu_info.h"
+    rdp_source = repo_root / "Middleware/Renesas/rx-driver-package/source"
+    mcu_info = rdp_source / "r_bsp/r_bsp_vx.xx/r_bsp/mcu/rx671/mcu_info.h"
     resource_source = project_dir / "src/whd_port/whd_port_resource.c"
     sdio_host = project_dir / "src/sdio_host.c"
-    flash_target = project_dir / "src/smc_gen/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
+    flash_target = rdp_source / "r_flash_rx/r_flash_rx_vx.xx/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
     layout_contract = project_dir / LAYOUT_CONTRACT_NAME
     bootloader_config = (
         repo_root
