@@ -402,6 +402,7 @@ def provision_cellular_apn(args: argparse.Namespace, port: serial.Serial) -> Non
 
 
 def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) -> None:
+    """Update application credentials without erasing installed boot trust."""
     endpoint, endpoint_var = env_text(ENDPOINT_VARS)
     if args.skip_private_key:
         dynamic_thing_name, dynamic_thing_name_var = env_text(
@@ -446,14 +447,6 @@ def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) ->
         + ", ".join(name for name in (endpoint_var, thing_name_var, cert_var, None if args.skip_private_key else key_var) if name)
     )
     enter_cli_mode(port, args.provision_cli_timeout, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
-    send_cli_command(
-        port,
-        "format",
-        char_delay=args.provision_char_delay,
-        line_delay=args.provision_line_delay,
-        timeout=6.0,
-        success_tokens=("OK",),
-    )
     provision_cellular_apn(args, port)
     send_cli_command(
         port,
@@ -491,6 +484,7 @@ def provision_mqtt_credentials(args: argparse.Namespace, port: serial.Serial) ->
 
 
 def provision_fleet_credentials(args: argparse.Namespace, port: serial.Serial) -> None:
+    """Update claim credentials without erasing installed boot trust."""
     endpoint, endpoint_var = env_text(ENDPOINT_VARS)
     template, template_var = env_text(FLEET_TEMPLATE_VARS)
     claim_cert, claim_cert_var = env_text(FLEET_CLAIM_CERT_VARS)
@@ -513,14 +507,6 @@ def provision_fleet_credentials(args: argparse.Namespace, port: serial.Serial) -
         + ", ".join(name for name in (endpoint_var, template_var, claim_cert_var, claim_key_var) if name)
     )
     enter_cli_mode(port, args.provision_cli_timeout, char_delay=args.provision_char_delay, line_delay=args.provision_line_delay)
-    send_cli_command(
-        port,
-        "format",
-        char_delay=args.provision_char_delay,
-        line_delay=args.provision_line_delay,
-        timeout=6.0,
-        success_tokens=("OK",),
-    )
     provision_cellular_apn(args, port)
     send_cli_command(
         port,

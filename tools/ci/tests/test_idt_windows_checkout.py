@@ -1,4 +1,4 @@
-"""Keep Windows WHD build entry points on an original-byte checkout policy."""
+"""Keep all Windows RX build entry points on the fresh checkout policy."""
 from pathlib import Path
 import os
 import re
@@ -9,7 +9,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 TEMPLATE = ".rx_windows_canonical_checkout"
-WHD_BUILD_JOBS = {
+WINDOWS_BUILD_JOBS = {
+    "build_rx72n_ether",
+    "build_rx65n_bg96",
     "idt_source_matrix",
     "build_rx671_wifi",
     "build_rx671_wifi_fleet",
@@ -62,10 +64,10 @@ class IdtWindowsCheckoutTests(unittest.TestCase):
         result.update(fields(self.blocks[name], 4))
         return result
 
-    def test_all_whd_build_entry_points_get_fresh_checkout_before_sources(self):
+    def test_all_rx_build_entry_points_get_fresh_checkout_before_sources(self):
         users = {name for name, block in self.blocks.items() if TEMPLATE in parents(block)}
-        self.assertEqual(users, WHD_BUILD_JOBS)
-        for name in WHD_BUILD_JOBS:
+        self.assertEqual(users, WINDOWS_BUILD_JOBS)
+        for name in WINDOWS_BUILD_JOBS:
             with self.subTest(job=name):
                 variables = self.variables(name)
                 self.assertEqual(variables["GIT_STRATEGY"], "clone")

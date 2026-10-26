@@ -107,7 +107,7 @@ class UartDownloadErrorTests(unittest.TestCase):
                 if expected:
                     self.assertIn("Missing firmware-install completion", output.getvalue())
 
-    def test_32k_progress_is_consumed_before_the_next_block_is_sent(self):
+    def _assert_acknowledged_transfer(self, target=None):
         class Receiver(FakeSerial):
             def __init__(self):
                 super().__init__([])
@@ -138,20 +138,45 @@ class UartDownloadErrorTests(unittest.TestCase):
                 return data
 
         with tempfile.TemporaryDirectory() as directory:
-            image = Path(directory) / 'inert.rsu'
+            image = Path(directory) / 'normal_app.rsu'
             image.write_bytes(b'\xff' * (3 * 32768))
-            downloader = subject.UartDownloader('unused', 921600, 5, strict_success=True,
-                                                ack_each_chunk=True, send_chunk_size=32768,
-                                                ack_prefix='installing firmware...',
-                                                success_message='jump to user program')
+            if target is None:
+                command = [sys.executable, 'test_uart_download_rx72n.py', '--rsu', str(image),
+                           '--timeout', '5', '--strict-success', '--ack-each-chunk',
+                           '--send-chunk-size', '32768', '--ack-prefix', 'installing firmware...',
+                           '--success-message', 'jump to user program']
+            else:
+                from tools import install_normal_boot as installer
+                from tools.idt.targets import get_target
+                command = installer.download_command(Path(directory), get_target(target))
+                # Bound a broken fixture while leaving production wait budgets unchanged.
+                command[command.index('--timeout') + 1] = '5'
             port = Receiver()
-            downloader.open_port = lambda: setattr(downloader, 'ser', port)
-            downloader.trigger_reset = lambda: None
-            with patch.object(subject.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(0, downloader.download(image))
+            if target is not None:
+                port.chunks.append(b'send "userprog.rsu" via UART.\r\n')
+            original = subject.UartDownloader
+            created = []
+            def make_downloader(*args, **kwargs):
+                instance = original(*args, **kwargs)
+                instance.open_port = lambda: setattr(instance, 'ser', port)
+                instance.trigger_reset = lambda: None
+                created.append(instance)
+                return instance
+            with patch.object(subject, 'UartDownloader', side_effect=make_downloader), \
+                 patch.object(sys, 'argv', command[1:]), \
+                 patch.object(subject.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(0, subject.main())
             self.assertEqual(3, port.blocks)
-            self.assertEqual(3, downloader.write_ack_count)
+            self.assertEqual(3, created[0].write_ack_count)
             self.assertFalse(port.is_open)
+
+    def test_32k_progress_is_consumed_before_the_next_block_is_sent(self):
+        self._assert_acknowledged_transfer()
+
+    def test_normal_installers_drive_acknowledged_block_transfer(self):
+        for target in ('rx72n-ethernet', 'rx65n-bg96', 'rx671-wifi'):
+            with self.subTest(target=target):
+                self._assert_acknowledged_transfer(target)
 
 
 if __name__ == "__main__":
