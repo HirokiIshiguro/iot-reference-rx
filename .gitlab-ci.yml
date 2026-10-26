@@ -4163,7 +4163,7 @@ cleanup_rx72n_ether_ota_jobs:
       when: on_success
     - when: never
   script:
-    - Write-Host "=== Cleanup stale RX72N OTA IoT Jobs ==="
+    - Write-Host "=== Require no active RX72N OTA IoT Jobs (read-only) ==="
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -4177,6 +4177,7 @@ cleanup_rx72n_ether_ota_jobs:
         --thing-name "$env:RX72N_DEVICE_ID" `
         --region "$env:AWS_DEFAULT_REGION" `
         --job-id-prefix "AFR_OTA-" `
+        --check-empty `
         --output-json "$artifactDir\cleanup_summary.json" `
         2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_ota_jobs.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cancel active AWS IoT Jobs for a thing before hardware tests."""
+"""Check for active AWS IoT Jobs, or explicitly use the legacy cancellation mode."""
 
 import argparse
 import json
@@ -10,6 +10,10 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+CHECK_STATUSES = ("QUEUED", "IN_PROGRESS")
+CHECK_TIMEOUT_SECONDS = 30
+CHECK_HEARTBEAT_SECONDS = 3
 
 
 def run_command(cmd, *, allow_failure=False):
@@ -97,6 +101,78 @@ def write_json(path, payload):
         handle.write("\n")
 
 
+def checked_snapshot(thing_name, region, status, deadline):
+    """One bounded, non-paginated list call; never publish the CLI's output."""
+    command = [*aws_command_prefix(), "iot", "list-job-executions-for-thing",
+               "--thing-name", thing_name, "--status", status,
+               "--max-results", "250", "--no-paginate", "--region", region,
+               "--output", "json", "--cli-connect-timeout", "10", "--cli-read-timeout", "20"]
+    environment = dict(os.environ, AWS_MAX_ATTEMPTS="1", AWS_PAGER="", AWS_CLI_AUTO_PROMPT="off")
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                               env=environment)
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("AWS list snapshot deadline exhausted")
+            try:
+                stdout, _stderr = process.communicate(timeout=min(CHECK_HEARTBEAT_SECONDS, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                print(json.dumps({"status": "lookup_waiting"}), flush=True)
+        if process.returncode != 0 or len(stdout) > 2 * 1024 * 1024:
+            raise ValueError("AWS list snapshot failed")
+        payload = json.loads(stdout)
+        if not isinstance(payload, dict) or not isinstance(payload.get("executionSummaries"), list):
+            raise ValueError("Invalid AWS list snapshot")
+        return payload
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=CHECK_HEARTBEAT_SECONDS)
+
+
+def check_empty(thing_name, region, job_id_prefix, output_json):
+    # Reserve the final heartbeat interval for stopping/reaping the owned CLI.
+    deadline = time.monotonic() + CHECK_TIMEOUT_SECONDS - CHECK_HEARTBEAT_SECONDS
+    counts = {status: None for status in CHECK_STATUSES}
+    result = {"status": "lookup_failed", "active_count": None, "status_counts": counts,
+              "snapshot_complete": False, "mutation_count": 0}
+    code = 1
+    try:
+        for status in CHECK_STATUSES:
+            payload = checked_snapshot(thing_name, region, status, deadline)
+            matched = 0
+            for item in payload["executionSummaries"]:
+                if not isinstance(item, dict) or not isinstance(item.get("jobId"), str):
+                    raise ValueError("Invalid AWS execution summary")
+                summary = item.get("jobExecutionSummary")
+                if not isinstance(summary, dict) or summary.get("status") != status:
+                    raise ValueError("Unexpected AWS execution status")
+                if item["jobId"].startswith(job_id_prefix):
+                    matched += 1
+            counts[status] = matched
+            if payload.get("nextToken"):
+                result["status"] = "incomplete_snapshot"
+                break
+        else:
+            total = sum(counts.values())
+            result.update(status="active" if total else "empty", active_count=total,
+                          snapshot_complete=True)
+            code = 1 if total else 0
+    except KeyboardInterrupt:
+        result["status"] = "interrupted"
+        code = 130
+    except (OSError, ValueError, RuntimeError, TimeoutError, subprocess.SubprocessError):
+        # Exceptions and AWS stderr can contain commands, identifiers or credentials.
+        # Keep the failure terminal and publish only aggregate state.
+        result["status"] = "lookup_failed"
+    write_json(Path(output_json), result)
+    print(json.dumps(result, sort_keys=True), flush=True)
+    return code
+
+
 def main():
     parser = argparse.ArgumentParser(description="Cancel queued/in-progress AWS IoT Jobs for one thing")
     parser.add_argument("--thing-name", required=True)
@@ -107,7 +183,12 @@ def main():
     parser.add_argument("--poll-interval", type=int, default=3)
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--check-empty", action="store_true",
+                        help="Read one QUEUED/IN_PROGRESS snapshot and fail if matching jobs exist; never cancel")
     args = parser.parse_args()
+
+    if args.check_empty:
+        return check_empty(args.thing_name, args.region, args.job_id_prefix, args.output_json)
 
     summary = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
