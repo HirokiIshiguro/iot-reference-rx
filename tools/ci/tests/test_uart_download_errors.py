@@ -173,8 +173,29 @@ class UartDownloadErrorTests(unittest.TestCase):
     def test_32k_progress_is_consumed_before_the_next_block_is_sent(self):
         self._assert_acknowledged_transfer()
 
-    def test_normal_installers_drive_acknowledged_block_transfer(self):
+    def test_normal_install_download_commands_preserve_target_specific_pacing(self):
+        from tools import install_normal_boot as installer
+        from tools.idt.targets import get_target
         for target in ('rx72n-ethernet', 'rx65n-bg96', 'rx671-wifi'):
+            with self.subTest(target=target):
+                command = installer.download_command(Path('/private'), get_target(target))
+                self.assertIn('--strict-success', command)
+                self.assertIn('--wait-for-ready', command)
+                self.assertEqual('420', command[command.index('--timeout') + 1])
+                self.assertEqual('120', command[command.index('--post-tx-wait') + 1])
+                self.assertEqual('90', command[command.index('--success-timeout') + 1])
+                if target == 'rx72n-ethernet':
+                    self.assertNotIn('--ack-each-chunk', command)
+                    self.assertNotIn('--send-chunk-size', command)
+                    self.assertNotIn('--ack-prefix', command)
+                    self.assertNotIn('--inter-chunk-delay', command)
+                else:
+                    self.assertIn('--ack-each-chunk', command)
+                    self.assertEqual('32768', command[command.index('--send-chunk-size') + 1])
+                    self.assertEqual('installing firmware...', command[command.index('--ack-prefix') + 1])
+
+    def test_rx65n_and_rx671_normal_installers_drive_acknowledged_block_transfer(self):
+        for target in ('rx65n-bg96', 'rx671-wifi'):
             with self.subTest(target=target):
                 self._assert_acknowledged_transfer(target)
 
