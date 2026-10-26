@@ -14,6 +14,11 @@ REQUIRED = {
         "152cf36d6775bce6026a791845af12201aae703d", (
             "FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c",
             "FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI/FreeRTOS_CLI.h")),
+    "Middleware/Renesas/r_flash_rx": (
+        "cdadb4ddb6e250f3a7dde29446873e6b33f8625e", (
+            "Makefile", "r_flash_rx_vx.xx_extend.mdf", "r_flash_rx_vx.xx.xml",
+            "r_flash_rx_vx.xx/r_config/r_flash_rx_config.h",
+            "r_flash_rx_vx.xx/r_flash_rx/r_flash_rx_if.h")),
     "Test/Unity": ("22777c4810de3e3a4cb521a05eca2752fccd00ea", (
         "src/unity.h", "src/unity.c", "extras/fixture/src/unity_fixture.h",
         "extras/fixture/src/unity_fixture.c", "extras/memory/src/unity_memory.c")),
@@ -26,7 +31,7 @@ REQUIRED = {
 
 
 class IdtUnitDependencyTests(unittest.TestCase):
-    def test_ci_initializes_only_the_seven_root_dependencies_before_source_only_tests(self):
+    def test_ci_initializes_only_the_eight_root_dependencies_before_source_only_tests(self):
         text = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
         job = text[text.index("idt_ci_contract:\n"):text.index(".rx_idt_job:\n")]
         self.assertRegex(job, r"(?m)^  stage: dependency_check$")

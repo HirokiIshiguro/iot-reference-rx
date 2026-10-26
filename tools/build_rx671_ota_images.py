@@ -73,6 +73,7 @@ FORMAL_INPUT_SUBMODULES = (
     Path("Middleware/3rdparty/tinycbor"),
     Path("Middleware/3rdparty/tinycrypt"),
     Path("Middleware/Renesas/rx-driver-package"),
+    Path("Middleware/Renesas/r_flash_rx"),
     Path("Middleware/Renesas/rm_littlefs_rx"),
     Path("Middleware/Renesas/rm_rtos_abstraction_rx"),
     Path("Middleware/Renesas/r_sdio_rx"),

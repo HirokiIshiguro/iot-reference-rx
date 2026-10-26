@@ -45,6 +45,12 @@ dependencies:
       type: "git"
       url: "https://github.com/FreeRTOS/coreSNTP.git"
       path: "/Middleware/FreeRTOS/coreSNTP"
+  - name: "r_flash_rx (FCU nested interrupt fork)"
+    version: "5.31.saffti-custom.1"
+    repository:
+      type: "git"
+      url: "https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_flash_rx/r_flash_rx.git"
+      path: "/Middleware/Renesas/r_flash_rx"
   - name: "r_cellular (BG96 fork)"
     version: "1.13.saffti-custom.4"
     repository:

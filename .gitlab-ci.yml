@@ -629,13 +629,14 @@ idt_ci_contract:
     - hw-sakura-vps
     - cap-internet
   variables:
-    # Host tests read the original Kernel/CLI/Unity/SDK and three boot chip headers.
-    # Keep this source-only job on the exact seven root gitlinks, without recursion.
+    # Host tests read the original Kernel/CLI/Unity/SDK/Flash and three boot chip headers.
+    # Keep this source-only job on the exact eight root gitlinks, without recursion.
     GIT_SUBMODULE_STRATEGY: normal
     GIT_SUBMODULE_DEPTH: "1"
     GIT_SUBMODULE_PATHS: >-
       Middleware/FreeRTOS/FreeRTOS-Kernel
       Middleware/FreeRTOS-Plus-CLI
+      Middleware/Renesas/r_flash_rx
       Test/Unity
       Test/FreeRTOS-Libraries-Integration-Tests
       Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader
