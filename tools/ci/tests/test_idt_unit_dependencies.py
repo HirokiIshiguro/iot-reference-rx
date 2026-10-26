@@ -15,7 +15,7 @@ REQUIRED = {
             "FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI/FreeRTOS_CLI.c",
             "FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI/FreeRTOS_CLI.h")),
     "Middleware/Renesas/r_flash_rx": (
-        "cdadb4ddb6e250f3a7dde29446873e6b33f8625e", (
+        "5304d35e22002d0b0b0d24ae7773c64788ede5b3", (
             "Makefile", "r_flash_rx_vx.xx_extend.mdf", "r_flash_rx_vx.xx.xml",
             "r_flash_rx_vx.xx/r_config/r_flash_rx_config.h",
             "r_flash_rx_vx.xx/r_flash_rx/r_flash_rx_if.h")),
