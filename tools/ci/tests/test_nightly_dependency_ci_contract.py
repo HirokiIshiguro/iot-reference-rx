@@ -302,6 +302,20 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
             self.assertIn('$PIPELINE_PROFILE == "mr-idt-targets"', blocks[name])
         self.assertEqual("false", selected["RUN_RX671_BOOTLOADER_BUILD"])
 
+    def test_owned_cloud_cleanup_failures_are_required_without_removing_always_rules(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        for name in ("cleanup_lanbench_tls13_0rtt_server", "cleanup_rx72n_ether_fleet",
+                     "cleanup_rx65n_bg96_fleet"):
+            with self.subTest(job=name):
+                self.assertIn("  allow_failure: false", blocks[name])
+                self.assertNotIn("allow_failure: true", blocks[name])
+        for name in ("cleanup_lanbench_tls13_0rtt_server", "cleanup_rx72n_ether_fleet",
+                     ".rx65n_bg96_fleet_cleanup_rules"):
+            with self.subTest(rules=name):
+                rules = blocks[name].split("  script:", maxsplit=1)[0]
+                self.assertIn("when: always", rules)
+        self.assertIn(".rx65n_bg96_fleet_cleanup_rules", blocks["cleanup_rx65n_bg96_fleet"])
+
 
     def test_policy_covers_kernel_and_every_used_aws_library(self) -> None:
         rx671_dependencies = {

@@ -3611,7 +3611,7 @@ cleanup_lanbench_tls13_0rtt_server:
   stage: credential_cleanup
   extends: .aws_cli_windows_job
   resource_group: lanbench-tls13-0rtt-ec2
-  allow_failure: true
+  allow_failure: false
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && ($RX65N_BG96_TLS_BACKEND == "software" || $RX65N_BG96_TLS_BACKEND == "tsip") && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
       when: always
@@ -5445,7 +5445,7 @@ debug_rx72n_ether_fleet_current_app:
 
 cleanup_rx72n_ether_fleet:
   stage: fleet_cleanup
-  allow_failure: true
+  allow_failure: false
   extends: .aws_cli_windows_job
   dependencies:
     - test_rx72n_ether_fleet
@@ -5580,7 +5580,7 @@ test_rx65n_bg96_fleet:
 
 cleanup_rx65n_bg96_fleet:
   stage: fleet_cleanup
-  allow_failure: true
+  allow_failure: false
   dependencies:
     - test_rx65n_bg96_fleet
   extends:
