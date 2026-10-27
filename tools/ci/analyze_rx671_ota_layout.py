@@ -1426,7 +1426,7 @@ def analyze(
     mcu_info = rdp_source / "r_bsp/r_bsp_vx.xx/r_bsp/mcu/rx671/mcu_info.h"
     resource_source = project_dir / "src/whd_port/whd_port_resource.c"
     sdio_host = project_dir / "src/sdio_host.c"
-    flash_target = rdp_source / "r_flash_rx/r_flash_rx_vx.xx/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
+    flash_target = repo_root / "Middleware/Renesas/r_flash_rx/r_flash_rx_vx.xx/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
     layout_contract = project_dir / LAYOUT_CONTRACT_NAME
     bootloader_config = (
         repo_root

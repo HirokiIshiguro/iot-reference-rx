@@ -83,7 +83,7 @@
 		<link>
 			<name>Vendor/r_flash_rx</name>
 			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_flash_rx/r_flash_rx_vx.xx/r_flash_rx</locationURI>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/r_flash_rx/r_flash_rx_vx.xx/r_flash_rx</locationURI>
 		</link>
 		<link>
 			<name>Vendor/r_irq_rx</name>

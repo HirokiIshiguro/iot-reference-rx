@@ -450,6 +450,25 @@ workflow:
         RX671_WIFI_SKIP_HW_TESTS: "true"
         RUN_RX671_BOOTLOADER_BUILD: "false"
       when: always
+    # A shared Flash driver pin needs all three board lanes.
+    # Keep this after the dependency-only gate and before RX671-only changes.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - Middleware/Renesas/r_flash_rx
+      variables:
+        PIPELINE_PROFILE: "mr-shared-flash"
+        RUN_RX65N_BG96_BUILD: "true"
+        RX65N_BG96_TEST_SCOPE: "mqtt"
+        RX65N_BG96_SKIP_HW_TESTS: "false"
+        RUN_RX72N_BUILD: "true"
+        RX72N_TEST_SCOPE: "mqtt"
+        RX72N_SKIP_HW_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "true"
+        RX671_WIFI_TEST_SCOPE: "mqtt"
+        RX671_WIFI_SKIP_HW_TESTS: "false"
+        RUN_RX671_BOOTLOADER_BUILD: "true"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "true"
+      when: always
     # Shared RX671 application/build inputs affect both the normal network image
     # and the signed OTA images. GitLab workflow rules are first-match, so keep a
     # combined lane ahead of both narrower rules instead of letting either
@@ -629,13 +648,14 @@ idt_ci_contract:
     - hw-sakura-vps
     - cap-internet
   variables:
-    # Host tests read the original Kernel/CLI/Unity/SDK and three boot chip headers.
-    # Keep this source-only job on the exact seven root gitlinks, without recursion.
+    # Host tests read the original Kernel/CLI/Unity/SDK/Flash and three boot chip headers.
+    # Keep this source-only job on the exact eight root gitlinks, without recursion.
     GIT_SUBMODULE_STRATEGY: normal
     GIT_SUBMODULE_DEPTH: "1"
     GIT_SUBMODULE_PATHS: >-
       Middleware/FreeRTOS/FreeRTOS-Kernel
       Middleware/FreeRTOS-Plus-CLI
+      Middleware/Renesas/r_flash_rx
       Test/Unity
       Test/FreeRTOS-Libraries-Integration-Tests
       Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader
@@ -1012,6 +1032,7 @@ rx671_ota_ci_contract:
         - tools/ci/tests/test_manage_rx671_ota_event_policy.py
         - tools/ci/tests/test_plan_rx671_ota.py
         - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
+        - tools/ci/tests/test_shared_flash_mr_workflow.py
         - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
         - tools/ci/tests/test_rx671_ota_host_tools.py
         - tools/ci/tests/test_rx671_ota_runtime_profile_contract.py
@@ -1026,6 +1047,7 @@ rx671_ota_ci_contract:
       tools.ci.tests.test_manage_ephemeral_iot_thing
       tools.ci.tests.test_manage_rx671_ota_event_policy
       tools.ci.tests.test_rx671_ota_artifact_ci_contract
+      tools.ci.tests.test_shared_flash_mr_workflow
       tools.ci.tests.test_rx671_ota_hardware_ci_contract
       tools.ci.tests.test_rx671_ota_host_tools
       tools.ci.tests.test_rx671_ota_runtime_profile_contract
@@ -4162,7 +4184,7 @@ cleanup_rx72n_ether_ota_jobs:
       when: on_success
     - when: never
   script:
-    - Write-Host "=== Cleanup stale RX72N OTA IoT Jobs ==="
+    - Write-Host "=== Require no active RX72N OTA IoT Jobs (read-only) ==="
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -4176,6 +4198,7 @@ cleanup_rx72n_ether_ota_jobs:
         --thing-name "$env:RX72N_DEVICE_ID" `
         --region "$env:AWS_DEFAULT_REGION" `
         --job-id-prefix "AFR_OTA-" `
+        --check-empty `
         --output-json "$artifactDir\cleanup_summary.json" `
         2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_ota_jobs.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -189,6 +189,19 @@ class DependencyProvenanceTests(unittest.TestCase):
                 expected[path.relative_to(self.source).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(expected, provenance["dependency_files_sha256"])
 
+    def test_flash_leaf_is_required_for_all_targets_and_copied_bytes_are_verified(self):
+        flash = "Middleware/Renesas/r_flash_rx"
+        for target in manifest.BOOT:
+            self.assertIn(flash, manifest.dependency_paths(target))
+        destination, provenance = self.snapshot()
+        self.assertEqual(self.pins[flash], provenance["submodule_shas"][flash])
+        source = destination / flash / "source.c"
+        changed = source.read_bytes() + b"unexpected Flash driver change\n"
+        source.write_bytes(changed)
+        with self.assertRaisesRegex(ValueError, "differs from captured source"):
+            manifest.verify_dependency_provenance(destination, self.target, provenance)
+        self.assertEqual(changed, source.read_bytes())
+
     def test_all_targets_verify_after_copy_without_git(self):
         for target in manifest.BOOT:
             with self.subTest(target=target):

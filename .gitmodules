@@ -138,3 +138,6 @@
 [submodule "Middleware/Renesas/r_cellular"]
 	path = Middleware/Renesas/r_cellular
 	url = https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular.git
+[submodule "Middleware/Renesas/r_flash_rx"]
+	path = Middleware/Renesas/r_flash_rx
+	url = https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_flash_rx/r_flash_rx.git

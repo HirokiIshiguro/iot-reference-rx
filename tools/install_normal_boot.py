@@ -108,8 +108,9 @@ def download_command(root, target):
         "180" if target["id"] == "rx65n-bg96" else "90", "--ready-message", 'send "userprog.rsu" via UART.',
         "--reset-cmd", shlex.join([*rfp_command(target), "-sig", "-run", "-noquery"]),
         "--success-message", "jump to user program", "--success-timeout", "90", "--strict-success"]
-    # Each bootloader commits a 32 KiB block before reporting its write ACK.
-    if target["id"] in ("rx72n-ethernet", "rx65n-bg96", "rx671-wifi"):
+    # Keep 32 KiB write-ACK pacing on RX65N/RX671. RX72N streams without
+    # receiver ACK waits to validate the guarded Flash interrupt nesting.
+    if target["id"] in ("rx65n-bg96", "rx671-wifi"):
         command += ["--ack-each-chunk", "--send-chunk-size", "32768", "--ack-prefix", "installing firmware..."]
     return command
 
