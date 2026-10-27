@@ -1,3 +1,4 @@
+#requires -Version 7.0
 param(
     [string] $Region = "ap-northeast-1",
     [string] $InstanceName = "iot-reference-rx-lanbench-tls13-0rtt",

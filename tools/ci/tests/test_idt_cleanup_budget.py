@@ -75,16 +75,16 @@ class CleanupBudgetTests(unittest.TestCase):
             host = {"wsl_distribution": "unit-test", "wsl_python": "python3"}
             with patch.dict(run_idt.HOST, host), patch.object(run_idt, "wsl_path", side_effect=str), \
                     patch.object(run_idt.subprocess, "run", return_value=Mock(returncode=0, stdout='{"signaled": 1}')):
-                tail = run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
-                process.communicate.assert_called_once_with(timeout=run_idt.NATIVE_STATUS_SECONDS)
-                self.assertEqual(b"cleanup complete\n", tail)
+                drain = Mock()
+                with patch.object(run_idt.time, "monotonic", return_value=0):
+                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials, drain=drain)
+                drain.assert_called_once_with(budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS))
+                process.communicate.assert_not_called()
                 self.assertFalse((runtime / "console.log").exists())
-                process.communicate.side_effect = subprocess.TimeoutExpired("mock WSL", 1)
-                full_budget = budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS)
-                with patch.object(run_idt.time, "monotonic", side_effect=[0, 0, full_budget + 1]), \
-                        contextlib.redirect_stdout(io.StringIO()), \
+                drain.side_effect = RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse")
+                with contextlib.redirect_stdout(io.StringIO()), \
                         self.assertRaisesRegex(RuntimeError, "inspect the private runtime"):
-                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
+                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials, drain=drain)
             process.kill.assert_not_called()
             process.terminate.assert_not_called()
 

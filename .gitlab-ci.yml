@@ -1896,8 +1896,10 @@ build_rx65n_bg96:
   script:
     - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
-    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_normal_boot_jobs tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_idt_bg96_network tools.ci.tests.test_lanbench_ec2_owned_cleanup
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_normal_boot_jobs tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_idt_bg96_network
     - if ($LASTEXITCODE -ne 0) { throw 'RX65N BG96 host regression tests failed.' }
+    - python -m tools.ci.tests.test_lanbench_ec2_owned_cleanup
+    - if ($LASTEXITCODE -ne 0) { throw 'Owned EC2 regression tests must execute without skips on Windows CI.' }
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"

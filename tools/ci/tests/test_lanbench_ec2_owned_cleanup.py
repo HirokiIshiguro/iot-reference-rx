@@ -105,7 +105,7 @@ if ($body -is [string]) { Write-Output $body } else { $body | ConvertTo-Json -De
 class LanbenchOwnedCleanupTests(unittest.TestCase):
     def setUp(self):
         # Keep all new fixture files inside the authorized workspace.
-        base = Path("C:/ai/codex/tmp") if os.name == "nt" else Path(tempfile.gettempdir())
+        base = Path(os.environ.get("CI_PROJECT_DIR", ROOT))
         self.temp = tempfile.TemporaryDirectory(prefix="lanbench-owned-", dir=base)
         self.addCleanup(self.temp.cleanup)
         self.folder = Path(self.temp.name)
@@ -345,4 +345,11 @@ class LanbenchOwnedCleanupTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    program = unittest.main(exit=False)
+    result = program.result
+    critical_windows_ci = os.environ.get("CI") == "true" and os.name == "nt"
+    print(json.dumps({"suite": "lanbench_ec2_owned_cleanup", "tests_run": result.testsRun,
+                      "skipped": len(result.skipped), "successful": result.wasSuccessful(),
+                      "critical_windows_ci": critical_windows_ci}))
+    raise SystemExit(0 if result.wasSuccessful() and
+                     (not critical_windows_ci or (result.testsRun > 0 and not result.skipped)) else 1)

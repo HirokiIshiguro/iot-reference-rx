@@ -43,6 +43,17 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
             )
         )
 
+    def test_failed_peer_prepare_publishes_journal_to_required_cleanup(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        prepare = blocks["prepare_lanbench_tls13_0rtt_server"]
+        cleanup = blocks["cleanup_lanbench_tls13_0rtt_server"]
+        self.assertRegex(prepare, r"(?m)^  artifacts:\n    when: always\n")
+        self.assertIn("- artifacts/prepare_lanbench_tls13_0rtt_server/", prepare)
+        self.assertRegex(cleanup, r"(?m)^  dependencies:\n    - prepare_lanbench_tls13_0rtt_server\n")
+        self.assertIn("when: always", cleanup)
+        self.assertIn("allow_failure: false", cleanup)
+        self.assertNotRegex(blocks[".rx_idt_job"], r"(?m)^  needs:")
+
     def test_dependency_gate_mr_is_contract_only_and_hardware_free(self) -> None:
         workflow = self.ci.split(
             "\nnightly_dependency_contract:\n",
