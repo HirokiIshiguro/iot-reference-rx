@@ -76,6 +76,8 @@ variables:
   # Bring-up scopes are partial results, not a release qualification PASS.
   RX72N_IDT_SCOPE: "preflight"
   NIGHTLY_MATRIX_INCLUDE_STABILIZING: "false"
+  # Forward only into nightly RX72N MQTT rows; focused defaults stay opt-in.
+  NIGHTLY_RX72N_MULTI_TLS_TEST: "true"
   RUN_RX65N_BG96_BUILD: "true"
   # RX65N_BG96_TEST_SCOPE:
   #   build - build/package only, no hardware test.
@@ -723,6 +725,8 @@ idt_ci_contract:
         tools.ci.tests.test_idt_public_signer_integration \
         tools.ci.tests.test_tls_metadata_preserves_signing_trust \
         tools.ci.tests.test_idt_ci_contract \
+        tools.ci.tests.test_idt_process_output \
+        tools.ci.tests.test_nightly_dependency_ci_contract \
         tools.ci.tests.test_idt_windows_checkout \
         tools.ci.tests.test_prepare_public_signer \
         tools.ci.tests.test_build_public_signer_provisioner \
@@ -847,6 +851,27 @@ idt_ci_contract:
     reports:
       junit: artifacts/idt/FRQ_Report.xml
     expire_in: 30 days
+
+# Native transport regression runs after all nightly bridge rows. Job-local
+# selectors do not enable the explicit IDT workflow or any other native scope.
+matrix_rx_idt_transport:
+  extends:
+    - .rx_idt_job
+    - .rx_windows_canonical_checkout
+  parallel:
+    matrix:
+      - IDT_TARGET:
+          - rx72n-ethernet
+          - rx65n-bg96
+          - rx671-wifi
+  variables:
+    RUN_RX_IDT: "true"
+    IDT_SCOPE: "transport"
+  allow_failure: false
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: on_success
+    - when: never
 
 test_rx72n_idt:
   extends: .rx_idt_job
@@ -1423,6 +1448,7 @@ matrix_rx671_wifi_tsip_tls13_resumption_0rtt:
 matrix_rx72n_ether_software_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "software"
 
@@ -1441,6 +1467,7 @@ matrix_rx72n_ether_software_fleet:
 matrix_rx72n_ether_software_tls13_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "software"
     RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
@@ -1465,6 +1492,7 @@ matrix_rx72n_ether_software_tls13_fleet:
 matrix_rx72n_ether_tsip_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "tsip"
 
@@ -1484,6 +1512,7 @@ matrix_rx72n_ether_tsip_fleet:
 matrix_rx72n_ether_tsip_tls13_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "tsip"
     RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"

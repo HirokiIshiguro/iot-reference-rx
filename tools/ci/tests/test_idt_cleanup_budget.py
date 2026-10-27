@@ -71,16 +71,19 @@ class CleanupBudgetTests(unittest.TestCase):
             runtime = Path(directory)
             process = Mock()
             process.poll.return_value = None
-            process.communicate.return_value = ("cleanup complete\n", None)
+            process.communicate.return_value = (b"cleanup complete\n", None)
             host = {"wsl_distribution": "unit-test", "wsl_python": "python3"}
             with patch.dict(run_idt.HOST, host), patch.object(run_idt, "wsl_path", side_effect=str), \
                     patch.object(run_idt.subprocess, "run", return_value=Mock(returncode=0, stdout='{"signaled": 1}')):
-                run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
-                process.communicate.assert_called_once_with(
-                    timeout=budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS))
-                self.assertEqual("cleanup complete\n", (runtime / "console.log").read_text())
+                tail = run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
+                process.communicate.assert_called_once_with(timeout=run_idt.NATIVE_STATUS_SECONDS)
+                self.assertEqual(b"cleanup complete\n", tail)
+                self.assertFalse((runtime / "console.log").exists())
                 process.communicate.side_effect = subprocess.TimeoutExpired("mock WSL", 1)
-                with self.assertRaisesRegex(RuntimeError, "inspect the private runtime"):
+                full_budget = budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS)
+                with patch.object(run_idt.time, "monotonic", side_effect=[0, 0, full_budget + 1]), \
+                        contextlib.redirect_stdout(io.StringIO()), \
+                        self.assertRaisesRegex(RuntimeError, "inspect the private runtime"):
                     run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
             process.kill.assert_not_called()
             process.terminate.assert_not_called()

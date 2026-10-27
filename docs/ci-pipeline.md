@@ -23,8 +23,8 @@ job定義の正本は[`.gitlab-ci.yml`](../.gitlab-ci.yml)、接続構成とツ�
 | `main` | default branch push | RX72N / RX65N MQTTとRX671 network smoke |
 | `release` | tag | RX72N / RX65N software TLS regressionとRX671 network smoke |
 | `focused` | manual / API | 指定したターゲット・機能だけを実行 |
-| `idt` | web / APIで明示指定 | RX72NのIDT版照合、または開発用TLS通信試験 |
-| `nightly_matrix` | schedule | 複数projectを含む重い回帰matrix |
+| `idt` | web / APIで明示指定 | 選択した1ターゲットのnative IDT |
+| `nightly_matrix` | schedule / web / API | 50回帰rowと3ターゲットのIDT TLS transport |
 
 ## Focused pipelineの主な変数
 
@@ -44,7 +44,9 @@ Fleetも3環境とも試験job内で署名付きの専用appを一括導入し�
 
 RX671 Fleetの時間上限は全体3時間、主処理140分、`after_script`の復元30分です。復元時のbench lock待ちは60秒で打ち切り、一括導入の共通時間予算を別に確保します。[GitLabの時間上限設定](https://docs.gitlab.com/ci/runners/configure_runners/#set-script-and-after_script-timeouts)に従い、主処理と復元の合計をjob全体の上限より短くしています。
 
-IDTは通常の`full`やnightlyには含めません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt-validation.md)を参照してください。
+通常の`full`はIDTを含みません。nightlyは50回帰rowの完了後に、3ターゲットの`IDT_SCOPE=transport`を実行します。既存のCC-RX resource groupと実機lockで直列化し、各native結果と終了状態を判定します。これは全IDT認定ではありません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt-validation.md)を参照してください。
+
+nightlyのRX72N MQTT 4構成では、`NIGHTLY_RX72N_MULTI_TLS_TEST=true`（既定）を子pipelineへ渡し、通常MQTTの後に複数TLS接続を検証します。`false`で狙った実験から除外できますが、完全回帰の合格には含めません。focusedの`RUN_RX72N_MULTI_TLS_TEST`は従来どおり既定`false`です。
 
 共通基盤MRのbuild-only profileでは、RX72Nの通常software appに加え、通常TSIP appも専用jobでビルドします。TSIP側のdescriptor・buffer変更後のリンク容量を確認するため、MAPもartifactへ保存します。実機scopeは追加しません。
 
@@ -76,6 +78,11 @@ RX65Nの通常appにある、CLI成功後のリンカ設定調整と明示make�
 | 変数 | `PIPELINE_PROFILE=nightly_matrix` / `NIGHTLY_MATRIX_INCLUDE_STABILIZING=true` |
 
 Schedule再開、変数変更、追加playはMaintainer / Ownerの承認後に行います。
+今回承認された単発検証でも定期実行はInactiveを維持します。成功判定は必要な50回帰rowと3つのIDT transportの実jobを確認し、未生成・未実行・skipを合格へ数えません。build・cleanupなどの補助jobは別に確認します。
+
+全50行を実行するには`NIGHTLY_MATRIX_INCLUDE_STABILIZING=true`が必要です。親bridgeのsuccessだけでなく、各子pipelineに必要な実機jobが生成され、実行SHAと成功が一致することを確認します。IDTは各ターゲットで必須14ケースすべての成功、複数TLS接続は上記4構成で実行件数が0件ではないことを確認します。
+
+タグ・リリースは、対象main SHAの全必須jobと所有AWS資源の後始末が成功し、各実機の通常FWへの復帰と、その後のreset／UART静止を別々に確認した後に行います。未実行・skip・manual・cancel・許容された失敗を合格に数えません。リリースには子projectのSHAと`IDT_SCOPE=transport`／`qualification=not-established`を記載し、全IDT認定と区別します。タグ時の既存release profileも維持します。
 
 ## 代表証跡
 

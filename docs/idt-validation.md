@@ -31,6 +31,14 @@ Wi-Fi / APNは既存のターゲット専用CI変数からprivate runtimeへ渡�
 共通基盤のcoreMQTTは3ターゲットとも5.0.2（MQTT 5）へ統一しています。suiteのMQTT 3.1.1期待値との不一致はNGとして保持します。以前のRX65N/BG96の2.3.1による結果を新基盤のnative合格へ流用しません。
 失敗・ERROR・SKIPをPASSへ書き換えず、LTS / manifest / vendor suiteを変更しません。
 
+### nightlyのTLS transport
+
+`PIPELINE_PROFILE=nightly_matrix`では、既存50回帰rowの完了後に`matrix_rx_idt_transport`が上記3ターゲットの`transport`を実行します。job内の選択値だけを設定し、専用IDT workflowや他scopeは有効にしません。Windowsのcanonical checkout・CC-RX resource group・既存実機lockと終了処理を共有します。通常push / MR / focusedではこのmatrixを生成しません。
+
+この3実行は`FullTransportInterfaceTLS`の回帰です。版照合、MQTT、PKCS #11、OTAを含む全IDT認定を意味せず、OTAのGreaterVersion / SameVersion / UntrustedCertificateは各ターゲットで別に検証します。今回のリリース判定でも必要な実jobと終了状態を対象main SHAに対応付け、未実行・skipや過去SHAの結果を合格の代わりにしません。
+
+既存report checkerは必須14ケースの名前と全件成功を確認し、0件・欠落・failure／error／skip・宣言件数の不整合を拒否します。nativeの終了処理とreportの成功の両方が必要です。reset／UART静止は通常FWへの復帰を証明しないため、復帰の証跡は別に確認します。
+
 MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検査、`idt_target_plans`は3ターゲットの計画を保存します。
 `idt_source_matrix`はWindows runnerで、Transport、DeviceAdvisor、OTAE2E、PKCS11 StartFinish、PKCS11 NoObject、OTAPALの6構成×3ターゲット＝18構成について、実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
 過去のローカル15構成compile成功は保存されたsourceに対する結果として保持し、このMRのclean SHA・runner・実機の合格へ流用しません。
@@ -146,7 +154,7 @@ OTA setupでは`KeyProvisioning=Import`、ECC公開鍵を設定しても、対�
 GitLabのRun pipelineまたはPipelines APIで、`RUN_RX72N_IDT=true`と上表の`RX72N_IDT_SCOPE`を指定します。
 `RUN_RX72N_IDT`の既定は`false`です。
 IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指定しません。
-通常のpush、MR、main更新、schedule、tag作成ではIDT jobを生成しません。
+通常のpush、MR、main更新、tag作成ではnative IDT jobを生成しません。nightlyは上記の3ターゲットTLS transportだけを追加します。
 
 <details>
 <summary>OTAケースの選択と起動版の確認</summary>

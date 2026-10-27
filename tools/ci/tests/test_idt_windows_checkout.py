@@ -16,6 +16,7 @@ WINDOWS_BUILD_JOBS = {
     "build_rx671_wifi",
     "build_rx671_wifi_fleet",
     "test_rx671_wifi_idt",
+    "matrix_rx_idt_transport",
     "package_rx671_ota_artifacts",
 }
 
@@ -83,7 +84,7 @@ class IdtWindowsCheckoutTests(unittest.TestCase):
     def test_existing_native_fleet_and_matrix_settings_survive_inheritance(self):
         self.assertIn(".rx_idt_job", parents(self.blocks["test_rx671_wifi_idt"]))
         self.assertIn(".rx671_wifi_fleet_rules", parents(self.blocks["build_rx671_wifi_fleet"]))
-        for name in ("idt_source_matrix", "test_rx671_wifi_idt"):
+        for name in ("idt_source_matrix", "test_rx671_wifi_idt", "matrix_rx_idt_transport"):
             with self.subTest(job=name):
                 variables = self.variables(name)
                 self.assertEqual(variables["GIT_SUBMODULE_STRATEGY"], "normal")
