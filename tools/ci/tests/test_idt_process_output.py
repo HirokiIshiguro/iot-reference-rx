@@ -149,14 +149,91 @@ class IdtProcessOutputTests(unittest.TestCase):
         process.kill.assert_not_called()
         process.terminate.assert_not_called()
 
-    def test_exited_parent_with_unclosed_output_is_not_a_success(self):
+    def test_exited_parent_with_unclosed_output_uses_owned_cleanup_and_stays_failed(self):
         process = Mock()
         process.poll.return_value = 0
+        process.stdout = SimpleNamespace(closed=False)
         process.communicate.side_effect = subprocess.TimeoutExpired("fixture", 3, output=b"tail")
-        with patch.object(run_idt, "stop_hardware_runtime") as cleanup:
+        console = io.StringIO()
+        runtime, environment = Path("fixture-runtime"), {"fixture": "environment"}
+        with patch.object(run_idt, "stop_hardware_runtime", return_value=b"tail after cleanup") as cleanup:
             with self.assertRaisesRegex(RuntimeError, "without closing its output pipe"):
+                run_idt.observe_hardware_runtime(process, runtime, environment, CREDENTIALS, console)
+        cleanup.assert_called_once_with(process, runtime, environment, CREDENTIALS)
+        self.assertEqual("tail after cleanup", console.getvalue())
+        process.kill.assert_not_called()
+        process.terminate.assert_not_called()
+
+    def test_exited_launcher_cleanup_failure_retains_signers(self):
+        from tools.idt import ota_aws_signers
+        process = Mock()
+        process.poll.return_value = 0
+        process.stdout = SimpleNamespace(closed=False)
+        process.communicate.side_effect = subprocess.TimeoutExpired("fixture", 3)
+        with patch.object(run_idt, "stop_hardware_runtime", side_effect=RuntimeError("owned cleanup failed")) as cleanup:
+            with self.assertRaisesRegex(RuntimeError, "owned cleanup failed"):
                 run_idt.observe_hardware_runtime(process, Path("fixture-runtime"), {}, CREDENTIALS, io.StringIO())
-        cleanup.assert_not_called()
+        cleanup.assert_called_once()
+        with patch.object(ota_aws_signers, "cleanup_aws_signers") as delete_signers:
+            result = run_idt.cleanup_signers_after_runtime(process, Path("fixture-inputs"), object())
+        self.assertEqual("cleanup_failed", result["state"])
+        delete_signers.assert_not_called()
+        process.kill.assert_not_called()
+        process.terminate.assert_not_called()
+
+    def test_real_grandchild_pipe_is_drained_after_owned_cleanup_but_is_not_success(self):
+        public, private = io.StringIO(), io.StringIO()
+        with tempfile.TemporaryDirectory() as folder:
+            runtime = Path(folder)
+            release = runtime / "release-fixture-child"
+            ready = runtime / "fixture-child-ready"
+            child_source = (
+                "from pathlib import Path; import os,sys,time\n"
+                "release,ready=map(Path,sys.argv[1:]);ready.write_text(str(os.getpid()))\n"
+                "deadline=time.monotonic()+5\n"
+                "while not release.exists() and time.monotonic()<deadline:time.sleep(.01)\n"
+                "os.write(1,b'fixture child drained\\n')\n"
+            )
+            launcher_source = (
+                "import os,subprocess,sys\n"
+                "subprocess.Popen([sys.executable,'-u','-c',sys.argv[1],*sys.argv[2:]],"
+                "stdout=sys.stdout,stderr=sys.stderr)\nos._exit(0)\n"
+            )
+            process = subprocess.Popen(
+                [sys.executable, "-u", "-c", launcher_source, child_source, str(release), str(ready)],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            try:
+                # Establish the exact reproduction: launcher exited, one known
+                # fixture descendant still owns the inherited stdout handle.
+                process.wait(timeout=5)
+                deadline = time.monotonic() + 3
+                while not ready.is_file() and time.monotonic() < deadline:
+                    time.sleep(.01)
+                self.assertTrue(ready.is_file(), "Fixture descendant did not start")
+                fixture_child_pid = int(ready.read_text())
+                self.assertGreater(fixture_child_pid, 0)
+
+                def finish_owned_fixture(selected, selected_runtime, environment, credentials):
+                    self.assertIs(process, selected)
+                    self.assertEqual(runtime, selected_runtime)
+                    # Cooperative exit affects this unique fixture directory
+                    # only; no PID enumeration, WSL or OS signaling is used.
+                    release.touch()
+                    output, _ = process.communicate(timeout=3)
+                    return output
+
+                with patch.object(run_idt, "NATIVE_STATUS_SECONDS", .04), \
+                        patch.object(run_idt, "stop_hardware_runtime", side_effect=finish_owned_fixture) as cleanup:
+                    with redirect_stdout(public), self.assertRaisesRegex(RuntimeError, "without closing its output pipe"):
+                        run_idt.observe_hardware_runtime(process, runtime, {}, CREDENTIALS, private)
+                cleanup.assert_called_once_with(process, runtime, {}, CREDENTIALS)
+                self.assertEqual(0, process.returncode)
+                self.assertTrue(process.stdout.closed)
+                self.assertEqual("fixture child drained\n", private.getvalue())
+                self.assertNotIn("fixture child drained", public.getvalue())
+            finally:
+                release.touch()
+                process.communicate(timeout=6)
 
     def test_owned_cleanup_wait_emits_status_without_killing_wsl(self):
         process = Mock()
@@ -176,6 +253,25 @@ class IdtProcessOutputTests(unittest.TestCase):
         self.assertEqual(b"cleanup tail", tail)
         self.assertEqual("IDT phase: owned runtime cleanup active\n", public.getvalue())
         self.assertEqual(2, process.communicate.call_count)
+        process.kill.assert_not_called()
+        process.terminate.assert_not_called()
+
+    def test_owned_stop_signals_linux_selector_even_when_launcher_already_exited(self):
+        process = Mock()
+        process.poll.return_value = 0
+        process.stdout = SimpleNamespace(closed=False)
+        process.communicate.return_value = (b"drained after owned stop", None)
+        runtime, environment = Path("fixture-runtime"), {"fixture": "environment"}
+        with patch.object(run_idt, "HOST", {"wsl_distribution": "fixture-distro", "wsl_python": "fixture-python"}), \
+                patch.object(run_idt, "wsl_path", side_effect=lambda path: str(path)), \
+                patch.object(run_idt.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout='{"signaled": 1}')) as signal_owned:
+            output = run_idt.stop_hardware_runtime(process, runtime, environment, CREDENTIALS)
+        signal_owned.assert_called_once()
+        command = signal_owned.call_args.args[0]
+        self.assertIn(str(runtime / "execution"), command)
+        self.assertIn(str(run_idt.SOURCE), command)
+        self.assertEqual(environment, signal_owned.call_args.kwargs["env"])
+        self.assertEqual(b"drained after owned stop", output)
         process.kill.assert_not_called()
         process.terminate.assert_not_called()
 

@@ -315,6 +315,8 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
                 rules = blocks[name].split("  script:", maxsplit=1)[0]
                 self.assertIn("when: always", rules)
         self.assertIn(".rx65n_bg96_fleet_cleanup_rules", blocks["cleanup_rx65n_bg96_fleet"])
+        for name in ("idt_ci_contract", "build_rx65n_bg96"):
+            self.assertIn("tools.ci.tests.test_lanbench_ec2_owned_cleanup", blocks[name])
 
 
     def test_policy_covers_kernel_and_every_used_aws_library(self) -> None:

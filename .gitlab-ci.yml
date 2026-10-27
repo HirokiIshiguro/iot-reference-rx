@@ -667,6 +667,12 @@ idt_ci_contract:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - .gitlab-ci.yml
+        - tools/aws/create_lanbench_tls13_0rtt_ec2.ps1
+        - tools/aws/terminate_lanbench_tls13_0rtt_ec2.ps1
+        - tools/aws/lanbench_ec2_ownership.ps1
+        - tools/ci/tests/test_lanbench_ec2_owned_cleanup.py
+        - tools/normal_boot.py
+        - tools/ci/tests/test_normal_boot_benchmark_provenance.py
         - tools/idt/**/*
         - tools/ci/tests/test_idt_report.py
         - tools/ci/tests/test_idt_host_profile.py
@@ -727,6 +733,8 @@ idt_ci_contract:
         tools.ci.tests.test_idt_ci_contract \
         tools.ci.tests.test_idt_process_output \
         tools.ci.tests.test_nightly_dependency_ci_contract \
+        tools.ci.tests.test_lanbench_ec2_owned_cleanup \
+        tools.ci.tests.test_normal_boot_benchmark_provenance \
         tools.ci.tests.test_idt_windows_checkout \
         tools.ci.tests.test_prepare_public_signer \
         tools.ci.tests.test_build_public_signer_provisioner \
@@ -1847,6 +1855,7 @@ prepare_lanbench_tls13_0rtt_server:
   script:
     - Write-Host "=== Prepare public LANBENCH TLS 1.3 0-RTT server ==="
     - |
+      $ErrorActionPreference = 'Stop'
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       & "$env:CI_PROJECT_DIR\tools\aws\create_lanbench_tls13_0rtt_ec2.ps1" `
@@ -1855,6 +1864,7 @@ prepare_lanbench_tls13_0rtt_server:
         -InstanceType "$env:LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_TYPE" `
         -SecurityGroupName "$env:LANBENCH_MBEDTLS_0RTT_EC2_SECURITY_GROUP_NAME" `
         -Port ([int]$env:LANBENCH_MBEDTLS_0RTT_PORT) `
+        -ProjectId "$env:CI_PROJECT_ID" -PipelineId "$env:CI_PIPELINE_ID" -JobId "$env:CI_JOB_ID" `
         -OutputJson "$artifactDir\lanbench_tls13_0rtt_ec2.json" `
         -OutputEnv "$artifactDir\lanbench_tls13_0rtt.env"
   artifacts:
@@ -1886,7 +1896,7 @@ build_rx65n_bg96:
   script:
     - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
-    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_normal_boot_jobs tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_idt_bg96_network
+    - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_normal_boot_jobs tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_idt_bg96_network tools.ci.tests.test_lanbench_ec2_owned_cleanup
     - if ($LASTEXITCODE -ne 0) { throw 'RX65N BG96 host regression tests failed.' }
     - python -m pip install --user cryptography
     - |
@@ -3619,7 +3629,7 @@ cleanup_lanbench_tls13_0rtt_server:
   dependencies:
     - prepare_lanbench_tls13_0rtt_server
   script:
-    - $ErrorActionPreference = "Continue"
+    - $ErrorActionPreference = "Stop"
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_lanbench_tls13_0rtt_server"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -3627,6 +3637,7 @@ cleanup_lanbench_tls13_0rtt_server:
       & "$env:CI_PROJECT_DIR\tools\aws\terminate_lanbench_tls13_0rtt_ec2.ps1" `
         -Region "$env:AWS_DEFAULT_REGION" `
         -InstanceName "$env:LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_NAME" `
+        -ProjectId "$env:CI_PROJECT_ID" -PipelineId "$env:CI_PIPELINE_ID" `
         -MetadataJson "$metaPath" `
         -OutputJson "$artifactDir\cleanup_summary.json"
   artifacts:

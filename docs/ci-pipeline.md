@@ -85,6 +85,7 @@ Schedule再開、変数変更、追加playはMaintainer / Ownerの承認後に�
 タグ・リリースは、対象main SHAの全必須jobと所有AWS資源の後始末が成功し、各実機の通常FWへの復帰と、その後のreset／UART静止を別々に確認した後に行います。未実行・skip・manual・cancel・許容された失敗を合格に数えません。リリースには子projectのSHAと`IDT_SCOPE=transport`／`qualification=not-established`を記載し、全IDT認定と区別します。タグ時の既存release profileも維持します。
 
 LANBENCH用EC2とRX72N／RX65N Fleetのcleanupも、失敗を許容しません。成功・失敗にかかわらず後始末を実行する既存の条件は維持します。
+自動EC2対向はproject／pipeline／作成jobと実行IDを記録し、同じ記録・client token・AWSタグを照合して終了します。記録が欠けたときに同名のinstanceを探して停止しません。既存の設定済みsecurity groupは検証して読み取り専用で利用し、新規作成したものだけを同じ所有記録で後始末します。
 
 ## 代表証跡
 

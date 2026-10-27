@@ -340,8 +340,9 @@ def stop_hardware_runtime(process, runtime, env, credentials):
     # Account for interruption during WSL/Python startup, before the supervisor
     # is visible. This is bounded startup recovery, not device-command polling.
     for attempt in range(3):
-        if process.poll() is not None:
-            break
+        # The Windows launcher can exit while its Linux supervisor/descendants
+        # still hold stdout. Select the owned source/runtime pair independently
+        # of the launcher PID before waiting for its cleanup/output drain.
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20)
         if result.returncode != 0:
             raise RuntimeError("Could not signal the owned IDT supervisor")
@@ -401,7 +402,7 @@ def observe_hardware_runtime(process, runtime, env, credentials, console):
                 capture(output, final=True)
                 return process.returncode
     except BaseException:
-        if process.poll() is None:
+        if process.poll() is None or process.stdout is None or not process.stdout.closed:
             remaining = stop_hardware_runtime(process, runtime, env, credentials)
             capture(remaining, final=True)
         raise
