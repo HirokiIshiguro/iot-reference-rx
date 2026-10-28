@@ -33,7 +33,13 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Diagnostics;
+using System.Text;
 public class Launcher {
+    static void WriteBytes(Stream stream, Encoding encoding, string value) {
+        byte[] bytes = encoding.GetBytes(value);
+        stream.Write(bytes, 0, bytes.Length);
+        stream.Flush();
+    }
     public static int Main(string[] args) {
         if (args.Length == 1 && args[0] == "--fixture-child") {
             Thread.Sleep(30000);
@@ -42,15 +48,45 @@ public class Launcher {
         if (args.Length == 1 && args[0] == "--fixture-middle") {
             var grandchild = Process.Start(new ProcessStartInfo(
                 Process.GetCurrentProcess().MainModule.FileName, "--fixture-child") {
-                UseShellExecute = false, CreateNoWindow = true
+                UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = Environment.GetEnvironmentVariable("RXCLI_FIXTURE_MODE") == "orphan-stderr"
             });
             File.WriteAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_CHILD_PID"), grandchild.Id.ToString());
             return 0;
         }
         File.AppendAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_ARGUMENTS"),
             String.Join("|", args) + "\n");
-        Console.WriteLine("RAW_TOOL_OUTPUT_SENTINEL");
         string mode = Environment.GetEnvironmentVariable("RXCLI_FIXTURE_MODE");
+        if (mode != "no-config-bom" && mode != "capture-overflow") Console.WriteLine("RAW_TOOL_OUTPUT_SENTINEL");
+        Stream stdout = Console.OpenStandardOutput();
+        Stream stderr = Console.OpenStandardError();
+        var utf8 = new UTF8Encoding(false);
+        if (mode == "mixed-encoding") {
+            WriteBytes(stdout, utf8, "fixture.c(7): W0520513: UTF8 \u65E5\u672C\r\n");
+            WriteBytes(stdout, Encoding.GetEncoding(932), "fixture.c(8): W0520198: CP932 \u65E5\u672C\r\n");
+            WriteBytes(stderr, Encoding.GetEncoding(932), "fixture.c(9): E0520020: CP932 \u65E5\u672C\r\n");
+        }
+        if (mode == "upstream-replacement") WriteBytes(stdout, utf8, "fixture.c(4): W0520513: \uFFFD\r\n");
+        if (mode == "code-only") Console.WriteLine("E0520020: SENSITIVE_SYNTHETIC_MARKER");
+        if (mode == "undecodable") { stdout.WriteByte(0x81); stdout.Flush(); }
+        if (mode == "capture-overflow") {
+            byte[] block = new byte[1024 * 1024];
+            for (int i = 0; i < block.Length; i++) block[i] = (byte)'x';
+            // Put the limit inside a three-byte UTF-8 sequence, then keep
+            // writing. The capture must still drain and reject success.
+            for (int i = 0; i < 31; i++) stdout.Write(block, 0, block.Length);
+            stdout.Write(block, 0, block.Length - 1);
+            WriteBytes(stdout, utf8, "\u65E5\r\n");
+            stdout.Write(block, 0, block.Length);
+        }
+        if (mode == "make-error") Console.WriteLine("make: *** [makefile:42: src/fixture.obj] Error 1");
+        if (mode == "clean-success") Console.WriteLine("make: *** No rule to make target 'clean'. Stop.");
+        if (mode == "sensitive") {
+            Console.WriteLine("ccrx -define=SENSITIVE_SYNTHETIC_MARKER -include=E0520020");
+            Console.WriteLine("C:/SENSITIVE_SYNTHETIC_MARKER/fixture.c(11): W0520513: SENSITIVE_SYNTHETIC_MARKER");
+            Console.WriteLine("SENSITIVE_SYNTHETIC_MARKER.c(12): E0520020: private message");
+            Console.WriteLine("make: *** [SENSITIVE_SYNTHETIC_MARKER.obj] Error 2");
+        }
         int importFlag = Array.IndexOf(args, "-import");
         int buildFlag = Array.IndexOf(args, "-build");
         if (mode == "delay-child") {
@@ -60,7 +96,7 @@ public class Launcher {
             });
             File.WriteAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_CHILD_PID"), child.Id.ToString());
         }
-        if (mode == "orphan-pipe") {
+        if (mode == "orphan-pipe" || mode == "orphan-stderr") {
             var middle = Process.Start(new ProcessStartInfo(
                 Process.GetCurrentProcess().MainModule.FileName, "--fixture-middle") {
                 UseShellExecute = false, CreateNoWindow = true
@@ -100,20 +136,21 @@ public class Launcher {
             }
         }
         string outputs = Environment.GetEnvironmentVariable("RXCLI_FIXTURE_OUTPUTS");
-        if (!String.IsNullOrEmpty(outputs) && mode != "missing-output") {
+        if (!String.IsNullOrEmpty(outputs) && mode != "missing-output" && mode != "make-error") {
             foreach (string output in outputs.Split('|')) {
                 Directory.CreateDirectory(Path.GetDirectoryName(output));
                 File.WriteAllText(output, mode == "empty-output" ? "" : "FRESH_OUTPUT");
                 if (mode == "stale-output") File.SetLastWriteTimeUtc(output, DateTime.UtcNow.AddDays(-1));
             }
         }
-        if (mode == "no-config" && buildFlag >= 0) {
+        if ((mode == "no-config" || mode == "no-config-bom") && buildFlag >= 0) {
             File.WriteAllText(Path.Combine(args[importFlag + 1], ".cproject"), "AFTER_HEADLESS");
             File.WriteAllText(Path.Combine(args[importFlag + 1], Path.GetFileName(args[importFlag + 1]) + ".rcpc"), "AFTER_HEADLESS_RCPC");
             string workspace = args[Array.IndexOf(args, "-data") + 1];
             Directory.CreateDirectory(Path.Combine(workspace, ".metadata"));
             File.WriteAllText(Path.Combine(workspace, ".metadata", ".log"), "WORKSPACE_DIAGNOSTIC");
-            Console.WriteLine("No Config matched " + args[buildFlag + 1] + ". Skipping...");
+            if (mode == "no-config-bom") WriteBytes(stdout, utf8, "\uFEFF");
+            WriteBytes(stdout, utf8, "No Config matched " + args[buildFlag + 1] + ". Skipping...\r\n");
             Console.WriteLine("Build completed successfully");
             return 0;
         }
@@ -154,19 +191,26 @@ public class Launcher {
             generated.mkdir(parents=True, exist_ok=True)
             (generated / "r_bsp_config.h").write_text("EXPECTED_HEADER", encoding="utf-8")
 
-    def invoke(self, mode="success", timeout=5, allow_timeout=False, targets=None, expected_outputs=None, preserve_calls=False):
+    def invoke(self, mode="success", timeout=5, allow_timeout=False, targets=None, expected_outputs=None,
+               preserve_calls=False, summary=False, fallback_code_page=None, public_names=None, strict_mode=False):
         calls = self.directory / (self._testMethodName + ".arguments")
         log = self.directory / (self._testMethodName + ".log")
+        self.summary_path = self.directory / (self._testMethodName + ".summary.json")
+        self.summary_path.unlink(missing_ok=True)
         targets = targets or ["a.project/HardwareDebug", "b.project/HardwareDebug"]
         code = (
             "$ErrorActionPreference='Stop'; . " + literal(HELPER) + "; "
-            "$result=Invoke-RxE2StudioBuild -Executable " + literal(self.executable)
+            + ("Set-StrictMode -Version Latest; " if strict_mode else "")
+            + "$result=Invoke-RxE2StudioBuild -Executable " + literal(self.executable)
             + " -WorkspacePath " + literal(self.directory / "workspace")
             + " -ProjectPaths @(" + ",".join(map(literal, self.projects)) + ")"
             + " -BuildTargets @(" + ",".join(map(literal, targets)) + ")"
             + " -OutputLog " + literal(log) + " -TimeoutSeconds " + str(timeout)
             + (" -AllowTimeoutExitCode" if allow_timeout else "")
             + (" -ExpectedOutputs @(" + ",".join(map(literal, expected_outputs)) + ")" if expected_outputs else "")
+            + (" -DiagnosticSummaryPath " + literal(self.summary_path) if summary else "")
+            + (" -DiagnosticFallbackCodePage " + str(fallback_code_page) if fallback_code_page is not None else "")
+            + (" -PublicDiagnosticFileNames @(" + ",".join(map(literal, public_names)) + ")" if public_names else "")
             + "; Write-Output ('RESULT=' + $result)"
         )
         if not preserve_calls:
@@ -204,6 +248,131 @@ public class Launcher {
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("RAW_TOOL_OUTPUT_SENTINEL", result.stdout + result.stderr)
         self.assertIn("RAW_TOOL_OUTPUT_SENTINEL", log.read_text(encoding="utf-8"))
+        self.assertFalse(self.summary_path.exists(), "public projection is opt-in")
+
+    def read_summary(self):
+        summary = json.loads(self.summary_path.read_text(encoding="utf-8"))
+        self.assertEqual(set(summary), {"schema_version", "classification", "streams", "diagnostics"})
+        self.assertEqual(summary["schema_version"], 1)
+        stream_fields = {"stream", "byte_count", "capture_limit_exceeded", "fallback_code_page", "fallback_source",
+                         "utf8_line_count", "fallback_line_count", "undecodable_line_count",
+                         "upstream_replacement_line_count", "encoding_status"}
+        for stream in summary["streams"]:
+            self.assertEqual(set(stream), stream_fields)
+            self.assertIn(stream["stream"], ("stdout", "stderr"))
+        for diagnostic in summary["diagnostics"]:
+            self.assertLessEqual(set(diagnostic), {"stream", "code", "category", "file", "line", "error_number"})
+        return summary
+
+    def test_mixed_utf8_cp932_streams_preserve_private_text_and_safe_codes(self):
+        result, calls, log = self.invoke("mixed-encoding", summary=True, fallback_code_page=932,
+                                         public_names=["fixture.c"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("reported a compiler", result.stderr)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+        detail = log.read_text(encoding="utf-8")
+        self.assertIn("UTF8 \u65E5\u672C", detail)
+        self.assertEqual(detail.count("CP932 \u65E5\u672C"), 2)
+        self.assertNotIn("\ufffd", detail)
+        summary = self.read_summary()
+        self.assertEqual(summary["classification"], "failed")
+        streams = {stream["stream"]: stream for stream in summary["streams"]}
+        self.assertEqual(streams["stdout"]["utf8_line_count"], 2)
+        self.assertEqual(streams["stdout"]["fallback_line_count"], 1)
+        self.assertEqual(streams["stderr"]["fallback_line_count"], 1)
+        self.assertEqual(streams["stderr"]["fallback_source"], "explicit")
+        self.assertEqual(summary["diagnostics"], [
+            {"stream": "stdout", "code": "W0520513", "category": "ccrx_warning", "file": "fixture.c", "line": 7},
+            {"stream": "stdout", "code": "W0520198", "category": "ccrx_warning", "file": "fixture.c", "line": 8},
+            {"stream": "stderr", "code": "E0520020", "category": "ccrx_error", "file": "fixture.c", "line": 9},
+        ])
+
+    def test_valid_utf8_replacement_is_unrecoverable_upstream_loss(self):
+        result, _, log = self.invoke("upstream-replacement", summary=True, fallback_code_page=932)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("\ufffd", log.read_text(encoding="utf-8"))
+        stream = self.read_summary()["streams"][0]
+        self.assertEqual(stream["encoding_status"], "upstream_replacement_present")
+        self.assertEqual(stream["upstream_replacement_line_count"], 1)
+        self.assertEqual(stream["fallback_line_count"], 0)
+
+    def test_undecodable_bytes_are_counted_without_raw_content(self):
+        result, _, _ = self.invoke("undecodable", summary=True, fallback_code_page=932)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stream = self.read_summary()["streams"][0]
+        self.assertEqual(stream["encoding_status"], "undecodable_bytes")
+        self.assertEqual(stream["undecodable_line_count"], 1)
+        self.assertEqual(stream["fallback_line_count"], 0)
+
+    def test_zero_exit_make_failure_summary_does_not_bypass_missing_outputs(self):
+        output = self.projects[0] / "HardwareDebug" / "make-failure.mot"
+        output.unlink(missing_ok=True)
+        result, calls, _ = self.invoke("make-error", expected_outputs=[output], summary=True,
+                                        public_names=["fixture.obj"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Expected RX build output is missing", result.stderr)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+        summary = self.read_summary()
+        self.assertEqual(summary["classification"], "failed")
+        self.assertEqual(summary["diagnostics"], [
+            {"stream": "stdout", "category": "make_error", "error_number": 1, "file": "fixture.obj"},
+        ])
+
+    def test_initial_clean_missing_rule_with_all_fresh_outputs_still_succeeds(self):
+        outputs = [self.projects[0] / "HardwareDebug" / ("clean-success." + ext) for ext in ("mot", "abs", "map")]
+        result, calls, _ = self.invoke("clean-success", expected_outputs=outputs, summary=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+        summary = self.read_summary()
+        self.assertEqual(summary["classification"], "no_failure_diagnostic")
+        self.assertEqual(summary["diagnostics"], [{"stream": "stdout", "category": "make_clean_missing_rule"}])
+
+    def test_summary_drops_unknown_text_paths_and_unapproved_filenames(self):
+        result, _, log = self.invoke("sensitive", summary=True, public_names=["fixture.c"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SENSITIVE_SYNTHETIC_MARKER", log.read_text(encoding="utf-8"))
+        public_text = self.summary_path.read_text(encoding="utf-8")
+        self.assertNotIn("SENSITIVE_SYNTHETIC_MARKER", public_text)
+        self.assertNotIn("RAW_TOOL_OUTPUT_SENTINEL", public_text)
+        self.assertNotIn("ccrx -define", public_text)
+        summary = self.read_summary()
+        self.assertEqual(len(summary["diagnostics"]), 3)
+        self.assertEqual(summary["diagnostics"][0]["file"], "fixture.c")
+        self.assertNotIn("file", summary["diagnostics"][1])
+        self.assertNotIn("file", summary["diagnostics"][2])
+
+    def test_capture_overflow_drains_but_cannot_pass_with_fresh_outputs(self):
+        output = self.projects[0] / "HardwareDebug" / "overflow.mot"
+        result, calls, _ = self.invoke("capture-overflow", summary=True, expected_outputs=[output], timeout=10,
+                                        fallback_code_page=932)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private capture limit", result.stderr)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+        stream = self.read_summary()["streams"][0]
+        self.assertTrue(stream["capture_limit_exceeded"])
+        self.assertGreater(stream["byte_count"], 32 * 1024 * 1024)
+        self.assertEqual(stream["undecodable_line_count"], 1)
+
+    def test_default_fallback_uses_verified_windows_acp(self):
+        import ctypes
+        result, _, _ = self.invoke(summary=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        stream = self.read_summary()["streams"][0]
+        self.assertEqual(stream["fallback_code_page"], ctypes.WinDLL("kernel32").GetACP())
+        self.assertEqual(stream["fallback_source"], "windows_acp")
+
+    def test_unsafe_public_filename_is_rejected_before_launcher(self):
+        result, calls, _ = self.invoke(summary=True, public_names=["../fixture.c"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(calls.exists())
+
+    def test_code_only_diagnostic_works_with_caller_strict_mode(self):
+        result, _, _ = self.invoke("code-only", summary=True, strict_mode=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("reported a compiler", result.stderr)
+        self.assertEqual(self.read_summary()["diagnostics"], [
+            {"stream": "stdout", "category": "ccrx_error", "code": "E0520020"},
+        ])
 
     def test_zero_exit_import_rejection_is_rejected(self):
         result, calls, _ = self.invoke("reject")
@@ -346,6 +515,19 @@ public class Launcher {
             self.assertTrue(diagnostic.name.startswith("rx-e2-import-"))
             shutil.rmtree(diagnostic)
 
+    def test_initial_utf8_bom_and_crlf_preserve_no_configuration_rejection(self):
+        result, _, log = self.invoke("no-config-bom", summary=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("build was rejected", result.stderr)
+        detail = log.read_text(encoding="utf-8")
+        self.assertIn("No Config matched", detail)
+        self.assertNotIn("\ufeff", detail)
+        diagnostic = Path(next(line.split(": ", 1)[1] for line in detail.splitlines()
+                               if line.startswith("Private import metadata diagnostics: ")))
+        self.assertEqual(diagnostic.parent, Path(tempfile.gettempdir()))
+        self.assertTrue(diagnostic.name.startswith("rx-e2-import-"))
+        shutil.rmtree(diagnostic)
+
     def test_nonfatal_plugin_warning_is_not_import_failure(self):
         result, _, _ = self.invoke("warning")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -447,6 +629,16 @@ public class Launcher {
             self.assertLess(time.time() - marker.stat().st_mtime, 1.0)
             self.assertTrue(running(int(child_file.read_text())), "fixture orphan must still hold the pipe")
             self.assertIn("Output drain timed out", log.read_text(encoding="utf-8"))
+
+    def test_stderr_only_orphan_pipe_cannot_pass(self):
+        with self.fixture_child() as (child_file, running):
+            result, calls, log = self.invoke("orphan-stderr", timeout=1, summary=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("output drain timed out", result.stderr)
+            self.assertEqual(len(calls.read_text().splitlines()), 1)
+            self.assertTrue(running(int(child_file.read_text())))
+            self.assertIn("Output drain timed out", log.read_text(encoding="utf-8"))
+            self.assertFalse(self.summary_path.exists(), "incomplete streams must not produce a completed projection")
 
     def test_strict_timeout_throws(self):
         result, _, log = self.invoke("delay", timeout=1)
