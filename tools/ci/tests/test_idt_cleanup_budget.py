@@ -71,17 +71,20 @@ class CleanupBudgetTests(unittest.TestCase):
             runtime = Path(directory)
             process = Mock()
             process.poll.return_value = None
-            process.communicate.return_value = ("cleanup complete\n", None)
+            process.communicate.return_value = (b"cleanup complete\n", None)
             host = {"wsl_distribution": "unit-test", "wsl_python": "python3"}
             with patch.dict(run_idt.HOST, host), patch.object(run_idt, "wsl_path", side_effect=str), \
                     patch.object(run_idt.subprocess, "run", return_value=Mock(returncode=0, stdout='{"signaled": 1}')):
-                run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
-                process.communicate.assert_called_once_with(
-                    timeout=budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS))
-                self.assertEqual("cleanup complete\n", (runtime / "console.log").read_text())
-                process.communicate.side_effect = subprocess.TimeoutExpired("mock WSL", 1)
-                with self.assertRaisesRegex(RuntimeError, "inspect the private runtime"):
-                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
+                drain = Mock()
+                with patch.object(run_idt.time, "monotonic", return_value=0):
+                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials, drain=drain)
+                drain.assert_called_once_with(budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS))
+                process.communicate.assert_not_called()
+                self.assertFalse((runtime / "console.log").exists())
+                drain.side_effect = RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse")
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        self.assertRaisesRegex(RuntimeError, "inspect the private runtime"):
+                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials, drain=drain)
             process.kill.assert_not_called()
             process.terminate.assert_not_called()
 

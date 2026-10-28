@@ -76,6 +76,8 @@ variables:
   # Bring-up scopes are partial results, not a release qualification PASS.
   RX72N_IDT_SCOPE: "preflight"
   NIGHTLY_MATRIX_INCLUDE_STABILIZING: "false"
+  # Forward only into nightly RX72N MQTT rows; focused defaults stay opt-in.
+  NIGHTLY_RX72N_MULTI_TLS_TEST: "true"
   RUN_RX65N_BG96_BUILD: "true"
   # RX65N_BG96_TEST_SCOPE:
   #   build - build/package only, no hardware test.
@@ -665,6 +667,12 @@ idt_ci_contract:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - .gitlab-ci.yml
+        - tools/aws/create_lanbench_tls13_0rtt_ec2.ps1
+        - tools/aws/terminate_lanbench_tls13_0rtt_ec2.ps1
+        - tools/aws/lanbench_ec2_ownership.ps1
+        - tools/ci/tests/test_lanbench_ec2_owned_cleanup.py
+        - tools/normal_boot.py
+        - tools/ci/tests/test_normal_boot_benchmark_provenance.py
         - tools/idt/**/*
         - tools/ci/tests/test_idt_report.py
         - tools/ci/tests/test_idt_host_profile.py
@@ -723,6 +731,10 @@ idt_ci_contract:
         tools.ci.tests.test_idt_public_signer_integration \
         tools.ci.tests.test_tls_metadata_preserves_signing_trust \
         tools.ci.tests.test_idt_ci_contract \
+        tools.ci.tests.test_idt_process_output \
+        tools.ci.tests.test_nightly_dependency_ci_contract \
+        tools.ci.tests.test_lanbench_ec2_owned_cleanup \
+        tools.ci.tests.test_normal_boot_benchmark_provenance \
         tools.ci.tests.test_idt_windows_checkout \
         tools.ci.tests.test_prepare_public_signer \
         tools.ci.tests.test_build_public_signer_provisioner \
@@ -847,6 +859,27 @@ idt_ci_contract:
     reports:
       junit: artifacts/idt/FRQ_Report.xml
     expire_in: 30 days
+
+# Native transport regression runs after all nightly bridge rows. Job-local
+# selectors do not enable the explicit IDT workflow or any other native scope.
+matrix_rx_idt_transport:
+  extends:
+    - .rx_idt_job
+    - .rx_windows_canonical_checkout
+  parallel:
+    matrix:
+      - IDT_TARGET:
+          - rx72n-ethernet
+          - rx65n-bg96
+          - rx671-wifi
+  variables:
+    RUN_RX_IDT: "true"
+    IDT_SCOPE: "transport"
+  allow_failure: false
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: on_success
+    - when: never
 
 test_rx72n_idt:
   extends: .rx_idt_job
@@ -1423,6 +1456,7 @@ matrix_rx671_wifi_tsip_tls13_resumption_0rtt:
 matrix_rx72n_ether_software_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "software"
 
@@ -1441,6 +1475,7 @@ matrix_rx72n_ether_software_fleet:
 matrix_rx72n_ether_software_tls13_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "software"
     RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
@@ -1465,6 +1500,7 @@ matrix_rx72n_ether_software_tls13_fleet:
 matrix_rx72n_ether_tsip_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "tsip"
 
@@ -1484,6 +1520,7 @@ matrix_rx72n_ether_tsip_fleet:
 matrix_rx72n_ether_tsip_tls13_mqtt:
   extends: .nightly_matrix_rx72n
   variables:
+    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"
     RX72N_TEST_SCOPE: "mqtt"
     RX72N_TLS_BACKEND: "tsip"
     RX72N_REQUIRE_TLS_VERSION: "TLSv1.3"
@@ -1818,6 +1855,7 @@ prepare_lanbench_tls13_0rtt_server:
   script:
     - Write-Host "=== Prepare public LANBENCH TLS 1.3 0-RTT server ==="
     - |
+      $ErrorActionPreference = 'Stop'
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
       & "$env:CI_PROJECT_DIR\tools\aws\create_lanbench_tls13_0rtt_ec2.ps1" `
@@ -1826,6 +1864,7 @@ prepare_lanbench_tls13_0rtt_server:
         -InstanceType "$env:LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_TYPE" `
         -SecurityGroupName "$env:LANBENCH_MBEDTLS_0RTT_EC2_SECURITY_GROUP_NAME" `
         -Port ([int]$env:LANBENCH_MBEDTLS_0RTT_PORT) `
+        -ProjectId "$env:CI_PROJECT_ID" -PipelineId "$env:CI_PIPELINE_ID" -JobId "$env:CI_JOB_ID" `
         -OutputJson "$artifactDir\lanbench_tls13_0rtt_ec2.json" `
         -OutputEnv "$artifactDir\lanbench_tls13_0rtt.env"
   artifacts:
@@ -1859,6 +1898,8 @@ build_rx65n_bg96:
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
     - python -m unittest tools.ci.tests.test_rx65n_hardware_transaction_contract tools.ci.tests.test_build_bg96_ota_candidate tools.ci.tests.test_normal_boot_jobs tools.ci.tests.test_cleanup_bg96_iot_credentials tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_idt_bg96_network
     - if ($LASTEXITCODE -ne 0) { throw 'RX65N BG96 host regression tests failed.' }
+    - python -m tools.ci.tests.test_lanbench_ec2_owned_cleanup
+    - if ($LASTEXITCODE -ne 0) { throw 'Owned EC2 regression tests must execute without skips on Windows CI.' }
     - python -m pip install --user cryptography
     - |
       $lanbenchEnv = "$env:CI_PROJECT_DIR\artifacts\prepare_lanbench_tls13_0rtt_server\lanbench_tls13_0rtt.env"
@@ -3582,7 +3623,7 @@ cleanup_lanbench_tls13_0rtt_server:
   stage: credential_cleanup
   extends: .aws_cli_windows_job
   resource_group: lanbench-tls13-0rtt-ec2
-  allow_failure: true
+  allow_failure: false
   rules:
     - if: '$RX65N_BG96_SKIP_HW_TESTS != "true" && $RX65N_BG96_TEST_SCOPE == "tls13_0rtt" && ($RX65N_BG96_TLS_BACKEND == "software" || $RX65N_BG96_TLS_BACKEND == "tsip") && $RX65N_BG96_TLS13_0RTT_ENABLE == "true" && $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true" && $LANBENCH_MBEDTLS_0RTT_HOST == ""'
       when: always
@@ -3590,7 +3631,7 @@ cleanup_lanbench_tls13_0rtt_server:
   dependencies:
     - prepare_lanbench_tls13_0rtt_server
   script:
-    - $ErrorActionPreference = "Continue"
+    - $ErrorActionPreference = "Stop"
     - |
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_lanbench_tls13_0rtt_server"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
@@ -3598,6 +3639,7 @@ cleanup_lanbench_tls13_0rtt_server:
       & "$env:CI_PROJECT_DIR\tools\aws\terminate_lanbench_tls13_0rtt_ec2.ps1" `
         -Region "$env:AWS_DEFAULT_REGION" `
         -InstanceName "$env:LANBENCH_MBEDTLS_0RTT_EC2_INSTANCE_NAME" `
+        -ProjectId "$env:CI_PROJECT_ID" -PipelineId "$env:CI_PIPELINE_ID" `
         -MetadataJson "$metaPath" `
         -OutputJson "$artifactDir\cleanup_summary.json"
   artifacts:
@@ -5416,7 +5458,7 @@ debug_rx72n_ether_fleet_current_app:
 
 cleanup_rx72n_ether_fleet:
   stage: fleet_cleanup
-  allow_failure: true
+  allow_failure: false
   extends: .aws_cli_windows_job
   dependencies:
     - test_rx72n_ether_fleet
@@ -5551,7 +5593,7 @@ test_rx65n_bg96_fleet:
 
 cleanup_rx65n_bg96_fleet:
   stage: fleet_cleanup
-  allow_failure: true
+  allow_failure: false
   dependencies:
     - test_rx65n_bg96_fleet
   extends:

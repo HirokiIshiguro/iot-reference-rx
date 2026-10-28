@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import struct
 
@@ -24,6 +25,41 @@ PROFILE = "rx-normal-signed-install-v1"
 FILES = frozenset(("normal_app.rsu", "bootloader.mot", "bootloader_bank1.mot",
     "public_signer_provisioner.mot", "public_signer_provisioner_manifest.json",
     "signer.crt.pem", "signer.pub.pem", "public_signer_bootloader_config.h", "public_signer_target.h"))
+
+BENCHMARK_PROVENANCE_FIELDS = frozenset(("schema_version", "project_id", "pipeline_id", "job_id",
+    "source_sha", "application_source_sha", "profile", "role", "application_sha256"))
+
+
+def validate_benchmark_provenance(value, manifest):
+    """Validate public build claims; CI source binding remains the caller's responsibility.
+
+    The signed application hash binds these claims to this bundle. It does not
+    prove which repository built the image; readers must also verify the exact
+    producer job/source/profile against their immutable CI snapshot.
+    """
+    if type(value) is not dict or set(value) != BENCHMARK_PROVENANCE_FIELDS:
+        raise RuntimeError("Unexpected benchmark provenance fields")
+    if type(value["schema_version"]) is not int or value["schema_version"] != 1:
+        raise RuntimeError("Unsupported benchmark provenance schema")
+    if any(type(value[key]) is not int or value[key] <= 0
+           for key in ("project_id", "pipeline_id", "job_id")):
+        raise RuntimeError("Benchmark provenance requires positive CI identifiers")
+    for key in ("source_sha", "application_source_sha"):
+        if type(value[key]) is not str or not re.fullmatch(r"[0-9a-f]{40}", value[key]):
+            raise RuntimeError("Benchmark provenance requires full source commits")
+    if (type(value["profile"]) is not str or
+            not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", value["profile"]) or
+            value["role"] not in ("benchmark", "normal-restore")):
+        raise RuntimeError("Unsupported benchmark provenance profile or role")
+    application_source = (value["source_sha"] if value["role"] == "benchmark"
+                          else manifest["source_sha"])
+    if value["application_source_sha"] != application_source:
+        raise RuntimeError("Benchmark provenance application source/role mismatch")
+    digest = value["application_sha256"]
+    if (type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest) or
+            digest != manifest["files"]["normal_app.rsu"]):
+        raise RuntimeError("Benchmark provenance application hash mismatch")
+    return dict(value)
 
 
 def file_hash(path):
@@ -56,7 +92,7 @@ def signed_application(files, target):
     return {"sequence": sequence, "reset_vector": f"0x{vector:08X}", "code_flash_only": True}
 
 
-def validate(root, target, source_sha):
+def validate(root, target, source_sha, *, expected_benchmark_provenance=None):
     root = Path(root)
     files = {name: root/name for name in FILES}
     manifest = json.loads(trust._bytes(root/"normal_install_manifest.json"))
@@ -65,6 +101,13 @@ def validate(root, target, source_sha):
             manifest.get("target_sha256") != target_fingerprint(target) or
             manifest.get("tls_backend") not in ("software", "tsip")):
         raise RuntimeError("Normal install source/target/backend/profile mismatch")
+    if "benchmark_provenance" in manifest:
+        actual_provenance = validate_benchmark_provenance(manifest["benchmark_provenance"], manifest)
+        if (expected_benchmark_provenance is not None and
+                actual_provenance != validate_benchmark_provenance(expected_benchmark_provenance, manifest)):
+            raise RuntimeError("Normal install benchmark provenance differs from the expected producer")
+    elif expected_benchmark_provenance is not None:
+        raise RuntimeError("Normal install benchmark provenance is missing")
     # Parse public-only boundaries before hashing can read an unexpected PEM body.
     plan = trust.validate_boot_trust(files, target, source_sha)
     app = signed_application(files, target)
@@ -77,7 +120,7 @@ def validate(root, target, source_sha):
     return manifest
 
 
-def prepare(source, target_id, output, inputs, *, tls_backend="software"):
+def prepare(source, target_id, output, inputs, *, tls_backend="software", benchmark_provenance=None):
     try:
         from .idt.prepare_public_signer import _source_state, _unlinked
     except ImportError:
@@ -106,6 +149,8 @@ def prepare(source, target_id, output, inputs, *, tls_backend="software"):
                 "public_signer_spki_sha256": plan["public_signer_spki_sha256"],
                 "bootloader_policy_sha256": trust.policy_hashes(inputs, target),
                 "files": {name: file_hash(path) for name, path in inputs.items()}}
+    if benchmark_provenance is not None:
+        manifest["benchmark_provenance"] = validate_benchmark_provenance(benchmark_provenance, manifest)
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
     manifest_path = output/"normal_install_manifest.json"
     try:
@@ -114,7 +159,11 @@ def prepare(source, target_id, output, inputs, *, tls_backend="software"):
         if _source_state(source) != source_sha:
             raise RuntimeError("Normal install source changed during preparation")
         manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2)+"\n", encoding="utf-8")
-        validate(output, target, source_sha)
+        if benchmark_provenance is None:
+            validate(output, target, source_sha)
+        else:
+            validate(output, target, source_sha,
+                     expected_benchmark_provenance=manifest["benchmark_provenance"])
         if _source_state(source) != source_sha:
             raise RuntimeError("Normal install source changed during preparation")
     except BaseException:

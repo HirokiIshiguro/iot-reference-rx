@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import codecs
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
@@ -10,6 +11,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import queue
+import threading
 import sys
 import tempfile
 import time
@@ -43,6 +46,12 @@ except ImportError:
 
 VERSION = "4.9.0"
 SUITE = "FRQ_2.5.0"
+NATIVE_STATUS_SECONDS = 3
+NATIVE_CONSOLE_PHASES = (
+    "IDT_UART_READY", "Copying source code", "Provisioning cloud resources",
+    "Creating EC2 instance", "Starting echo server", "Building source code",
+    "Building device image", "Flashing", "Cleaning up test resources", "IDT_UART_END_STATE",
+)
 SCOPE_GROUPS = {"preflight": "FreeRTOSVersion", "transport": "FullTransportInterfaceTLS",
                 "mqtt": "FullCloudIoT", "ota-mqtt": "OTADataplaneMQTT", "pkcs11": "FullPKCS11_Core",
                 "ota-pal": "OTACore"}
@@ -325,16 +334,14 @@ def wsl_path(path: Path) -> str:
     return subprocess.check_output([str(WSL), "-d", HOST["wsl_distribution"], "--exec", "wslpath", "-a", "-u", str(path.resolve())], encoding="utf-8").strip()
 
 
-def stop_hardware_runtime(process, runtime, env, credentials):
-    """Let the owned Linux supervisor clean AWS and reset the board on interruption."""
+def stop_hardware_runtime(process, runtime, env, credentials, *, drain):
+    """Signal the owned Linux supervisor; the existing stdout owner drains it."""
     command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"],
                wsl_path(Path(__file__).with_name("stop_runtime.py")), "--source", wsl_path(SOURCE),
                "--runtime", wsl_path(runtime / "execution")]
-    # Account for interruption during WSL/Python startup, before the supervisor
-    # is visible. This is bounded startup recovery, not device-command polling.
+    # Startup recovery is bounded. Launcher exit does not prove that its Linux
+    # supervisor or descendants have stopped, so always try the exact selector.
     for attempt in range(3):
-        if process.poll() is not None:
-            break
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20)
         if result.returncode != 0:
             raise RuntimeError("Could not signal the owned IDT supervisor")
@@ -342,15 +349,126 @@ def stop_hardware_runtime(process, runtime, env, credentials):
             break
         if attempt < 2:
             time.sleep(1)
+    # Never call communicate() here: it would compete with the reader thread.
+    drain(time.monotonic() + owned_runtime_cleanup_seconds(NATIVE_CLEANUP_SECONDS))
+
+
+def native_output_events(process):
+    """One reader owns stdout on Windows and POSIX, independent of newlines."""
+    if process.stdout is None:
+        raise RuntimeError("Native process must provide an output pipe")
+    events = queue.Queue()
+
+    def read_output():
+        try:
+            # read1 performs one underlying read and returns available bytes;
+            # BufferedReader.read(n) can wait for the entire buffer to fill.
+            read = getattr(process.stdout, "read1", None) or process.stdout.read
+            while True:
+                chunk = read(8192)
+                if not chunk:
+                    process.stdout.close()
+                    events.put(("eof", None))
+                    return
+                events.put(("data", chunk))
+        except Exception:
+            # Do not publish arbitrary I/O exception text or mark a failed
+            # read as a verified EOF. Keep the journal until explicit review.
+            events.put(("error", None))
+
+    reader = threading.Thread(target=read_output, name="idt-native-console", daemon=True)
+    reader.start()
+    return events, reader
+
+
+def observe_hardware_runtime(process, runtime, env, credentials, console):
+    """Stream complete redacted lines while supervising the owned native run."""
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    pending = ""
+    events = reader = None
+    eof = read_failed = False
+    next_status = time.monotonic() + NATIVE_STATUS_SECONDS
+    process._idt_output_drain_complete = False
+
+    def capture(chunk, *, final=False):
+        nonlocal pending, next_status
+        pending += decoder.decode(chunk, final=final)
+        lines = pending.splitlines(keepends=True)
+        pending = ""
+        if not final and lines and not lines[-1].endswith(("\r", "\n")):
+            pending = lines.pop()
+        for line in lines:
+            console.write(redact(line, credentials))
+            for phase in NATIVE_CONSOLE_PHASES:
+                if phase in line:
+                    print("IDT phase: " + phase, flush=True)
+                    next_status = time.monotonic() + NATIVE_STATUS_SECONDS
+                    break
+        console.flush()
+
+    def drain(deadline=None):
+        nonlocal eof, read_failed, next_status
+        while True:
+            now = time.monotonic()
+            if deadline is not None and now >= deadline:
+                raise RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse")
+            if events is None or read_failed:
+                raise RuntimeError("Native output could not be drained; retain the runtime journal")
+            if now >= next_status:
+                status = "owned runtime cleanup active" if deadline is not None else "native runtime active"
+                print("IDT phase: " + status, flush=True)
+                next_status = now + NATIVE_STATUS_SECONDS
+            wait_seconds = max(0.001, next_status - now)
+            if deadline is not None:
+                wait_seconds = min(wait_seconds, deadline - now)
+            if eof:
+                try:
+                    code = process.wait(timeout=wait_seconds)
+                except subprocess.TimeoutExpired:
+                    continue
+                capture(b"", final=True)
+                reader.join(timeout=0)
+                process._idt_output_drain_complete = True
+                return code
+            try:
+                kind, payload = events.get(timeout=wait_seconds)
+            except queue.Empty:
+                if deadline is None and process.poll() is not None:
+                    raise RuntimeError("Native process exited without closing its output pipe") from None
+                continue
+            if kind == "data":
+                capture(payload)
+            elif kind == "eof":
+                eof = True
+            else:
+                read_failed = True
+                raise RuntimeError("Native output could not be drained; retain the runtime journal")
+
     try:
-        remaining, _ = process.communicate(timeout=owned_runtime_cleanup_seconds(NATIVE_CLEANUP_SECONDS))
-    except subprocess.TimeoutExpired:
-        # Killing wsl.exe alone would abandon the Linux SDK and bench helper.
-        # Keep the ownership journal and fail rather than delete live signers.
-        raise RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse") from None
-    if remaining:
-        with (runtime / "console.log").open("a", encoding="utf-8") as stream:
-            stream.write(redact(remaining, credentials))
+        events, reader = native_output_events(process)
+        return drain()
+    except BaseException:
+        if process._idt_output_drain_complete is not True:
+            stop_hardware_runtime(process, runtime, env, credentials, drain=drain)
+        raise
+
+
+def cleanup_signers_after_runtime(process, inputs, signer_session):
+    """Retain the signer journal when a native process or output drain is unfinished."""
+    try:
+        from .ota_aws_signers import cleanup_aws_signers
+    except ImportError:
+        from ota_aws_signers import cleanup_aws_signers
+    try:
+        if process is not None and (process.poll() is None or
+                                    process.stdout is None or not process.stdout.closed or
+                                    getattr(process, "_idt_output_drain_complete", None) is False):
+            raise RuntimeError("IDT must finish its native cleanup and output drain before signer deletion")
+        journal = cleanup_aws_signers(inputs, signer_session)
+        return {"state": journal["state"], "certificates": len(journal["certificates"]),
+                "certificates_deleted": sum(bool(item.get("deleted")) for item in journal["certificates"])}
+    except Exception as error:
+        return {"state": "cleanup_failed", "error_type": type(error).__name__}
 
 
 def transport(runtime: Path, region: str, credentials, provenance: dict, scope: str = "transport",
@@ -460,9 +578,9 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
         if scope == "ota-mqtt":
             import boto3
             try:
-                from .ota_aws_signers import prepare_aws_signers, cleanup_aws_signers
+                from .ota_aws_signers import prepare_aws_signers
             except ImportError:
-                from ota_aws_signers import prepare_aws_signers, cleanup_aws_signers
+                from ota_aws_signers import prepare_aws_signers
             signer_session = boto3.Session(aws_access_key_id=credentials.access_key,
                                            aws_secret_access_key=credentials.secret_key,
                                            aws_session_token=credentials.token, region_name=region)
@@ -471,35 +589,12 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
             write_json(inputs / "userdata.json", userdata)
             print("IDT phase: temporary AWS signing certificates prepared", flush=True)
         with (runtime / "console.log").open("w", encoding="utf-8") as console:
-            process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                       encoding="utf-8", errors="replace")
-            for line in process.stdout:
-                line = redact(line, credentials)
-                console.write(line)
-                console.flush()
-                # Keep the unrestricted raw log local, while CI shows phase progress.
-                for phase in ("IDT_UART_READY", "Copying source code", "Provisioning cloud resources",
-                              "Creating EC2 instance", "Starting echo server", "Building source code",
-                              "Building device image", "Flashing", "Cleaning up test resources", "IDT_UART_END_STATE"):
-                    if phase in line:
-                        print("IDT phase: " + phase, flush=True)
-                        break
-            code = process.wait()
-    except BaseException:
-        if process is not None and process.poll() is None:
-            stop_hardware_runtime(process, runtime, env, credentials)
-        raise
+            process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            code = observe_hardware_runtime(process, runtime, env, credentials, console)
     finally:
         if signer_session is not None:
-            try:
-                if process is not None and process.poll() is None:
-                    raise RuntimeError("IDT must finish its native cleanup before signer deletion")
-                journal = cleanup_aws_signers(inputs, signer_session)
-                status = {"state": journal["state"], "certificates": len(journal["certificates"]),
-                          "certificates_deleted": sum(bool(item.get("deleted")) for item in journal["certificates"])}
-            except Exception as error:
-                cleanup_failed = True
-                status = {"state": "cleanup_failed", "error_type": type(error).__name__}
+            status = cleanup_signers_after_runtime(process, inputs, signer_session)
+            cleanup_failed = status["state"] == "cleanup_failed"
             write_json(runtime / "ota-signers-cleanup.json", status)
             print("IDT phase: temporary signer cleanup " + status["state"], flush=True)
     if cleanup_failed:

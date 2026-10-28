@@ -5,6 +5,8 @@ import re
 import unittest
 from pathlib import Path
 
+from tools.ci.tests.test_shared_flash_mr_workflow import mr_variables
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -40,6 +42,17 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+
+    def test_failed_peer_prepare_publishes_journal_to_required_cleanup(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        prepare = blocks["prepare_lanbench_tls13_0rtt_server"]
+        cleanup = blocks["cleanup_lanbench_tls13_0rtt_server"]
+        self.assertRegex(prepare, r"(?m)^  artifacts:\n    when: always\n")
+        self.assertIn("- artifacts/prepare_lanbench_tls13_0rtt_server/", prepare)
+        self.assertRegex(cleanup, r"(?m)^  dependencies:\n    - prepare_lanbench_tls13_0rtt_server\n")
+        self.assertIn("when: always", cleanup)
+        self.assertIn("allow_failure: false", cleanup)
+        self.assertNotRegex(blocks[".rx_idt_job"], r"(?m)^  needs:")
 
     def test_dependency_gate_mr_is_contract_only_and_hardware_free(self) -> None:
         workflow = self.ci.split(
@@ -217,6 +230,105 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
                     )
                 )
         self.assertEqual(configured, actual)
+
+    def test_nightly_transport_preserves_fifty_bridge_rows_and_adds_three_targets(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        bridges = {
+            name: block for name, block in blocks.items()
+            if name.startswith("matrix_") and name != "matrix_rx_idt_transport"
+        }
+        self.assertEqual(50, len(bridges))
+        for prefix, count in (("matrix_rx671_", 22), ("matrix_rx72n_", 14),
+                              ("matrix_rx65n_", 14)):
+            self.assertEqual(count, sum(name.startswith(prefix) for name in bridges))
+
+        native = blocks["matrix_rx_idt_transport"]
+        targets = re.findall(r"(?m)^          - (rx[0-9a-z-]+)$", native)
+        self.assertEqual(["rx72n-ethernet", "rx65n-bg96", "rx671-wifi"], targets)
+        self.assertEqual(53, len(bridges) + len(targets))
+        self.assertIn("  parallel:\n    matrix:\n      - IDT_TARGET:\n", native)
+        self.assertIn("    - .rx_idt_job", native)
+        self.assertIn("    - .rx_windows_canonical_checkout", native)
+        self.assertIn('    RUN_RX_IDT: "true"', native)
+        self.assertIn('    IDT_SCOPE: "transport"', native)
+        # Native jobs inherit the later stage and shared CC-RX lease. A needs
+        # shortcut would start them while nightly hardware children still run.
+        for override in ("  stage:", "  needs:", "  resource_group:"):
+            self.assertNotIn(override, native)
+        self.assertIn("  allow_failure: false", native)
+        shared = blocks[".rx_idt_job"]
+        self.assertIn("  stage: test", shared)
+        self.assertIn("  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP", shared)
+        self.assertNotIn("allow_failure:", shared)
+        stages = self.ci.split("variables:\n", maxsplit=1)[0]
+        self.assertLess(stages.index("  - nightly_matrix"), stages.index("  - test"))
+
+    def test_nightly_native_selection_keeps_explicit_idt_opt_in_unchanged(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        native = blocks["matrix_rx_idt_transport"]
+        condition = ('($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" '
+                     '|| $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"')
+        self.assertIn(f"    - if: '{condition}'", native)
+        self.assertIn("    - when: never", native)
+        self.assertNotIn("parent_pipeline", native)
+        self.assertNotIn("merge_request_event", native)
+        self.assertIn('  RUN_RX_IDT: "false"', blocks["variables"])
+        self.assertIn('  RUN_RX72N_IDT: "false"', blocks["variables"])
+        for name in ("test_rx72n_idt", "test_rx65n_bg96_idt", "test_rx671_wifi_idt"):
+            explicit = blocks[name]
+            self.assertIn('$CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"', explicit)
+            self.assertNotIn('"schedule"', explicit)
+            self.assertNotIn('"parent_pipeline"', explicit)
+
+    def test_multi_tls_selector_is_forwarded_only_into_four_nightly_mqtt_rows(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        self.assertIn('  RUN_RX72N_MULTI_TLS_TEST: "false"', blocks["variables"])
+        self.assertIn('  NIGHTLY_RX72N_MULTI_TLS_TEST: "true"', blocks["variables"])
+        forwarding = '    RUN_RX72N_MULTI_TLS_TEST: "$NIGHTLY_RX72N_MULTI_TLS_TEST"'
+        expected = {"matrix_rx72n_ether_software_mqtt", "matrix_rx72n_ether_software_tls13_mqtt",
+                    "matrix_rx72n_ether_tsip_mqtt", "matrix_rx72n_ether_tsip_tls13_mqtt"}
+        actual = {name for name, block in blocks.items() if forwarding in block}
+        self.assertEqual(expected, actual)
+        for name in actual:
+            self.assertIn('RX72N_TEST_SCOPE: "mqtt"', blocks[name])
+        trigger = blocks[".nightly_matrix_trigger"]
+        self.assertIn("      yaml_variables: true", trigger)
+        self.assertIn("      pipeline_variables: false", trigger)
+
+    def test_nightly_idt_source_mr_uses_existing_three_target_build_profile(self) -> None:
+        changed = {".gitlab-ci.yml", "tools/idt/run_idt.py", "docs/idt-validation.md",
+                   "docs/ci-pipeline.md", "tools/ci/tests/test_idt_process_output.py",
+                   "tools/ci/tests/test_idt_cleanup_budget.py",
+                   "tools/ci/tests/test_nightly_dependency_ci_contract.py"}
+        selected = mr_variables(self.ci, changed, branch="codex/180-idt-nightly")
+        self.assertEqual("mr-idt-targets", selected["PIPELINE_PROFILE"])
+        for board in ("RX72N", "RX65N_BG96", "RX671_WIFI"):
+            self.assertEqual("true", selected[f"RUN_{board}_BUILD"])
+            self.assertEqual("build", selected[f"{board}_TEST_SCOPE"])
+            self.assertEqual("true", selected[f"{board}_SKIP_HW_TESTS"])
+        blocks = top_level_blocks(self.ci)
+        self.assertIn("tools.ci.tests.test_nightly_dependency_ci_contract", blocks["idt_ci_contract"])
+        for name in ("idt_target_plans", "idt_source_matrix", "build_rx72n_tsip_common_core",
+                     "build_rx65n_tsip_common_core"):
+            self.assertIn('$PIPELINE_PROFILE == "mr-idt-targets"', blocks[name])
+        self.assertEqual("false", selected["RUN_RX671_BOOTLOADER_BUILD"])
+
+    def test_owned_cloud_cleanup_failures_are_required_without_removing_always_rules(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        for name in ("cleanup_lanbench_tls13_0rtt_server", "cleanup_rx72n_ether_fleet",
+                     "cleanup_rx65n_bg96_fleet"):
+            with self.subTest(job=name):
+                self.assertIn("  allow_failure: false", blocks[name])
+                self.assertNotIn("allow_failure: true", blocks[name])
+        for name in ("cleanup_lanbench_tls13_0rtt_server", "cleanup_rx72n_ether_fleet",
+                     ".rx65n_bg96_fleet_cleanup_rules"):
+            with self.subTest(rules=name):
+                rules = blocks[name].split("  script:", maxsplit=1)[0]
+                self.assertIn("when: always", rules)
+        self.assertIn(".rx65n_bg96_fleet_cleanup_rules", blocks["cleanup_rx65n_bg96_fleet"])
+        for name in ("idt_ci_contract", "build_rx65n_bg96"):
+            self.assertIn("tools.ci.tests.test_lanbench_ec2_owned_cleanup", blocks[name])
+
 
     def test_policy_covers_kernel_and_every_used_aws_library(self) -> None:
         rx671_dependencies = {
