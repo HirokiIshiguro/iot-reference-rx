@@ -672,6 +672,8 @@ idt_ci_contract:
         - tools/aws/lanbench_ec2_ownership.ps1
         - tools/ci/tests/test_lanbench_ec2_owned_cleanup.py
         - tools/normal_boot.py
+        - tools/install_normal_boot.py
+        - tools/ci/tests/test_normal_boot.py
         - tools/ci/tests/test_normal_boot_benchmark_provenance.py
         - tools/idt/**/*
         - tools/ci/tests/test_idt_report.py

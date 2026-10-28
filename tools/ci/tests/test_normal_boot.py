@@ -145,12 +145,22 @@ class NormalBootTests(unittest.TestCase):
         self.assertFalse(state["late_open"])
         self.assertFalse(state["open"])
 
-    def test_uart_open_failure_does_not_start_reset_or_clear_owner(self):
+    def test_uart_open_failure_still_attempts_one_stop_reset_and_retains_owner(self):
         target, commands, _, _, serial, _, _ = self.reset_only_transaction()
         serial.side_effect = OSError("synthetic observer unavailable")
         with self.assertRaisesRegex(OSError, "synthetic observer unavailable"):
             installer.install(self.root, target, SOURCE_SHA, reset_only=True)
-        self.assertEqual([], commands)
+        self.assertEqual(1, len(commands))
+        self.assertIn("-reset", commands[0])
+        self.assertTrue(Path(target["owner_file"]).exists())
+
+    def test_uart_open_failure_reports_a_failed_stop_reset(self):
+        target, commands, _, _, serial, _, _ = self.reset_only_transaction(return_code=7)
+        serial.side_effect = OSError("synthetic observer unavailable")
+        with self.assertRaisesRegex(RuntimeError, "did not return success") as raised:
+            installer.install(self.root, target, SOURCE_SHA, reset_only=True)
+        self.assertIsInstance(raised.exception.__context__, OSError)
+        self.assertEqual(1, len(commands))
         self.assertTrue(Path(target["owner_file"]).exists())
 
     def test_owner_refusal_precedes_uart_open_and_reset(self):
