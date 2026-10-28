@@ -118,9 +118,11 @@ def download_command(root, target):
 def reset_and_quiet(target, call, check_owner):
     import serial
     check_owner()
-    trust._checked_call(call, check_owner, [*rfp_command(target), "-sig", "-reset", "-noquery"],
-                        budget.FLASH_ABORT_RESET_SECONDS)
+    # Prepare the USB/UART observer before reset, so reopening it cannot
+    # introduce delayed RX or control-line changes into the quiet interval.
     with serial.Serial(target["uart"], target["baud"], timeout=0.1, exclusive=True) as observer:
+        trust._checked_call(call, check_owner, [*rfp_command(target), "-sig", "-reset", "-noquery"],
+                            budget.FLASH_ABORT_RESET_SECONDS)
         observer.reset_input_buffer()
         deadline, count = time.monotonic()+budget.END_STATE_QUIET_SECONDS, 0
         while time.monotonic() < deadline:
