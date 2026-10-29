@@ -137,7 +137,7 @@ def restrict_runtime(path: Path) -> None:
 
 
 def git(*args: str) -> str:
-    return subprocess.check_output(["git", "--no-optional-locks", "-c", "safe.directory=" + str(SOURCE), "-C", str(SOURCE), *args], encoding="utf-8").strip()
+    return subprocess.check_output(["git", "--no-optional-locks", "-c", "safe.directory=" + str(SOURCE), "-C", str(SOURCE), *args], encoding="utf-8").rstrip("\r\n")
 
 
 def manifest_version() -> str:
