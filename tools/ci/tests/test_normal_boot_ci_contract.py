@@ -89,6 +89,13 @@ class NormalBootCiContractTests(unittest.TestCase):
             self.assertIn("tools.ci.tests." + name, contract)
         self.assertNotIn("tools.ci.tests.test_build_bg96_ota_candidate", contract)
 
+    def test_normal_install_changes_select_the_linux_host_contract(self):
+        contract = job("idt_ci_contract")
+        changes = contract[contract.index("changes:"):contract.index("when: on_success")]
+        for path in ("tools/install_normal_boot.py", "tools/ci/tests/test_normal_boot.py"):
+            self.assertIn("- " + path + "\n", changes)
+        self.assertIn("tools.ci.tests.test_normal_boot \\\n", contract)
+
     def test_candidate_wrapper_checks_run_on_windows_build_runner(self):
         build = job("build_rx65n_bg96")
         self.assertIn("- os-windows", build)
