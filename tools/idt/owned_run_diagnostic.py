@@ -23,7 +23,7 @@ def strict(raw):
 # Root must bind the separately frozen inner probe and its exact schema.
 EXECUTION_READY=True
 INNER_FILENAME='native_host_metadata_proc.py'
-INNER_SHA256='798c76787b8c36a3cc61e535cbbac1aa84b4c4cbb0710c05c992ee8be9f5aae5'
+INNER_SHA256='776d4ab21e77528eca2f1cfe3d2f81f8ced25d9d8c209df8d3ff148ff2e017a8'
 INNER_SCOPE='CURRENT_NORMAL_WSL_UID_LAUNCH_NAME_METADATA'
 INNER_FIELDS={'current_uid_relevant_processes_absent', 'SDK_count', 'FRQ_count', 'scan_error_stage', 'scan_error_class', 'unparsed_python_count', 'all_UID_processes_absent', 'prior_run_host_stopped', 'scope', 'scan_error_errno', 'python_version', 'scan_complete', 'supervisor_count'}
 

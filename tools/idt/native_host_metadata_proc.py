@@ -41,7 +41,7 @@ try:
    # this is observation, not proof of historical ownership or no other users.
    sdk_comm='devicetester_linux_x86-64'[:15]
    frq_comm='frq_linux_x86-64'[:15]
-   python_comm=comm==own_python or re.fullmatch(r'python(?:[0-9]+(?:\.[0-9]+)*)?',comm)is not None
+   python_comm=comm in(own_python,'run_transport.py'[:15])or re.fullmatch(r'python(?:[0-9]+(?:\.[0-9]+)*)?',comm)is not None
    if comm not in(sdk_comm,frq_comm)and not python_comm:continue
    stage='PROCESS_EXE'
    executable=undeleted(Path(os.readlink(p/'exe')).name)
