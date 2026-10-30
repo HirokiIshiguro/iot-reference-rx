@@ -4,6 +4,7 @@ import argparse,ctypes,hashlib,json,os,re,stat,subprocess
 from datetime import datetime,timezone
 from pathlib import Path
 
+PROVENANCE_BYTES=6063777  # Observed readonly11908 filemetadata; this incident only.
 PRIOR={'project_id':38,'pipeline_id':11883,'job_id':73265,
        'source_sha':'83489f135c0382ef7879612b5cde03844f2d399c','target_id':'rx65n-bg96',
        'target_sha256':'7fd421681eede85a1d668bf76966e10471b5640058f4ce82dc10685f111f3bc2',
@@ -92,12 +93,13 @@ def read_owned(path,limit,diagnostic=None,kind=None):
     unlinked(path);relation=windows_owner_relation(path)
     need(relation in('TOKEN_USER','TOKEN_DEFAULT_OWNER'),'ORIGINAL_OWNER_MISMATCH');before=path.stat()
     if diagnostic is not None:
-        limits={'SOURCE_PROVENANCE':2*1024*1024,'TRANSPORT_RESULT':512*1024,'CONSOLE':4*1024*1024}
+        limits={'SOURCE_PROVENANCE':PROVENANCE_BYTES,'TRANSPORT_RESULT':512*1024,'CONSOLE':4*1024*1024}
         need(type(diagnostic)is dict and kind in limits and limit==limits[kind],'FILE_SHAPE_DIAGNOSTIC_SCOPE')
         need(type(before.st_nlink)is int and 0<=before.st_nlink<=2147483647 and
              type(before.st_size)is int and 0<=before.st_size<=9223372036854775807,'FILE_SHAPE_METADATA_BOUNDS')
         diagnostic['last_file_shape']={'kind':kind,'owner_relation':relation,'regular':bool(stat.S_ISREG(before.st_mode)),
             'link_count':before.st_nlink,'size_bytes':before.st_size,'limit_bytes':limit}
+        need(kind!='SOURCE_PROVENANCE'or before.st_size==PROVENANCE_BYTES,'SOURCE_PROVENANCE_SIZE_CHANGED')
     need(stat.S_ISREG(before.st_mode)and before.st_nlink==1 and before.st_size<=limit,'OWNED_FILE_SHAPE')
     with path.open('rb')as f:raw=f.read(limit+1)
     after=path.stat()
@@ -119,7 +121,7 @@ def select_runtime(root,request,metadata,diagnostic=None):
         metadata['candidate_count']+=1;relation=windows_owner_relation(path)
         if relation=='OTHER':continue  # Unrelated owner: metadata only, no body read.
         accepted_owner_count+=1
-        provenance=strict(read_owned(path/'source-provenance.json',2*1024*1024,diagnostic,'SOURCE_PROVENANCE'))
+        provenance=strict(read_owned(path/'source-provenance.json',PROVENANCE_BYTES,diagnostic,'SOURCE_PROVENANCE'))
         if type(provenance)is dict and all(provenance.get(k)==request[k]for k in('source_sha','target_id','target_sha256'))and provenance.get('source_tree_dirty')is False:
             matches.append((path,relation))
     metadata['owner_relation']=matches[0][1]if len(matches)==1 else'OTHER'
