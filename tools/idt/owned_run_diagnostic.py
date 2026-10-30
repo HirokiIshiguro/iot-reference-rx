@@ -5,7 +5,7 @@ from pathlib import Path
 
 SOURCE='83489f135c0382ef7879612b5cde03844f2d399c'
 CALLER='77805a37506378922c472d6e108516db98d846ed4387883bf31237fd82bf744d'
-ADAPTER='025a5351b20658ed8175e056d9be571e68f7d1884d7196999623a594e0c52a8a'
+ADAPTER='0f6dd989673cc7ce770f5760f63f01ac3b0c55fb1ae237de06f2d8f763972ca0'
 ADAPTER_CODES=frozenset('SOURCE_BOM SOURCE_LONE_CR LINKED_SOURCE OWNED_CHILD_START OWNED_CHILD_STOP_UNKNOWN OWNED_CHILD_TIME_BUDGET OWNED_CHILD_OUTPUT_BOUND POWERSHELL7_REQUIRED CI_IDENTITY CI_SELECTOR NORMAL_CLONE_REQUIRED CI_CHECKOUT_ROOT ORIGINAL_SOURCE_HASH ROOT_TOPLEVEL_MISMATCH ROOT_DEPENDENCY_METADATA DEPENDENCY_PATH_SCHEMA DEPENDENCY_COUNT INITIALIZER_COMPLETED NESTED_INITIALIZATION_FAILED INITIALIZER_UNCLASSIFIED_FAILURE CI_SOURCE_HEAD SOURCE_DIFF_UNAVAILABLE UNREVIEWED_SOURCE_DELTA TRACKED_SOURCE_DIRTY GITLINK_METADATA ORIGINAL_GITLINKS_CHANGED ROOT_DEPENDENCY_NOT_INITIALIZED DEPENDENCY_METADATA_FAILED ROOT_PIN_MISMATCH INITIALIZER_NOT_EXERCISED INITIALIZER_LAUNCHER_HOLD INITIALIZER_RESULT_SCHEMA DEPENDENCY_DIAGNOSTIC_OBSERVED DEPENDENCY_DIAGNOSTIC_HOLD'.split())
 REQUEST={'kind':'NORMAL_DEPENDENCY_INITIALIZER_DIAGNOSTIC','project_id':38,'prior_pipeline_id':11896,
          'prior_job_id':73293,'original_source':SOURCE,'caller_sha256':CALLER,'initialize_once':True}
@@ -76,8 +76,8 @@ def run_requested(caller):
         for path in(source/'artifacts',desired):
             if not path.exists():path.mkdir()
             unlinked(path)
+        need(not(desired/'prior-run-diagnostic.json').exists(),'ALREADY_WRITTEN')
         destination=desired/'prior-run-diagnostic.json'
-        need(not destination.exists(),'ALREADY_WRITTEN')
         # Exclusive marker prevents executing twice within this disposable CI job.
         with(desired/'normal-dependency-once.json').open('x',encoding='utf-8')as stream:json.dump({'kind':REQUEST['kind'],'original_source':SOURCE},stream)
         adapter=caller.with_name('normal_dependency_diagnostic.ps1');unlinked(adapter)

@@ -71,7 +71,7 @@ $currentDependencyId=$null
 $result=@{schema_version=1;result='HOLD';reasonCode='DEPENDENCY_DIAGNOSTIC_HOLD';initializer_invoked=$false;
           initializer_succeeded=$false;raw_git_output_saved=$false;hardware_actions=0;sdk_aws_actions=0}
 try {
-    Require ($PSVersionTable.PSVersion.Major -eq 7) 'POWERSHELL7_REQUIRED'
+    Require ($PSVersionTable.PSVersion.Major -eq 7 -and $PSVersionTable.PSVersion -ge [version]'7.2') 'POWERSHELL7_REQUIRED'
     Require ($env:CI_PROJECT_ID -ceq '38' -and $env:CI_PIPELINE_SOURCE -ceq 'api' -and $env:GITLAB_USER_ID -ceq '38') 'CI_IDENTITY'
     Require ($env:CI_JOB_NAME -ceq 'test_rx65n_bg96_idt' -and $env:IDT_TARGET -ceq 'rx65n-bg96' -and $env:IDT_SCOPE -ceq 'transport') 'CI_SELECTOR'
     Require ($env:GIT_SUBMODULE_STRATEGY -ceq 'normal' -and $env:GIT_STRATEGY -ceq 'clone') 'NORMAL_CLONE_REQUIRED'
@@ -96,14 +96,14 @@ try {
     Require ($dependencies.Count -eq 41) 'DEPENDENCY_COUNT'
     if($InnerInitialize) {
         # No proxy and no replacement implementation: invoke the pinned function.
-        . $helper
+        . $helper *> $null
         $result.initializer_invoked=$true
         try {
             $discard=@(Initialize-RxBuildDependencies -ProjectRoot $root *>&1)
             $exit=$global:LASTEXITCODE
             $discard=$null
             $result.initializer_succeeded=$true
-            $result.result='INITIALIZER_COMPLETED'; $result.reasonCode='INITIALIZER_COMPLETED'; $result.git_exit_code=[int]$exit
+            $result.result='INITIALIZER_COMPLETED'; $result.reasonCode='INITIALIZER_COMPLETED'; $result.git_exit_code=if($null -eq $exit){$null}else{[int]$exit}
         } catch {
             $exit=$global:LASTEXITCODE; $message=$_.Exception.Message
             $result.git_exit_code=if($null -eq $exit){$null}else{[int]$exit}
