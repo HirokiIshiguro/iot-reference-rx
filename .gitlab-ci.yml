@@ -803,7 +803,20 @@ idt_ci_contract:
   variables:
     GIT_SUBMODULE_STRATEGY: normal
     PYTHONUTF8: "1"
+  before_script:
+    - |
+      $ErrorActionPreference = "Stop"
+      if ($null -ne [Environment]::GetEnvironmentVariable('RX_IDT_PRIOR_RUN_DIAGNOSTIC', 'Process')) {
+        & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --output artifacts/idt
+        exit $LASTEXITCODE
+      }
+    - !reference [.aws_cli_windows_job, before_script]
   script:
+    - |
+      if ($null -ne [Environment]::GetEnvironmentVariable('RX_IDT_PRIOR_RUN_DIAGNOSTIC', 'Process')) {
+        Write-Host 'Prior-run diagnostic did not exit through its dedicated entry; refusing native setup.'
+        exit 2
+      }
     - !reference [.windows_ccrx_host_lease, script]
     - |
       . tools/rx_e2studio_cli.ps1
@@ -858,6 +871,7 @@ idt_ci_contract:
       - artifacts/idt/FRQ_Report.xml
       - artifacts/idt/metadata.json
       - artifacts/idt/summary.json
+      - artifacts/idt/prior-run-diagnostic.json
     reports:
       junit: artifacts/idt/FRQ_Report.xml
     expire_in: 30 days
@@ -895,6 +909,8 @@ test_rx72n_idt:
 test_rx65n_bg96_idt:
   extends: .rx_idt_job
   rules:
+    - if: '$RX_IDT_PRIOR_RUN_DIAGNOSTIC == ""'
+      when: never
     - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx65n-bg96"'
       when: on_success
     - when: never

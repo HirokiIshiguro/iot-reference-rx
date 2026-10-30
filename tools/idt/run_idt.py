@@ -23,6 +23,15 @@ import shutil
 import zipfile
 import xml.etree.ElementTree as ET
 
+# A present diagnostic selector, including an empty/invalid value, never falls
+# through into SDK setup, credentials, firmware preparation or hardware.
+if "RX_IDT_PRIOR_RUN_DIAGNOSTIC" in os.environ:
+    try:
+        from .owned_run_diagnostic import run_requested
+    except ImportError:
+        from owned_run_diagnostic import run_requested
+    raise SystemExit(run_requested(Path(__file__)))
+
 try:
     from .host_profile import load_host_profile
     from .idt_bundle import verify_install, verify_archive_digest
