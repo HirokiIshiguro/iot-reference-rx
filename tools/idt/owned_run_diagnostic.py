@@ -88,15 +88,23 @@ def windows_owner_relation(path):
         if token:k.CloseHandle(token)
         if descriptor:k.LocalFree(descriptor)
 
-def read_owned(path,limit):
-    unlinked(path);need(windows_owner_relation(path)in('TOKEN_USER','TOKEN_DEFAULT_OWNER'),'ORIGINAL_OWNER_MISMATCH');before=path.stat()
+def read_owned(path,limit,diagnostic=None,kind=None):
+    unlinked(path);relation=windows_owner_relation(path)
+    need(relation in('TOKEN_USER','TOKEN_DEFAULT_OWNER'),'ORIGINAL_OWNER_MISMATCH');before=path.stat()
+    if diagnostic is not None:
+        limits={'SOURCE_PROVENANCE':2*1024*1024,'TRANSPORT_RESULT':512*1024,'CONSOLE':4*1024*1024}
+        need(type(diagnostic)is dict and kind in limits and limit==limits[kind],'FILE_SHAPE_DIAGNOSTIC_SCOPE')
+        need(type(before.st_nlink)is int and 0<=before.st_nlink<=2147483647 and
+             type(before.st_size)is int and 0<=before.st_size<=9223372036854775807,'FILE_SHAPE_METADATA_BOUNDS')
+        diagnostic['last_file_shape']={'kind':kind,'owner_relation':relation,'regular':bool(stat.S_ISREG(before.st_mode)),
+            'link_count':before.st_nlink,'size_bytes':before.st_size,'limit_bytes':limit}
     need(stat.S_ISREG(before.st_mode)and before.st_nlink==1 and before.st_size<=limit,'OWNED_FILE_SHAPE')
     with path.open('rb')as f:raw=f.read(limit+1)
     after=path.stat()
     need(len(raw)<=limit and(before.st_ino,before.st_size,before.st_mtime_ns)==(after.st_ino,after.st_size,after.st_mtime_ns),'OWNED_FILE_CHANGED')
     return raw
 
-def select_runtime(root,request,metadata):
+def select_runtime(root,request,metadata,diagnostic=None):
     # This canonical parent is a shared container: inspect only directory
     # metadata using the normal account's existing permissions. Its owner can
     # differ; every candidate private run and allowed file must match our token.
@@ -111,7 +119,7 @@ def select_runtime(root,request,metadata):
         metadata['candidate_count']+=1;relation=windows_owner_relation(path)
         if relation=='OTHER':continue  # Unrelated owner: metadata only, no body read.
         accepted_owner_count+=1
-        provenance=strict(read_owned(path/'source-provenance.json',2*1024*1024))
+        provenance=strict(read_owned(path/'source-provenance.json',2*1024*1024,diagnostic,'SOURCE_PROVENANCE'))
         if type(provenance)is dict and all(provenance.get(k)==request[k]for k in('source_sha','target_id','target_sha256'))and provenance.get('source_tree_dirty')is False:
             matches.append((path,relation))
     metadata['owner_relation']=matches[0][1]if len(matches)==1 else'OTHER'
@@ -219,17 +227,17 @@ def run_requested(caller):
         destination=desired
         try:from .host_profile import load_host_profile
         except ImportError:from host_profile import load_host_profile
-        profile=load_host_profile();metadata={'owner_relation':'OTHER','candidate_count':0};output['runtime_metadata']=metadata
-        runtime=select_runtime(Path(profile['runtime_root']),request,metadata)
+        profile=load_host_profile();output['process_observation']=observe_processes(profile)
+        metadata={'owner_relation':'OTHER','candidate_count':0};output['runtime_metadata']=metadata
+        runtime=select_runtime(Path(profile['runtime_root']),request,metadata,output)
         output.update(prior_run={k:request[k]for k in PRIOR},
                       current_ci={'project_id':38,'pipeline_id':int(os.environ['CI_PIPELINE_ID']),'job_id':int(os.environ['CI_JOB_ID']),'source_sha':os.environ['CI_COMMIT_SHA']},
-                      normal_creator_owner_class_accepted=True,uniquely_matched_runtime=True,
-                      process_observation=observe_processes(profile))
-        try:value=strict(read_owned(runtime/'execution/transport-result.json',512*1024))
+                      normal_creator_owner_class_accepted=True,uniquely_matched_runtime=True)
+        try:value=strict(read_owned(runtime/'execution/transport-result.json',512*1024,output,'TRANSPORT_RESULT'))
         except FileNotFoundError:raise Hold('TRANSPORT_RESULT_MISSING')from None
         output['prior_result']=project_result(value,request)
         if request['include_console_enums']:
-            raw=read_owned(runtime/'console.log',4*1024*1024)
+            raw=read_owned(runtime/'console.log',4*1024*1024,output,'CONSOLE')
             output['console_fixed_enum_counts']={code:min(65535,raw.count(text.encode()))for text,code in REASONS.items()}
         output.update(result='DIAGNOSTIC_OBSERVED',reasonCode='DIAGNOSTIC_OBSERVED',observed_at=datetime.now(timezone.utc).isoformat())
     except BaseException as error:
