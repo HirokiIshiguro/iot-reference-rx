@@ -54,8 +54,12 @@ def unlinked(path):
         info=p.lstat()
         need(not stat.S_ISLNK(info.st_mode)and not(getattr(info,'st_file_attributes',0)&0x400),'LINKED_PATH_REJECTED')
 
-def same_windows_owner(path):
-    """Compare file owner to the effective token in memory; never stringify a SID."""
+def owner_relation(token_user_matches,token_default_owner_matches):
+    need(type(token_user_matches)is bool and type(token_default_owner_matches)is bool,'OWNER_RELATION_FLAGS')
+    return 'TOKEN_USER'if token_user_matches else'TOKEN_DEFAULT_OWNER'if token_default_owner_matches else'OTHER'
+
+def windows_owner_relation(path):
+    """Compare owner to effective TokenUser/TokenOwner; never stringify a SID."""
     need(os.name=='nt','NORMAL_WINDOWS_OWNER_REQUIRED')
     from ctypes import wintypes as w
     a=ctypes.WinDLL('advapi32',use_last_error=True);k=ctypes.WinDLL('kernel32',use_last_error=True)
@@ -72,39 +76,47 @@ def same_windows_owner(path):
     try:
         if not a.OpenThreadToken(k.GetCurrentThread(),8,True,ctypes.byref(token)):
             need(ctypes.get_last_error()==1008 and a.OpenProcessToken(k.GetCurrentProcess(),8,ctypes.byref(token)),'EFFECTIVE_TOKEN_UNAVAILABLE')
-        size=w.DWORD();a.GetTokenInformation(token,1,None,0,ctypes.byref(size));need(0<size.value<=65536,'TOKEN_METADATA_BOUND')
-        data=ctypes.create_string_buffer(size.value)
-        need(a.GetTokenInformation(token,1,data,size.value,ctypes.byref(size)),'TOKEN_METADATA_DENIED')
-        sid=ctypes.cast(data,ctypes.POINTER(ctypes.c_void_p))[0]
-        need(bool(a.EqualSid(owner,sid)),'ORIGINAL_OWNER_MISMATCH')
+        matches=[]
+        for information_class in(1,4):  # TokenUser and TokenOwner/default creator owner.
+            size=w.DWORD();a.GetTokenInformation(token,information_class,None,0,ctypes.byref(size));need(0<size.value<=65536,'TOKEN_METADATA_BOUND')
+            data=ctypes.create_string_buffer(size.value)
+            need(a.GetTokenInformation(token,information_class,data,size.value,ctypes.byref(size)),'TOKEN_METADATA_DENIED')
+            sid=ctypes.cast(data,ctypes.POINTER(ctypes.c_void_p))[0]
+            matches.append(bool(a.EqualSid(owner,sid)))
+        return owner_relation(*matches)
     finally:
         if token:k.CloseHandle(token)
         if descriptor:k.LocalFree(descriptor)
 
 def read_owned(path,limit):
-    unlinked(path);same_windows_owner(path);before=path.stat()
+    unlinked(path);need(windows_owner_relation(path)in('TOKEN_USER','TOKEN_DEFAULT_OWNER'),'ORIGINAL_OWNER_MISMATCH');before=path.stat()
     need(stat.S_ISREG(before.st_mode)and before.st_nlink==1 and before.st_size<=limit,'OWNED_FILE_SHAPE')
     with path.open('rb')as f:raw=f.read(limit+1)
     after=path.stat()
     need(len(raw)<=limit and(before.st_ino,before.st_size,before.st_mtime_ns)==(after.st_ino,after.st_size,after.st_mtime_ns),'OWNED_FILE_CHANGED')
     return raw
 
-def select_runtime(root,request):
+def select_runtime(root,request,metadata):
     # This canonical parent is a shared container: inspect only directory
     # metadata using the normal account's existing permissions. Its owner can
     # differ; every candidate private run and allowed file must match our token.
     unlinked(root);need(root.is_dir(),'RUNTIME_ROOT_MISSING')
-    start,end=(moment(request[k]).timestamp()for k in('job_started_at','job_finished_at'));matches=[]
+    start,end=(moment(request[k]).timestamp()for k in('job_started_at','job_finished_at'));matches=[];accepted_owner_count=0
     entries=list(root.iterdir());need(len(entries)<=4096,'RUNTIME_ENTRY_BOUND')
     for path in entries:
         if not re.fullmatch('run-[a-z0-9_]{8}',path.name):continue
         info=path.lstat();created=getattr(info,'st_birthtime',info.st_ctime)
         if not start<=created<=end:continue
-        need(stat.S_ISDIR(info.st_mode),'RUNTIME_DIRECTORY_REQUIRED');unlinked(path);same_windows_owner(path)
+        need(stat.S_ISDIR(info.st_mode),'RUNTIME_DIRECTORY_REQUIRED');unlinked(path)
+        metadata['candidate_count']+=1;relation=windows_owner_relation(path)
+        if relation=='OTHER':continue  # Unrelated owner: metadata only, no body read.
+        accepted_owner_count+=1
         provenance=strict(read_owned(path/'source-provenance.json',2*1024*1024))
         if type(provenance)is dict and all(provenance.get(k)==request[k]for k in('source_sha','target_id','target_sha256'))and provenance.get('source_tree_dirty')is False:
-            matches.append(path)
-    need(len(matches)==1,'PRIOR_RUNTIME_MISSING_OR_AMBIGUOUS');return matches[0]
+            matches.append((path,relation))
+    metadata['owner_relation']=matches[0][1]if len(matches)==1 else'OTHER'
+    need(not metadata['candidate_count']or accepted_owner_count>0,'ORIGINAL_OWNER_MISMATCH')
+    need(len(matches)==1,'PRIOR_RUNTIME_MISSING_OR_AMBIGUOUS');return matches[0][0]
 
 def reason_code(value):
     if type(value)is not str:return 'NONE'if value is None else'UNKNOWN'
@@ -207,10 +219,11 @@ def run_requested(caller):
         destination=desired
         try:from .host_profile import load_host_profile
         except ImportError:from host_profile import load_host_profile
-        profile=load_host_profile();runtime=select_runtime(Path(profile['runtime_root']),request)
+        profile=load_host_profile();metadata={'owner_relation':'OTHER','candidate_count':0};output['runtime_metadata']=metadata
+        runtime=select_runtime(Path(profile['runtime_root']),request,metadata)
         output.update(prior_run={k:request[k]for k in PRIOR},
                       current_ci={'project_id':38,'pipeline_id':int(os.environ['CI_PIPELINE_ID']),'job_id':int(os.environ['CI_JOB_ID']),'source_sha':os.environ['CI_COMMIT_SHA']},
-                      effective_owner_matches_runtime=True,uniquely_matched_runtime=True,
+                      normal_creator_owner_class_accepted=True,uniquely_matched_runtime=True,
                       process_observation=observe_processes(profile))
         try:value=strict(read_owned(runtime/'execution/transport-result.json',512*1024))
         except FileNotFoundError:raise Hold('TRANSPORT_RESULT_MISSING')from None
