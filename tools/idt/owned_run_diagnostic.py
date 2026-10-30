@@ -23,8 +23,8 @@ def strict(raw):
 # Root must bind the separately frozen inner probe and its exact schema.
 EXECUTION_READY=True
 INNER_FILENAME='native_host_metadata_proc.py'
-INNER_SHA256='fdb2bb7435f3e3ee1c5f7415c02c3b8cef1bee5352d20ba5892f6922eb70433a'
-INNER_SCOPE='CURRENT_NORMAL_WSL_UID_ONLY'
+INNER_SHA256='798c76787b8c36a3cc61e535cbbac1aa84b4c4cbb0710c05c992ee8be9f5aae5'
+INNER_SCOPE='CURRENT_NORMAL_WSL_UID_LAUNCH_NAME_METADATA'
 INNER_FIELDS={'current_uid_relevant_processes_absent', 'SDK_count', 'FRQ_count', 'scan_error_stage', 'scan_error_class', 'unparsed_python_count', 'all_UID_processes_absent', 'prior_run_host_stopped', 'scope', 'scan_error_errno', 'python_version', 'scan_complete', 'supervisor_count'}
 
 def load_inner():
@@ -61,7 +61,7 @@ def observe(profile):
         need(type(value['python_version'])is list and len(value['python_version'])==3 and all(type(n)is int and 0<=n<=65535 for n in value['python_version']),'WSL_VERSION')
         need(value['prior_run_host_stopped']==value['all_UID_processes_absent']=='UNKNOWN','WSL_OVERCLAIM')
         need(value['scan_error_errno']is None or type(value['scan_error_errno'])is int and -65535<=value['scan_error_errno']<=65535,'WSL_ERRNO')
-        stages={'NONE','IDENTITY','SELF_EXE','ENUMERATE_PROC','PROCESS_STAT','PROCESS_EXE','PYTHON_CMDLINE','PYTHON_ARGUMENTS'}
+        stages={'NONE','IDENTITY','SELF_EXE','ENUMERATE_PROC','PROCESS_STAT','PROCESS_COMM','PROCESS_EXE','PYTHON_CMDLINE','PYTHON_ARGUMENTS'}
         classes={'NONE','PermissionError','FileNotFoundError','ProcessLookupError','OSError','ValueError','TypeError','AttributeError','RuntimeError','AssertionError','UnicodeDecodeError','OTHER_EXCEPTION'}
         need(value['scan_error_stage']in stages and value['scan_error_class']in classes,'WSL_ERROR_ENUM')
         absent=value['current_uid_relevant_processes_absent']

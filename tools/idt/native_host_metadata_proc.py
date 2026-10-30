@@ -15,7 +15,7 @@ def first_script(parts):
   if arg.startswith((b'-W',b'-X'))and len(arg)>2:i+=1;continue
   return None
  return None
-out={'scope':'CURRENT_NORMAL_WSL_UID_ONLY','scan_complete':False,'SDK_count':0,'FRQ_count':0,'supervisor_count':0,'unparsed_python_count':0,'current_uid_relevant_processes_absent':'UNKNOWN','prior_run_host_stopped':'UNKNOWN','all_UID_processes_absent':'UNKNOWN'}
+out={'scope':'CURRENT_NORMAL_WSL_UID_LAUNCH_NAME_METADATA','scan_complete':False,'SDK_count':0,'FRQ_count':0,'supervisor_count':0,'unparsed_python_count':0,'current_uid_relevant_processes_absent':'UNKNOWN','prior_run_host_stopped':'UNKNOWN','all_UID_processes_absent':'UNKNOWN'}
 out.update(python_version=list(sys.version_info[:3]),scan_error_stage='NONE',scan_error_class='NONE',scan_error_errno=None)
 stage='IDENTITY'
 def undeleted(value):
@@ -33,6 +33,16 @@ try:
   try:
    stage='PROCESS_STAT'
    if p.stat().st_uid!=uid:continue
+   stage='PROCESS_COMM'
+   with(p/'comm').open('rb')as stream:comm_raw=stream.read(257)
+   if len(comm_raw)>256:raise RuntimeError('COMM_METADATA_BOUND')
+   comm=comm_raw.rstrip(b'\n').decode('utf-8','strict')
+   # Kernel comm has at most 15 visible bytes. Classify expected launch names;
+   # this is observation, not proof of historical ownership or no other users.
+   sdk_comm='devicetester_linux_x86-64'[:15]
+   frq_comm='frq_linux_x86-64'[:15]
+   python_comm=comm==own_python or re.fullmatch(r'python(?:[0-9]+(?:\.[0-9]+)*)?',comm)is not None
+   if comm not in(sdk_comm,frq_comm)and not python_comm:continue
    stage='PROCESS_EXE'
    executable=undeleted(Path(os.readlink(p/'exe')).name)
    if executable=='devicetester_linux_x86-64':out['SDK_count']+=1;continue
