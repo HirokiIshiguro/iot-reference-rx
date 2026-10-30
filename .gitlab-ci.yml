@@ -909,6 +909,8 @@ test_rx72n_idt:
 test_rx65n_bg96_idt:
   extends: .rx_idt_job
   rules:
+    - if: '$RX_IDT_PRIOR_RUN_DIAGNOSTIC == ""'
+      when: never
     - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $RUN_RX_IDT == "true" && $IDT_SCOPE != "plan" && $IDT_TARGET == "rx65n-bg96"'
       when: on_success
     - when: never
