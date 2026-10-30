@@ -90,6 +90,9 @@ def read_owned(path,limit):
     return raw
 
 def select_runtime(root,request):
+    # This canonical parent is a shared container: inspect only directory
+    # metadata using the normal account's existing permissions. Its owner can
+    # differ; every candidate private run and allowed file must match our token.
     unlinked(root);need(root.is_dir(),'RUNTIME_ROOT_MISSING')
     start,end=(moment(request[k]).timestamp()for k in('job_started_at','job_finished_at'));matches=[]
     entries=list(root.iterdir());need(len(entries)<=4096,'RUNTIME_ENTRY_BOUND')
@@ -122,26 +125,43 @@ def project_result(value,request):
             'result_finish_relative_to_job':'AFTER_JOB_TERMINAL'if finish>moment(request['job_finished_at'])else'BY_JOB_TERMINAL','functional_PASS_claimed':False}
 
 PROC_CODE=r'''
-import json,os,sys
+import json,os,re,sys
 from pathlib import Path
-out={'scope':'CURRENT_NORMAL_WSL_UID_ONLY','scan_complete':False,'SDK_count':0,'FRQ_count':0,'supervisor_count':0,'current_uid_relevant_processes_absent':'UNKNOWN','prior_run_host_stopped':'UNKNOWN','all_UID_processes_absent':'UNKNOWN'}
+def first_script(parts):
+ i=1
+ while i<len(parts)and i<=64:
+  arg=parts[i]
+  if arg==b'--':return parts[i+1]if i+1<len(parts)and parts[i+1]!=b'-'else None
+  if not arg.startswith(b'-'):return arg
+  if arg in(b'-c',b'-m',b'-'):return None
+  if arg in(b'-W',b'-X',b'--check-hash-based-pycs'):
+   if i+1>=len(parts):return None
+   i+=2;continue
+  if re.fullmatch(rb'-[BEIOPqsuSvVxibdR]+',arg):i+=1;continue
+  if arg.startswith((b'-W',b'-X'))and len(arg)>2:i+=1;continue
+  return None
+ return None
+out={'scope':'CURRENT_NORMAL_WSL_UID_ONLY','scan_complete':False,'SDK_count':0,'FRQ_count':0,'supervisor_count':0,'unparsed_python_count':0,'current_uid_relevant_processes_absent':'UNKNOWN','prior_run_host_stopped':'UNKNOWN','all_UID_processes_absent':'UNKNOWN'}
 try:
  uid=os.geteuid();assert os.getuid()==uid
+ own_python=Path(os.readlink('/proc/self/exe')).name.removesuffix(' (deleted)')
  entries=list(Path('/proc').iterdir());assert len(entries)<=65536
  for p in entries:
   if not p.name.isdecimal()or int(p.name)==os.getpid():continue
   try:
    if p.stat().st_uid!=uid:continue
-   args=(p/'cmdline').read_bytes();assert len(args)<=1024*1024
-   parts=[v for v in args.split(b'\0')if v]
-   if not parts:continue
    executable=Path(os.readlink(p/'exe')).name.removesuffix(' (deleted)')
-   if executable=='devicetester_linux_x86-64':out['SDK_count']+=1
-   if executable=='frq_linux_x86-64':out['FRQ_count']+=1
-   if any(Path(os.fsdecode(v)).name=='run_transport.py'for v in parts[:3]):out['supervisor_count']+=1
+   if executable=='devicetester_linux_x86-64':out['SDK_count']+=1;continue
+   if executable=='frq_linux_x86-64':out['FRQ_count']+=1;continue
+   if executable!=own_python and re.fullmatch(r'python(?:[0-9]+(?:\.[0-9]+)*)?',executable)is None:continue
+   with(p/'cmdline').open('rb')as stream:args=stream.read(65537)
+   if len(args)>65536:out['unparsed_python_count']+=1;continue
+   script=first_script([v for v in args.split(b'\0')if v])
+   if script is None:out['unparsed_python_count']+=1;continue
+   if Path(os.fsdecode(script)).name=='run_transport.py':out['supervisor_count']+=1
   except(FileNotFoundError,ProcessLookupError):continue
- out['scan_complete']=True
- out['current_uid_relevant_processes_absent']=not any(out[k]for k in('SDK_count','FRQ_count','supervisor_count'))
+ out['scan_complete']=out['unparsed_python_count']==0
+ if out['scan_complete']:out['current_uid_relevant_processes_absent']=not any(out[k]for k in('SDK_count','FRQ_count','supervisor_count'))
 except BaseException:pass
 print(json.dumps(out))
 '''
@@ -152,9 +172,9 @@ def observe_processes(profile):
         result=subprocess.run([str(wsl),'-d',profile['wsl_distribution'],'--exec',profile['wsl_python'],'-I','-B','-c',PROC_CODE],capture_output=True,timeout=20)
         need(result.returncode==0 and len(result.stdout)<=8192 and not result.stderr.strip(),'WSL_METADATA_UNCONFIRMED')
         value=strict(result.stdout)
-        expected={'scope','scan_complete','SDK_count','FRQ_count','supervisor_count','current_uid_relevant_processes_absent','prior_run_host_stopped','all_UID_processes_absent'}
+        expected={'scope','scan_complete','SDK_count','FRQ_count','supervisor_count','unparsed_python_count','current_uid_relevant_processes_absent','prior_run_host_stopped','all_UID_processes_absent'}
         need(type(value)is dict and set(value)==expected and value['scope']=='CURRENT_NORMAL_WSL_UID_ONLY','WSL_PROJECTION_SCHEMA')
-        need(type(value['scan_complete'])is bool and all(type(value[k])is int and 0<=value[k]<=65536 for k in('SDK_count','FRQ_count','supervisor_count')),'WSL_PROJECTION_TYPES')
+        need(type(value['scan_complete'])is bool and all(type(value[k])is int and 0<=value[k]<=65536 for k in('SDK_count','FRQ_count','supervisor_count','unparsed_python_count'))and(not value['scan_complete']or value['unparsed_python_count']==0),'WSL_PROJECTION_TYPES')
         need(value['prior_run_host_stopped']==value['all_UID_processes_absent']=='UNKNOWN','WSL_SCOPE_OVERCLAIM')
         absent=value['current_uid_relevant_processes_absent']
         need((type(absent)is bool or absent=='UNKNOWN')and(absent is(not any(value[k]for k in('SDK_count','FRQ_count','supervisor_count')))if value['scan_complete']else absent=='UNKNOWN'),'WSL_PROJECTION_TYPES')
@@ -165,7 +185,8 @@ def run_requested(caller):
     """Only this entry reads the restricted original-owner files, after closed admission."""
     output={'schema_version':1,'diagnostic_only':True,'native_tests_run':False,'qualification':False,
             'result':'HOLD','reasonCode':'DIAGNOSTIC_HOLD','functional_PASS_claimed':False,
-            'RPi_actions':0,'SDK_executions':0,'AWS_operations':0,'signals_sent':0,
+            'RPi_actions':0,'SDK_executions':0,'AWS_operations':0,'native_process_signals_sent':0,
+            'WSL_metadata_launcher_terminations':'UNKNOWN',
             'raw_private_content_saved':False,'prior_run_host_stopped':'UNKNOWN'}
     destination=None
     try:
@@ -182,8 +203,8 @@ def run_requested(caller):
         for directory in(source/'artifacts',desired):
             if not directory.exists():directory.mkdir()
             unlinked(directory)
+        need(not(desired/'prior-run-diagnostic.json').exists(),'DIAGNOSTIC_ALREADY_WRITTEN')
         destination=desired
-        need(not(destination/'prior-run-diagnostic.json').exists(),'DIAGNOSTIC_ALREADY_WRITTEN')
         try:from .host_profile import load_host_profile
         except ImportError:from host_profile import load_host_profile
         profile=load_host_profile();runtime=select_runtime(Path(profile['runtime_root']),request)
@@ -193,10 +214,11 @@ def run_requested(caller):
                       process_observation=observe_processes(profile))
         try:value=strict(read_owned(runtime/'execution/transport-result.json',512*1024))
         except FileNotFoundError:raise Hold('TRANSPORT_RESULT_MISSING')from None
-        output.update(project_result(value,request),result='DIAGNOSTIC_OBSERVED',observed_at=datetime.now(timezone.utc).isoformat())
+        output['prior_result']=project_result(value,request)
         if request['include_console_enums']:
             raw=read_owned(runtime/'console.log',4*1024*1024)
             output['console_fixed_enum_counts']={code:min(65535,raw.count(text.encode()))for text,code in REASONS.items()}
+        output.update(result='DIAGNOSTIC_OBSERVED',reasonCode='DIAGNOSTIC_OBSERVED',observed_at=datetime.now(timezone.utc).isoformat())
     except BaseException as error:
         output.update(result='HOLD',reasonCode=str(error)if type(error)is Hold and re.fullmatch('[A-Z_]{1,80}',str(error))else'DIAGNOSTIC_HOLD')
     if destination is not None:

@@ -812,6 +812,11 @@ idt_ci_contract:
       }
     - !reference [.aws_cli_windows_job, before_script]
   script:
+    - |
+      if ($null -ne [Environment]::GetEnvironmentVariable('RX_IDT_PRIOR_RUN_DIAGNOSTIC', 'Process')) {
+        Write-Host 'Prior-run diagnostic did not exit through its dedicated entry; refusing native setup.'
+        exit 2
+      }
     - !reference [.windows_ccrx_host_lease, script]
     - |
       . tools/rx_e2studio_cli.ps1
