@@ -93,13 +93,15 @@ def read_owned(path,limit,diagnostic=None,kind=None):
     unlinked(path);relation=windows_owner_relation(path)
     need(relation in('TOKEN_USER','TOKEN_DEFAULT_OWNER'),'ORIGINAL_OWNER_MISMATCH');before=path.stat()
     if diagnostic is not None:
-        limits={'SOURCE_PROVENANCE':PROVENANCE_BYTES,'TRANSPORT_RESULT':512*1024,'CONSOLE':4*1024*1024}
+        limits={'SOURCE_PROVENANCE':PROVENANCE_BYTES,'TRANSPORT_RESULT':512*1024,'CONSOLE':4*1024*1024,
+                'UART_CAPTURE_META':65536,'UART_RAW':4771885}
         need(type(diagnostic)is dict and kind in limits and limit==limits[kind],'FILE_SHAPE_DIAGNOSTIC_SCOPE')
         need(type(before.st_nlink)is int and 0<=before.st_nlink<=2147483647 and
              type(before.st_size)is int and 0<=before.st_size<=9223372036854775807,'FILE_SHAPE_METADATA_BOUNDS')
         diagnostic['last_file_shape']={'kind':kind,'owner_relation':relation,'regular':bool(stat.S_ISREG(before.st_mode)),
             'link_count':before.st_nlink,'size_bytes':before.st_size,'limit_bytes':limit}
         need(kind!='SOURCE_PROVENANCE'or before.st_size==PROVENANCE_BYTES,'SOURCE_PROVENANCE_SIZE_CHANGED')
+        need(kind!='UART_RAW'or before.st_size==4771885,'UART_RAW_SIZE_CHANGED')
     need(stat.S_ISREG(before.st_mode)and before.st_nlink==1 and before.st_size<=limit,'OWNED_FILE_SHAPE')
     with path.open('rb')as f:raw=f.read(limit+1)
     after=path.stat()
@@ -145,6 +147,42 @@ def project_result(value,request):
             'prior_verdict':value.get('verdict')if value.get('verdict')in('FAIL','INTERRUPTED','SELECTED_GROUP_PASS','SINGLE_CASE_PASS','SELECTED_CASES_PASS')else'UNKNOWN',
             'source_target_time_bound':True,'prior_result_started_at':start.isoformat(),'prior_result_finished_at':finish.isoformat(),
             'result_finish_relative_to_job':'AFTER_JOB_TERMINAL'if finish>moment(request['job_finished_at'])else'BY_JOB_TERMINAL','functional_PASS_claimed':False}
+
+
+def project_uart_fatal(runtime,diagnostic):
+    """Read this qualified run's first UART witness in RAM; emit fixed counts only."""
+    capture=strict(read_owned(runtime/'execution/uart-capture.json',65536,diagnostic,'UART_CAPTURE_META'))
+    need(type(capture)is dict and set(capture)=={'schema_version','complete','error','raw_bytes',
+         'invalid_marker_count','truncated_marker','raw_sha256','events'},'UART_CAPTURE_SCHEMA')
+    need(type(capture['schema_version'])is int and capture['schema_version']==1 and
+         capture['complete']is True and capture['error']is None and
+         type(capture['raw_bytes'])is int and capture['raw_bytes']==4771885 and
+         type(capture['invalid_marker_count'])is int and capture['invalid_marker_count']==0 and
+         capture['truncated_marker']is False and type(capture['events'])is list,'UART_CAPTURE_QUALIFICATION')
+    need(type(capture['raw_sha256'])is str and re.fullmatch('[0-9a-f]{64}',capture['raw_sha256'])is not None,'UART_CAPTURE_HASH_SCHEMA')
+    raw=read_owned(runtime/'execution/uart-witness/uart.bin',4771885,diagnostic,'UART_RAW')
+    need(len(raw)==4771885,'UART_RAW_BYTE_COUNT')
+    raw_sha256=hashlib.sha256(raw).hexdigest()
+    need(raw_sha256==capture['raw_sha256'],'UART_CAPTURE_HASH_MISMATCH')
+    markers={
+        'THREAD_JOIN_TIMEOUT':b'IDT_PORT_FATAL: thread join timeout',
+        'TRANSPORT_CREDENTIAL_PROVISIONING_FAILED':b'IDT_PORT_FATAL: transport credential provisioning failed',
+        'OTA_SIGNER_PROVISIONING_FAILED':b'IDT_PORT_FATAL: OTA PAL signer provisioning failed'}
+    counts={code:raw.count(literal)for code,literal in markers.items()}
+    prefix_count=raw.count(b'IDT_PORT_FATAL:');known_count=sum(counts.values())
+    need(prefix_count>=known_count,'UART_FATAL_COUNT_INCONSISTENT')
+    unknown_count=prefix_count-known_count
+    result={'source_target_time_bound':True,'raw_bytes':len(raw),
+        'capture_raw_sha256_matched':True,'capture_complete':True,'capture_error_is_none':True,
+        'invalid_boot_marker_count':0,'truncated_boot_marker':False,
+        'count_scope':'UART_FIXED_LITERAL_OCCURRENCES_ONLY','fatal_prefix_count':min(65535,prefix_count),
+        'known_fatal_counts':{code:min(65535,count)for code,count in counts.items()},
+        'unknown_fatal_count':min(65535,unknown_count),
+        'counts_capped':any(count>65535 for count in(*counts.values(),prefix_count,unknown_count)),
+        'raw_memory_only':True,'raw_saved':False,'native_case_proof':False,
+        'functional_PASS_claimed':False,'quiet_confirmation_claimed':False,'prior_run_host_stopped':'UNKNOWN'}
+    raw=b'';capture=None
+    return result
 
 PROC_CODE=r'''
 import json,os,re,sys
@@ -238,6 +276,9 @@ def run_requested(caller):
         try:value=strict(read_owned(runtime/'execution/transport-result.json',512*1024,output,'TRANSPORT_RESULT'))
         except FileNotFoundError:raise Hold('TRANSPORT_RESULT_MISSING')from None
         output['prior_result']=project_result(value,request)
+        need(output['prior_result']['source_target_time_bound']is True and
+             output['prior_result']['reasonCode']==output['prior_result']['cleanupReasonCode']=='DEVICE_FATAL_PORT_ERROR','UART_FATAL_PRIOR_REASON_BINDING')
+        output['uart_fatal_projection']=project_uart_fatal(runtime,output)
         if request['include_console_enums']:
             raw=read_owned(runtime/'console.log',4*1024*1024,output,'CONSOLE')
             output['console_fixed_enum_counts']={code:min(65535,raw.count(text.encode()))for text,code in REASONS.items()}
