@@ -239,7 +239,12 @@ int main(void) {
  assert(TCP_Sockets_Send(socket,"DATA",4)==4);
  receiveResult=CELLULAR_ERR_OTHER_API_RUNNING;assert(TCP_Sockets_Recv(socket,bytes,sizeof(bytes))==0);
  sendResult=CELLULAR_ERR_NOT_CONNECT;assert(TCP_Sockets_Send(socket,"DATA",4)==0);
- TCP_Sockets_Disconnect(socket);assert(closed==1 && allocated==freed);
+ /* Driver error values must not escape into the common socket error space. */
+ sendResult=CELLULAR_ERR_SOCKET_NOT_READY;
+ assert(TCP_Sockets_Send(socket,"DATA",4)==TCP_SOCKETS_ERRNO_ENOTCONN && closed==1);
+ receiveResult=CELLULAR_ERR_SOCKET_NOT_READY;
+ assert(TCP_Sockets_Recv(socket,bytes,sizeof(bytes))==TCP_SOCKETS_ERRNO_ENOTCONN && closed==2);
+ TCP_Sockets_Disconnect(socket);assert(closed==3 && allocated==freed);
  failDns=1;before=closed;assert(TCP_Sockets_Connect(&socket,"example.test",8883,17,23)!=0 && !socket);
  assert(closed==before+1 && allocated==freed);failDns=0;
  failConnect=1;before=closed;assert(TCP_Sockets_Connect(&socket,"example.test",8883,17,23)!=0 && !socket);
