@@ -203,6 +203,9 @@ void *pvPortMalloc(size_t);void vPortFree(void *);
             "logging_stack.h": "#define LogInfo(x) ((void)0)\n#define LogError(x) ((void)0)\n#define LogDebug(x) ((void)0)\n",
         })
         self.compile_run(r'''
+#ifdef NDEBUG
+#error Assertions must remain enabled
+#endif
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
