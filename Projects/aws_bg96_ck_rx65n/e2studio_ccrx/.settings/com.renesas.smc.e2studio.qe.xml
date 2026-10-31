@@ -44,7 +44,7 @@
         <Setting id="r_sci_rx" value="FIT"/>
         <Setting id="r_flash_rx" value="FIT"/>
         <Setting id="FreeRTOS_Kernel" value=""/>
-        <Segment component="r_cellular1.13.saffti-custom.4" id="r_cellular" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_cellular1.13.saffti-custom.6" id="r_cellular" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="CELLULAR_CFG_BG96_DTR_PIN" value="7"/>
             <Setting id="CELLULAR_CFG_BG96_PWRKEY_PIN" value="7"/>
             <Setting id="CELLULAR_CFG_RING_LINE_ACTIVE_TIME" value="1000"/>

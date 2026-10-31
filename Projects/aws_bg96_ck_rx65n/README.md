@@ -15,7 +15,7 @@ https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n
 | Modem | Quectel BG96 |
 | Debug/power | J14 E2 Lite |
 | Log/provisioning UART | J20 |
-| Cellular stack | Renesas `r_cellular` BG96 FIT fork (`1.13.saffti-custom.4`), pinned as `Middleware/Renesas/r_cellular` |
+| Cellular stack | Renesas `r_cellular` BG96 FIT fork (`1.13.saffti-custom.6`), pinned as `Middleware/Renesas/r_cellular` |
 
 ## Project
 
