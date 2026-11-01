@@ -233,6 +233,7 @@ int32_t TCP_Sockets_Recv( Socket_t xSocket,
             /* Reset the counter of CELLULAR_ERR_MODULE_COM */
             count_module_comm = 0;
             CloseSocket(pxContext->socket_no);
+            receive_byte = TCP_SOCKETS_ERRNO_ENOTCONN;
         }
         else
         {
@@ -285,11 +286,17 @@ int32_t TCP_Sockets_Send(Socket_t xSocket,
             /* Reset the counter of CELLULAR_ERR_MODULE_COM */
             count_module_comm = 0;
         }
+        else if (CELLULAR_ERR_SEND_REJECTED == send_byte)
+        {
+            count_module_comm = 0;
+            send_byte = TCP_SOCKETS_ERRNO_ERROR;
+        }
         else if (CELLULAR_ERR_SOCKET_NOT_READY == send_byte)
         {
             /* Reset the counter of CELLULAR_ERR_MODULE_COM */
             count_module_comm = 0;
             CloseSocket(pxContext->socket_no);
+            send_byte = TCP_SOCKETS_ERRNO_ENOTCONN;
         }
         else
         {
