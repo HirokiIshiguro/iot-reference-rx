@@ -240,6 +240,9 @@ int main(void) {
  assert(TCP_Sockets_Connect(&socket,"example.test",8883,17,23)==0 && socket);
  assert(TCP_Sockets_Recv(socket,bytes,sizeof(bytes))==4 && !memcmp(bytes,"DATA",4));
  assert(TCP_Sockets_Send(socket,"DATA",4)==4);
+ extern volatile uint32_t count_module_comm;
+ count_module_comm=2;sendResult=CELLULAR_ERR_SEND_REJECTED;before=closed;
+ assert(TCP_Sockets_Send(socket,"DATA",4)==TCP_SOCKETS_ERRNO_ERROR && closed==before && count_module_comm==0);
  receiveResult=CELLULAR_ERR_OTHER_API_RUNNING;assert(TCP_Sockets_Recv(socket,bytes,sizeof(bytes))==0);
  sendResult=CELLULAR_ERR_NOT_CONNECT;assert(TCP_Sockets_Send(socket,"DATA",4)==0);
  /* Driver error values must not escape into the common socket error space. */
