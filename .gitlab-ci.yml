@@ -1665,7 +1665,7 @@ matrix_rx65n_bg96_software_tls13_fleet:
 matrix_rx65n_bg96_software_tls13_resumption_0rtt:
   extends: .nightly_matrix_rx65n_bg96
   rules:
-    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && ($LANBENCH_MBEDTLS_0RTT_HOST || $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true")'
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && (($LANBENCH_MBEDTLS_0RTT_HOST != null && $LANBENCH_MBEDTLS_0RTT_HOST != "") || $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true")'
       when: on_success
     - when: never
   variables:
@@ -1724,7 +1724,7 @@ matrix_rx65n_bg96_tsip_tls13_fleet:
 matrix_rx65n_bg96_tsip_tls13_resumption_0rtt:
   extends: .nightly_matrix_rx65n_bg96
   rules:
-    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && ($LANBENCH_MBEDTLS_0RTT_HOST || $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true")'
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix" && (($LANBENCH_MBEDTLS_0RTT_HOST != null && $LANBENCH_MBEDTLS_0RTT_HOST != "") || $LANBENCH_MBEDTLS_0RTT_AUTO_EC2 == "true")'
       when: on_success
     - when: never
   variables:
