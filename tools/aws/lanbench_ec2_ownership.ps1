@@ -57,7 +57,7 @@ function Write-LanbenchJournal {
 
 function Invoke-LanbenchAwsText {
     param([string[]] $Arguments, [string] $AwsCli = 'aws')
-    $executable = (Get-Command $AwsCli -CommandType Application, ExternalScript -ErrorAction Stop).Source
+    $executable = (Get-Command $AwsCli -CommandType Application, ExternalScript -ErrorAction Stop | Select-Object -First 1).Source
     $operation = ($Arguments | Select-Object -First 2) -join ' '
     $job = Start-Job -ArgumentList $executable, $Arguments -ScriptBlock {
         param($Executable, [string[]] $Arguments)
