@@ -1352,7 +1352,7 @@
                 <gridItem id="LFS_FLASH_READ_SIZE" selectedIndex="4"/>
                 <gridItem id="LFS_FLASH_PROGRAM_SIZE" selectedIndex="4"/>
                 <gridItem id="LFS_FLASH_BLOCK_SIZE" selectedIndex="128"/>
-                <gridItem id="LFS_FLASH_BLOCK_COUNT" selectedIndex="64"/>
+                <gridItem id="LFS_FLASH_BLOCK_COUNT" selectedIndex="128"/>
                 <gridItem id="RM_LITTLEFS_FLASH_DATA_START" selectedIndex="FLASH_DF_BLOCK_0_MACRO"/>
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>

@@ -705,6 +705,7 @@ idt_ci_contract:
         - Demos/cli/CLIcommands.c
         - tools/ci/tests/test_product_littlefs.py
         - tools/ci/tests/test_tsip_littlefs_capacity.py
+        - tools/ci/tests/test_rx72n_tsip_capacity.py
         - tools/ci/tests/test_public_signer_cli_commands.py
         - Demos/OtaOverMqtt/OtaOverMqttDemo.c
         - tools/ci/tests/test_ota_request_retry.py
@@ -739,6 +740,7 @@ idt_ci_contract:
         tools.ci.tests.test_tls_metadata_preserves_signing_trust \
         tools.ci.tests.test_product_littlefs \
         tools.ci.tests.test_tsip_littlefs_capacity \
+        tools.ci.tests.test_rx72n_tsip_capacity \
         tools.ci.tests.test_idt_ci_contract \
         tools.ci.tests.test_idt_process_output \
         tools.ci.tests.test_nightly_dependency_ci_contract \

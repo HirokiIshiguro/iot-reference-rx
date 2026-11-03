@@ -121,8 +121,8 @@ class TsipLittlefsCapacityTests(unittest.TestCase):
     def test_old_eight_kib_geometry_fails_the_same_storage_sequence(self):
         self.run_capacity("aws_bg96_ck_rx65n_tsip", "int main(void) { assert(replay(64,1)==LFS_ERR_NOSPC);return 0;}\n")
 
-    def test_rx72n_geometry_still_supports_its_profile_without_cellular_fields(self):
-        self.run_capacity("aws_ether_rx72n_envision_kit_tsip", "int main(void) { assert(replay(LFS_FLASH_BLOCK_COUNT,0)==0);return 0;}\n")
+    def test_rx72n_legacy_four_slot_profile_fits_eight_kib(self):
+        self.run_capacity("aws_ether_rx72n_envision_kit_tsip", "int main(void) { assert(replay(64,0)==0);return 0;}\n")
 
     def test_smart_configurator_retains_the_application_geometry(self):
         for app in ("aws_bg96_ck_rx65n", "aws_bg96_ck_rx65n_tsip"):
