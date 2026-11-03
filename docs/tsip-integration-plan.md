@@ -63,6 +63,12 @@ TSIP TLSでは、同じ非秘密メタデータに加えてTSIP用wrapped素材�
 ホスト側スクリプトとデバイス側CLIは、可能な限り同じコマンドフローに揃える。
 backendの違いは、投入するpayload形式と最後のprepare処理だけに閉じ込める。
 
+RX65N/BG96のLittleFSはData Flashの`0x00100000`から16 KiBを使う。
+software/TSIP app、Smart Configurator設定、bootloader、公開signer provisionerで
+同じ領域を共有し、署名信頼情報とTSIP素材・KeyIndexの同時保存量を確保する。
+旧8 KiBの端末ではappだけをOTA更新せず、bootloaderとappをそろえて書き直し、
+署名信頼情報・資格情報を再投入する。CIは全消去・再導入で検証する。
+
 ## TSIP実装の参照元
 
 初期実装は次のTSIPベンチマークプロジェクトをベースにする。

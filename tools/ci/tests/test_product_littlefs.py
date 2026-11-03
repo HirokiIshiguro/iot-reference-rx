@@ -23,6 +23,7 @@ class ProductLittlefsTests(unittest.TestCase):
             with self.subTest(application=application):
                 self_path = f"Projects/{application}/e2studio_ccrx/src"
                 boot_path = f"Projects/{bootloader}/e2studio_ccrx/src"
+                block_count = 128 if "rx65n" in application else 64
                 source = f'''
 #include <assert.h>
 #include "platform.h"
@@ -32,7 +33,7 @@ class ProductLittlefsTests(unittest.TestCase):
 int main(void) {{
     assert(RM_LITTLEFS_FLASH_DATA_START == 0x00100000UL);
     assert(RX_BOOTLOADER_LITTLEFS_KEY_STORE_BASE_ADDRESS == RM_LITTLEFS_FLASH_DATA_START);
-    assert(LFS_FLASH_BLOCK_SIZE == 128 && LFS_FLASH_BLOCK_COUNT == 64);
+    assert(LFS_FLASH_BLOCK_SIZE == 128 && LFS_FLASH_BLOCK_COUNT == {block_count});
     assert(RX_BOOTLOADER_LITTLEFS_KEY_STORE_REGION_SIZE == LFS_FLASH_BLOCK_SIZE*LFS_FLASH_BLOCK_COUNT);
     assert(LFS_FLASH_READ_SIZE == 4 && LFS_FLASH_READ_SIZE == RM_LITTLEFS_CFG_READ_SIZE);
     assert(LFS_FLASH_PROGRAM_SIZE == 4 && LFS_FLASH_PROGRAM_SIZE == RM_LITTLEFS_CFG_PROG_SIZE);

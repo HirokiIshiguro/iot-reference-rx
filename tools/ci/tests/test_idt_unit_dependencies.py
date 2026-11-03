@@ -19,6 +19,12 @@ REQUIRED = {
             "Makefile", "r_flash_rx_vx.xx_extend.mdf", "r_flash_rx_vx.xx.xml",
             "r_flash_rx_vx.xx/r_config/r_flash_rx_config.h",
             "r_flash_rx_vx.xx/r_flash_rx/r_flash_rx_if.h")),
+    "Middleware/Renesas/rm_littlefs_rx": (
+        "60f93c8427ce88f70ea26aae7abc641f577a7765", (
+            "rm_littlefs_rx_vx.xx/rm_littlefs_rx/rm_littlefs_rx_if.h",)),
+    "Middleware/Renesas/rm_rtos_abstraction_rx": (
+        "5818cdfbda661d098fd028bf6975847d5af2c491", (
+            "rm_rtos_abstraction_rx_vx.xx/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx_if.h",)),
     "Test/Unity": ("22777c4810de3e3a4cb521a05eca2752fccd00ea", (
         "src/unity.h", "src/unity.c", "extras/fixture/src/unity_fixture.h",
         "extras/fixture/src/unity_fixture.c", "extras/memory/src/unity_memory.c")),
@@ -31,7 +37,7 @@ REQUIRED = {
 
 
 class IdtUnitDependencyTests(unittest.TestCase):
-    def test_ci_initializes_only_the_eight_root_dependencies_before_source_only_tests(self):
+    def test_ci_initializes_only_selected_original_dependencies_before_source_only_tests(self):
         text = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
         job = text[text.index("idt_ci_contract:\n"):text.index(".rx_idt_job:\n")]
         self.assertRegex(job, r"(?m)^  stage: dependency_check$")
@@ -47,6 +53,8 @@ class IdtUnitDependencyTests(unittest.TestCase):
         self.assertNotIn("--recursive", job)
         self.assertNotIn("GIT_SUBMODULE_FORCE_HTTPS", job, "No custom authentication rewrite is needed")
         self.assertIn("tools.ci.tests.test_idt_unit_dependencies", job)
+        self.assertIn("git -C Middleware/Renesas/rm_littlefs_rx submodule update --init --depth 1 -- rm_littlefs_rx_vx.xx/rm_littlefs_rx/third_party/littlefs", job)
+        self.assertIn("tools.ci.tests.test_tsip_littlefs_capacity", job)
         self.assertNotIn("tools/idt/run_idt.py", job, "Unit job may not launch hardware/native qualification")
 
     def test_required_headers_and_runner_are_bytes_from_the_registered_original_gitlinks(self):
@@ -70,6 +78,18 @@ class IdtUnitDependencyTests(unittest.TestCase):
                     self.assertEqual(hashlib.sha256(original).hexdigest(),
                                      hashlib.sha256(path.read_bytes()).hexdigest(),
                                      "Original input differs: " + relative + "/" + name)
+
+    def test_littlefs_replay_uses_the_registered_child_bytes(self):
+        parent = ROOT / "Middleware/Renesas/rm_littlefs_rx"
+        relative = "rm_littlefs_rx_vx.xx/rm_littlefs_rx/third_party/littlefs"
+        expected = "6cb4e86540eca0d9ba62500a298385c9d863c8be"
+        tree = subprocess.check_output(["git", "ls-tree", "HEAD", "--", relative], cwd=parent).decode().strip()
+        self.assertEqual("160000 commit " + expected + "\t" + relative, tree)
+        child = parent / relative
+        self.assertEqual(expected, subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=child).decode().strip())
+        for name in ("lfs.c", "lfs.h", "lfs_util.c", "lfs_util.h"):
+            original = subprocess.check_output(["git", "show", expected + ":" + name], cwd=child)
+            self.assertEqual(hashlib.sha256(original).digest(), hashlib.sha256((child / name).read_bytes()).digest())
 
 
 if __name__ == "__main__":
