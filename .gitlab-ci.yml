@@ -701,6 +701,8 @@ idt_ci_contract:
         - Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src/application_code/main.c
         - Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/src/application_code/main.c
         - Demos/cli/CLIcommands.c
+        - Demos/tsip_provisioning/**/*
+        - tools/ci/tests/test_tsip_prepare_diagnostics.py
         - tools/ci/tests/test_public_signer_cli_commands.py
         - Demos/OtaOverMqtt/OtaOverMqttDemo.c
         - tools/ci/tests/test_ota_request_retry.py
@@ -732,6 +734,7 @@ idt_ci_contract:
         tools.ci.tests.test_idt_public_signer_provision \
         tools.ci.tests.test_idt_public_signer_integration \
         tools.ci.tests.test_tls_metadata_preserves_signing_trust \
+        tools.ci.tests.test_tsip_prepare_diagnostics \
         tools.ci.tests.test_idt_ci_contract \
         tools.ci.tests.test_idt_process_output \
         tools.ci.tests.test_nightly_dependency_ci_contract \
