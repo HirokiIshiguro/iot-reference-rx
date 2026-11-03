@@ -435,6 +435,8 @@ class IdtCiContractTests(unittest.TestCase):
             "Middleware/FreeRTOS/FreeRTOS-Kernel",
             "Middleware/FreeRTOS-Plus-CLI",
             "Middleware/Renesas/r_flash_rx",
+            "Middleware/Renesas/rm_littlefs_rx",
+            "Middleware/Renesas/rm_rtos_abstraction_rx",
             "Test/Unity", "Test/FreeRTOS-Libraries-Integration-Tests",
             "Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader",
             "Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader",
