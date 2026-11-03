@@ -140,16 +140,18 @@ class LanbenchOwnedCleanupTests(unittest.TestCase):
         self.save_state()
         return value
 
-    def run_script(self, name, extra=()):
+    def run_script(self, name, extra=(), *, aws_cli=None):
         allowed = ("SystemRoot", "WINDIR", "TEMP", "TMP", "PATH", "PATHEXT", "COMSPEC", "USERPROFILE",
                    "HOME", "LOCALAPPDATA", "APPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "ProgramW6432", "PSModulePath")
         env = {key: os.environ[key] for key in allowed if key in os.environ}
         env.update(LANBENCH_STUB_STATE=str(self.state_file), CI_JOB_ID="999",
                    AWS_EC2_METADATA_DISABLED="true", AWS_PROFILE="fixture-no-profile")
+        if aws_cli is not None:
+            env["PATH"] = str(self.folder) + os.pathsep + env.get("PATH", "")
         command = [PWSH, "-NoProfile", "-File", str(ROOT / "tools/aws" / name), "-Region", "ap-northeast-1",
                    "-InstanceName", "fixture-instance", "-ProjectId", "71", "-PipelineId", "99",
                    "-OutputJson", str(self.result if name.startswith("terminate") else self.journal),
-                   "-AwsCli", str(self.stub), *extra]
+                   "-AwsCli", str(self.stub) if aws_cli is None else aws_cli, *extra]
         return subprocess.run(command, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90)
 
     def cleanup(self):
@@ -341,6 +343,22 @@ class LanbenchOwnedCleanupTests(unittest.TestCase):
         result = self.cleanup()
         self.assertNotEqual(0, result.returncode)
         self.assertEqual([], self.mutations())
+        self.assertNotIn("fixture-private-diagnostic", result.stdout + result.stderr)
+
+    @unittest.skipUnless(os.name == "nt", "Windows command suffix resolution is required")
+    def test_cli_name_with_script_and_cmd_candidates_preserves_lifecycle_arguments(self):
+        self.metadata()
+        self.stub.with_suffix(".cmd").write_text(
+            '@echo off\n"' + PWSH + '" -NoProfile -File "%~dp0aws-fixture.ps1" %*\n'
+            'exit /b %errorlevel%\n', encoding="utf-8")
+        result = self.run_script("terminate_lanbench_tls13_0rtt_ec2.ps1",
+                                 ["-MetadataJson", str(self.journal)], aws_cli="aws-fixture")
+        self.assertEqual(0, result.returncode, result.stderr)
+        first = self.read_state()["calls"][0]
+        self.assertEqual(["ec2", "describe-instances"], first[:2])
+        self.assertEqual("ap-northeast-1", first[first.index("--region") + 1])
+        self.assertEqual("i-11111111", first[first.index("--instance-ids") + 1])
+        self.assertEqual(["terminate-instances"], self.mutations())
         self.assertNotIn("fixture-private-diagnostic", result.stdout + result.stderr)
 
 
