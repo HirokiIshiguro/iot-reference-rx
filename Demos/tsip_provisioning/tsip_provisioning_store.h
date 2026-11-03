@@ -37,4 +37,12 @@ BaseType_t xTsipProvisioningReadRootCaSignature(uint8_t * pucBuffer,
 BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void);
 BaseType_t xTsipProvisioningLoadClientRsa2048KeyPair(void);
 
+/* CLI diagnostics contain only a fixed stage name and a numeric status.
+ * TSIP/common API stages retain their return code; parse stages report the
+ * input length, and storage stages report -1 because the accessors return bool.
+ */
+void vTsipProvisioningClearPrepareError(void);
+const char * pcTsipProvisioningPrepareErrorStage(void);
+int32_t lTsipProvisioningPrepareErrorCode(void);
+
 #endif /* TSIP_PROVISIONING_STORE_H_ */

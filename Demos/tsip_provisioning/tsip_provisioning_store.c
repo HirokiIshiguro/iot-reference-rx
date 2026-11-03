@@ -75,9 +75,37 @@ static tsip_tls_ca_certification_public_key_index_t xRootSignerPublicKeyIndex;
 static BaseType_t xRootCaTrustAnchorReady = pdFALSE;
 static uint8_t ucRootSignerBlob[ROOT_SIGNER_MAX_STORED_SIZE];
 static uint8_t ucClientPrivateBlob[CLIENT_PRIVATE_MAX_STORED_SIZE];
+static const char * pcPrepareErrorStage = NULL;
+static int32_t lPrepareErrorCode = 0;
 
 extern tsip_rsa2048_private_key_index_t rsa2048_private_key;
 extern tsip_rsa2048_public_key_index_t rsa2048_public_key;
+
+void vTsipProvisioningClearPrepareError(void)
+{
+    pcPrepareErrorStage = NULL;
+    lPrepareErrorCode = 0;
+}
+
+const char * pcTsipProvisioningPrepareErrorStage(void)
+{
+    return (NULL != pcPrepareErrorStage) ? pcPrepareErrorStage : "none";
+}
+
+int32_t lTsipProvisioningPrepareErrorCode(void)
+{
+    return lPrepareErrorCode;
+}
+
+static BaseType_t prvPrepareFailure(const char * pcStage, int32_t lCode)
+{
+    if (NULL == pcPrepareErrorStage)
+    {
+        pcPrepareErrorStage = pcStage;
+        lPrepareErrorCode = lCode;
+    }
+    return pdFALSE;
+}
 
 const char * pcTsipProvisioningSlotCliName(TsipProvisioningSlot_t xSlot)
 {
@@ -186,7 +214,7 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
     xCommonApiResult = R_Demo_Common_API_TSIP_Open(NULL, NULL);
     if (COMMONAPI_SUCCESS != xCommonApiResult)
     {
-        return pdFALSE;
+        return prvPrepareFailure("open-plain", (int32_t)xCommonApiResult);
     }
 
     vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_ROOT_CA_DER);
@@ -198,13 +226,17 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
     if ((pdTRUE != xResult) || (sizeof(xRootSignerPublicKeyIndex) != ulRootSignerSize))
     {
         xResult = prvImportRootSignerPublicKey();
-        if ((pdTRUE != xResult) ||
-            (pdTRUE != prvWriteFile(TSIP_ROOT_SIGNER_KEY_INDEX_STORAGE_NAME,
-                                    (const uint8_t *)&xRootSignerPublicKeyIndex,
-                                    sizeof(xRootSignerPublicKeyIndex))))
+        if (pdTRUE != xResult)
         {
             (void)R_Demo_Common_API_TSIP_Close();
             return pdFALSE;
+        }
+        if (pdTRUE != prvWriteFile(TSIP_ROOT_SIGNER_KEY_INDEX_STORAGE_NAME,
+                                   (const uint8_t *)&xRootSignerPublicKeyIndex,
+                                   sizeof(xRootSignerPublicKeyIndex)))
+        {
+            (void)R_Demo_Common_API_TSIP_Close();
+            return prvPrepareFailure("root-index-write", -1);
         }
     }
 
@@ -215,13 +247,13 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
     xCommonApiResult = R_Demo_Common_API_TSIP_Open(&xRootSignerPublicKeyIndex, NULL);
     if (COMMONAPI_SUCCESS != xCommonApiResult)
     {
-        return pdFALSE;
+        return prvPrepareFailure("open-with-root", (int32_t)xCommonApiResult);
     }
 
     xTsipResult = R_TSIP_TlsRegisterCaCertificationPublicKeyIndex(TSIP_TLS_MODE_CLIENT, &xRootSignerPublicKeyIndex);
     if (TSIP_SUCCESS != xTsipResult)
     {
-        return pdFALSE;
+        return prvPrepareFailure("root-register", (int32_t)xTsipResult);
     }
 
     xRootCaTrustAnchorReady = pdTRUE;
@@ -347,13 +379,16 @@ static BaseType_t prvImportRootSignerPublicKey(void)
                                         ucRootSignerBlob,
                                         sizeof(ucRootSignerBlob),
                                         &ulStoredLength);
-    if ((pdTRUE != xResult) ||
-        (pdTRUE != prvParseSkmtWrappedKey(ucRootSignerBlob,
+    if (pdTRUE != xResult)
+    {
+        return prvPrepareFailure("root-slot-read", -1);
+    }
+    if (pdTRUE != prvParseSkmtWrappedKey(ucRootSignerBlob,
                                           ulStoredLength,
                                           TSIP_TLS_RSA2048_PUBLIC_ENCRYPTED_KEY_SIZE,
-                                          &xWrappedKey)))
+                                          &xWrappedKey))
     {
-        return pdFALSE;
+        return prvPrepareFailure("root-parse", (int32_t)ulStoredLength);
     }
 
     xTsipResult = R_TSIP_GenerateTlsRsaPublicKeyIndex(xWrappedKey.pucWufpk,
@@ -361,7 +396,8 @@ static BaseType_t prvImportRootSignerPublicKey(void)
                                                       xWrappedKey.pucEncryptedKey,
                                                       &xRootSignerPublicKeyIndex);
 
-    return (TSIP_SUCCESS == xTsipResult) ? pdTRUE : pdFALSE;
+    return (TSIP_SUCCESS == xTsipResult) ? pdTRUE :
+        prvPrepareFailure("root-generate", (int32_t)xTsipResult);
 }
 
 static BaseType_t prvLoadOrImportClientPublicKey(void)
@@ -385,13 +421,16 @@ static BaseType_t prvLoadOrImportClientPublicKey(void)
                                         ucRootSignerBlob,
                                         sizeof(ucRootSignerBlob),
                                         &ulStoredLength);
-    if ((pdTRUE != xResult) ||
-        (pdTRUE != prvParseSkmtWrappedKey(ucRootSignerBlob,
+    if (pdTRUE != xResult)
+    {
+        return prvPrepareFailure("client-pub-slot-read", -1);
+    }
+    if (pdTRUE != prvParseSkmtWrappedKey(ucRootSignerBlob,
                                           ulStoredLength,
                                           TSIP_RSA2048_PUBLIC_ENCRYPTED_KEY_SIZE,
-                                          &xWrappedKey)))
+                                          &xWrappedKey))
     {
-        return pdFALSE;
+        return prvPrepareFailure("client-pub-parse", (int32_t)ulStoredLength);
     }
 
     xTsipResult = R_TSIP_GenerateRsa2048PublicKeyIndex(xWrappedKey.pucWufpk,
@@ -400,7 +439,7 @@ static BaseType_t prvLoadOrImportClientPublicKey(void)
                                                        &rsa2048_public_key);
     if (TSIP_SUCCESS != xTsipResult)
     {
-        return pdFALSE;
+        return prvPrepareFailure("client-pub-generate", (int32_t)xTsipResult);
     }
 
     xResult = prvWriteFile(TSIP_CLIENT_PUBLIC_KEY_INDEX_STORAGE_NAME,
@@ -409,6 +448,10 @@ static BaseType_t prvLoadOrImportClientPublicKey(void)
     if (pdTRUE == xResult)
     {
         vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_CLIENT_PUBLIC_KEY);
+    }
+    else
+    {
+        return prvPrepareFailure("client-pub-index-write", -1);
     }
 
     return xResult;
@@ -435,13 +478,16 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
                                         ucClientPrivateBlob,
                                         sizeof(ucClientPrivateBlob),
                                         &ulStoredLength);
-    if ((pdTRUE != xResult) ||
-        (pdTRUE != prvParseSkmtWrappedKey(ucClientPrivateBlob,
+    if (pdTRUE != xResult)
+    {
+        return prvPrepareFailure("client-pri-slot-read", -1);
+    }
+    if (pdTRUE != prvParseSkmtWrappedKey(ucClientPrivateBlob,
                                           ulStoredLength,
                                           TSIP_RSA2048_PRIVATE_ENCRYPTED_KEY_SIZE,
-                                          &xWrappedKey)))
+                                          &xWrappedKey))
     {
-        return pdFALSE;
+        return prvPrepareFailure("client-pri-parse", (int32_t)ulStoredLength);
     }
 
     xTsipResult = R_TSIP_GenerateRsa2048PrivateKeyIndex(xWrappedKey.pucWufpk,
@@ -450,7 +496,7 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
                                                         &rsa2048_private_key);
     if (TSIP_SUCCESS != xTsipResult)
     {
-        return pdFALSE;
+        return prvPrepareFailure("client-pri-generate", (int32_t)xTsipResult);
     }
 
     xResult = prvWriteFile(TSIP_CLIENT_PRIVATE_KEY_INDEX_STORAGE_NAME,
@@ -459,6 +505,10 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
     if (pdTRUE == xResult)
     {
         vTsipProvisioningEraseSlot(TSIP_PROVISIONING_SLOT_CLIENT_PRIVATE_KEY);
+    }
+    else
+    {
+        return prvPrepareFailure("client-pri-index-write", -1);
     }
 
     return xResult;

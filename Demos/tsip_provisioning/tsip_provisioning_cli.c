@@ -104,7 +104,6 @@ static BaseType_t prvTsipProvisioningCommand(char * pcWriteBuffer,
     uint32_t ulValue = 0U;
     uint32_t ulChunkLength = 0U;
 
-    (void)xWriteBufferLen;
     pcWriteBuffer[0] = '\0';
 
     pcRequest = FreeRTOS_CLIGetParameter(pcCommandString, 1U, &xRequestLength);
@@ -230,6 +229,7 @@ static BaseType_t prvTsipProvisioningCommand(char * pcWriteBuffer,
     }
     else if (0 == strncmp(pcRequest, "prepare", (size_t)xRequestLength))
     {
+        vTsipProvisioningClearPrepareError();
         if ((pdTRUE == xTsipProvisioningPrepareTlsRootCaTrustAnchor()) &&
             (pdTRUE == xTsipProvisioningLoadClientRsa2048KeyPair()))
         {
@@ -237,7 +237,10 @@ static BaseType_t prvTsipProvisioningCommand(char * pcWriteBuffer,
         }
         else
         {
-            sprintf(pcWriteBuffer, "Error: TSIP runtime key prepare failed.\r\n");
+            snprintf(pcWriteBuffer, xWriteBufferLen,
+                     "Error: TSIP runtime key prepare failed. stage=%s code=%ld\r\n",
+                     pcTsipProvisioningPrepareErrorStage(),
+                     (long)lTsipProvisioningPrepareErrorCode());
         }
     }
     else if (0 == strncmp(pcRequest, "credentials", (size_t)xRequestLength))

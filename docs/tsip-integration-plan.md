@@ -63,6 +63,12 @@ TSIP TLSでは、同じ非秘密メタデータに加えてTSIP用wrapped素材�
 ホスト側スクリプトとデバイス側CLIは、可能な限り同じコマンドフローに揃える。
 backendの違いは、投入するpayload形式と最後のprepare処理だけに閉じ込める。
 
+`tsipprov prepare` の失敗応答は、既存の `Error:` 文に `stage` と `code` を付け、
+その呼出しで最初に失敗した段階だけを示す。鍵・KeyIndexの内容は表示しない。
+`code` はTSIP/common APIの戻り値、parse段階では入力byte数、storage段階では
+bool accessorの失敗を示す `-1` であり、storage内部のlittlefsエラー番号ではない。
+診断情報の追加でformat、import、キャッシュ利用、slot削除の条件は変更しない。
+
 ## TSIP実装の参照元
 
 初期実装は次のTSIPベンチマークプロジェクトをベースにする。
