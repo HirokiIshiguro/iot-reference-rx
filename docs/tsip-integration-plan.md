@@ -63,11 +63,11 @@ TSIP TLSでは、同じ非秘密メタデータに加えてTSIP用wrapped素材�
 ホスト側スクリプトとデバイス側CLIは、可能な限り同じコマンドフローに揃える。
 backendの違いは、投入するpayload形式と最後のprepare処理だけに閉じ込める。
 
-`tsipprov prepare` の失敗応答は、既存の `Error:` 文に `stage` と `code` を付け、
-その呼出しで最初に失敗した段階だけを示す。鍵・KeyIndexの内容は表示しない。
-`code` はTSIP/common APIの戻り値、parse段階では入力byte数、storage段階では
-bool accessorの失敗を示す `-1` であり、storage内部のlittlefsエラー番号ではない。
-診断情報の追加でformat、import、キャッシュ利用、slot削除の条件は変更しない。
+RX65N/BG96のLittleFSはData Flashの`0x00100000`から16 KiBを使う。
+software/TSIP app、Smart Configurator設定、bootloader、公開signer provisionerで
+同じ領域を共有し、署名信頼情報とTSIP素材・KeyIndexの同時保存量を確保する。
+旧8 KiBの端末ではappだけをOTA更新せず、bootloaderとappをそろえて書き直し、
+署名信頼情報・資格情報を再投入する。CIは全消去・再導入で検証する。
 
 ## TSIP実装の参照元
 
