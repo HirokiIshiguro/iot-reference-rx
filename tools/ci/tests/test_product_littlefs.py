@@ -23,7 +23,7 @@ class ProductLittlefsTests(unittest.TestCase):
             with self.subTest(application=application):
                 self_path = f"Projects/{application}/e2studio_ccrx/src"
                 boot_path = f"Projects/{bootloader}/e2studio_ccrx/src"
-                block_count = 128 if "rx65n" in application else 64
+                block_count = 64 if "rx671" in application else 128
                 source = f'''
 #include <assert.h>
 #include "platform.h"
@@ -64,7 +64,9 @@ int main(void) {{
 #include "semphr.h"
 #include "lfs_common_data.h"
 #include "rm_rtos_abstraction_rx_if.h"
-static unsigned char flash[8192];
+#include "platform.h"
+#include "rm_littlefs_flash_config.h"
+static unsigned char flash[LFS_FLASH_BLOCK_SIZE * LFS_FLASH_BLOCK_COUNT];
 static int held, created, common_open_count, adapter_open_count, format_count, yield_count;
 static int common_open_error=1, mount_error=1, read_error;
 static rm_rtos_abstraction_sleep_task_t sleep_task;
@@ -79,26 +81,26 @@ rm_rtos_abstraction_err_t RM_RTOS_ABSTRACTION_SetSleepTask(rm_rtos_abstraction_s
     assert(held && function); sleep_task=function; return RM_RTOS_ABSTRACTION_SUCCESS;
 }
 static int read_block(const struct lfs_config *cfg, lfs_block_t block, lfs_off_t offset, void *buffer, lfs_size_t size) {
-    assert(held && block<64 && offset+size<=128 && !(offset%4) && !(size%4));
+    assert(held && block<LFS_FLASH_BLOCK_COUNT && offset+size<=128 && !(offset%4) && !(size%4));
     if(read_error) return LFS_ERR_IO;
     memcpy(buffer, flash+block*cfg->block_size+offset,size); return 0;
 }
 static int program_block(const struct lfs_config *cfg, lfs_block_t block, lfs_off_t offset, const void *buffer, lfs_size_t size) {
     unsigned i; unsigned char *destination=flash+block*cfg->block_size+offset;
     const unsigned char *bytes=buffer;
-    assert(held && block<64 && offset+size<=128 && !(offset%4) && !(size%4));
+    assert(held && block<LFS_FLASH_BLOCK_COUNT && offset+size<=128 && !(offset%4) && !(size%4));
     for(i=0;i<size;i++) { assert((destination[i]&bytes[i])==bytes[i]); destination[i]&=bytes[i]; }
     assert(sleep_task); sleep_task(0); return 0;
 }
 static int erase_block(const struct lfs_config *cfg, lfs_block_t block) {
-    assert(held && block<64); memset(flash+block*cfg->block_size,255,cfg->block_size); return 0;
+    assert(held && block<LFS_FLASH_BLOCK_COUNT); memset(flash+block*cfg->block_size,255,cfg->block_size); return 0;
 }
 static int sync_block(const struct lfs_config *cfg) { (void)cfg; assert(held); return 0; }
 lfs_t *RM_LITTLEFS_GetLfs(rm_littlefs_ctrl_t *ctrl) { return ctrl->opened?&ctrl->lfs:NULL; }
 rm_littlefs_err_t RM_LITTLEFS_Open(rm_littlefs_ctrl_t *ctrl, const rm_littlefs_cfg_t *cfg) {
     int result;
     assert(held); ++adapter_open_count;
-    assert(cfg->base_address==0x00100000 && cfg->region_size==8192);
+    assert(cfg->base_address==0x00100000 && cfg->region_size==sizeof(flash));
     assert(cfg->read_size==4 && cfg->prog_size==4 && cfg->block_size==128);
     assert(cfg->cache_size==64 && cfg->lookahead_size==16 && cfg->block_cycles==500);
     assert(cfg->format_if_mount_failed==1);
@@ -106,7 +108,7 @@ rm_littlefs_err_t RM_LITTLEFS_Open(rm_littlefs_ctrl_t *ctrl, const rm_littlefs_c
     memset(ctrl,0,sizeof(*ctrl)); controller=ctrl;
     ctrl->lfs_cfg.context=ctrl; ctrl->base_address=cfg->base_address; ctrl->region_size=cfg->region_size;
     ctrl->lfs_cfg.read=read_block; ctrl->lfs_cfg.prog=program_block; ctrl->lfs_cfg.erase=erase_block; ctrl->lfs_cfg.sync=sync_block;
-    ctrl->lfs_cfg.read_size=4; ctrl->lfs_cfg.prog_size=4; ctrl->lfs_cfg.block_size=128; ctrl->lfs_cfg.block_count=64;
+    ctrl->lfs_cfg.read_size=4; ctrl->lfs_cfg.prog_size=4; ctrl->lfs_cfg.block_size=128; ctrl->lfs_cfg.block_count=LFS_FLASH_BLOCK_COUNT;
     ctrl->lfs_cfg.cache_size=64; ctrl->lfs_cfg.lookahead_size=16; ctrl->lfs_cfg.block_cycles=500;
     ctrl->lfs_cfg.read_buffer=ctrl->read_buffer; ctrl->lfs_cfg.prog_buffer=ctrl->prog_buffer;
     ctrl->lfs_cfg.lookahead_buffer=ctrl->lookahead_buffer;
