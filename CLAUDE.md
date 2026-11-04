@@ -603,16 +603,7 @@ Step 8 の完了判定:
 - `main` ブランチは protected。直接 push 不可
 - ブランチを切って MR 経由でマージ
 - MR は `Draft:` プレフィックス付きで作成、assignee: @HirokiIshiguro
-- コミット author:
-
-| Operator | git author |
-|----------|-----------|
-| HirokiIshiguro（人間） | `HirokiIshiguro <ishiguro.hiroki@globe.ocn.ne.jp>` |
-| Claude Code | `Claude Code <claude-code@noreply.anthropic.com>` |
-
-```bash
-git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
-```
+- コミット author: [コミット author の対応表](https://gitlab.saffti.jp/oss/claude-codex-gemini-index/-/blob/main/docs/development/commit-author.md) のとおり
 
 ## Related Projects / 関連プロジェクト
 
