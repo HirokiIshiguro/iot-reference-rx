@@ -625,6 +625,26 @@ workflow:
     - if: $CI_COMMIT_BRANCH
       when: always
 
+logging_delivery_contract:
+  stage: dependency_check
+  tags:
+    - exec-shell
+    - os-linux
+    - hw-sakura-vps
+    - cap-internet
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - Middleware/logging/**/*
+        - tools/ci/tests/test_logging_delivery.py
+      when: on_success
+    - when: never
+  script:
+    - python3 -B -c 'from tools.ci.tests.test_product_oss_api import GCC, MSVC; assert GCC or MSVC, "Host C compiler required for logging delivery regression"'
+    - python3 -B -m unittest tools.ci.tests.test_logging_delivery -v
+
 idt_docs_check:
   stage: dependency_check
   tags:
