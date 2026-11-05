@@ -48,7 +48,7 @@ python3() {
   return "$ENDING_STATUS"
 }
 '''
-            (path / "run.sh").write_text(stub + SCRIPT, encoding="utf-8", newline="\n")
+            (path / "run.sh").write_bytes((stub + SCRIPT).encode("utf-8"))
             env = {**os.environ, "MONITOR_STATUS": str(monitor_status),
                    "ENDING_STATUS": str(ending_status), "TERMINATE": "1" if terminate else "0"}
             result = subprocess.run([BASH, "--noprofile", "--norc", "run.sh"],
