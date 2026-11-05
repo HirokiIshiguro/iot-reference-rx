@@ -204,7 +204,9 @@ variables:
   RX72N_LINUX_COMMAND_BAUD_RATE: "115200"
   RX72N_MQTT_TEST_TIMEOUT: "600"
   RX72N_MQTT_TEST_REPEAT_COUNT: "1"
-  RX72N_MULTI_TLS_TEST_TIMEOUT: "180"
+  # Cold boot + two 35 s overlap windows + reconnect + heartbeat callbacks.
+  # The former 180 s bound left only 0.262 s after the observed reconnect window.
+  RX72N_MULTI_TLS_TEST_TIMEOUT: "240"
   RX72N_MULTI_TLS_MIN_OVERLAP_SECONDS: "30"
   RX72N_FLEET_TEST_TIMEOUT: "600"
   # Runner-local lock shared with every RPi#1 RX72N project. GitLab
@@ -695,6 +697,9 @@ idt_ci_contract:
         - tools/ci/tests/test_lanbench_ec2_owned_cleanup.py
         - tools/normal_boot.py
         - tools/install_normal_boot.py
+        - tools/ci/monitor_multi_tls.py
+        - tools/ci/tests/test_monitor_multi_tls.py
+        - tools/ci/tests/test_multi_tls_ci_ending.py
         - tools/ci/tests/test_normal_boot.py
         - tools/ci/tests/test_normal_boot_benchmark_provenance.py
         - tools/idt/**/*
@@ -788,6 +793,8 @@ idt_ci_contract:
         tools.ci.tests.test_normal_boot \
         tools.ci.tests.test_normal_boot_ci_contract \
         tools.ci.tests.test_normal_boot_install_ci \
+        tools.ci.tests.test_monitor_multi_tls \
+        tools.ci.tests.test_multi_tls_ci_ending \
         tools.ci.tests.test_bg96_bootloader_download \
         tools.ci.tests.test_bg96_ota_prepare \
         tools.ci.tests.test_bg96_static_provisioning.StaticProvisioningContractTests \
@@ -5145,6 +5152,8 @@ test_rx72n_ether_multi_tls:
   stage: test
   extends: .rx72n_linux_hw_job
   needs:
+    - job: package_normal_boot_rx72n
+      artifacts: true
     - job: test_rx72n_ether_mqtt
       artifacts: false
   rules:
@@ -5156,6 +5165,25 @@ test_rx72n_ether_multi_tls:
     - |
       artifact_dir="$CI_PROJECT_DIR/artifacts/test_rx72n_ether_multi_tls"
       mkdir -p "$artifact_dir"
+      finish_multi_tls() {
+        original_status=$?
+        trap - EXIT TERM INT
+        set +e
+        # FD9 remains locked by this job throughout the canonical reset/quiet.
+        python3 tools/install_normal_boot.py \
+          --bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx72n" \
+          --target rx72n-ethernet --source-sha "$CI_COMMIT_SHA" --reset-only \
+          > "$artifact_dir/end_state_receipt.json" 2> "$artifact_dir/end_state_error.log"
+        end_status=$?
+        if [ "$end_status" -ne 0 ]; then
+          touch "$artifact_dir/end_state_failed"
+          if [ "$original_status" -eq 0 ]; then original_status=1; fi
+        fi
+        exit "$original_status"
+      }
+      trap finish_multi_tls EXIT
+      trap 'exit 143' TERM
+      trap 'exit 130' INT
       python -m serial.tools.list_ports -v 2>&1 | tee "$artifact_dir/serial_ports.txt"
       reset_cmd="$RX72N_RFP_CLI -device RX72x -tool $RX72N_RFP_TOOL -if fine -speed $RFP_SPEED -auth id $RFP_AUTH -sig -run -noquery"
       tsip_evidence_args=()

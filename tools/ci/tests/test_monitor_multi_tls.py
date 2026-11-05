@@ -9,6 +9,7 @@ from tools.ci.monitor_multi_tls import (
     MultiTlsEvidence,
     monitor_uart,
     parse_marker,
+    parse_args,
     run_reset_command,
 )
 
@@ -282,6 +283,60 @@ class MultiTlsEvidenceTests(unittest.TestCase):
 
         self.assertFalse(summary["success"])
         self.assertIn("post_reconnect_overlap_long_enough", summary["failures"])
+
+    def test_cold_connection_schedule_needs_room_for_completion_callback(self):
+        # Reproduce job75701's public timing, with the first eligible callback
+        # one 2 s heartbeat after 144.738 + the firmware's 35 s window.
+        original = MultiTlsEvidence.consume_line
+        observed_times = {
+            0.0: 15.263, 1.0: 88.327, 2.0: 88.327,
+            3.0: 89.0, 3.1: 89.1, 4.0: 90.0, 4.1: 90.1,
+            33.0: 130.449, 34.0: 132.0, 34.1: 132.1,
+            35.0: 144.738, 36.0: 144.738,
+            37.0: 146.0, 37.1: 146.1, 38.0: 147.0, 38.1: 147.1,
+            68.0: 181.738,
+        }
+        for bound, expected_success in ((180, False), (240, True)):
+            with self.subTest(bound=bound):
+                evidence = MultiTlsEvidence(max_duration_seconds=bound)
+                def consume(line, elapsed):
+                    actual = observed_times[elapsed]
+                    return original(evidence, line, actual) if actual <= bound else False
+                with mock.patch.object(evidence, "consume_line", side_effect=consume):
+                    feed_happy_path(evidence)
+                summary = evidence.build_summary(elapsed=bound, timed_out=not expected_success)
+                self.assertEqual(expected_success, summary["success"])
+                if not expected_success:
+                    self.assertEqual({"test_complete_seen", "duration_within_bound"},
+                                     set(summary["failures"]))
+                else:
+                    self.assertGreater(summary["timeline"]["post_reconnect_overlap_seconds"], 35)
+
+    def test_new_default_still_rejects_no_completion_and_short_overlap(self):
+        evidence = MultiTlsEvidence()
+        self.assertEqual(240, evidence.max_duration_seconds)
+        feed_happy_path(evidence, complete_at=50.0)
+        self.assertIn("post_reconnect_overlap_long_enough", evidence.build_summary()["failures"])
+        evidence = MultiTlsEvidence(30, 240)
+        evidence.consume_line(marker("TEST_START", generation=1), 0)
+        summary = evidence.build_summary(elapsed=240, timed_out=True)
+        self.assertFalse(summary["success"])
+        self.assertFalse(summary["checks"]["test_complete_seen"])
+        self.assertFalse(summary["checks"]["duration_within_bound"])
+        evidence = MultiTlsEvidence()
+        feed_happy_path(evidence, complete_at=241.0)
+        self.assertIn("duration_within_bound", evidence.build_summary()["failures"])
+
+    def test_ci_cli_and_evidence_defaults_agree(self):
+        from pathlib import Path
+        import re
+        with mock.patch.dict("os.environ", {}, clear=True):
+            cli = parse_args(["--uart-port", "unused"])
+        ci = (Path(__file__).resolve().parents[3] / ".gitlab-ci.yml").read_text()
+        configured = float(re.search(r'RX72N_MULTI_TLS_TEST_TIMEOUT: "([0-9]+)"', ci).group(1))
+        self.assertEqual(240, configured)
+        self.assertEqual(configured, cli.timeout)
+        self.assertEqual(configured, MultiTlsEvidence().max_duration_seconds)
 
     def test_rejects_completion_after_duration_bound(self):
         evidence = MultiTlsEvidence(min_overlap_seconds=30, max_duration_seconds=60)

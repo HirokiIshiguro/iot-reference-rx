@@ -67,6 +67,12 @@ distinct client-ID fingerprints, network contexts, TLS contexts, and sockets;
 matching TX/RX heartbeat sequences; both overlap windows; session 1 traffic
 during the forced session 2 outage; and a clean session 2 reconnect.
 
+The observation bound is 240 seconds, including cold boot, connection setup,
+two 35-second firmware overlap windows, reconnect and heartbeat scheduling.
+The checker still requires 30 seconds in each overlap window and every protocol
+check. CI resets the board and verifies fresh UART quiet under the same bench
+lease on success or failure; this preserves the installed image.
+
 Evidence markers use the synchronous `configPRINT_STRING` path rather than the
 nonblocking general logging queue, preventing one-shot state transitions from
 being silently dropped when normal application logging is busy.
