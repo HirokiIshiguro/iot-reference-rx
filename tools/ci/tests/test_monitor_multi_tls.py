@@ -331,7 +331,7 @@ class MultiTlsEvidenceTests(unittest.TestCase):
         from pathlib import Path
         import re
         with mock.patch.dict("os.environ", {}, clear=True):
-            cli = parse_args(["--uart-port", "unused"])
+            cli = parse_args(["--uart-port", "unused", "--no-reset"])
         ci = (Path(__file__).resolve().parents[3] / ".gitlab-ci.yml").read_text()
         configured = float(re.search(r'RX72N_MULTI_TLS_TEST_TIMEOUT: "([0-9]+)"', ci).group(1))
         self.assertEqual(240, configured)
