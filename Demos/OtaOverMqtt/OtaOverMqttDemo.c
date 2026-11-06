@@ -135,28 +135,35 @@
       'c', 'd', 'e', 'f',
  };
 
-static MqttFileDownloaderContext_t mqttFileDownloaderContext = {0};
+/* Products opt in only when their BSS layout can hold these buffers. */
+#if defined(OTA_STATIC_BUFFERS_IN_BSS) && (OTA_STATIC_BUFFERS_IN_BSS == 1)
+#define OTA_STATIC_BUFFER_ZERO_INITIALIZER
+#else
+#define OTA_STATIC_BUFFER_ZERO_INITIALIZER = {0}
+#endif
+
+static MqttFileDownloaderContext_t mqttFileDownloaderContext OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 static uint32_t numOfBlocksRemaining = 0;
 static uint32_t currentBlockOffset = 0;
 static uint32_t totalNumOfBlocks = 0;
 static uint32_t nextBlockOffsetToRequest = 0;
 static uint8_t currentFileId = 0;
 static uint32_t totalBytesReceived = 0;
-char globalJobId[MAX_JOB_ID_LENGTH] = {0};
+char globalJobId[MAX_JOB_ID_LENGTH] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 
 /* The topic buffer to wait for job event */
-char jobEventTopicBuffer[TOPIC_BUFFER_SIZE + 1] = {0};
+char jobEventTopicBuffer[TOPIC_BUFFER_SIZE + 1] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 size_t jobEventTopicBufferLength = 0U;
 
 /* The topic buffer for new job notifications */
-char   notifyTopicBuffer[TOPIC_BUFFER_SIZE+1] = {0};
+char   notifyTopicBuffer[TOPIC_BUFFER_SIZE+1] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 size_t notifyTopicBufferLength                = 0U;
 
-static OtaDataEvent_t dataBuffers[MAX_NUM_OF_OTA_DATA_BUFFERS] = {0};
-static uint8_t receivedBlockBitmap[MAX_NUM_OF_OTA_FILE_BLOCKS] = {0};
-static OtaJobEventData_t jobDocBuffer = {0};
-static AfrOtaJobDocumentFields_t jobFields = {0};
-static uint8_t OtaImageSingatureDecoded[OTA_MAX_SIGNATURE_SIZE] = {0};
+static OtaDataEvent_t dataBuffers[MAX_NUM_OF_OTA_DATA_BUFFERS] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static uint8_t receivedBlockBitmap[MAX_NUM_OF_OTA_FILE_BLOCKS] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static OtaJobEventData_t jobDocBuffer OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static AfrOtaJobDocumentFields_t jobFields OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static uint8_t OtaImageSingatureDecoded[OTA_MAX_SIGNATURE_SIZE] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 static SemaphoreHandle_t bufferSemaphore;
 
 static OtaState_t otaAgentState = OtaAgentStateInit;
@@ -1388,7 +1395,7 @@ static void processOTAEvents(void)
             break;
         }
 
-        static uint8_t decodedData[mqttFileDownloader_CONFIG_BLOCK_SIZE] = {0};
+        static uint8_t decodedData[mqttFileDownloader_CONFIG_BLOCK_SIZE] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
         size_t decodedDataLength = 0;
         MQTTFileDownloaderStatus_t xReturnStatus;
         int16_t result = -1;

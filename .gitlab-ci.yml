@@ -2056,7 +2056,7 @@ build_rx671_wifi:
   script:
     - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build EK-RX671 Type 1YN Wi-Fi project ==="
-    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_hardware_transaction_contract tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract
+    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_hardware_transaction_contract tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract tools.ci.tests.test_ota_zero_storage_policy
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       $otaParkBuild = (
