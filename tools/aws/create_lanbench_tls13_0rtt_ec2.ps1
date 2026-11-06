@@ -2,7 +2,7 @@
 param(
     [string] $Region = "ap-northeast-1",
     [string] $InstanceName = "iot-reference-rx-lanbench-tls13-0rtt",
-    [string] $InstanceType = "t4g.nano",
+    [string] $InstanceType = "t4g.micro",
     [string] $SecurityGroupName = "iot-reference-rx-lanbench-tls13-0rtt-5443",
     [int] $Port = 5443,
     [string] $AmiParameterName = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64",
