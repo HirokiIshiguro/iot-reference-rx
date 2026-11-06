@@ -78,7 +78,8 @@ class RfpSupervisionTests(unittest.TestCase):
             result = rfp.run_guarded(command, target=self.target, timeout=10)
             self.assertEqual(0, result.returncode)
             self.assertEqual(command, result.args)
-            mocks['subprocess.Popen'].assert_called_once_with(command, start_new_session=True)
+            mocks['subprocess.Popen'].assert_called_once_with(
+                command, start_new_session=True, stdin=subprocess.DEVNULL)
             mocks['killpg'].assert_not_called()
         self.assertFalse(self.sentinel().exists())
 
@@ -86,6 +87,15 @@ class RfpSupervisionTests(unittest.TestCase):
         with supervision(Process([7]), lambda *_: {}), self.assertRaises(subprocess.CalledProcessError) as caught:
             rfp.run_guarded(['rfp-cli'], target=self.target, timeout=10)
         self.assertEqual(7, caught.exception.returncode)
+        self.assertFalse(self.sentinel().exists())
+
+    def test_nonquiet_input_is_eof_while_output_remains_inherited(self):
+        with supervision(Process([0]), lambda *_: {}) as (_, mocks):
+            rfp.run_guarded(['rfp-cli', '-noquery'], target=self.target, timeout=10, quiet=False)
+            options=mocks['subprocess.Popen'].call_args.kwargs
+            self.assertEqual(subprocess.DEVNULL, options['stdin'])
+            self.assertNotIn('stdout', options)
+            self.assertNotIn('stderr', options)
         self.assertFalse(self.sentinel().exists())
 
     def test_timeout_reserves_term_grace_inside_total_budget(self):
