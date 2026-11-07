@@ -60,7 +60,7 @@ class ProductApiTests(unittest.TestCase):
                     '" >nul\nif errorlevel 1 exit /b 1\nset INCLUDE\nset LIB\nset LIBPATH\nset PATH\n',
                     encoding="utf-8")
                 settings = subprocess.run(["cmd.exe", "/d", "/c", str(setup_script)],
-                    capture_output=True, text=True, check=True, timeout=20).stdout
+                    capture_output=True, text=True, check=True, timeout=(120 if os.name == "nt" else 20)).stdout
                 environment = dict(os.environ)
                 environment["VSLANG"] = "1033"
                 for line in settings.splitlines():

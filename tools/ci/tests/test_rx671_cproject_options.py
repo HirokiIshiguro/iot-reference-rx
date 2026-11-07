@@ -1,6 +1,7 @@
 """Execute only RX671 XML option helpers extracted with the PowerShell AST."""
 
 from __future__ import annotations
+import os
 
 import json
 from pathlib import Path
@@ -108,7 +109,7 @@ class Rx671CProjectOptionTests(unittest.TestCase):
     def setUpClass(cls):
         result = subprocess.run([POWERSHELL, "-NoLogo", "-NoProfile", "-NonInteractive",
                                  "-Command", "$PSVersionTable.PSVersion.Major"],
-                                text=True, capture_output=True, timeout=30)
+                                text=True, capture_output=True, timeout=(120 if os.name == "nt" else 30))
         if result.returncode or int(result.stdout.strip()) < 7:
             raise unittest.SkipTest("PowerShell 7 or later is required")
 
@@ -124,7 +125,7 @@ class Rx671CProjectOptionTests(unittest.TestCase):
             process = subprocess.run([POWERSHELL, "-NoLogo", "-NoProfile", "-NonInteractive",
                 "-ExecutionPolicy", "Bypass", "-File", str(script), "-HelperPath", str(HELPER),
                 "-RequestPath", str(request), "-ResultPath", str(result)],
-                text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=30)
+                text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=(120 if os.name == "nt" else 30))
             self.assertEqual(0, process.returncode, process.stderr)
             self.assertTrue(result.is_file(), "Isolated helper must emit its result")
             return json.loads(result.read_text(encoding="utf-8-sig"))

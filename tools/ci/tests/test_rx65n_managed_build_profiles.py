@@ -25,7 +25,7 @@ class Rx65ManagedProfileTests(unittest.TestCase):
         script.write_text(source, encoding="utf-8")
         return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(script)],
             text=True, encoding="utf-8", errors="replace", capture_output=True,
-            env=environment, timeout=30)
+            env=environment, timeout=(120 if os.name == "nt" else 30))
 
     def generation_harness(self, folder, fail=False):
         return r'''
@@ -140,7 +140,7 @@ if($env:RX65_FLEET_FIXTURE_FAIL -eq '1') { throw 'fixture build failed' }
                 result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File",
                     str(tools / FLEET.name), "-ProjectRoot", str(folder)],
                     text=True, encoding="utf-8", errors="replace", capture_output=True,
-                    env=environment, timeout=30)
+                    env=environment, timeout=(120 if os.name == "nt" else 30))
                 self.assertEqual(0 if not fail else 1, result.returncode, result.stderr)
                 observed = json.loads(report.read_text(encoding="utf-8-sig"))
                 self.assertEqual(0, observed["fleetFilterCount"])

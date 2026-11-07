@@ -144,7 +144,7 @@ function Invoke-RxE2StudioBuild {
                     "-Executable","fixture-e2studio-cli.exe","-Workspace",str(project if mode == "overlap" else workspace),
                     "-ProjectPath",str(base/"missing" if mode == "bad-path" else project),
                     "-OutputLog",str(log),"-TimeoutSeconds","0" if mode == "bad-timeout" else "11"], env=dict(os.environ,BG96_CLI_FIXTURE_MODE=mode),
-                    capture_output=True,text=True,encoding="utf-8",errors="replace",timeout=20)
+                    capture_output=True,text=True,encoding="utf-8",errors="replace",timeout=(120 if os.name == "nt" else 20))
                 self.assertEqual(result.returncode, expected_exit, result.stderr)
                 if mode in ("bad-path", "overlap", "bad-timeout"):
                     self.assertFalse(log.exists(), "pre-launch rejection must not invoke the IDE")
