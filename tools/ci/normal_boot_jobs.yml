@@ -5,7 +5,6 @@
   stage: build
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - |
       $ErrorActionPreference = 'Stop'
       python -m pip install --user cryptography
