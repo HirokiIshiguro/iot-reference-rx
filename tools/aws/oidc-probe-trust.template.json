@@ -1,0 +1,12 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/gitlab.saffti.jp"},
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {"StringEquals": {
+      "gitlab.saffti.jp:aud": "sts.amazonaws.com",
+      "gitlab.saffti.jp:sub": "project_path:oss/import/github/renesas/iot-reference-rx:ref_type:branch:ref:main"
+    }}
+  }]
+}

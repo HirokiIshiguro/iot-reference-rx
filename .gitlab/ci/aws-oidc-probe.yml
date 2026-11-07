@@ -1,0 +1,48 @@
+# Standalone configuration candidate. Not included by .gitlab-ci.yml.
+# Launch integration needs separate coordination; a CI_CONFIG_PATH pipeline
+# variable alone does not select an alternate configuration file.
+workflow:
+  rules:
+    - if: '$CI_DEBUG_TRACE == "true" || $CI_DEBUG_SERVICES == "true"'
+      when: never
+    - if: '$CI_PROJECT_ID == "38" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/)'
+    - when: never
+
+stages: [test]
+
+default:
+  tags: [aws-cli-ishiguro]
+  timeout: 5 minutes
+  cache: []
+  before_script: []
+  after_script: []
+
+variables:
+  GIT_SUBMODULE_STRATEGY: none
+  GIT_STRATEGY: clone
+
+oidc_read_probe:
+  stage: test
+  environment:
+    name: aws-oidc-probe
+    action: verify
+  id_tokens:
+    RX_IOT_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+    RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN:
+      aud: https://invalid.example/oidc-probe
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - python -m unittest tools.ci.tests.test_aws_oidc_probe
+    - python tools/aws/oidc_probe.py
+
+oidc_untrusted_ref_probe:
+  stage: test
+  id_tokens:
+    RX_IOT_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/'
+  script:
+    - python tools/aws/oidc_probe.py --expect-denied-ref
