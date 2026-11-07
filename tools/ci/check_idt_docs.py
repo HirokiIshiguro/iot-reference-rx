@@ -17,7 +17,7 @@ except ImportError:
 AUDIT_DOCS = {"docs/common-core-audit/" + name for name in (
     "README.md", "core-versions-config.md", "core-versions-config.json",
     "project-options.md", "project-options.json", "submodule-graph.md", "submodule-graph.json")}
-DOCS = {"README.md", "docs/idt-validation.md", "docs/ota-performance.md"} | AUDIT_DOCS
+DOCS = {"README.md", "docs/idt-validation.md", "docs/ota-performance.md", "tools/idt/RX671_BOOTSTRAP.md"} | AUDIT_DOCS
 BOOTSTRAP = {"tools/ci/check_idt_docs.py", "tools/ci/tests/test_idt_docs.py"}
 BEGIN = "    # BEGIN IDT DOCS WORKFLOW\n"
 END = "    # END IDT DOCS WORKFLOW\n"
