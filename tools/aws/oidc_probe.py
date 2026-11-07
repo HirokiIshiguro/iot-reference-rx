@@ -28,7 +28,7 @@ def configuration(environ, denied_ref=False):
             or not re.fullmatch(r"[0-9]+", environ.get("CI_JOB_ID", ""))
             or (not denied_ref and branch != "main")
             or (not denied_ref and environ.get("CI_COMMIT_REF_PROTECTED") != "true")
-            or (denied_ref and not re.fullmatch(r"200-[a-z0-9-]+", branch))):
+            or (denied_ref and not re.fullmatch(r"(?:(?:codex|claude)/)?[0-9]+-aws-oidc-[a-z0-9-]+", branch))):
         raise ProbeFailure()
     account = environ.get("RX_IOT_OIDC_ACCOUNT_ID", "")
     role = environ.get("RX_IOT_OIDC_ROLE_ARN", "")

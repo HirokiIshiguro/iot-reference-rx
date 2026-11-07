@@ -37,6 +37,8 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual((ACCOUNT, ROLE_ARN, NAME), probe.configuration(environment()))
         self.assertEqual((ACCOUNT, ROLE_ARN, NAME),
                          probe.configuration(environment("200-aws-oidc-probe"), True))
+        self.assertEqual((ACCOUNT, ROLE_ARN, NAME),
+                         probe.configuration(environment("codex/999-aws-oidc-check"), True))
         for key, value in (("CI_PROJECT_ID", "257"), ("CI_PROJECT_PATH", "fork/app"),
                            ("CI_COMMIT_BRANCH", "other"), ("CI_PIPELINE_SOURCE", "push"),
                            ("CI_COMMIT_REF_PROTECTED", "false"),

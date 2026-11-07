@@ -5,7 +5,7 @@
 | 段階 | この変更の状態 |
 |---|---|
 | 固定/動的credentialの利用整理 | 下表。秘密値は取得しない |
-| OIDC-onlyの任意profile | rootへ分離して追加。AWS上の成功は未検証 |
+| OIDC-onlyの任意profile / 通常source CI | rootへ分離して追加。AWS上の成功は未検証 |
 | CSR発行・異常終了時の回収 | 設計候補。未実装・未検証 |
 | 既存経路の切替・固定キー撤去 | 未実施。利用先と回帰成功を確認後に判断 |
 
@@ -42,10 +42,13 @@ project 38のCI/CD Variables 31件をGraphQL `ciVariables`でkey/type/scope/flag
 <summary>独立したOIDC-only疎通と最小role</summary>
 
 構成は[jobだけのinclude](../.gitlab/ci/aws-oidc-probe.yml)。rootは`RUN_RX_IOT_OIDC_PROBE=true`のapi/webだけを`oidc_probe` profileへ分離する。global defaults/stages/workflowをincludeから上書きしない。新flagの既定値はfalseで、既存profileの定義は変えない。
-通常push/MR/既存pipelineではOIDC jobを生成しない。`CI_CONFIG_PATH`というpipeline変数を渡すだけで別構成を選べるとは扱わない。
+`<issue番号>-aws-oidc-<説明>`（任意の`codex/`、`claude/`接頭辞）のMR/branchは、既存のissue種別workflowに沿う`oidc_source`を選び、通常のsource CIを自動実行する。特定のIssue番号や1本限りのbranchを例外にしない。open MRがあるpushは重複pipelineを抑止する。
+source jobは変更pathとrootの既存CI定義を検査し、無関係なfirmware/CI変更が混在すれば失敗する。既存dependency-gate scope検査のGit/比較helperを再利用する。OIDC以外の通常profileの定義は変えない。`[skip ci]`は最新MR commitに使わない。
+`CI_CONFIG_PATH`というpipeline変数を渡すだけで別構成を選べるとは扱わない。
 [GitLabのcustom config設定](https://docs.gitlab.com/ci/pipelines/settings/#specify-a-custom-cicd-configuration-file)はproject設定であり、既存CIに影響するため変更しない。
 新規pipelineへの入力は`RUN_RX_IOT_OIDC_PROBE=true`、`RX_IOT_OIDC_MODE=source|live|denied_ref`だけを基本とする。既存のbuild/IDT/OTA/nightly selectorや`PIPELINE_PROFILE`を同時指定しない。pipeline変数がworkflowのoff/build既定値を上書きできるため、**実行前に正確なpayloadと生成job一覧を照合する**。
-`source`は`aws_oidc_source_check`だけで、AWSを呼ばない。`live`はprotected mainでsource checkと`aws_oidc_read_probe`、`denied_ref`は`200-*`でsource checkと`aws_oidc_denial_observation`を生成する。
+API/webの`source`は`aws_oidc_source_check`だけで、AWSを呼ばない。`live`はprotected mainでsource checkと`aws_oidc_read_probe`、`denied_ref`はOIDC型branchでsource checkと`aws_oidc_denial_observation`を生成する。
+通常MRでは、このsource checkに加えて既存のCI契約jobが生成され得る。全生成jobの成功を確認してから承認する。CCRX/実機jobはこのsource profileで生成しない。
 main以外の正試験をscript（`configuration()`）でも拒否する。許可refやpipeline種別を変更する場合は、script、CI規則、trustを一緒にレビューする。trustだけを変えない。
 compiler/UART、certificate発行、EC2/S3/Signer、artifact/cacheは使用しない。新jobはcompiler共有leaseを取得しない。
 
@@ -74,7 +77,7 @@ CloudTrailの該当AssumeRoleWithWebIdentityイベントでsub・失敗理由を
 job cancel時にcloud側の変更資源はない。進行中のSTS sessionは最大900秒で失効する。
 
 debug設定は、配備Runner 18.9.0（revision `07e534ba`）の[build_settings.go](https://gitlab.com/gitlab-org/gitlab-runner/-/blob/v18.9.0/common/build_settings.go)を確認した。bool検査は[Go ParseBool](https://pkg.go.dev/strconv#ParseBool)で、真値は`1/t/T/TRUE/true/True`。CI規則とscriptはこれらを拒否し、追加で混合大小文字や`+1/01/+0001`も拒否する。job開始後のdebug変数上書きや、pipeline作成後にdebug変数を変えてretryする操作は禁止する。script側の拒否は既にRunnerへ出たログを取り消す機能ではない。
-ローカル確認: `python -m unittest tools.ci.tests.test_aws_oidc_probe`。source profileも同じ9件を実行する。
+ローカル確認: `python -m unittest tools.ci.tests.test_aws_oidc_probe tools.ci.tests.test_aws_oidc_scope`。source jobも同じ14件と、実diffのscope検査を実行する。
 実際のAWSでの正/負試験、GitLabの実token claim、runner配備botocore版は別途確認が必要。共有providerは別担当が作成し、個人account/URL/client IDを読取り確認済み。専用roleは未作成。
 既存pipelineと共有host leaseへの非干渉を調整してから実行する。
 

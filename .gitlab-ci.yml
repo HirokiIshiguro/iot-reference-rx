@@ -3,7 +3,9 @@ include:
     ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
     file: /templates/windows_ccrx_host_lease.yml
   - local: /tools/ci/normal_boot_jobs.yml
+  # OIDC include begin
   - local: /.gitlab/ci/aws-oidc-probe.yml
+  # OIDC include end
 
 stages:
   - dependency_check
@@ -31,11 +33,13 @@ stages:
   - credential_cleanup
 
 variables:
+  # OIDC inputs begin
   RUN_RX_IOT_OIDC_PROBE: "false"
   RX_IOT_OIDC_MODE:
     value: "source"
     options: ["source", "live", "denied_ref"]
     description: "Explicit OIDC-only profile: offline checks, main read probe, or STS denial observation."
+  # OIDC inputs end
   GIT_SUBMODULE_STRATEGY: normal
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: "core.longpaths"
@@ -340,10 +344,11 @@ variables:
 
 workflow:
   rules:
+    # OIDC workflows begin
     # This optional profile owns no compiler/hardware lease. The reviewed API
     # payload must not override these defaults with existing scope selectors.
-    - if: '$RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE !~ /^(t|true|[+]?0*1)$/i && $CI_DEBUG_SERVICES !~ /^(t|true|[+]?0*1)$/i && ($RX_IOT_OIDC_MODE == "source" || ($RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true") || ($RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/))'
-      variables:
+    - if: '$RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE !~ /^(t|true|[+]?0*1)$/i && $CI_DEBUG_SERVICES !~ /^(t|true|[+]?0*1)$/i && ($RX_IOT_OIDC_MODE == "source" || ($RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true") || ($RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^((codex|claude)\/)?[0-9]+-aws-oidc-[a-z0-9-]+$/))'
+      variables: &aws_oidc_offline_defaults
         PIPELINE_PROFILE: "oidc_probe"
         RUN_RX_IDT: "false"
         RUN_RX72N_IDT: "false"
@@ -375,6 +380,18 @@ workflow:
       when: always
     - if: '$RUN_RX_IOT_OIDC_PROBE == "true"'
       when: never
+    - if: '(($CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-aws-oidc-[a-z0-9-]+$/) || ($CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^((codex|claude)\/)?[0-9]+-aws-oidc-[a-z0-9-]+$/)) && ($CI_DEBUG_TRACE =~ /^(t|true|[+]?0*1)$/i || $CI_DEBUG_SERVICES =~ /^(t|true|[+]?0*1)$/i)'
+      when: never
+    # Follow the existing issue-type workflow convention. A scope verifier
+    # rejects mixed changes before this reduced compiler/hardware lane is valid.
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^((codex|claude)\/)?[0-9]+-aws-oidc-[a-z0-9-]+$/ && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '($CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-aws-oidc-[a-z0-9-]+$/) || ($CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^((codex|claude)\/)?[0-9]+-aws-oidc-[a-z0-9-]+$/)'
+      variables:
+        <<: *aws_oidc_offline_defaults
+        PIPELINE_PROFILE: "oidc_source"
+      when: always
+    # OIDC workflows end
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
