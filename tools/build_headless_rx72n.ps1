@@ -4,7 +4,7 @@ param(
     [string]$Workspace = "C:\ai\codex\ws\iotref-rx72n-ws",
     [string]$ProjectsPath = "Projects",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build.log"),
-    [int]$E2StudioTimeoutSeconds = 600,
+    [int]$E2StudioTimeoutSeconds = 1200,
     [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" }),
     [string]$RequireTlsVersion = $(if ($env:RX72N_REQUIRE_TLS_VERSION) { $env:RX72N_REQUIRE_TLS_VERSION } else { "" }),
     [switch]$Tls13ZeroRtt

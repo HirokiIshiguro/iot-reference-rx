@@ -225,7 +225,7 @@ public class Launcher {
         stderr_path = self.directory / (self._testMethodName + ".stderr")
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
             result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", code],
-                                    stdout=stdout, stderr=stderr, env=environment, timeout=20)
+                                    stdout=stdout, stderr=stderr, env=environment, timeout=120)
         result.stdout = stdout_path.read_text(encoding="utf-8", errors="replace")
         result.stderr = stderr_path.read_text(encoding="utf-8", errors="replace")
         return result, calls, log

@@ -302,7 +302,7 @@ def build(repo: Path, target_id: str, output: Path, workspace: Path, python: str
         effective = {path.relative_to(repo).as_posix(): hashlib.sha256(body).hexdigest()
                      for path, body in isolation.effective.items()}
         effective[(project / ".cproject").relative_to(repo).as_posix()] = sha256(project / ".cproject")
-        result = subprocess.run(command, cwd=repo, capture_output=True, timeout=1800, env=environment)
+        result = subprocess.run(command, cwd=repo, capture_output=True, timeout=3600, env=environment)
         (output / "launcher-private.log").write_bytes(result.stdout + result.stderr)
         if result.returncode:
             raise RuntimeError("Public signer provisioner build failed; inspect private build logs")
