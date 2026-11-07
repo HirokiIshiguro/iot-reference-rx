@@ -632,7 +632,6 @@ logging_delivery_contract:
   tags:
     - exec-shell
     - os-linux
-    - hw-sakura-vps
     - cap-internet
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
@@ -652,7 +651,6 @@ idt_docs_check:
   tags:
     - exec-shell
     - os-linux
-    - hw-sakura-vps
     - cap-internet
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
@@ -669,7 +667,6 @@ idt_ci_contract:
   tags:
     - exec-shell
     - os-linux
-    - hw-sakura-vps
     - cap-internet
   variables:
     # Host tests read the selected original APIs and the real littlefs allocator.
@@ -949,7 +946,7 @@ idt_target_plans:
   tags:
     - exec-shell
     - os-linux
-    - hw-sakura-vps
+    - cap-internet
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
   rules:
@@ -1050,7 +1047,6 @@ nightly_dependency_contract:
   tags:
     - exec-shell
     - os-linux
-    - hw-sakura-vps
     - cap-internet
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
@@ -1080,7 +1076,6 @@ rx671_ota_ci_contract:
   tags:
     - exec-shell
     - os-linux
-    - hw-sakura-vps
     - cap-internet
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
@@ -1131,7 +1126,6 @@ nightly_dependency_alignment:
   tags:
     - exec-shell
     - os-linux
-    - hw-sakura-vps
     - cap-internet
   variables:
     GIT_SUBMODULE_STRATEGY: "none"

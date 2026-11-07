@@ -1,4 +1,4 @@
-# Mock-only contract tests on Sakura's Python 3.9.2+ runner.
+# Mock-only contract tests on the general-purpose Linux runner (Python 3.9.2+).
 # AWS clients are replaced in these tests; no boto3/botocore is needed.
 # Keep runtime host pins in requirements-windows.txt / requirements-wsl.txt.
 # cryptography: Python >=3.8 excluding 3.9.0/1; cffi/typing-extensions: >=3.9.
