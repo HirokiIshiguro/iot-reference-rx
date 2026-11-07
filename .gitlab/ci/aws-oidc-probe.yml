@@ -13,7 +13,7 @@ aws_oidc_source_check:
   extends: .aws_oidc_probe_job
   stage: dependency_check
   rules:
-    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true"'
+    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE !~ /^(t|true|[+]?0*1)$/i && $CI_DEBUG_SERVICES !~ /^(t|true|[+]?0*1)$/i'
   script:
     - python -m unittest tools.ci.tests.test_aws_oidc_probe
 
@@ -30,7 +30,7 @@ aws_oidc_read_probe:
     RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN:
       aud: https://invalid.example/oidc-probe
   rules:
-    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && $RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true"'
+    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && $RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE !~ /^(t|true|[+]?0*1)$/i && $CI_DEBUG_SERVICES !~ /^(t|true|[+]?0*1)$/i'
   script:
     - python tools/aws/oidc_probe.py
 
@@ -42,6 +42,6 @@ aws_oidc_denial_observation:
     RX_IOT_OIDC_TOKEN:
       aud: sts.amazonaws.com
   rules:
-    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && $RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/ && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true"'
+    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && $RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/ && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE !~ /^(t|true|[+]?0*1)$/i && $CI_DEBUG_SERVICES !~ /^(t|true|[+]?0*1)$/i'
   script:
     - python tools/aws/oidc_probe.py --expect-denied-ref

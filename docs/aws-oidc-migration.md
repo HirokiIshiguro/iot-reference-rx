@@ -46,7 +46,7 @@ project 38のCI/CD Variables 31件をGraphQL `ciVariables`でkey/type/scope/flag
 [GitLabのcustom config設定](https://docs.gitlab.com/ci/pipelines/settings/#specify-a-custom-cicd-configuration-file)はproject設定であり、既存CIに影響するため変更しない。
 新規pipelineへの入力は`RUN_RX_IOT_OIDC_PROBE=true`、`RX_IOT_OIDC_MODE=source|live|denied_ref`だけを基本とする。既存のbuild/IDT/OTA/nightly selectorや`PIPELINE_PROFILE`を同時指定しない。pipeline変数がworkflowのoff/build既定値を上書きできるため、**実行前に正確なpayloadと生成job一覧を照合する**。
 `source`は`aws_oidc_source_check`だけで、AWSを呼ばない。`live`はprotected mainでsource checkと`aws_oidc_read_probe`、`denied_ref`は`200-*`でsource checkと`aws_oidc_denial_observation`を生成する。
-main以外の正試験をsourceでも拒否する。許可refやpipeline種別を変更する場合は、`configuration()`、CI規則、trustを一緒にレビューする。trustだけを変えない。
+main以外の正試験をscript（`configuration()`）でも拒否する。許可refやpipeline種別を変更する場合は、script、CI規則、trustを一緒にレビューする。trustだけを変えない。
 compiler/UART、certificate発行、EC2/S3/Signer、artifact/cacheは使用しない。新jobはcompiler共有leaseを取得しない。
 
 専用role名は`saffti-iot-reference-rx-oidc-probe`。[trust template](../tools/aws/oidc-probe-trust.template.json)の`${ACCOUNT_ID}`を、正本metadataとcaller identityで照合した個人accountに置換する。
@@ -73,7 +73,8 @@ unsigned STSにtokenをmemoryで渡す。応答の短期keysだけをidentityと
 CloudTrailの該当AssumeRoleWithWebIdentityイベントでsub・失敗理由を確認できない場合は、その証拠が未取得と記録する。別branchが出すbooleanだけを承認根拠にしない。
 job cancel時にcloud側の変更資源はない。進行中のSTS sessionは最大900秒で失効する。
 
-ローカル確認: `python -m unittest tools.ci.tests.test_aws_oidc_probe`。source profileも同じ8件を実行する。
+debug設定は、配備Runner 18.9.0（revision `07e534ba`）の[build_settings.go](https://gitlab.com/gitlab-org/gitlab-runner/-/blob/v18.9.0/common/build_settings.go)を確認した。bool検査は[Go ParseBool](https://pkg.go.dev/strconv#ParseBool)で、真値は`1/t/T/TRUE/true/True`。CI規則とscriptはこれらを拒否し、追加で混合大小文字や`+1/01/+0001`も拒否する。job開始後のdebug変数上書きは禁止する。script側の拒否は既にRunnerへ出たログを取り消す機能ではない。
+ローカル確認: `python -m unittest tools.ci.tests.test_aws_oidc_probe`。source profileも同じ9件を実行する。
 実際のAWSでの正/負試験、GitLabの実token claim、runner配備botocore版は別途確認が必要。共有providerは別担当が作成し、個人account/URL/client IDを読取り確認済み。専用roleは未作成。
 既存pipelineと共有host leaseへの非干渉を調整してから実行する。
 

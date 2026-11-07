@@ -18,12 +18,16 @@ class ProbeFailure(Exception):
 
 
 def configuration(environ, denied_ref=False):
+    if any(re.fullmatch(r"(?:t|true|\+?0*1)", environ.get(key, ""), re.IGNORECASE)
+           for key in ("CI_DEBUG_TRACE", "CI_DEBUG_SERVICES")):
+        raise ProbeFailure()
     branch = environ.get("CI_COMMIT_BRANCH", "")
     if (environ.get("CI_PROJECT_ID") != "38" or environ.get("CI_PROJECT_PATH") != PROJECT
             or environ.get("CI_PIPELINE_SOURCE") not in ("api", "web")
             or environ.get("CI_COMMIT_TAG")
             or not re.fullmatch(r"[0-9]+", environ.get("CI_JOB_ID", ""))
             or (not denied_ref and branch != "main")
+            or (not denied_ref and environ.get("CI_COMMIT_REF_PROTECTED") != "true")
             or (denied_ref and not re.fullmatch(r"200-[a-z0-9-]+", branch))):
         raise ProbeFailure()
     account = environ.get("RX_IOT_OIDC_ACCOUNT_ID", "")

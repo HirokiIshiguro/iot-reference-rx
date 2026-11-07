@@ -342,7 +342,7 @@ workflow:
   rules:
     # This optional profile owns no compiler/hardware lease. The reviewed API
     # payload must not override these defaults with existing scope selectors.
-    - if: '$RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true" && ($RX_IOT_OIDC_MODE == "source" || ($RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true") || ($RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/))'
+    - if: '$RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE !~ /^(t|true|[+]?0*1)$/i && $CI_DEBUG_SERVICES !~ /^(t|true|[+]?0*1)$/i && ($RX_IOT_OIDC_MODE == "source" || ($RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true") || ($RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/))'
       variables:
         PIPELINE_PROFILE: "oidc_probe"
         RUN_RX_IDT: "false"

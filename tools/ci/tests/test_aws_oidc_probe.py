@@ -26,7 +26,8 @@ SESSION = "fixture-session-never-print"
 
 def environment(branch="main"):
     return {"CI_PROJECT_ID": "38", "CI_PROJECT_PATH": probe.PROJECT,
-            "CI_COMMIT_BRANCH": branch, "CI_PIPELINE_SOURCE": "api", "CI_JOB_ID": "321",
+            "CI_COMMIT_BRANCH": branch, "CI_COMMIT_REF_PROTECTED": "true",
+            "CI_PIPELINE_SOURCE": "api", "CI_JOB_ID": "321",
             "RX_IOT_OIDC_ACCOUNT_ID": ACCOUNT, "RX_IOT_OIDC_ROLE_ARN": ROLE_ARN,
             "RX_IOT_OIDC_TOKEN": TOKEN, "RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN": WRONG}
 
@@ -38,6 +39,7 @@ class ProbeTests(unittest.TestCase):
                          probe.configuration(environment("200-aws-oidc-probe"), True))
         for key, value in (("CI_PROJECT_ID", "257"), ("CI_PROJECT_PATH", "fork/app"),
                            ("CI_COMMIT_BRANCH", "other"), ("CI_PIPELINE_SOURCE", "push"),
+                           ("CI_COMMIT_REF_PROTECTED", "false"),
                            ("CI_COMMIT_TAG", "v1"), ("CI_JOB_ID", "invalid"),
                            ("RX_IOT_OIDC_ACCOUNT_ID", "999999999999"),
                            ("RX_IOT_OIDC_ROLE_ARN", ROLE_ARN + "-other")):
@@ -45,6 +47,19 @@ class ProbeTests(unittest.TestCase):
                 probe.configuration({**environment(), key: value})
         with self.assertRaises(probe.ProbeFailure):
             probe.configuration(environment(), True)
+
+    def test_debug_boolean_aliases_fail_before_sdk_or_token_use(self):
+        for flag in ("CI_DEBUG_TRACE", "CI_DEBUG_SERVICES"):
+            for value in ("1", "t", "T", "TRUE", "true", "True", "TrUe", "+1", "01", "+0001"):
+                out = io.StringIO()
+                with self.subTest(flag=flag, value=value), \
+                        patch.dict(os.environ, {**environment(), flag:value}, clear=True), \
+                        patch.object(sys, "argv", ["probe"]), \
+                        patch.object(probe, "isolated_session") as factory, \
+                        contextlib.redirect_stdout(out):
+                    self.assertEqual(1, probe.main())
+                    factory.assert_not_called()
+                    self.assertEqual('{"oidc_probe_failed": true}\n', out.getvalue())
 
     def test_ambient_provider_inputs_are_removed_without_reading_files(self):
         with patch.dict(os.environ, {"AWS_ACCESS_KEY_ID": KEY, "AWS_SECRET_ACCESS_KEY": SECRET,
