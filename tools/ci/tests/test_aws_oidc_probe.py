@@ -1,5 +1,6 @@
 """Offline security boundaries for the independent, read-only OIDC probe."""
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -126,7 +127,8 @@ class ProbeTests(unittest.TestCase):
 
     def test_untrusted_ref_requires_sts_denial_and_never_calls_iot(self):
         result, calls = self.exercise(denied=True)
-        self.assertEqual({"untrusted_ref_denied": True}, result)
+        self.assertEqual({"sts_access_denied": True, "configured_target_sha256":
+                          hashlib.sha256((ACCOUNT + "|" + ROLE_ARN).encode()).hexdigest()}, result)
         self.assertEqual(1, len(calls))
 
     def test_wrong_audience_must_be_rejected_for_the_expected_reason(self):

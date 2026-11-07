@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
 import re
@@ -10,7 +11,6 @@ import sys
 PROJECT = "oss/import/github/renesas/iot-reference-rx"
 ROLE = "saffti-iot-reference-rx-oidc-probe"
 REGION = "ap-northeast-1"
-AUDIENCE = "sts.amazonaws.com"
 
 
 class ProbeFailure(Exception):
@@ -73,9 +73,11 @@ def run_probe(session, account, role, name, token, wrong_audience, denied_ref=Fa
                 return
         raise ProbeFailure()
 
+    target = hashlib.sha256((account + "|" + role).encode("ascii")).hexdigest()
     if denied_ref:
         require_denied(token, "AccessDenied")
-        return {"untrusted_ref_denied": True}
+        # AccessDenied alone does not identify which trust condition failed.
+        return {"sts_access_denied": True, "configured_target_sha256": target}
     require_denied(wrong_audience, "InvalidIdentityToken")
     credentials = assume(token)["Credentials"]
     # All authenticated calls receive the returned STS keys explicitly. No
@@ -97,8 +99,8 @@ def run_probe(session, account, role, name, token, wrong_audience, denied_ref=Fa
     if not re.fullmatch(r"[a-z0-9-]+-ats\.iot\.ap-northeast-1\.amazonaws\.com",
                         endpoint.get("endpointAddress", "")):
         raise ProbeFailure()
-    return {"oidc_assumed_expected_role": True, "wrong_audience_denied": True,
-            "iot_endpoint_read": True, "runner_static_credentials_excluded": True}
+    return {"caller_is_expected_assumed_role": True, "wrong_audience_denied": True,
+            "iot_endpoint_read": True, "configured_target_sha256": target}
 
 
 def main():

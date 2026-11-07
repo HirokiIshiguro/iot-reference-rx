@@ -12,8 +12,8 @@
 短い疎通の流れは `GitLab ID token → unsigned STS → identity照合 → IoT endpoint読取り`。
 誤audienceと未許可refはSTSで拒否される必要がある。
 
-以降は基本的にAI向けの網羅的資料です。人間が読む必要はありません。
-内容を確認したい場合は、最初にAIへ要約を依頼してください。
+人間の判断が必要な残件は、main限定probeの起動導線、CSR発行/削除の権限境界、独立回収の責任者・期限・通知先である。
+以下は実装・監査担当向けの根拠と未検証事項である。
 
 <details>
 <summary>既存の利用経路とアカウント境界</summary>
@@ -44,8 +44,9 @@ project 38のCI/CD Variables 31件をGraphQL `ciVariables`でkey/type/scope/flag
 構成候補は[standalone config](../.gitlab/ci/aws-oidc-probe.yml)。root `.gitlab-ci.yml`へincludeしていない。projectのCI config設定も変更しない。
 通常push/MR/既存pipelineでは動かない。`CI_CONFIG_PATH`というpipeline変数を渡すだけで別構成を選べるとは扱わない。
 [GitLabのcustom config設定](https://docs.gitlab.com/ci/pipelines/settings/#specify-a-custom-cicd-configuration-file)はproject設定であり、既存CIに影響するため変更しない。
-実行には、既存CI担当者と起動導線を別途調整する必要がある。例は、専用probe refのroot構成として検証する方法か、mainへ明示的に隔離したtriggerを追加する方法であり、どちらも今回未実装。
-probe refを使う場合はtrustのrefもその完全一致へ変更し、mainの成功と混同しない。起動したpipelineの実構成がprobeだけと確認できてから`RUN_RX_IOT_OIDC_PROBE=true`を指定する。
+実行には、既存CI担当者と**main限定probeの起動導線を別途設計**する必要がある。今回のsourceはmain以外の正試験を拒否する。
+許可refやpipeline種別を変更する場合は、sourceの`configuration()`、CI規則、trustを一緒にレビュー・変更する。trustだけを変更して別refで正試験を行わない。
+起動したpipelineの実構成がprobeだけと確認できてから`RUN_RX_IOT_OIDC_PROBE=true`を指定する。
 mainでは読取りprobe、`200-*` branchでは未許可refの拒否確認だけを行う。compiler/probe/UART、certificate発行、EC2/S3/Signer、artifact/cacheは使用しない。
 
 専用role名は`saffti-iot-reference-rx-oidc-probe`。[trust template](../tools/aws/oidc-probe-trust.template.json)の`${ACCOUNT_ID}`を、正本metadataとcaller identityで照合した個人accountに置換する。
@@ -53,16 +54,23 @@ mainでは読取りprobe、`200-*` branchでは未許可refの拒否確認だけ
 Self-ManagedではAWS条件キーにgitlab.com専用の`project_id`や`ref_protected`を用いない。
 [permission policy](../tools/aws/oidc-probe-policy.json)は東京リージョンの`iot:DescribeEndpoint`のみ。STS GetCallerIdentityに追加Allowは不要。
 このroleにIoT発行/変更/削除権限を追加しない。
+`sub`だけでは構成file/job/保護状態を制限できないため、mainの他jobも同じaudのID tokenを要求できる。発行/回収用roleはこのtrustだけを流用して有効化しない。
 
 設定候補の名前は`RX_IOT_OIDC_ACCOUNT_ID` / `RX_IOT_OIDC_ROLE_ARN`。値の登録は今回未実施。
 main用の非secret設定をprotectedかつenvironment scope `aws-oidc-probe`に置く。未許可ref確認では、同じ非secret設定を当該pipelineに明示指定する。
 登録した場合はhardware-configに**変数名のみ**記録し、値・JWT・STS credentialsは載せない。
 `RX_IOT_OIDC_TOKEN` / `RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN`は`id_tokens`が発行するため、固定変数へ登録しない。
+pipeline変数はproject変数を上書きできる。実証の記録では、起動者とoverride権限設定を確認し、正本account/専用roleから独立に計算した`SHA256(account + "|" + role ARN)`と出力`configured_target_sha256`を照合する。
+2026-11-07のproject API確認では`ci_pipeline_variables_minimum_override_role=developer`だった。今回この設定は変更していない。
+この照合なしに「個人accountで成功」「同一roleの正/負試験」と判定しない。scriptのidentity照合は入力されたtargetとの一致を示すだけである。
 
 probeはambient `AWS_*` / Boto設定を除去し、config/credentialsの読取り先を空deviceに固定する。
 unsigned STSにtokenをmemoryで渡す。応答の短期keysだけをidentityとIoT clientへ明示し、環境変数・file・process argumentsへ書かない。
 有効期間900秒、SDK再試行なし、通信timeoutは接続5秒・応答15秒。ログは成功booleanか固定失敗booleanだけ。SDK debugも抑止する。
 誤audienceが`InvalidIdentityToken`、未許可refが`AccessDenied`以外なら成功と扱わない。
+誤audience試験はprovider側のclient ID一覧が`sts.amazonaws.com`のみであることを前提にする。共有providerの管理者はRX74M親であり、一覧が変わった場合は判定根拠を再評価する。追加audienceをprobeから登録しない。
+未許可refの出力は`sts_access_denied`であり、ref拒否の証明ではない。同一targetでmain正試験が直近に成功し、source SHA/実際のref/role設定/監査記録を突き合わせて初めてref制限を評価する。
+CloudTrailの該当AssumeRoleWithWebIdentityイベントでsub・失敗理由を確認できない場合は、その証拠が未取得と記録する。別branchが出すbooleanだけを承認根拠にしない。
 job cancel時にcloud側の変更資源はない。進行中のSTS sessionは最大900秒で失効する。
 
 ローカル確認: `python -m unittest tools.ci.tests.test_aws_oidc_probe`。
@@ -98,7 +106,8 @@ credential発行/回収を検証する仲介service、または明示的に限�
 | 回収権限不足/証拠不一致 | 既存資源を推測で削除しない。secretなしresource ID/状態を保持し、責任者へ具体的な未回収対象を報告。次の同一対象試験を止める |
 
 回収実行者の候補は定期janitorとon-demand recovery。周期、最大残存時間、所有journalの保存場所、CloudTrail等との照合、担当者、通知先を決定してからenableする。
-Thingはproject/pipeline/job/target/expiryを作成時に付与できるが、certificateは同じタグ方式にできない。
+Thingの名前とattributesにproject/pipeline/job/target/expiryを記録する案は、所有journalとの照合用でありIAM tag ABACではない。Thing/certificateにThing group等と同じタグ制限を適用できるとは扱わない。
+発行結果不明時のreconciliationには、永続intentに保存したCSRのSPKI公開鍵hashと、候補certificateのDescribeCertificate結果との一致確認が必要になる。候補を発見するread範囲と証跡基盤は未設計である。
 公開journalにprivate key/CSR本文/JWT/STS keysを含めない。kill直後にprivate file消去を保証できないため、private領域のACLと再起動時清掃も確認する。
 
 既存固定credentialの撤去条件は、利用先一覧・OIDC-only正/負試験・CSR/回収試験・別担当と調整したIDT/OTA/benchmark回帰がそろうこと。

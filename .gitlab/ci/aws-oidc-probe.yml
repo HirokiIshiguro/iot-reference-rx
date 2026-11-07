@@ -45,4 +45,5 @@ oidc_untrusted_ref_probe:
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/'
   script:
+    - python -m unittest tools.ci.tests.test_aws_oidc_probe
     - python tools/aws/oidc_probe.py --expect-denied-ref
