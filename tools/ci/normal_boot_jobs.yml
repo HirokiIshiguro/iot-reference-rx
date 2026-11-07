@@ -73,7 +73,7 @@
 
 package_normal_boot_rx72n:
   extends: .normal_boot_package
-  tags: [exec-shell, os-windows, ccrx, $RX72N_BUILD_RUNNER_TAG]
+  tags: [exec-shell, os-windows, ccrx]
   needs:
     - job: build_rx72n_ether
       artifacts: true
@@ -89,7 +89,7 @@ package_normal_boot_rx72n:
 
 package_normal_boot_rx65n:
   extends: .normal_boot_package
-  tags: [exec-shell, os-windows, ccrx, $RX65N_BG96_BUILD_RUNNER_TAG]
+  tags: [exec-shell, os-windows, ccrx]
   needs:
     - job: build_rx65n_bg96
       artifacts: true
@@ -104,7 +104,7 @@ package_normal_boot_rx65n:
 
 package_normal_boot_rx671:
   extends: .normal_boot_package
-  tags: [exec-shell, os-windows, ccrx, $RX671_WIFI_BUILD_RUNNER_TAG]
+  tags: [exec-shell, os-windows, ccrx]
   needs:
     - job: build_rx671_wifi
       artifacts: true
@@ -116,7 +116,7 @@ package_normal_boot_rx671:
 
 package_normal_boot_rx72n_fleet:
   extends: .normal_boot_package
-  tags: [exec-shell, os-windows, ccrx, $RX72N_BUILD_RUNNER_TAG]
+  tags: [exec-shell, os-windows, ccrx]
   needs:
     - job: build_rx72n_ether_fleet
       artifacts: true
@@ -132,7 +132,7 @@ package_normal_boot_rx72n_fleet:
 
 package_normal_boot_rx65n_fleet:
   extends: .normal_boot_package
-  tags: [exec-shell, os-windows, ccrx, $RX65N_BG96_BUILD_RUNNER_TAG]
+  tags: [exec-shell, os-windows, ccrx]
   needs:
     - job: build_rx65n_bg96_fleet
       artifacts: true
@@ -154,7 +154,6 @@ package_normal_boot_rx671_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   variables:
     GIT_SUBMODULE_STRATEGY: none

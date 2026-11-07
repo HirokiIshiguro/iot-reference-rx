@@ -829,7 +829,6 @@ idt_ci_contract:
     - exec-shell
     - os-windows
     - $RX72N_IDT_RUNNER_TAG
-    - ccrx
     - $AWS_CLI_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   timeout: 3 hours
@@ -983,7 +982,6 @@ idt_source_matrix:
     - exec-shell
     - os-windows
     - $RX72N_IDT_RUNNER_TAG
-    - ccrx
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   timeout: 3 hours
   variables:
@@ -1772,7 +1770,6 @@ build_rx72n_ether:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
@@ -1915,7 +1912,6 @@ build_rx65n_bg96:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX65N_BG96_BUILD == "true"'
@@ -2038,7 +2034,6 @@ build_rx671_wifi:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
@@ -2138,7 +2133,6 @@ build_rx671_wifi_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx671_wifi_fleet_rules
@@ -2337,7 +2331,6 @@ build_rx671_bootloader:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
@@ -2394,7 +2387,6 @@ package_rx671_ota_artifacts:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
@@ -2700,7 +2692,6 @@ build_rx65n_bg96_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx65n_bg96_fleet_rules
@@ -2772,7 +2763,6 @@ build_rx72n_ether_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
@@ -3682,7 +3672,6 @@ build_rx65n_bg96_ota:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx65n_bg96_ota_rules
@@ -5677,7 +5666,6 @@ build_rx72n_ether_mqtt_candidate:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
@@ -5769,7 +5757,6 @@ build_rx72n_ether_ota:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   needs:
     - test_rx72n_ether_mqtt
@@ -6211,7 +6198,6 @@ validate_rx72n_hw_platform:
   tags:
     - exec-shell
     - os-windows
-    - ccrx
     - $RX72N_BUILD_RUNNER_TAG
   variables:
     GIT_STRATEGY: none
@@ -6229,7 +6215,6 @@ validate_rx65n_bg96_scope:
   tags:
     - exec-shell
     - os-windows
-    - ccrx
     - $RX65N_BG96_BUILD_RUNNER_TAG
   variables:
     GIT_STRATEGY: none
