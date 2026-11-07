@@ -70,7 +70,7 @@ variables:
   IDT_SCOPE: "preflight"
   RUN_RX72N_IDT: "false"
   # Override when a second Windows/WSL host has the same validated capabilities.
-  RX72N_IDT_RUNNER_TAG: "hw-ishiguro-pc"
+  RX72N_IDT_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
   RX72N_IDT_PYTHON: "C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe"
   RX72N_IDT_HOST_PROFILE: "C:/ai/codex/tools/venvs/rx72n-idt-windows/host-profile.json"
   # Bring-up scopes are partial results, not a release qualification PASS.
@@ -239,8 +239,8 @@ variables:
   RX72N_OTA_OBSERVE_TIMEOUT: "900"
   AWS_DEFAULT_REGION: "ap-northeast-1"
   AWS_CLI_RUNNER_TAG: "aws-cli-ishiguro"
-  RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
-  RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  RX72N_BUILD_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
+  RX65N_BG96_BUILD_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
   E2STUDIO_WORKSPACE_RX671_WIFI: "C:/ai/codex/ws/ci-rx671-wifi-${CI_PIPELINE_ID}-${CI_JOB_ID}"
   E2STUDIO_WORKSPACE_RX671_WIFI_FLEET: "C:/Temp/e2ws_iot_ref_rx671_wifi_fleet_2026_04_2"
   E2STUDIO_WORKSPACE_RX671_BOOTLOADER: "C:/ai/codex/ws/ci-rx671-boot-${CI_PIPELINE_ID}-${CI_JOB_ID}/e2ws_iot_ref_rx671_bootloader_2026_04_2"
@@ -287,7 +287,7 @@ variables:
   # frame. Focused HIL uses this to prove the bounded non-abort recovery path.
   RX671_WIFI_F2_FAULT_INJECT_ONCE: "false"
   RX671_WIFI_SKIP_HW_TESTS: "false"
-  RX671_WIFI_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  RX671_WIFI_BUILD_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
   RX671_WIFI_DEVICE_RESOURCE_GROUP: "ek-rx671-rpi1-hardware"
   # Runner-local lock shared with the standalone RX671 benchmark projects.
   # GitLab resource_group locks are project-scoped, so they cannot prevent a
