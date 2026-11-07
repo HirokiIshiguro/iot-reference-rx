@@ -4,8 +4,6 @@ include:
     file: /templates/windows_ccrx_host_lease.yml
   - local: /tools/ci/normal_boot_jobs.yml
   - local: /.gitlab/ci/aws-oidc-probe.yml
-    rules:
-      - if: '$RUN_RX_IOT_OIDC_PROBE == "true"'
 
 stages:
   - dependency_check
