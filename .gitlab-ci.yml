@@ -3,6 +3,9 @@ include:
     ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
     file: /templates/windows_ccrx_host_lease.yml
   - local: /tools/ci/normal_boot_jobs.yml
+  - local: /.gitlab/ci/aws-oidc-probe.yml
+    rules:
+      - if: '$RUN_RX_IOT_OIDC_PROBE == "true"'
 
 stages:
   - dependency_check
@@ -30,6 +33,11 @@ stages:
   - credential_cleanup
 
 variables:
+  RUN_RX_IOT_OIDC_PROBE: "false"
+  RX_IOT_OIDC_MODE:
+    value: "source"
+    options: ["source", "live", "denied_ref"]
+    description: "Explicit OIDC-only profile: offline checks, main read probe, or STS denial observation."
   GIT_SUBMODULE_STRATEGY: normal
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: "core.longpaths"
@@ -334,6 +342,41 @@ variables:
 
 workflow:
   rules:
+    # This optional profile owns no compiler/hardware lease. The reviewed API
+    # payload must not override these defaults with existing scope selectors.
+    - if: '$RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true" && ($RX_IOT_OIDC_MODE == "source" || ($RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true") || ($RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/))'
+      variables:
+        PIPELINE_PROFILE: "oidc_probe"
+        RUN_RX_IDT: "false"
+        RUN_RX72N_IDT: "false"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RX72N_TEST_SCOPE: "build"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+        RX72N_HW_RUNNER_PLATFORM: "linux"
+        RX65N_BG96_HW_RUNNER_PLATFORM: "linux"
+      when: always
+    - if: '$RUN_RX_IOT_OIDC_PROBE == "true"'
+      when: never
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.

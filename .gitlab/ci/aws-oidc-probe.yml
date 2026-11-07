@@ -1,28 +1,26 @@
-# Standalone configuration candidate. Not included by .gitlab-ci.yml.
-# Launch integration needs separate coordination; a CI_CONFIG_PATH pipeline
-# variable alone does not select an alternate configuration file.
-workflow:
-  rules:
-    - if: '$CI_DEBUG_TRACE == "true" || $CI_DEBUG_SERVICES == "true"'
-      when: never
-    - if: '$CI_PROJECT_ID == "38" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/)'
-    - when: never
-
-stages: [test]
-
-default:
-  tags: [aws-cli-ishiguro]
+# Job-only include: no global defaults/workflow/stages affect other profiles.
+.aws_oidc_probe_job:
+  tags: [exec-shell, os-windows, aws-cli-ishiguro]
   timeout: 5 minutes
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
   cache: []
   before_script: []
   after_script: []
+  dependencies: []
 
-variables:
-  GIT_SUBMODULE_STRATEGY: none
-  GIT_STRATEGY: clone
+aws_oidc_source_check:
+  extends: .aws_oidc_probe_job
+  stage: dependency_check
+  rules:
+    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true"'
+  script:
+    - python -m unittest tools.ci.tests.test_aws_oidc_probe
 
-oidc_read_probe:
+aws_oidc_read_probe:
+  extends: .aws_oidc_probe_job
   stage: test
+  needs: [aws_oidc_source_check]
   environment:
     name: aws-oidc-probe
     action: verify
@@ -32,18 +30,18 @@ oidc_read_probe:
     RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN:
       aud: https://invalid.example/oidc-probe
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && $RX_IOT_OIDC_MODE == "live" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true"'
   script:
-    - python -m unittest tools.ci.tests.test_aws_oidc_probe
     - python tools/aws/oidc_probe.py
 
-oidc_untrusted_ref_probe:
+aws_oidc_denial_observation:
+  extends: .aws_oidc_probe_job
   stage: test
+  needs: [aws_oidc_source_check]
   id_tokens:
     RX_IOT_OIDC_TOKEN:
       aud: sts.amazonaws.com
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/'
+    - if: '$PIPELINE_PROFILE == "oidc_probe" && $RUN_RX_IOT_OIDC_PROBE == "true" && $RX_IOT_OIDC_MODE == "denied_ref" && $CI_COMMIT_BRANCH =~ /^200-[a-z0-9-]+$/ && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_DEBUG_TRACE != "true" && $CI_DEBUG_SERVICES != "true"'
   script:
-    - python -m unittest tools.ci.tests.test_aws_oidc_probe
     - python tools/aws/oidc_probe.py --expect-denied-ref
