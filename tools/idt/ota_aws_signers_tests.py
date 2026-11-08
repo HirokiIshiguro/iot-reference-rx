@@ -1,12 +1,22 @@
 """Mock-only ownership/lifecycle tests; no AWS connection is made."""
 import json
-from unittest.mock import patch
+import os
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 try:
     from . import ota_aws_signers as module
-    from .ota_support_tests import OtaSupportTests
 except ImportError:
     import ota_aws_signers as module
-    from ota_support_tests import OtaSupportTests
+
+ORIGINAL_CLIENTS = module._clients
 
 
 class ApiError(Exception):
@@ -63,9 +73,28 @@ class Signer:
         self.get_signing_profile(profileName)["status"] = "Canceled"
 
 
-class AwsSignerTests(OtaSupportTests):
+class AwsSignerTests(unittest.TestCase):
     def setUp(self):
-        super().setUp()
+        temporary = tempfile.TemporaryDirectory(prefix="idt-signer-unit-")
+        self.addCleanup(temporary.cleanup)
+        environment = patch.dict(os.environ, {"CI": "false"})
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.inputs = Path(temporary.name)
+        self.config = {"codeSigningConfiguration": {"signCommand": "test"}}
+        now = datetime.now(timezone.utc)
+        for cert_name, key_name in ((module.TRUSTED_CERT, module.SIGNING_KEY),
+                                    (module.UNTRUSTED_CERT, module.UNTRUSTED_KEY)):
+            key = ec.generate_private_key(ec.SECP256R1())
+            name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "unit-test")])
+            cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                    .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                    .not_valid_before(now - timedelta(minutes=1))
+                    .not_valid_after(now + timedelta(days=1)).sign(key, hashes.SHA256()))
+            (self.inputs / cert_name).write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+            (self.inputs / key_name).write_bytes(key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption()))
         self.acm, self.signer = Acm(), Signer()
         mock = patch.object(module, "_clients", return_value=(self.acm, self.signer))
         mock.start()
@@ -73,6 +102,19 @@ class AwsSignerTests(OtaSupportTests):
 
     def prepare(self):
         return module.prepare_aws_signers(self.inputs, "ap-northeast-1", "unit-run", self.config)
+
+    def test_aws_clients_disable_automatic_mutation_retries(self):
+        session = Mock()
+        ORIGINAL_CLIENTS("ap-northeast-1", session)
+        self.assertEqual(2, session.client.call_count)
+        for call in session.client.call_args_list:
+            self.assertEqual(1, call.kwargs["config"].retries["total_max_attempts"])
+
+    def test_ci_or_oidc_native_ota_stops_before_import(self):
+        for value in ({"CI": "true"}, {"RX_OIDC_EXPIRATION_UTC": "synthetic"}):
+            with self.subTest(value=value), patch.dict(os.environ, value), self.assertRaisesRegex(RuntimeError, "not ready"):
+                self.prepare()
+            self.assertEqual({}, self.acm.certificates)
 
     def test_native_config_and_owned_certificates_cleanup(self):
         native = self.prepare()["codeSigningConfiguration"]
@@ -95,16 +137,82 @@ class AwsSignerTests(OtaSupportTests):
         self.assertNotIn(arn, self.acm.deleted)
         self.assertEqual(self.signer.canceled, [])
 
-    def test_in_use_cancels_only_profile_using_owned_certificate(self):
+    def test_same_certificate_other_run_profile_is_never_canceled_or_deleted(self):
         self.prepare()
         arn = next(iter(self.acm.certificates))
         self.signer.profiles = [
-            {"profileName": "owned", "status": "Active", "signingMaterial": {"certificateArn": arn}},
+            {"profileName": "other-run", "status": "Active", "signingMaterial": {"certificateArn": arn}},
             {"profileName": "unrelated", "status": "Active", "signingMaterial": {"certificateArn": "other"}}]
-        self.acm.in_use_once = True
-        with patch.object(module.time, "sleep"):
+        with self.assertRaisesRegex(RuntimeError, "incomplete"):
             module.cleanup_aws_signers(self.inputs)
-        self.assertEqual(self.signer.canceled, ["owned"])
+        self.assertEqual(self.signer.canceled, [])
+        self.assertNotIn(arn, self.acm.deleted)
+        self.assertIn(arn, self.acm.certificates)
+
+    def test_in_use_without_profile_evidence_never_cancels(self):
+        self.prepare()
+        arn = next(iter(self.acm.certificates))
+        self.acm.in_use_once = True
+        with self.assertRaisesRegex(RuntimeError, "incomplete"):
+            module.cleanup_aws_signers(self.inputs)
+        self.assertNotIn(arn, self.acm.deleted)
+        self.assertEqual(self.signer.canceled, [])
+
+    def test_profile_scan_follows_pages_and_includes_canceled(self):
+        self.prepare()
+        arn = next(iter(self.acm.certificates))
+        calls = []
+
+        def pages(**request):
+            calls.append(request)
+            if "nextToken" not in request:
+                return {"profiles": [], "nextToken": "page-2"}
+            return {"profiles": [{"profileName": "other", "status": "Canceled",
+                                   "signingMaterial": {"certificateArn": arn}}]}
+
+        self.signer.list_signing_profiles = pages
+        with self.assertRaisesRegex(RuntimeError, "incomplete"):
+            module.cleanup_aws_signers(self.inputs)
+        self.assertTrue(all(call["includeCanceled"] for call in calls))
+        self.assertNotIn(arn, self.acm.deleted)
+        self.assertEqual(self.signer.canceled, [])
+
+    def test_profile_scan_failure_or_unknown_material_retains_certificate(self):
+        for response in (ApiError("AccessDeniedException"), {"profiles": [{}]}, {}):
+            with self.subTest(response=response):
+                self.prepare()
+                original = set(self.acm.certificates)
+                with patch.object(self.signer, "list_signing_profiles",
+                                  side_effect=response if isinstance(response, Exception) else None,
+                                  return_value=response):
+                    with self.assertRaisesRegex(RuntimeError, "incomplete"):
+                        module.cleanup_aws_signers(self.inputs)
+                self.assertEqual(original, set(self.acm.certificates))
+                self.assertEqual(self.signer.canceled, [])
+                (self.inputs / module.JOURNAL).unlink()
+                self.acm.certificates.clear()
+
+    def test_snapshot_is_complete_paginated_and_contains_only_identifiers(self):
+        calls = []
+        profile = {"profileName": "other", "arn": "arn:aws:signer:region:account:/signing-profiles/other",
+                   "profileVersion": "a" * 10, "profileVersionArn": "version-arn", "status": "Canceled",
+                   "signingMaterial": {"certificateArn": "not-saved"}, "tags": {"private": "not-saved"}}
+
+        def pages(**request):
+            calls.append(request)
+            return {"profiles": [], "nextToken": "next"} if "nextToken" not in request else {"profiles": [profile]}
+
+        self.signer.list_signing_profiles = pages
+        snapshot = module.profile_snapshot(self.signer, module.time.monotonic() + 10)
+        self.assertEqual([{"profileName": "other", "arn": profile["arn"], "profileVersion": "a" * 10,
+                           "profileVersionArn": "version-arn", "status": "Canceled"}], snapshot)
+        self.assertTrue(all(call["includeCanceled"] for call in calls))
+
+    def test_snapshot_rejects_incomplete_or_repeated_pagination(self):
+        for response in ({"profiles": [{}]}, {"profiles": [], "nextToken": "same"}, {}):
+            with self.subTest(response=response), patch.object(self.signer, "list_signing_profiles", return_value=response):
+                with self.assertRaises(RuntimeError):
+                    module.profile_snapshot(self.signer, module.time.monotonic() + 10)
 
     def test_partial_import_is_journaled_before_second_call_fails(self):
         self.acm.fail_second = True
@@ -165,5 +273,4 @@ def load_tests(loader, _tests, _pattern):
 
 
 if __name__ == "__main__":
-    import unittest
     unittest.main()

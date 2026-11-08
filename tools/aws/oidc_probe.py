@@ -56,11 +56,13 @@ def run_probe(session, account, role, name, token, wrong_audience, denied_ref=Fa
     from botocore import UNSIGNED
     from botocore.config import Config
     from botocore.exceptions import ClientError
+    from botocore.httpsession import DEFAULT_CA_BUNDLE
     common = dict(connect_timeout=5, read_timeout=15, retries={"total_max_attempts": 1},
-                  ignore_configured_endpoint_urls=True)
+                  proxies={}, ignore_configured_endpoint_urls=True)
     # UNSIGNED prevents credential-provider resolution for the STS bootstrap.
     sts = session.create_client("sts", region_name=REGION,
                                 endpoint_url=f"https://sts.{REGION}.amazonaws.com",
+                                verify=DEFAULT_CA_BUNDLE,
                                 config=Config(signature_version=UNSIGNED, **common))
 
     def assume(value):
@@ -91,6 +93,7 @@ def run_probe(session, account, role, name, token, wrong_audience, denied_ref=Fa
                 "aws_session_token": credentials["SessionToken"]}
     signed_sts = session.create_client("sts", region_name=REGION,
                                        endpoint_url=f"https://sts.{REGION}.amazonaws.com",
+                                       verify=DEFAULT_CA_BUNDLE,
                                        config=Config(**common), **key_args)
     identity = signed_sts.get_caller_identity()
     if (identity.get("Account") != account
@@ -98,6 +101,7 @@ def run_probe(session, account, role, name, token, wrong_audience, denied_ref=Fa
         raise ProbeFailure()
     iot = session.create_client("iot", region_name=REGION,
                                 endpoint_url=f"https://iot.{REGION}.amazonaws.com",
+                                verify=DEFAULT_CA_BUNDLE,
                                 config=Config(**common), **key_args)
     endpoint = iot.describe_endpoint(endpointType="iot:Data-ATS")
     if not re.fullmatch(r"[a-z0-9-]+-ats\.iot\.ap-northeast-1\.amazonaws\.com",

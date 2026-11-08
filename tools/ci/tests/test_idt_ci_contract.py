@@ -15,10 +15,10 @@ PWSH=shutil.which("pwsh")
 
 
 def bootstrap_block():
-    yaml=(ROOT/".gitlab-ci.yml").read_text(encoding="utf-8")
-    start=yaml.index("      if ($idtScope -ne 'preflight') {")
-    end=yaml.index('      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py',start)
-    return "\n".join(line[6:] for line in yaml[start:end].splitlines())
+    script=(ROOT/"tools/idt/run_ci_job.ps1").read_text(encoding="utf-8")
+    start=script.index("if ($idtScope -ne 'preflight') {")
+    end=script.index('& "$env:RX72N_IDT_PYTHON" tools/idt/oidc_job.py --check-before-run',start)
+    return script[start:end]
 
 
 class IdtCiContractTests(unittest.TestCase):
@@ -36,6 +36,10 @@ class IdtCiContractTests(unittest.TestCase):
         self.assertEqual(set(ENVIRONMENT_INPUTS.values()),set(re.findall(r"'((?:IDT_PUBLIC_SIGNER_)[A-Z_]+)'",block)))
         yaml=(ROOT/".gitlab-ci.yml").read_text(encoding="utf-8")
         native=yaml[yaml.index(".rx_idt_job:"):yaml.index("test_rx72n_idt:")]
+        self.assertIn("  resource_group: ishiguro-pc-ccrx-e2studio-build",native)
+        self.assertIn("    RX_OIDC_ID_TOKEN:\n      aud: sts.amazonaws.com",native)
+        self.assertIn("tools/idt/oidc_job.py",native)
+        self.assertNotIn("tools/idt/check_host.py --target",native)
         artifacts=native[native.index("  artifacts:"):]
         for private in ("signer.crt.pem","signer.pub.pem","producer-private.log","build-private.log",".mot",".abs"):
             self.assertNotIn(private,artifacts)

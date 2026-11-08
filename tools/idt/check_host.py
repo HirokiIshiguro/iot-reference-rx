@@ -164,7 +164,16 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check-aws", action="store_true", help="Also call read-only AWS STS GetCallerIdentity")
     args = parser.parse_args()
-    result = check_host(load_host_profile(args.profile), check_aws=args.check_aws,
+    profile = load_host_profile(args.profile)
+    if args.check_aws:
+        try:
+            from .oidc_job import check_child_budget, verify_host_profile
+        except ImportError:
+            from oidc_job import check_child_budget, verify_host_profile
+        check_child_budget(os.environ, before_run=True)
+        if os.environ.get("RX_OIDC_EXPIRATION_UTC"):
+            verify_host_profile(profile, os.environ.get("RX_IDT_REVIEWED_PROFILE_SHA256", ""))
+    result = check_host(profile, check_aws=args.check_aws,
                         target=get_target(args.target))
     text = json.dumps(result, ensure_ascii=True, indent=2) + "\n"
     if args.output:

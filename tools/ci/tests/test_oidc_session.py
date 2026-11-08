@@ -319,6 +319,24 @@ class OidcSessionTests(unittest.TestCase):
         with self.assertRaises(oidc.OidcError):
             oidc.child_environment(source, session, allow_names=("AWS_PROFILE",))
 
+    def test_job_and_actual_id_tokens_cannot_be_allowed_in_child_or_wsl(self):
+        session, _, _ = self.issue()
+        names = ("CI_JOB_TOKEN", "CI_JOB_JWT", "CI_JOB_JWT_V2", "RX_OIDC_ID_TOKEN",
+                 "RX_IOT_OIDC_TOKEN", "RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN")
+        source = {**environment(), **{name: "synthetic-private-token" for name in names}}
+        bridge = oidc.wsl_bridge_environment(source, session)
+        linux = oidc.wsl_child_environment(bridge)
+        for name in names:
+            with self.subTest(name=name):
+                self.assertNotIn(name, bridge)
+                self.assertNotIn(name, linux)
+                with self.assertRaises(oidc.OidcError):
+                    oidc.child_environment(source, session, allow_names=(name.lower(),))
+                with self.assertRaises(oidc.OidcError):
+                    oidc.wsl_bridge_environment(source, session, allow_names=(name,))
+                with self.assertRaises(oidc.OidcError):
+                    oidc.wsl_child_environment(bridge, allow_names=(name,))
+
 
 if __name__ == "__main__":
     unittest.main()

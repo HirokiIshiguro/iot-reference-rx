@@ -38,6 +38,7 @@ class ExpectedIdentity:
     ref: str
     sha: str
     pipeline_sources: tuple[str, ...]
+    runner_id: int | None = None
 
 
 @dataclass(frozen=True, repr=False)
@@ -114,6 +115,11 @@ def validate_context(env: dict[str, str], expected: ExpectedIdentity, token: str
             or claims.get("project_id") != expected.project_id
             or claims.get("job_id") != env.get("CI_JOB_ID")
             or claims.get("pipeline_source") != env.get("CI_PIPELINE_SOURCE")
+            or (expected.runner_id is not None and
+                (not isinstance(expected.runner_id, int) or isinstance(expected.runner_id, bool)
+                 or expected.runner_id <= 0 or claims.get("runner_id") != expected.runner_id
+                 or not isinstance(claims.get("runner_id"), int) or isinstance(claims.get("runner_id"), bool)
+                 or env.get("CI_RUNNER_ID") != str(expected.runner_id)))
             or claims.get("ref_protected") != "true" or claims.get("ref_type") != ref_type
             or claims.get("ref") != ref or claims.get("sha") != expected.sha
             or audience != AUDIENCE or not isinstance(claims.get("exp"), int) or isinstance(claims.get("exp"), bool)
@@ -291,7 +297,7 @@ def child_environment(env: dict[str, str], session: FixedSession, *, allow_names
     if not isinstance(session.expiration, datetime) or session.expiration.tzinfo is None:
         raise OidcError("invalid session deadlines")
     secret_names = {TOKEN_ENV, "RX_IOT_OIDC_TOKEN", "RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN",
-                    "CI_JOB_JWT", "CI_JOB_JWT_V2"}
+                    "CI_JOB_JWT", "CI_JOB_JWT_V2", "CI_JOB_TOKEN"}
     allowed = _BASE_ENV | {name.upper() for name in allow_names}
     if allowed & secret_names or any(name.startswith("AWS_") and name not in _DEVICE_NETWORK_ENV for name in allowed):
         raise OidcError("credential inputs cannot be allowed")

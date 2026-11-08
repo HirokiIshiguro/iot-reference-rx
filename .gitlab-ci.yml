@@ -334,6 +334,10 @@ variables:
 
 workflow:
   rules:
+    # Runner debug traces can expose a job token before Python can reject it.
+    # Reject the entire IDT/nightly pipeline before the ID token is minted.
+    - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/) && ((($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && (($RUN_RX_IDT == "true" && $IDT_SCOPE != "plan") || $RUN_RX72N_IDT == "true" || $PIPELINE_PROFILE == "nightly_matrix")) || $CI_PIPELINE_SOURCE == "schedule")'
+      when: never
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
@@ -748,6 +752,9 @@ idt_ci_contract:
       "$idt_ci_python" -m unittest \
         tools.ci.tests.test_oidc_session \
         tools.ci.tests.test_aws_oidc_probe \
+        tools.ci.tests.test_idt_ota_admission \
+        tools.ci.tests.test_idt_oidc_job \
+        tools.ci.tests.test_idt_runner_identity \
         tools.ci.tests.test_idt_report \
         tools.ci.tests.test_idt_host_profile \
         tools.ci.tests.test_idt_credentials \
@@ -830,13 +837,21 @@ idt_ci_contract:
 .rx_idt_job:
   stage: test
   extends: .aws_cli_windows_job
+  id_tokens:
+    RX_OIDC_ID_TOKEN:
+      aud: sts.amazonaws.com
+  # Do not start PATH-selected AWS/Python tools while the JWT is in the job shell.
+  before_script: []
+  after_script: []
   tags:
     - exec-shell
     - os-windows
-    - $RX72N_IDT_RUNNER_TAG
+    - hw-ishiguro-pc
     - ccrx
-    - $AWS_CLI_RUNNER_TAG
-  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+    - aws-cli-ishiguro
+  # This exact group must also protect the eventual independent OTA recovery.
+  # A pipeline variable override must not silently remove that serialization.
+  resource_group: ishiguro-pc-ccrx-e2studio-build
   timeout: 3 hours
   variables:
     GIT_SUBMODULE_STRATEGY: normal
@@ -844,49 +859,7 @@ idt_ci_contract:
   script:
     - !reference [.windows_ccrx_host_lease, script]
     - |
-      . tools/rx_e2studio_cli.ps1
-      Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
-      $idtTarget = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_TARGET } else { 'rx72n-ethernet' }
-      $env:IDT_TARGET = $idtTarget
-      $idtScope = if ($env:RUN_RX_IDT -eq 'true') { $env:IDT_SCOPE } else { $env:RX72N_IDT_SCOPE }
-      $idtHostJson = & "$env:RX72N_IDT_PYTHON" tools/idt/check_host.py --target "$idtTarget" --check-aws
-      $idtHostStatus = $LASTEXITCODE
-      try { $idtHostCheck = ($idtHostJson -join "`n") | ConvertFrom-Json }
-      catch { throw "IDT host preflight did not return valid JSON" }
-      foreach ($check in $idtHostCheck.checks) {
-        Write-Host ("IDT host check {0}: passed={1}" -f $check.name, $check.passed)
-      }
-      Write-Host ("IDT host versions: e2studio={0}, CC-RX={1}, Linux={2}" -f `
-        $idtHostCheck.installed_toolchain.e2studio.release, `
-        $idtHostCheck.installed_toolchain.ccrx.version, `
-        $idtHostCheck.linux_os_release.VERSION_ID)
-      if ($idtHostStatus -ne 0 -or -not $idtHostCheck.host_preflight_passed) {
-        throw "IDT host preflight failed; inspect the named checks under the runner identity"
-      }
-      if ($idtScope -ne 'preflight') {
-        $bootstrapNames = @('IDT_PUBLIC_SIGNER_PROVISIONER_MOT_FILE', 'IDT_PUBLIC_SIGNER_PROVISIONER_MANIFEST_FILE', 'IDT_PUBLIC_SIGNER_CERT_FILE', 'IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE')
-        $bootstrapPresent = @($bootstrapNames | Where-Object { [Environment]::GetEnvironmentVariable($_, 'Process') })
-        if ($bootstrapPresent.Count -eq 0) {
-          $bootstrapRoot = "C:/ai/codex/tmp/rx-idt-public-signer-$env:CI_PIPELINE_ID-$env:CI_JOB_ID-$idtTarget"
-          $bootstrapJson = & "$env:RX72N_IDT_PYTHON" tools/idt/prepare_public_signer.py --source "$env:CI_PROJECT_DIR" --target "$idtTarget" --output "$bootstrapRoot" --workspace "C:/ai/codex/ws/rx-idt-bootstrap-$env:CI_PIPELINE_ID-$env:CI_JOB_ID" --python "$env:RX72N_IDT_PYTHON"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          try { $bootstrapInputs = ($bootstrapJson -join "`n") | ConvertFrom-Json }
-          catch { throw 'Public signer bootstrap did not return valid input paths' }
-          if (@($bootstrapInputs.PSObject.Properties).Count -ne $bootstrapNames.Count) {
-            throw 'Public signer bootstrap returned an unexpected input set'
-          }
-          foreach ($name in $bootstrapNames) {
-            $path = $bootstrapInputs.$name
-            if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) {
-              throw "Public signer bootstrap input is missing: $name"
-            }
-            [Environment]::SetEnvironmentVariable($name, $path, 'Process')
-          }
-        } elseif ($bootstrapPresent.Count -ne $bootstrapNames.Count) {
-          throw 'Public signer bootstrap input overrides must supply the complete set'
-        }
-      }
-      & "$env:RX72N_IDT_PYTHON" tools/idt/run_idt.py --target "$idtTarget" --scope "$idtScope" --output artifacts/idt
+      & "C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe" -I tools/idt/oidc_job.py
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   artifacts:
     when: always
@@ -1001,6 +974,7 @@ idt_source_matrix:
     - when: never
   script:
     - !reference [.windows_ccrx_host_lease, script]
+    - '& tools/ci/report_runner_identity.ps1'
     - |
       # Preserve complete diagnostics outside the checkout: Runner trace is
       # capped and the next canonical clone removes this job's working tree.

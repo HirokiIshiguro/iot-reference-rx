@@ -30,6 +30,12 @@ from cleanup_budget import (NATIVE_CLEANUP_SECONDS, NATIVE_TERMINATE_SECONDS, NA
                             BRIDGE_SHUTDOWN_SECONDS, REMOTE_TERMINATE_SECONDS, REMOTE_KILL_SECONDS,
                             CAPTURE_DRAIN_SECONDS, BRIDGE_THREAD_JOIN_SECONDS)
 
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
+from tools.aws.oidc_session import OidcError, wsl_child_environment
+from tools.idt.oidc_job import check_child_budget, check_native_timeouts, IDT_WSL_INPUTS
+
 GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
 SSH = os.environ.get("IDT_WINDOWS_SSH", "/mnt/c/Windows/System32/OpenSSH/ssh.exe")
@@ -286,6 +292,16 @@ def interrupted(_signum, _frame):
 
 
 def main():
+    if os.environ.get("RX_OIDC_EXPIRATION_UTC"):
+        isolated = wsl_child_environment(dict(os.environ), allow_names=IDT_WSL_INPUTS)
+        try:
+            isolated["PATH"] = isolated.pop("RX_OIDC_IDT_WSL_PATH")
+            isolated["HOME"] = isolated.pop("RX_OIDC_IDT_WSL_HOME")
+        except KeyError:
+            raise RuntimeError("reviewed WSL environment is missing") from None
+        os.environ.clear()
+        os.environ.update(isolated)
+    check_child_budget(os.environ)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--idt-root", required=True)
     parser.add_argument("--target", choices=target_ids(), default=os.getenv("IDT_TARGET", "rx72n-ethernet"))
@@ -299,6 +315,8 @@ def main():
     parser.add_argument("--timeout-seconds", type=int, default=4500)
     parser.add_argument("--cleanup-timeout-seconds", type=int, default=NATIVE_CLEANUP_SECONDS)
     args = parser.parse_args()
+    if args.group in {"OTADataplaneMQTT", "OTACore"}:
+        parser.error("native OTA admission is not ready")
     target = get_target(args.target)
     if os.getenv("IDT_TARGET") and os.environ["IDT_TARGET"] != args.target:
         parser.error("Target argument disagrees with inherited IDT_TARGET")
@@ -315,6 +333,10 @@ def main():
         parser.error("AWS region and inherited AWS credential environment variables are required")
     if args.timeout_seconds <= 0 or args.cleanup_timeout_seconds <= 0:
         parser.error("timeouts must be positive")
+    try:
+        check_native_timeouts(os.environ, args.timeout_seconds, args.cleanup_timeout_seconds)
+    except OidcError:
+        parser.error("native timeouts exceed the checked OIDC budget")
     idt_root = Path(args.idt_root).resolve(strict=True)
     source = Path(args.source_path).resolve(strict=True)
     run_dir = Path(args.output).resolve()
@@ -402,6 +424,7 @@ def main():
             command += ["--test-id", args.test_id]
         print("Starting development-only " + args.group + "; this cannot qualify a release.", flush=True)
         sensitive = [env[key] for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN") if env.get(key)]
+        check_child_budget(env)
         process = subprocess.Popen(command, cwd=idt_root / "bin", env=env,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    start_new_session=True)

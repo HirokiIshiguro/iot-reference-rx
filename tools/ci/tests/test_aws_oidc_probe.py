@@ -90,6 +90,9 @@ class ProbeTests(unittest.TestCase):
                 self.assertEqual("ap-northeast-1", kwargs["region_name"])
                 self.assertEqual(f"https://{service}.ap-northeast-1.amazonaws.com", kwargs["endpoint_url"])
                 self.assertTrue(kwargs["config"].ignore_configured_endpoint_urls)
+                self.assertEqual({}, kwargs["config"].proxies)
+                from botocore.httpsession import DEFAULT_CA_BUNDLE
+                self.assertEqual(DEFAULT_CA_BUNDLE, kwargs["verify"])
                 calls.append((service, kwargs))
                 result = original(service, **kwargs)
                 stub = Stubber(result)

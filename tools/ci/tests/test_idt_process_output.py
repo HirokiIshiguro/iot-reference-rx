@@ -186,6 +186,7 @@ class IdtProcessOutputTests(unittest.TestCase):
             with self.subTest(running=running, output_closed=output_closed):
                 process = Mock(stdout=SimpleNamespace(closed=output_closed))
                 process.poll.return_value = None if running else 0
+                process._idt_output_drain_complete = output_closed
                 with patch.object(ota_aws_signers, "cleanup_aws_signers", return_value={
                         "state": "deleted", "certificates": [{"deleted": True}]}) as cleanup:
                     result = run_idt.cleanup_signers_after_runtime(process, inputs, session)
@@ -196,6 +197,14 @@ class IdtProcessOutputTests(unittest.TestCase):
                 else:
                     self.assertEqual("cleanup_failed", result["state"])
                     cleanup.assert_not_called()
+
+    def test_unknown_drain_state_does_not_authorize_signer_cleanup(self):
+        from tools.idt import ota_aws_signers
+        process = SimpleNamespace(stdout=SimpleNamespace(closed=True), poll=lambda: 0)
+        with patch.object(ota_aws_signers, "cleanup_aws_signers") as cleanup:
+            result = run_idt.cleanup_signers_after_runtime(process, Path("fixture-inputs"), object())
+        self.assertEqual("cleanup_failed", result["state"])
+        cleanup.assert_not_called()
 
     def test_signers_created_before_native_start_can_be_cleaned(self):
         from tools.idt import ota_aws_signers

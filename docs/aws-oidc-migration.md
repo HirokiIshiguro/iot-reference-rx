@@ -1,10 +1,12 @@
 # AWS OIDC移行の準備
 
-この変更はGitLab ID tokenから短期STS sessionを得る共通部品と、既存の読取りprobeを追加する。**通常CI、IDT、OTA、利用側への接続は未実装であり、OIDC移行の完了ではない。** AWS role/trust、CI/CD Variables、実機および共有operatorの固定キーは変更しない。
+この変更はGitLab ID tokenから短期STS sessionを得る共通部品、既存の読取りprobe、IDT jobへの接続案を含む。**通常CI、独立recovery、利用側への接続と実環境でのOIDC検証は未完了であり、OIDC移行の完了ではない。** IDT jobのレビュー済み設定と時間予算は未登録であり、現状はAWS処理や実機操作の前に停止する。AWS role/trust、CI/CD Variables、実機および共有operatorの固定キーは変更しない。
 
 ## 固定sessionの境界
 
 `tools/aws/oidc_session.py`は、呼出し側が明示したproject・account・role・ref・source SHAと、protected refのID token claimを照合する。claimの読取りは事前検査であり、JWT署名の検証と最終的な認可はSTSとAWS trust policyが行う。unsigned STSに対して1回だけ `AssumeRoleWithWebIdentity` を実行し、返された固定credentialでcallerのaccount・assumed roleを確認する。任意のrunner profile・endpoint設定・EC2 metadataにfallbackしない。
+
+GitLab Self-ManagedのAWS trustで使うaud/subは、同じtrust条件を満たす別jobをjob単位で分離しない。SHA・job ID・runner ID等の署名claim照合はこの呼出し側の検査であり、AWS IAMによるjob単位の強制ではない。実行を許すsource/refと同SID主体は別途管理する。
 
 sessionの長さは呼出し側が明示する。IDTの候補は10800秒で、jobの残り時間、scriptの保守的な残り時間、実際のSTS expirationの最小値が、残準備・native・cleanup・保存と安全余裕の合計を覆わなければ停止する。安全余裕には時刻ずれを含める。ID tokenはSTS交換時に時刻ずれと通信の余裕を含めて有効性を検査し、交換後の残時間判定には含めない。交換後にID tokenが失効しても、発行済みcredentialの期限はSTS expirationである。credentialはjob終了後もその期限まで有効な場合がある。自動更新は行わない。budgetの確定とnative直前の再判定は既存IDT supervisorへの接続時に検証する。`CI_JOB_STARTED_AT`、`CI_JOB_TIMEOUT`やdeadlineが利用できないときもfail closedとする。
 
@@ -12,7 +14,11 @@ sessionの長さは呼出し側が明示する。IDTの候補は10800秒で、jo
 
 STS交換時はprocess全体のambient AWS環境を一時的に退避するため、並行AWS処理、環境変数を使う処理、子process起動を始める前に呼び出す。`quiet_aws_logging` は呼出しthreadの同期SDK処理の診断を対象に既存logging handlerをfilterし、UART等の無関係なloggingを停止しない。loggingのthread ID記録が無効なら開始せず、対象scope中のlogging設定変更やSDK worker threadは対象外である。対象はbotocore、boto3、s3transfer、urllib3のPython loggerであり、その他のlibrary、`warnings`、直接の標準出力、別processは抑止しない。後続のS3 presignは `FixedSession` のcredentialをclientへ明示し、このscopeとログ境界を検証する。URLやcredentialを記録しない責任は呼出し側にある。
 
-`child_environment`は許可リストで入力を選び、固定session以外のAWS設定とOIDC tokenを渡さない。WindowsからWSLへの受渡しは `wsl_bridge_environment` と `wsl_child_environment` の2段階で、Linux側のprofileやmetadataを無効化してから利用する設計である。合成credentialを用いたWindows→Ubuntu WSLの受渡しは確認したが、既存IDT supervisorへの接続、signal伝播、子孫process停止と実機確認は未実施であり、それまでは実機jobに接続しない。JWT、STS credential、変換済みの署名URL、鍵や子processの出力・artifactの秘匿は呼出し側の責任であり、環境変数の除外だけでは保証されない。
+`child_environment`は許可リストで入力を選び、固定session以外のAWS設定とOIDC tokenを渡さない。WindowsからWSLへの受渡しは `wsl_bridge_environment` と `wsl_child_environment` の2段階で、Linux側のprofileやmetadataを無効化してから利用する設計である。IDTのsource接続案はhost preflightより前に一度だけSTSを取得し、Windows/WSL/native開始前に期限を再判定する。実際のAWS CLI署名とWindows→Ubuntu WSLの受渡しは合成credentialで確認した。実role、監督processのsignal伝播・子孫停止、全入力とartifactの秘匿、実機は未検証である。JWT、STS credential、変換済みの署名URL、鍵や子processの出力・artifactの秘匿は呼出し側の責任であり、環境変数の除外だけでは保証されない。
+
+IDTの `oidc_job.py` は期待account/role、runner ID、host profile、実行パス、bootstrap・native準備・報告・余裕の予算をレビュー済みsource設定から選ぶ。現在 `REVIEWED_CONFIGS` は空であり、未測定時間を0とせずfail closedとする。この停止より前にGitLabはJWTを発行し、jobはhost leaseを取得する。共有shell runnerのPython環境や実行ファイルを信頼できないjobが書き換えられる場合、`-I` やsource上のpath固定だけではJWTを守れないため、実配備前にrunnerの信頼・書込み境界を確認する。sourceで許可するrefは現在mainのみで、保護integration refやtagは別途設定と検証が必要である。OTA scopeはowner journalと独立recoveryが未接続のため開始しない。
+
+Signer cleanupは、cert ARNの一致だけを理由にprofileをcancelしない。profileの参照や一覧取得が不明ならcertを保持する。`ota_admission.py` はversioned S3の条件付きwriteと元run／回収jobの区別をofflineで検討する部品で、実job、所有証拠の取得、独立recovery、IAM境界には未接続である。snapshotのページングは原子的ではなく、管理外主体による変更を防止するものではない。S3のETag条件とversion照合は、管理外主体による旧versionのcopy復元やdelete markerを使う競合を原子的に防止しない。journalのwriter・履歴保護と運用上の管理外変更検出は実適用前の前提である。
 
 BG96の既存APN入力は `AWS_IOT_CELLULAR_APN_*_CK_RX65N_01` などのAWS接頭辞を持つが、AWS SDKの認証設定ではない。呼出し側が既存の4変数を個別に許可した場合だけ、これらのdevice通信入力を引き継ぐ。`AWS_PROFILE` やAWS endpoint overrideは許可できない。
 
