@@ -241,6 +241,8 @@ _BASE_ENV = {"PATH", "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "TEMP", "TMP", "TMPD
              "CI_JOB_ID", "CI_JOB_STARTED_AT", "CI_JOB_TIMEOUT", "CI_PROJECT_ID", "CI_PROJECT_PATH",
              "CI_COMMIT_SHA", "CI_COMMIT_BRANCH", "CI_COMMIT_TAG", "CI_COMMIT_REF_PROTECTED",
              "CI_PIPELINE_SOURCE", "RUNNER_SCRIPT_TIMEOUT"}
+_DEVICE_NETWORK_ENV = {"AWS_IOT_CELLULAR_APN_CK_RX65N_01", "AWS_IOT_CELLULAR_APN_USER_CK_RX65N_01",
+                       "AWS_IOT_CELLULAR_APN_PASS_CK_RX65N_01", "AWS_IOT_CELLULAR_APN_AUTH_CK_RX65N_01"}
 
 
 def child_environment(env: dict[str, str], session: FixedSession, *, allow_names=()) -> dict[str, str]:
@@ -248,7 +250,7 @@ def child_environment(env: dict[str, str], session: FixedSession, *, allow_names
     secret_names = {TOKEN_ENV, "RX_IOT_OIDC_TOKEN", "RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN",
                     "CI_JOB_JWT", "CI_JOB_JWT_V2"}
     allowed = _BASE_ENV | {name.upper() for name in allow_names}
-    if allowed & secret_names or any(name.startswith("AWS_") for name in allowed):
+    if allowed & secret_names or any(name.startswith("AWS_") and name not in _DEVICE_NETWORK_ENV for name in allowed):
         raise OidcError("credential inputs cannot be allowed")
     clean = {k: v for k, v in env.items() if k.upper() in allowed
              and k.upper() not in {"BOTO_CONFIG", "BOTO_PATH", *secret_names}}
@@ -270,6 +272,8 @@ def wsl_bridge_environment(env: dict[str, str], session: FixedSession, *, allow_
     names = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
              "AWS_EC2_METADATA_DISABLED", "AWS_DEFAULT_REGION", "AWS_REGION", "RX_OIDC_EXPIRATION_UTC",
              "CI_JOB_STARTED_AT", "CI_JOB_TIMEOUT", "RUNNER_SCRIPT_TIMEOUT")
+    explicit = tuple(name.upper() for name in allow_names if name.upper() in clean)
+    names = tuple(dict.fromkeys(names + explicit))
     existing = [part for part in clean.get("WSLENV", "").split(":")
                 if part and part.split("/", 1)[0].upper() not in names]
     clean["WSLENV"] = ":".join(existing + [name + "/u" for name in names if name in clean])

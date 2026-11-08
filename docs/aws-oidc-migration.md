@@ -10,6 +10,8 @@ sessionの長さは呼出し側が明示する。IDTの候補は10800秒で、jo
 
 `child_environment`は許可リストで入力を選び、固定session以外のAWS設定とOIDC tokenを渡さない。WindowsからWSLへの受渡しは `wsl_bridge_environment` と `wsl_child_environment` の2段階で、Linux側のprofileやmetadataを無効化してから利用する設計である。合成credentialを用いたWindows→Ubuntu WSLの受渡しは確認したが、既存IDT supervisorへの接続、signal伝播、子孫process停止と実機確認は未実施であり、それまでは実機jobに接続しない。JWT、STS credential、変換済みの署名URL、鍵や子processの出力・artifactの秘匿は呼出し側の責任であり、環境変数の除外だけでは保証されない。
 
+BG96の既存APN入力は `AWS_IOT_CELLULAR_APN_*_CK_RX65N_01` などのAWS接頭辞を持つが、AWS SDKの認証設定ではない。呼出し側が既存の4変数を個別に許可した場合だけ、これらのdevice通信入力を引き継ぐ。`AWS_PROFILE` やAWS endpoint overrideは許可できない。
+
 ## probeと後続
 
 `tools/aws/oidc_probe.py`とそのread-only policy/trustの候補は、[MR !251](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/251)から再利用した。probeのlive jobはこの変更では追加・実行していない。policyは候補であり、!251単体のsource CI成功はlive OIDC成功を意味しない。

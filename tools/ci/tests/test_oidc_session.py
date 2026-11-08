@@ -217,6 +217,18 @@ class OidcSessionTests(unittest.TestCase):
         with self.assertRaises(oidc.OidcError):
             oidc.wsl_child_environment({**linux, "AWS_SESSION_TOKEN": ""})
 
+    def test_device_apn_is_explicitly_allowed_without_allowing_aws_profile(self):
+        session, _, _ = self.issue()
+        source = {**environment(), "AWS_IOT_CELLULAR_APN_CK_RX65N_01": "test-apn"}
+        name = "AWS_IOT_CELLULAR_APN_CK_RX65N_01"
+        bridge = oidc.wsl_bridge_environment(source, session, allow_names=(name,))
+        self.assertEqual("test-apn", bridge[name])
+        self.assertIn(name + "/u", bridge["WSLENV"].split(":"))
+        self.assertEqual("test-apn", oidc.wsl_child_environment(bridge, allow_names=(name,))[name])
+        self.assertNotIn(name, oidc.child_environment(source, session))
+        with self.assertRaises(oidc.OidcError):
+            oidc.child_environment(source, session, allow_names=("AWS_PROFILE",))
+
 
 if __name__ == "__main__":
     unittest.main()
