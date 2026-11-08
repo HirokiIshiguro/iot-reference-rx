@@ -2,6 +2,7 @@
 import base64
 from datetime import datetime, timedelta, timezone
 import json
+import logging
 import os
 import unittest
 from unittest.mock import patch
@@ -201,6 +202,8 @@ class OidcSessionTests(unittest.TestCase):
         linux = oidc.wsl_child_environment(oidc.wsl_bridge_environment(environment(), session))
         self.assertEqual((NOW + timedelta(hours=3)).isoformat(), linux["RX_OIDC_EXPIRATION_UTC"])
         self.assertEqual((NOW + timedelta(hours=2)).isoformat(), linux["RX_OIDC_TOKEN_DEADLINE_UTC"])
+        oidc.ensure_session_budget(env, session, 6000, NOW, margin_seconds=60)
+        oidc.ensure_child_budget(linux, 6000, NOW, margin_seconds=60)
         with self.assertRaises(oidc.OidcError):
             oidc.ensure_session_budget(env, session, 6000, NOW + timedelta(seconds=1200), margin_seconds=60)
         with self.assertRaises(oidc.OidcError):
@@ -208,11 +211,65 @@ class OidcSessionTests(unittest.TestCase):
         with self.assertRaises(oidc.OidcError):
             oidc.ensure_child_budget({k: v for k, v in linux.items() if k != "RX_OIDC_TOKEN_DEADLINE_UTC"},
                                      6000, NOW, margin_seconds=60)
+        with self.assertRaises(oidc.OidcError):
+            oidc.ensure_child_budget({k: v for k, v in linux.items() if k != "RX_OIDC_EXPIRATION_UTC"},
+                                     6000, NOW, margin_seconds=60)
+        invalid = oidc.FixedSession(ACCESS, SECRET, SESSION, session.expiration, None)
+        with self.assertRaises(oidc.OidcError):
+            oidc.ensure_session_budget(env, invalid, 6000, NOW, margin_seconds=60)
+        short = oidc.FixedSession(ACCESS, SECRET, SESSION, NOW + timedelta(seconds=5400),
+                                  NOW + timedelta(hours=3))
+        short_linux = oidc.wsl_child_environment(oidc.wsl_bridge_environment(environment(), short))
+        with self.assertRaises(oidc.OidcError):
+            oidc.ensure_child_budget(short_linux, 5400, NOW, margin_seconds=60)
 
     def test_sdk_errors_do_not_expose_credentials(self):
         with self.assertRaises(oidc.OidcError) as caught:
             self.issue(fake=FakeSts(fail=True))
         self.assertNotIn(SECRET, str(caught.exception))
+
+    def test_sdk_logging_is_suppressed_and_restored(self):
+        fake = FakeSts()
+        original = fake.assume_role_with_web_identity
+        called = []
+
+        def noisy(**kwargs):
+            called.append(True)
+            logging.getLogger("botocore.auth").critical(SECRET)
+            return original(**kwargs)
+
+        fake.assume_role_with_web_identity = noisy
+        records = []
+
+        class Capture(logging.Handler):
+            def emit(self, record):
+                records.append(record.getMessage())
+
+        handler = Capture()
+        root = logging.getLogger()
+        previous = logging.root.manager.disable
+        root.addHandler(handler)
+        try:
+            logging.disable(logging.NOTSET)
+            self.issue(fake=fake)
+            self.assertTrue(called)
+            self.assertFalse(records)
+            self.assertEqual(logging.NOTSET, logging.root.manager.disable)
+            logging.getLogger("botocore.auth").critical("visible fixture")
+            self.assertEqual(["visible fixture"], records)
+        finally:
+            root.removeHandler(handler)
+            logging.disable(previous)
+
+    def test_logging_is_restored_after_sts_failure(self):
+        previous = logging.root.manager.disable
+        try:
+            logging.disable(logging.NOTSET)
+            with self.assertRaises(oidc.OidcError):
+                self.issue(fake=FakeSts(fail=True))
+            self.assertEqual(logging.NOTSET, logging.root.manager.disable)
+        finally:
+            logging.disable(previous)
 
     def test_short_jobs_can_use_shorter_sessions_and_invalid_durations_fail(self):
         short = FakeSts(duration=900, expiration=NOW + timedelta(seconds=900))

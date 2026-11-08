@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import json
+import logging
 import os
 import re
 
@@ -152,6 +153,9 @@ def ensure_budget(env: dict[str, str], expiration: datetime, required_seconds: i
 def ensure_session_budget(env: dict[str, str], session: FixedSession, required_seconds: int,
                           now: datetime, *, margin_seconds: int) -> None:
     """Recheck a verified session without accidentally omitting either deadline."""
+    if (not isinstance(session.expiration, datetime) or session.expiration.tzinfo is None
+            or not isinstance(session.token_deadline, datetime) or session.token_deadline.tzinfo is None):
+        raise OidcError("invalid session deadlines")
     ensure_budget(env, session.expiration, required_seconds, now,
                   margin_seconds=margin_seconds, token_deadline=session.token_deadline)
 
@@ -187,6 +191,17 @@ def _without_ambient_aws():
         os.environ.update(saved)
 
 
+@contextmanager
+def quiet_aws_logging():
+    """Suppress SDK diagnostics while handling tokens; use before starting threads."""
+    previous = logging.root.manager.disable
+    try:
+        logging.disable(logging.CRITICAL)
+        yield
+    finally:
+        logging.disable(previous)
+
+
 def obtain_session(env: dict[str, str], expected: ExpectedIdentity, *, required_seconds: int,
                    margin_seconds: int, duration_seconds: int, now: datetime | None = None) -> FixedSession:
     """Exchange exactly one JWT, check caller identity and return frozen keys.
@@ -215,7 +230,7 @@ def obtain_session(env: dict[str, str], expected: ExpectedIdentity, *, required_
         import botocore.session
         common = dict(connect_timeout=5, read_timeout=15, retries={"total_max_attempts": 1},
                       proxies={}, ignore_configured_endpoint_urls=True)
-        with _without_ambient_aws():
+        with _without_ambient_aws(), quiet_aws_logging():
             sdk = botocore.session.Session()
             sdk.set_config_variable("config_file", os.devnull)
             sdk.set_config_variable("credentials_file", os.devnull)
