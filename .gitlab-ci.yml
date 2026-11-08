@@ -746,6 +746,8 @@ idt_ci_contract:
       "$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-ci.txt
       "$idt_ci_python" -m pip check
       "$idt_ci_python" -m unittest \
+        tools.ci.tests.test_oidc_session \
+        tools.ci.tests.test_aws_oidc_probe \
         tools.ci.tests.test_idt_report \
         tools.ci.tests.test_idt_host_profile \
         tools.ci.tests.test_idt_credentials \
