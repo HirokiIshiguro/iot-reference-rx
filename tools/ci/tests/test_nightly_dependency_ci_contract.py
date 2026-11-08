@@ -258,7 +258,9 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         self.assertIn("  allow_failure: false", native)
         shared = blocks[".rx_idt_job"]
         self.assertIn("  stage: test", shared)
-        self.assertIn("  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP", shared)
+        self.assertIn("  resource_group: ishiguro-pc-ccrx-e2studio-build", shared)
+        self.assertIn('  WINDOWS_CCRX_BUILD_RESOURCE_GROUP: "ishiguro-pc-ccrx-e2studio-build"', blocks["variables"])
+        self.assertIn("!reference [.windows_ccrx_host_lease, script]", shared)
         self.assertNotIn("allow_failure:", shared)
         stages = self.ci.split("variables:\n", maxsplit=1)[0]
         self.assertLess(stages.index("  - nightly_matrix"), stages.index("  - test"))
