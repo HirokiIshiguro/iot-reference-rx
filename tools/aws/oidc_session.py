@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import threading
 
 REGION = "ap-northeast-1"
 ISSUER = "https://gitlab.saffti.jp"
@@ -45,7 +46,6 @@ class FixedSession:
     secret_key: str = field(repr=False)
     session_token: str = field(repr=False)
     expiration: datetime
-    token_deadline: datetime
 
 
 def _timestamp(value: str) -> datetime:
@@ -123,7 +123,7 @@ def validate_context(env: dict[str, str], expected: ExpectedIdentity, token: str
 
 
 def ensure_budget(env: dict[str, str], expiration: datetime, required_seconds: int,
-                  now: datetime, *, margin_seconds: int, token_deadline: datetime | None = None) -> None:
+                  now: datetime, *, margin_seconds: int) -> None:
     """Check both the fixed STS expiry and conservative CI/script deadlines."""
     if (now.tzinfo is None or expiration.tzinfo is None or not isinstance(required_seconds, int)
             or isinstance(required_seconds, bool) or required_seconds <= 0
@@ -137,12 +137,6 @@ def ensure_budget(env: dict[str, str], expiration: datetime, required_seconds: i
     if timeout <= 0 or started > now + timedelta(seconds=margin_seconds):
         raise OidcError("invalid job deadline")
     deadlines = [expiration.astimezone(timezone.utc), started + timedelta(seconds=timeout)]
-    if token_deadline is not None:
-        if token_deadline.tzinfo is None:
-            raise OidcError("invalid token deadline")
-        # The signed token expiry is a conservative upper bound, not the
-        # actual expiration of credentials already issued by STS.
-        deadlines.append(token_deadline.astimezone(timezone.utc))
     if env.get("RUNNER_SCRIPT_TIMEOUT"):
         # Actual script start is at or after job start; this is conservative.
         deadlines.append(started + timedelta(seconds=_duration(env["RUNNER_SCRIPT_TIMEOUT"])))
@@ -152,12 +146,10 @@ def ensure_budget(env: dict[str, str], expiration: datetime, required_seconds: i
 
 def ensure_session_budget(env: dict[str, str], session: FixedSession, required_seconds: int,
                           now: datetime, *, margin_seconds: int) -> None:
-    """Recheck a verified session without accidentally omitting either deadline."""
-    if (not isinstance(session.expiration, datetime) or session.expiration.tzinfo is None
-            or not isinstance(session.token_deadline, datetime) or session.token_deadline.tzinfo is None):
+    """Recheck STS and job deadlines after the exchange."""
+    if not isinstance(session.expiration, datetime) or session.expiration.tzinfo is None:
         raise OidcError("invalid session deadlines")
-    ensure_budget(env, session.expiration, required_seconds, now,
-                  margin_seconds=margin_seconds, token_deadline=session.token_deadline)
+    ensure_budget(env, session.expiration, required_seconds, now, margin_seconds=margin_seconds)
 
 
 def ensure_child_budget(env: dict[str, str], required_seconds: int,
@@ -165,16 +157,14 @@ def ensure_child_budget(env: dict[str, str], required_seconds: int,
     """Recheck propagated deadlines, including in a sanitized WSL child."""
     try:
         expiration = _timestamp(env["RX_OIDC_EXPIRATION_UTC"])
-        token_deadline = _timestamp(env["RX_OIDC_TOKEN_DEADLINE_UTC"])
     except KeyError:
         raise OidcError("missing child deadlines") from None
-    ensure_budget(env, expiration, required_seconds, now,
-                  margin_seconds=margin_seconds, token_deadline=token_deadline)
+    ensure_budget(env, expiration, required_seconds, now, margin_seconds=margin_seconds)
 
 
 @contextmanager
 def _without_ambient_aws():
-    """Do not read ambient profiles or endpoints; call before starting threads."""
+    """Do not read ambient profiles or endpoints; call before concurrent AWS work."""
     saved = {k: v for k, v in os.environ.items()
              if k.upper().startswith("AWS_") or k.upper() in {"BOTO_CONFIG", "BOTO_PATH"}}
     try:
@@ -193,13 +183,34 @@ def _without_ambient_aws():
 
 @contextmanager
 def quiet_aws_logging():
-    """Suppress SDK diagnostics while handling tokens; use before starting threads."""
-    previous = logging.root.manager.disable
+    """Filter synchronous SDK diagnostics in this thread; keep other logs live.
+
+    Logging configuration must not be changed during this scope. This does not
+    cover SDK worker threads, warnings, stdout, or logging in other processes.
+    """
+    if not logging.logThreads:
+        raise OidcError("logging thread identification unavailable")
+    owner = threading.get_ident()
+
+    class SdkFilter(logging.Filter):
+        def filter(self, record):
+            return (record.thread is not None and record.thread != owner) or not any(
+                record.name == name or record.name.startswith(name + ".")
+                for name in ("botocore", "boto3", "s3transfer", "urllib3"))
+
+    sdk_filter = SdkFilter()
+    loggers = [logging.getLogger()] + [logger for logger in list(logging.root.manager.loggerDict.values())
+                                      if isinstance(logger, logging.Logger)]
+    handlers = {handler for logger in loggers for handler in logger.handlers}
+    if logging.lastResort is not None:
+        handlers.add(logging.lastResort)
+    for handler in handlers:
+        handler.addFilter(sdk_filter)
     try:
-        logging.disable(logging.CRITICAL)
         yield
     finally:
-        logging.disable(previous)
+        for handler in handlers:
+            handler.removeFilter(sdk_filter)
 
 
 def obtain_session(env: dict[str, str], expected: ExpectedIdentity, *, required_seconds: int,
@@ -216,13 +227,9 @@ def obtain_session(env: dict[str, str], expected: ExpectedIdentity, *, required_
         raise OidcError("invalid session duration")
     token = env.get(TOKEN_ENV, "")
     name = validate_context(env, expected, token, now)
-    try:
-        token_deadline = datetime.fromtimestamp(_claims(token)["exp"], tz=timezone.utc)
-    except (OverflowError, OSError, ValueError):
-        raise OidcError("invalid token deadline") from None
     # Fail before STS when the job budget is already insufficient.
     ensure_budget(env, now + timedelta(seconds=duration_seconds), required_seconds, now,
-                  margin_seconds=margin_seconds, token_deadline=token_deadline)
+                  margin_seconds=margin_seconds)
     try:
         from botocore import UNSIGNED
         from botocore.config import Config
@@ -245,7 +252,7 @@ def obtain_session(env: dict[str, str], expected: ExpectedIdentity, *, required_
                 raise OidcError("STS token identity mismatch")
             cred = result["Credentials"]
             session = FixedSession(cred["AccessKeyId"], cred["SecretAccessKey"],
-                                   cred["SessionToken"], cred["Expiration"], token_deadline)
+                                   cred["SessionToken"], cred["Expiration"])
             if any(not isinstance(value, str) or not value for value in
                    (session.access_key, session.secret_key, session.session_token)):
                 raise OidcError("invalid temporary credentials")
@@ -281,8 +288,7 @@ _DEVICE_NETWORK_ENV = {"AWS_IOT_CELLULAR_APN_CK_RX65N_01", "AWS_IOT_CELLULAR_APN
 
 def child_environment(env: dict[str, str], session: FixedSession, *, allow_names=()) -> dict[str, str]:
     """Pass fixed STS keys and explicitly allowed non-AWS inputs, never the JWT."""
-    if (not isinstance(session.expiration, datetime) or session.expiration.tzinfo is None
-            or not isinstance(session.token_deadline, datetime) or session.token_deadline.tzinfo is None):
+    if not isinstance(session.expiration, datetime) or session.expiration.tzinfo is None:
         raise OidcError("invalid session deadlines")
     secret_names = {TOKEN_ENV, "RX_IOT_OIDC_TOKEN", "RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN",
                     "CI_JOB_JWT", "CI_JOB_JWT_V2"}
@@ -296,7 +302,6 @@ def child_environment(env: dict[str, str], session: FixedSession, *, allow_names
                  AWS_SHARED_CREDENTIALS_FILE=os.devnull, BOTO_CONFIG=os.devnull,
                  AWS_EC2_METADATA_DISABLED="true", AWS_DEFAULT_REGION=REGION, AWS_REGION=REGION)
     clean["RX_OIDC_EXPIRATION_UTC"] = session.expiration.astimezone(timezone.utc).isoformat()
-    clean["RX_OIDC_TOKEN_DEADLINE_UTC"] = session.token_deadline.astimezone(timezone.utc).isoformat()
     if "WSLENV" in clean:
         clean["WSLENV"] = ":".join(part for part in clean["WSLENV"].split(":")
                                    if part and not part.split("/", 1)[0].upper().startswith("AWS_")
@@ -309,7 +314,6 @@ def wsl_bridge_environment(env: dict[str, str], session: FixedSession, *, allow_
     clean = child_environment(env, session, allow_names=allow_names)
     names = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
              "AWS_EC2_METADATA_DISABLED", "AWS_DEFAULT_REGION", "AWS_REGION", "RX_OIDC_EXPIRATION_UTC",
-             "RX_OIDC_TOKEN_DEADLINE_UTC",
              "CI_JOB_STARTED_AT", "CI_JOB_TIMEOUT", "RUNNER_SCRIPT_TIMEOUT")
     explicit = tuple(name.upper() for name in allow_names if name.upper() in clean)
     names = tuple(dict.fromkeys(names + explicit))
@@ -323,13 +327,12 @@ def wsl_child_environment(env: dict[str, str], *, allow_names=()) -> dict[str, s
     """Rebuild a Linux child environment before it can resolve AWS credentials."""
     try:
         expiration = _timestamp(env["RX_OIDC_EXPIRATION_UTC"])
-        token_deadline = _timestamp(env["RX_OIDC_TOKEN_DEADLINE_UTC"])
         values = [env[name] for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN")]
         if any(not value for value in values):
             raise ValueError
     except (KeyError, ValueError):
         raise OidcError("missing WSL session") from None
-    session = FixedSession(*values, expiration, token_deadline)
+    session = FixedSession(*values, expiration)
     clean = child_environment(env, session, allow_names=allow_names)
     # Windows NUL is not the Linux null device. Do not propagate host paths.
     clean.update(AWS_CONFIG_FILE="/dev/null", AWS_SHARED_CREDENTIALS_FILE="/dev/null", BOTO_CONFIG="/dev/null")

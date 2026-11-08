@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import logging
 import os
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -110,7 +111,6 @@ class OidcSessionTests(unittest.TestCase):
             self.assertEqual("host-admin", os.environ["AWS_PROFILE"])
             self.assertEqual("yes", os.environ["KEEP"])
             self.assertEqual(NOW + timedelta(hours=3), session.expiration)
-            self.assertEqual(NOW + timedelta(hours=3), session.token_deadline)
             self.assertNotIn(SECRET, repr(session))
 
     def test_child_cli_sdk_and_wsl_receive_only_fixed_sts_credentials(self):
@@ -121,7 +121,7 @@ class OidcSessionTests(unittest.TestCase):
         self.assertEqual(SESSION, env["AWS_SESSION_TOKEN"])
         self.assertEqual(os.devnull, env["AWS_SHARED_CREDENTIALS_FILE"])
         self.assertEqual("true", env["AWS_EC2_METADATA_DISABLED"])
-        self.assertEqual(session.token_deadline.isoformat(), env["RX_OIDC_TOKEN_DEADLINE_UTC"])
+        self.assertNotIn("RX_OIDC_TOKEN_DEADLINE_UTC", env)
         self.assertEqual("KEEP/u", env["WSLENV"])
         for key in (oidc.TOKEN_ENV, "AWS_PROFILE", "AWS_ENDPOINT_URL", "BOTO_PATH"):
             self.assertNotIn(key, env)
@@ -144,7 +144,7 @@ class OidcSessionTests(unittest.TestCase):
             self.assertEqual(0, fake.assume_calls)
         for token in ("", "bad", "a" * 32769, jwt(aud="wrong"), jwt(aud=[oidc.AUDIENCE]),
                       jwt(sub="project_path:other:ref_type:branch:ref:main"),
-                      jwt(exp=int(NOW.timestamp()) + 10),
+                      jwt(exp=int(NOW.timestamp()) - 1), jwt(exp=int(NOW.timestamp()) + 10),
                       jwt(iss="https://invalid.example"), jwt(ref_protected="false"),
                       jwt(project_id="221"), jwt(job_id="18"), jwt(sha="b" * 40),
                       jwt(pipeline_source="api")):
@@ -183,42 +183,26 @@ class OidcSessionTests(unittest.TestCase):
             self.assertEqual(0, fake.assume_calls)
         self.issue({**environment(), "RUNNER_SCRIPT_TIMEOUT": "2h"})
 
-    def test_short_token_deadline_is_conservative_even_when_job_timeout_is_long(self):
-        token = jwt(exp=int((NOW + timedelta(seconds=6500)).timestamp()))
-        fake = FakeSts()
-        with self.assertRaises(oidc.OidcError):
-            self.issue({**environment(), oidc.TOKEN_ENV: token}, fake=fake, required=6489, margin=60)
-        self.assertEqual(0, fake.assume_calls)
-
-    def test_downstream_budget_recheck_uses_both_returned_deadlines(self):
-        token = jwt(exp=int((NOW + timedelta(hours=2)).timestamp()))
+    def test_expired_jwt_does_not_limit_issued_session(self):
+        token = jwt(exp=int((NOW + timedelta(seconds=300)).timestamp()))
         session, _, _ = self.issue({**environment(), oidc.TOKEN_ENV: token},
                                    fake=FakeSts(expected_token=token), required=6000)
         self.assertEqual(NOW + timedelta(hours=3), session.expiration)
-        self.assertEqual(NOW + timedelta(hours=2), session.token_deadline)
         env = oidc.child_environment(environment(), session)
         self.assertEqual((NOW + timedelta(hours=3)).isoformat(), env["RX_OIDC_EXPIRATION_UTC"])
-        self.assertEqual((NOW + timedelta(hours=2)).isoformat(), env["RX_OIDC_TOKEN_DEADLINE_UTC"])
         linux = oidc.wsl_child_environment(oidc.wsl_bridge_environment(environment(), session))
         self.assertEqual((NOW + timedelta(hours=3)).isoformat(), linux["RX_OIDC_EXPIRATION_UTC"])
-        self.assertEqual((NOW + timedelta(hours=2)).isoformat(), linux["RX_OIDC_TOKEN_DEADLINE_UTC"])
-        oidc.ensure_session_budget(env, session, 6000, NOW, margin_seconds=60)
-        oidc.ensure_child_budget(linux, 6000, NOW, margin_seconds=60)
-        with self.assertRaises(oidc.OidcError):
-            oidc.ensure_session_budget(env, session, 6000, NOW + timedelta(seconds=1200), margin_seconds=60)
-        with self.assertRaises(oidc.OidcError):
-            oidc.ensure_child_budget(linux, 6000, NOW + timedelta(seconds=1200), margin_seconds=60)
-        with self.assertRaises(oidc.OidcError):
-            oidc.ensure_child_budget({k: v for k, v in linux.items() if k != "RX_OIDC_TOKEN_DEADLINE_UTC"},
-                                     6000, NOW, margin_seconds=60)
+        self.assertNotIn(oidc.TOKEN_ENV, linux)
+        self.assertNotIn("RX_OIDC_TOKEN_DEADLINE_UTC", linux)
+        oidc.ensure_session_budget(env, session, 6000, NOW + timedelta(seconds=600), margin_seconds=60)
+        oidc.ensure_child_budget(linux, 6000, NOW + timedelta(seconds=600), margin_seconds=60)
         with self.assertRaises(oidc.OidcError):
             oidc.ensure_child_budget({k: v for k, v in linux.items() if k != "RX_OIDC_EXPIRATION_UTC"},
                                      6000, NOW, margin_seconds=60)
-        invalid = oidc.FixedSession(ACCESS, SECRET, SESSION, session.expiration, None)
+        invalid = oidc.FixedSession(ACCESS, SECRET, SESSION, None)
         with self.assertRaises(oidc.OidcError):
             oidc.ensure_session_budget(env, invalid, 6000, NOW, margin_seconds=60)
-        short = oidc.FixedSession(ACCESS, SECRET, SESSION, NOW + timedelta(seconds=5400),
-                                  NOW + timedelta(hours=3))
+        short = oidc.FixedSession(ACCESS, SECRET, SESSION, NOW + timedelta(seconds=5400))
         short_linux = oidc.wsl_child_environment(oidc.wsl_bridge_environment(environment(), short))
         with self.assertRaises(oidc.OidcError):
             oidc.ensure_child_budget(short_linux, 5400, NOW, margin_seconds=60)
@@ -236,6 +220,16 @@ class OidcSessionTests(unittest.TestCase):
         def noisy(**kwargs):
             called.append(True)
             logging.getLogger("botocore.auth").critical(SECRET)
+            with patch.object(logging, "logThreads", False):
+                logging.getLogger("botocore.auth").critical(SECRET)
+            logging.getLogger("uart").critical("uart same thread")
+            def other_thread_logs():
+                logging.getLogger("uart").critical("uart other thread")
+                logging.getLogger("urllib3.connectionpool").critical("other thread")
+
+            thread = threading.Thread(target=other_thread_logs)
+            thread.start()
+            thread.join()
             return original(**kwargs)
 
         fake.assume_role_with_web_identity = noisy
@@ -248,28 +242,40 @@ class OidcSessionTests(unittest.TestCase):
         handler = Capture()
         root = logging.getLogger()
         previous = logging.root.manager.disable
+        direct = logging.getLogger("botocore.auth")
         root.addHandler(handler)
+        direct.addHandler(handler)
         try:
-            logging.disable(logging.NOTSET)
             self.issue(fake=fake)
             self.assertTrue(called)
-            self.assertFalse(records)
-            self.assertEqual(logging.NOTSET, logging.root.manager.disable)
+            self.assertEqual(["uart same thread", "uart other thread", "other thread"], records)
+            self.assertEqual(previous, logging.root.manager.disable)
             logging.getLogger("botocore.auth").critical("visible fixture")
-            self.assertEqual(["visible fixture"], records)
+            self.assertEqual(2, records.count("visible fixture"))
         finally:
+            direct.removeHandler(handler)
             root.removeHandler(handler)
-            logging.disable(previous)
 
     def test_logging_is_restored_after_sts_failure(self):
         previous = logging.root.manager.disable
+        root = logging.getLogger()
+        handler = logging.NullHandler()
+        root.addHandler(handler)
         try:
-            logging.disable(logging.NOTSET)
+            existing_filters = list(handler.filters)
             with self.assertRaises(oidc.OidcError):
                 self.issue(fake=FakeSts(fail=True))
-            self.assertEqual(logging.NOTSET, logging.root.manager.disable)
+            self.assertEqual(previous, logging.root.manager.disable)
+            self.assertEqual(existing_filters, handler.filters)
         finally:
-            logging.disable(previous)
+            root.removeHandler(handler)
+
+    def test_logging_without_thread_ids_fails_before_sts(self):
+        fake = FakeSts()
+        with patch.object(logging, "logThreads", False):
+            with self.assertRaises(oidc.OidcError):
+                self.issue(fake=fake)
+        self.assertEqual(0, fake.assume_calls)
 
     def test_short_jobs_can_use_shorter_sessions_and_invalid_durations_fail(self):
         short = FakeSts(duration=900, expiration=NOW + timedelta(seconds=900))
@@ -285,7 +291,7 @@ class OidcSessionTests(unittest.TestCase):
         session, _, _ = self.issue()
         bridge = oidc.wsl_bridge_environment(environment(), session)
         for name in ("AWS_ACCESS_KEY_ID/u", "AWS_SECRET_ACCESS_KEY/u", "AWS_SESSION_TOKEN/u",
-                     "RX_OIDC_TOKEN_DEADLINE_UTC/u"):
+                     "RX_OIDC_EXPIRATION_UTC/u"):
             self.assertIn(name, bridge["WSLENV"].split(":"))
         self.assertNotIn("RX_OIDC_ID_TOKEN/u", bridge["WSLENV"])
         # Model a WSL host with an unrelated ambient profile and AWS endpoint.
@@ -299,7 +305,7 @@ class OidcSessionTests(unittest.TestCase):
         with self.assertRaises(oidc.OidcError):
             oidc.wsl_child_environment({**linux, "AWS_SESSION_TOKEN": ""})
         with self.assertRaises(oidc.OidcError):
-            oidc.wsl_child_environment({k: v for k, v in linux.items() if k != "RX_OIDC_TOKEN_DEADLINE_UTC"})
+            oidc.wsl_child_environment({k: v for k, v in linux.items() if k != "RX_OIDC_EXPIRATION_UTC"})
 
     def test_device_apn_is_explicitly_allowed_without_allowing_aws_profile(self):
         session, _, _ = self.issue()
