@@ -4279,7 +4279,7 @@ cleanup_rx72n_ether_ota_jobs:
       $env:GITLAB_OIDC_TOKEN = $null
       $env:AWS_WEB_IDENTITY_TOKEN_FILE = $tokenFile
       foreach ($name in @('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_SECURITY_TOKEN', 'AWS_PROFILE', 'AWS_DEFAULT_PROFILE', 'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI', 'AWS_CONTAINER_CREDENTIALS_FULL_URI', 'AWS_ACCESS_KEY_ID_ISHIGURO', 'AWS_SECRET_ACCESS_KEY_ISHIGURO')) {
-        [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+        Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
       }
       $env:AWS_CONFIG_FILE = 'NUL'
       $env:AWS_SHARED_CREDENTIALS_FILE = 'NUL'
