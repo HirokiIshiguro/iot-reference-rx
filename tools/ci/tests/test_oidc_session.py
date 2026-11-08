@@ -46,17 +46,19 @@ def environment():
 
 class FakeSts:
     def __init__(self, *, account=ACCOUNT, role="test-oidc-role", expiration=None, fail=False, duration=10800,
-                 subject="project_path:oss/example/project:ref_type:branch:ref:main", audience=oidc.AUDIENCE):
+                 subject="project_path:oss/example/project:ref_type:branch:ref:main", audience=oidc.AUDIENCE,
+                 expected_token=None):
         self.account, self.role, self.fail = account, role, fail
         self.duration = duration
         self.subject, self.audience = subject, audience
+        self.expected_token = jwt() if expected_token is None else expected_token
         self.expiration = expiration or (NOW + timedelta(hours=3))
         self.assume_calls = 0
 
     def assume_role_with_web_identity(self, **kwargs):
         self.assume_calls += 1
         assert kwargs["DurationSeconds"] == self.duration
-        assert kwargs["WebIdentityToken"] == jwt()
+        assert kwargs["WebIdentityToken"] == self.expected_token
         assert os.environ.get("AWS_CONFIG_FILE") == os.devnull
         assert "AWS_PROFILE" not in os.environ
         if self.fail:
@@ -107,6 +109,7 @@ class OidcSessionTests(unittest.TestCase):
             self.assertEqual("host-admin", os.environ["AWS_PROFILE"])
             self.assertEqual("yes", os.environ["KEEP"])
             self.assertEqual(NOW + timedelta(hours=3), session.expiration)
+            self.assertEqual(NOW + timedelta(hours=3), session.token_deadline)
             self.assertNotIn(SECRET, repr(session))
 
     def test_child_cli_sdk_and_wsl_receive_only_fixed_sts_credentials(self):
@@ -117,6 +120,7 @@ class OidcSessionTests(unittest.TestCase):
         self.assertEqual(SESSION, env["AWS_SESSION_TOKEN"])
         self.assertEqual(os.devnull, env["AWS_SHARED_CREDENTIALS_FILE"])
         self.assertEqual("true", env["AWS_EC2_METADATA_DISABLED"])
+        self.assertEqual(session.token_deadline.isoformat(), env["RX_OIDC_TOKEN_DEADLINE_UTC"])
         self.assertEqual("KEEP/u", env["WSLENV"])
         for key in (oidc.TOKEN_ENV, "AWS_PROFILE", "AWS_ENDPOINT_URL", "BOTO_PATH"):
             self.assertNotIn(key, env)
@@ -185,6 +189,26 @@ class OidcSessionTests(unittest.TestCase):
             self.issue({**environment(), oidc.TOKEN_ENV: token}, fake=fake, required=6489, margin=60)
         self.assertEqual(0, fake.assume_calls)
 
+    def test_downstream_budget_recheck_uses_both_returned_deadlines(self):
+        token = jwt(exp=int((NOW + timedelta(hours=2)).timestamp()))
+        session, _, _ = self.issue({**environment(), oidc.TOKEN_ENV: token},
+                                   fake=FakeSts(expected_token=token), required=6000)
+        self.assertEqual(NOW + timedelta(hours=3), session.expiration)
+        self.assertEqual(NOW + timedelta(hours=2), session.token_deadline)
+        env = oidc.child_environment(environment(), session)
+        self.assertEqual((NOW + timedelta(hours=3)).isoformat(), env["RX_OIDC_EXPIRATION_UTC"])
+        self.assertEqual((NOW + timedelta(hours=2)).isoformat(), env["RX_OIDC_TOKEN_DEADLINE_UTC"])
+        linux = oidc.wsl_child_environment(oidc.wsl_bridge_environment(environment(), session))
+        self.assertEqual((NOW + timedelta(hours=3)).isoformat(), linux["RX_OIDC_EXPIRATION_UTC"])
+        self.assertEqual((NOW + timedelta(hours=2)).isoformat(), linux["RX_OIDC_TOKEN_DEADLINE_UTC"])
+        with self.assertRaises(oidc.OidcError):
+            oidc.ensure_session_budget(env, session, 6000, NOW + timedelta(seconds=1200), margin_seconds=60)
+        with self.assertRaises(oidc.OidcError):
+            oidc.ensure_child_budget(linux, 6000, NOW + timedelta(seconds=1200), margin_seconds=60)
+        with self.assertRaises(oidc.OidcError):
+            oidc.ensure_child_budget({k: v for k, v in linux.items() if k != "RX_OIDC_TOKEN_DEADLINE_UTC"},
+                                     6000, NOW, margin_seconds=60)
+
     def test_sdk_errors_do_not_expose_credentials(self):
         with self.assertRaises(oidc.OidcError) as caught:
             self.issue(fake=FakeSts(fail=True))
@@ -203,7 +227,8 @@ class OidcSessionTests(unittest.TestCase):
     def test_wsl_bridge_requires_linux_environment_rebuild(self):
         session, _, _ = self.issue()
         bridge = oidc.wsl_bridge_environment(environment(), session)
-        for name in ("AWS_ACCESS_KEY_ID/u", "AWS_SECRET_ACCESS_KEY/u", "AWS_SESSION_TOKEN/u"):
+        for name in ("AWS_ACCESS_KEY_ID/u", "AWS_SECRET_ACCESS_KEY/u", "AWS_SESSION_TOKEN/u",
+                     "RX_OIDC_TOKEN_DEADLINE_UTC/u"):
             self.assertIn(name, bridge["WSLENV"].split(":"))
         self.assertNotIn("RX_OIDC_ID_TOKEN/u", bridge["WSLENV"])
         # Model a WSL host with an unrelated ambient profile and AWS endpoint.
@@ -216,6 +241,8 @@ class OidcSessionTests(unittest.TestCase):
         self.assertNotIn("AWS_ENDPOINT_URL", linux)
         with self.assertRaises(oidc.OidcError):
             oidc.wsl_child_environment({**linux, "AWS_SESSION_TOKEN": ""})
+        with self.assertRaises(oidc.OidcError):
+            oidc.wsl_child_environment({k: v for k, v in linux.items() if k != "RX_OIDC_TOKEN_DEADLINE_UTC"})
 
     def test_device_apn_is_explicitly_allowed_without_allowing_aws_profile(self):
         session, _, _ = self.issue()

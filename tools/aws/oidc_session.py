@@ -44,6 +44,7 @@ class FixedSession:
     secret_key: str = field(repr=False)
     session_token: str = field(repr=False)
     expiration: datetime
+    token_deadline: datetime
 
 
 def _timestamp(value: str) -> datetime:
@@ -148,6 +149,25 @@ def ensure_budget(env: dict[str, str], expiration: datetime, required_seconds: i
         raise OidcError("insufficient remaining time")
 
 
+def ensure_session_budget(env: dict[str, str], session: FixedSession, required_seconds: int,
+                          now: datetime, *, margin_seconds: int) -> None:
+    """Recheck a verified session without accidentally omitting either deadline."""
+    ensure_budget(env, session.expiration, required_seconds, now,
+                  margin_seconds=margin_seconds, token_deadline=session.token_deadline)
+
+
+def ensure_child_budget(env: dict[str, str], required_seconds: int,
+                        now: datetime, *, margin_seconds: int) -> None:
+    """Recheck propagated deadlines, including in a sanitized WSL child."""
+    try:
+        expiration = _timestamp(env["RX_OIDC_EXPIRATION_UTC"])
+        token_deadline = _timestamp(env["RX_OIDC_TOKEN_DEADLINE_UTC"])
+    except KeyError:
+        raise OidcError("missing child deadlines") from None
+    ensure_budget(env, expiration, required_seconds, now,
+                  margin_seconds=margin_seconds, token_deadline=token_deadline)
+
+
 @contextmanager
 def _without_ambient_aws():
     """Do not read ambient profiles or endpoints; call before starting threads."""
@@ -210,7 +230,7 @@ def obtain_session(env: dict[str, str], expected: ExpectedIdentity, *, required_
                 raise OidcError("STS token identity mismatch")
             cred = result["Credentials"]
             session = FixedSession(cred["AccessKeyId"], cred["SecretAccessKey"],
-                                   cred["SessionToken"], cred["Expiration"])
+                                   cred["SessionToken"], cred["Expiration"], token_deadline)
             if any(not isinstance(value, str) or not value for value in
                    (session.access_key, session.secret_key, session.session_token)):
                 raise OidcError("invalid temporary credentials")
@@ -227,8 +247,7 @@ def obtain_session(env: dict[str, str], expected: ExpectedIdentity, *, required_
             raise OidcError("caller identity mismatch")
         # Re-read the clock after the network call in production.
         checked_at = datetime.now(timezone.utc) if real_clock else now
-        ensure_budget(env, session.expiration, required_seconds, checked_at,
-                      margin_seconds=margin_seconds, token_deadline=token_deadline)
+        ensure_session_budget(env, session, required_seconds, checked_at, margin_seconds=margin_seconds)
         return session
     except OidcError:
         raise
@@ -247,6 +266,9 @@ _DEVICE_NETWORK_ENV = {"AWS_IOT_CELLULAR_APN_CK_RX65N_01", "AWS_IOT_CELLULAR_APN
 
 def child_environment(env: dict[str, str], session: FixedSession, *, allow_names=()) -> dict[str, str]:
     """Pass fixed STS keys and explicitly allowed non-AWS inputs, never the JWT."""
+    if (not isinstance(session.expiration, datetime) or session.expiration.tzinfo is None
+            or not isinstance(session.token_deadline, datetime) or session.token_deadline.tzinfo is None):
+        raise OidcError("invalid session deadlines")
     secret_names = {TOKEN_ENV, "RX_IOT_OIDC_TOKEN", "RX_IOT_OIDC_WRONG_AUDIENCE_TOKEN",
                     "CI_JOB_JWT", "CI_JOB_JWT_V2"}
     allowed = _BASE_ENV | {name.upper() for name in allow_names}
@@ -259,6 +281,7 @@ def child_environment(env: dict[str, str], session: FixedSession, *, allow_names
                  AWS_SHARED_CREDENTIALS_FILE=os.devnull, BOTO_CONFIG=os.devnull,
                  AWS_EC2_METADATA_DISABLED="true", AWS_DEFAULT_REGION=REGION, AWS_REGION=REGION)
     clean["RX_OIDC_EXPIRATION_UTC"] = session.expiration.astimezone(timezone.utc).isoformat()
+    clean["RX_OIDC_TOKEN_DEADLINE_UTC"] = session.token_deadline.astimezone(timezone.utc).isoformat()
     if "WSLENV" in clean:
         clean["WSLENV"] = ":".join(part for part in clean["WSLENV"].split(":")
                                    if part and not part.split("/", 1)[0].upper().startswith("AWS_")
@@ -271,6 +294,7 @@ def wsl_bridge_environment(env: dict[str, str], session: FixedSession, *, allow_
     clean = child_environment(env, session, allow_names=allow_names)
     names = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
              "AWS_EC2_METADATA_DISABLED", "AWS_DEFAULT_REGION", "AWS_REGION", "RX_OIDC_EXPIRATION_UTC",
+             "RX_OIDC_TOKEN_DEADLINE_UTC",
              "CI_JOB_STARTED_AT", "CI_JOB_TIMEOUT", "RUNNER_SCRIPT_TIMEOUT")
     explicit = tuple(name.upper() for name in allow_names if name.upper() in clean)
     names = tuple(dict.fromkeys(names + explicit))
@@ -284,12 +308,13 @@ def wsl_child_environment(env: dict[str, str], *, allow_names=()) -> dict[str, s
     """Rebuild a Linux child environment before it can resolve AWS credentials."""
     try:
         expiration = _timestamp(env["RX_OIDC_EXPIRATION_UTC"])
+        token_deadline = _timestamp(env["RX_OIDC_TOKEN_DEADLINE_UTC"])
         values = [env[name] for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN")]
         if any(not value for value in values):
             raise ValueError
     except (KeyError, ValueError):
         raise OidcError("missing WSL session") from None
-    session = FixedSession(*values, expiration)
+    session = FixedSession(*values, expiration, token_deadline)
     clean = child_environment(env, session, allow_names=allow_names)
     # Windows NUL is not the Linux null device. Do not propagate host paths.
     clean.update(AWS_CONFIG_FILE="/dev/null", AWS_SHARED_CREDENTIALS_FILE="/dev/null", BOTO_CONFIG="/dev/null")
