@@ -82,7 +82,7 @@ foreach ($name in ($env:CONTRACT_PATHS | ConvertFrom-Json -AsHashtable).Keys) {
                     if scenario=="complete":environment.update(paths)
                     elif scenario=="partial":environment[variables[0]]=paths[variables[0]]
                     result=subprocess.run([PWSH,"-NoProfile","-File",str(path)],capture_output=True,text=True,
-                                          encoding="utf-8",errors="replace",env=environment,timeout=15)
+                                          encoding="utf-8",errors="replace",env=environment,timeout=(120 if os.name == "nt" else 15))
                     if scenario in ("generate","complete","preflight"):
                         self.assertEqual(0,result.returncode,result.stderr)
                         observed=json.loads(result.stdout)

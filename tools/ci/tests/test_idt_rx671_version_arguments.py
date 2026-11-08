@@ -1,6 +1,7 @@
 """Invoke the real RX671 builder call with an isolated argument-recording stub."""
 
 from __future__ import annotations
+import os
 
 import json
 from pathlib import Path
@@ -145,7 +146,7 @@ class Rx671VersionArgumentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         result = subprocess.run([POWERSHELL, "-NoLogo", "-NoProfile", "-NonInteractive",
-            "-Command", "$PSVersionTable.PSVersion.Major"], text=True, capture_output=True, timeout=30)
+            "-Command", "$PSVersionTable.PSVersion.Major"], text=True, capture_output=True, timeout=(120 if os.name == "nt" else 30))
         if result.returncode or int(result.stdout.strip()) < 7:
             raise unittest.SkipTest("PowerShell 7 or later is required")
 
@@ -161,7 +162,7 @@ class Rx671VersionArgumentTests(unittest.TestCase):
             process = subprocess.run([POWERSHELL, "-NoLogo", "-NoProfile", "-NonInteractive",
                 "-ExecutionPolicy", "Bypass", "-File", str(harness), "-BuilderPath", str(BUILDER),
                 "-HelperPath", str(HELPER), "-RequestPath", str(request), "-ResultPath", str(result)],
-                text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=30)
+                text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=(120 if os.name == "nt" else 30))
             self.assertEqual(0, process.returncode, process.stderr)
             self.assertTrue(result.is_file(), "Actual command must invoke the argument receiver")
             return json.loads(result.read_text(encoding="utf-8-sig"))

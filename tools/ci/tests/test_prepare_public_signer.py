@@ -122,6 +122,36 @@ class PreparePublicSignerTests(unittest.TestCase):
         self.assertEqual(set(helper.controller.ENVIRONMENT_INPUTS.values()),set(paths))
         self.assertTrue(selected.is_file())
 
+    def test_early_source_timeout_reports_only_fixed_diagnostic_and_stops_before_generation(self):
+        fixture=self.fixture()
+        private="SYNTHETIC_PRIVATE_SUBPROCESS_ARGUMENT_AND_OUTPUT"
+        error=subprocess.TimeoutExpired(["git",private],30,output=private,stderr=private)
+        stdout,stderr=io.StringIO(),io.StringIO()
+        with patch.object(helper.subprocess,"run",side_effect=error), \
+                patch.object(helper.producer,"build") as compiler, \
+                patch.dict(os.environ,{variable:"" for variable in helper.controller.ENVIRONMENT_INPUTS.values()}), \
+                redirect_stdout(stdout),redirect_stderr(stderr):
+            status=helper.main(["--source",str(fixture.source),"--target",fixture.target["id"],
+                "--output",str(fixture.output),"--workspace",str(fixture.workspace)])
+        self.assertEqual(1,status);self.assertFalse(stdout.getvalue())
+        self.assertEqual("Public signer preparation failed: Git source verification exceeded 30 seconds\n",stderr.getvalue())
+        self.assertNotIn(private,stderr.getvalue());compiler.assert_not_called()
+        self.assertFalse(fixture.output.exists())
+
+    def test_early_dirty_source_is_distinguishable_without_disclosing_paths_or_contents(self):
+        fixture=self.fixture();private="SYNTHETIC_PRIVATE_UNCOMMITTED_CONTENT"
+        (fixture.source/"private-filename.txt").write_text(private)
+        stdout,stderr=io.StringIO(),io.StringIO()
+        with patch.object(helper.producer,"build") as compiler, \
+                patch.dict(os.environ,{variable:"" for variable in helper.controller.ENVIRONMENT_INPUTS.values()}), \
+                redirect_stdout(stdout),redirect_stderr(stderr):
+            status=helper.main(["--source",str(fixture.source),"--target",fixture.target["id"],
+                "--output",str(fixture.output),"--workspace",str(fixture.workspace)])
+        self.assertEqual(1,status);self.assertFalse(stdout.getvalue())
+        self.assertIn("requires a clean committed source checkout",stderr.getvalue())
+        self.assertNotIn(private,stderr.getvalue());self.assertNotIn("private-filename",stderr.getvalue())
+        compiler.assert_not_called();self.assertFalse(fixture.output.exists())
+
     def test_formal_false_missing_artifacts_and_certificate_mismatch_leave_no_public_input_set(self):
         for case in ("formal","mot","manifest","certificate","certificate_mismatch"):
             with self.subTest(case=case):

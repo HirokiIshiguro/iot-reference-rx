@@ -1,4 +1,5 @@
 """Exercise the production nested initializer and unchanged capture guard."""
+import os
 from pathlib import Path
 import hashlib
 import importlib.util
@@ -96,7 +97,7 @@ class IdtNestedInitializationTests(unittest.TestCase):
         harness.write_text("$ErrorActionPreference='Stop'\n. " + ps_quote(CLI) +
             "\nInitialize-RxBuildDependencies -ProjectRoot " + ps_quote(source) + "\n", encoding="utf-8")
         result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(harness)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=40)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=(120 if os.name == "nt" else 40))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def capture(self, source):

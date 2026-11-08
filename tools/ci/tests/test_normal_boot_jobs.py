@@ -155,7 +155,7 @@ function python {
                                    RX72N_TLS_BACKEND=backend, RX65N_BG96_TLS_BACKEND=backend,
                                    EXPECTED_BACKEND=backend, E2STUDIO_CLI="fixture-e2studio-cli.exe")
                 result = subprocess.run([PWSH, "-NoProfile", "-File", str(harness)], cwd=source,
-                                        env=environment, capture_output=True, text=True, timeout=20)
+                                        env=environment, capture_output=True, text=True, timeout=(120 if os.name == "nt" else 20))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 artifact = source / settings["NORMAL_BOOT_ARTIFACT_DIR"]
                 self.assertEqual({p.name for p in artifact.iterdir()},

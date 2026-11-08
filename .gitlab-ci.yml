@@ -44,7 +44,7 @@ variables:
   # Participating CI builds retain their shared resource group and file lease.
   # Normal app/boot workspaces are isolated by pipeline and job.
   WINDOWS_CCRX_BUILD_RESOURCE_GROUP: "ishiguro-pc-ccrx-e2studio-build"
-  RX72N_E2STUDIO_TIMEOUT_SECONDS: "600"
+  RX72N_E2STUDIO_TIMEOUT_SECONDS: "1200"
   RFP_CLI: "C:/Program Files (x86)/Renesas Electronics/Programming Tools/Renesas Flash Programmer V3.22/rfp-cli.exe"
   RFP_SPEED: "1500K"
   RFP_AUTH: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"

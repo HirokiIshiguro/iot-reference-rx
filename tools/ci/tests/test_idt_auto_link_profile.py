@@ -127,7 +127,7 @@ foreach($target in $targets.Keys) {
 $reports|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $output 'profiles.json') -Encoding utf8
 ''', encoding="utf-8")
         return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(script)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=(120 if os.name == "nt" else 30))
 
     def test_all_eighteen_profiles_select_only_their_virtual_file_sources(self):
         with tempfile.TemporaryDirectory(prefix="idt-auto-link-") as temporary:

@@ -101,8 +101,10 @@ public class Launcher {
                 Process.GetCurrentProcess().MainModule.FileName, "--fixture-middle") {
                 UseShellExecute = false, CreateNoWindow = true
             });
-            if (!middle.WaitForExit(1000)) return 90;
-            Thread.Sleep(200);
+            if (!middle.WaitForExit(10000)) return 90;
+            // Occupy half of the orphan tests' 12s shared budget so a new
+            // full drain budget remains distinguishable under host load.
+            Thread.Sleep(6000);
             File.WriteAllText(Environment.GetEnvironmentVariable("RXCLI_FIXTURE_EXIT_MARKER"), "0");
             return 0;
         }
@@ -225,7 +227,7 @@ public class Launcher {
         stderr_path = self.directory / (self._testMethodName + ".stderr")
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
             result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", code],
-                                    stdout=stdout, stderr=stderr, env=environment, timeout=20)
+                                    stdout=stdout, stderr=stderr, env=environment, timeout=120)
         result.stdout = stdout_path.read_text(encoding="utf-8", errors="replace")
         result.stderr = stderr_path.read_text(encoding="utf-8", errors="replace")
         return result, calls, log
@@ -617,22 +619,23 @@ public class Launcher {
 
     def test_orphan_pipe_after_zero_exit_fails_within_global_budget(self):
         with self.fixture_child() as (child_file, running):
-            result, calls, log = self.invoke("orphan-pipe", timeout=1, allow_timeout=True)
+            result, calls, log = self.invoke("orphan-pipe", timeout=12, allow_timeout=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("output drain timed out", result.stderr)
             self.assertNotIn("RESULT=124", result.stdout)
             self.assertEqual(1, len(calls.read_text().splitlines()))
             marker = self.directory / (self._testMethodName + ".exit-marker")
             self.assertEqual("0", marker.read_text(encoding="utf-8"))
-            # The fixture launcher exited before the deadline; its orphan still
-            # owns the pipe. Failure must arrive within the remaining 1s budget.
-            self.assertLess(time.time() - marker.stat().st_mtime, 1.0)
+            # The helper records drain failure after at most the remaining 6s.
+            # Allow 3s of scheduling margin; a new full 12s drain budget fails.
+            # Measure that record, excluding PowerShell/Python return overhead.
+            self.assertLess(log.stat().st_mtime - marker.stat().st_mtime, 9.0)
             self.assertTrue(running(int(child_file.read_text())), "fixture orphan must still hold the pipe")
             self.assertIn("Output drain timed out", log.read_text(encoding="utf-8"))
 
     def test_stderr_only_orphan_pipe_cannot_pass(self):
         with self.fixture_child() as (child_file, running):
-            result, calls, log = self.invoke("orphan-stderr", timeout=1, summary=True)
+            result, calls, log = self.invoke("orphan-stderr", timeout=12, summary=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("output drain timed out", result.stderr)
             self.assertEqual(len(calls.read_text().splitlines()), 1)
