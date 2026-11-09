@@ -4246,6 +4246,9 @@ cleanup_rx65n_bg96_mqtt_credentials:
 cleanup_rx72n_ether_ota_jobs:
   stage: pre_test_cleanup
   extends: .aws_cli_windows_job
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sts.amazonaws.com
   needs:
     - job: build_rx72n_ether
       artifacts: false
@@ -4268,6 +4271,27 @@ cleanup_rx72n_ether_ota_jobs:
   script:
     - Write-Host "=== Require no active RX72N OTA IoT Jobs (read-only) ==="
     - |
+      if ([string]::IsNullOrWhiteSpace($env:AWS_ROLE_ARN) -or [string]::IsNullOrWhiteSpace($env:GITLAB_OIDC_TOKEN)) {
+        throw 'OIDC role or job token is unavailable'
+      }
+      $tokenFile = Join-Path $env:CI_PROJECT_DIR (".gitlab-oidc-{0}.jwt" -f $env:CI_JOB_ID)
+      [IO.File]::WriteAllText($tokenFile, $env:GITLAB_OIDC_TOKEN, [Text.UTF8Encoding]::new($false))
+      $env:GITLAB_OIDC_TOKEN = $null
+      $env:AWS_WEB_IDENTITY_TOKEN_FILE = $tokenFile
+      foreach ($name in @('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_SECURITY_TOKEN', 'AWS_PROFILE', 'AWS_DEFAULT_PROFILE', 'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI', 'AWS_CONTAINER_CREDENTIALS_FULL_URI', 'AWS_ACCESS_KEY_ID_ISHIGURO', 'AWS_SECRET_ACCESS_KEY_ISHIGURO')) {
+        Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+      }
+      $env:AWS_CONFIG_FILE = 'NUL'
+      $env:AWS_SHARED_CREDENTIALS_FILE = 'NUL'
+      $env:BOTO_CONFIG = 'NUL'
+      $env:AWS_EC2_METADATA_DISABLED = 'true'
+      try {
+        python -c "import botocore.session; c=botocore.session.get_session().get_credentials(); assert c and c.method == 'assume-role-with-web-identity'; print('AWS SDK web identity provider verified')"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $callerArn = aws sts get-caller-identity --query Arn --output text
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        if ($callerArn -notmatch ':assumed-role/saffti-oss-gitlab-oidc/') { throw 'Unexpected AWS caller role' }
+        Write-Host 'AWS CLI caller role verified'
       $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
       New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
@@ -4284,6 +4308,9 @@ cleanup_rx72n_ether_ota_jobs:
         --output-json "$artifactDir\cleanup_summary.json" `
         2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_ota_jobs.log"
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      } finally {
+        Remove-Item -LiteralPath $tokenFile -Force -ErrorAction SilentlyContinue
+      }
   artifacts:
     when: always
     paths:
