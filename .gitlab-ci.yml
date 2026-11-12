@@ -424,6 +424,20 @@ workflow:
         RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
       when: always
     # END CI RUNNER MR WORKFLOW
+    # BG96 changes use the RX65N bench for MR validation.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-rx65n-bg96-/'
+      variables:
+        PIPELINE_PROFILE: "mr-rx65n-bg96"
+        RUN_RX65N_BG96_BUILD: "true"
+        RX65N_BG96_TEST_SCOPE: "mqtt"
+        RUN_RX72N_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+      when: always
     - if: $CI_COMMIT_TAG
       variables:
         PIPELINE_PROFILE: "release"
@@ -3531,6 +3545,7 @@ test_rx65n_bg96_mqtt:
       if [ -n "${RX65N_BG96_REQUIRE_TLS_VERSION:-}" ]; then
         tls_version_args+=(--require-tls-version "${RX65N_BG96_REQUIRE_TLS_VERSION}")
       fi
+      status=0
       python3 tools/bg96_bootloader_integration.py \
         --action verify-mqtt \
         --uart-port "${uart_port}" \
@@ -3545,8 +3560,17 @@ test_rx65n_bg96_mqtt:
         --rfp-interface "${RX65N_BG96_RFP_INTERFACE}" \
         --rfp-speed "${RX65N_BG96_RFP_SPEED}" \
         --rfp-auth-id "${RX65N_BG96_RFP_AUTH_ID}" \
-        2>&1 | tee "$artifact_dir/verify_mqtt.log"
-      status="${PIPESTATUS[0]}"
+        2>&1 | tee "$artifact_dir/verify_mqtt.log" || status=$?
+      if [ "$PIPELINE_PROFILE" = "mr-rx65n-bg96" ]; then
+        reset_status=0
+        python3 tools/install_normal_boot.py \
+          --bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx65n" \
+          --target rx65n-bg96 --source-sha "$CI_COMMIT_SHA" --reset-only \
+          2>&1 | tee "$artifact_dir/end_state.log" || reset_status=$?
+        if [ "$status" -eq 0 ]; then
+          status="$reset_status"
+        fi
+      fi
       exit "$status"
   artifacts:
     when: always
