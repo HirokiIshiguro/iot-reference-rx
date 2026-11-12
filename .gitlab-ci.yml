@@ -364,6 +364,36 @@ workflow:
         RUN_RX671_TSIP_FLEET_TEST: "false"
         RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
       when: always
+    # BEGIN CI RUNNER MR WORKFLOW
+    # Runner-only MRs use a dedicated non-hardware scope contract.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-ci-runner-/'
+      variables:
+        PIPELINE_PROFILE: "mr-ci-runner"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
+    # END CI RUNNER MR WORKFLOW
     # Validate this multi-target change without taking any physical bench.
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-(idt-|common-core-)/'
       variables:
@@ -1044,6 +1074,20 @@ idt_source_matrix:
       - artifacts/idt-bootstrap/signer.pub.pem
     expire_in: 30 days
 
+
+ci_runner_mr_contract:
+  stage: dependency_check
+  tags: [exec-shell, os-linux, cap-aws-sdk]
+  variables:
+    GIT_SUBMODULE_STRATEGY: "none"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $PIPELINE_PROFILE == "mr-ci-runner"'
+      when: on_success
+    - when: never
+  script:
+    - python3 -m tools.ci.verify_ci_runner_mr_scope
+    - python3 -c 'import botocore'
+    - python3 -m unittest tools.ci.tests.test_cleanup_iot_jobs tools.ci.tests.test_shared_flash_mr_workflow tools.ci.tests.test_ci_runner_mr_scope -v
 
 nightly_dependency_contract:
   stage: dependency_check
@@ -4245,7 +4289,9 @@ cleanup_rx65n_bg96_mqtt_credentials:
 
 cleanup_rx72n_ether_ota_jobs:
   stage: pre_test_cleanup
-  extends: .aws_cli_windows_job
+  tags: [exec-shell, os-linux, cap-aws-sdk]
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: sts.amazonaws.com
@@ -4269,48 +4315,55 @@ cleanup_rx72n_ether_ota_jobs:
       when: on_success
     - when: never
   script:
-    - Write-Host "=== Require no active RX72N OTA IoT Jobs (read-only) ==="
     - |
-      if ([string]::IsNullOrWhiteSpace($env:AWS_ROLE_ARN) -or [string]::IsNullOrWhiteSpace($env:GITLAB_OIDC_TOKEN)) {
-        throw 'OIDC role or job token is unavailable'
-      }
-      $tokenFile = Join-Path $env:CI_PROJECT_DIR (".gitlab-oidc-{0}.jwt" -f $env:CI_JOB_ID)
-      [IO.File]::WriteAllText($tokenFile, $env:GITLAB_OIDC_TOKEN, [Text.UTF8Encoding]::new($false))
-      $env:GITLAB_OIDC_TOKEN = $null
-      $env:AWS_WEB_IDENTITY_TOKEN_FILE = $tokenFile
-      foreach ($name in @('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_SECURITY_TOKEN', 'AWS_PROFILE', 'AWS_DEFAULT_PROFILE', 'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI', 'AWS_CONTAINER_CREDENTIALS_FULL_URI', 'AWS_ACCESS_KEY_ID_ISHIGURO', 'AWS_SECRET_ACCESS_KEY_ISHIGURO')) {
-        Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
-      }
-      $env:AWS_CONFIG_FILE = 'NUL'
-      $env:AWS_SHARED_CREDENTIALS_FILE = 'NUL'
-      $env:BOTO_CONFIG = 'NUL'
-      $env:AWS_EC2_METADATA_DISABLED = 'true'
-      try {
-        python -c "import botocore.session; c=botocore.session.get_session().get_credentials(); assert c and c.method == 'assume-role-with-web-identity'; print('AWS SDK web identity provider verified')"
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        $callerArn = aws sts get-caller-identity --query Arn --output text
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        if ($callerArn -notmatch ':assumed-role/saffti-oss-gitlab-oidc/') { throw 'Unexpected AWS caller role' }
-        Write-Host 'AWS CLI caller role verified'
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\cleanup_rx72n_ether_ota_jobs"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      set -euo pipefail
+      : "${GITLAB_OIDC_TOKEN:?OIDC job token is unavailable}"
+      : "${AWS_ROLE_ARN:?OIDC role is unavailable}"
+      token_file="$(mktemp)"
+      trap 'rm -f -- "$token_file"' EXIT
+      printf '%s' "$GITLAB_OIDC_TOKEN" > "$token_file"
+      unset GITLAB_OIDC_TOKEN
+      unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+      unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_CONTAINER_CREDENTIALS_RELATIVE_URI AWS_CONTAINER_CREDENTIALS_FULL_URI
+      unset AWS_ACCESS_KEY_ID_ISHIGURO AWS_SECRET_ACCESS_KEY_ISHIGURO
+      export AWS_WEB_IDENTITY_TOKEN_FILE="$token_file"
+      export AWS_ROLE_SESSION_NAME="gitlab38-$CI_JOB_ID"
+      export AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null BOTO_CONFIG=/dev/null
+      export AWS_EC2_METADATA_DISABLED=true AWS_PAGER=""
+      python3 - <<'PY'
+      import os
+      import re
+      import botocore.session
+      from botocore.config import Config
 
-      if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
-        Write-Error "AWS CLI is unavailable on the AWS CLI runner."
-        exit 1
-      }
+      role = re.fullmatch(r"arn:aws:iam::([0-9]{12}):role/(saffti-oss-gitlab-oidc)", os.environ["AWS_ROLE_ARN"])
+      if not role:
+          raise SystemExit("Unexpected AWS_ROLE_ARN")
+      session = botocore.session.get_session()
+      try:
+          credentials = session.get_credentials()
+          if not credentials or credentials.method != "assume-role-with-web-identity":
+              raise SystemExit("Unexpected AWS credential provider")
+          sts = session.create_client("sts", region_name=os.environ["AWS_DEFAULT_REGION"],
+                                      config=Config(retries={"total_max_attempts": 1}, connect_timeout=10, read_timeout=20))
+          caller = sts.get_caller_identity()["Arn"]
+      except Exception:
+          raise SystemExit("AWS OIDC identity check failed") from None
+      expected = f"arn:aws:sts::{role[1]}:assumed-role/{role[2]}/{os.environ['AWS_ROLE_SESSION_NAME']}"
+      if caller != expected:
+          raise SystemExit("Unexpected AWS caller role or session")
+      print("AWS SDK web identity and caller role verified")
+      PY
 
-      python tools\cleanup_iot_jobs.py `
-        --thing-name "$env:RX72N_DEVICE_ID" `
-        --region "$env:AWS_DEFAULT_REGION" `
-        --job-id-prefix "AFR_OTA-" `
-        --check-empty `
-        --output-json "$artifactDir\cleanup_summary.json" `
-        2>&1 | Tee-Object -FilePath "$artifactDir\cleanup_rx72n_ether_ota_jobs.log"
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      } finally {
-        Remove-Item -LiteralPath $tokenFile -Force -ErrorAction SilentlyContinue
-      }
+      artifact_dir="$CI_PROJECT_DIR/artifacts/cleanup_rx72n_ether_ota_jobs"
+      mkdir -p "$artifact_dir"
+      python3 tools/cleanup_iot_jobs.py \
+        --thing-name "$RX72N_DEVICE_ID" \
+        --region "$AWS_DEFAULT_REGION" \
+        --job-id-prefix "AFR_OTA-" \
+        --check-empty \
+        --output-json "$artifact_dir/cleanup_summary.json" \
+        2>&1 | tee "$artifact_dir/cleanup_rx72n_ether_ota_jobs.log"
   artifacts:
     when: always
     paths:
