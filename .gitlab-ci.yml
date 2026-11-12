@@ -364,36 +364,6 @@ workflow:
         RUN_RX671_TSIP_FLEET_TEST: "false"
         RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
       when: always
-    # BEGIN CI RUNNER MR WORKFLOW
-    # Runner-only MRs use a dedicated non-hardware scope contract.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-ci-runner-/'
-      variables:
-        PIPELINE_PROFILE: "mr-ci-runner"
-        RUN_RX65N_BG96_BUILD: "false"
-        RX65N_BG96_TEST_SCOPE: "build"
-        RX65N_BG96_SKIP_HW_TESTS: "true"
-        RUN_RX72N_BUILD: "false"
-        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
-        RX72N_TEST_SCOPE: "build"
-        RX72N_SKIP_HW_TESTS: "true"
-        RX72N_SKIP_OTA_TESTS: "true"
-        RUN_RX72N_HW_TESTS: "false"
-        RUN_RX72N_MULTI_TLS_TEST: "false"
-        RUN_RX72N_OTA_TESTS: "false"
-        RUN_RX72N_FLEET_TESTS: "false"
-        RUN_RX671_WIFI_BUILD: "false"
-        RX671_WIFI_TEST_SCOPE: "build"
-        RX671_WIFI_SKIP_HW_TESTS: "true"
-        RUN_RX671_BOOTLOADER_BUILD: "false"
-        RUN_RX671_BOOTLOADER_SMOKE: "false"
-        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
-        RUN_RX671_OTA_TEST: "false"
-        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
-        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
-        RUN_RX671_TSIP_FLEET_TEST: "false"
-        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
-      when: always
-    # END CI RUNNER MR WORKFLOW
     # Validate this multi-target change without taking any physical bench.
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-(idt-|common-core-)/'
       variables:
@@ -424,6 +394,36 @@ workflow:
       when: always
     - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
       when: always
+    # BEGIN CI RUNNER MR WORKFLOW
+    # Runner-only MRs use a dedicated non-hardware scope contract.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-ci-runner-/'
+      variables:
+        PIPELINE_PROFILE: "mr-ci-runner"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
+    # END CI RUNNER MR WORKFLOW
     - if: $CI_COMMIT_TAG
       variables:
         PIPELINE_PROFILE: "release"
