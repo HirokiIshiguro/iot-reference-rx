@@ -87,7 +87,7 @@ class SharedFlashMrWorkflowTests(unittest.TestCase):
     def test_selected_iot_job_precheck_is_read_only(self) -> None:
         # There is one tracked production caller; retain the explicit no-cancel mode.
         blocks = re.split(r"(?m)(?=^[A-Za-z0-9_.-]+:\s*$)", self.ci)
-        callers = [b for b in blocks if re.search(r"python\s+tools[\\/]cleanup_iot_jobs\.py", b)]
+        callers = [b for b in blocks if re.search(r"python(?:3)?\s+tools[\\/]cleanup_iot_jobs\.py", b)]
         self.assertEqual(len(callers), 1)
         self.assertTrue(callers[0].startswith("cleanup_rx72n_ether_ota_jobs:"))
         self.assertIn("--check-empty", callers[0])
