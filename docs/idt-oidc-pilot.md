@@ -6,6 +6,8 @@
 
 GitLabの保護mainは、既存のグループ変数 `AWS_ROLE_ARN` から `saffti-oss-gitlab-oidc` を使用する。既存のtrustと `rx72n-baseline-read` を保持する。AWSで追加するCI権限には `StringEquals` の `gitlab.saffti.jp:sub` として `project_path:oss/import/github/renesas/iot-reference-rx:ref_type:branch:ref:main` を指定する。これは同一project/refの境界であり、ジョブ単位の権限制御はできない。[AWSのOIDC条件キー](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html)
 
+RPi #4の一時保護ブランチ2本で、共通ロールのOIDCセッションに対する `iot:DescribeThing` のsubject条件を実証した。許可側は既存RX72N Thingの読取りに成功し、比較側は同じロールにSTSで接続したうえでAWSに拒否された。試験用trust・policy・ブランチは復元または削除済み。現在は対象projectのmain・東京・既存RX72N Thingの `DescribeThing` を設定済み。作成・削除権限は別に確認する。[許可側 #15576](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/15576) · [比較側 #15577](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/15577)
+
 | 対象 | 追加権限の候補と対象範囲 |
 |---|---|
 | 通常OTAのThing | `iot:DescribeThing` / `ListThingPrincipalsV2` を既存RX72N Thingと実行ごとの `<device>-ota-*` Thingに許可。作成・削除は後者のThing ARN。principalのattach/detachは設定済み証明書ARNと `iot:thingArn` で後者に限定。 |
@@ -16,7 +18,9 @@ GitLabの保護mainは、既存のグループ変数 `AWS_ROLE_ARN` から `saff
 
 旧Transportと同じ時刻のCloudTrailは資源と権限の候補。現行jobへの帰属や全APIの証明は次の試験で行う。既定サブネットの現在の `MapPublicIpOnLaunch` は有効なので、実行前の費用にはIPv4を含める。IAM管理者が実ARNを埋め、対象mainの許可、別project/タグ・別資源の拒否を確認してから、`IAM → Roles → saffti-oss-gitlab-oidc → Permissions` で用途別の差分を適用する。IDTの固定sessionを有効にする際は、同じロールの `Maximum session duration` も1時間から3時間へ変更する。この上限変更は共通ロール全体に及ぶ。通常OTAの試行には3時間化は不要。[AWS IoT](https://docs.aws.amazon.com/service-authorization/latest/reference/list_iot.html) · [AWS Signer](https://docs.aws.amazon.com/service-authorization/latest/reference/list_signer.html) · [IDTの権限例](https://docs.aws.amazon.com/freertos/latest/userguide/lts-idt-dev-tester-prereqs.html)
 
-IDT Transportの実行予算には `idt_source_matrix` が生成する `artifacts/idt-bootstrap/rx72n-bootstrap-seconds.txt` の実測と、既存のnative 75分および回収枠を使う。実測1回は時間上限の証明にならないため、準備の上限と余裕は別に確認する。
+IDT Transportの実行予算には `idt_source_matrix` の署名準備の実測210秒・220秒と、既存のnative 75分および回収枠を使う。準備の上限と余裕は別に確認する。[計測1 #84196](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/84196) · [計測2 #84297](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/84297)
+
+検証コミット `db8c19b0` の初回はWindowsの休止で中断した。再実行はGitLab Runner #3でOIDC、SSM公開AMIパラメータ、EC2参照、ホスト事前確認まで成功した。WSL側のSSHが終了コード255を返し、RPi #1のUARTブリッジは起動しなかった。nativeのJUnitは生成されず、対象UARTの受信は0 bytes。RFP未稼働とロック解放、作成したEC2・SG・鍵ペアがないこと、一時IAM設定とブランチの撤去を確認した。SSHの原因を絞れるよう、起動時失敗の分類だけをCIログに出す。[初回 #84540](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/84540) · [再実行 #84552](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/84552)
 
 native OTAが内部で行うIAM role/policy作成・attachは、通常OTAの `PassRole` と分ける。固定suiteで既存roleを指定する設定や、作成時にpermissions boundaryを強制できることを確認できていない。native OTAは独立した試験アカウント、または同等の制約でその操作を許可できる構成を決めてから実行する。
 

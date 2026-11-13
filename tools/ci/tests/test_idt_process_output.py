@@ -104,6 +104,15 @@ class IdtProcessOutputTests(unittest.TestCase):
         self.assertNotIn("fixture-", public)
         self.assertNotIn("secret", public)
 
+    def test_bridge_startup_only_publishes_known_categories(self):
+        code, public, private = self.observe_child(
+            "print('IDT bridge startup: authentication'); "
+            "print('IDT bridge startup: unexpected-private-value')"
+        )
+        self.assertEqual(0, code)
+        self.assertEqual("IDT bridge startup: authentication\n", public)
+        self.assertIn("unexpected-private-value", private)
+
     def test_complete_phase_and_private_lines_arrive_before_child_exit_without_communicate(self):
         public = io.StringIO()
         with tempfile.TemporaryDirectory() as folder:

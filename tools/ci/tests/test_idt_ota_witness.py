@@ -181,6 +181,27 @@ class OtaWitnessTests(unittest.TestCase):
         self.assertEqual(B, result["events"][-1]["image_id"])
 
     @unittest.skipUnless(sys.platform == "linux", "PTY failure/draining is exercised on Linux/WSL")
+    def test_bridge_drains_ssh_error_before_closing(self):
+        directory = Path(__file__).resolve().parents[2] / "idt"
+        with patch.object(sys, "path", [str(directory)] + sys.path):
+            spec = importlib.util.spec_from_file_location("idt_bridge_startup_failure", directory / "run_transport.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        popen = subprocess.Popen
+
+        def local_child(_args, **kwargs):
+            return popen([sys.executable, "-c",
+                          "import sys; sys.stderr.write('Host key verification failed.\\n'); sys.exit(255)"],
+                         **kwargs)
+
+        with patch.object(module.subprocess, "Popen", side_effect=local_child):
+            bridge = module.Bridge("0" * 32, self.root / "startup-failure")
+            with self.assertRaisesRegex(RuntimeError, "exit 255"):
+                bridge.close()
+        self.assertFalse(bridge.ready.is_set())
+        self.assertEqual("host_key", bridge.ssh_failure)
+
+    @unittest.skipUnless(sys.platform == "linux", "PTY failure/draining is exercised on Linux/WSL")
     def test_bridge_capture_failure_drains_child_and_cannot_become_pass(self):
         directory = Path(__file__).resolve().parents[2] / "idt"
         with patch.object(sys, "path", [str(directory)] + sys.path):
