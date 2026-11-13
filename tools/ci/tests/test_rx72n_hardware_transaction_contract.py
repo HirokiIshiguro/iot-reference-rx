@@ -149,7 +149,12 @@ class Rx72nHardwareTransactionContractTests(unittest.TestCase):
         cleanup = job_block(
             self.ci, "cleanup_rx72n_ether_ota", "build_rx72n_ether_fleet"
         )
-        self.assertIn("extends: .aws_cli_windows_job", creator)
+        auth = job_block(self.ci, ".rx72n_ota_aws_job", "create_rx72n_ether_ota")
+        self.assertIn("extends: .aws_cli_windows_job", auth)
+        self.assertIn("GITLAB_OIDC_TOKEN:", auth)
+        for ota_job in (creator, cleanup):
+            self.assertIn("extends: .rx72n_ota_aws_job", ota_job)
+            self.assertIn("Invoke-Rx72nOtaWithOidc", ota_job)
         self.assertIn("tools/manage_ephemeral_iot_thing.py create", creator)
         self.assertIn("tools/create_ota_update.py", creator)
         self.assertIn("$env:CI_PIPELINE_ID-$env:CI_JOB_ID", creator)
