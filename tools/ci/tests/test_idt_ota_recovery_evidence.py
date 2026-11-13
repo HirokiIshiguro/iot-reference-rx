@@ -17,11 +17,12 @@ class RecoveryEvidenceTests(unittest.TestCase):
         self.store = Mock()
         self.store.inspect.return_value = (self.record, 'etag', 'version')
         self.args = dict(role_arn='arn:aws:iam::123456789012:role/path/runner',
-                         certificate_arn=self.cert, profile_name='profile', thing_arn='thing',
-                         iot_job_id='job', events=[], iot=Mock(), signer=Mock())
+                         certificate_arn=self.cert, profile_name='profile',
+                         events=[], iot=Mock(), signer=Mock())
 
     @patch('tools.idt.ota_recovery_evidence.verify_live_profile', return_value={'checked': True})
-    @patch('tools.idt.ota_recovery_evidence.match_created_profile', return_value={'candidate': True})
+    @patch('tools.idt.ota_recovery_evidence.match_created_job',
+           return_value={'thingArn': 'thing', 'iotJobId': 'job'})
     def test_exact_record_and_actor(self, match, live):
         result = inspect_candidate(self.store, self.original, ('request', 'version'), **self.args)
         self.assertEqual(result['live'], {'checked': True})
@@ -34,7 +35,7 @@ class RecoveryEvidenceTests(unittest.TestCase):
         self.record['state'] = 'UNKNOWN'
         inspect_candidate(self.store, self.original, ('request', 'version'), **self.args)
 
-    @patch('tools.idt.ota_recovery_evidence.match_created_profile')
+    @patch('tools.idt.ota_recovery_evidence.match_created_job')
     def test_reject_unbound_inputs_before_live_calls(self, match):
         for expected in [('old', 'version'), ('request', 'old')]:
             with self.subTest(expected=expected), self.assertRaises(EvidenceError):
@@ -57,8 +58,8 @@ class RecoveryEvidenceTests(unittest.TestCase):
 
     @patch('tools.idt.ota_recovery_evidence.verify_live_profile', return_value={'checked': True})
     def test_real_event_match_uses_recorded_intent(self, live):
-        from tools.ci.tests.test_idt_ota_profile_evidence import ProfileEvidenceTests
-        fixture = ProfileEvidenceTests()
+        from tools.ci.tests.test_idt_ota_profile_evidence import CreatedJobEvidenceTests
+        fixture = CreatedJobEvidenceTests()
         fixture.setUp()
         actor = 'arn:aws:sts::123456789012:assumed-role/runner/gitlab38-101'
         for event in (fixture.events[0], fixture.events[3]):
@@ -68,6 +69,7 @@ class RecoveryEvidenceTests(unittest.TestCase):
         result = inspect_candidate(self.store, self.original, ('request', 'version'), **self.args)
         self.assertEqual(result['candidate']['otaUpdateId'], 'ota1')
         self.assertEqual(live.call_args.args[0]['signingJobId'], 'job1')
+        self.assertEqual(live.call_args.kwargs['iot_job_id'], 'AFR_OTA-ota1')
         self.record['profile_intent']['before'] = [{'profileName': 'profile1'}]
         with self.assertRaises(EvidenceError):
             inspect_candidate(self.store, self.original, ('request', 'version'), **self.args)

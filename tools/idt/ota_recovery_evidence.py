@@ -1,16 +1,16 @@
 """Compose private run evidence without authorizing any recovery action."""
 import re
 
-from tools.idt.ota_profile_evidence import EvidenceError, match_created_profile, verify_live_profile
+from tools.idt.ota_profile_evidence import EvidenceError, match_created_job, verify_live_profile
 
 
 def inspect_candidate(store, original, expected, *, role_arn, certificate_arn, profile_name,
-                      thing_arn, iot_job_id, events, iot, signer):
+                      events, iot, signer):
     """Inspect one candidate using caller-authenticated private run evidence.
 
     The caller must authenticate the recovery job, serialize writers, verify
-    that the configured role belongs to the original run, and supply the Thing,
-    IoT Job and complete CloudTrail collection from trusted private evidence.
+    that the configured role belongs to the original run and supply a complete
+    CloudTrail collection from trusted private evidence.
     This snapshot proves neither collection completeness nor permission to act.
     """
     record, _, version = store.inspect(original)
@@ -27,9 +27,10 @@ def inspect_candidate(store, original, expected, *, role_arn, certificate_arn, p
     if role is None:
         raise EvidenceError('invalid original role')
     actor = f'arn:aws:sts::{original.account}:assumed-role/{role.group(1)}/gitlab38-{original.job_id}'
-    candidate = match_created_profile(events, run_actor_arn=actor, certificate_arn=certificate_arn,
-                                      profile_name=profile_name,
-                                      before_names=[item['profileName'] for item in intent['before']])
+    candidate = match_created_job(events, run_actor_arn=actor, certificate_arn=certificate_arn,
+                                  profile_name=profile_name,
+                                  before_names=[item['profileName'] for item in intent['before']])
     live = verify_live_profile(candidate, iot=iot, signer=signer, account=original.account,
-                               region=original.region, thing_arn=thing_arn, iot_job_id=iot_job_id)
+                               region=original.region, thing_arn=candidate['thingArn'],
+                               iot_job_id=candidate['iotJobId'])
     return {'admission': expected, 'candidate': candidate, 'live': live}

@@ -30,6 +30,8 @@ native OTAが内部で行うIAM role/policy作成・attachは、通常OTAの `Pa
 
 `ota_profile_evidence.match_created_profile` は回収候補ごとに、元runのcaller ARN、所有確認済み証明書ARN、対象OTAのprofile名、事前一覧、収集済みイベントから照合する。中断runでは同じ証明書を使うprofileが2件あったため、証明書とprofile名を組にする。過去3件に対する照合と単体試験を確認済み。過去の事前一覧は得られていないため、履歴で照合したのはイベント間の関係まで。
 
-`verify_live_profile` は、対象Thingが1件だけのOTA更新と、それに紐付く署名ジョブを読み取り、CloudTrailで特定したプロファイルのバージョンと証明書を照合する。IoT Job IDは元runの記録から渡す。AWS応答を模した単体試験で、対象や署名ジョブが違う場合は照合を拒否することを確認している。
+`verify_live_profile` は、対象Thingが1件だけのOTA更新と、それに紐付く署名ジョブを読み取り、CloudTrailで特定したIoT Job ID、プロファイルのバージョンと証明書を照合する。AWS応答を模した単体試験で、対象や署名ジョブが違う場合は照合を拒否することを確認している。
 
-`ota_recovery_evidence.inspect_candidate` は、版管理された `AdmissionStore` で元runと記録の世代を確認し、同runの証明書と事前一覧からイベント照合と現在値の読取りをつなぐ。対象Thing・IoT JobとCloudTrailの収集範囲は、別の認証セッションで元runの記録に基づいて確定する。独立ジョブでの証拠収集・回収・終了照合が接続されるまで、native OTAの起動は保留する。
+`match_created_job` は、CloudTrailの `CreateOTAUpdate` と `CreateJob` から、同一の単一Thing、IoTサービスロール、Job ID/ARNを照合する。過去 #70703/#70704 の3件すべてで `AFR_OTA-<otaUpdateId>` と対象Thingが一致した。元runの更新が既に削除されていても作成時の情報を照合できる。現在の資源の有無や回収完了は、サービス側で別途確認する。
+
+`ota_recovery_evidence.inspect_candidate` は、版管理された `AdmissionStore` で元runと記録の世代を確認し、同runの証明書と事前一覧からイベント照合と現在値の読取りをつなぐ。別の認証セッションで、元runのロールとCloudTrailの収集範囲を確定してから呼び出す。独立ジョブでの証拠収集・回収・終了照合が接続されるまで、native OTAの起動は保留する。

@@ -128,6 +128,51 @@ def match_created_profile(events, *, run_actor_arn, certificate_arn, profile_nam
             'eventIds': {event['eventName']: event['eventID'] for event in (imported, put, start, update)}}
 
 
+def match_created_job(events, *, run_actor_arn, certificate_arn, profile_name, before_names):
+    """Correlate one OTA-created IoT job; this does not authorize any action.
+
+    CloudTrail collection completeness and the authenticated original actor
+    remain caller prerequisites. This is historical evidence, not live state.
+    """
+    candidate = match_created_profile(events, run_actor_arn=run_actor_arn, certificate_arn=certificate_arn,
+                                      profile_name=profile_name, before_names=before_names)
+    cert = re.fullmatch(r'arn:aws:acm:([a-z0-9-]+):([0-9]{12}):certificate/[0-9a-fA-F-]{36}', certificate_arn)
+    region, account = cert.groups()
+    updates = [event for event in events if event.get('eventID') == candidate['eventIds']['CreateOTAUpdate']]
+    if len(updates) != 1:
+        raise EvidenceError('ambiguous OTA event identity')
+    update = updates[0]
+    request = update['requestParameters']
+    targets = request.get('targets')
+    thing_pattern = rf'arn:aws:iot:{re.escape(region)}:{account}:thing/[A-Za-z0-9:_-]{{1,128}}'
+    if (not isinstance(targets, list) or len(targets) != 1 or not isinstance(targets[0], str)
+            or not re.fullmatch(thing_pattern, targets[0])):
+        raise EvidenceError('invalid OTA target')
+    job_id = 'AFR_OTA-' + candidate['otaUpdateId']
+    jobs = [event for event in events if event.get('eventName') == 'CreateJob'
+            and isinstance(event.get('requestParameters'), dict)
+            and event['requestParameters'].get('jobId') == job_id]
+    if len(jobs) != 1:
+        raise EvidenceError('missing or ambiguous IoT job evidence')
+    job = jobs[0]
+    event_id = job.get('eventID')
+    identity = job.get('userIdentity')
+    if (not isinstance(event_id, str) or not event_id
+            or sum(1 for event in events if event.get('eventID') == event_id) != 1
+            or job.get('eventSource') != 'iot.amazonaws.com' or job.get('errorCode') or job.get('errorMessage')
+            or not isinstance(identity, dict) or identity.get('invokedBy') != 'iot.amazonaws.com'
+            or not isinstance(identity.get('sessionContext'), dict)
+            or not isinstance(identity['sessionContext'].get('sessionIssuer'), dict)
+            or identity['sessionContext']['sessionIssuer'].get('arn') != request.get('roleArn')
+            or job['requestParameters'].get('targets') != targets
+            or not isinstance(job.get('responseElements'), dict)
+            or job['responseElements'].get('jobId') != job_id
+            or job['responseElements'].get('jobArn') != f'arn:aws:iot:{region}:{account}:job/{job_id}'):
+        raise EvidenceError('IoT job identity mismatch')
+    return {**candidate, 'thingArn': targets[0], 'iotJobId': job_id,
+            'eventIds': {**candidate['eventIds'], 'CreateJob': event_id}}
+
+
 def verify_live_profile(candidate, *, iot, signer, account, region, thing_arn, iot_job_id):
     """Read and verify one correlated candidate; never authorizes a mutation.
 

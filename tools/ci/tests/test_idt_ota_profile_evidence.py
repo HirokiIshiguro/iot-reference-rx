@@ -2,7 +2,7 @@ import copy
 import unittest
 from unittest.mock import Mock
 
-from tools.idt.ota_profile_evidence import EvidenceError, match_created_profile, verify_live_profile
+from tools.idt.ota_profile_evidence import EvidenceError, match_created_job, match_created_profile, verify_live_profile
 
 
 class ProfileEvidenceTests(unittest.TestCase):
@@ -91,6 +91,66 @@ class ProfileEvidenceTests(unittest.TestCase):
         self.events[1]['eventID'] = '1'
         with self.assertRaises(EvidenceError):
             self.match()
+
+
+class CreatedJobEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        fixture = ProfileEvidenceTests()
+        fixture.setUp()
+        self.events, self.actor, self.cert = fixture.events, fixture.actor, fixture.cert
+        self.thing = 'arn:aws:iot:us-east-1:123456789012:thing/device'
+        self.events[3]['requestParameters']['targets'] = [self.thing]
+        self.events.append(fixture.event('5', 'iot.amazonaws.com', 'CreateJob', fixture.role,
+                           {'jobId': 'AFR_OTA-ota1', 'targets': [self.thing]},
+                           {'jobId': 'AFR_OTA-ota1',
+                            'jobArn': 'arn:aws:iot:us-east-1:123456789012:job/AFR_OTA-ota1'}, True))
+
+    def match(self):
+        return match_created_job(self.events, run_actor_arn=self.actor, certificate_arn=self.cert,
+                                 profile_name='profile1', before_names=[])
+
+    def test_unique_job(self):
+        result = self.match()
+        self.assertEqual((result['thingArn'], result['iotJobId'], result['eventIds']['CreateJob']),
+                         (self.thing, 'AFR_OTA-ota1', '5'))
+
+    def test_mismatches_fail_closed(self):
+        original = copy.deepcopy(self.events)
+        changes = [
+            (3, ('requestParameters', 'targets'), []),
+            (3, ('requestParameters', 'targets'), [self.thing, self.thing]),
+            (3, ('requestParameters', 'targets'), [self.thing.replace('123456789012', '999999999999')]),
+            (4, ('requestParameters', 'targets'), []),
+            (4, ('requestParameters', 'jobId'), 'other'),
+            (4, ('responseElements', 'jobId'), 'other'),
+            (4, ('responseElements', 'jobArn'), 'other'),
+            (4, ('userIdentity', 'invokedBy'), 'other'),
+            (4, ('userIdentity', 'sessionContext', 'sessionIssuer', 'arn'), 'other'),
+            (4, ('eventSource',), 'other'),
+            (4, ('eventID',), '4'),
+            (4, ('errorCode',), 'AccessDenied'),
+        ]
+        for index, path, value in changes:
+            self.events = copy.deepcopy(original)
+            node = self.events[index]
+            for key in path[:-1]:
+                node = node[key]
+            node[path[-1]] = value
+            with self.subTest(path=path, value=value), self.assertRaises(EvidenceError):
+                self.match()
+
+    def test_duplicate_job_and_missing_job_fail(self):
+        duplicate = copy.deepcopy(self.events[-1])
+        duplicate['eventID'] = '6'
+        self.events.append(duplicate)
+        with self.assertRaises(EvidenceError):
+            self.match()
+        self.events = self.events[:4]
+        with self.assertRaises(EvidenceError):
+            self.match()
+        self.assertEqual(match_created_profile(self.events, run_actor_arn=self.actor,
+                                               certificate_arn=self.cert, profile_name='profile1',
+                                               before_names=[])['otaUpdateId'], 'ota1')
 
 
 class LiveProfileEvidenceTests(unittest.TestCase):
