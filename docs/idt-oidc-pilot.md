@@ -32,4 +32,4 @@ native OTAが内部で行うIAM role/policy作成・attachは、通常OTAの `Pa
 
 `verify_live_profile` は、対象Thingが1件だけのOTA更新と、それに紐付く署名ジョブを読み取り、CloudTrailで特定したプロファイルのバージョンと証明書を照合する。IoT Job IDは元runの記録から渡す。AWS応答を模した単体試験で、対象や署名ジョブが違う場合は照合を拒否することを確認している。
 
-`AdmissionStore` は現時点では条件付き書込みと事前記録の部品。独立ジョブでの証拠収集・回収・終了照合が接続されるまで、native OTAの起動は保留する。
+`ota_recovery_evidence.inspect_candidate` は、版管理された `AdmissionStore` で元runと記録の世代を確認し、同runの証明書と事前一覧からイベント照合と現在値の読取りをつなぐ。対象Thing・IoT JobとCloudTrailの収集範囲は、別の認証セッションで元runの記録に基づいて確定する。独立ジョブでの証拠収集・回収・終了照合が接続されるまで、native OTAの起動は保留する。

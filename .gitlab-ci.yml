@@ -804,6 +804,7 @@ idt_ci_contract:
         tools.ci.tests.test_aws_oidc_probe \
         tools.ci.tests.test_idt_ota_admission \
         tools.ci.tests.test_idt_ota_profile_evidence \
+        tools.ci.tests.test_idt_ota_recovery_evidence \
         tools.ci.tests.test_idt_oidc_job \
         tools.ci.tests.test_idt_runner_identity \
         tools.ci.tests.test_idt_report \
