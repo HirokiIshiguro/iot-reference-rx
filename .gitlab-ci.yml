@@ -4,7 +4,7 @@ workflow:
     - when: never
 
 rx72n_aws_oidc_read_proof:
-  tags: [exec-shell, os-linux, cap-aws-sdk]
+  tags: [exec-shell, os-linux, cap-aws-sdk, ef-saffti-001-rpi-linux-004]
   timeout: 5 minutes
   variables:
     GIT_SUBMODULE_STRATEGY: none
