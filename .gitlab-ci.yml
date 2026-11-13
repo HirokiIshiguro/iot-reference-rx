@@ -1050,7 +1050,9 @@ idt_source_matrix:
       $bootstrapTimer = [System.Diagnostics.Stopwatch]::StartNew()
       & "$env:RX72N_IDT_PYTHON" tools/idt/prepare_public_signer.py --source "$env:CI_PROJECT_DIR" --target rx72n-ethernet --output "$privateLogRoot/rx72n-bootstrap" --workspace "C:/ai/codex/ws/idt-rx72n-bootstrap-ci-$env:CI_JOB_ID" --python "$env:RX72N_IDT_PYTHON" | Out-Null
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      Write-Host ("RX72N IDT signer bootstrap seconds: {0}" -f [Math]::Ceiling($bootstrapTimer.Elapsed.TotalSeconds))
+      $bootstrapSeconds = [int][Math]::Ceiling($bootstrapTimer.Elapsed.TotalSeconds)
+      New-Item -ItemType Directory -Force artifacts/idt-bootstrap | Out-Null
+      Set-Content -LiteralPath artifacts/idt-bootstrap/rx72n-bootstrap-seconds.txt -Value $bootstrapSeconds -Encoding ascii
     - |
       $provisionerLog = Join-Path $privateLogRoot 'provisioner-build.log'
       Write-Host "RX671 provisioner; private diagnostics: $provisionerLog"
@@ -1072,6 +1074,7 @@ idt_source_matrix:
     # Placeholder firmware and raw compiler logs are not runtime test evidence.
     paths:
       - artifacts/idt-compile/*/build_manifest.json
+      - artifacts/idt-bootstrap/rx72n-bootstrap-seconds.txt
       - artifacts/idt-bootstrap/provisioner-manifest.json
       - artifacts/idt-bootstrap/signer.crt.pem
       - artifacts/idt-bootstrap/signer.pub.pem

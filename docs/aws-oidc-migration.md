@@ -26,6 +26,8 @@ BG96の既存APN入力は `AWS_IOT_CELLULAR_APN_*_CK_RX65N_01` などのAWS接�
 
 RX72N Ethernetの通常OTAでは、保護mainの検証パイプラインに `RX72N_OTA_OIDC=true` を渡すと、`create_rx72n_ether_ota` と `cleanup_rx72n_ether_ota` がそれぞれGitLab ID tokenを使って共通 `AWS_ROLE_ARN` を引き受ける。従来のOTA journalと回収処理を使用する。OIDCを選択したjobで認証に失敗した場合は停止する。初回実行には対象のIoT Thing／OTA、S3 object、Signer参照とOTA service roleの `iam:PassRole` の許可が必要。タグ実行は別途trustとIAMの確認が必要。
 
+初回の [IAM権限とnative OTAの回収手順](idt-oidc-pilot.md) に、通常OTA・IDT Transport・native OTAそれぞれの権限と実行前に確認する項目を記載する。
+
 `tools/aws/oidc_probe.py`とそのread-only policy/trustの候補は、[MR !251](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/251)から再利用した。probeのlive jobはこの変更では追加・実行していない。policyは候補であり、!251単体のsource CI成功はlive OIDC成功を意味しない。
 
 [Issue #202の設計](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/202#note_63778)には対象job・権限候補・独立cleanupを記載している。Schedule #5の過去pipeline #12263は50 bridge中8 childが未生成のfailed runだった。main `a80863b9`のCI定義には同じ50行と3-target IDT matrixが存在するが、名前の照合は現行expanded graphや試験成功の証明ではない。利用側project142のS3 presignは一時session tokenを含み得るURLをfirmwareに組み込み得るため、安全な受渡しと期限・URL長を確認する前にOIDCで実行しない。
