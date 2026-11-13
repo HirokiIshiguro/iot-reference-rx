@@ -5,6 +5,9 @@ Mbed TLS libraries are used. Synthetic keys exist only inside the host process;
 no private key or environment credential is read, printed, or embedded here.
 """
 from pathlib import Path
+import ast
+import hashlib
+import ssl
 from contextlib import redirect_stdout
 from io import StringIO
 import os
@@ -41,6 +44,25 @@ def function(text, name):
 
 
 class StaticProvisioningContractTests(unittest.TestCase):
+    def test_software_ats_default_trust_bundle(self):
+        config_dir = ROOT / "Projects/aws_bg96_ck_rx65n/e2studio_ccrx/src/frtos_config"
+        config = (config_dir / "demo_config.h").read_text()
+        header = (config_dir / "iot_default_root_certificates.h").read_text()
+        self.assertRegex(config, r"(?m)^#define\s+democonfigROOT_CA_PEM\s+tlsATS1_ATS3_ROOT_CERTIFICATE_PEM\s*$")
+        self.assertRegex(header, r"tlsATS1_ATS3_ROOT_CERTIFICATE_PEM\[\]\s*=\s*"
+                                 r"tlsATS1_ROOT_CERTIFICATE_LITERAL\s+tlsATS3_ROOT_CERTIFICATE_LITERAL\s*;")
+        expected = {
+            1: "8ecde6884f3d87b1125ba31ac3fcb13d7016de7f57cc904fe1cb97c6ae98196e",
+            3: "18ce6cfe7bf14e60b2e347b8dfe868cb31d02ebb3ada271569f50343b46db3a4",
+        }
+        for number, fingerprint in expected.items():
+            match = re.search(rf"#define tlsATS{number}_ROOT_CERTIFICATE_LITERAL \\\n(.*?)(?=\nstatic const)", header, re.S)
+            self.assertIsNotNone(match)
+            pem = "".join(ast.literal_eval(part) for part in
+                          re.findall(r'"(?:[^"\\]|\\.)*"', match.group(1)))
+            der = ssl.PEM_cert_to_DER_cert(pem)
+            self.assertEqual(hashlib.sha256(der).hexdigest(), fingerprint)
+
     def provision_store(self, action, *, skip_private_key=False):
         """Model the CLI cache/commit boundary, including destructive format."""
         original = {

@@ -53,7 +53,7 @@ MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検
 
 既存lockを保持して、独立したRFP chip eraseを完了後に保守用dual-bank MOTを起動します。実機source識別子を確認し、LittleFSをformatして公開署名鍵を保存・commitした後、Data Flashを保持して両bankのbootloaderと署名付きapplicationを導入します。`runtime_trust`は実署名検査と起動成功が確認できるまで`not_established`です。built-in fallbackは有効にしません。
 
-共通LittleFSは2.11.3、領域は`0x00100000`から8KiBです。RX72Nの旧開始位置とRX65N/RX72Nの旧容量からの変更により、初回formatと再provisionが必要です。今回の部品・host検証を実機の移行確認やIDT合格へ流用しません。OTAのbuild ledger / 起動識別子はターゲットとfingerprintを照合し、通常firmwareへの復帰は既存flash / provision経路で確認します。
+共通LittleFSは2.11.3、領域の開始位置は`0x00100000`、容量はRX65N/RX72Nが16KiB、RX671が8KiBです。RX72Nの旧開始位置とRX65N/RX72Nの旧容量からの変更により、初回formatと再provisionが必要です。今回の部品・host検証を実機の移行確認やIDT合格へ流用しません。OTAのbuild ledger / 起動識別子はターゲットとfingerprintを照合し、通常firmwareへの復帰は既存flash / provision経路で確認します。
 
 [共有予算](../tools/idt/cleanup_budget.py)は3環境ともtransaction 1565秒、公開鍵投入CLIは絶対上限200秒です。終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗、UART出力継続、privileged子processの終了不明では所有記録を保持して再利用を止めます。
 

@@ -368,11 +368,6 @@
  * information about the Server Root CAs.
  * https://docs.aws.amazon.com/iot/latest/developerguide/server-authentication.html#server-authentication-certs
  *
- * @note The TI C3220 Launchpad board requires that the Root CA have its
- * certificate self-signed. As mentioned in the above link, the Amazon Root CAs
- * are cross-signed by the Starfield Root CA. Thus, ONLY the Starfield Root CA
- * can be used to connect to the ATS endpoints on AWS IoT for the TI board.
- *
  * @note This certificate should be PEM-encoded.
  *
  * Must include the PEM header and footer:
@@ -381,7 +376,7 @@
  * "-----END CERTIFICATE-----\n"
  *
  */
-#define democonfigROOT_CA_PEM                   tlsSTARFIELD_ROOT_CERTIFICATE_PEM
+#define democonfigROOT_CA_PEM                   tlsATS1_ATS3_ROOT_CERTIFICATE_PEM
 
 /**
  * @brief The length of the queue used to hold commands for the agent.

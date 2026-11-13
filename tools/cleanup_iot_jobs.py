@@ -101,13 +101,24 @@ def write_json(path, payload):
         handle.write("\n")
 
 
+def sdk_snapshot(thing_name, region, status):
+    """Worker for a single IoT API read using the SDK credential chain."""
+    import botocore.session
+    from botocore.config import Config
+
+    client = botocore.session.get_session().create_client(
+        "iot",
+        region_name=region,
+        config=Config(connect_timeout=10, read_timeout=20, retries={"total_max_attempts": 1}),
+    )
+    return client.list_job_executions_for_thing(thingName=thing_name, status=status, maxResults=250)
+
+
 def checked_snapshot(thing_name, region, status, deadline):
-    """One bounded, non-paginated list call; never publish the CLI's output."""
-    command = [*aws_command_prefix(), "iot", "list-job-executions-for-thing",
-               "--thing-name", thing_name, "--status", status,
-               "--max-results", "250", "--no-paginate", "--region", region,
-               "--output", "json", "--cli-connect-timeout", "10", "--cli-read-timeout", "20"]
-    environment = dict(os.environ, AWS_MAX_ATTEMPTS="1", AWS_PAGER="", AWS_CLI_AUTO_PROMPT="off")
+    """Bound one SDK read in a child process; retain the existing shared deadline."""
+    command = [sys.executable, str(Path(__file__).resolve()), "--_sdk-snapshot",
+               thing_name, region, status]
+    environment = dict(os.environ, AWS_MAX_ATTEMPTS="1")
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                                env=environment)
@@ -134,7 +145,7 @@ def checked_snapshot(thing_name, region, status, deadline):
 
 
 def check_empty(thing_name, region, job_id_prefix, output_json):
-    # Reserve the final heartbeat interval for stopping/reaping the owned CLI.
+    # Reserve the final heartbeat interval for stopping/reaping the SDK worker.
     deadline = time.monotonic() + CHECK_TIMEOUT_SECONDS - CHECK_HEARTBEAT_SECONDS
     counts = {status: None for status in CHECK_STATUSES}
     result = {"status": "lookup_failed", "active_count": None, "status_counts": counts,
@@ -251,4 +262,10 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    if sys.argv[1:2] == ["--_sdk-snapshot"]:
+        try:
+            print(json.dumps(sdk_snapshot(*sys.argv[2:]), default=str))
+        except Exception:
+            sys.exit(1)
+    else:
+        sys.exit(main())
