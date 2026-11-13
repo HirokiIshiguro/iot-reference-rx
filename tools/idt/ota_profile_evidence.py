@@ -1,4 +1,4 @@
-"""Offline correlation of CloudTrail records; never authorizes cancellation.
+"""Correlate CloudTrail records and verify live resources without changing them.
 
 Input is a complete, privately obtained set of decoded CloudTrail events for one
 run. The caller must authenticate the run, establish collection completeness,
@@ -126,3 +126,50 @@ def match_created_profile(events, *, run_actor_arn, certificate_arn, profile_nam
             'profileVersionArn': response['profileVersionArn'], 'certificateArn': certificate_arn,
             'otaUpdateId': update_id, 'signingJobId': job,
             'eventIds': {event['eventName']: event['eventID'] for event in (imported, put, start, update)}}
+
+
+def verify_live_profile(candidate, *, iot, signer, account, region, thing_arn, iot_job_id):
+    """Read and verify one correlated candidate; never authorizes a mutation.
+
+    Clients must already be authenticated. API failures propagate to the caller.
+    A successful result is a snapshot and does not establish collection completeness.
+    """
+    if (not isinstance(candidate, dict) or not isinstance(account, str) or not re.fullmatch(r'[0-9]{12}', account)
+            or not isinstance(region, str) or not re.fullmatch(r'[a-z0-9-]+', region)
+            or not isinstance(thing_arn, str)
+            or not re.fullmatch(rf'arn:aws:iot:{re.escape(region)}:{account}:thing/[^/]+', thing_arn)
+            or not isinstance(iot_job_id, str) or not iot_job_id
+            or iot.meta.region_name != region or signer.meta.region_name != region):
+        raise EvidenceError('invalid live verification scope')
+    try:
+        name = candidate['profileName']
+        version = candidate['profileVersion']
+        cert = candidate['certificateArn']
+        update_id = candidate['otaUpdateId']
+        signing_id = candidate['signingJobId']
+        profile_arn = f'arn:aws:signer:{region}:{account}:/signing-profiles/{name}'
+        if (not all(isinstance(value, str) and value for value in (name, version, cert, update_id, signing_id))
+                or candidate['arn'] != profile_arn
+                or candidate['profileVersionArn'] != f'{profile_arn}/{version}'
+                or not re.fullmatch(rf'arn:aws:acm:{re.escape(region)}:{account}:certificate/[0-9a-fA-F-]{{36}}', cert)):
+            raise EvidenceError('candidate identity mismatch')
+        update = iot.get_ota_update(otaUpdateId=update_id)['otaUpdateInfo']
+        files = update['otaUpdateFiles']
+        if (update['otaUpdateId'] != update_id
+                or update['otaUpdateArn'] != f'arn:aws:iot:{region}:{account}:otaupdate/{update_id}'
+                or update['targets'] != [thing_arn]
+                or update['awsIotJobId'] != iot_job_id
+                or update['awsIotJobArn'] != f'arn:aws:iot:{region}:{account}:job/{iot_job_id}'
+                or not isinstance(files, list) or len(files) != 1):
+            raise EvidenceError('live OTA identity mismatch')
+        signing = files[0]['codeSigning']
+        if signing['awsSignerJobId'] != signing_id:
+            raise EvidenceError('live OTA signing mismatch')
+        job = signer.describe_signing_job(jobId=signing_id)
+        if (job['jobId'] != signing_id or job['jobOwner'] != account
+                or job['profileName'] != name or job['profileVersion'] != version
+                or job['signingMaterial']['certificateArn'] != cert):
+            raise EvidenceError('live signing job mismatch')
+    except (KeyError, TypeError, AttributeError):
+        raise EvidenceError('incomplete live evidence') from None
+    return {'otaUpdateId': update_id, 'awsIotJobId': iot_job_id, 'signingJobId': signing_id}

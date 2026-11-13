@@ -1,7 +1,8 @@
 import copy
 import unittest
+from unittest.mock import Mock
 
-from tools.idt.ota_profile_evidence import EvidenceError, match_created_profile
+from tools.idt.ota_profile_evidence import EvidenceError, match_created_profile, verify_live_profile
 
 
 class ProfileEvidenceTests(unittest.TestCase):
@@ -90,6 +91,67 @@ class ProfileEvidenceTests(unittest.TestCase):
         self.events[1]['eventID'] = '1'
         with self.assertRaises(EvidenceError):
             self.match()
+
+
+class LiveProfileEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.thing = 'arn:aws:iot:us-east-1:123456789012:thing/device'
+        self.cert = 'arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789abc'
+        profile_arn = 'arn:aws:signer:us-east-1:123456789012:/signing-profiles/profile1'
+        self.candidate = {'profileName': 'profile1', 'profileVersion': 'abcdefghij', 'certificateArn': self.cert,
+                          'otaUpdateId': 'ota1', 'signingJobId': 'job1', 'arn': profile_arn,
+                          'profileVersionArn': profile_arn + '/abcdefghij'}
+        self.iot = Mock()
+        self.signer = Mock()
+        self.iot.meta.region_name = self.signer.meta.region_name = 'us-east-1'
+        self.update = {'otaUpdateId': 'ota1', 'otaUpdateArn': 'arn:aws:iot:us-east-1:123456789012:otaupdate/ota1',
+                       'targets': [self.thing], 'awsIotJobId': 'iotjob',
+                       'awsIotJobArn': 'arn:aws:iot:us-east-1:123456789012:job/iotjob',
+                       'otaUpdateFiles': [{'codeSigning': {'awsSignerJobId': 'job1'}}]}
+        self.job = {'jobId': 'job1', 'jobOwner': '123456789012', 'profileName': 'profile1',
+                    'profileVersion': 'abcdefghij', 'signingMaterial': {'certificateArn': self.cert}}
+        self.iot.get_ota_update.return_value = {'otaUpdateInfo': self.update}
+        self.signer.describe_signing_job.return_value = self.job
+
+    def verify(self):
+        return verify_live_profile(self.candidate, iot=self.iot, signer=self.signer, account='123456789012',
+                                   region='us-east-1', thing_arn=self.thing, iot_job_id='iotjob')
+
+    def test_live_match(self):
+        self.assertEqual(self.verify()['signingJobId'], 'job1')
+        self.iot.get_ota_update.assert_called_once_with(otaUpdateId='ota1')
+        self.signer.describe_signing_job.assert_called_once_with(jobId='job1')
+
+    def test_mismatches_fail_closed(self):
+        for field in ('otaUpdateId', 'otaUpdateArn', 'targets', 'awsIotJobId', 'awsIotJobArn', 'otaUpdateFiles'):
+            with self.subTest(field=field):
+                original = self.update[field]
+                self.update[field] = [] if field in ('targets', 'otaUpdateFiles') else 'wrong'
+                with self.assertRaises(EvidenceError):
+                    self.verify()
+                self.update[field] = original
+        for field in ('jobId', 'jobOwner', 'profileName', 'profileVersion', 'signingMaterial'):
+            with self.subTest(field=field):
+                original = self.job[field]
+                self.job[field] = {} if field == 'signingMaterial' else 'wrong'
+                with self.assertRaises(EvidenceError):
+                    self.verify()
+                self.job[field] = original
+
+    def test_scope_and_api_failure(self):
+        self.signer.meta.region_name = 'us-west-2'
+        with self.assertRaises(EvidenceError):
+            self.verify()
+        self.signer.meta.region_name = 'us-east-1'
+        self.iot.get_ota_update.side_effect = RuntimeError('unavailable')
+        with self.assertRaises(RuntimeError):
+            self.verify()
+
+    def test_other_signing_job_is_rejected_before_signer_lookup(self):
+        self.update['otaUpdateFiles'][0]['codeSigning']['awsSignerJobId'] = 'other'
+        with self.assertRaises(EvidenceError):
+            self.verify()
+        self.signer.describe_signing_job.assert_not_called()
 
 
 if __name__ == '__main__':
