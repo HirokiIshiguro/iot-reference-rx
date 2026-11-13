@@ -16,7 +16,7 @@ STS交換時はprocess全体のambient AWS環境を一時的に退避するた�
 
 `child_environment`は許可リストで入力を選び、固定session以外のAWS設定とOIDC tokenを渡さない。WindowsからWSLへの受渡しは `wsl_bridge_environment` と `wsl_child_environment` の2段階で、Linux側のprofileやmetadataを無効化してから利用する設計である。IDTのsource接続案はhost preflightより前に一度だけSTSを取得し、Windows/WSL/native開始前に期限を再判定する。実際のAWS CLI署名とWindows→Ubuntu WSLの受渡しは合成credentialで確認した。実role、監督processのsignal伝播・子孫停止、全入力とartifactの秘匿、実機は未検証である。JWT、STS credential、変換済みの署名URL、鍵や子processの出力・artifactの秘匿は呼出し側の責任であり、環境変数の除外だけでは保証されない。
 
-IDTの `oidc_job.py` は期待account/role、runner ID、host profile、実行パス、bootstrap・native準備・報告・余裕の予算をレビュー済みsource設定から選ぶ。現在 `REVIEWED_CONFIGS` は空であり、未測定時間を0とせずfail closedとする。この停止より前にGitLabはJWTを発行し、jobはhost leaseを取得する。共有shell runnerのPython環境や実行ファイルを信頼できないjobが書き換えられる場合、`-I` やsource上のpath固定だけではJWTを守れないため、実配備前にrunnerの信頼・書込み境界を確認する。sourceで許可するrefは現在mainのみで、保護integration refやtagは別途設定と検証が必要である。OTA scopeはowner journalと独立recoveryが未接続のため開始しない。
+IDTの `oidc_job.py` は、`/oss` から継承する `AWS_ROLE_ARN` をレビュー済みのARNに照合する。期待account、runner ID、host profile、実行パス、bootstrap・native準備・報告・余裕の予算もレビュー済みsource設定を使う。現在 `REVIEWED_CONFIGS` は空であり、AWS認証前に停止する。この停止より前にGitLabはJWTを発行し、jobはhost leaseを取得する。共有shell runnerのPython環境や実行ファイルを信頼できないjobが書き換えられる場合、`-I` やsource上のpath固定だけではJWTを守れないため、実配備前にrunnerの信頼・書込み境界を確認する。sourceで許可するrefは現在mainのみで、保護integration refやtagは別途設定と検証が必要である。OTA scopeはowner journalと独立recoveryが未接続のため開始しない。
 
 Signer cleanupは、cert ARNの一致だけを理由にprofileをcancelしない。profileの参照や一覧取得が不明ならcertを保持する。`ota_admission.py` はversioned S3の条件付きwriteと元run／回収jobの区別をofflineで検討する部品で、実job、所有証拠の取得、独立recovery、IAM境界には未接続である。snapshotのページングは原子的ではなく、管理外主体による変更を防止するものではない。S3のETag条件とversion照合は、管理外主体による旧versionのcopy復元やdelete markerを使う競合を原子的に防止しない。journalのwriter・履歴保護と運用上の管理外変更検出は実適用前の前提である。
 

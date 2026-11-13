@@ -36,7 +36,7 @@ def environment():
             "CI_JOB_TIMEOUT": "10800", "CI_RUNNER_ID": "3", "CI_PIPELINE_ID": "18", "CI_PROJECT_DIR": str(oidc_job.ROOT),
             "CI_JOB_TOKEN": "synthetic-job-token",
             "RUN_RX_IDT": "true", "IDT_SCOPE": "transport", "IDT_TARGET": "rx65n-bg96",
-            "RX_OIDC_ACCOUNT_ID": "123456789012", "RX_OIDC_ROLE_ARN_IDT_TRANSPORT": "arn:aws:iam::123456789012:role/test",
+            "AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/test",
             "RX_OIDC_ID_TOKEN": "synthetic-jwt", "AWS_PROFILE": "host-profile",
             "AWS_ENDPOINT_URL": "https://invalid.example", "AWS_ACCESS_KEY_ID": "host-old-key",
             "AWS_IOT_CELLULAR_APN_CK_RX65N_01": "synthetic-apn", "PATH": os.environ.get("PATH", ""),
@@ -117,10 +117,12 @@ class IdtOidcJobTests(unittest.TestCase):
                 oidc_job.check_native_timeouts(child, native, cleanup)
 
     def test_pipeline_overrides_cannot_choose_role_or_executable(self):
-        bad_role = {**environment(), "RX_OIDC_ACCOUNT_ID": "999999999999",
-                    "RX_OIDC_ROLE_ARN_IDT_TRANSPORT": "arn:aws:iam::999999999999:role/other"}
-        with self.assertRaises(OidcError):
-            oidc_job.prepare_child(bad_role, source_sha=SHA, config=self.config, user_name="synthetic-runner", session_factory=self.issue)
+        for role in (None, "", "arn:aws:iam::999999999999:role/other"):
+            bad_role = {**environment(), "AWS_ROLE_ARN": role,
+                        "RX_OIDC_ACCOUNT_ID": self.config.account,
+                        "RX_OIDC_ROLE_ARN_IDT_TRANSPORT": self.config.role_arn}
+            with self.subTest(role=role), self.assertRaises(OidcError):
+                oidc_job.prepare_child(bad_role, source_sha=SHA, config=self.config, user_name="synthetic-runner", session_factory=self.issue)
         self.assertEqual([], self.calls)
         env = {**environment(), "RX72N_IDT_PYTHON": "C:/untrusted/python.exe",
                "RX72N_IDT_HOST_PROFILE": "C:/untrusted/profile.json",

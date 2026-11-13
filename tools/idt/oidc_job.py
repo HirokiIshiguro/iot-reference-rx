@@ -133,8 +133,7 @@ def prepare_child(env, *, source_sha, config, user_name, session_factory=None):
         raise OidcError("unreviewed IDT configuration")
     if not isinstance(user_name, str) or not user_name or any(c in user_name for c in "\r\n\0"):
         raise OidcError("IDT execution identity unavailable")
-    if (env.get("RX_OIDC_ACCOUNT_ID") != config.account
-            or env.get("RX_OIDC_ROLE_ARN_IDT_TRANSPORT") != config.role_arn):
+    if env.get("AWS_ROLE_ARN") != config.role_arn:
         raise OidcError("IDT routing differs from reviewed configuration")
     budget = config.budget
     expected = ExpectedIdentity("38", PROJECT_PATH, config.account, config.role_arn,
