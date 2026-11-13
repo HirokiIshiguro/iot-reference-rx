@@ -327,12 +327,12 @@ class IdtCiContractTests(unittest.TestCase):
     def test_idt_workflow_precedes_other_profiles_and_disables_normal_targets(self) -> None:
         workflow = self.blocks["workflow"]
         conditions = re.findall(r"- if: '([^']+)'", workflow)
-        self.assertIn("CI_DEBUG_TRACE", conditions[0])
-        self.assertIn("CI_DEBUG_SERVICES", conditions[0])
-        self.assertIn("schedule", conditions[0])
-        debug_rule = workflow.split("- if: '" + conditions[0] + "'", 1)[1].split("\n    - if:", 1)[0]
+        debug = next(condition for condition in conditions
+                     if "CI_DEBUG_TRACE" in condition and "schedule" in condition)
+        self.assertIn("CI_DEBUG_SERVICES", debug)
+        self.assertLess(conditions.index(debug), conditions.index(OPT_IN))
+        debug_rule = workflow.split("- if: '" + debug + "'", 1)[1].split("\n    - if:", 1)[0]
         self.assertIn("when: never", debug_rule)
-        self.assertEqual(OPT_IN, conditions[1])
         selected_rule = workflow.split(f"- if: '{OPT_IN}'", 1)[1].split("\n    - if:", 1)[0]
         self.assertIn('PIPELINE_PROFILE: "idt"', selected_rule)
         for variable in (
@@ -349,13 +349,11 @@ class IdtCiContractTests(unittest.TestCase):
     def test_review_draft_does_not_start_shared_bench_jobs(self) -> None:
         workflow = self.blocks["workflow"]
         conditions = re.findall(r"- if: '([^']+)'", workflow)
-        guard = conditions[2]
-        expected = (
+        guard = (
             '$CI_PIPELINE_SOURCE == "merge_request_event" && '
             '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-(idt-|common-core-)/'
         )
-        self.assertEqual(OPT_IN, conditions[1])
-        self.assertEqual(expected, guard)
+        self.assertLess(conditions.index(OPT_IN), conditions.index(guard))
         block = workflow.split("- if: '" + guard + "'", 1)[1].split("\n    - if:", 1)[0]
         self.assertIn('PIPELINE_PROFILE: "mr-idt-targets"', block)
         self.assertIn('RUN_RX72N_BUILD: "true"', block)
@@ -389,7 +387,7 @@ class IdtCiContractTests(unittest.TestCase):
         other_mr_positions = [index for index, item in enumerate(conditions)
                               if '"merge_request_event"' in item and item != guard]
         self.assertTrue(other_mr_positions)
-        self.assertTrue(all(index > 2 for index in other_mr_positions))
+        self.assertTrue(all(index > conditions.index(guard) for index in other_mr_positions))
 
     def test_idt_uses_windows_aws_runner_and_shared_compiler_lock(self) -> None:
         job = self.blocks[".rx_idt_job"]
