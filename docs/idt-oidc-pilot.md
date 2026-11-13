@@ -28,4 +28,6 @@ native OTAが内部で行うIAM role/policy作成・attachは、通常OTAの `Pa
 4. Thing・IoT証明書・policyとIAM role/policyは、作成記録と識別子を照合し、attachmentを解除して回収する。残ったEC2も作成記録で今回の所有を確認してから回収する。Signer profileは作成前に同名がなく、作成時と現在のARN・version・証明書が一致し、他の利用がないことを確認した場合だけ取り消す。 `CancelSigningProfile` は名前指定なので、照合と取消の間に別の書込みがないことが必要。 `Canceled` を読み戻し、証明書の所有と参照解消を確認してからACMを回収する。[CancelSigningProfile](https://docs.aws.amazon.com/signer/latest/api/API_CancelSigningProfile.html)
 5. 通常FW復帰、reset、UART静穏、ロック解放、各AWS資源の終了状態、GreaterVersionの起動証跡を記録する。取得できない証拠や所有が曖昧な資源は保留し、次の実行を止める。中断 #70704 の手動回収を参照し、元job喪失時の独立回収を別に検証する。[過去の公開証跡](https://gitlab.saffti.jp/-/project/38/uploads/539031949e04d575e3cc0e0ef84248ee/idt-ota-witness-11262-11265-sanitized-evidence.zip)
 
-`AdmissionStore` は現時点では条件付き書込みと事前記録の部品。独立ジョブでの回収実行と終了照合が接続されるまで、native OTAの起動は保留する。
+`ota_profile_evidence.match_created_profile` は回収候補ごとに、元runのcaller ARN、所有確認済み証明書ARN、対象OTAのprofile名、事前一覧、収集済みイベントから照合する。中断runでは同じ証明書を使うprofileが2件あったため、証明書とprofile名を組にする。過去3件に対する照合と単体試験を確認済み。過去の事前一覧は得られていないため、履歴で照合したのはイベント間の関係まで。
+
+`AdmissionStore` は現時点では条件付き書込みと事前記録の部品。独立ジョブでの証拠収集・回収・終了照合が接続されるまで、native OTAの起動は保留する。
