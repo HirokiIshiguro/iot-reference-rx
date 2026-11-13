@@ -1,4 +1,8 @@
 $ErrorActionPreference = "Stop"
+if ($env:CI_COMMIT_BRANCH -eq '202-idt-transport-rx72n-pilot') {
+  & "$env:RX72N_IDT_PYTHON" -I tools/idt/oidc_job.py --verify-transport-aws
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 & "$env:RX72N_IDT_PYTHON" -I -m awscli --version
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 . tools/rx_e2studio_cli.ps1

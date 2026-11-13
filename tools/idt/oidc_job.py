@@ -28,6 +28,7 @@ from tools.idt.prepare_target_network import INPUTS as NETWORK_INPUTS
 from tools.idt.public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_INPUTS
 
 PROJECT_PATH = "oss/import/github/renesas/iot-reference-rx"
+PILOT_REF = "202-idt-transport-rx72n-pilot"
 NATIVE_SECONDS = 4500
 MAX_JOB_SECONDS = 10800
 SIGNER_CLEANUP_SECONDS = 60
@@ -135,9 +136,14 @@ def prepare_child(env, *, source_sha, config, user_name, session_factory=None):
         raise OidcError("IDT execution identity unavailable")
     if env.get("AWS_ROLE_ARN") != config.role_arn:
         raise OidcError("IDT routing differs from reviewed configuration")
+    if (scope != "transport" or env.get("RUN_RX_IDT") != "true"
+            or env.get("IDT_TARGET") != "rx72n-ethernet"
+            or env.get("IDT_TEST_ID") or env.get("RX72N_IDT_TEST_ID")
+            or env.get("CI_COMMIT_BRANCH") != PILOT_REF):
+        raise OidcError("outside the reviewed Transport pilot")
     budget = config.budget
     expected = ExpectedIdentity("38", PROJECT_PATH, config.account, config.role_arn,
-                                "branch", "main", source_sha, ("web", "api", "schedule"), config.runner_id)
+                                "branch", PILOT_REF, source_sha, ("api",), config.runner_id)
     if session_factory is None:
         session_factory = obtain_session
     session = session_factory(env, expected, required_seconds=budget.initial_required(),
@@ -291,12 +297,37 @@ def load_reviewed_host(config):
     return profile
 
 
+def verify_transport_aws():
+    """Check the exact public SSM parameter and EC2 read before native IDT."""
+    check_child_budget(os.environ, before_run=True)
+    import boto3
+    from botocore.config import Config
+    from tools.aws.oidc_session import quiet_aws_logging
+
+    cfg = Config(connect_timeout=5, read_timeout=15, retries={"total_max_attempts": 1},
+                 proxies={}, ignore_configured_endpoint_urls=True)
+    parameter = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+    with quiet_aws_logging():
+        session = boto3.Session(region_name=REGION)
+        reply = session.client("ssm", config=cfg).get_parameters(Names=[parameter])
+        image = reply.get("Parameters", [])
+        if (len(image) != 1 or image[0].get("Name") != parameter
+                or not re.fullmatch(r"ami-[0-9a-f]+", image[0].get("Value", ""))):
+            raise OidcError("unexpected Transport AMI parameter")
+        session.client("ec2", config=cfg).describe_instances(
+            Filters=[{"Name": "tag:Owner", "Values": ["IoTDeviceTester"]}], MaxResults=5)
+    print("IDT Transport AWS read preflight passed", flush=True)
+
+
 def main():
-    # A local, reviewed configuration is a prerequisite, not a CI-variable
-    # override or a guess based on a partial 6489-second calculation.
+    # Account and runner settings come from the reviewed host file rather than
+    # user-supplied GitLab pipeline variables.
     source_env = dict(os.environ)
     scope = scope_from_env(source_env)
     config = REVIEWED_CONFIGS.get(scope)
+    if scope == "transport" and source_env.get("CI_COMMIT_BRANCH") == PILOT_REF:
+        host_config = json.loads(Path("C:/ai/codex/tools/venvs/rx72n-idt-windows/transport-pilot-config.json").read_text(encoding="utf-8"))
+        config = ReviewedConfig(**{**host_config, "budget": Budget(**host_config["budget"])})
     if not isinstance(config, ReviewedConfig):
         raise OidcError("unreviewed IDT configuration")
     if ntpath.normcase(ntpath.normpath(source_env.get("CI_PROJECT_DIR", ""))) != ntpath.normcase(ntpath.normpath(str(ROOT))):
@@ -324,6 +355,9 @@ if __name__ == "__main__":
     try:
         if sys.argv[1:] == ["--check-before-run"]:
             check_child_budget(os.environ, before_run=True)
+            sys.exit(0)
+        if sys.argv[1:] == ["--verify-transport-aws"]:
+            verify_transport_aws()
             sys.exit(0)
         if sys.argv[1:]:
             raise OidcError("invalid arguments")
