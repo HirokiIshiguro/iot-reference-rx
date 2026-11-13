@@ -334,6 +334,12 @@ variables:
 
 workflow:
   rules:
+    # OTA creation and cleanup share one credential mode. Reject a debug OTA
+    # pipeline before either job receives a token.
+    - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/) && ($RX72N_OTA_OIDC == "true" || $RUN_RX72N_OTA_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(ota|full)$/ || $CI_COMMIT_TAG || ($RX72N_TEST_SCOPE == "auto" && ($CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api")))'
+      when: never
+    - if: '$RX72N_OTA_OIDC == "true" && ($CI_COMMIT_BRANCH != "main" || $CI_COMMIT_REF_PROTECTED != "true")'
+      when: never
     # Runner debug traces can expose a job token before Python can reject it.
     # Reject the entire IDT/nightly pipeline before the ID token is minted.
     - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/) && ((($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && (($RUN_RX_IDT == "true" && $IDT_SCOPE != "plan") || $RUN_RX72N_IDT == "true" || $PIPELINE_PROFILE == "nightly_matrix")) || $CI_PIPELINE_SOURCE == "schedule")'
@@ -1038,6 +1044,13 @@ idt_source_matrix:
         }
       }
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    - |
+      # Measure the actual RX72N signer bootstrap on the IDT runner before
+      # assigning time to it in the Transport OIDC job.
+      $bootstrapTimer = [System.Diagnostics.Stopwatch]::StartNew()
+      & "$env:RX72N_IDT_PYTHON" tools/idt/prepare_public_signer.py --source "$env:CI_PROJECT_DIR" --target rx72n-ethernet --output "$privateLogRoot/rx72n-bootstrap" --workspace "C:/ai/codex/ws/idt-rx72n-bootstrap-ci-$env:CI_JOB_ID" --python "$env:RX72N_IDT_PYTHON" | Out-Null
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      Write-Host ("RX72N IDT signer bootstrap seconds: {0}" -f [Math]::Ceiling($bootstrapTimer.Elapsed.TotalSeconds))
     - |
       $provisionerLog = Join-Path $privateLogRoot 'provisioner-build.log'
       Write-Host "RX671 provisioner; private diagnostics: $provisionerLog"
@@ -1821,6 +1834,7 @@ build_rx72n_ether:
     - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
+    - pwsh -NoProfile -File tools/ci/tests/test_rx72n_ota_oidc.ps1 -Wrapper tools/aws/rx72n_ota_oidc.ps1
     - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_hardware_transaction_contract tools.ci.tests.test_rx72n_tsip_trace_init tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_rx72n_fwup_prm_contract tools.ci.tests.test_rx_e2studio_cli
     - pip install cryptography --quiet
     - |
@@ -5998,9 +6012,23 @@ park_rx72n_ether_ota_cli:
       - artifacts/park_rx72n_ether_ota_cli/
     expire_in: 7 days
 
+.rx72n_ota_aws_job:
+  extends: .aws_cli_windows_job
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+  before_script:
+    - |
+      $rx72nOtaToken = $env:GITLAB_OIDC_TOKEN
+      Remove-Item Env:GITLAB_OIDC_TOKEN -ErrorAction SilentlyContinue
+      if ($env:RX72N_OTA_OIDC -cne 'true') {
+        $rx72nOtaToken = $null
+      }
+    - !reference [.aws_cli_windows_job, before_script]
+
 create_rx72n_ether_ota:
   stage: ota_create
-  extends: .aws_cli_windows_job
+  extends: .rx72n_ota_aws_job
   needs:
     - job: build_rx72n_ether_ota
       artifacts: true
@@ -6023,71 +6051,74 @@ create_rx72n_ether_ota:
   script:
     - Write-Host "=== Validate RX72N AWS IoT OTA creation inputs ==="
     - |
-      $artifactDir = "$env:CI_PROJECT_DIR\artifacts\create_rx72n_ether_ota"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      . tools/aws/rx72n_ota_oidc.ps1
+      Invoke-Rx72nOtaWithOidc -Token $rx72nOtaToken -Action {
+        $artifactDir = "$env:CI_PROJECT_DIR\artifacts\create_rx72n_ether_ota"
+        New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
-      foreach ($name in @("RX72N_DEVICE_ID", "RX72N_OTA_CANDIDATE_VERSION", "AWS_OTA_S3_BUCKET_RX72N_02", "AWS_OTA_SIGNING_PROFILE_RX72N_02", "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02", "AWS_DEFAULT_REGION")) {
-        if (-not [Environment]::GetEnvironmentVariable($name)) {
-          Write-Error "$name not set"
-          exit 1
+        foreach ($name in @("RX72N_DEVICE_ID", "RX72N_OTA_CANDIDATE_VERSION", "AWS_OTA_S3_BUCKET_RX72N_02", "AWS_OTA_SIGNING_PROFILE_RX72N_02", "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02", "AWS_DEFAULT_REGION")) {
+          if (-not [Environment]::GetEnvironmentVariable($name)) {
+            Write-Error "$name not set"
+            exit 1
+          }
         }
-      }
 
-      $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
-      $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_ota\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
-      if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
-      $parkMarker = "$env:CI_PROJECT_DIR\artifacts\park_rx72n_ether_ota_cli\parked.ok"
-      if (-not (Test-Path $parkMarker)) { Write-Error "RX72N CLI park marker missing: $parkMarker"; exit 1 }
-      $otaThingName = "$env:RX72N_DEVICE_ID-ota-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
-      if ($otaThingName.Length -gt 128) {
-        throw "Generated RX72N OTA Thing name exceeds 128 characters."
-      }
+        $versionUnderscore = $env:RX72N_OTA_CANDIDATE_VERSION -replace '\.', '_'
+        $candidateRsu = "$env:CI_PROJECT_DIR\artifacts\build_rx72n_ether_ota\$env:RX72N_DEVICE_ID" + "_" + $versionUnderscore + ".rsu"
+        if (-not (Test-Path $candidateRsu)) { Write-Error "OTA candidate .rsu missing: $candidateRsu"; exit 1 }
+        $parkMarker = "$env:CI_PROJECT_DIR\artifacts\park_rx72n_ether_ota_cli\parked.ok"
+        if (-not (Test-Path $parkMarker)) { Write-Error "RX72N CLI park marker missing: $parkMarker"; exit 1 }
+        $otaThingName = "$env:RX72N_DEVICE_ID-ota-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
+        if ($otaThingName.Length -gt 128) {
+          throw "Generated RX72N OTA Thing name exceeds 128 characters."
+        }
 
-      [ordered]@{
-        schema_version = 1
-        status = "prepared"
-        candidate_rsu = $candidateRsu
-        base_thing_name = $env:RX72N_DEVICE_ID
-        thing_name = $otaThingName
-        created_ephemeral_alias = $true
-        file_version = $env:RX72N_OTA_CANDIDATE_VERSION
-        bucket = $env:AWS_OTA_S3_BUCKET_RX72N_02
-        signing_profile = $env:AWS_OTA_SIGNING_PROFILE_RX72N_02
-        role_arn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
-        region = $env:AWS_DEFAULT_REGION
-        note = "A pipeline-owned Thing prevents another pipeline from consuming this one-shot OTA Job."
-      } | ConvertTo-Json | Set-Content -LiteralPath "$artifactDir\creation_prepared.json" -Encoding utf8
+        [ordered]@{
+          schema_version = 1
+          status = "prepared"
+          candidate_rsu = $candidateRsu
+          base_thing_name = $env:RX72N_DEVICE_ID
+          thing_name = $otaThingName
+          created_ephemeral_alias = $true
+          file_version = $env:RX72N_OTA_CANDIDATE_VERSION
+          bucket = $env:AWS_OTA_S3_BUCKET_RX72N_02
+          signing_profile = $env:AWS_OTA_SIGNING_PROFILE_RX72N_02
+          role_arn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
+          region = $env:AWS_DEFAULT_REGION
+          note = "A pipeline-owned Thing prevents another pipeline from consuming this one-shot OTA Job."
+        } | ConvertTo-Json | Set-Content -LiteralPath "$artifactDir\creation_prepared.json" -Encoding utf8
 
-      python tools/manage_ephemeral_iot_thing.py create `
-        --base-thing-name "$env:RX72N_DEVICE_ID" `
-        --thing-name "$otaThingName" `
-        --region "$env:AWS_DEFAULT_REGION" `
-        --owner-project-id "$env:CI_PROJECT_ID" `
-        --owner-pipeline-id "$env:CI_PIPELINE_ID" `
-        --owner-job-id "$env:CI_JOB_ID" `
-        --meta-json "$artifactDir\ephemeral_thing_meta.json"
-      if ($LASTEXITCODE -ne 0) {
-        throw "Failed to create the pipeline-owned RX72N OTA Thing."
-      }
+        python tools/manage_ephemeral_iot_thing.py create `
+          --base-thing-name "$env:RX72N_DEVICE_ID" `
+          --thing-name "$otaThingName" `
+          --region "$env:AWS_DEFAULT_REGION" `
+          --owner-project-id "$env:CI_PROJECT_ID" `
+          --owner-pipeline-id "$env:CI_PIPELINE_ID" `
+          --owner-job-id "$env:CI_JOB_ID" `
+          --meta-json "$artifactDir\ephemeral_thing_meta.json"
+        if ($LASTEXITCODE -ne 0) {
+          throw "Failed to create the pipeline-owned RX72N OTA Thing."
+        }
 
-      $otaRoleArn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
-      if ($otaRoleArn -notmatch '^arn:') {
-        $otaRoleArn = "arn:aws:iam::$otaRoleArn"
-      }
-      python tools/create_ota_update.py `
-        --artifact-dir "$artifactDir" `
-        --thing-name "$otaThingName" `
-        --input-rsu "$candidateRsu" `
-        --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
-        --bucket "$env:AWS_OTA_S3_BUCKET_RX72N_02" `
-        --signing-profile "$env:AWS_OTA_SIGNING_PROFILE_RX72N_02" `
-        --role-arn "$otaRoleArn" `
-        --region "$env:AWS_DEFAULT_REGION" `
-        --ota-id-prefix "$env:RX72N_DEVICE_ID-ota" `
-        2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
-      $createStatus = $LASTEXITCODE
-      if ($createStatus -ne 0) {
-        exit $createStatus
+        $otaRoleArn = $env:AWS_OTA_SERVICE_ROLE_ARN_RX72N_02
+        if ($otaRoleArn -notmatch '^arn:') {
+          $otaRoleArn = "arn:aws:iam::$otaRoleArn"
+        }
+        python tools/create_ota_update.py `
+          --artifact-dir "$artifactDir" `
+          --thing-name "$otaThingName" `
+          --input-rsu "$candidateRsu" `
+          --file-version "$env:RX72N_OTA_CANDIDATE_VERSION" `
+          --bucket "$env:AWS_OTA_S3_BUCKET_RX72N_02" `
+          --signing-profile "$env:AWS_OTA_SIGNING_PROFILE_RX72N_02" `
+          --role-arn "$otaRoleArn" `
+          --region "$env:AWS_DEFAULT_REGION" `
+          --ota-id-prefix "$env:RX72N_DEVICE_ID-ota" `
+          2>&1 | Tee-Object -FilePath "$artifactDir\create_ota_console.log"
+        $createStatus = $LASTEXITCODE
+        if ($createStatus -ne 0) {
+          exit $createStatus
+        }
       }
   artifacts:
     when: always
@@ -6231,7 +6262,7 @@ test_rx72n_ether_ota:
 
 cleanup_rx72n_ether_ota:
   stage: ota_cleanup
-  extends: .aws_cli_windows_job
+  extends: .rx72n_ota_aws_job
   dependencies:
     - create_rx72n_ether_ota
     - test_rx72n_ether_ota
@@ -6252,47 +6283,50 @@ cleanup_rx72n_ether_ota:
   script:
     - $ErrorActionPreference = "Continue"
     - |
-      $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx72n_ether_ota\ota_job_meta.json"
-      $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\cleanup_rx72n_ether_ota"
-      New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+      . tools/aws/rx72n_ota_oidc.ps1
+      Invoke-Rx72nOtaWithOidc -Token $rx72nOtaToken -Action {
+        $metaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx72n_ether_ota\ota_job_meta.json"
+        $artifactDir = Join-Path $env:CI_PROJECT_DIR "artifacts\cleanup_rx72n_ether_ota"
+        New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
-      if (Test-Path -LiteralPath $metaPath) {
-        python tools/verify_ota_aws_state.py snapshot `
-          --meta-json "$metaPath" `
-          --output-json (Join-Path $artifactDir "pre_cleanup_state.json")
-        $snapshotStatus = $LASTEXITCODE
+        if (Test-Path -LiteralPath $metaPath) {
+          python tools/verify_ota_aws_state.py snapshot `
+            --meta-json "$metaPath" `
+            --output-json (Join-Path $artifactDir "pre_cleanup_state.json")
+          $snapshotStatus = $LASTEXITCODE
 
-        python tools/verify_ota_aws_state.py cleanup `
-          --meta-json "$metaPath" `
-          --output-json (Join-Path $artifactDir "post_cleanup_state.json")
-        $cleanupStatus = $LASTEXITCODE
-      } else {
-        Write-Warning "OTA metadata is absent; the pre-mutation journal contract proves that OTA/S3 creation did not start."
-        $snapshotStatus = 1
-        $cleanupStatus = 0
-        [ordered]@{
-          schema_version = 1
-          status = "not-started"
-          reason = "ota_job_meta.json was not created before any AWS OTA/S3 mutation"
-          absence = [ordered]@{ passed = $true }
-        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $artifactDir "post_cleanup_state.json") -Encoding utf8
-      }
-
-      $ephemeralStatus = 0
-      $ephemeralMetaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx72n_ether_ota\ephemeral_thing_meta.json"
-      if (Test-Path -LiteralPath $ephemeralMetaPath) {
-        if ($cleanupStatus -ne 0) {
-          Write-Warning "OTA cleanup did not complete; independently attempting exact pipeline-owned Thing cleanup."
+          python tools/verify_ota_aws_state.py cleanup `
+            --meta-json "$metaPath" `
+            --output-json (Join-Path $artifactDir "post_cleanup_state.json")
+          $cleanupStatus = $LASTEXITCODE
+        } else {
+          Write-Warning "OTA metadata is absent; the pre-mutation journal contract proves that OTA/S3 creation did not start."
+          $snapshotStatus = 1
+          $cleanupStatus = 0
+          [ordered]@{
+            schema_version = 1
+            status = "not-started"
+            reason = "ota_job_meta.json was not created before any AWS OTA/S3 mutation"
+            absence = [ordered]@{ passed = $true }
+          } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $artifactDir "post_cleanup_state.json") -Encoding utf8
         }
-        python tools/manage_ephemeral_iot_thing.py cleanup `
-          --meta-json "$ephemeralMetaPath" `
-          --output-json (Join-Path $artifactDir "ephemeral_thing_cleanup.json")
-        $ephemeralStatus = $LASTEXITCODE
-      }
 
-      if ($snapshotStatus -ne 0 -or $cleanupStatus -ne 0 -or $ephemeralStatus -ne 0) {
-        Write-Error "RX72N OTA evidence or fail-closed cleanup verification failed."
-        exit 1
+        $ephemeralStatus = 0
+        $ephemeralMetaPath = Join-Path $env:CI_PROJECT_DIR "artifacts\create_rx72n_ether_ota\ephemeral_thing_meta.json"
+        if (Test-Path -LiteralPath $ephemeralMetaPath) {
+          if ($cleanupStatus -ne 0) {
+            Write-Warning "OTA cleanup did not complete; independently attempting exact pipeline-owned Thing cleanup."
+          }
+          python tools/manage_ephemeral_iot_thing.py cleanup `
+            --meta-json "$ephemeralMetaPath" `
+            --output-json (Join-Path $artifactDir "ephemeral_thing_cleanup.json")
+          $ephemeralStatus = $LASTEXITCODE
+        }
+
+        if ($snapshotStatus -ne 0 -or $cleanupStatus -ne 0 -or $ephemeralStatus -ne 0) {
+          Write-Error "RX72N OTA evidence or fail-closed cleanup verification failed."
+          exit 1
+        }
       }
   artifacts:
     when: always

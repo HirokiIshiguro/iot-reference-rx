@@ -1,6 +1,6 @@
 # AWS OIDC移行の準備
 
-この変更はGitLab ID tokenから短期STS sessionを得る共通部品、既存の読取りprobe、IDT jobへの接続案を含む。**通常CI、独立recovery、利用側への接続と実環境でのOIDC検証は未完了であり、OIDC移行の完了ではない。** IDT jobのレビュー済み設定と時間予算は未登録であり、現状はAWS処理や実機操作の前に停止する。AWS role/trust、CI/CD Variables、実機および共有operatorの固定キーは変更しない。
+この変更はGitLab ID tokenから短期STS sessionを得る共通部品、読取りprobe、IDT jobへの接続案、通常OTAの作成・回収ジョブの切替を含む。IDT jobのレビュー済み設定と時間予算は未登録であり、現状はAWS処理や実機操作の前に停止する。OTAの切替はRX72N Ethernetの作成・回収ジョブが対象。実環境でのOIDC検証、native OTAの独立recoveryと利用側の接続は後続。AWS role/trust、CI/CD Variables、実機および共有operatorの固定キーは変更しない。
 
 ## 固定sessionの境界
 
@@ -23,6 +23,8 @@ Signer cleanupは、cert ARNの一致だけを理由にprofileをcancelしない
 BG96の既存APN入力は `AWS_IOT_CELLULAR_APN_*_CK_RX65N_01` などのAWS接頭辞を持つが、AWS SDKの認証設定ではない。呼出し側が既存の4変数を個別に許可した場合だけ、これらのdevice通信入力を引き継ぐ。`AWS_PROFILE` やAWS endpoint overrideは許可できない。
 
 ## probeと後続
+
+RX72N Ethernetの通常OTAでは、保護mainの検証パイプラインに `RX72N_OTA_OIDC=true` を渡すと、`create_rx72n_ether_ota` と `cleanup_rx72n_ether_ota` がそれぞれGitLab ID tokenを使って共通 `AWS_ROLE_ARN` を引き受ける。従来のOTA journalと回収処理を使用する。OIDCを選択したjobで認証に失敗した場合は停止する。初回実行には対象のIoT Thing／OTA、S3 object、Signer参照とOTA service roleの `iam:PassRole` の許可が必要。タグ実行は別途trustとIAMの確認が必要。
 
 `tools/aws/oidc_probe.py`とそのread-only policy/trustの候補は、[MR !251](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/251)から再利用した。probeのlive jobはこの変更では追加・実行していない。policyは候補であり、!251単体のsource CI成功はlive OIDC成功を意味しない。
 
