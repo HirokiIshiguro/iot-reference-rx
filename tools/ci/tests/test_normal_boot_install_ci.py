@@ -60,7 +60,17 @@ class NormalBootInstallCiTests(unittest.TestCase):
                 self.assertIn("--target "+target,command)
                 self.assertIn('--source-sha "$CI_COMMIT_SHA"',command)
                 self.assertIn('status="${PIPESTATUS[0]}"',command)
-                self.assertEqual(body.count("tools/install_normal_boot.py"),1)
+                self.assertNotIn("--reset-only", command)
+                if name == "test_rx65n_bg96_mqtt":
+                    self.assertEqual(body.count("tools/install_normal_boot.py"), 2)
+                    reset_start = body.rindex("tools/install_normal_boot.py")
+                    reset = body[reset_start:].split('if [ "$status" -eq 0 ]', 1)[0]
+                    self.assertLess(body.index("--action verify-mqtt"), reset_start)
+                    self.assertIn('if [ "$PIPELINE_PROFILE" = "mr-rx65n-bg96" ]; then', body)
+                    self.assertIn('--bundle "$CI_PROJECT_DIR/artifacts/normal_boot_rx65n"', reset)
+                    self.assertIn('--target rx65n-bg96 --source-sha "$CI_COMMIT_SHA" --reset-only', reset)
+                else:
+                    self.assertEqual(body.count("tools/install_normal_boot.py"), 1)
                 self.assertNotIn("-erase-chip",body)
                 self.assertNotIn("tools/test_uart_download_rx72n.py",body)
                 self.assertNotIn("--action flash-bootloader",body)
