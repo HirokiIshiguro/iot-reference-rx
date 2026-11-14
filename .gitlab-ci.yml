@@ -1,102 +1,75 @@
-# Standalone public-input probe; it is not included in the normal pipeline.
-# Use only through a temporary protected ref after the dedicated runners and
-# Windows -> RPi #4 SSH are ready. It never requests an ID token or hardware.
-include:
-  - project: oss/infra/hardware-config
-    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
-    file: /templates/windows_ccrx_host_lease.yml
-
 workflow:
   rules:
-    - if: '$CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/'
+    - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/)'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "public-controller"'
-      when: always
-    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "api" && $IDT_PAIR_MODE == "python-contract"'
-      when: always
-    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
-      when: always
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-paired-failure-readonly" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_FAILURE_READONLY == "true"'
     - when: never
-
-stages: [probe]
-
+stages: [test]
 variables:
-  GIT_STRATEGY: clone
-  GIT_SUBMODULE_STRATEGY: normal
-  GIT_CONFIG_COUNT: "3"
-  GIT_CONFIG_KEY_0: core.longpaths
-  GIT_CONFIG_VALUE_0: "true"
-  GIT_CONFIG_KEY_1: core.autocrlf
-  GIT_CONFIG_VALUE_1: "false"
-  GIT_CONFIG_KEY_2: core.eol
-  GIT_CONFIG_VALUE_2: lf
-
-rpi4_public_python_contract:
-  stage: probe
-  timeout: 10 minutes
+  GIT_STRATEGY: empty
+  GIT_SUBMODULE_STRATEGY: none
+win29_paired_failure_readonly:
+  stage: test
   tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "api" && $IDT_PAIR_MODE == "python-contract"'
-    - when: never
+  timeout: 5 minutes
+  before_script: []
+  after_script: []
   script:
     - |
       $ErrorActionPreference = 'Stop'
       if ($env:CI_PROJECT_ID -ne '38' -or $env:CI_RUNNER_ID -ne '29' -or
-          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx') {
-          throw 'Unexpected contract job identity.'
-      }
+          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx') { throw 'Unexpected execution context.' }
       foreach ($entry in @(Get-ChildItem Env:)) {
           if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '(?i:TOKEN|SECRET|PRIVATE_KEY|PASSWORD)') {
               Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
           }
       }
-      . tools/idt/rpi4_windows_python.ps1
-      & $script:IdtWorkerPython -c "import shutil,sys; sys.exit(0 if shutil.which('pwsh') else 1)"
-      if ($LASTEXITCODE -ne 0) { throw 'PowerShell 7 is unavailable.' }
-      & $script:IdtWorkerPython -B -m unittest tools.ci.tests.test_idt_explicit_python -v
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-rpi4_public_controller:
-  stage: probe
-  timeout: 2 hours
-  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
-  rules:
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "public-controller"'
-    - when: never
-  script:
-    - python3 -B tools/idt/rpi4_public_controller.py
-
-rpi4_public_windows_build:
-  stage: probe
-  timeout: 2 hours
-  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  resource_group: ishiguro-pc-ccrx-e2studio-build
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
-    - when: never
-  script:
-    - !reference [.windows_ccrx_host_lease, script]
-    - |
-      $ErrorActionPreference = 'Stop'
-      $leaseFile = Join-Path $env:TEMP ("idt-public-lease-$env:CI_PIPELINE_ID-$env:CI_JOB_ID.ps1")
-      try {
-          $text = 'function Enter-WindowsCcrxHostLease {' + "`n" + ${function:Enter-WindowsCcrxHostLease}.ToString() + "`n}"
-          $stream = [IO.File]::Open($leaseFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-          try { $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false)); $writer.Write($text); $writer.Flush() }
-          finally { $stream.Dispose() }
-          $env:IDT_PAIR_LEASE_DEFINITION = $leaseFile
-      } finally {
-          $script:WindowsCcrxHostLease.Dispose()
-          $script:WindowsCcrxHostLease = $null
+      $private = 'C:/ai/codex/tmp/idt-public-dsgubf36'
+      $workspace = 'C:/ai/codex/ws/idt-public-mkvodlqi'
+      $start = [DateTimeOffset]::Parse('2026-11-15T04:08:02.518+09:00').UtcDateTime
+      $end = [DateTimeOffset]::Parse('2026-11-15T04:16:46.930+09:00').UtcDateTime
+      $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+      foreach ($path in @('C:/ai/codex/tmp', $private, 'C:/ai/codex/ws', $workspace)) {
+          if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw 'Expected directory missing.' }
+          if ((Get-Item -LiteralPath $path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Unexpected path link.' }
       }
-      try {
-          . tools/rx_e2studio_cli.ps1
-          Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
-          . tools/idt/rpi4_windows_python.ps1
-          & $script:IdtWorkerPython -I tools/idt/rpi4_windows_worker.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      } finally {
-          Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue
+      foreach ($path in @($private, $workspace)) {
+          $item = Get-Item -LiteralPath $path -Force
+          $owner = (Get-Acl -LiteralPath $path).GetOwner([Security.Principal.SecurityIdentifier]).Value
+          if ($owner -ne $currentSid -or $item.CreationTimeUtc -lt $start -or $item.CreationTimeUtc -gt $end) { throw 'Directory owner or creation time mismatch.' }
       }
+      Write-Host 'TARGET_DIRECTORIES_MATCH_JOB_WINDOW_AND_OWNER=True'
+      $logs = @(
+          @{ name='WRAPPER'; path=(Join-Path $private 'build.log') },
+          @{ name='APPLICATION'; path=(Join-Path $private 'rx72n-ethernet/build.log') },
+          @{ name='BOOTLOADER'; path=(Join-Path $private 'rx72n-ethernet/bootloader_build.log') }
+      )
+      foreach ($entry in $logs) {
+          $path = $entry.path; $parent = Split-Path -Parent $path
+          if ((Test-Path -LiteralPath $parent) -and ((Get-Item -LiteralPath $parent -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected log directory link.' }
+          if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { Write-Host ("LOG_$($entry.name)=ABSENT"); continue }
+          $item = Get-Item -LiteralPath $path -Force
+          if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 25000000) { throw 'Unexpected log link or size.' }
+          $content = Get-Content -LiteralPath $path -Raw
+          $flags = [ordered]@{
+              bytes = $item.Length
+              metadata_pass = [bool]($content -match 'PASS: \d+ target/group metadata validations')
+              launcher_started = [bool]($content -match 'e2studio-cli headless import/build|\+ e2studio-cli')
+              source_verification = [bool]($content -match 'dependency source-copy verification failed|Dependency file differs from captured source')
+              workspace_rejected = [bool]($content -match 'workspace is outside the dedicated workspace roots')
+              compiler_codes = @([regex]::Matches($content, '(?i)\b[CEF][0-9]{5,8}\b') | ForEach-Object { $_.Value.ToUpperInvariant() } | Sort-Object -Unique)
+              error_location = @([regex]::Matches($content, '(?i)(test_build_rx_idt\.ps1|build_rx72n_idt_transport\.ps1|rx_e2studio_cli\.ps1|rpi4_windows_public_build\.ps1):(?:line\s*)?([0-9]{1,5})') | ForEach-Object { $_.Groups[1].Value + ':' + $_.Groups[2].Value } | Sort-Object -Unique)
+          }
+          Write-Host ("LOG_$($entry.name)=" + ($flags | ConvertTo-Json -Compress))
+          $lines = @([regex]::Replace($content, '\x1b\[[0-9;]*[A-Za-z]', '') -split "`r?`n")
+          $candidates = @($lines | Where-Object { $_ -match '(?i)\b(exception|error|fatal|failed|cannot|timeout|timed out|not found)\b|\b[CEF][0-9]{5,8}\b' } | Select-Object -Last 3)
+          foreach ($line in $candidates) {
+              $line = [regex]::Replace($line, '(?i)https?://\S+|[A-Z]:[\\/][^\s"'']+|\\\\[^\s"'']+', '<PATH>')
+              $line = [regex]::Replace($line, '[\w.+-]+@[\w.-]+', '<EMAIL>')
+              $line = [regex]::Replace($line, '(?i)(token|secret|password|key|credential)\s*[:=]\s*\S+', '$1=<REDACTED>')
+              $line = [regex]::Replace($line, '\b[A-Za-z0-9_+/=-]{24,}\b', '<REDACTED>')
+              if ($line.Length -gt 300) { $line = $line.Substring(0, 300) }
+              Write-Host ("SAFE_ERROR_$($entry.name)=" + $line.Trim())
+          }
+      }
+      Write-Host 'READ_ONLY_DIAGNOSTIC_COMPLETE'
