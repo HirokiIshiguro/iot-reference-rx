@@ -5,5 +5,5 @@ workflow:
   rules:
     - if: '$CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/'
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "207-idt-rpi4-sample-stage1"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "207-idt-rpi4-explicit-frq-probe"'
     - when: never

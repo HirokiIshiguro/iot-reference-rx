@@ -1,5 +1,5 @@
 stages: [test]
-rpi4_official_idt_sample_smoke:
+rpi4_idt_explicit_qemu_frq_help_probe:
   stage: test
   tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
   timeout: 10 minutes
@@ -12,7 +12,7 @@ rpi4_official_idt_sample_smoke:
   artifacts:
     when: always
     reports:
-      junit: artifacts/idt-rpi4-sample/official-junit.xml
+      junit: artifacts/idt-rpi4-explicit-frq/frq-help-junit.xml
     paths:
-      - artifacts/idt-rpi4-sample/official-junit.xml
+      - artifacts/idt-rpi4-explicit-frq/frq-help-junit.xml
     expire_in: 7 days

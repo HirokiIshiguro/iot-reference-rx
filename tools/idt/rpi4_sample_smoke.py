@@ -41,7 +41,7 @@ def main():
         signal.signal(sig, stop)
     if (os.environ.get('CI_PROJECT_ID') != '38'
             or os.environ.get('CI_PIPELINE_SOURCE') != 'api'
-            or os.environ.get('CI_COMMIT_BRANCH') != '207-idt-rpi4-sample-stage1'):
+            or os.environ.get('CI_COMMIT_BRANCH') != '207-idt-rpi4-explicit-frq-probe'):
         raise RuntimeError('sample requires the dedicated project, API and ref')
     for name in ('CI_DEBUG_TRACE', 'CI_DEBUG_SERVICES'):
         if re.fullmatch(r'(?i)(?:t|true|\+?0*1)', os.environ.get(name, '')):
@@ -53,9 +53,9 @@ def main():
         raise RuntimeError('IDT_RPI4_SAMPLE_ARCHIVE must be an absolute path to the pinned official ZIP')
     archive_path = Path(archive_setting)
     verify_archive_digest('linux', digest(archive_path))
-    output = ROOT / 'artifacts/idt-rpi4-sample'
+    output = ROOT / 'artifacts/idt-rpi4-explicit-frq'
     output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='idt-rpi4-sample-') as directory:
+    with tempfile.TemporaryDirectory(prefix='idt-rpi4-explicit-frq-') as directory:
         work = Path(directory)
         env = {'PATH': '/usr/bin:/bin', 'HOME': str(work), 'LANG': 'C.UTF-8',
                'AWS_EC2_METADATA_DISABLED': 'true', 'AWS_CONFIG_FILE': '/dev/null',
@@ -76,13 +76,26 @@ def main():
             archive.extractall(work)
         idt = work / 'devicetester_freertos_linux'
         verify_install(idt, 'linux')
-        for path in (idt / 'bin/devicetester_linux_x86-64',):
+        for path in (idt / 'bin/devicetester_linux_x86-64', idt / 'tests/FRQ_2.5.0/frq_linux_x86-64'):
             path.chmod(0o700)
         sample = idt / 'samples/python'
-        suite = idt / 'tests/IDTSampleSuitePython_1.0.1'
+        suite = idt / 'tests/IDTExplicitFRQProbe_1.0.0'
         shutil.copytree(sample / 'configuration/IDTSampleSuitePython_1.0.1', suite)
         shutil.copytree(sample / 'src/suite', suite / 'suite', dirs_exist_ok=True)
         shutil.copytree(idt / 'sdks/python/idt_client', suite / 'suite/sample_group/idt_client')
+        # Only the copied synthetic suite is changed; the verified Transport
+        # definitions and the vendor FRQ executable remain byte-identical.
+        suite_meta = suite / 'suite/suite.json'
+        metadata = json.loads(suite_meta.read_text())
+        metadata['id'] = 'IDTExplicitFRQProbe_1.0.0'
+        suite_meta.write_text(json.dumps(metadata))
+        testcase = suite / 'suite/sample_group/test_log/test.json'
+        test_config = json.loads(testcase.read_text())
+        qemu = work / 'packages/usr/bin/qemu-x86_64-static'
+        sysroot = work / 'packages/usr/x86_64-linux-gnu'
+        frq = idt / 'tests/FRQ_2.5.0/frq_linux_x86-64'
+        test_config['execution']['linux'] = {'cmd': str(qemu), 'args': ['-L', str(sysroot), str(frq), '--help']}
+        testcase.write_text(json.dumps(test_config))
         subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(work / 'dummy_key')],
                        env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         config = idt / 'configs'
@@ -102,7 +115,7 @@ def main():
         qemu = work / 'packages/usr/bin/qemu-x86_64-static'
         sysroot = work / 'packages/usr/x86_64-linux-gnu'
         command = [str(qemu), '-L', str(sysroot), str(idt / 'bin/devicetester_linux_x86-64'),
-                   'run-suite', '--suite-id', 'IDTSampleSuitePython_1.0.1', '--pool-id', 'LocalPool',
+                   'run-suite', '--suite-id', 'IDTExplicitFRQProbe_1.0.0', '--pool-id', 'LocalPool',
                    '--group-id', 'sample_group', '--test-id', 'test_log',
                    '--update-idt', 'n', '--upgrade-test-suite', 'n', '--update-managed-policy', 'n']
         proc = subprocess.Popen(command, cwd=idt / 'bin', env=env, stdin=subprocess.DEVNULL,
@@ -113,19 +126,21 @@ def main():
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
-        reports = list((runtime / 'results').rglob('IDTSampleSuitePython_Report.xml'))
+        reports = list((runtime / 'results').rglob('IDTExplicitFRQProbe_Report.xml'))
         if proc.returncode or len(reports) != 1:
             raise RuntimeError('official sample did not finish with one report')
         report = ET.parse(reports[0]).getroot()
         cases = report.findall('.//testcase')
-        if (report.get('tests') != '1' or any(report.get(k, '0') != '0' for k in ('failures', 'errors', 'skipped'))
+        if (report.get('tests') != '1' or report.get('errors') != '1'
+                or any(report.get(k, '0') != '0' for k in ('failures', 'skipped'))
                 or len(cases) != 1 or cases[0].get('name') != 'test_log'
-                or any(cases[0].find(k) is not None for k in ('failure', 'error', 'skipped'))
-                or b'Finished running test case' not in stdout):
-            raise RuntimeError('official sample JUnit or SDK result is not a single pass')
-        shutil.copyfile(reports[0], output / 'official-junit.xml')
-        print('Official sample test_log: 1 PASS; IDT 4.9.0; FRQ 2.5.0 bundle verified', flush=True)
-        print('This is an ARM64 QEMU sample smoke, not a Transport or hardware test.', flush=True)
+                or cases[0].find('error') is None
+                or b'Usage of' not in stdout or b'frq_linux_x86-64' not in stdout):
+            raise RuntimeError('explicit QEMU FRQ help evidence or expected SDK-less JUnit missing')
+        shutil.copyfile(reports[0], output / 'frq-help-junit.xml')
+        print('IDT invoked explicit QEMU and unmodified FRQ --help; expected SDK-less JUnit error=1', flush=True)
+        print('This is a synthetic launch probe, not Transport or hardware qualification.', flush=True)
+
 
 
 if __name__ == '__main__':
