@@ -1,299 +1,84 @@
-# Activation candidate for the exact protected temporary ref only; do not run until reviewed.
-include:
-  - project: oss/infra/hardware-config
-    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
-    file: /templates/windows_ccrx_host_lease.yml
-
 workflow:
   rules:
     - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/)'
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-python-bootstrap" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_WIN29_PUBLIC == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-log-readonly" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_LOG_READONLY == "true"'
     - when: never
-
-stages: [bootstrap, test, build]
-
+stages: [test]
 variables:
-  GIT_STRATEGY: clone
-  GIT_SUBMODULE_STRATEGY: normal
-  GIT_CONFIG_COUNT: "3"
-  GIT_CONFIG_KEY_0: core.longpaths
-  GIT_CONFIG_VALUE_0: "true"
-  GIT_CONFIG_KEY_1: core.autocrlf
-  GIT_CONFIG_VALUE_1: "false"
-  GIT_CONFIG_KEY_2: core.eol
-  GIT_CONFIG_VALUE_2: lf
-  PYTHONUTF8: "1"
-  IDT_WIN29_PYTHON_SELECTION: dedicated
-
-.win29_public_job:
+  GIT_STRATEGY: empty
+  GIT_SUBMODULE_STRATEGY: none
+win29_log_readonly:
+  stage: test
   tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  before_script:
-    - |
-      $ErrorActionPreference = 'Stop'
-      if ($env:CI_PROJECT_ID -ne '38' -or $env:CI_RUNNER_ID -ne '29' -or
-          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or
-          [Environment]::UserName -ne 'svc-idt-rx') {
-          throw 'Unexpected project, runner, protected ref or execution account.'
-      }
-      # Preserve GitLab's job token for nested dependency checkout; remove AWS
-      # and other secrets before invoking test/build tools. Never print values.
-      foreach ($entry in @(Get-ChildItem Env:)) {
-          if ($entry.Name -ne 'CI_JOB_TOKEN' -and
-              ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '(?i:TOKEN|SECRET|PRIVATE_KEY|PASSWORD)')) {
-              Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
-          }
-      }
-      $env:AWS_EC2_METADATA_DISABLED = 'true'
-      if ($env:IDT_WIN29_PYTHON_SELECTION -eq 'existing') {
-          $idtPython = 'C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe'
-      } elseif ($env:IDT_WIN29_PYTHON_SELECTION -eq 'dedicated') {
-          $idtPython = 'C:/ProgramData/SAFFTI-IdtRxRunner/work/tools/venv-3.14.10/Scripts/python.exe'
-      } else { throw 'Unexpected Python selection.' }
-      & $idtPython -I -c 'import boto3, cryptography; print("Python runtime and imports OK")'
-      if ($LASTEXITCODE -ne 0) { throw 'Dedicated account cannot use the reviewed Python runtime.' }
-  after_script: []
-
-win29_python_bootstrap:
-  stage: bootstrap
-  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  timeout: 30 minutes
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
+  timeout: 5 minutes
   before_script: []
   after_script: []
   script:
     - |
       $ErrorActionPreference = 'Stop'
       if ($env:CI_PROJECT_ID -ne '38' -or $env:CI_RUNNER_ID -ne '29' -or
-          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx' -or
-          $env:CI_PIPELINE_ID -notmatch '^\d+$' -or $env:CI_JOB_ID -notmatch '^\d+$') {
-          throw 'Unexpected project, runner, protected ref or execution account.'
-      }
-      # The checkout is complete; neither download nor Python needs CI or AWS credentials.
+          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx') { throw 'Unexpected execution context.' }
       foreach ($entry in @(Get-ChildItem Env:)) {
           if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '(?i:TOKEN|SECRET|PRIVATE_KEY|PASSWORD)') {
               Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
           }
       }
-      $env:AWS_EC2_METADATA_DISABLED = 'true'
-      $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-      $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
-      $ProgressPreference = 'SilentlyContinue'
-      $work = [IO.Path]::GetFullPath('C:/ProgramData/SAFFTI-IdtRxRunner/work').TrimEnd('\')
-      $tools = [IO.Path]::GetFullPath((Join-Path $work 'tools'))
-      $stage = [IO.Path]::GetFullPath((Join-Path $tools "bootstrap-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"))
-      $runtime = [IO.Path]::GetFullPath((Join-Path $tools 'python-3.14.10'))
-      $venv = [IO.Path]::GetFullPath((Join-Path $tools 'venv-3.14.10'))
-      if ([IO.Path]::GetDirectoryName($tools) -ine $work -or
-          @($stage, $runtime, $venv | Where-Object { [IO.Path]::GetDirectoryName($_) -ine $tools }).Count -gt 0) {
-          throw 'Bootstrap target escaped the dedicated work directory.'
+      $output = 'C:/ai/codex/tmp/idt-win29-public-15835-85499'
+      $workspace = 'C:/ai/codex/ws/idt-win29-public-15835-85499'
+      foreach ($path in @('C:/ai/codex/tmp', $output, 'C:/ai/codex/ws', $workspace)) {
+          if ((Test-Path -LiteralPath $path) -and ((Get-Item -LiteralPath $path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected path link.' }
       }
-      function Assert-PlainAncestors([string]$Path) {
-          $entry = Get-Item -LiteralPath $Path -Force
-          while ($null -ne $entry) {
-              if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse point in bootstrap path.' }
-              $entry = $entry.Parent
+      Write-Host ('OUTPUT_EXISTS=' + [bool](Test-Path -LiteralPath $output -PathType Container))
+      Write-Host ('WORKSPACE_EXISTS=' + [bool](Test-Path -LiteralPath $workspace -PathType Container))
+      $files = @(
+          @{ name = 'PUBLIC'; path = (Join-Path $output 'public-build.log') },
+          @{ name = 'APPLICATION'; path = (Join-Path $output 'rx72n-ethernet/build.log') },
+          @{ name = 'BOOTLOADER'; path = (Join-Path $output 'rx72n-ethernet/bootloader_build.log') }
+      )
+      foreach ($item in $files) {
+          $path = $item.path; $parent = Split-Path -Parent $path
+          if ((Test-Path -LiteralPath $parent) -and ((Get-Item -LiteralPath $parent -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected log directory link.' }
+          if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { Write-Host ("LOG_$($item.name)=ABSENT"); continue }
+          $info = Get-Item -LiteralPath $path -Force
+          if (($info.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $info.Length -gt 25000000) { throw 'Unexpected log link or size.' }
+          $content = Get-Content -LiteralPath $path -Raw
+          $flags = [ordered]@{
+              bytes = $info.Length
+              codes = @([regex]::Matches($content, '(?i)\b[EFW][0-9]{5,8}\b') | ForEach-Object { $_.Value.ToUpperInvariant() } | Sort-Object -Unique)
+              metadata_pass = [bool]($content -match 'PASS: \d+ target/group metadata validations')
+              launcher_started = [bool]($content -match 'e2studio-cli headless import/build; output:')
+              workspace_rejected = [bool]($content -match 'workspace is outside the dedicated workspace roots')
+              unregistered_sources = [bool]($content -match 'unregistered source inputs')
+              launcher_missing = [bool]($content -match 'require the e2studio-cli.exe command launcher')
+              build_rejected = [bool]($content -match 'headless build was rejected')
+              compiler_error = [bool]($content -match 'compiler, assembler or linker error')
+              output_missing = [bool]($content -match 'Expected RX build output is (missing|empty or stale)')
+              license = [bool]($content -match '(?i)licen[sc]e')
+              timeout = [bool]($content -match '(?i)timed?\s*out|timeout')
+              permission_denied = [bool]($content -match '(?i)access (to the path .* )?is denied|permission denied|UnauthorizedAccessException')
+              path_missing = [bool]($content -match '(?i)cannot find path|could not find (a part of )?the (file|path)|FileNotFoundException|DirectoryNotFoundException')
+              powershell_native_error = [bool]($content -match 'NativeCommandError')
           }
+          Write-Host ("LOG_$($item.name)=" + ($flags | ConvertTo-Json -Compress))
       }
-      Assert-PlainAncestors $work
-      [void](New-Item -ItemType Directory -Force -Path $tools)
-      Assert-PlainAncestors $tools
-      foreach ($path in @($stage, $runtime, $venv)) {
-          if (Test-Path -LiteralPath $path) { throw 'A bootstrap target already exists; inspect before reuse.' }
-      }
-      [void](New-Item -ItemType Directory -Path $stage -ErrorAction Stop)
-      $env:DOTNET_CLI_HOME = $stage
-      $completed = $false
-      try {
-          $package = Join-Path $stage 'python.3.14.10.nupkg'
-          $url = 'https://api.nuget.org/v3-flatcontainer/python/3.14.10/python.3.14.10.nupkg'
-          Invoke-WebRequest -Uri $url -OutFile $package -UseBasicParsing -TimeoutSec 120
-          if ((Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'f54ba67c9951c3d773ea47d2bb095150c037c399f0423a968bcda22809241784') {
-              throw 'Python package SHA256 differs from reviewed staging.'
-          }
-          $verification = (& 'C:/Program Files/dotnet/dotnet.exe' nuget verify $package --all -v minimal 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0 -or $verification -notmatch '(?i)1f4b311d9acc115c8dc8018b5a49e00fce6da8e2855f9f014ca6f34570bc482d') {
-              throw 'Python package repository signature verification failed.'
-          }
-          Add-Type -AssemblyName System.IO.Compression
-          $archive = [IO.Compression.ZipFile]::OpenRead($package)
-          $unpacked = [IO.Path]::GetFullPath((Join-Path $stage 'unpacked'))
+      $targetNames = @('ccrx.exe','rlink.exe','e2studio-cli.exe','e2studioc.exe','make.exe','sh.exe','java.exe','pwsh.exe','powershell.exe')
+      $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+      $counts = @{}; $matched = 0; $unknown = 0
+      foreach ($process in @(Get-CimInstance Win32_Process -Property ProcessId,Name,CommandLine)) {
+          if ($process.Name -notin $targetNames -or $process.ProcessId -eq $PID) { continue }
           try {
-              foreach ($entry in $archive.Entries) {
-                  $name = $entry.FullName
-                  $parts = $name -split '/'
-                  $mode = ($entry.ExternalAttributes -shr 16) -band 0xF000
-                  if (-not $name -or $name.Contains('\') -or $name.Contains(':') -or
-                      $name.StartsWith('/') -or '..' -in $parts -or $mode -eq 0xA000) {
-                      throw 'Unsafe Python package member.'
-                  }
-                  $full = [IO.Path]::GetFullPath((Join-Path $unpacked $name))
-                  if (-not $full.StartsWith($unpacked + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                      throw 'Python package member escaped staging.'
-                  }
+              $owner = Invoke-CimMethod -InputObject $process -MethodName GetOwnerSid -ErrorAction Stop
+              if ($owner.ReturnValue -ne 0 -or -not $owner.Sid) { $unknown++; continue }
+              if ($owner.Sid -eq $sid) {
+                  if (-not $counts.ContainsKey($process.Name)) { $counts[$process.Name] = 0 }
+                  $counts[$process.Name]++
+                  if (-not $process.CommandLine) { $unknown++ }
+                  elseif ($process.CommandLine -match 'idt-win29-public-15835-85499') { $matched++ }
               }
-          } finally { $archive.Dispose() }
-          [IO.Compression.ZipFile]::ExtractToDirectory($package, $unpacked)
-          if ((Resolve-Path -LiteralPath $unpacked).Path -ine $unpacked -or
-              [IO.Path]::GetDirectoryName($runtime) -ine $tools -or (Test-Path -LiteralPath $runtime)) {
-              throw 'Unsafe Python runtime move.'
-          }
-          Assert-PlainAncestors $unpacked
-          Move-Item -LiteralPath $unpacked -Destination $runtime -ErrorAction Stop
-          $basePython = Join-Path $runtime 'tools/python.exe'
-          $version = & $basePython -I -c 'import sys; print(sys.version.split()[0])'
-          if ($LASTEXITCODE -ne 0 -or $version -cne '3.14.10') { throw 'Staged Python version mismatch.' }
-          & $basePython -I -m venv $venv
-          if ($LASTEXITCODE -ne 0) { throw 'Dedicated venv creation failed.' }
-          $python = Join-Path $venv 'Scripts/python.exe'
-          $log = Join-Path $stage 'bootstrap.log'
-          & $python -I -m pip --isolated install --disable-pip-version-check --no-input -r tools/idt/requirements-windows.txt *> $log
-          if ($LASTEXITCODE -ne 0) { throw 'Pinned dependency installation failed; private log retained.' }
-          & $python -I -m pip --isolated check *>> $log
-          if ($LASTEXITCODE -ne 0) { throw 'Pinned dependency verification failed; private log retained.' }
-          & $python -I -c 'import boto3, cryptography; print("Dedicated Python runtime and imports OK")'
-          if ($LASTEXITCODE -ne 0) { throw 'Dedicated Python imports failed.' }
-          $completed = $true
-      } finally {
-          if ($completed) {
-              $resolved = (Resolve-Path -LiteralPath $stage).Path
-              if ($resolved -ine $stage -or [IO.Path]::GetDirectoryName($resolved) -ine $tools) {
-                  throw 'Unsafe bootstrap cleanup.'
-              }
-              Assert-PlainAncestors $resolved
-              Remove-Item -LiteralPath $resolved -Recurse -Force
-              if (Test-Path -LiteralPath $resolved) { throw 'Bootstrap staging remains.' }
-              Write-Host 'Bootstrap staging removed; dedicated Python and venv retained.'
-          } else {
-              Write-Warning 'Bootstrap incomplete; dedicated paths are retained for review.'
-          }
+          } catch { $unknown++ }
       }
-
-win29_public_stop_and_cleanup_contract:
-  extends: .win29_public_job
-  stage: test
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-  timeout: 10 minutes
-  script:
-    - |
-      Remove-Item Env:CI_JOB_TOKEN -ErrorAction SilentlyContinue
-      & $idtPython -B -m unittest `
-        tools.ci.tests.test_windows_build_job tools.ci.tests.test_idt_rpi4_pair -v
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-win29_public_rx72n_compile:
-  extends: .win29_public_job
-  stage: build
-  needs: [win29_public_stop_and_cleanup_contract]
-  resource_group: ishiguro-pc-ccrx-e2studio-build
-  timeout: 3 hours
-  script:
-    - !reference [.windows_ccrx_host_lease, script]
-    - |
-      $ErrorActionPreference = 'Stop'
-      $tools = @{
-        'C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe' = '6b021cc60f8736f4124f2ff61586bf883a415d1957b0a584346403cc91de2320'
-        'C:/Program Files (x86)/Renesas/RX/3_7_0/bin/ccrx.exe' = '64c3daf4cd80557efa98071378dbe13fb4ba9f78da80560f5616bbb22ff5bc0a'
-      }
-      foreach ($path in $tools.Keys) {
-        if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $tools[$path]) {
-          throw 'A reviewed compiler launcher differs.'
-        }
-      }
-      if ($env:CI_PIPELINE_ID -notmatch '^\d+$' -or $env:CI_JOB_ID -notmatch '^\d+$') {
-        throw 'Invalid CI job identity.'
-      }
-      # Finish dependency checkout while GitLab's job token is still available.
-      . tools/rx_e2studio_cli.ps1
-      Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
-      # Child tools do not need the GitLab job token after checkout.
-      Remove-Item Env:CI_JOB_TOKEN -ErrorAction SilentlyContinue
-      $sourceRoot = (Resolve-Path -LiteralPath $env:CI_PROJECT_DIR).Path.TrimEnd('\')
-      $buildsRoot = [IO.Path]::GetFullPath($env:CI_BUILDS_DIR).TrimEnd('\')
-      if (-not $sourceRoot.StartsWith($buildsRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Checkout is outside this Runner build root.'
-      }
-      $workspaceParent = [IO.Path]::GetFullPath('C:/ai/codex/ws').TrimEnd('\')
-      $outputParent = [IO.Path]::GetFullPath('C:/ai/codex/tmp').TrimEnd('\')
-      $runName = "idt-win29-public-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"
-      $workspace = [IO.Path]::GetFullPath((Join-Path $workspaceParent $runName))
-      $output = [IO.Path]::GetFullPath((Join-Path $outputParent $runName))
-      $generated = @(
-        (Join-Path $sourceRoot 'Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/HardwareDebug'),
-        (Join-Path $sourceRoot 'Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug')
-      ) | ForEach-Object { [IO.Path]::GetFullPath($_) }
-      foreach ($path in @($workspace, $output) + $generated) {
-        if (Test-Path -LiteralPath $path) { throw 'A job-owned output path already exists.' }
-      }
-      function Assert-PlainAncestors([string]$Path) {
-        $entry = Get-Item -LiteralPath $Path -Force
-        while ($null -ne $entry) {
-          if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse point in job-owned path.' }
-          $entry = $entry.Parent
-        }
-      }
-      foreach ($path in @($sourceRoot, $workspaceParent, $outputParent)) { Assert-PlainAncestors $path }
-      $completed = $false
-      try {
-        [void](New-Item -ItemType Directory -Path $workspace -ErrorAction Stop)
-        [void](New-Item -ItemType Directory -Path $output -ErrorAction Stop)
-        foreach ($path in @($workspace, $output)) {
-          & $idtPython -B -c 'import sys; from pathlib import Path; from tools.idt.run_idt import restrict_runtime; restrict_runtime(Path(sys.argv[1]))' $path
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot restrict job-owned directory.' }
-        }
-        # Job Object assigns this waiting child before the first build command.
-        $helper = Join-Path $output 'public-build.ps1'
-        $helperText = @'
-      param([string]$Python, [string]$Output, [string]$Workspace)
-      $ErrorActionPreference = 'Stop'
-      if ([Console]::In.ReadLine() -cne 'go') { throw 'No build containment.' }
-      & tools/test_build_rx_idt.ps1 -Python $Python -CompileTargets @('rx72n-ethernet') -OutputDirectory $Output -WorkspaceRoot $Workspace
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      '@
-        [IO.File]::WriteAllText($helper, $helperText, [Text.UTF8Encoding]::new($false))
-        $driver = @'
-      import os, queue, sys, threading
-      from tools.idt.windows_build_job import run_managed
-      result = queue.Queue(maxsize=1)
-      def build():
-          try:
-              run_managed(['pwsh', '-NoProfile', '-NonInteractive', '-File', sys.argv[1],
-                           '-Python', sys.argv[2], '-Output', sys.argv[3], '-Workspace', sys.argv[4]],
-                          timeout=3600, env=os.environ.copy())
-              result.put(True)
-          except BaseException:
-              result.put(False)
-      thread = threading.Thread(target=build)
-      thread.start()
-      while thread.is_alive():
-          thread.join(15)
-          if thread.is_alive():
-              print('Public RX72N build is still running', flush=True)
-      if not result.get():
-          raise SystemExit('public build or process-stop verification failed')
-      '@
-        $driver | & $idtPython -B - $helper $idtPython $output $workspace
-        if ($LASTEXITCODE -ne 0) { throw 'Public build or process-stop verification failed.' }
-        $completed = $true
-        Write-Host 'RX72N placeholder compile only; no image may be flashed.'
-      } finally {
-        if ($completed) {
-          # Only exact, previously absent paths owned by this job are removed.
-          foreach ($path in @($workspace, $output) + $generated) {
-            if (Test-Path -LiteralPath $path) {
-              $resolved = (Resolve-Path -LiteralPath $path).Path
-              if ($resolved -ine $path -or (Get-Item -LiteralPath $resolved -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
-                throw 'Refusing unsafe output cleanup.'
-              }
-              Assert-PlainAncestors $resolved
-              Remove-Item -LiteralPath $resolved -Recurse -Force
-              if (Test-Path -LiteralPath $resolved) { throw 'Job-owned output remains.' }
-            }
-          }
-          Write-Host 'Job-owned public build output and workspace removed.'
-        } else {
-          Write-Warning 'Build or process stop uncertain; job-owned paths retained for review.'
-        }
-      }
+      Write-Host ('CURRENT_DEDICATED_TOOL_PROCESS_COUNTS=' + ($counts | ConvertTo-Json -Compress))
+      Write-Host ('TARGET_PATH_PROCESS_MATCHES=' + $matched)
+      Write-Host ('PROCESS_INSPECTION_UNKNOWN=' + $unknown)
+      Write-Host 'READ_ONLY_DIAGNOSTIC; NO TARGET PROCESS OR FILE CHANGED'
