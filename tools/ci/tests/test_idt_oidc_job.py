@@ -156,6 +156,8 @@ class IdtOidcJobTests(unittest.TestCase):
                                              credentials, get_target("rx65n-bg96"))
         for key in ("AWS_PROFILE", "AWS_ENDPOINT_URL", "RX_OIDC_ID_TOKEN"):
             self.assertNotIn(key, bridge)
+        self.assertEqual(self.config.program_data, bridge["PROGRAMDATA"])
+        self.assertFalse(any(part.split("/", 1)[0] == "PROGRAMDATA" for part in bridge["WSLENV"].split(":")))
         self.assertNotIn("PATH/l", bridge["WSLENV"].split(":"))
         self.assertNotIn("HOME/p", bridge["WSLENV"].split(":"))
         for name in ("AWS_SESSION_TOKEN/u", "RX_OIDC_EXPIRATION_UTC/u", "IDT_RUNTIME_DIR/u",
@@ -166,9 +168,14 @@ class IdtOidcJobTests(unittest.TestCase):
                                       "RX_OIDC_IDT_NATIVE_REQUIRED_SECONDS", "RX_OIDC_IDT_PREPARE_SECONDS",
                                       "RX_OIDC_IDT_MARGIN_SECONDS", "AWS_IOT_CELLULAR_APN_CK_RX65N_01"))
         self.assertEqual(TOKEN, linux["AWS_SESSION_TOKEN"])
+        self.assertNotIn("PROGRAMDATA", linux)
+        self.assertNotIn("RX_OIDC_ID_TOKEN", linux)
         self.assertEqual("synthetic-apn", linux["AWS_IOT_CELLULAR_APN_CK_RX65N_01"])
         with self.assertRaisesRegex(RuntimeError, "unreviewed IDT WSL input"):
             run_idt.idt_wsl_environment(child, {**inherited, "IDT_UNREVIEWED": "value"},
+                                        credentials, get_target("rx65n-bg96"))
+        with self.assertRaisesRegex(RuntimeError, "PROGRAMDATA"):
+            run_idt.idt_wsl_environment({k: v for k, v in child.items() if k != "PROGRAMDATA"}, inherited,
                                         credentials, get_target("rx65n-bg96"))
 
     def test_real_exchange_path_rejects_context_mismatch_and_ignores_later_jwt_expiry(self):
