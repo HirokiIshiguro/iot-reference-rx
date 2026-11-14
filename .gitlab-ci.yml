@@ -810,6 +810,7 @@ idt_ci_contract:
         tools.ci.tests.test_idt_linux_transport \
         tools.ci.tests.test_idt_linux_supervisor \
         tools.ci.tests.test_idt_linux_flash \
+        tools.ci.tests.test_idt_linux_nested_dependencies \
         tools.ci.tests.test_idt_rpi4_pair \
         tools.ci.tests.test_idt_rpi4_public \
         tools.ci.tests.test_idt_explicit_python \

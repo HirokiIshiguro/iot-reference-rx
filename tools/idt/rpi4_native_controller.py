@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.idt import linux_oidc_job
+from tools.idt.initialize_linux_dependencies import git_environment, initialize
 from tools.idt.rpi4_pair_broker import Broker
 
 
@@ -36,6 +37,8 @@ def main():
     sha = subprocess.check_output([config.git, "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
     job = linux_oidc_job.current_job_metadata(env.get("CI_JOB_TOKEN", ""))
     linux_oidc_job.verified_context(env, source_sha=sha, config=config, job=job)
+    count = initialize(ROOT, config.git, git_environment(env, config))
+    print("Pinned nested dependency roots initialized: " + str(count), flush=True)
     broker = Broker(env["CI_JOB_TOKEN"], config.ref, str(job["pipeline"]["id"]), sha,
                     "transport", build_seconds=config.pair_build_seconds)
     broker.start()
