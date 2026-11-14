@@ -25,6 +25,10 @@ class LinuxTransportTests(unittest.TestCase):
             binary.parent.mkdir(parents=True)
             binary.write_bytes(b"offline")
             binary.chmod(0o700)
+            original_config = bundle / "configs/config.json"
+            original_config.parent.mkdir()
+            original_config.write_text('{"original": true}', encoding="utf-8")
+            original_config.chmod(0o400)
             runtime = root / "run"
             runtime.mkdir()
             environment = {"IDT_HOST_MODE": "linux-arm64", "IDT_LINUX_IDT_ROOT": str(bundle),
@@ -38,6 +42,8 @@ class LinuxTransportTests(unittest.TestCase):
                 return object()
 
             def observe(_process, directory, _env, _credentials, _console):
+                copied_config = directory / "vendor-idt/configs/config.json"
+                copied_config.write_text('{"run": true}', encoding="utf-8")
                 report = directory / "execution/results/FRQ_Report.xml"
                 report.parent.mkdir(parents=True)
                 report.write_text("<testsuites/>", encoding="utf-8")
@@ -52,14 +58,32 @@ class LinuxTransportTests(unittest.TestCase):
                  patch.object(run_idt, "observe_hardware_runtime", side_effect=observe):
                 report, code = run_idt.transport_linux(runtime, "ap-northeast-1", credentials,
                                                        {"source_sha": "a" * 40}, get_target("rx72n-ethernet"))
-            verified.assert_called_once_with(bundle, "linux")
+            self.assertEqual(verified.call_args_list, [unittest.mock.call(bundle, "linux"),
+                                                       unittest.mock.call(runtime / "vendor-idt", "linux")])
             self.assertEqual(code, 0)
+            self.assertEqual(original_config.read_text(encoding="utf-8"), '{"original": true}')
+            self.assertEqual((runtime / "vendor-idt/configs/config.json").read_text(encoding="utf-8"), '{"run": true}')
+            self.assertIn(str(runtime / "vendor-idt"), observed["command"])
             self.assertTrue(report.is_file())
             self.assertIn("run_transport.py", " ".join(observed["command"]))
             self.assertNotIn("wsl.exe", " ".join(observed["command"]).lower())
             self.assertEqual(observed["environment"]["IDT_LINUX_BUILD_CALLBACK"], "/reviewed/build-hook")
             self.assertEqual(observed["environment"]["IDT_TARGET"], "rx72n-ethernet")
             self.assertNotIn("RX_OIDC_ID_TOKEN", observed["environment"])
+
+    def test_corrupted_copy_fails_verification_before_native_process(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            bundle = root / "bundle"
+            bundle.mkdir()
+            runtime = root / "run"
+            runtime.mkdir()
+            with patch.dict(os.environ, {"IDT_HOST_MODE": "linux-arm64", "IDT_LINUX_IDT_ROOT": str(bundle)}, clear=True), \
+                 patch.object(run_idt, "verify_install", side_effect=[None, RuntimeError("copy mismatch")]), \
+                 patch.object(run_idt.subprocess, "Popen", side_effect=AssertionError("must not start")):
+                with self.assertRaisesRegex(RuntimeError, "copy mismatch"):
+                    run_idt.transport_linux(runtime, "ap-northeast-1", SimpleNamespace(),
+                                            {"source_sha": "a" * 40}, get_target("rx72n-ethernet"))
 
     def test_budget_failure_precedes_native_process(self):
         with tempfile.TemporaryDirectory() as folder:

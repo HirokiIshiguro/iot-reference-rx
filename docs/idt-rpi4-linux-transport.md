@@ -11,6 +11,8 @@ RPi #4 の専用 Runner から Linux 版 IDT を起動し、RPi #1 の RX72N Eth
 5. Windows担当が提供する `rpi4_pair.snapshot` で、IDTに渡す前のsource snapshotをprivate runtimeに保存する。結果の一時出力もcheckoutの外へ置き、IDTのsource copy後にredacted reportだけをCI用の `artifacts/idt` へ移す。IDTのbuild callbackは `callback <IDTが生成したsource path>` で呼ばれ、`IDT_PAIR_BASELINE`、`IDT_PAIR_BUILD_SECONDS`、`IDT_PAIR_SOCKET=$HOME/.cache/idt-rx72n-pair/<pipeline ID>/build.sock` と既存 `IDT_PROVENANCE_FILE` を受け取る。callbackと対向workerの実装・統合は別担当。
 6. 既存 `run_transport.py` のbridge、`flash_transport.py` のtarget/manifest/hash検証、redacted JUnit checker、停止・回収処理を使う。Linux側は通常のSSH/SCPを使い、WSLのpath変換を呼ばない。対象はRX72N Ethernet / Transport groupだけ。
 
+Linux版の配布元は使用前に検証し、各実行のprivate runtime内に書込み可能なコピーを作る。コピーも検証してから使うため、配布元の設定やテスト定義を書き換えない。コピーは実行記録と同じprivate runtimeに残し、安全な停止を確認する前には削除しない。
+
 host設定の `runtime.json` は `schema_version`、`account`、`role_arn`、`ref`、`runner_id`、`job_timeout_seconds`、`budget`、`runtime_root`、`idt_root`、`build_callback`、`ssh`、`scp`、`git`、`python`、`home`、`search_path`、`pair_build_seconds` を持つ。`budget` は既存 `Budget` の `bootstrap_seconds`、`native_prepare_seconds`、`report_seconds`、`margin_seconds` を持つ。値は統合時に実測・レビューしてhost側で配置し、この文書の存在を設定済みの証拠にはしない。
 
 ## 未実施と開始条件

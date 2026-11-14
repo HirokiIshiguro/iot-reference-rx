@@ -20,6 +20,7 @@ import csv
 import io
 import re
 import shutil
+import stat
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -523,6 +524,23 @@ def transport_userdata() -> dict:
             "testStartDelayms": 0, "echoServerConfiguration": {"keyGenerationMethod": "EC", "serverPort": 9000}}
 
 
+def copy_linux_bundle(source: Path, runtime: Path) -> Path:
+    """Keep each run's writable IDT installation inside its private runtime."""
+    verify_install(source, "linux")
+    destination = runtime / "vendor-idt"
+    shutil.copytree(source, destination)
+    # The installed bundle may be read-only.  Only the private copy becomes
+    # writable; retain executable bits needed by the unchanged vendor suite.
+    for directory, _subdirs, files in os.walk(destination):
+        path = Path(directory)
+        path.chmod(stat.S_IMODE(path.stat().st_mode) | stat.S_IRWXU)
+        for name in files:
+            file = path / name
+            file.chmod(stat.S_IMODE(file.stat().st_mode) | stat.S_IRUSR | stat.S_IWUSR)
+    verify_install(destination, "linux")
+    return destination
+
+
 def transport_linux(runtime: Path, region: str, credentials, provenance: dict, target: dict) -> tuple[Path, int]:
     """Launch the unchanged vendor suite on Linux; the build callback is supplied separately."""
     if target["id"] != "rx72n-ethernet" or os.environ.get("IDT_HOST_MODE") != "linux-arm64":
@@ -530,8 +548,8 @@ def transport_linux(runtime: Path, region: str, credentials, provenance: dict, t
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives import serialization
 
-    root = Path(os.environ["IDT_LINUX_IDT_ROOT"]).resolve(strict=True)
-    verify_install(root, "linux")
+    source_root = Path(os.environ["IDT_LINUX_IDT_ROOT"]).resolve(strict=True)
+    root = copy_linux_bundle(source_root, runtime)
     binary = root / "bin/devicetester_linux_x86-64"
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise RuntimeError("Verified Linux IDT executable is unavailable")
