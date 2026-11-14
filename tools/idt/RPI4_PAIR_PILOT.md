@@ -46,8 +46,21 @@ under that identity; cancellation/descendant-stop and private workspace cleanup;
 fixed deadline and recovery ownership. A failed Windows build intentionally
 retains its workspace because child process termination is not yet proven.
 
+The Windows worker now starts its build helper in a Windows Job Object with
+`KILL_ON_JOB_CLOSE` and without breakaway flags. The helper blocks on stdin
+until the worker assigns it to the Job and sends `go`; it cannot take the lease
+or invoke the compiler first. A controlled timeout or exception terminates the
+Job and checks its active-process count. An unconfirmed stop fails closed and
+retains the private workspace. Abrupt worker death closes the Job handle, but
+cannot run Python cleanup: private files must be recovered separately. Local
+dummy parent/child/grandchild tests cover normal execution, failed assignment,
+timeout, and forced worker death. They do **not** prove e2 studio, nested
+Runner-service Job behavior, the lease-release race, or workspace cleanup on a
+real cancellation. `COMPILER_CANCELLATION_VERIFIED` therefore remains false.
+
 Local nonsecret tests:
 
 ```sh
 python -B -m unittest tools.ci.tests.test_idt_rpi4_pair -v
+python -B -m unittest tools.ci.tests.test_windows_build_job -v
 ```

@@ -8,6 +8,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# The owning worker assigns this process to its Job Object before sending go.
+if ([Console]::In.ReadLine() -cne 'go') { throw 'Build containment was not established.' }
+
 # This definition is exported by the CI job from the pinned shared template.
 # Its final invocation is not copied; take the existing lease only for build.
 . $LeaseDefinition
