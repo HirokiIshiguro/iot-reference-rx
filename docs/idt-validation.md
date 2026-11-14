@@ -207,11 +207,13 @@ Windowsホストはprofileとrunner設定で移設可能にし、接続個体と
 | 場所 | GitLab Runner | RX72N Ethernetの移行構成で担当する処理 |
 |---|---|---|
 | RPi #4 | #26 | 汎用CI。IDT専用Runnerと同じホストで並行実行できる |
-| RPi #4 | #28 | QEMU経由でIDTを動かし、試験を進行する。AWS通信、ファームウェアの包装、結果集計も担当する |
+| RPi #4 | #28 | QEMU経由でIDTを動かし、試験を進行する。AWS通信、ファームウェアのパッケージ化、結果集計も担当する |
 | Windows PC | #29 | IDTからの依頼を受け、e² studioとCC-RXでビルドし、成果物を返す。サービスは手動起動 |
 | RPi #1 | 既存の実機ベンチ | UART中継とRFPによるRX72Nの書き込みを担当する |
 
 `gitlab-runner-idt-rx` はRPi #4とWindowsで付けたOS上のサービス名です。RPi #4のサービスはGitLabのRunner #28、WindowsのサービスはRunner #29に接続します。#28と#26はCPUとメモリを共有します。
+
+Windowsのサービスを起動すると、専用ユーザーでGitLabのビルドジョブを受け付けられます。バックグラウンドでジョブを受けるための構成で、試験時だけ起動できます。ビルド依頼と成果物をやり取りする処理は、Runnerが実行するプロジェクト側のコードが担当します。
 
 IDTは試験の実行中に設定を注入したソースを用意し、`buildTool.command` に渡します。ビルド用コマンドはWindowsへその入力を渡し、成果物が戻るまで待ちます。IDTは受け取った成果物を使って書き込みと試験を続けます。GitLab上でビルドを別ジョブとして実行する場合も、試験開始前に固定した `needs` だけでは、この時点で生成される入力と成果物を結び付けられません。実行中の要求と応答を結ぶ処理が必要です。 [AWSのビルド・書き込み設定](https://docs.aws.amazon.com/freertos/latest/userguide/config-settings-device.html)
 
