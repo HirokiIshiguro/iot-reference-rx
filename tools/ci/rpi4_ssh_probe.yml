@@ -1,5 +1,7 @@
 workflow:
   rules:
+    - if: '$CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/'
+      when: never
     - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PROJECT_ID == "38"'
       when: always
     - when: never
