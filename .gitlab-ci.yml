@@ -79,6 +79,24 @@ win29_log_readonly:
           }
           Write-Host ("LOG_$($item.name)=" + ($flags | ConvertTo-Json -Compress))
           if ($item.name -eq 'PUBLIC') {
+              $plain = [regex]::Replace($content, '\x1b\[[0-9;]*[A-Za-z]', '')
+              $allLines = @($plain -split "`r?`n")
+              for ($i = 0; $i -lt $allLines.Count; $i++) {
+                  if ($allLines[$i] -notmatch 'build_rx72n_idt_transport\.ps1:150') { continue }
+                  $selected = @()
+                  for ($n = $i + 1; $n -lt [Math]::Min($i + 9, $allLines.Count); $n++) {
+                      $line = $allLines[$n].Trim()
+                      if (-not $line -or $line -match '^\d+\s*\|' -or $line -match '^[~+|\s]+$') { continue }
+                      $line = [regex]::Replace($line, '(?i)https?://\S+|[A-Z]:[\\/][^\s"'']+|\\\\[^\s"'']+', '<PATH>')
+                      $line = [regex]::Replace($line, '[\w.+-]+@[\w.-]+', '<EMAIL>')
+                      $line = [regex]::Replace($line, '(?i)(token|secret|password|key|credential)\s*[:=]\s*\S+', '$1=<REDACTED>')
+                      $line = [regex]::Replace($line, '\b[A-Za-z0-9_+/=-]{24,}\b', '<REDACTED>')
+                      $selected += $line
+                      if ($selected.Count -ge 3) { break }
+                  }
+                  foreach ($line in $selected) { Write-Host ('SAFE_ERROR=' + $line) }
+                  break
+              }
               $allowed = @('error','exception','failed','failure','fatal','python','python.exe','pwsh','process','command','program','execute','execution','run','running','cannot','could','not','the','a','of','is','was','with','in','for','at','line','char','exit','code','status','memory','allocation','resource','available','insufficient','enough','access','denied','permission','file','directory','path','system','argument','invalid','handle','closed','broken','pipe','output','input','encoding','decode','encode','unicode','version','module','import','missing','found','exist','source','dependency','dependencies','provenance','capture','captured','verify','verification','manifest','target','schema','hash','hashes','pin','pins','different','differs','mismatch','unrecorded','changed','initialization','uninitialized','unsupported','unexpected','requires','timed','out','timeout','space','disk','operating','specified','name','data','no','available','parameter','value','empty','start','started','launch','launcher','initializing','control','job','stopped','response','returned','warning','terminating','native','traceback','most','recent','call','last','erroractionpreference','method','operation','stream','stderr','stdout','as','when','external','an','while','being','has','been','used','all','configured','to','from','object','test','test_build_rx_idt.ps1','build_rx72n_idt_transport.ps1','rx_e2studio_cli.ps1','idt_source_manifest.py')
               $lines = @($content -split "`r?`n")
               for ($index = [Math]::Max(0, $lines.Count - 25); $index -lt $lines.Count; $index++) {
