@@ -14,13 +14,15 @@ stages: [run]
 variables:
   GIT_STRATEGY: clone
   GIT_SUBMODULE_STRATEGY: normal
-  GIT_CONFIG_COUNT: "3"
+  GIT_CONFIG_COUNT: "4"
   GIT_CONFIG_KEY_0: core.longpaths
   GIT_CONFIG_VALUE_0: "true"
   GIT_CONFIG_KEY_1: core.autocrlf
   GIT_CONFIG_VALUE_1: "false"
   GIT_CONFIG_KEY_2: core.eol
   GIT_CONFIG_VALUE_2: lf
+  GIT_CONFIG_KEY_3: core.symlinks
+  GIT_CONFIG_VALUE_3: "false"
 
 rpi4_windows_worker:
   stage: run

@@ -32,18 +32,21 @@ def git_environment(source, config):
     return env
 
 
-def initialize(source: Path, git: str, env: dict[str, str]) -> int:
-    """Update nested pins and verify the resulting recursive status."""
+def _git_run(source, git, env, args, *, allow_missing=False):
+    result = subprocess.run([git, "--no-optional-locks", *args], cwd=source, env=env,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+    if result.returncode != 0 and not (allow_missing and result.returncode == 1):
+        # Git stderr can contain credential-bearing remote URLs.
+        raise RuntimeError("nested dependency initialization failed")
+    return result.stdout.strip()
+
+
+def verify_pins(source: Path, git: str, env: dict[str, str]) -> None:
+    """Read-only recursive pin check, including intentionally disabled entries."""
     source = Path(source).resolve(strict=True)
     excluded = source_only_paths(source / "tools/rx_e2studio_cli.ps1")
-
     def git_run(args, *, allow_missing=False):
-        result = subprocess.run([git, *args], cwd=source, env=env,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
-        if result.returncode != 0 and not (allow_missing and result.returncode == 1):
-            # Git stderr can contain credential-bearing remote URLs.
-            raise RuntimeError("nested dependency initialization failed")
-        return result.stdout.strip()
+        return _git_run(source, git, env, args, allow_missing=allow_missing)
 
     def disabled_in_manifest(name):
         relative = PurePosixPath(name)
@@ -67,6 +70,24 @@ def initialize(source: Path, git: str, env: dict[str, str]) -> int:
                                    allow_missing=True).lower() == "none"
         return False
 
+    status = git_run(["submodule", "status", "--recursive"])
+    for row in status.splitlines():
+        if not row or row[0] not in "-+U":
+            continue
+        name = row[42:].split(" (", 1)[0].strip()
+        if any(name.startswith(path + "/") for path in excluded):
+            continue
+        if row[0] == "-" and disabled_in_manifest(name):
+            continue
+        raise RuntimeError("nested dependency is missing or differs from its pinned revision")
+
+
+def initialize(source: Path, git: str, env: dict[str, str]) -> int:
+    """Update nested pins and verify the resulting recursive status."""
+    source = Path(source).resolve(strict=True)
+    excluded = source_only_paths(source / "tools/rx_e2studio_cli.ps1")
+    def git_run(args, *, allow_missing=False):
+        return _git_run(source, git, env, args, allow_missing=allow_missing)
     rows = git_run(["config", "--file", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$"])
     include = git_run(["config", "--get", "include.path"], allow_missing=True)
     count = 0
@@ -87,15 +108,5 @@ def initialize(source: Path, git: str, env: dict[str, str]) -> int:
             args += ["-c", "include.path=" + include]
         git_run(args + ["submodule", "update", "--init", "--recursive", "--depth", "1"])
         count += 1
-
-    status = git_run(["submodule", "status", "--recursive"])
-    for row in status.splitlines():
-        if not row or row[0] not in "-+U":
-            continue
-        name = row[42:].split(" (", 1)[0].strip()
-        if any(name.startswith(path + "/") for path in excluded):
-            continue
-        if row[0] == "-" and disabled_in_manifest(name):
-            continue
-        raise RuntimeError("nested dependency is missing or differs from its pinned revision")
+    verify_pins(source, git, env)
     return count

@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.idt import initialize_linux_dependencies as nested
+from tools.idt import rpi4_pair
 
 ROOT = Path(__file__).resolve().parents[3]
 GIT = shutil.which("git")
@@ -62,6 +63,22 @@ class LinuxNestedDependenciesTests(unittest.TestCase):
         self.assertEqual(env["PATH"], "/reviewed/bin")
         for name in ("RX_OIDC_ID_TOKEN", "AWS_SECRET_ACCESS_KEY", "GIT_TRACE", "GIT_DIR"):
             self.assertNotIn(name, env)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX symlink fixture required")
+    def test_git_symlink_setting_matches_windows_plain_source_snapshot(self):
+        source = self.repository("symlink-origin")
+        (source / "target.c").write_text("public fixture\n", encoding="utf-8")
+        (source / "link.c").symlink_to("target.c")
+        self.commit(source)
+        self.git(self.root, "clone", source.as_uri(), "normal")
+        self.git(self.root, "-c", "core.symlinks=false", "clone", source.as_uri(), "windows-style")
+        normal, compatible = self.root / "normal", self.root / "windows-style"
+        self.assertTrue((normal / "link.c").is_symlink())
+        with self.assertRaisesRegex(ValueError, "linked build source"):
+            rpi4_pair.snapshot(normal)
+        self.assertFalse((compatible / "link.c").is_symlink())
+        self.assertEqual((compatible / "link.c").read_bytes(), b"target.c")
+        self.assertIn("link.c", rpi4_pair.snapshot(compatible))
 
     def test_nested_pin_is_initialized_but_windows_source_only_roots_are_not(self):
         child = self.repository("child")
