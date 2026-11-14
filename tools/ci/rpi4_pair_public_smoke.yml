@@ -12,6 +12,8 @@ workflow:
       when: never
     - if: '$CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "public-controller"'
       when: always
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "api" && $IDT_PAIR_MODE == "python-contract"'
+      when: always
     - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
       when: always
     - when: never
@@ -28,6 +30,33 @@ variables:
   GIT_CONFIG_VALUE_1: "false"
   GIT_CONFIG_KEY_2: core.eol
   GIT_CONFIG_VALUE_2: lf
+
+rpi4_public_python_contract:
+  stage: probe
+  timeout: 10 minutes
+  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $IDT_PAIR_MODE == "python-contract"'
+    - when: never
+  script:
+    - |
+      $ErrorActionPreference = 'Stop'
+      if ($env:CI_PROJECT_ID -ne '38' -or $env:CI_RUNNER_ID -ne '29' -or
+          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx') {
+          throw 'Unexpected contract job identity.'
+      }
+      foreach ($entry in @(Get-ChildItem Env:)) {
+          if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '(?i:TOKEN|SECRET|PRIVATE_KEY|PASSWORD)') {
+              Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
+          }
+      }
+      . tools/idt/rpi4_windows_python.ps1
+      & $script:IdtWorkerPython -c "import shutil,sys; sys.exit(0 if shutil.which('pwsh') else 1)"
+      if ($LASTEXITCODE -ne 0) { throw 'PowerShell 7 is unavailable.' }
+      & $script:IdtWorkerPython -B -m unittest tools.ci.tests.test_idt_explicit_python -v
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 rpi4_public_controller:
   stage: probe

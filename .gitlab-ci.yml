@@ -812,6 +812,7 @@ idt_ci_contract:
         tools.ci.tests.test_idt_linux_flash \
         tools.ci.tests.test_idt_rpi4_pair \
         tools.ci.tests.test_idt_rpi4_public \
+        tools.ci.tests.test_idt_explicit_python \
         tools.ci.tests.test_windows_build_job \
         tools.ci.tests.test_idt_runner_identity \
         tools.ci.tests.test_idt_report \

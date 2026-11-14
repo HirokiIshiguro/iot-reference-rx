@@ -144,7 +144,7 @@ try {
     $rejected = $false
     try {
         & $builder -ProjectRoot $root -Target 'rx72n-ethernet' -TestGroup Transport `
-            -ProvenanceFile $provenances['rx72n-ethernet'] -ValidateOnly
+            -Python $Python -ProvenanceFile $provenances['rx72n-ethernet'] -ValidateOnly
     }
     catch {
         if ($_.Exception.Message -notmatch 'build requires') { throw }
