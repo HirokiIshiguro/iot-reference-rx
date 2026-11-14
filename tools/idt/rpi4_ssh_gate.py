@@ -43,7 +43,7 @@ def main():
     if account.pw_name != "gitlab-runner-idt-rx":
         raise ValueError("unexpected paired SSH account")
     path, session = checked_agent(os.environ.get("SSH_ORIGINAL_COMMAND", ""), account.pw_dir, uid)
-    os.execv("/usr/bin/python3", ["python3", "-E", "-s", "-u", str(path), "attach", session])
+    os.execv("/usr/bin/python3", ["python3", "-E", "-s", "-B", "-u", str(path), "attach", session])
 
 
 if __name__ == "__main__":

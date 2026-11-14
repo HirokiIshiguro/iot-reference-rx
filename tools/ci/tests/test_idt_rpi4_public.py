@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 import queue
+import select
+import shutil
 import socket
 import subprocess
 import sys
@@ -152,9 +154,60 @@ class PublicPairTests(unittest.TestCase):
             with patch('pwd.getpwuid', return_value=SimpleNamespace(pw_name='gitlab-runner-idt-rx', pw_dir=str(home))), \
                  patch.dict(os.environ, {'SSH_ORIGINAL_COMMAND': command}), patch.object(ssh_gate.os, 'execv') as execute:
                 ssh_gate.main()
-            execute.assert_called_once_with('/usr/bin/python3', ['python3', '-E', '-s', '-u', str(path), 'attach', '123'])
+            execute.assert_called_once_with('/usr/bin/python3', ['python3', '-E', '-s', '-B', '-u', str(path), 'attach', '123'])
             (session / 'rpi4_pair.py').chmod(0o644)
             with self.assertRaises(ValueError): ssh_gate.checked_agent(command, home, os.getuid())
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Unix socket and FIFO required')
+    def test_agent_process_cleanup_with_gate_bytecode_setting(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'HOME': directory}):
+            for session, bytecode_disabled in [('123', False), ('456', True)]:
+                agent.prepare(session)
+                reader, keepalive = agent.open_ready(session)
+                path = agent.session_path(session)
+                args = [sys.executable, '-E', '-s'] + (['-B'] if bytecode_disabled else [])
+                process = subprocess.Popen(args + ['-u', str(path / 'rpi4_pair_agent.py'), 'attach', session],
+                                           stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                def reply():
+                    while True:
+                        request = pair.read_frame(process.stdout)
+                        if request == {'kind': 'shutdown'}:
+                            pair.write_frame(process.stdin, {'kind': 'shutdown_ack'})
+                            return
+                        pair.write_frame(process.stdin, {'kind': 'fixture-response'})
+                thread = threading.Thread(target=reply, daemon=True)
+                thread.start()
+                try:
+                    self.assertTrue(select.select([reader], [], [], 10)[0], 'agent did not become ready')
+                    self.assertEqual(os.read(reader, 1), b'R')
+                    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                        connection.settimeout(10)
+                        connection.connect(str(path / 'build.sock'))
+                        with connection.makefile('rwb', buffering=0) as stream:
+                            pair.write_frame(stream, {'kind': 'fixture-request'})
+                            self.assertEqual(pair.read_frame(stream), {'kind': 'fixture-response'})
+                    agent.shutdown(session, 10)
+                    thread.join(10)
+                    self.assertFalse(thread.is_alive())
+                    process.stdin.close()
+                    self.assertEqual(process.wait(timeout=10), 0)
+                    if bytecode_disabled:
+                        self.assertFalse((path / '__pycache__').exists())
+                    else:
+                        self.assertTrue((path / '__pycache__').is_dir())
+                        with self.assertRaisesRegex(RuntimeError, 'unexpected files'):
+                            agent.cleanup(session)
+                        shutil.rmtree(path / '__pycache__')
+                    agent.cleanup(session)
+                    self.assertFalse(path.exists())
+                finally:
+                    os.close(reader)
+                    os.close(keepalive)
+                    if process.poll() is None:
+                        process.terminate()
+                        process.wait(timeout=10)
+                    process.stdout.close()
+                    process.stderr.close()
 
     def test_only_reviewed_public_job_is_admitted(self):
         env = {"CI_PROJECT_ID": "38", "CI_RUNNER_ID": "28", "CI_COMMIT_REF_PROTECTED": "true",
