@@ -493,7 +493,14 @@ def idt_wsl_environment(env, inherited, credentials, target):
         if not allowed <= IDT_WSL_INPUTS:
             raise RuntimeError("unreviewed IDT WSL input")
         env["WSLENV"] = ""
-        return wsl_bridge_environment(env, session, allow_names=allowed)
+        program_data = env.get("PROGRAMDATA")
+        if not program_data:
+            raise RuntimeError("reviewed Windows PROGRAMDATA is missing")
+        bridge = wsl_bridge_environment(env, session, allow_names=allowed)
+        # WSL's Windows process launch needs this reviewed host setting. Keep it
+        # on the Windows side; it is not an input to WSLENV or Linux children.
+        bridge["PROGRAMDATA"] = program_data
+        return bridge
     existing = [item for item in env.get("WSLENV", "").split(":")
                 if item and item.split("/", 1)[0] not in inherited]
     env["WSLENV"] = ":".join(existing + [name + "/u" for name in inherited])

@@ -1,6 +1,7 @@
 """Synthetic read-only bridge probe; publishes fixed labels only."""
 import os, subprocess, sys
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root))
@@ -17,8 +18,14 @@ session=FixedSession("DUMMYACCESS", "DUMMYSECRET", "DUMMYSESSION", datetime.now(
 allowed={"CI","IDT_TARGET","IDT_WINDOWS_SSH","RX_OIDC_IDT_WSL_PATH","RX_OIDC_IDT_WSL_HOME"}
 env=wsl_bridge_environment(base,session,allow_names=allowed)
 cmd=[str(Path("C:/Windows/System32/wsl.exe")),"-d",profile["wsl_distribution"],"--exec",profile["wsl_python"],wsl_path(Path(__file__).with_name("ssh_exact_probe_linux.py"))]
-for label, keys in (("baseline",()), ("programdata",("PROGRAMDATA",))):
- launch_env=env.copy()
+parent={**base,"RX_OIDC_EXPIRATION_UTC":session.expiration.isoformat()}
+creds=SimpleNamespace(access_key="DUMMYACCESS",secret_key="DUMMYSECRET",token="DUMMYSESSION")
+inherited={key:base[key] for key in allowed}
+fixed=run_idt.idt_wsl_environment(parent,inherited,creds,{"id":"rx72n-ethernet"})
+print("PROBE fixed_wslenv_programdata="+str(int(any(x.split("/",1)[0]=="PROGRAMDATA" for x in fixed["WSLENV"].split(":"))))+" jwt_present="+str(int("RX_OIDC_ID_TOKEN" in fixed)),flush=True)
+for label, keys in (("fixed_first",()), ("without_programdata",()), ("fixed_again",())):
+ launch_env=fixed.copy()
+ if label == "without_programdata": launch_env.pop("PROGRAMDATA")
  for key in keys:
   if key in base: launch_env[key]=base[key]
  proc=subprocess.Popen(cmd,env=launch_env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
