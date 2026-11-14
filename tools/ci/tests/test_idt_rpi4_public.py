@@ -141,6 +141,34 @@ class PublicPairTests(unittest.TestCase):
         native = {**win, "IDT_PAIR_MODE": "transport"}
         self.assertEqual(worker.verify_worker_job(native, win_job, "svc-idt-rx", "transport"), "456")
 
+    @unittest.skipUnless(os.name == 'nt', 'Windows identity entry point')
+    def test_public_entry_uses_windows_identity_api_without_decoding_whoami(self):
+        env = {"CI_PROJECT_ID": "38", "CI_RUNNER_ID": "29", "CI_PIPELINE_SOURCE": "pipeline",
+               "CI_COMMIT_REF_PROTECTED": "true", "CI_COMMIT_SHA": SHA, "CI_PIPELINE_ID": "234",
+               "CI_JOB_ID": "18", "CI_JOB_TOKEN": "fixture", "IDT_PAIR_MODE": "public",
+               "IDT_PAIR_PARENT_PIPELINE": "123", "IDT_PAIR_SESSION": "456", "IDT_PAIR_PARENT_SHA": SHA}
+        job = {"status": "running", "id": 18, "pipeline": {"id": 234}, "runner": {"id": 29},
+               "commit": {"id": SHA}, "tag_list": ["project38-idt-windows-protected"]}
+        status = [b'']
+        def command(args, **_kwargs):
+            if 'rev-parse' in args: return SHA + '\n'
+            if 'status' in args: return status[0]
+            raise AssertionError('identity must not decode a whoami subprocess')
+        with patch.dict(os.environ, env, clear=True), patch.object(worker, 'current_job_metadata', return_value=job), \
+             patch.object(worker, 'current_windows_user', return_value='svc-idt-rx') as identity, \
+             patch.object(worker.subprocess, 'check_output', side_effect=command), \
+             patch.object(worker, 'run_connection') as connection:
+            worker.main()
+            identity.assert_called_once()
+            connection.assert_called_once()
+            self.assertNotIn('CI_JOB_TOKEN', os.environ)
+            connection.reset_mock()
+            status[0] = b'non-UTF8-fixture-\x82'
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaisesRegex(ValueError, 'source differs'):
+                    worker.main()
+            connection.assert_not_called()
+
     def test_trigger_uses_form_token_and_rejects_wrong_revision(self):
         client = Mock()
         client.open.return_value = Response(json.dumps({"id": 42, "sha": SHA, "ref": "branch", "source": "pipeline"}).encode())

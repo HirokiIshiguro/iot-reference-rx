@@ -19,7 +19,7 @@ from tools.idt import rpi4_pair as pair
 from tools.idt.run_idt import restrict_runtime
 from tools.idt_source_manifest import verify_dependency_provenance
 from tools.idt.windows_build_job import run_managed
-from tools.idt.oidc_job import current_job_metadata
+from tools.idt.oidc_job import current_job_metadata, current_windows_user
 
 # Replace in reviewed source only after the project-specific Windows execution
 # account has been established. An environment variable cannot grant admission.
@@ -225,13 +225,14 @@ def main():
         raise RuntimeError("Windows worker required")
     mode = os.environ.get("IDT_PAIR_MODE")
     job = current_job_metadata(os.environ.get("CI_JOB_TOKEN", ""))
-    username = subprocess.check_output(["whoami.exe"], text=True).strip().rsplit("\\", 1)[-1]
+    username = current_windows_user()
     pipeline = verify_worker_job(os.environ, job, username, mode)
     if os.environ.get("IDT_PAIR_MODE") == "public":
         sha = os.environ["CI_COMMIT_SHA"]
-        actual_sha = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
+        actual_sha = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                                             text=True, encoding="ascii").strip()
         status = subprocess.check_output(["git", "-C", str(ROOT), "status", "--porcelain=v1",
-                                          "--untracked-files=all", "--ignore-submodules=none"], text=True)
+                                          "--untracked-files=all", "--ignore-submodules=none"])
         if sha != actual_sha or status:
             raise ValueError("public worker source differs from its pipeline")
         clean = scrubbed_environment()
@@ -243,7 +244,8 @@ def main():
         raise RuntimeError("reviewed dedicated Windows execution identity is not configured")
     import csv
     import io
-    user = subprocess.check_output(["whoami.exe", "/user", "/fo", "csv", "/nh"], text=True)
+    user = subprocess.check_output(["whoami.exe", "/user", "/fo", "csv", "/nh"],
+                                   text=True, encoding="utf-8", errors="replace")
     if next(csv.reader(io.StringIO(user)))[1] != REVIEWED_WINDOWS_SID:
         raise RuntimeError("Windows execution identity differs")
     clean = scrubbed_environment()
