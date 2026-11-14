@@ -2,14 +2,14 @@ workflow:
   rules:
     - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/)'
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-pair-key" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_KEY_PREP == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-pair-key-recover" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_KEY_INSPECT == "true"'
     - when: never
 stages: [test]
 variables:
   GIT_STRATEGY: empty
   GIT_SUBMODULE_STRATEGY: none
 
-win29_create_pair_public_key:
+win29_inspect_existing_pair_public_key:
   stage: test
   tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
   timeout: 5 minutes
@@ -31,52 +31,43 @@ win29_create_pair_public_key:
       $directory = [IO.Path]::GetFullPath((Join-Path $work 'ssh-idt-rpi4'))
       $private = Join-Path $directory 'id_ed25519'
       $public = $private + '.pub'
-      if ([IO.Path]::GetDirectoryName($directory) -ine $work -or (Test-Path -LiteralPath $directory)) {
-          throw 'Dedicated SSH directory already exists or escaped its parent; do not replace keys.'
+      if ([IO.Path]::GetDirectoryName($directory) -ine $work -or
+          -not (Test-Path -LiteralPath $directory -PathType Container) -or
+          -not (Test-Path -LiteralPath $private -PathType Leaf) -or
+          -not (Test-Path -LiteralPath $public -PathType Leaf)) {
+          throw 'The existing key pair is incomplete; do not create or replace it.'
       }
-      $entry = Get-Item -LiteralPath $work -Force
-      while ($null -ne $entry) {
-          if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse point in SSH path.' }
-          $entry = $entry.Parent
+      foreach ($path in @($directory, $private, $public)) {
+          $entry = Get-Item -LiteralPath $path -Force
+          if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'SSH key path is a reparse point.' }
       }
-      [void](New-Item -ItemType Directory -Path $directory -ErrorAction Stop)
-      $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
-      $allow = [Security.AccessControl.AccessControlType]::Allow
-      $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'
-      $propagate = [Security.AccessControl.PropagationFlags]::None
-      $acl = [Security.AccessControl.DirectorySecurity]::new()
-      $acl.SetAccessRuleProtection($true, $false)
-      foreach ($id in @($sid.Value, 'S-1-5-18', 'S-1-5-32-544')) {
-          $r = [Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($id), 'FullControl', $inherit, $propagate, $allow)
-          [void]$acl.AddAccessRule($r)
-      }
-      Set-Acl -LiteralPath $directory -AclObject $acl
-      $sshkeygen = 'C:/Windows/System32/OpenSSH/ssh-keygen.exe'
-      & $sshkeygen -q -t ed25519 -N '' -C 'project38-idt-win29' -f $private *> $null
-      if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $private -PathType Leaf) -or
-          -not (Test-Path -LiteralPath $public -PathType Leaf)) { throw 'SSH key generation did not complete; retain directory for inspection.' }
-      $fileAcl = [Security.AccessControl.FileSecurity]::new()
-      $fileAcl.SetAccessRuleProtection($true, $false)
-      foreach ($id in @($sid.Value, 'S-1-5-18', 'S-1-5-32-544')) {
-          $r = [Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($id), 'FullControl', $allow)
-          [void]$fileAcl.AddAccessRule($r)
-      }
-      Set-Acl -LiteralPath $private -AclObject $fileAcl
+      $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+      $allowed = @($sid, 'S-1-5-18', 'S-1-5-32-544')
+      $directoryAcl = Get-Acl -LiteralPath $directory
+      if (-not $directoryAcl.AreAccessRulesProtected) { throw 'SSH directory ACL inheritance is not disabled.' }
       foreach ($path in @($directory, $private)) {
           $checked = Get-Acl -LiteralPath $path
-          if (-not $checked.AreAccessRulesProtected) { throw 'SSH ACL inheritance was not disabled.' }
           foreach ($rule in $checked.Access) {
               $ruleSid = $rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
-              if ($rule.AccessControlType -eq $allow -and $ruleSid -notin @($sid.Value, 'S-1-5-18', 'S-1-5-32-544')) {
-                  throw 'Unexpected principal can access SSH private path.'
+              if ($rule.AccessControlType -eq [Security.AccessControl.AccessControlType]::Allow -and $ruleSid -notin $allowed) {
+                  throw 'Unexpected principal can access the SSH private path.'
               }
           }
       }
+      $sshkeygen = 'C:/Windows/System32/OpenSSH/ssh-keygen.exe'
       $key = [IO.File]::ReadAllText($public).Trim()
       if ($key -cnotmatch '^ssh-ed25519 [A-Za-z0-9+/=]+ project38-idt-win29$') { throw 'Unexpected public key format.' }
+      $derived = & $sshkeygen -y -f $private 2>$null
+      if ($LASTEXITCODE -ne 0) { throw 'OpenSSH could not use the existing private key under this account.' }
+      $actualParts = $key -split '\s+'
+      $derivedParts = ($derived -join '') -split '\s+'
+      if ($actualParts.Count -lt 2 -or $derivedParts.Count -lt 2 -or
+          $actualParts[0] -cne $derivedParts[0] -or $actualParts[1] -cne $derivedParts[1]) {
+          throw 'The existing public and private keys do not match.'
+      }
       $fingerprint = & $sshkeygen -lf $public -E sha256
       if ($LASTEXITCODE -ne 0 -or $fingerprint -notmatch 'SHA256:[A-Za-z0-9+/]+') { throw 'Cannot compute public fingerprint.' }
       Write-Host ('PUBLIC_KEY=' + $key)
       Write-Host ('PUBLIC_FINGERPRINT=' + $Matches[0])
       Write-Host 'PRIVATE_KEY_PATH=C:/ProgramData/SAFFTI-IdtRxRunner/work/ssh-idt-rpi4/id_ed25519'
-      Write-Host 'PRIVATE_ACL=svc-idt-rx,SYSTEM,Administrators; inheritance disabled'
+      Write-Host 'PRIVATE_ACL=svc-idt-rx,SYSTEM,Administrators only; directory inheritance disabled'
