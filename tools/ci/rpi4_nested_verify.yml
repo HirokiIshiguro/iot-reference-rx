@@ -25,7 +25,7 @@ rpi4_nested_source_verify:
   script:
     - |
       python3 -B - <<'PY'
-      import hashlib, json, os, pathlib, pwd, subprocess
+      import hashlib, json, os, pathlib, pwd, subprocess, urllib.error, urllib.request
       from types import SimpleNamespace
       from tools.idt import initialize_linux_dependencies as nested, rpi4_pair
       from tools.idt.oidc_job import current_job_metadata
@@ -38,6 +38,15 @@ rpi4_nested_source_verify:
       sha = subprocess.check_output(['/usr/bin/git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
       if job['status'] != 'running' or str(job['id']) != os.environ['CI_JOB_ID'] or job['runner']['id'] != 28 or job['commit']['id'] != sha or sha != os.environ['CI_COMMIT_SHA']:
           raise SystemExit('Unexpected GitLab job identity')
+      class NoRedirect(urllib.request.HTTPRedirectHandler):
+          def redirect_request(self, *_args, **_kwargs): return None
+      request = urllib.request.Request('https://gitlab.saffti.jp/api/v4/projects/38/pipelines/15867/jobs?per_page=20', headers={'JOB-TOKEN': os.environ['CI_JOB_TOKEN']})
+      try:
+          with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()).open(request, timeout=10) as response:
+              jobs = json.loads(response.read(65536))
+          print('JOB_TOKEN_VISIBLE_EXPECTED_JOB=' + str(isinstance(jobs, list) and any(x.get('id') == 85614 for x in jobs)).lower())
+      except (urllib.error.URLError, ValueError):
+          print('JOB_TOKEN_VISIBLE_EXPECTED_JOB=false')
       config = SimpleNamespace(search_path='/usr/bin:/bin', home=account.pw_dir)
       env = nested.git_environment(dict(os.environ), config)
       count = nested.initialize(root, '/usr/bin/git', env)
