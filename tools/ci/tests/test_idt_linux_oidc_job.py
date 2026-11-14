@@ -6,7 +6,9 @@ import json
 import io
 import os
 from pathlib import Path
+import signal
 import stat
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -62,6 +64,55 @@ def fake_session(env, expected, **kwargs):
 
 
 class LinuxOidcJobTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "linux", "Linux signal behavior")
+    def test_real_interrupt_reaches_owned_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            child = Path(directory) / "child.py"
+            child.write_text(
+                "from pathlib import Path\nimport sys, time\n"
+                "ready, stopped = map(Path, sys.argv[1:])\n"
+                "try:\n    ready.write_text('ready')\n    while True: time.sleep(1)\n"
+                "except KeyboardInterrupt:\n    stopped.write_text('stopped')\n",
+                encoding="utf-8")
+            harness = (
+                "import os, signal, sys, threading, time\n"
+                "from pathlib import Path\n"
+                "from tools.idt.linux_oidc_job import cancel_linux_child, run_linux_child\n"
+                "directory = Path(sys.argv[1])\n"
+                "signal.signal(signal.SIGTERM, cancel_linux_child)\n"
+                "def interrupt():\n"
+                "    while not (directory / 'ready').exists(): time.sleep(0.01)\n"
+                "    os.kill(os.getpid(), signal.SIGTERM)\n"
+                "threading.Thread(target=interrupt, daemon=True).start()\n"
+                "try:\n"
+                "    run_linux_child([sys.executable, str(directory / 'child.py'), "
+                "str(directory / 'ready'), str(directory / 'stopped')], dict(os.environ))\n"
+                "except KeyboardInterrupt:\n    pass\n")
+            result = subprocess.run([sys.executable, "-c", harness, directory], cwd=launcher.ROOT,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((Path(directory) / "stopped").read_text(), "stopped")
+
+    def test_linux_child_interrupt_requests_owned_cleanup(self):
+        process = Mock()
+        process.wait.side_effect = [KeyboardInterrupt(), 130]
+        process.poll.return_value = None
+        with patch.object(launcher.subprocess, "Popen", return_value=process) as popen:
+            with self.assertRaises(KeyboardInterrupt):
+                launcher.run_linux_child(["python", "supervisor.py"], {"CI": "true"})
+        self.assertTrue(popen.call_args.kwargs["start_new_session"])
+        process.send_signal.assert_called_once_with(signal.SIGINT)
+        self.assertEqual(process.wait.call_args.kwargs["timeout"], launcher.owned_runtime_cleanup_seconds())
+
+    def test_linux_child_unconfirmed_stop_does_not_claim_success(self):
+        process = Mock()
+        process.wait.side_effect = [KeyboardInterrupt(), subprocess.TimeoutExpired("supervisor", 1)]
+        process.poll.return_value = None
+        with patch.object(launcher.subprocess, "Popen", return_value=process):
+            with self.assertRaises(KeyboardInterrupt):
+                launcher.run_linux_child(["python", "supervisor.py"], {})
+        process.send_signal.assert_called_once_with(signal.SIGINT)
+
     def test_unreviewed_entry_stops_before_job_or_sts(self):
         with patch.object(launcher, "current_job_metadata", side_effect=AssertionError("must not contact GitLab")):
             with self.assertRaises(OidcError):

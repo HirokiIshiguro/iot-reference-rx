@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 import platform
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -27,6 +28,7 @@ from tools.aws.oidc_session import (ExpectedIdentity, IDT_SESSION_SECONDS, OidcE
 from tools.idt.oidc_job import (Budget, MAX_JOB_SECONDS, NATIVE_SECONDS, PROJECT_PATH, current_job_metadata,
                                 verified_job_environment)
 from tools.idt.public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_INPUTS
+from tools.idt.cleanup_budget import owned_runtime_cleanup_seconds
 
 RUNNER_TAG = "project38-idt-rpi4-protected"
 RUNNER_USER = "gitlab-runner-idt-rx"
@@ -191,6 +193,29 @@ def capture_baseline(source, path):
     os.chmod(path, 0o600)
 
 
+def cancel_linux_child(_signal, _frame):
+    raise KeyboardInterrupt
+
+
+def run_linux_child(command, environment):
+    """Forward cancellation to the owned supervisor and wait for its cleanup."""
+    process = subprocess.Popen(command, cwd=ROOT, env=environment, start_new_session=True)
+    try:
+        return process.wait()
+    except BaseException:
+        if process.poll() is None:
+            try:
+                process.send_signal(signal.SIGINT)
+            except ProcessLookupError:
+                pass
+            try:
+                process.wait(timeout=owned_runtime_cleanup_seconds())
+            except subprocess.TimeoutExpired:
+                # An unconfirmed stop must retain the private runtime.
+                pass
+        raise
+
+
 def main():
     if sys.platform != "linux":
         raise OidcError("unexpected Linux runner identity")
@@ -235,11 +260,16 @@ def main():
         command = [config.python, str(ROOT / "tools/idt/run_idt.py"), "--target", "rx72n-ethernet",
                    "--scope", "transport", "--output", str(private_output), "--region", REGION]
         launched = True
-        result = subprocess.run(command, cwd=ROOT, env=child, check=False)
-        publish_reports(private_output, ROOT / "artifacts/idt", require_all=result.returncode == 0)
+        previous_term = signal.getsignal(signal.SIGTERM)
+        signal.signal(signal.SIGTERM, cancel_linux_child)
+        try:
+            returncode = run_linux_child(command, child)
+        finally:
+            signal.signal(signal.SIGTERM, previous_term)
+        publish_reports(private_output, ROOT / "artifacts/idt", require_all=returncode == 0)
         # A nonzero launcher exit does not prove its descendants are stopped.
-        finished = result.returncode == 0
-        return result.returncode
+        finished = returncode == 0
+        return returncode
     finally:
         if finished or not launched:
             shutil.rmtree(baseline_dir)
