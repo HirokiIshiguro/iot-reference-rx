@@ -29,17 +29,28 @@ same_project_token_parent:
       token = os.environ.get('CI_JOB_TOKEN')
       if not token:
           raise SystemExit('job token unavailable')
-      fields = {'ref': branch, 'variables[PAIR_TOKEN_PROBE]': 'child',
+      fields = {'token': token, 'ref': branch, 'variables[PAIR_TOKEN_PROBE]': 'child',
                 'variables[PAIR_PARENT_SHA]': os.environ['CI_COMMIT_SHA'],
                 'variables[PAIR_PARENT_PIPELINE]': os.environ['CI_PIPELINE_ID']}
       request = urllib.request.Request('https://gitlab.saffti.jp/api/v4/projects/38/trigger/pipeline',
           data=urllib.parse.urlencode(fields).encode('ascii'),
-          headers={'JOB-TOKEN': token}, method='POST')
+          method='POST')
       try:
           with urllib.request.urlopen(request, timeout=25) as response:
               result = json.load(response)
       except urllib.error.HTTPError as error:
           print('trigger_http_status=' + str(error.code), flush=True)
+          try:
+              message = json.load(error).get('message', '')
+          except (ValueError, AttributeError):
+              message = ''
+          text = str(message).lower()
+          for label, fragment in (('same_project', 'same project'), ('pipeline_loop', 'loop'),
+                                  ('workflow', 'workflow'), ('variables', 'variables'),
+                                  ('missing_token', 'token is missing'), ('invalid_token', 'invalid token'),
+                                  ('ref_not_found', 'reference not found'), ('permission', 'permission')):
+              if fragment in text:
+                  print('trigger_diagnostic=' + label, flush=True)
           raise SystemExit('same-project token trigger rejected') from None
       except Exception as error:
           print('trigger_error_type=' + type(error).__name__, flush=True)
