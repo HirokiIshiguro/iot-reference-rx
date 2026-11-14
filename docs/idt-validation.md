@@ -198,9 +198,26 @@ IDTによる検証と[AWSの正式認定](https://docs.aws.amazon.com/freertos/l
 | RX72N Envision Kit / Ethernet | production transport、MQTT / OTA、および選択した試験コード |
 | AWS / ap-northeast-1 | TLS echo server、IoT Core / Device Advisor、OTA試験資源 |
 
-Linux版IDTはx86_64用のため、RPiのARM64上では直接動かしません。
+この表は既存のWindows / WSL構成です。RPi #4への移行では、x86-64用のLinux版IDTをARM64上でQEMU経由で実行します。
 Windowsホストはprofileとrunner設定で移設可能にし、接続個体とツールの正本は[hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config)に従います。
 **既存PCの新規Windows / WSL venvでhost検査17項目PASS**を確認しました。e2 studioのproduct / release metadataとCC-RXの版も照合しています。新規PCでの再構築・実機完走は未検証です。
+
+### RPi #4への移行とWindowsビルドの役割分担
+
+| 場所 | GitLab Runner | RX72N Ethernetの移行構成で担当する処理 |
+|---|---|---|
+| RPi #4 | #26 | 汎用CI。IDT専用Runnerと同じホストで並行実行できる |
+| RPi #4 | #28 | QEMU経由でIDTを動かし、試験を進行する。AWS通信、ファームウェアの包装、結果集計も担当する |
+| Windows PC | #29 | IDTからの依頼を受け、e² studioとCC-RXでビルドし、成果物を返す。サービスは手動起動 |
+| RPi #1 | 既存の実機ベンチ | UART中継とRFPによるRX72Nの書き込みを担当する |
+
+`gitlab-runner-idt-rx` はRPi #4とWindowsで付けたOS上のサービス名です。RPi #4のサービスはGitLabのRunner #28、WindowsのサービスはRunner #29に接続します。#28と#26はCPUとメモリを共有します。
+
+IDTは試験の実行中に設定を注入したソースを用意し、`buildTool.command` に渡します。ビルド用コマンドはWindowsへその入力を渡し、成果物が戻るまで待ちます。IDTは受け取った成果物を使って書き込みと試験を続けます。GitLab上でビルドを別ジョブとして実行する場合も、試験開始前に固定した `needs` だけでは、この時点で生成される入力と成果物を結び付けられません。実行中の要求と応答を結ぶ処理が必要です。 [AWSのビルド・書き込み設定](https://docs.aws.amazon.com/freertos/latest/userguide/config-settings-device.html)
+
+プロジェクト固有のCI定義、ビルド要求の受け渡し、Windowsでのビルド呼び出し、入力と成果物の検証は、このリポジトリのCI設定と `tools/idt/` で版管理します。各サービスが起動するGitLab Runner本体はGitLab公式配布を使います。Runner番号・タグ・ホスト配備の記録は [hardware-configのRunner台帳](https://gitlab.saffti.jp/oss/infra/hardware-config/-/blob/main/docs/runner-inventory.md) を参照し、認証トークンを含む `config.toml` とSSH秘密鍵は各ホストで管理します。 [GitLab Runnerのサービスコマンド](https://docs.gitlab.com/runner/commands/)
+
+Runner #28で公式サンプルが合格し、同時に#26で汎用処理が動くことを確認しました。Windowsとの成果物往復は公開ダミー、ビルド呼び出しは模擬試験まで確認済みです。#29を使った実ビルド連携とRX72N Ethernetの実Transportは検証前です。 [並行実行CI #15742](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/15742) · [移行記録 #207](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/207)
 
 <details>
 <summary>ホストを再構築する手順と固定版の検査</summary>
