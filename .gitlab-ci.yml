@@ -1,21 +1,81 @@
+# Local proposal only. Public fixture; never place runtime inputs or images here.
+include:
+  - project: oss/infra/hardware-config
+    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
+    file: /templates/windows_ccrx_host_lease.yml
+
 workflow:
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "207-idt-rpi4-sample-stage1"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $IDT_PUBLIC_PAIR_PROBE == "true"'
     - when: never
-stages: [test]
-rpi4_official_idt_sample_smoke:
-  stage: test
-  tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
-  timeout: 10 minutes
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-  script:
-    - python3 tools/idt/rpi4_sample_smoke.py
-  artifacts:
-    when: always
-    reports:
-      junit: artifacts/idt-rpi4-sample/official-junit.xml
-    paths:
-      - artifacts/idt-rpi4-sample/official-junit.xml
-    expire_in: 7 days
 
+stages: [prepare, windows_fixture, verify]
+
+variables:
+  GIT_STRATEGY: empty
+  GIT_SUBMODULE_STRATEGY: none
+
+rpi4_public_fixture_prepare:
+  stage: prepare
+  tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
+  before_script: []
+  after_script: []
+  script:
+    - |
+      set -eu
+      test "$CI_RUNNER_ID" = 26
+      test "$(id -un)" = gitlab-runner
+      test "$(hostname)" = ef-saffti-001-rpi-linux-004
+      mkdir -p public-bridge
+      printf 'idt-public-fixture-v1\n' > public-bridge/request.bin
+      sha256sum public-bridge/request.bin
+  artifacts:
+    paths: [public-bridge/request.bin]
+    expire_in: 1 hour
+
+windows_public_fixture:
+  stage: windows_fixture
+  tags: [exec-shell, os-windows, ccrx, ef-saffti-001-pc-windows-001]
+  resource_group: ishiguro-pc-ccrx-e2studio-build
+  timeout: 10 minutes
+  needs:
+    - job: rpi4_public_fixture_prepare
+      artifacts: true
+  before_script: []
+  after_script: []
+  script:
+    - !reference [.windows_ccrx_host_lease, script]
+    - |
+      $ErrorActionPreference = 'Stop'
+      if ($env:CI_RUNNER_ID -ne '3') {
+          throw 'Unexpected Windows runner.'
+      }
+      $request = [IO.File]::ReadAllBytes((Join-Path $env:CI_PROJECT_DIR 'public-bridge/request.bin'))
+      $expected = [Text.Encoding]::ASCII.GetBytes("idt-public-fixture-v1`n")
+      if ([Convert]::ToBase64String($request) -cne [Convert]::ToBase64String($expected)) {
+          throw 'Public fixture request differs.'
+      }
+      $response = Join-Path $env:CI_PROJECT_DIR 'public-bridge/response.bin'
+      [IO.File]::WriteAllBytes($response, [Text.Encoding]::ASCII.GetBytes("windows-public-response-v1`n"))
+      $hash = (Get-FileHash -LiteralPath $response -Algorithm SHA256).Hash.ToLowerInvariant()
+      Write-Host "Public fixture response SHA256: $hash"
+  artifacts:
+    paths: [public-bridge/response.bin]
+    expire_in: 1 hour
+
+rpi4_public_fixture_verify:
+  stage: verify
+  tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
+  needs:
+    - job: windows_public_fixture
+      artifacts: true
+  before_script: []
+  after_script: []
+  script:
+    - |
+      set -eu
+      test "$CI_RUNNER_ID" = 26
+      test "$(id -un)" = gitlab-runner
+      test "$(hostname)" = ef-saffti-001-rpi-linux-004
+      printf 'windows-public-response-v1\n' | cmp - public-bridge/response.bin
+      sha256sum public-bridge/response.bin
