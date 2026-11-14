@@ -18,6 +18,7 @@ from tools.idt import rpi4_build_callback as callback
 from tools.idt import rpi4_pair as pair
 from tools.idt import rpi4_pair_agent as agent
 from tools.idt import rpi4_pair_broker as broker_module
+from tools.idt import rpi4_native_controller as native_controller
 from tools.idt import rpi4_public_controller as controller
 from tools.idt import rpi4_ssh_gate as ssh_gate
 from tools.idt import rpi4_windows_worker as worker
@@ -32,6 +33,19 @@ class Response(io.BytesIO):
 
 
 class PublicPairTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "linux", "native controller requires Linux")
+    def test_native_controller_rejects_home_different_from_ssh_gate(self):
+        with tempfile.TemporaryDirectory() as folder:
+            actual, configured = Path(folder) / 'actual', Path(folder) / 'configured'
+            actual.mkdir(); configured.mkdir()
+            account = SimpleNamespace(pw_name='gitlab-runner-idt-rx', pw_dir=str(actual))
+            with patch('pwd.getpwuid', return_value=account), patch.object(native_controller.platform, 'machine', return_value='aarch64'), \
+                 patch.dict(os.environ, {'CI_PROJECT_DIR': str(native_controller.ROOT)}), \
+                 patch.object(native_controller.linux_oidc_job, 'read_reviewed_config', return_value=SimpleNamespace(home=str(configured))), \
+                 patch.object(native_controller.linux_oidc_job, 'current_job_metadata', side_effect=AssertionError('must not query')):
+                with self.assertRaisesRegex(ValueError, 'home differs'):
+                    native_controller.main()
+
     def test_forced_command_accepts_only_exact_paired_attach(self):
         command = 'python3 -u "$HOME/.cache/idt-rx72n-pair/123/rpi4_pair_agent.py" attach 123'
         self.assertIsNotNone(ssh_gate.COMMAND.fullmatch(command))

@@ -24,10 +24,13 @@ def main():
     if sys.platform != "linux" or platform.machine().lower() not in {"aarch64", "arm64"}:
         raise ValueError("dedicated Linux ARM64 runner required")
     import pwd
-    if (pwd.getpwuid(os.geteuid()).pw_name != linux_oidc_job.RUNNER_USER
+    account = pwd.getpwuid(os.geteuid())
+    if (account.pw_name != linux_oidc_job.RUNNER_USER
             or Path(os.environ.get("CI_PROJECT_DIR", "")).resolve() != ROOT):
         raise ValueError("unexpected Linux controller identity")
     config = linux_oidc_job.read_reviewed_config()
+    if Path(config.home).resolve(strict=True) != Path(account.pw_dir).resolve(strict=True):
+        raise ValueError("reviewed home differs from the dedicated account")
     os.environ["HOME"] = config.home
     env = dict(os.environ)
     sha = subprocess.check_output([config.git, "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
