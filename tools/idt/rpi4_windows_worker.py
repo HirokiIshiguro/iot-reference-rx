@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 from tools.idt import rpi4_pair as pair
 from tools.idt.run_idt import restrict_runtime
 from tools.idt_source_manifest import verify_dependency_provenance
+from tools.idt.windows_build_job import run_managed
 
 # Replace in reviewed source only after the project-specific Windows execution
 # account has been established. An environment variable cannot grant admission.
@@ -75,9 +76,12 @@ def build_request(request, checkout, temporary_parent, workspace_parent, lease_d
                    "-ProjectRoot", str(source), "-ProvenanceFile", str(provenance),
                    "-Workspace", str(workspace_path), "-PrivateLog", str(private / "build.log"),
                    "-LeaseDefinition", str(lease_definition)]
-        runner = subprocess.run if run is None else run
-        runner(command, check=True, env=scrubbed_environment(),
-               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if run is None:
+            run_managed(command, timeout=int(os.environ["IDT_PAIR_BUILD_SECONDS"]),
+                        env=scrubbed_environment())
+        else:
+            run(command, check=True, env=scrubbed_environment(),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         output = source / "artifacts/idt/build_transport"
         files = {name: (output / name).read_bytes() for name in pair.OUTPUTS}
         result = pair.response(request["request_id"], files)
