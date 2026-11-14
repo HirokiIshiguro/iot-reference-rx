@@ -1,0 +1,62 @@
+# Integration draft only: this file is not included by the normal pipeline.
+# Even if selected as a CI configuration, execution remains disabled.
+include:
+  - project: oss/infra/hardware-config
+    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
+    file: /templates/windows_ccrx_host_lease.yml
+
+workflow:
+  rules:
+    - when: never
+
+stages: [prepare, run]
+
+rpi4_pair_prepare:
+  stage: prepare
+  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
+  script:
+    - test "$CI_PROJECT_ID" = 38
+    - test "$CI_RUNNER_ID" = 28
+    - test "$(id -un)" = gitlab-runner-idt-rx
+    - python3 tools/idt/rpi4_pair_agent.py prepare "$CI_PIPELINE_ID"
+
+rpi4_windows_worker:
+  stage: run
+  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
+  needs: [rpi4_pair_prepare]
+  script:
+    # The pinned template takes its lease here. Export its function, then
+    # release immediately; each build subprocess acquires it again.
+    - !reference [.windows_ccrx_host_lease, script]
+    - |
+      $ErrorActionPreference = 'Stop'
+      $leaseFile = Join-Path $env:TEMP ("idt-pair-lease-$env:CI_PIPELINE_ID-$env:CI_JOB_ID.ps1")
+      try {
+          $text = 'function Enter-WindowsCcrxHostLease {' + "`n" + ${function:Enter-WindowsCcrxHostLease}.ToString() + "`n}"
+          $stream = [IO.File]::Open($leaseFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+          try { $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false)); $writer.Write($text); $writer.Flush() }
+          finally { $stream.Dispose() }
+          $env:IDT_PAIR_LEASE_DEFINITION = $leaseFile
+      } finally {
+          $script:WindowsCcrxHostLease.Dispose()
+          $script:WindowsCcrxHostLease = $null
+      }
+      try {
+          & 'C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe' -I tools/idt/rpi4_windows_worker.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      } finally {
+          Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue
+      }
+
+rpi4_transport_controller:
+  stage: run
+  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
+  needs: [rpi4_pair_prepare]
+  script:
+    - test "$CI_PROJECT_ID" = 38
+    - test "$CI_RUNNER_ID" = 28
+    - test "$(id -un)" = gitlab-runner-idt-rx
+    # The separate Linux transport launcher and reviewed time budget must be
+    # integrated here before the disabled workflow may be enabled.
+    - echo 'Linux IDT launcher integration is not yet connected.'
+    - exit 1
