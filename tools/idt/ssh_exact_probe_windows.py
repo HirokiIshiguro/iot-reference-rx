@@ -17,9 +17,14 @@ session=FixedSession("DUMMYACCESS", "DUMMYSECRET", "DUMMYSESSION", datetime.now(
 allowed={"CI","IDT_TARGET","IDT_WINDOWS_SSH","RX_OIDC_IDT_WSL_PATH","RX_OIDC_IDT_WSL_HOME"}
 env=wsl_bridge_environment(base,session,allow_names=allowed)
 cmd=[str(Path("C:/Windows/System32/wsl.exe")),"-d",profile["wsl_distribution"],"--exec",profile["wsl_python"],wsl_path(Path(__file__).with_name("ssh_exact_probe_linux.py"))]
-proc=subprocess.Popen(cmd,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-out,_=proc.communicate(timeout=90)
-for line in out.decode("utf-8","replace").splitlines():
- if line.startswith("PROBE ") and len(line)<160 and all(c.isalnum() or c in " _=-" for c in line): print(line,flush=True)
-print("PROBE wsl_return="+str(proc.returncode),flush=True)
-if proc.returncode: raise SystemExit(1)
+for label, keys in (("baseline",()), ("programdata",("PROGRAMDATA",))):
+ launch_env=env.copy()
+ for key in keys:
+  if key in base: launch_env[key]=base[key]
+ proc=subprocess.Popen(cmd,env=launch_env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+ out,_=proc.communicate(timeout=90)
+ print("PROBE launch="+label,flush=True)
+ for line in out.decode("utf-8","replace").splitlines():
+  if line.startswith("PROBE ") and len(line)<160 and all(c.isalnum() or c in " _=-" for c in line): print(line,flush=True)
+ print("PROBE wsl_return="+str(proc.returncode),flush=True)
+ if proc.returncode: raise SystemExit(1)
