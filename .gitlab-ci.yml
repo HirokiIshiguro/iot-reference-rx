@@ -334,6 +334,37 @@ variables:
 
 workflow:
   rules:
+    # Avoid a duplicate push pipeline; MR and explicit API runs are the sample lane.
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "207-rpi4-idt-sample"'
+      when: never
+    # This dedicated sample branch is guarded against unrelated changes by its only job.
+    - if: '($CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "207-rpi4-idt-sample") || (($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && (($CI_COMMIT_BRANCH == "207-rpi4-idt-sample") || ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RUN_RPI4_IDT_SAMPLE == "true")))'
+      variables:
+        PIPELINE_PROFILE: "rpi4-idt-sample"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
@@ -681,6 +712,8 @@ logging_delivery_contract:
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
   rules:
+    - if: '$PIPELINE_PROFILE == "rpi4-idt-sample" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "207-rpi4-idt-sample"'
+      when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - Middleware/logging/**/*
@@ -732,6 +765,8 @@ idt_ci_contract:
       Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader
       Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/lib/rx_bootloader
   rules:
+    - if: '$PIPELINE_PROFILE == "rpi4-idt-sample" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "207-rpi4-idt-sample"'
+      when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - .gitlab-ci.yml
@@ -1143,6 +1178,8 @@ rx671_ota_ci_contract:
   variables:
     GIT_SUBMODULE_STRATEGY: "none"
   rules:
+    - if: '$PIPELINE_PROFILE == "rpi4-idt-sample" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "207-rpi4-idt-sample"'
+      when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - .gitlab-ci.yml
@@ -6360,3 +6397,27 @@ validate_rx65n_bg96_scope:
     - when: never
   script:
     - throw 'RX65N BG96 partial scopes are retired; select build, mqtt, ota, fleet, tls13_0rtt, or full.'
+
+# Device-free official sample; this is not a native Transport or HIL lane.
+rpi4_official_idt_sample_smoke:
+  stage: dependency_check
+  tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
+  timeout: 10 minutes
+  variables:
+    GIT_STRATEGY: clone
+    GIT_SUBMODULE_STRATEGY: none
+    IDT_RPI4_SAMPLE_ARCHIVE: "/var/tmp/codex-idt-archives/idt-freertos-4.9.0-linux.zip"
+  rules:
+    - if: '$PIPELINE_PROFILE == "rpi4-idt-sample" && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "207-rpi4-idt-sample"'
+    - if: '$PIPELINE_PROFILE == "rpi4-idt-sample" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_COMMIT_BRANCH == "207-rpi4-idt-sample"'
+    - if: '$PIPELINE_PROFILE == "rpi4-idt-sample" && ($CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RUN_RPI4_IDT_SAMPLE == "true"'
+    - when: never
+  script:
+    - python3 tools/idt/rpi4_sample_smoke.py
+  artifacts:
+    when: always
+    reports:
+      junit: artifacts/idt-rpi4-sample/official-junit.xml
+    paths:
+      - artifacts/idt-rpi4-sample/official-junit.xml
+    expire_in: 7 days
