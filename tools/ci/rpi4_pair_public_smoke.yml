@@ -43,6 +43,7 @@ rpi4_public_windows_build:
   stage: probe
   timeout: 2 hours
   tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
+  resource_group: ishiguro-pc-ccrx-e2studio-build
   rules:
     - if: '$CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
     - when: never
@@ -64,7 +65,8 @@ rpi4_public_windows_build:
       try {
           . tools/rx_e2studio_cli.ps1
           Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
-          & 'C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe' -I tools/idt/rpi4_windows_worker.py
+          . tools/idt/rpi4_windows_python.ps1
+          & $script:IdtWorkerPython -I tools/idt/rpi4_windows_worker.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       } finally {
           Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue

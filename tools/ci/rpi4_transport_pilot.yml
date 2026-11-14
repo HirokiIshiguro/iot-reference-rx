@@ -38,7 +38,8 @@ rpi4_windows_worker:
       try {
           . tools/rx_e2studio_cli.ps1
           Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
-          & 'C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe' -I tools/idt/rpi4_windows_worker.py
+          . tools/idt/rpi4_windows_python.ps1
+          & $script:IdtWorkerPython -I tools/idt/rpi4_windows_worker.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       } finally {
           Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue

@@ -129,7 +129,7 @@ class WindowsBuildJobTests(unittest.TestCase):
     def test_build_script_rejects_without_handshake(self):
         script = Path(__file__).resolve().parents[2] / "idt/rpi4_windows_build.ps1"
         args = ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(script),
-                "-ProjectRoot", "unused", "-ProvenanceFile", "unused", "-Workspace", "unused",
+                "-ProjectRoot", "unused", "-Python", "unused", "-ProvenanceFile", "unused", "-Workspace", "unused",
                 "-PrivateLog", "unused", "-LeaseDefinition", "unused"]
         result = subprocess.run(args, input=b"", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
         self.assertNotEqual(result.returncode, 0)

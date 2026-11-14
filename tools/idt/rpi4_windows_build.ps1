@@ -1,5 +1,6 @@
 param(
     [Parameter(Mandatory)][string] $ProjectRoot,
+    [Parameter(Mandatory)][string] $Python,
     [Parameter(Mandatory)][string] $ProvenanceFile,
     [Parameter(Mandatory)][string] $Workspace,
     [Parameter(Mandatory)][string] $PrivateLog,
@@ -23,7 +24,7 @@ try {
         ProvenanceFile = $ProvenanceFile
         Workspace = $Workspace
         E2Studio = 'C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe'
-        Python = 'C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe'
+        Python = $Python
     }
     & (Join-Path $ProjectRoot 'tools/build_rx72n_idt_transport.ps1') @arguments *> $PrivateLog
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'The build helper failed.' }

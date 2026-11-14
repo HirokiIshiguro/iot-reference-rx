@@ -806,6 +806,13 @@ idt_ci_contract:
         tools.ci.tests.test_idt_ota_profile_evidence \
         tools.ci.tests.test_idt_ota_recovery_evidence \
         tools.ci.tests.test_idt_oidc_job \
+        tools.ci.tests.test_idt_linux_oidc_job \
+        tools.ci.tests.test_idt_linux_transport \
+        tools.ci.tests.test_idt_linux_supervisor \
+        tools.ci.tests.test_idt_linux_flash \
+        tools.ci.tests.test_idt_rpi4_pair \
+        tools.ci.tests.test_idt_rpi4_public \
+        tools.ci.tests.test_windows_build_job \
         tools.ci.tests.test_idt_runner_identity \
         tools.ci.tests.test_idt_report \
         tools.ci.tests.test_idt_host_profile \

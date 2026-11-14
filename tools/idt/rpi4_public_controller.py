@@ -61,6 +61,7 @@ def run(env, job, source_sha):
         request_public_build(pipeline, source_sha, 4800)
     finally:
         broker.close()
+    print("Public paired RX72N placeholder build completed", flush=True)
 
 
 def main():

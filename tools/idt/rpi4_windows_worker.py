@@ -75,7 +75,7 @@ def build_request(request, checkout, temporary_parent, workspace_parent, lease_d
         restrict_runtime(workspace_path)
         command = ["pwsh", "-NoProfile", "-NonInteractive", "-File",
                    str(checkout / "tools/idt/rpi4_windows_build.ps1"),
-                   "-ProjectRoot", str(source), "-ProvenanceFile", str(provenance),
+                   "-ProjectRoot", str(source), "-Python", sys.executable, "-ProvenanceFile", str(provenance),
                    "-Workspace", str(workspace_path), "-PrivateLog", str(private / "build.log"),
                    "-LeaseDefinition", str(lease_definition)]
         if run is None:
@@ -158,12 +158,13 @@ def run_connection(pipeline, builder):
             process.wait(timeout=10)
 
 
-def verify_public_job(env, job, username):
+def verify_worker_job(env, job, username, mode):
     session = parent_pipeline(env)
     if (env.get("CI_PROJECT_ID") != "38" or env.get("CI_RUNNER_ID") != "29"
             or env.get("CI_PIPELINE_SOURCE") != "pipeline" or env.get("CI_COMMIT_REF_PROTECTED") != "true"
-            or env.get("IDT_PAIR_MODE") != "public" or username.lower() != "svc-idt-rx"):
-        raise ValueError("unexpected public worker identity")
+            or mode not in ("public", "transport") or env.get("IDT_PAIR_MODE") != mode
+            or username.lower() != "svc-idt-rx"):
+        raise ValueError("unexpected paired worker identity")
     try:
         if (job["status"] != "running" or str(job["id"]) != env["CI_JOB_ID"]
                 or str(job["pipeline"]["id"]) != env["CI_PIPELINE_ID"] or job["runner"]["id"] != 29
@@ -171,7 +172,7 @@ def verify_public_job(env, job, username):
                 or "project38-idt-windows-protected" not in job["tag_list"]):
             raise ValueError
     except (KeyError, TypeError, ValueError):
-        raise ValueError("public worker job metadata mismatch") from None
+        raise ValueError("paired worker job metadata mismatch") from None
     return session
 
 
@@ -208,10 +209,11 @@ def public_placeholder_build():
 def main():
     if os.name != "nt":
         raise RuntimeError("Windows worker required")
+    mode = os.environ.get("IDT_PAIR_MODE")
+    job = current_job_metadata(os.environ.get("CI_JOB_TOKEN", ""))
+    username = subprocess.check_output(["whoami.exe"], text=True).strip().rsplit("\\", 1)[-1]
+    pipeline = verify_worker_job(os.environ, job, username, mode)
     if os.environ.get("IDT_PAIR_MODE") == "public":
-        job = current_job_metadata(os.environ.get("CI_JOB_TOKEN", ""))
-        username = subprocess.check_output(["whoami.exe"], text=True).strip().rsplit("\\", 1)[-1]
-        pipeline = verify_public_job(os.environ, job, username)
         sha = os.environ["CI_COMMIT_SHA"]
         actual_sha = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
         status = subprocess.check_output(["git", "-C", str(ROOT), "status", "--porcelain=v1",
@@ -230,9 +232,9 @@ def main():
     user = subprocess.check_output(["whoami.exe", "/user", "/fo", "csv", "/nh"], text=True)
     if next(csv.reader(io.StringIO(user)))[1] != REVIEWED_WINDOWS_SID:
         raise RuntimeError("Windows execution identity differs")
-    pipeline = parent_pipeline(os.environ)
-    if os.environ.get("CI_PROJECT_ID") != "38":
-        raise RuntimeError("unexpected project or pipeline")
+    clean = scrubbed_environment()
+    os.environ.clear()
+    os.environ.update(clean)
     run_connection(pipeline, lambda request: build_request(request, ROOT, r"C:\ai\codex\tmp", r"C:\ai\codex\ws",
                                                            os.environ["IDT_PAIR_LEASE_DEFINITION"]))
 

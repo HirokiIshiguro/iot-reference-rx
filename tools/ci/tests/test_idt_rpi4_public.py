@@ -46,8 +46,11 @@ class PublicPairTests(unittest.TestCase):
                "IDT_PAIR_SESSION": "456", "IDT_PAIR_PARENT_SHA": SHA}
         win_job = {"status": "running", "id": 18, "pipeline": {"id": 234}, "runner": {"id": 29},
                    "commit": {"id": SHA}, "tag_list": ["project38-idt-windows-protected"]}
-        self.assertEqual(worker.verify_public_job(win, win_job, "svc-idt-rx"), "456")
-        with self.assertRaises(ValueError): worker.verify_public_job(win, win_job, "another-user")
+        self.assertEqual(worker.verify_worker_job(win, win_job, "svc-idt-rx", "public"), "456")
+        with self.assertRaises(ValueError): worker.verify_worker_job(win, win_job, "another-user", "public")
+        with self.assertRaises(ValueError): worker.verify_worker_job(win, win_job, "svc-idt-rx", "transport")
+        native = {**win, "IDT_PAIR_MODE": "transport"}
+        self.assertEqual(worker.verify_worker_job(native, win_job, "svc-idt-rx", "transport"), "456")
 
     def test_trigger_uses_form_token_and_rejects_wrong_revision(self):
         client = Mock()
