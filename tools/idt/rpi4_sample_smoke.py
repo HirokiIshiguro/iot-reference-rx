@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -16,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.idt.idt_bundle import verify_archive_digest, verify_install
 
-ARCHIVE = Path('/tmp/codex-idt-stage1-source-20261114/idt-freertos-linux.zip')
+ARCHIVE_ENV = 'IDT_RPI4_SAMPLE_ARCHIVE'
 PACKAGES = {
     'qemu-user-static=1:8.2.2+ds-0ubuntu1.18': '0565144632acc09b92da93e5ef9a2f44fa092797c5b0949744351b184ad948a8',
     'libc6-amd64-cross=2.39-0ubuntu8cross1': 'db98738caedbc18b257f59c0d5485023ff6eee7232a7682f8ece02f277bb521a',
@@ -38,9 +39,20 @@ def stop(signum, _frame):
 def main():
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, stop)
+    if (os.environ.get('CI_PROJECT_ID') != '38'
+            or os.environ.get('CI_PIPELINE_SOURCE') != 'api'
+            or os.environ.get('CI_COMMIT_BRANCH') != '207-idt-rpi4-sample-stage1'):
+        raise RuntimeError('sample requires the dedicated project, API and ref')
+    for name in ('CI_DEBUG_TRACE', 'CI_DEBUG_SERVICES'):
+        if re.fullmatch(r'(?i)(?:t|true|\+?0*1)', os.environ.get(name, '')):
+            raise RuntimeError('debug tracing is not allowed')
     if os.uname().machine != 'aarch64':
         raise RuntimeError('sample must run on ARM64')
-    verify_archive_digest('linux', digest(ARCHIVE))
+    archive_setting = os.environ.get(ARCHIVE_ENV, '')
+    if not archive_setting or not Path(archive_setting).is_absolute():
+        raise RuntimeError('IDT_RPI4_SAMPLE_ARCHIVE must be an absolute path to the pinned official ZIP')
+    archive_path = Path(archive_setting)
+    verify_archive_digest('linux', digest(archive_path))
     output = ROOT / 'artifacts/idt-rpi4-sample'
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='idt-rpi4-sample-') as directory:
@@ -56,7 +68,7 @@ def main():
             if len(files) != 1 or digest(files[0]) != expected:
                 raise RuntimeError('Ubuntu package hash mismatch')
             subprocess.run(['dpkg-deb', '-x', str(files[0]), str(work / 'packages')], check=True)
-        with zipfile.ZipFile(ARCHIVE) as archive:
+        with zipfile.ZipFile(archive_path) as archive:
             for entry in archive.infolist():
                 destination = (work / entry.filename).resolve()
                 if work.resolve() not in destination.parents or (entry.external_attr >> 16) & 0o170000 == 0o120000:

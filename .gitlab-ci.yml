@@ -1,21 +1,9 @@
+# Dedicated experiment ref only; never merge this root file into main.
+include:
+  - local: /.gitlab/ci/rpi4-official-idt-sample.yml
 workflow:
   rules:
+    - if: '$CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/'
+      when: never
     - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "207-idt-rpi4-sample-stage1"'
     - when: never
-stages: [test]
-rpi4_official_idt_sample_smoke:
-  stage: test
-  tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
-  timeout: 10 minutes
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-  script:
-    - python3 tools/idt/rpi4_sample_smoke.py
-  artifacts:
-    when: always
-    reports:
-      junit: artifacts/idt-rpi4-sample/official-junit.xml
-    paths:
-      - artifacts/idt-rpi4-sample/official-junit.xml
-    expire_in: 7 days
-
