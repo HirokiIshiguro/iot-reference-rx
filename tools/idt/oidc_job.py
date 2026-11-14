@@ -53,6 +53,12 @@ IDT_WSL_INPUTS = {
     *PUBLIC_SIGNER_INPUTS.values(),
     *(name for values in NETWORK_INPUTS.values() for name in values.values()),
 }
+# The native Linux runner uses the same fixed-session boundary without WSL.
+IDT_LINUX_INPUTS = IDT_WSL_INPUTS | {
+    "IDT_HOST_MODE", "IDT_LINUX_IDT_ROOT", "IDT_LINUX_RUNTIME_ROOT",
+    "IDT_LINUX_BUILD_CALLBACK", "IDT_LINUX_SSH", "IDT_LINUX_SCP",
+    "IDT_PAIR_BASELINE", "IDT_PAIR_BUILD_SECONDS", "IDT_PAIR_SOCKET",
+}
 
 
 @dataclass(frozen=True)

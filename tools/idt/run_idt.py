@@ -126,6 +126,9 @@ def write_json(path: Path, value: object) -> None:
 
 
 def restrict_runtime(path: Path) -> None:
+    if os.name == "posix":
+        os.chmod(path, 0o700)
+        return
     system32 = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32"
     identity = subprocess.check_output([str(system32 / "whoami.exe"), "/user", "/fo", "csv", "/nh"], encoding="utf-8", errors="replace")
     sid = next(csv.reader(io.StringIO(identity)))[1]
@@ -338,9 +341,13 @@ def wsl_path(path: Path) -> str:
 
 def stop_hardware_runtime(process, runtime, env, credentials, *, drain):
     """Signal the owned Linux supervisor; the existing stdout owner drains it."""
-    command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"],
-               wsl_path(Path(__file__).with_name("stop_runtime.py")), "--source", wsl_path(SOURCE),
-               "--runtime", wsl_path(runtime / "execution")]
+    if env.get("IDT_HOST_MODE") == "linux-arm64":
+        command = [sys.executable, str(Path(__file__).with_name("stop_runtime.py")),
+                   "--source", str(SOURCE), "--runtime", str(runtime / "execution")]
+    else:
+        command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"],
+                   wsl_path(Path(__file__).with_name("stop_runtime.py")), "--source", wsl_path(SOURCE),
+                   "--runtime", wsl_path(runtime / "execution")]
     # Startup recovery is bounded. Launcher exit does not prove that its Linux
     # supervisor or descendants have stopped, so always try the exact selector.
     for attempt in range(3):
@@ -507,6 +514,63 @@ def idt_wsl_environment(env, inherited, credentials, target):
     return env
 
 
+def transport_userdata() -> dict:
+    return {"freeRTOSVersion": manifest_version(), "retainModifiedSourceDirectories": True,
+            "freeRTOSTestParamConfigPath": "{{testData.sourcePath}}/Test/include/test_param_config.h",
+            "freeRTOSTestExecutionConfigPath": "{{testData.sourcePath}}/Test/include/test_execution_config.h",
+            "buildTool": {"name": "CC-RX/e2studio", "version": "3.07.00/2026-04.2", "command": []},
+            "flashTool": {"name": "rfp-cli", "version": "1.15", "command": []},
+            "testStartDelayms": 0, "echoServerConfiguration": {"keyGenerationMethod": "EC", "serverPort": 9000}}
+
+
+def transport_linux(runtime: Path, region: str, credentials, provenance: dict, target: dict) -> tuple[Path, int]:
+    """Launch the unchanged vendor suite on Linux; the build callback is supplied separately."""
+    if target["id"] != "rx72n-ethernet" or os.environ.get("IDT_HOST_MODE") != "linux-arm64":
+        raise RuntimeError("Linux native transport requires RX72N Ethernet")
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives import serialization
+
+    root = Path(os.environ["IDT_LINUX_IDT_ROOT"]).resolve(strict=True)
+    verify_install(root, "linux")
+    binary = root / "bin/devicetester_linux_x86-64"
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        raise RuntimeError("Verified Linux IDT executable is unavailable")
+    inputs = runtime / "inputs"
+    inputs.mkdir()
+    bootstrap = public_signer_bootstrap_environment(inputs, provenance["source_sha"], target)
+    private_path = inputs / "transport-private.pem"
+    public_path = inputs / "transport-public.hex"
+    key = ec.generate_private_key(ec.SECP256R1())
+    private_path.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                               serialization.NoEncryption()))
+    os.chmod(private_path, 0o600)
+    public_path.write_text(key.public_key().public_bytes(serialization.Encoding.DER,
+                           serialization.PublicFormat.SubjectPublicKeyInfo).hex(), encoding="ascii")
+    provenance_file = runtime / "source-provenance.json"
+    write_json(provenance_file, provenance)
+    write_json(inputs / "device.json", device_template(target, "transport", str(public_path)))
+    write_json(inputs / "userdata.json", transport_userdata())
+    execution = runtime / "execution"
+    env = os.environ.copy()
+    env.update(IDT_RUNTIME_DIR=str(execution), IDT_PRIVATE_KEY_FILE=str(private_path),
+               IDT_PROVENANCE_FILE=str(provenance_file), IDT_SCOPE="transport", IDT_TARGET=target["id"],
+               IDT_SOURCE_SHA=provenance["source_sha"], IDT_LINUX_PYTHON=sys.executable,
+               AWS_REGION=region, AWS_DEFAULT_REGION=region, **bootstrap)
+    command = [sys.executable, str(Path(__file__).with_name("run_transport.py")),
+               "--source-path", str(SOURCE), "--idt-root", str(root), "--output", str(execution),
+               "--userdata-template", str(inputs / "userdata.json"), "--device-template", str(inputs / "device.json"),
+               "--region", region, "--group", SCOPE_GROUPS["transport"], "--target", target["id"],
+               "--cleanup-timeout-seconds", str(NATIVE_CLEANUP_SECONDS)]
+    check_child_budget(env)
+    with (runtime / "console.log").open("w", encoding="utf-8") as console:
+        process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        code = observe_hardware_runtime(process, runtime, env, credentials, console)
+    reports = list((execution / "results").rglob("FRQ_Report.xml"))
+    if len(reports) != 1:
+        raise RuntimeError("IDT run did not produce exactly one JUnit report; inspect restricted runtime diagnostics")
+    return reports[0], code
+
+
 def transport(runtime: Path, region: str, credentials, provenance: dict, scope: str = "transport",
               test_id: str | None = None, diagnostic_only: bool = False, target=None) -> tuple[Path, int]:
     if scope in {"ota-mqtt", "ota-pal"}:
@@ -535,12 +599,7 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     provenance_file = runtime / "source-provenance.json"
     write_json(provenance_file, provenance)
     device = device_template(target, scope, wsl_path(public_path))
-    userdata = {"freeRTOSVersion": manifest_version(), "retainModifiedSourceDirectories": True,
-                "freeRTOSTestParamConfigPath": "{{testData.sourcePath}}/Test/include/test_param_config.h",
-                "freeRTOSTestExecutionConfigPath": "{{testData.sourcePath}}/Test/include/test_execution_config.h",
-                "buildTool": {"name": "CC-RX/e2studio", "version": "3.07.00/2026-04.2", "command": []},
-                "flashTool": {"name": "rfp-cli", "version": "1.15", "command": []},
-                "testStartDelayms": 0, "echoServerConfiguration": {"keyGenerationMethod": "EC", "serverPort": 9000}}
+    userdata = transport_userdata()
     if scope == "pkcs11":
         userdata["pkcs11LabelConfiguration"] = {
             # FRQ inserts C expressions verbatim. Resolve through the same
@@ -693,17 +752,29 @@ def main() -> int:
         write_json(args.output / "plan.json", plan)
         print(json.dumps(plan, sort_keys=True))
         return 0
-    if os.name != "nt":
+    native_linux = os.environ.get("IDT_HOST_MODE") == "linux-arm64"
+    if native_linux:
+        if (sys.platform != "linux" or os.environ.get("CI", "").lower() != "true"
+                or not os.environ.get("RX_OIDC_EXPIRATION_UTC") or args.target != "rx72n-ethernet"
+                or args.scope != "transport" or args.region != "ap-northeast-1"):
+            parser.error("native Linux entry is restricted to the reviewed RX72N Transport CI")
+    elif os.name != "nt":
         parser.error("Run this entry point on the Windows CC-RX/AWS runner")
     if args.scope in {"ota-mqtt", "ota-pal"}:
         parser.error("native OTA admission is not ready")
     check_child_budget(os.environ, before_run=True)
     if args.scope in {"transport", "mqtt", "ota-mqtt"}:
         network_values(target)
-    HOST = load_host_profile()
-    if os.environ.get("RX_OIDC_EXPIRATION_UTC"):
-        verify_host_profile(HOST, os.environ.get("RX_IDT_REVIEWED_PROFILE_SHA256", ""))
-    INSTALL, RUNTIME = Path(HOST["install_root"]), Path(HOST["runtime_root"])
+    if native_linux:
+        RUNTIME = Path(os.environ["IDT_LINUX_RUNTIME_ROOT"]).resolve(strict=True)
+        source = SOURCE.resolve(strict=True)
+        if not RUNTIME.is_dir() or RUNTIME == source or source in RUNTIME.parents:
+            parser.error("native Linux runtime must be outside the source checkout")
+    else:
+        HOST = load_host_profile()
+        if os.environ.get("RX_OIDC_EXPIRATION_UTC"):
+            verify_host_profile(HOST, os.environ.get("RX_IDT_REVIEWED_PROFILE_SHA256", ""))
+        INSTALL, RUNTIME = Path(HOST["install_root"]), Path(HOST["runtime_root"])
     args.output.mkdir(parents=True, exist_ok=True)
     RUNTIME.mkdir(parents=True, exist_ok=True)
     runtime = Path(tempfile.mkdtemp(prefix="run-", dir=RUNTIME))
@@ -739,7 +810,10 @@ def main() -> int:
                 "manifest_sha256": hashlib.sha256(json.dumps(provenance["dependency_files_sha256"], sort_keys=True,
                                                              separators=(",", ":")).encode()).hexdigest(),
             }
-            report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id, args.diagnostic_only, target)
+            if native_linux:
+                report, idt_code = transport_linux(runtime, args.region, credentials, provenance, target)
+            else:
+                report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id, args.diagnostic_only, target)
         else:
             report, idt_code = preflight(runtime, args.region, credentials, target)
     except (Exception, KeyboardInterrupt) as error:
@@ -799,6 +873,9 @@ def main() -> int:
             summary["passed"] = False
             summary["problems"].append("Private UART capture is missing or incomplete")
         manifests = list((runtime / "execution").rglob("build_manifest.json"))
+        if native_linux and len(manifests) != 1:
+            summary["passed"] = False
+            summary["problems"].append("Native RX72N Transport requires exactly one build manifest")
         ledger = runtime / "execution/ota-build-ledger.jsonl"
         if ledger.is_file():
             metadata["ota_builds"] = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -835,6 +912,10 @@ def main() -> int:
             if build.get("target_id") != target["id"] or build.get("target_sha256") != target_fingerprint(target):
                 summary["passed"] = False
                 summary["problems"].append("Firmware target provenance differs from this run")
+            if native_linux and (build.get("source_sha") != metadata["source_sha"] or
+                                 build.get("source_tree_dirty") != metadata["source_dirty"]):
+                summary["passed"] = False
+                summary["problems"].append("Firmware source provenance differs from this run")
             metadata["builds"].append({
                 "target_id": build.get("target_id"),
                 "target_sha256": build.get("target_sha256"),

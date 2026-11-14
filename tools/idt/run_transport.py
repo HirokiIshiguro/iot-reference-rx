@@ -34,7 +34,7 @@ SOURCE_ROOT = Path(__file__).resolve().parents[2]
 if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 from tools.aws.oidc_session import OidcError, wsl_child_environment
-from tools.idt.oidc_job import check_child_budget, check_native_timeouts, IDT_WSL_INPUTS
+from tools.idt.oidc_job import check_child_budget, check_native_timeouts, IDT_WSL_INPUTS, IDT_LINUX_INPUTS
 
 GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
@@ -167,8 +167,9 @@ class Bridge:
         self.capture = None
         try:
             self.capture = UartWitness(capture_dir)
+            ssh = os.environ["IDT_LINUX_SSH"] if os.environ.get("IDT_HOST_MODE") == "linux-arm64" else SSH
             self.remote = subprocess.Popen(
-                [SSH, "-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10",
+                [ssh, "-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10",
                  "-o", "ServerAliveCountMax=3", target["ssh_alias"], command],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 bufsize=0, env=env)
@@ -312,13 +313,17 @@ def interrupted(_signum, _frame):
 
 
 def main():
+    native_linux = os.environ.get("IDT_HOST_MODE") == "linux-arm64"
+    if native_linux and (os.environ.get("CI", "").lower() != "true" or not os.environ.get("RX_OIDC_EXPIRATION_UTC")):
+        raise RuntimeError("native Linux execution requires a fixed CI OIDC session")
     if os.environ.get("RX_OIDC_EXPIRATION_UTC"):
-        isolated = wsl_child_environment(dict(os.environ), allow_names=IDT_WSL_INPUTS)
-        try:
-            isolated["PATH"] = isolated.pop("RX_OIDC_IDT_WSL_PATH")
-            isolated["HOME"] = isolated.pop("RX_OIDC_IDT_WSL_HOME")
-        except KeyError:
-            raise RuntimeError("reviewed WSL environment is missing") from None
+        isolated = wsl_child_environment(dict(os.environ), allow_names=IDT_LINUX_INPUTS if native_linux else IDT_WSL_INPUTS)
+        if not native_linux:
+            try:
+                isolated["PATH"] = isolated.pop("RX_OIDC_IDT_WSL_PATH")
+                isolated["HOME"] = isolated.pop("RX_OIDC_IDT_WSL_HOME")
+            except KeyError:
+                raise RuntimeError("reviewed WSL environment is missing") from None
         os.environ.clear()
         os.environ.update(isolated)
     check_child_budget(os.environ)
@@ -347,8 +352,11 @@ def main():
     args.test_id = ",".join(selected_test_ids) if selected_test_ids else None
     if args.test_id and args.group != "OTADataplaneMQTT":
         parser.error("The selected test ID belongs to OTADataplaneMQTT")
-    if sys.platform != "linux" or not Path(SSH).is_file():
-        parser.error("this prototype requires WSL and Windows OpenSSH")
+    ssh = os.environ.get("IDT_LINUX_SSH", "") if native_linux else SSH
+    if sys.platform != "linux" or not Path(ssh).is_file():
+        parser.error("the reviewed SSH executable is unavailable")
+    if native_linux and (args.target != "rx72n-ethernet" or args.group != "FullTransportInterfaceTLS" or args.test_id):
+        parser.error("native Linux execution is limited to the RX72N Transport group")
     if not args.region or not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
         parser.error("AWS region and inherited AWS credential environment variables are required")
     if args.timeout_seconds <= 0 or args.cleanup_timeout_seconds <= 0:
@@ -366,9 +374,28 @@ def main():
         parser.error("runtime files must be outside the source repository")
     if any(any(char.isspace() for char in str(path)) for path in (idt_root, source, run_dir)):
         parser.error("FRQ paths must not contain whitespace")
-    for key in ("IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_WINDOWS_PYTHON", "IDT_WINDOWS_PWSH"):
+    required = ("IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_LINUX_BUILD_CALLBACK", "IDT_LINUX_SCP",
+                "IDT_LINUX_RUNTIME_ROOT", "IDT_PAIR_BASELINE", "IDT_PAIR_SOCKET", "IDT_PAIR_BUILD_SECONDS") if native_linux else (
+        "IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_WINDOWS_PYTHON", "IDT_WINDOWS_PWSH")
+    for key in required:
         if not os.getenv(key):
-            parser.error(key + " must be inherited from the Windows launcher")
+            parser.error(key + (" must be inherited from the Linux launcher" if native_linux else
+                                " must be inherited from the Windows launcher"))
+    if native_linux:
+        try:
+            runtime_root = Path(os.environ["IDT_LINUX_RUNTIME_ROOT"]).resolve(strict=True)
+            for key in ("IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_PAIR_BASELINE"):
+                path = Path(os.environ[key])
+                if path.is_symlink() or not path.is_file() or runtime_root not in path.resolve(strict=True).parents:
+                    raise ValueError
+            baseline = json.loads(Path(os.environ["IDT_PAIR_BASELINE"]).read_text(encoding="utf-8"))
+            seconds = int(os.environ["IDT_PAIR_BUILD_SECONDS"])
+            if (not isinstance(baseline, dict) or not baseline or not 0 < seconds <= args.timeout_seconds
+                    or not Path(os.environ["IDT_PAIR_SOCKET"]).is_socket()
+                    or not Path(os.environ["IDT_LINUX_SCP"]).is_file()):
+                raise ValueError
+        except (OSError, ValueError, TypeError):
+            parser.error("native Linux build inputs or paired socket are unavailable")
     binary = idt_root / "bin/devicetester_linux_x86-64"
     if not binary.is_file() or not source.is_dir():
         parser.error("IDT binary or source checkout is missing")
@@ -388,7 +415,8 @@ def main():
         parser.error("Device template SKU differs from selected target")
     userdata["sourcePath"] = str(source)
     userdata["retainModifiedSourceDirectories"] = True
-    for field, wrapper in (("buildTool", Path(__file__).with_name("build_transport.sh")),
+    build_wrapper = Path(os.environ["IDT_LINUX_BUILD_CALLBACK"]) if native_linux else Path(__file__).with_name("build_transport.sh")
+    for field, wrapper in (("buildTool", build_wrapper),
                            ("flashTool", Path(__file__).with_name("flash_transport.py"))):
         userdata.setdefault(field, {})["command"] = [wrapper_command(wrapper)]
     run_dir.mkdir(parents=True, exist_ok=False)
