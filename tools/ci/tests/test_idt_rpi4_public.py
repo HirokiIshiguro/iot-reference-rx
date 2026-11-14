@@ -43,6 +43,12 @@ class Response(io.BytesIO):
 
 
 class PublicPairTests(unittest.TestCase):
+    def test_selected_python_survives_worker_environment_scrubbing(self):
+        with patch.dict(os.environ, {'RX72N_IDT_PYTHON': 'fixture-python',
+                                     'CI_JOB_TOKEN': 'secret', 'AWS_TOKEN': 'secret'}, clear=True):
+            clean = worker.scrubbed_environment()
+        self.assertEqual(clean, {'RX72N_IDT_PYTHON': 'fixture-python'})
+
     def test_public_failure_diagnostic_accepts_only_fixed_fields(self):
         marker = ('PUBLIC_BUILD_FAILURE stage=target-build type=IOException '
                   'source=build_rx72n_idt_transport.ps1 line=42')
