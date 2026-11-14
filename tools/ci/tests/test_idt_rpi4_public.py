@@ -1,5 +1,7 @@
 """Public paired pipeline and socket contract, without external services."""
 import io
+import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -33,6 +35,34 @@ class Response(io.BytesIO):
 
 
 class PublicPairTests(unittest.TestCase):
+    def test_worker_uses_fixed_verified_host_key_and_exact_gate_command(self):
+        blob = base64.b64decode(worker.PAIR_HOST_KEY.split()[2], validate=True)
+        fingerprint = base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip('=')
+        self.assertEqual(fingerprint, 'Cs4R7fkjzUKr8+yrKLE+e/dSl92IxX4e35DPkZuPn8U')
+        command = worker.ssh_command('123', '/tmp/known_hosts')
+        self.assertIn('StrictHostKeyChecking=yes', command)
+        self.assertIn('IdentitiesOnly=yes', command)
+        self.assertIn('UserKnownHostsFile=/tmp/known_hosts', command)
+        self.assertIn(worker.PAIR_IDENTITY, command)
+        self.assertIsNotNone(ssh_gate.COMMAND.fullmatch(command[-1]))
+        with self.assertRaises(ValueError): worker.ssh_command('../123', '/tmp/known_hosts')
+
+    def test_worker_removes_temporary_host_key_file_after_disconnect(self):
+        observed = {}
+        process = Mock()
+        process.wait.return_value = 0
+        process.poll.return_value = 0
+        def start(command, **_kwargs):
+            argument = next(part for part in command if part.startswith('UserKnownHostsFile='))
+            path = Path(argument.split('=', 1)[1])
+            observed['path'] = path
+            self.assertEqual(path.read_text(encoding='ascii').strip(), worker.PAIR_HOST_KEY)
+            return process
+        with patch.object(worker.subprocess, 'Popen', side_effect=start), patch.object(worker, 'serve'):
+            worker.run_connection('123', lambda _request: None)
+        self.assertFalse(observed['path'].exists())
+        process.stdin.close.assert_called_once_with()
+
     @unittest.skipUnless(sys.platform == "linux", "native controller requires Linux")
     def test_native_controller_rejects_home_different_from_ssh_gate(self):
         with tempfile.TemporaryDirectory() as folder:

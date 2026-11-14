@@ -15,9 +15,10 @@ without IDT, AWS or hardware. Both runners and Windows-to-RPi SSH are required.
 The callback uses the parent socket under the dedicated user's private home.
 
 The Windows worker uses `ssh -T` with `BatchMode=yes` and
-`StrictHostKeyChecking=yes` against the preconfigured `rpi4-idt` alias. The
-dedicated account's pinned host key, identity and RPi forced-command policy
-must be installed and verified separately. The requested command is exactly
+`StrictHostKeyChecking=yes`, the dedicated Windows private key and a temporary
+known-hosts file containing the previously verified RPi #4 host key. It does
+not depend on the account's global SSH configuration. The private key and RPi
+forced-command policy must be installed and verified separately. The requested command is exactly
 `python3 -u "$HOME/.cache/idt-rx72n-pair/<session>/rpi4_pair_agent.py" attach <session>`,
 where both session fields are the same decimal identifier. The forced-command
 policy must accept this form without allowing an arbitrary shell.

@@ -27,6 +27,9 @@ REVIEWED_WINDOWS_SID = None
 # Cancellation of the compiler tree and safe removal after interruption still
 # require verification under the dedicated runner. Keep actual execution off.
 COMPILER_CANCELLATION_VERIFIED = False
+PAIR_HOST = "gitlab-runner-idt-rx@192.168.10.123"
+PAIR_HOST_KEY = "192.168.10.123 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOHlGXFMBaNKz+F1uwnyxARvZFi92qDdOAbcOCOMHaRT"
+PAIR_IDENTITY = "C:/ProgramData/SAFFTI-IdtRxRunner/work/ssh-idt-rpi4/id_ed25519"
 
 
 def scrubbed_environment():
@@ -140,22 +143,32 @@ def parent_pipeline(env):
     return session
 
 
-def run_connection(pipeline, builder):
+def ssh_command(pipeline, known_hosts):
+    if not re.fullmatch(r"[0-9]{1,20}", pipeline):
+        raise ValueError("invalid paired session")
     remote = ('python3 -u "$HOME/.cache/idt-rx72n-pair/' + pipeline +
               '/rpi4_pair_agent.py" attach ' + pipeline)
-    command = ["ssh.exe", "-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
-               "rpi4-idt", remote]
-    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, env=scrubbed_environment())
-    try:
-        serve(process.stdout, process.stdin, builder)
-        process.stdin.close()
-        if process.wait(timeout=30) != 0:
-            raise RuntimeError("paired SSH worker did not finish")
-    finally:
-        if process.poll() is None:
-            process.terminate()
-            process.wait(timeout=10)
+    return ["C:/Windows/System32/OpenSSH/ssh.exe", "-T", "-F", "NUL",
+            "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
+            "-o", "UserKnownHostsFile=" + str(known_hosts), "-o", "GlobalKnownHostsFile=NUL",
+            "-i", PAIR_IDENTITY, PAIR_HOST, remote]
+
+
+def run_connection(pipeline, builder):
+    with tempfile.TemporaryDirectory(prefix="idt-pair-host-") as directory:
+        known_hosts = Path(directory) / "known_hosts"
+        known_hosts.write_text(PAIR_HOST_KEY + "\n", encoding="ascii")
+        process = subprocess.Popen(ssh_command(pipeline, known_hosts), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=subprocess.DEVNULL, env=scrubbed_environment())
+        try:
+            serve(process.stdout, process.stdin, builder)
+            process.stdin.close()
+            if process.wait(timeout=30) != 0:
+                raise RuntimeError("paired SSH worker did not finish")
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
 
 
 def verify_worker_job(env, job, username, mode):
