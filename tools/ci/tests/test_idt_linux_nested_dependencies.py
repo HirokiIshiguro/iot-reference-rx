@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from tools.idt import initialize_linux_dependencies as nested
 
@@ -69,6 +70,8 @@ class LinuxNestedDependenciesTests(unittest.TestCase):
         parent = self.repository("parent")
         (parent / "parent.c").write_text("parent\n", encoding="utf-8")
         self.git(parent, "submodule", "add", child.as_uri(), "source/dependency/coreMQTT")
+        self.git(parent, "submodule", "add", child.as_uri(), "test/disabled")
+        self.git(parent, "config", "--file", ".gitmodules", "submodule.test/disabled.update", "none")
         self.commit(parent)
         source = self.repository("source")
         paths = ("Middleware/FreeRTOS/coreMQTT-Agent", "Middleware/FreeRTOS-Plus-CLI", "Middleware/freertos_plus")
@@ -82,9 +85,18 @@ class LinuxNestedDependenciesTests(unittest.TestCase):
         self.git(source, "config", "include.path", str(policy))
         agent_child = source / paths[0] / "source/dependency/coreMQTT"
         self.assertFalse((agent_child / "body.c").exists())
+        actual_run = subprocess.run
+        def skip_update(command, **kwargs):
+            if "submodule" in command and "update" in command:
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return actual_run(command, **kwargs)
+        with patch.object(nested.subprocess, "run", side_effect=skip_update):
+            with self.assertRaisesRegex(RuntimeError, "missing or differs"):
+                nested.initialize(source, GIT, self.env)
         self.assertEqual(nested.initialize(source, GIT, self.env), 1)
         self.assertEqual(self.git(agent_child, "rev-parse", "HEAD"), child_sha)
         self.assertTrue((agent_child / "body.c").is_file())
+        self.assertFalse((source / paths[0] / "test/disabled/body.c").exists())
         for relative in paths[1:]:
             self.assertFalse((source / relative / "source/dependency/coreMQTT/body.c").exists())
         self.assertEqual(self.git(source, "status", "--porcelain=v1", "--untracked-files=all"), "")

@@ -45,6 +45,28 @@ def initialize(source: Path, git: str, env: dict[str, str]) -> int:
             raise RuntimeError("nested dependency initialization failed")
         return result.stdout.strip()
 
+    def disabled_in_manifest(name):
+        relative = PurePosixPath(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("invalid nested dependency path")
+        path = source.joinpath(*relative.parts)
+        for parent in path.parents:
+            if parent == source.parent:
+                break
+            descriptor = parent / ".gitmodules"
+            if not descriptor.is_file():
+                continue
+            rows = git_run(["config", "--file", str(descriptor), "--get-regexp", r"^submodule\..*\.path$"],
+                           allow_missing=True)
+            subpath = path.relative_to(parent).as_posix()
+            for entry in rows.splitlines():
+                parts = entry.split(None, 1)
+                if len(parts) == 2 and parts[1] == subpath:
+                    update_key = parts[0][:-len(".path")] + ".update"
+                    return git_run(["config", "--file", str(descriptor), "--get", update_key],
+                                   allow_missing=True).lower() == "none"
+        return False
+
     rows = git_run(["config", "--file", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$"])
     include = git_run(["config", "--get", "include.path"], allow_missing=True)
     count = 0
@@ -72,6 +94,8 @@ def initialize(source: Path, git: str, env: dict[str, str]) -> int:
             continue
         name = row[42:].split(" (", 1)[0].strip()
         if any(name.startswith(path + "/") for path in excluded):
+            continue
+        if row[0] == "-" and disabled_in_manifest(name):
             continue
         raise RuntimeError("nested dependency is missing or differs from its pinned revision")
     return count
