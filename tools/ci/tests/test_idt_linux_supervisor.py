@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import socket
 import sys
 import tempfile
@@ -21,6 +22,13 @@ if sys.platform == "linux":
 
 @unittest.skipUnless(sys.platform == "linux", "PTY supervisor requires Linux")
 class LinuxSupervisorTests(unittest.TestCase):
+    def setUp(self):
+        # The real supervisor ignores signals during its final cleanup. This
+        # test invokes main() in-process, unlike the real standalone job.
+        for number in (signal.SIGINT, signal.SIGTERM):
+            previous = signal.getsignal(number)
+            self.addCleanup(signal.signal, number, previous)
+
     def test_native_group_runs_mocked_callbacks_and_restores_vendor_config(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve()
