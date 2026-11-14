@@ -41,7 +41,9 @@ def main():
         signal.signal(sig, stop)
     if (os.environ.get('CI_PROJECT_ID') != '38'
             or os.environ.get('CI_PIPELINE_SOURCE') != 'api'
-            or os.environ.get('CI_COMMIT_BRANCH') != '207-idt-rpi4-sample-stage1'):
+            or os.environ.get('CI_COMMIT_BRANCH') != '207-idt-runner28-probe-20261114'
+            or os.environ.get('CI_COMMIT_REF_PROTECTED') != 'true'
+            or os.environ.get('CI_RUNNER_ID') != '28' or os.getuid() != 995):
         raise RuntimeError('sample requires the dedicated project, API and ref')
     for name in ('CI_DEBUG_TRACE', 'CI_DEBUG_SERVICES'):
         if re.fullmatch(r'(?i)(?:t|true|\+?0*1)', os.environ.get(name, '')):
@@ -107,9 +109,20 @@ def main():
                    '--update-idt', 'n', '--upgrade-test-suite', 'n', '--update-managed-policy', 'n']
         proc = subprocess.Popen(command, cwd=idt / 'bin', env=env, stdin=subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
+        marker = None
         try:
+            if os.environ.get('MEASUREMENT_PHASE') == 'overlap':
+                pipeline_id = os.environ.get('CI_PIPELINE_ID', '')
+                if not pipeline_id.isdecimal():
+                    raise RuntimeError('invalid pipeline id')
+                marker = Path('/tmp') / ('idt-runner28-overlap-' + pipeline_id + '.ready')
+                fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+                os.close(fd)
+            print('SAMPLE_QEMU_STARTED', flush=True)
             stdout, _ = proc.communicate(timeout=90)
         finally:
+            if marker is not None and marker.exists() and marker.stat().st_uid == os.getuid():
+                marker.unlink()
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()

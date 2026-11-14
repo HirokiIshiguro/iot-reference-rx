@@ -1,9 +1,9 @@
 # Dedicated experiment ref only; never merge this root file into main.
 include:
-  - local: /.gitlab/ci/rpi4-official-idt-sample.yml
+  - local: /.gitlab/ci/rpi4-runner28-probe.yml
 workflow:
   rules:
     - if: '$CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/'
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "207-idt-rpi4-sample-stage1"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == "207-idt-runner28-probe-20261114"'
     - when: never

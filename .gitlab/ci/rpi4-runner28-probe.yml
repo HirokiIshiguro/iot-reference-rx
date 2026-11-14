@@ -1,0 +1,33 @@
+stages: [test]
+rpi4_runner28_official_sample:
+  stage: test
+  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
+  timeout: 10 minutes
+  variables:
+    GIT_STRATEGY: clone
+    GIT_SUBMODULE_STRATEGY: none
+    IDT_RPI4_SAMPLE_ARCHIVE: "/var/tmp/codex-idt-archives/idt-freertos-4.9.0-linux.zip"
+  rules:
+    - if: '$PROBE_MODE == "sample" || $PROBE_MODE == "overlap"'
+    - when: never
+  script:
+    - python3 tools/idt/rpi4_sample_smoke.py
+  artifacts:
+    when: always
+    reports:
+      junit: artifacts/idt-rpi4-sample/official-junit.xml
+    paths:
+      - artifacts/idt-rpi4-sample/official-junit.xml
+    expire_in: 7 days
+rpi4_runner26_fixed_control:
+  stage: test
+  tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
+  timeout: 4 minutes
+  variables:
+    GIT_STRATEGY: clone
+    GIT_SUBMODULE_STRATEGY: none
+  rules:
+    - if: '$PROBE_MODE == "control" || $PROBE_MODE == "overlap"'
+    - when: never
+  script:
+    - python3 tools/ci/rpi4_runner_control.py
