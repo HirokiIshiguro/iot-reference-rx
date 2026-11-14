@@ -105,7 +105,7 @@ def build_request(request, checkout, temporary_parent, workspace_parent, lease_d
             shutil.rmtree(private)
 
 
-def serve(reader, writer, builder):
+def serve(reader, writer, builder, *, report_public_errors=False):
     while True:
         request = pair.read_frame(reader)
         if request == {"kind": "shutdown"}:
@@ -113,7 +113,13 @@ def serve(reader, writer, builder):
             return
         try:
             result = builder(request)
-        except Exception:
+        except Exception as error:
+            if report_public_errors:
+                kind = type(error).__name__
+                if kind not in {'CalledProcessError', 'UnconfirmedStop', 'TimeoutExpired',
+                                'ValueError', 'OSError', 'RuntimeError'}:
+                    kind = 'Other'
+                print('Public paired build error type: ' + kind, file=sys.stderr, flush=True)
             # Do not include exception text, input, source paths, or build log.
             pair.write_frame(writer, {"kind": "error"})
             raise RuntimeError("paired Windows build failed") from None
@@ -154,14 +160,14 @@ def ssh_command(pipeline, known_hosts):
             "-i", PAIR_IDENTITY, PAIR_HOST, remote]
 
 
-def run_connection(pipeline, builder):
+def run_connection(pipeline, builder, *, report_public_errors=False):
     with tempfile.TemporaryDirectory(prefix="idt-pair-host-") as directory:
         known_hosts = Path(directory) / "known_hosts"
         known_hosts.write_text(PAIR_HOST_KEY + "\n", encoding="ascii")
         process = subprocess.Popen(ssh_command(pipeline, known_hosts), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.DEVNULL, env=scrubbed_environment())
         try:
-            serve(process.stdout, process.stdin, builder)
+            serve(process.stdout, process.stdin, builder, report_public_errors=report_public_errors)
             process.stdin.close()
             if process.wait(timeout=30) != 0:
                 raise RuntimeError("paired SSH worker did not finish")
@@ -189,6 +195,31 @@ def verify_worker_job(env, job, username, mode):
     return session
 
 
+PUBLIC_FAILURE = re.compile(
+    r'PUBLIC_BUILD_FAILURE stage=(?:metadata|placeholder-prepare|target-build|unknown) '
+    r'type=(?:RuntimeException|ParameterBindingException|ParameterBindingValidationException|'
+    r'UnauthorizedAccessException|IOException|FileNotFoundException|DirectoryNotFoundException|'
+    r'InvalidOperationException|MethodInvocationException|NativeCommandExitException|Other) '
+    r'source=(?:test_build_rx_idt\.ps1|build_rx72n_idt_transport\.ps1|'
+    r'build_headless_rx72n\.ps1|rx_e2studio_cli\.ps1|other) line=[0-9]{1,5}'
+)
+
+
+def report_public_failure(log):
+    """Publish only an allowlisted diagnostic from the public placeholder build."""
+    try:
+        with Path(log).open('rb') as stream:
+            stream.seek(0, os.SEEK_END)
+            stream.seek(max(0, stream.tell() - 16384))
+            lines = stream.read().decode('utf-8', errors='replace').splitlines()
+        for line in reversed(lines):
+            if PUBLIC_FAILURE.fullmatch(line):
+                print(line, file=sys.stderr, flush=True)
+                return
+    except OSError:
+        pass
+
+
 def public_placeholder_build():
     """Compile public placeholder inputs; remove only this job's outputs on success."""
     temporary_parent = Path(r"C:\ai\codex\tmp").resolve(strict=True)
@@ -208,7 +239,11 @@ def public_placeholder_build():
                    "-Python", sys.executable, "-Workspace", str(workspace), "-Output", str(private),
                    "-PrivateLog", str(private / "build.log"),
                    "-LeaseDefinition", os.environ["IDT_PAIR_LEASE_DEFINITION"]]
-        run_managed(command, timeout=3600, env=scrubbed_environment())
+        try:
+            run_managed(command, timeout=3600, env=scrubbed_environment())
+        except Exception:
+            report_public_failure(private / 'build.log')
+            raise
         completed = True
     finally:
         if completed:
@@ -238,7 +273,8 @@ def main():
         clean = scrubbed_environment()
         os.environ.clear()
         os.environ.update(clean)
-        run_connection(pipeline, lambda request: public_build(request, sha, public_placeholder_build))
+        run_connection(pipeline, lambda request: public_build(request, sha, public_placeholder_build),
+                       report_public_errors=True)
         return
     if REVIEWED_WINDOWS_SID is None or not COMPILER_CANCELLATION_VERIFIED:
         raise RuntimeError("reviewed dedicated Windows execution identity is not configured")

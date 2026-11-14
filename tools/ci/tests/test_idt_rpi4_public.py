@@ -1,5 +1,6 @@
 """Public paired pipeline and socket contract, without external services."""
 import io
+import contextlib
 import base64
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,7 @@ import os
 from pathlib import Path
 import queue
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -41,6 +43,35 @@ class Response(io.BytesIO):
 
 
 class PublicPairTests(unittest.TestCase):
+    def test_public_failure_diagnostic_accepts_only_fixed_fields(self):
+        marker = ('PUBLIC_BUILD_FAILURE stage=target-build type=IOException '
+                  'source=build_rx72n_idt_transport.ps1 line=42')
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'build.log'
+            log.write_text('secret fixture\n' + marker + '\n', encoding='utf-8')
+            out = io.StringIO()
+            with contextlib.redirect_stderr(out):
+                worker.report_public_failure(log)
+            self.assertEqual(out.getvalue(), marker + '\n')
+            log.write_text(marker + ' secret fixture\n', encoding='utf-8')
+            out = io.StringIO()
+            with contextlib.redirect_stderr(out):
+                worker.report_public_failure(log)
+            self.assertEqual(out.getvalue(), '')
+
+    def test_public_serve_reports_only_exception_type(self):
+        def fail(_request):
+            raise subprocess.CalledProcessError(1, ['secret fixture'])
+        for public in (True, False):
+            stream = io.BytesIO()
+            pair.write_frame(stream, {'kind': 'fixture'})
+            stream.seek(0)
+            out = io.StringIO()
+            with contextlib.redirect_stderr(out):
+                with self.assertRaisesRegex(RuntimeError, 'paired Windows build failed'):
+                    worker.serve(stream, stream, fail, report_public_errors=public)
+            self.assertEqual(out.getvalue(), 'Public paired build error type: CalledProcessError\n' if public else '')
+
     def test_public_queue_budget_reserves_existing_build_and_cleanup_time(self):
         now = datetime(2026, 11, 15, tzinfo=timezone.utc)
         job = {'started_at': (now - timedelta(seconds=300)).isoformat()}

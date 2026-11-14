@@ -4,7 +4,8 @@ param(
     [ValidateSet('rx72n-ethernet', 'rx65n-bg96', 'rx671-wifi')]
     [string[]]$CompileTargets = @(),
     [string]$OutputDirectory = '',
-    [string]$WorkspaceRoot = ''
+    [string]$WorkspaceRoot = '',
+    [ref]$DiagnosticStage = $null
 )
 
 # Exercises real project/source metadata with inert runtime headers. No compiler,
@@ -13,6 +14,7 @@ param(
 # only. These images must never be flashed or reported as native IDT results.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if ($null -ne $DiagnosticStage) { $DiagnosticStage.Value = 'metadata' }
 $root = (Resolve-Path -LiteralPath $ProjectRoot).Path
 . (Join-Path $PSScriptRoot 'rx_e2studio_cli.ps1')
 # Runner's normal submodule strategy updates only the top-level pins. Resolve
@@ -158,6 +160,7 @@ try {
     }
     Write-Host "PASS: $count target/group metadata validations, suite mismatch rejected, production metadata unchanged. Hardware qualification is not established."
     if ($CompileTargets.Count -gt 0) {
+        if ($null -ne $DiagnosticStage) { $DiagnosticStage.Value = 'placeholder-prepare' }
         if (-not $OutputDirectory -or -not $WorkspaceRoot) {
             throw 'CompileTargets requires explicit OutputDirectory and WorkspaceRoot.'
         }
@@ -173,6 +176,7 @@ try {
         $execution = ($flags | ForEach-Object { '#define ' + $_ + ' (' + [int]($_ -eq $groups['Transport']) + ')' }) -join "`n"
         [IO.File]::WriteAllText($runtimePaths[0], $execution + "`n")
         foreach ($target in $CompileTargets) {
+            if ($null -ne $DiagnosticStage) { $DiagnosticStage.Value = 'target-build' }
             & $builder -ProjectRoot $root -Target $target -TestGroup Transport -Python $Python `
                 -ProvenanceFile $provenances[$target] `
                 -Workspace (Join-Path $WorkspaceRoot $target) `

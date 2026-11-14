@@ -137,6 +137,33 @@ class WindowsBuildJobTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(b"Build containment was not established", result.stdout)
 
+    def test_public_build_records_safe_failure_stage(self):
+        helper = Path(__file__).resolve().parents[2] / 'idt/rpi4_windows_public_build.ps1'
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'tools').mkdir()
+            (root / 'tools/test_build_rx_idt.ps1').write_text(
+                "param($ProjectRoot,$Python,$CompileTargets,$OutputDirectory,$WorkspaceRoot,[ref]$DiagnosticStage)\n"
+                "$DiagnosticStage.Value='target-build'\nthrow [IO.IOException]::new('private fixture')\n",
+                encoding='utf-8')
+            lease = root / 'lease.ps1'
+            lease.write_text(
+                "function Enter-WindowsCcrxHostLease { $script:WindowsCcrxHostLease=[IO.MemoryStream]::new() }\n"
+                "function Get-FileHash { param($LiteralPath,$Algorithm) "
+                "if ($LiteralPath -like '*e2studio-cli.exe') { $h='6b021cc60f8736f4124f2ff61586bf883a415d1957b0a584346403cc91de2320' } "
+                "else { $h='64c3daf4cd80557efa98071378dbe13fb4ba9f78da80560f5616bbb22ff5bc0a' }; "
+                "[pscustomobject]@{Hash=$h} }\n", encoding='utf-8')
+            log = root / 'build.log'
+            args = ['pwsh', '-NoProfile', '-NonInteractive', '-File', str(helper),
+                    '-ProjectRoot', str(root), '-Python', sys.executable, '-Workspace', str(root),
+                    '-Output', str(root), '-PrivateLog', str(log), '-LeaseDefinition', str(lease)]
+            result = subprocess.run(args, input=b'go\n', stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+            self.assertNotEqual(result.returncode, 0)
+            contents = log.read_text(encoding='utf-8-sig')
+            self.assertIn('PUBLIC_BUILD_FAILURE stage=target-build type=IOException source=test_build_rx_idt.ps1 line=3', contents)
+            from tools.idt.rpi4_windows_worker import PUBLIC_FAILURE
+            self.assertTrue(any(PUBLIC_FAILURE.fullmatch(line) for line in contents.splitlines()))
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--dummy-controller":
