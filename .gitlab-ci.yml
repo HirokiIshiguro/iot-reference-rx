@@ -1,102 +1,60 @@
-# Standalone public-input probe; it is not included in the normal pipeline.
-# Use only through a temporary protected ref after the dedicated runners and
-# Windows -> RPi #4 SSH are ready. It never requests an ID token or hardware.
-include:
-  - project: oss/infra/hardware-config
-    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
-    file: /templates/windows_ccrx_host_lease.yml
-
 workflow:
   rules:
-    - if: '$CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/'
+    - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/)'
       when: never
-    - if: '$CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "public-controller"'
-      when: always
-    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "api" && $IDT_PAIR_MODE == "python-contract"'
-      when: always
-    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
-      when: always
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-encoding-diagnostic" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_ENCODING_DIAGNOSTIC == "true"'
     - when: never
-
-stages: [probe]
-
+stages: [test]
 variables:
   GIT_STRATEGY: clone
-  GIT_SUBMODULE_STRATEGY: normal
-  GIT_CONFIG_COUNT: "3"
-  GIT_CONFIG_KEY_0: core.longpaths
-  GIT_CONFIG_VALUE_0: "true"
-  GIT_CONFIG_KEY_1: core.autocrlf
-  GIT_CONFIG_VALUE_1: "false"
-  GIT_CONFIG_KEY_2: core.eol
-  GIT_CONFIG_VALUE_2: lf
-
-rpi4_public_python_contract:
-  stage: probe
-  timeout: 10 minutes
+  GIT_SUBMODULE_STRATEGY: none
+win29_encoding_diagnostic:
+  stage: test
   tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "api" && $IDT_PAIR_MODE == "python-contract"'
-    - when: never
+  timeout: 5 minutes
+  before_script: []
+  after_script: []
   script:
     - |
       $ErrorActionPreference = 'Stop'
       if ($env:CI_PROJECT_ID -ne '38' -or $env:CI_RUNNER_ID -ne '29' -or
-          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx') {
-          throw 'Unexpected contract job identity.'
-      }
+          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx') { throw 'Unexpected execution context.' }
       foreach ($entry in @(Get-ChildItem Env:)) {
           if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '(?i:TOKEN|SECRET|PRIVATE_KEY|PASSWORD)') {
               Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
           }
       }
-      . tools/idt/rpi4_windows_python.ps1
-      & $script:IdtWorkerPython -c "import shutil,sys; sys.exit(0 if shutil.which('pwsh') else 1)"
-      if ($LASTEXITCODE -ne 0) { throw 'PowerShell 7 is unavailable.' }
-      & $script:IdtWorkerPython -B -m unittest tools.ci.tests.test_idt_explicit_python -v
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-rpi4_public_controller:
-  stage: probe
-  timeout: 2 hours
-  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
-  rules:
-    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "public-controller"'
-    - when: never
-  script:
-    - python3 -B tools/idt/rpi4_public_controller.py
-
-rpi4_public_windows_build:
-  stage: probe
-  timeout: 2 hours
-  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  resource_group: ishiguro-pc-ccrx-e2studio-build
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
-    - when: never
-  script:
-    - !reference [.windows_ccrx_host_lease, script]
-    - |
-      $ErrorActionPreference = 'Stop'
-      $leaseFile = Join-Path $env:TEMP ("idt-public-lease-$env:CI_PIPELINE_ID-$env:CI_JOB_ID.ps1")
-      try {
-          $text = 'function Enter-WindowsCcrxHostLease {' + "`n" + ${function:Enter-WindowsCcrxHostLease}.ToString() + "`n}"
-          $stream = [IO.File]::Open($leaseFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-          try { $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false)); $writer.Write($text); $writer.Flush() }
-          finally { $stream.Dispose() }
-          $env:IDT_PAIR_LEASE_DEFINITION = $leaseFile
-      } finally {
-          $script:WindowsCcrxHostLease.Dispose()
-          $script:WindowsCcrxHostLease = $null
+      $python = 'C:/ProgramData/SAFFTI-IdtRxRunner/work/tools/venv-3.14.10/Scripts/python.exe'
+      $script = @'
+      import ctypes, json, locale, os, subprocess, sys
+      from ctypes import wintypes
+      print('ENCODINGS=' + json.dumps({'python_version':sys.version.split()[0], 'utf8_mode':sys.flags.utf8_mode,
+          'preferred':locale.getpreferredencoding(False), 'locale':locale.getencoding(),
+          'ansi_cp':ctypes.windll.kernel32.GetACP(), 'oem_cp':ctypes.windll.kernel32.GetOEMCP()}), flush=True)
+      size = wintypes.DWORD(256)
+      buffer = ctypes.create_unicode_buffer(size.value)
+      ok = bool(ctypes.windll.advapi32.GetUserNameW(buffer, ctypes.byref(size)))
+      print('GETUSERNAME_MATCH=' + json.dumps({'api_ok':ok, 'expected':ok and buffer.value.casefold() == 'svc-idt-rx',
+          'environment':ok and buffer.value.casefold() == os.environ.get('USERNAME','').casefold()}), flush=True)
+      commands = {
+          'WHOAMI': ['whoami.exe'],
+          'WHOAMI_CSV': ['whoami.exe','/user','/fo','csv','/nh'],
+          'GIT_HEAD': ['git','--no-optional-locks','rev-parse','HEAD'],
+          'GIT_STATUS': ['git','--no-optional-locks','status','--porcelain=v1','--untracked-files=all','--ignore-submodules=none'],
       }
-      try {
-          . tools/rx_e2studio_cli.ps1
-          Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
-          . tools/idt/rpi4_windows_python.ps1
-          & $script:IdtWorkerPython -I tools/idt/rpi4_windows_worker.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      } finally {
-          Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue
-      }
+      for name, args in commands.items():
+          result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+          def can_decode(data, encoding):
+              try: data.decode(encoding, 'strict'); return True
+              except (UnicodeError, LookupError): return False
+          data = {'returncode':result.returncode, 'stdout_bytes':len(result.stdout), 'stderr_bytes':len(result.stderr)}
+          for stream, value in [('stdout',result.stdout),('stderr',result.stderr)]:
+              data[stream + '_default'] = can_decode(value, locale.getpreferredencoding(False))
+              data[stream + '_utf8'] = can_decode(value, 'utf-8')
+              data[stream + '_oem'] = can_decode(value, 'cp' + str(ctypes.windll.kernel32.GetOEMCP()))
+          if name == 'GIT_STATUS': data['clean'] = not result.stdout
+          print(name + '=' + json.dumps(data), flush=True)
+      '@
+      $script | & $python -I -
+      if ($LASTEXITCODE -ne 0) { throw 'Read-only encoding diagnostic failed.' }
+      Write-Host 'READ_ONLY_DIAGNOSTIC_COMPLETE'
