@@ -13,6 +13,9 @@ RPi #4 の専用 Runner から Linux 版 IDT を起動し、RPi #1 の RX72N Eth
 
 Linux版の配布元は使用前に検証し、各実行のprivate runtime内に書込み可能なコピーを作る。コピーも検証してから使うため、配布元の設定やテスト定義を書き換えない。コピーは実行記録と同じprivate runtimeに残し、安全な停止を確認する前には削除しない。
 
+Windows jobの共有枠待ちは、job開始後の接続確立待ちと分けて数える。親jobの既存tokenで下流jobの状態だけを確認し、接続が先に成立した場合はすぐ進む。枠待ち・接続待ち・ビルドの合計は既存のnative実行時間内に収め、回収用の時間は使わない。停止や期限超過では一時sessionを保持し、下流jobを確認してから回収する。
+nativeでは `pair_build_seconds` に、接続確立600秒と応答・終了30秒を加えても既存のnative実行上限4500秒未満とし、その残りを最大の共有枠待ちに充てる。待機の上限はコントローラー開始時から減り、処理前の準備時間も含めて保守的に扱う。
+
 host設定の `runtime.json` は `schema_version`、`account`、`role_arn`、`ref`、`runner_id`、`job_timeout_seconds`、`budget`、`runtime_root`、`idt_root`、`ssh`、`scp`、`git`、`python`、`home`、`search_path`、`pair_build_seconds`、`qemu_sysroot` を持つ。build callbackは同じsource SHAの `tools/idt/rpi4_build_callback.py` をPythonで実行する。`qemu_sysroot` は管理者が固定したQEMU用sysrootで、Linux子プロセスの `QEMU_LD_PREFIX` に設定する。`budget` は既存 `Budget` の `bootstrap_seconds`、`native_prepare_seconds`、`report_seconds`、`margin_seconds` を持つ。値は統合時に実測・レビューしてhost側で配置し、この文書の存在を設定済みの証拠にはしない。
 
 ## 未実施と開始条件

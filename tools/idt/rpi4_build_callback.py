@@ -12,12 +12,12 @@ import sys
 
 try:
     from .prepare_transport_key import validate_source
-    from .rpi4_pair import create_request, read_frame, sha256, validate_response, write_frame
+    from .rpi4_pair import READY_SECONDS, RESPONSE_SECONDS, create_request, read_frame, sha256, validate_response, write_frame
     from .targets import get_target, target_fingerprint
     from .ota_support import record_packaging, validate_packaging
 except ImportError:
     from prepare_transport_key import validate_source
-    from rpi4_pair import create_request, read_frame, sha256, validate_response, write_frame
+    from rpi4_pair import READY_SECONDS, RESPONSE_SECONDS, create_request, read_frame, sha256, validate_response, write_frame
     from targets import get_target, target_fingerprint
     from ota_support import record_packaging, validate_packaging
 
@@ -90,10 +90,11 @@ def main():
     provenance = json.loads(Path(os.environ["IDT_PROVENANCE_FILE"]).read_text(encoding="utf-8-sig"))
     baseline = json.loads(Path(os.environ["IDT_PAIR_BASELINE"]).read_text(encoding="utf-8"))
     seconds = int(os.environ["IDT_PAIR_BUILD_SECONDS"])
-    if seconds <= 0:
+    queue_seconds = int(os.environ["IDT_PAIR_QUEUE_SECONDS"])
+    if seconds <= 0 or queue_seconds <= 0:
         raise ValueError("missing paired build budget")
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-        connection.settimeout(seconds)
+        connection.settimeout(queue_seconds + READY_SECONDS + seconds + RESPONSE_SECONDS)
         connection.connect(os.environ["IDT_PAIR_SOCKET"])
         with connection.makefile("rwb", buffering=0) as stream:
             build(source, baseline, provenance, stream)

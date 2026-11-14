@@ -35,6 +35,7 @@ if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 from tools.aws.oidc_session import OidcError, wsl_child_environment
 from tools.idt.oidc_job import check_child_budget, check_native_timeouts, IDT_WSL_INPUTS, IDT_LINUX_INPUTS
+from tools.idt.rpi4_pair import READY_SECONDS, RESPONSE_SECONDS
 
 GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
@@ -375,7 +376,8 @@ def main():
     if any(any(char.isspace() for char in str(path)) for path in (idt_root, source, run_dir)):
         parser.error("FRQ paths must not contain whitespace")
     required = ("IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_LINUX_BUILD_CALLBACK", "IDT_LINUX_SCP",
-                "IDT_LINUX_RUNTIME_ROOT", "IDT_PAIR_BASELINE", "IDT_PAIR_SOCKET", "IDT_PAIR_BUILD_SECONDS") if native_linux else (
+                "IDT_LINUX_RUNTIME_ROOT", "IDT_PAIR_BASELINE", "IDT_PAIR_SOCKET", "IDT_PAIR_BUILD_SECONDS",
+                "IDT_PAIR_QUEUE_SECONDS") if native_linux else (
         "IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_WINDOWS_PYTHON", "IDT_WINDOWS_PWSH")
     for key in required:
         if not os.getenv(key):
@@ -390,7 +392,9 @@ def main():
                     raise ValueError
             baseline = json.loads(Path(os.environ["IDT_PAIR_BASELINE"]).read_text(encoding="utf-8"))
             seconds = int(os.environ["IDT_PAIR_BUILD_SECONDS"])
-            if (not isinstance(baseline, dict) or not baseline or not 0 < seconds <= args.timeout_seconds
+            queue_seconds = int(os.environ["IDT_PAIR_QUEUE_SECONDS"])
+            if (not isinstance(baseline, dict) or not baseline or seconds <= 0 or queue_seconds <= 0
+                    or queue_seconds + READY_SECONDS + seconds + RESPONSE_SECONDS > args.timeout_seconds
                     or not Path(os.environ["IDT_PAIR_SOCKET"]).is_socket()
                     or not Path(os.environ["IDT_LINUX_SCP"]).is_file()):
                 raise ValueError

@@ -1,6 +1,6 @@
 """Offline coverage of the dedicated Linux runner and fixed-session boundary."""
 import base64
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
 import json
 import io
@@ -146,11 +146,17 @@ class LinuxOidcJobTests(unittest.TestCase):
         self.assertEqual(child["IDT_PAIR_BASELINE"], "/var/tmp/idt-runtime/baseline.json")
         self.assertEqual(child["IDT_PAIR_SOCKET"].replace("\\", "/"), "/var/lib/gitlab-runner-idt-rx/.cache/idt-rx72n-pair/19/build.sock")
         self.assertEqual(child["IDT_PAIR_BUILD_SECONDS"], "600")
+        self.assertEqual(child["IDT_PAIR_QUEUE_SECONDS"], str(launcher.NATIVE_SECONDS - 600 - launcher.READY_SECONDS - launcher.RESPONSE_SECONDS))
         self.assertEqual(child["QEMU_LD_PREFIX"], "/opt/idt-qemu/sysroot")
         self.assertEqual(child["AWS_ACCESS_KEY_ID"], "temporary-key")
         for name in ("RX_OIDC_ID_TOKEN", "CI_JOB_TOKEN", "AWS_ROLE_ARN", "AWS_PROFILE", "UNREVIEWED_INPUT"):
             self.assertNotIn(name, child)
         self.assertEqual(child["AWS_CONFIG_FILE"], __import__("os").devnull)
+
+    def test_native_build_budget_must_leave_time_for_queue_and_readiness(self):
+        maximum = launcher.NATIVE_SECONDS - launcher.READY_SECONDS - launcher.RESPONSE_SECONDS
+        with self.assertRaises(OidcError):
+            replace(config(), pair_build_seconds=maximum)
 
     def test_wrong_runner_claim_tag_ref_and_target_are_rejected(self):
         bad_env = environment(); bad_env["CI_RUNNER_ID"] = "29"

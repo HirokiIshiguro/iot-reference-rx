@@ -40,7 +40,9 @@ def main():
     count = initialize(ROOT, config.git, git_environment(env, config))
     print("Pinned nested dependency roots initialized: " + str(count), flush=True)
     broker = Broker(env["CI_JOB_TOKEN"], config.ref, str(job["pipeline"]["id"]), sha,
-                    "transport", build_seconds=config.pair_build_seconds)
+                    "transport", build_seconds=config.pair_build_seconds,
+                    queue_seconds=linux_oidc_job.NATIVE_SECONDS - config.pair_build_seconds
+                    - linux_oidc_job.READY_SECONDS - linux_oidc_job.RESPONSE_SECONDS)
     broker.start()
     try:
         return linux_oidc_job.main()

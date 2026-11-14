@@ -66,6 +66,28 @@ def wait_ready(pipeline, seconds):
         raise RuntimeError("paired build worker did not become ready") from None
 
 
+def open_ready(pipeline):
+    """Open a cancellable readiness reader without leaving a blocked thread."""
+    path = session_path(pipeline)
+    check_session(path)
+    fifo = path / "ready"
+    info = fifo.lstat()
+    if not stat.S_ISFIFO(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+        raise ValueError("paired readiness pipe is invalid")
+    reader = os.open(fifo, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    try:
+        keepalive = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        reader_info, writer_info = os.fstat(reader), os.fstat(keepalive)
+        if ((reader_info.st_dev, reader_info.st_ino) != (info.st_dev, info.st_ino)
+                or (writer_info.st_dev, writer_info.st_ino) != (info.st_dev, info.st_ino)):
+            os.close(keepalive)
+            raise ValueError("paired readiness pipe changed")
+        return reader, keepalive
+    except BaseException:
+        os.close(reader)
+        raise
+
+
 def attach(pipeline, input_stream, output_stream):
     path = session_path(pipeline)
     check_session(path)

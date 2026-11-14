@@ -20,6 +20,8 @@ OUTPUTS = ("rx72n_idt_transport.mot", "bootloader.mot", "build_manifest.json")
 MAX_FRAME_BYTES = 64 * 1024 * 1024
 MAX_HEADER_BYTES = 4 * 1024 * 1024
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
+READY_SECONDS = 600
+RESPONSE_SECONDS = 30
 
 
 def sha256(data: bytes) -> str:

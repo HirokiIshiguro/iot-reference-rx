@@ -29,6 +29,7 @@ from tools.idt.oidc_job import (Budget, MAX_JOB_SECONDS, NATIVE_SECONDS, PROJECT
                                 verified_job_environment)
 from tools.idt.public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_INPUTS
 from tools.idt.cleanup_budget import owned_runtime_cleanup_seconds
+from tools.idt.rpi4_pair import READY_SECONDS, RESPONSE_SECONDS
 
 RUNNER_TAG = "project38-idt-rpi4-protected"
 RUNNER_USER = "gitlab-runner-idt-rx"
@@ -63,7 +64,7 @@ class LinuxConfig:
                 or not isinstance(self.job_timeout_seconds, int) or isinstance(self.job_timeout_seconds, bool)
                 or not 0 < self.job_timeout_seconds <= MAX_JOB_SECONDS or not isinstance(self.budget, Budget)
                 or not isinstance(self.pair_build_seconds, int) or isinstance(self.pair_build_seconds, bool)
-                or not 0 < self.pair_build_seconds <= NATIVE_SECONDS
+                or not 0 < self.pair_build_seconds < NATIVE_SECONDS - READY_SECONDS - RESPONSE_SECONDS
                 or self.budget.initial_required() + self.budget.margin_seconds > min(self.job_timeout_seconds, IDT_SESSION_SECONDS)):
             raise OidcError("invalid reviewed Linux IDT configuration")
         paths = (self.runtime_root, self.idt_root, self.ssh, self.scp,
@@ -160,6 +161,7 @@ def prepare_child(env, *, source_sha, config, job, baseline_path, session_factor
                  IDT_LINUX_SCP=config.scp, IDT_PAIR_BASELINE=str(baseline),
                  IDT_PAIR_SOCKET=str(Path(config.home) / ".cache/idt-rx72n-pair" / str(job["pipeline"]["id"]) / "build.sock"),
                  IDT_PAIR_BUILD_SECONDS=str(config.pair_build_seconds),
+                 IDT_PAIR_QUEUE_SECONDS=str(NATIVE_SECONDS - config.pair_build_seconds - READY_SECONDS - RESPONSE_SECONDS),
                  RX_OIDC_IDT_NATIVE_REQUIRED_SECONDS=str(config.budget.native_required()),
                  RX_OIDC_IDT_PREPARE_SECONDS=str(config.budget.native_prepare_seconds),
                  RX_OIDC_IDT_MARGIN_SECONDS=str(config.budget.margin_seconds))

@@ -2,6 +2,7 @@
 import io
 import base64
 import hashlib
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import Mock, patch
 from types import SimpleNamespace
@@ -29,12 +31,23 @@ from tools.idt.targets import get_target, target_fingerprint
 SHA = "a" * 40
 
 
+def running():
+    return {"status": "running", "started_at": datetime.now(timezone.utc).isoformat()}
+
+
 class Response(io.BytesIO):
     def __enter__(self): return self
     def __exit__(self, *_args): self.close()
 
 
 class PublicPairTests(unittest.TestCase):
+    def test_public_queue_budget_reserves_existing_build_and_cleanup_time(self):
+        now = datetime(2026, 11, 15, tzinfo=timezone.utc)
+        job = {'started_at': (now - timedelta(seconds=300)).isoformat()}
+        self.assertEqual(controller.public_queue_budget({'CI_JOB_TIMEOUT': '7200'}, job, now=now), 2370)
+        with self.assertRaisesRegex(ValueError, 'insufficient'):
+            controller.public_queue_budget({'CI_JOB_TIMEOUT': '7200', 'RUNNER_SCRIPT_TIMEOUT': '1h'}, job, now=now)
+
     def test_worker_uses_fixed_verified_host_key_and_exact_gate_command(self):
         blob = base64.b64decode(worker.PAIR_HOST_KEY.split()[2], validate=True)
         fingerprint = base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip('=')
@@ -145,6 +158,133 @@ class PublicPairTests(unittest.TestCase):
             dispatch.trigger_worker("dummy-secret", "branch", "123", SHA, "456", "public", 600, opener=client)
         self.assertEqual(client.open.call_count, 2)
 
+    def test_worker_status_checks_the_expected_job_and_revision(self):
+        client = Mock()
+        started = datetime.now(timezone.utc).isoformat()
+        data = [{"name": "rpi4_public_windows_build", "status": "running", "started_at": started,
+                 "commit": {"id": SHA}, "runner": {"id": 29}}]
+        client.open.return_value = Response(json.dumps(data).encode())
+        self.assertEqual(dispatch.worker_status("dummy-secret", 42, SHA, "public", opener=client),
+                         {"status": "running", "started_at": started})
+        request = client.open.call_args.args[0]
+        self.assertNotIn("dummy-secret", request.full_url)
+        self.assertEqual(request.get_header("Job-token"), "dummy-secret")
+        data[0]["runner"]["id"] = 3
+        client.open.return_value = Response(json.dumps(data).encode())
+        with self.assertRaises(RuntimeError):
+            dispatch.worker_status("dummy-secret", 42, SHA, "public", opener=client)
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Unix FIFO required')
+    def test_queue_wait_is_separate_from_connection_wait(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, 'home', return_value=Path(home)):
+            agent.prepare('456')
+            broker = broker_module.Broker('token', 'branch', '123', SHA, 'public', build_seconds=5, queue_seconds=5)
+            start = time.monotonic()
+            def status(*_args):
+                return {'status': 'waiting_for_resource', 'started_at': None} if time.monotonic() - start < 1.2 else running()
+            def ready():
+                time.sleep(1.4)
+                fd = os.open(agent.session_path('456') / 'ready', os.O_WRONLY | os.O_NONBLOCK)
+                try: os.write(fd, b'R')
+                finally: os.close(fd)
+            thread = threading.Thread(target=ready)
+            thread.start()
+            with patch.object(broker_module, 'READY_SECONDS', 1), patch.object(broker_module, 'POLL_SECONDS', 0.05), \
+                 patch.object(broker_module, 'worker_status', side_effect=status):
+                broker.wait_ready('456', 42, 4)
+            thread.join(2)
+            self.assertFalse(thread.is_alive())
+            self.assertGreaterEqual(time.monotonic() - start, 1.2)
+            agent.cleanup('456')
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Unix FIFO required')
+    def test_ready_does_not_wait_for_slow_job_status_request(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, 'home', return_value=Path(home)):
+            agent.prepare('456')
+            broker = broker_module.Broker('token', 'branch', '123', SHA, 'public', build_seconds=5, queue_seconds=5)
+            release = threading.Event()
+            def slow_status(*_args):
+                release.wait(5)
+                return running()
+            def ready():
+                deadline = time.monotonic() + 3
+                while True:
+                    try:
+                        fd = os.open(agent.session_path('456') / 'ready', os.O_WRONLY | os.O_NONBLOCK)
+                        break
+                    except OSError:
+                        if time.monotonic() >= deadline: raise
+                        time.sleep(0.01)
+                try: os.write(fd, b'R')
+                finally: os.close(fd)
+            thread = threading.Thread(target=ready)
+            thread.start()
+            try:
+                with patch.object(broker_module, 'worker_status', side_effect=slow_status):
+                    start = time.monotonic()
+                    broker.wait_ready('456', 42, 4)
+                    self.assertLess(time.monotonic() - start, 1)
+            finally:
+                release.set()
+                thread.join(3)
+            self.assertFalse(thread.is_alive())
+            agent.cleanup('456')
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Unix FIFO required')
+    def test_failed_job_stops_waiting_and_closes_readiness_pipe(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, 'home', return_value=Path(home)):
+            agent.prepare('456')
+            broker = broker_module.Broker('token', 'branch', '123', SHA, 'public', build_seconds=5, queue_seconds=5)
+            with patch.object(broker_module, 'worker_status', return_value={'status': 'failed', 'started_at': None}) as status:
+                with self.assertRaisesRegex(RuntimeError, 'ended before readiness'):
+                    broker.wait_ready('456', 42, 4)
+                status.assert_called_once()
+            with self.assertRaises(OSError):
+                os.open(agent.session_path('456') / 'ready', os.O_WRONLY | os.O_NONBLOCK)
+            agent.cleanup('456')
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Unix FIFO required')
+    def test_queue_deadline_closes_readiness_before_a_late_worker(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, 'home', return_value=Path(home)):
+            agent.prepare('456')
+            broker = broker_module.Broker('token', 'branch', '123', SHA, 'public', build_seconds=5, queue_seconds=5)
+            with patch.object(broker_module, 'worker_status', return_value={'status': 'waiting_for_resource', 'started_at': None}), \
+                 patch.object(broker_module, 'POLL_SECONDS', 0.05):
+                with self.assertRaisesRegex(RuntimeError, 'reviewed wait budget'):
+                    broker.wait_ready('456', 42, 0.3)
+            with self.assertRaises(OSError):
+                os.open(agent.session_path('456') / 'ready', os.O_WRONLY | os.O_NONBLOCK)
+            agent.cleanup('456')
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Unix FIFO required')
+    def test_connection_deadline_begins_when_worker_is_running(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, 'home', return_value=Path(home)):
+            agent.prepare('456')
+            broker = broker_module.Broker('token', 'branch', '123', SHA, 'public', build_seconds=5, queue_seconds=5)
+            with patch.object(broker_module, 'worker_status', side_effect=lambda *_args: running()), \
+                 patch.object(broker_module, 'READY_SECONDS', 0.3):
+                start = time.monotonic()
+                with self.assertRaisesRegex(RuntimeError, 'reviewed wait budget'):
+                    broker.wait_ready('456', 42, 4)
+                self.assertLess(time.monotonic() - start, 2)
+            with self.assertRaises(OSError):
+                os.open(agent.session_path('456') / 'ready', os.O_WRONLY | os.O_NONBLOCK)
+            agent.cleanup('456')
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Unix FIFO required')
+    def test_connection_deadline_uses_actual_start_not_poll_time(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(Path, 'home', return_value=Path(home)):
+            agent.prepare('456')
+            broker = broker_module.Broker('token', 'branch', '123', SHA, 'public', build_seconds=5, queue_seconds=5)
+            started = (datetime.now(timezone.utc) - timedelta(seconds=3)).isoformat()
+            with patch.object(broker_module, 'worker_status', return_value={'status': 'running', 'started_at': started}), \
+                 patch.object(broker_module, 'READY_SECONDS', 1):
+                now = time.monotonic()
+                with self.assertRaisesRegex(RuntimeError, 'reviewed wait budget'):
+                    broker.wait_ready('456', 42, 4)
+                self.assertLess(time.monotonic() - now, 1)
+            agent.cleanup('456')
+
     def test_worker_requires_matching_parent_sha_and_request(self):
         env = {"IDT_PAIR_PARENT_PIPELINE": "123", "IDT_PAIR_SESSION": "456", "IDT_PAIR_PARENT_SHA": SHA, "CI_COMMIT_SHA": SHA}
         self.assertEqual(worker.parent_pipeline(env), "456")
@@ -219,8 +359,9 @@ class PublicPairTests(unittest.TestCase):
                     threads.append(thread)
                     thread.start()
                 return 42
-            with patch.object(broker_module, "trigger_worker", side_effect=trigger):
-                broker = broker_module.Broker("token", "branch", "123", SHA, "public", build_seconds=5)
+            with patch.object(broker_module, "trigger_worker", side_effect=trigger), \
+                 patch.object(broker_module, "worker_status", side_effect=lambda *_args: running()):
+                broker = broker_module.Broker("token", "branch", "123", SHA, "public", build_seconds=5, queue_seconds=5)
                 broker.start()
                 self.assertEqual(calls, [])
                 controller.request_public_build("123", SHA, 10)
@@ -239,7 +380,7 @@ class PublicPairTests(unittest.TestCase):
     def test_unconfirmed_trigger_is_not_retried_and_retains_sessions(self):
         with tempfile.TemporaryDirectory() as home, patch.object(Path, "home", return_value=Path(home)), \
              patch.object(broker_module, "trigger_worker", side_effect=RuntimeError("unknown outcome")) as trigger:
-            broker = broker_module.Broker("token", "branch", "123", SHA, "public", build_seconds=5)
+            broker = broker_module.Broker("token", "branch", "123", SHA, "public", build_seconds=5, queue_seconds=5)
             broker.start()
             with self.assertRaises(ValueError): controller.request_public_build("123", SHA, 5)
             with self.assertRaisesRegex(RuntimeError, "retain"):
@@ -294,8 +435,9 @@ class PublicPairTests(unittest.TestCase):
                     threads.append(thread)
                     thread.start()
                 return 42
-            with patch.object(broker_module, "trigger_worker", side_effect=trigger):
-                broker = broker_module.Broker("token", "branch", "123", SHA, "transport", build_seconds=5)
+            with patch.object(broker_module, "trigger_worker", side_effect=trigger), \
+                 patch.object(broker_module, "worker_status", side_effect=lambda *_args: running()):
+                broker = broker_module.Broker("token", "branch", "123", SHA, "transport", build_seconds=5, queue_seconds=5)
                 broker.start()
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
                     connection.settimeout(10)
