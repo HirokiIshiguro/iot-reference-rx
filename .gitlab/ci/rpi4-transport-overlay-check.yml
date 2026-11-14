@@ -1,0 +1,12 @@
+stages: [test]
+rpi4_rx72n_transport_overlay_prepare_check:
+  stage: test
+  tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
+  timeout: 10 minutes
+  variables:
+    GIT_STRATEGY: clone
+    GIT_SUBMODULE_STRATEGY: none
+    IDT_RPI4_SAMPLE_ARCHIVE: "/var/tmp/codex-idt-archives/idt-freertos-4.9.0-linux.zip"
+  script:
+    - python3 -m unittest tools.ci.tests.test_rpi4_transport_overlay
+    - python3 tools/ci/check_rpi4_transport_overlay.py
