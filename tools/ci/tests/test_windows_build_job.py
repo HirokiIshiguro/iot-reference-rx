@@ -127,13 +127,15 @@ class WindowsBuildJobTests(unittest.TestCase):
                         kernel.CloseHandle(handle)
 
     def test_build_script_rejects_without_handshake(self):
-        script = Path(__file__).resolve().parents[2] / "idt/rpi4_windows_build.ps1"
-        args = ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(script),
-                "-ProjectRoot", "unused", "-Python", "unused", "-ProvenanceFile", "unused", "-Workspace", "unused",
-                "-PrivateLog", "unused", "-LeaseDefinition", "unused"]
-        result = subprocess.run(args, input=b"", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn(b"Build containment was not established", result.stdout)
+        root = Path(__file__).resolve().parents[2] / "idt"
+        for name, extra in (("rpi4_windows_build.ps1", ["-ProvenanceFile", "unused"]),
+                            ("rpi4_windows_public_build.ps1", ["-Output", "unused"])):
+            args = ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(root / name),
+                    "-ProjectRoot", "unused", "-Python", "unused", "-Workspace", "unused",
+                    "-PrivateLog", "unused", "-LeaseDefinition", "unused", *extra]
+            result = subprocess.run(args, input=b"", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(b"Build containment was not established", result.stdout)
 
 
 if __name__ == "__main__":

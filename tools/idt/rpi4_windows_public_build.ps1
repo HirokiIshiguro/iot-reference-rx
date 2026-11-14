@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][string] $Python,
     [Parameter(Mandatory)][string] $Workspace,
     [Parameter(Mandatory)][string] $Output,
+    [Parameter(Mandatory)][string] $PrivateLog,
     [Parameter(Mandatory)][string] $LeaseDefinition
 )
 Set-StrictMode -Version Latest
@@ -21,7 +22,7 @@ try {
         }
     }
     & (Join-Path $ProjectRoot 'tools/test_build_rx_idt.ps1') -ProjectRoot $ProjectRoot `
-        -Python $Python -CompileTargets @('rx72n-ethernet') -OutputDirectory $Output -WorkspaceRoot $Workspace
+        -Python $Python -CompileTargets @('rx72n-ethernet') -OutputDirectory $Output -WorkspaceRoot $Workspace *> $PrivateLog
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Public placeholder build failed.' }
 } finally {
     if ($script:WindowsCcrxHostLease) { $script:WindowsCcrxHostLease.Dispose() }

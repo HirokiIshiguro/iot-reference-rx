@@ -193,6 +193,7 @@ def public_placeholder_build():
         command = ["pwsh", "-NoProfile", "-NonInteractive", "-File",
                    str(ROOT / "tools/idt/rpi4_windows_public_build.ps1"), "-ProjectRoot", str(ROOT),
                    "-Python", sys.executable, "-Workspace", str(workspace), "-Output", str(private),
+                   "-PrivateLog", str(private / "build.log"),
                    "-LeaseDefinition", os.environ["IDT_PAIR_LEASE_DEFINITION"]]
         run_managed(command, timeout=3600, env=scrubbed_environment())
         completed = True
