@@ -8,10 +8,10 @@ workflow:
   rules:
     - if: '($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/)'
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-python-bootstrap" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_WIN29_PUBLIC == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_BRANCH == "codex/209-win29-public-build-log" && $CI_COMMIT_REF_PROTECTED == "true" && $IDT_WIN29_PUBLIC == "true"'
     - when: never
 
-stages: [bootstrap, test, build]
+stages: [test, build]
 
 variables:
   GIT_STRATEGY: clone
@@ -54,127 +54,9 @@ variables:
       if ($LASTEXITCODE -ne 0) { throw 'Dedicated account cannot use the reviewed Python runtime.' }
   after_script: []
 
-win29_python_bootstrap:
-  stage: bootstrap
-  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  timeout: 30 minutes
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
-  before_script: []
-  after_script: []
-  script:
-    - |
-      $ErrorActionPreference = 'Stop'
-      if ($env:CI_PROJECT_ID -ne '38' -or $env:CI_RUNNER_ID -ne '29' -or
-          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx' -or
-          $env:CI_PIPELINE_ID -notmatch '^\d+$' -or $env:CI_JOB_ID -notmatch '^\d+$') {
-          throw 'Unexpected project, runner, protected ref or execution account.'
-      }
-      # The checkout is complete; neither download nor Python needs CI or AWS credentials.
-      foreach ($entry in @(Get-ChildItem Env:)) {
-          if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '(?i:TOKEN|SECRET|PRIVATE_KEY|PASSWORD)') {
-              Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
-          }
-      }
-      $env:AWS_EC2_METADATA_DISABLED = 'true'
-      $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-      $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
-      $ProgressPreference = 'SilentlyContinue'
-      $work = [IO.Path]::GetFullPath('C:/ProgramData/SAFFTI-IdtRxRunner/work').TrimEnd('\')
-      $tools = [IO.Path]::GetFullPath((Join-Path $work 'tools'))
-      $stage = [IO.Path]::GetFullPath((Join-Path $tools "bootstrap-$env:CI_PIPELINE_ID-$env:CI_JOB_ID"))
-      $runtime = [IO.Path]::GetFullPath((Join-Path $tools 'python-3.14.10'))
-      $venv = [IO.Path]::GetFullPath((Join-Path $tools 'venv-3.14.10'))
-      if ([IO.Path]::GetDirectoryName($tools) -ine $work -or
-          @($stage, $runtime, $venv | Where-Object { [IO.Path]::GetDirectoryName($_) -ine $tools }).Count -gt 0) {
-          throw 'Bootstrap target escaped the dedicated work directory.'
-      }
-      function Assert-PlainAncestors([string]$Path) {
-          $entry = Get-Item -LiteralPath $Path -Force
-          while ($null -ne $entry) {
-              if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse point in bootstrap path.' }
-              $entry = $entry.Parent
-          }
-      }
-      Assert-PlainAncestors $work
-      [void](New-Item -ItemType Directory -Force -Path $tools)
-      Assert-PlainAncestors $tools
-      foreach ($path in @($stage, $runtime, $venv)) {
-          if (Test-Path -LiteralPath $path) { throw 'A bootstrap target already exists; inspect before reuse.' }
-      }
-      [void](New-Item -ItemType Directory -Path $stage -ErrorAction Stop)
-      $env:DOTNET_CLI_HOME = $stage
-      $completed = $false
-      try {
-          $package = Join-Path $stage 'python.3.14.10.nupkg'
-          $url = 'https://api.nuget.org/v3-flatcontainer/python/3.14.10/python.3.14.10.nupkg'
-          Invoke-WebRequest -Uri $url -OutFile $package -UseBasicParsing -TimeoutSec 120
-          if ((Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'f54ba67c9951c3d773ea47d2bb095150c037c399f0423a968bcda22809241784') {
-              throw 'Python package SHA256 differs from reviewed staging.'
-          }
-          $verification = (& 'C:/Program Files/dotnet/dotnet.exe' nuget verify $package --all -v minimal 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0 -or $verification -notmatch '(?i)1f4b311d9acc115c8dc8018b5a49e00fce6da8e2855f9f014ca6f34570bc482d') {
-              throw 'Python package repository signature verification failed.'
-          }
-          Add-Type -AssemblyName System.IO.Compression
-          $archive = [IO.Compression.ZipFile]::OpenRead($package)
-          $unpacked = [IO.Path]::GetFullPath((Join-Path $stage 'unpacked'))
-          try {
-              foreach ($entry in $archive.Entries) {
-                  $name = $entry.FullName
-                  $parts = $name -split '/'
-                  $mode = ($entry.ExternalAttributes -shr 16) -band 0xF000
-                  if (-not $name -or $name.Contains('\') -or $name.Contains(':') -or
-                      $name.StartsWith('/') -or '..' -in $parts -or $mode -eq 0xA000) {
-                      throw 'Unsafe Python package member.'
-                  }
-                  $full = [IO.Path]::GetFullPath((Join-Path $unpacked $name))
-                  if (-not $full.StartsWith($unpacked + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                      throw 'Python package member escaped staging.'
-                  }
-              }
-          } finally { $archive.Dispose() }
-          [IO.Compression.ZipFile]::ExtractToDirectory($package, $unpacked)
-          if ((Resolve-Path -LiteralPath $unpacked).Path -ine $unpacked -or
-              [IO.Path]::GetDirectoryName($runtime) -ine $tools -or (Test-Path -LiteralPath $runtime)) {
-              throw 'Unsafe Python runtime move.'
-          }
-          Assert-PlainAncestors $unpacked
-          Move-Item -LiteralPath $unpacked -Destination $runtime -ErrorAction Stop
-          $basePython = Join-Path $runtime 'tools/python.exe'
-          $version = & $basePython -I -c 'import sys; print(sys.version.split()[0])'
-          if ($LASTEXITCODE -ne 0 -or $version -cne '3.14.10') { throw 'Staged Python version mismatch.' }
-          & $basePython -I -m venv $venv
-          if ($LASTEXITCODE -ne 0) { throw 'Dedicated venv creation failed.' }
-          $python = Join-Path $venv 'Scripts/python.exe'
-          $log = Join-Path $stage 'bootstrap.log'
-          & $python -I -m pip --isolated install --disable-pip-version-check --no-input -r tools/idt/requirements-windows.txt *> $log
-          if ($LASTEXITCODE -ne 0) { throw 'Pinned dependency installation failed; private log retained.' }
-          & $python -I -m pip --isolated check *>> $log
-          if ($LASTEXITCODE -ne 0) { throw 'Pinned dependency verification failed; private log retained.' }
-          & $python -I -c 'import boto3, cryptography; print("Dedicated Python runtime and imports OK")'
-          if ($LASTEXITCODE -ne 0) { throw 'Dedicated Python imports failed.' }
-          $completed = $true
-      } finally {
-          if ($completed) {
-              $resolved = (Resolve-Path -LiteralPath $stage).Path
-              if ($resolved -ine $stage -or [IO.Path]::GetDirectoryName($resolved) -ine $tools) {
-                  throw 'Unsafe bootstrap cleanup.'
-              }
-              Assert-PlainAncestors $resolved
-              Remove-Item -LiteralPath $resolved -Recurse -Force
-              if (Test-Path -LiteralPath $resolved) { throw 'Bootstrap staging remains.' }
-              Write-Host 'Bootstrap staging removed; dedicated Python and venv retained.'
-          } else {
-              Write-Warning 'Bootstrap incomplete; dedicated paths are retained for review.'
-          }
-      }
-
 win29_public_stop_and_cleanup_contract:
   extends: .win29_public_job
   stage: test
-  variables:
-    GIT_SUBMODULE_STRATEGY: none
   timeout: 10 minutes
   script:
     - |
@@ -249,8 +131,14 @@ win29_public_rx72n_compile:
       param([string]$Python, [string]$Output, [string]$Workspace)
       $ErrorActionPreference = 'Stop'
       if ([Console]::In.ReadLine() -cne 'go') { throw 'No build containment.' }
-      & tools/test_build_rx_idt.ps1 -Python $Python -CompileTargets @('rx72n-ethernet') -OutputDirectory $Output -WorkspaceRoot $Workspace
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      $privateLog = Join-Path $Output 'public-build.log'
+      try {
+        & tools/test_build_rx_idt.ps1 -Python $Python -CompileTargets @('rx72n-ethernet') -OutputDirectory $Output -WorkspaceRoot $Workspace *> $privateLog
+        if ($LASTEXITCODE -ne 0) { throw 'Public build helper returned a nonzero exit.' }
+      } catch {
+        ($_ | Out-String) | Add-Content -LiteralPath $privateLog
+        throw 'Public build helper failed; private log retained.'
+      }
       '@
         [IO.File]::WriteAllText($helper, $helperText, [Text.UTF8Encoding]::new($false))
         $driver = @'
@@ -262,16 +150,19 @@ win29_public_rx72n_compile:
               run_managed(['pwsh', '-NoProfile', '-NonInteractive', '-File', sys.argv[1],
                            '-Python', sys.argv[2], '-Output', sys.argv[3], '-Workspace', sys.argv[4]],
                           timeout=3600, env=os.environ.copy())
-              result.put(True)
-          except BaseException:
-              result.put(False)
+              result.put('success')
+          except BaseException as error:
+              kind = type(error).__name__
+              result.put(kind if kind in ('CalledProcessError', 'TimeoutExpired', 'UnconfirmedStop', 'OSError', 'RuntimeError') else 'Other')
       thread = threading.Thread(target=build)
       thread.start()
       while thread.is_alive():
           thread.join(15)
           if thread.is_alive():
               print('Public RX72N build is still running', flush=True)
-      if not result.get():
+      outcome = result.get()
+      if outcome != 'success':
+          print('PUBLIC_BUILD_FAILURE_TYPE=' + outcome, flush=True)
           raise SystemExit('public build or process-stop verification failed')
       '@
         $driver | & $idtPython -B - $helper $idtPython $output $workspace
