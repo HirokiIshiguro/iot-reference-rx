@@ -38,7 +38,7 @@ def config():
     return launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 10800, Budget(100, 100, 10, 10),
                                 "/var/tmp/idt-runtime", "/opt/idt", "/opt/idt/build-hook",
                                 "/usr/bin/ssh", "/usr/bin/scp", "/usr/bin/git", "/usr/bin/python3",
-                                "/var/lib/gitlab-runner-idt-rx", "/usr/bin:/bin", 600)
+                                "/var/lib/gitlab-runner-idt-rx", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
 
 
 def environment():
@@ -49,6 +49,7 @@ def environment():
             "RUN_RX_IDT": "true", "IDT_TARGET": "rx72n-ethernet", "IDT_SCOPE": "transport",
             "AWS_ROLE_ARN": ROLE, "AWS_ACCESS_KEY_ID": "ambient-key", "AWS_SECRET_ACCESS_KEY": "ambient-secret",
             "AWS_PROFILE": "ambient-profile", "UNREVIEWED_INPUT": "do-not-forward",
+            "QEMU_LD_PREFIX": "/unreviewed/sysroot",
             **{name: "/var/tmp/bootstrap/" + name for name in launcher.PUBLIC_SIGNER_INPUTS.values()}}
 
 
@@ -126,6 +127,7 @@ class LinuxOidcJobTests(unittest.TestCase):
         self.assertEqual(child["IDT_PAIR_BASELINE"], "/var/tmp/idt-runtime/baseline.json")
         self.assertEqual(child["IDT_PAIR_SOCKET"].replace("\\", "/"), "/var/lib/gitlab-runner-idt-rx/.cache/idt-rx72n-pair/19/build.sock")
         self.assertEqual(child["IDT_PAIR_BUILD_SECONDS"], "600")
+        self.assertEqual(child["QEMU_LD_PREFIX"], "/opt/idt-qemu/sysroot")
         self.assertEqual(child["AWS_ACCESS_KEY_ID"], "temporary-key")
         for name in ("RX_OIDC_ID_TOKEN", "CI_JOB_TOKEN", "AWS_ROLE_ARN", "AWS_PROFILE", "UNREVIEWED_INPUT"):
             self.assertNotIn(name, child)
@@ -157,7 +159,7 @@ class LinuxOidcJobTests(unittest.TestCase):
         with self.assertRaises(OidcError):
             launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 500, Budget(100, 100, 10, 10),
                                  "/tmp/runtime", "/opt/idt", "/opt/hook", "/usr/bin/ssh", "/usr/bin/scp",
-                                 "/usr/bin/git", "/usr/bin/python3", "/tmp/home", "/usr/bin:/bin", 600)
+                                 "/usr/bin/git", "/usr/bin/python3", "/tmp/home", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
 
     def test_fixed_host_config_rejects_wrong_owner_mode_and_extra_fields(self):
         document = {"schema_version": 1, **asdict(config())}
@@ -166,6 +168,8 @@ class LinuxOidcJobTests(unittest.TestCase):
             launcher.parse_config({**document, "extra": "unreviewed"})
         with self.assertRaises(OidcError):
             launcher.parse_config({**document, "schema_version": True})
+        with self.assertRaises(OidcError):
+            launcher.parse_config({**document, "qemu_sysroot": "relative/path"})
         directory = SimpleNamespace(st_mode=stat.S_IFDIR | 0o755, st_uid=0)
         file = SimpleNamespace(st_mode=stat.S_IFREG | 0o640, st_uid=0, st_gid=123)
         launcher.validate_config_metadata(directory, file, 123)

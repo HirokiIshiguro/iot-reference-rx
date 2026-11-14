@@ -47,7 +47,7 @@ class LinuxSupervisorTests(unittest.TestCase):
                    "IDT_LINUX_SSH": "/usr/bin/ssh", "IDT_LINUX_SCP": "/usr/bin/scp",
                    "IDT_LINUX_RUNTIME_ROOT": str(root), "IDT_PAIR_BASELINE": str(root / "baseline.json"),
                    "IDT_PAIR_SOCKET": str(root / "build.sock"),
-                   "IDT_PAIR_BUILD_SECONDS": "600",
+                   "IDT_PAIR_BUILD_SECONDS": "600", "QEMU_LD_PREFIX": "/reviewed/qemu/sysroot",
                    "IDT_PRIVATE_KEY_FILE": str(root / "private"), "IDT_PROVENANCE_FILE": str(root / "provenance"),
                    "AWS_ACCESS_KEY_ID": "fake-key", "AWS_SECRET_ACCESS_KEY": "fake-secret", "AWS_SESSION_TOKEN": "fake-token",
                    "RX_OIDC_EXPIRATION_UTC": (now + timedelta(hours=3)).isoformat(), "PATH": "/usr/bin:/bin",
@@ -89,6 +89,7 @@ class LinuxSupervisorTests(unittest.TestCase):
             self.assertEqual(observed["env"]["IDT_PAIR_BASELINE"], str(root / "baseline.json"))
             self.assertEqual(observed["env"]["IDT_PAIR_SOCKET"], str(root / "build.sock"))
             self.assertEqual(observed["env"]["IDT_PAIR_BUILD_SECONDS"], "600")
+            self.assertEqual(observed["env"]["QEMU_LD_PREFIX"], "/reviewed/qemu/sysroot")
             self.assertEqual((bundle / "configs/config.json").read_bytes(), original)
             configured = json.loads((runtime / "userdata.json").read_text())
             self.assertEqual(configured["buildTool"]["command"], ["/bin/bash " + str(hook) + " {{testData.sourcePath}}"])

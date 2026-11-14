@@ -54,6 +54,7 @@ class LinuxConfig:
     home: str
     search_path: str
     pair_build_seconds: int
+    qemu_sysroot: str
 
     def __post_init__(self):
         if (not re.fullmatch(r"[0-9]{12}", self.account)
@@ -67,7 +68,7 @@ class LinuxConfig:
                 or self.budget.initial_required() + self.budget.margin_seconds > min(self.job_timeout_seconds, IDT_SESSION_SECONDS)):
             raise OidcError("invalid reviewed Linux IDT configuration")
         paths = (self.runtime_root, self.idt_root, self.build_callback, self.ssh, self.scp,
-                 self.git, self.python, self.home, *self.search_path.split(":"))
+                 self.git, self.python, self.home, self.qemu_sysroot, *self.search_path.split(":"))
         if any(not isinstance(path, str) or not path or not PurePosixPath(path).is_absolute()
                or any(c.isspace() or c == "\0" for c in path) for path in paths):
             raise OidcError("invalid reviewed Linux path")
@@ -154,6 +155,7 @@ def prepare_child(env, *, source_sha, config, job, baseline_path, session_factor
                *PUBLIC_SIGNER_INPUTS.values()}
     child = child_environment(verified, session, allow_names=allowed)
     child.update(PATH=config.search_path, HOME=config.home, IDT_HOST_MODE="linux-arm64",
+                 QEMU_LD_PREFIX=config.qemu_sysroot,
                  IDT_LINUX_RUNTIME_ROOT=config.runtime_root, IDT_LINUX_IDT_ROOT=config.idt_root,
                  IDT_LINUX_BUILD_CALLBACK=config.build_callback, IDT_LINUX_SSH=config.ssh,
                  IDT_LINUX_SCP=config.scp, IDT_PAIR_BASELINE=str(baseline),
@@ -228,7 +230,7 @@ def main():
     for path in (config.git, config.python, config.ssh, config.scp, config.build_callback):
         if not Path(path).is_file() or not os.access(path, os.X_OK):
             raise OidcError("reviewed Linux executable unavailable")
-    for path in (config.runtime_root, config.idt_root, config.home):
+    for path in (config.runtime_root, config.idt_root, config.home, config.qemu_sysroot):
         if not Path(path).is_dir():
             raise OidcError("reviewed Linux directory unavailable")
     source_env = dict(os.environ)

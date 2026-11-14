@@ -33,7 +33,7 @@ class LinuxTransportTests(unittest.TestCase):
             runtime.mkdir()
             environment = {"IDT_HOST_MODE": "linux-arm64", "IDT_LINUX_IDT_ROOT": str(bundle),
                            "IDT_LINUX_BUILD_CALLBACK": "/reviewed/build-hook", "IDT_LINUX_SSH": "/usr/bin/ssh",
-                           "IDT_LINUX_SCP": "/usr/bin/scp", "CI": "true"}
+                           "IDT_LINUX_SCP": "/usr/bin/scp", "CI": "true", "QEMU_LD_PREFIX": "/reviewed/qemu/sysroot"}
             credentials = SimpleNamespace(access_key="dummy-key", secret_key="dummy-secret", token="dummy-token")
             observed = {}
 
@@ -69,6 +69,7 @@ class LinuxTransportTests(unittest.TestCase):
             self.assertNotIn("wsl.exe", " ".join(observed["command"]).lower())
             self.assertEqual(observed["environment"]["IDT_LINUX_BUILD_CALLBACK"], "/reviewed/build-hook")
             self.assertEqual(observed["environment"]["IDT_TARGET"], "rx72n-ethernet")
+            self.assertEqual(observed["environment"]["QEMU_LD_PREFIX"], "/reviewed/qemu/sysroot")
             self.assertNotIn("RX_OIDC_ID_TOKEN", observed["environment"])
 
     def test_corrupted_copy_fails_verification_before_native_process(self):
