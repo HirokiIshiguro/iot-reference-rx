@@ -14,6 +14,23 @@ The public-only standalone CI file tests a placeholder compile and response
 without IDT, AWS or hardware. Both runners and Windows-to-RPi SSH are required.
 The callback uses the parent socket under the dedicated user's private home.
 
+The Windows worker uses `ssh -T` with `BatchMode=yes` and
+`StrictHostKeyChecking=yes` against the preconfigured `rpi4-idt` alias. The
+dedicated account's pinned host key, identity and RPi forced-command policy
+must be installed and verified separately. The requested command is exactly
+`python3 -u "$HOME/.cache/idt-rx72n-pair/<session>/rpi4_pair_agent.py" attach <session>`,
+where both session fields are the same decimal identifier. The forced-command
+policy must accept this form without allowing an arbitrary shell.
+`rpi4_ssh_gate.py` is a proposed forced-command entry that accepts only this
+form, checks the session owner and permissions, and executes the session agent.
+It is not installed or authorized by this repository change; the host owner
+must review and place a root-managed copy before configuring the key.
+
+The public smoke covers job dispatch, authenticated socket exchange, a real
+placeholder-only compile and worker shutdown. It does not supply the two
+IDT-generated headers, compare complete source snapshots, validate a native
+build manifest or prove a hardware/AWS run; those remain separate checks.
+
 FRQ calls `rpi4_build_callback.py <source-path>` with exactly one argument,
 `IDT_TARGET=rx72n-ethernet` and `IDT_SCOPE=transport`. Only changes to the two
 test headers are accepted; the entire original file-hash snapshot is included

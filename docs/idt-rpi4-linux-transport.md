@@ -8,7 +8,7 @@ RPi #4 の専用 Runner から Linux 版 IDT を起動し、RPi #1 の RX72N Eth
 2. `/etc/idt-rx/runtime.json` のみから非秘密のレビュー済み設定を読む。directoryはroot所有0755、fileはroot:gitlab-runner-idt-rx 0640とし、symlinkを受け付けない。CI変数による設定pathの上書きはできない。未配置・未レビューなら停止する。
 3. 同一sourceの公開signer provisioner、manifest、公開証明書と公開鍵の４入力を事前に用意する。既存の `public_signer_bootstrap_environment` が一致を確認してprivate runtimeに取り込む。
 4. 共通roleから更新しない一時セッションを１回取得し、既存のジョブ・処理・回収時間の予算を確認する。元checkoutと依存gitlinkのSHAを記録する。
-5. `rpi4_pair.snapshot` でIDTに渡す前のsource snapshotをprivate runtimeに保存する。結果の一時出力もcheckoutの外へ置き、IDTのsource copy後にredacted reportだけをCI用の `artifacts/idt` へ移す。build callbackはprivate socketへ要求し、RPi側の仲介がその時点でWindows jobを起動する。job tokenは仲介が保持し、IDT・Windowsへ渡さない。Windowsは同じsource SHAを確認し、受け取ったヘッダだけをprivate copyへ適用してビルド結果を返す。
+5. `rpi4_pair.snapshot` でIDTに渡す前のsource snapshotをprivate runtimeに保存する。結果の一時出力もcheckoutの外へ置き、IDTのsource copy後にredacted reportだけをCI用の `artifacts/idt` へ移す。build callbackはprivate socketへ要求し、RPi側の仲介がその時点でWindows jobを起動する。親jobのtokenは仲介が保持し、IDT・Windowsへ渡さない。Windows側自身のjob tokenはcheckoutとjob確認後、build処理に渡さない。Windowsは同じsource SHAを確認し、受け取ったヘッダだけをprivate copyへ適用してビルド結果を返す。
 6. 既存 `run_transport.py` のbridge、`flash_transport.py` のtarget/manifest/hash検証、redacted JUnit checker、停止・回収処理を使う。Linux側は通常のSSH/SCPを使い、WSLのpath変換を呼ばない。対象はRX72N Ethernet / Transport groupだけ。
 
 Linux版の配布元は使用前に検証し、各実行のprivate runtime内に書込み可能なコピーを作る。コピーも検証してから使うため、配布元の設定やテスト定義を書き換えない。コピーは実行記録と同じprivate runtimeに残し、安全な停止を確認する前には削除しない。

@@ -10,6 +10,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import Mock, patch
+from types import SimpleNamespace
 from urllib.parse import parse_qs
 
 from tools.idt import rpi4_dispatch as dispatch
@@ -18,6 +19,7 @@ from tools.idt import rpi4_pair as pair
 from tools.idt import rpi4_pair_agent as agent
 from tools.idt import rpi4_pair_broker as broker_module
 from tools.idt import rpi4_public_controller as controller
+from tools.idt import rpi4_ssh_gate as ssh_gate
 from tools.idt import rpi4_windows_worker as worker
 from tools.idt.targets import get_target, target_fingerprint
 
@@ -30,6 +32,36 @@ class Response(io.BytesIO):
 
 
 class PublicPairTests(unittest.TestCase):
+    def test_forced_command_accepts_only_exact_paired_attach(self):
+        command = 'python3 -u "$HOME/.cache/idt-rx72n-pair/123/rpi4_pair_agent.py" attach 123'
+        self.assertIsNotNone(ssh_gate.COMMAND.fullmatch(command))
+        for bad in (command + '; id', command.replace('attach 123', 'attach 124'),
+                    command.replace('/123/', '/../'), command + '\n', 'id'):
+            self.assertIsNone(ssh_gate.COMMAND.fullmatch(bad))
+
+    @unittest.skipUnless(sys.platform == "linux", "Unix file ownership required")
+    def test_forced_command_checks_session_files(self):
+        command = 'python3 -u "$HOME/.cache/idt-rx72n-pair/123/rpi4_pair_agent.py" attach 123'
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            parent = home / '.cache/idt-rx72n-pair'
+            session = parent / '123'
+            session.mkdir(parents=True, mode=0o700)
+            parent.chmod(0o700)
+            for name in ('rpi4_pair_agent.py', 'rpi4_pair.py'):
+                path = session / name
+                path.write_text('public fixture')
+                path.chmod(0o600)
+            path, identity = ssh_gate.checked_agent(command, home, os.getuid())
+            self.assertEqual(path, session / 'rpi4_pair_agent.py')
+            self.assertEqual(identity, '123')
+            with patch('pwd.getpwuid', return_value=SimpleNamespace(pw_name='gitlab-runner-idt-rx', pw_dir=str(home))), \
+                 patch.dict(os.environ, {'SSH_ORIGINAL_COMMAND': command}), patch.object(ssh_gate.os, 'execv') as execute:
+                ssh_gate.main()
+            execute.assert_called_once_with('/usr/bin/python3', ['python3', '-E', '-s', '-u', str(path), 'attach', '123'])
+            (session / 'rpi4_pair.py').chmod(0o644)
+            with self.assertRaises(ValueError): ssh_gate.checked_agent(command, home, os.getuid())
+
     def test_only_reviewed_public_job_is_admitted(self):
         env = {"CI_PROJECT_ID": "38", "CI_RUNNER_ID": "28", "CI_COMMIT_REF_PROTECTED": "true",
                "CI_PIPELINE_SOURCE": "api", "CI_COMMIT_SHA": SHA, "CI_PIPELINE_ID": "123",
