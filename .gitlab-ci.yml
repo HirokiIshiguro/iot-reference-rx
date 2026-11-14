@@ -39,18 +39,25 @@ win29_limited_ssh_probe:
                   Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
               }
           }
-          $options = @('-F', 'NUL', '-o', 'StrictHostKeyChecking=yes', '-o', "UserKnownHostsFile=$known",
-                       '-o', 'GlobalKnownHostsFile=NUL', '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes',
-                       '-o', 'ConnectTimeout=8', '-i', $key, 'gitlab-runner-idt-rx@192.168.10.123')
-          $ErrorActionPreference = 'Continue'
-          $rejected = (& $ssh @options 'hostname' 2>&1 | Out-String)
-          $rejectedCode = $LASTEXITCODE
-          $allowed = (& $ssh @options 'python3 -u "$HOME/.cache/idt-rx72n-pair/20969174760001/rpi4_pair_agent.py" attach 20969174760001' 2>&1 | Out-String)
-          $allowedCode = $LASTEXITCODE
-          $ErrorActionPreference = 'Stop'
-          if ($rejectedCode -ne 1 -or $rejected -notmatch 'Paired SSH command rejected') { throw 'Unexpected general command result.' }
-          if ($allowedCode -ne 0 -or $allowed.Trim() -cne 'IDT_GATE_PROBE_OK') { throw 'Expected limited command did not complete.' }
-          Write-Host 'PASS: pinned host, dedicated key, general-command rejection and limited-command acceptance.'
+          $python = 'C:/ProgramData/SAFFTI-IdtRxRunner/work/tools/venv-3.14.10/Scripts/python.exe'
+          $probe = @'
+      import subprocess, sys
+      ssh, known, key = sys.argv[1:]
+      options = ['-F', 'NUL', '-o', 'StrictHostKeyChecking=yes', '-o', 'UserKnownHostsFile=' + known,
+                 '-o', 'GlobalKnownHostsFile=NUL', '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes',
+                 '-o', 'ConnectTimeout=8', '-i', key, 'gitlab-runner-idt-rx@192.168.10.123']
+      def invoke(command):
+          return subprocess.run([ssh, *options, command], capture_output=True, text=True, timeout=15)
+      rejected = invoke('hostname')
+      if rejected.returncode != 1 or 'Paired SSH command rejected' not in rejected.stderr:
+          raise SystemExit('Unexpected general command result')
+      allowed = invoke('python3 -u "$HOME/.cache/idt-rx72n-pair/20969174760001/rpi4_pair_agent.py" attach 20969174760001')
+      if allowed.returncode != 0 or allowed.stdout.strip() != 'IDT_GATE_PROBE_OK':
+          raise SystemExit('Expected limited command did not complete')
+      print('PASS: pinned host, dedicated key, general-command rejection and limited-command acceptance.')
+      '@
+          $probe | & $python -I - $ssh $known $key
+          if ($LASTEXITCODE -ne 0) { throw 'Restricted SSH probe failed.' }
       } finally {
           Remove-Item -LiteralPath $known -Force -ErrorAction SilentlyContinue
       }
