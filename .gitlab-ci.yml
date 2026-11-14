@@ -78,6 +78,14 @@ win29_log_readonly:
               exit_codes = @([regex]::Matches($content, '(?i)\bexit(?:ed with)? (?:code|status)\s*[:=]?\s*(-?[0-9]{1,4})\b') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
           }
           Write-Host ("LOG_$($item.name)=" + ($flags | ConvertTo-Json -Compress))
+          if ($item.name -eq 'PUBLIC') {
+              $allowed = @('error','exception','failed','failure','fatal','python','python.exe','pwsh','process','command','program','execute','execution','run','running','cannot','could','not','the','a','of','is','was','with','in','for','at','line','char','exit','code','status','memory','allocation','resource','available','insufficient','enough','access','denied','permission','file','directory','path','system','argument','invalid','handle','closed','broken','pipe','output','input','encoding','decode','encode','unicode','version','module','import','missing','found','exist','source','dependency','dependencies','provenance','capture','captured','verify','verification','manifest','target','schema','hash','hashes','pin','pins','different','differs','mismatch','unrecorded','changed','initialization','uninitialized','unsupported','unexpected','requires','timed','out','timeout','space','disk','operating','specified','name','data','no','available','parameter','value','empty','start','started','launch','launcher','initializing','control','job','stopped','response','returned','warning','terminating','native','traceback','most','recent','call','last','erroractionpreference','method','operation','stream','stderr','stdout','as','when','external','an','while','being','has','been','used','all','configured','to','from','object','test','test_build_rx_idt.ps1','build_rx72n_idt_transport.ps1','rx_e2studio_cli.ps1','idt_source_manifest.py')
+              $lines = @($content -split "`r?`n")
+              for ($index = [Math]::Max(0, $lines.Count - 25); $index -lt $lines.Count; $index++) {
+                  $safe = @([regex]::Matches($lines[$index], '[A-Za-z][A-Za-z0-9_.-]*') | ForEach-Object { $_.Value.ToLowerInvariant() } | Where-Object { $_ -in $allowed })
+                  if ($safe.Count) { Write-Host ('SAFE_LOG_LINE_' + ($index + 1) + '=' + ($safe -join ' ')) }
+              }
+          }
       }
       $targetNames = @('ccrx.exe','rlink.exe','e2studio-cli.exe','e2studioc.exe','make.exe','sh.exe','java.exe','pwsh.exe','powershell.exe')
       $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
