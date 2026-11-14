@@ -1,0 +1,54 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PROJECT_ID == "38"'
+      when: always
+    - when: never
+
+stages: [probe]
+variables:
+  GIT_STRATEGY: none
+  GIT_SUBMODULE_STRATEGY: none
+
+win29_limited_ssh_probe:
+  stage: probe
+  timeout: 5 minutes
+  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
+  script:
+    - |
+      $ErrorActionPreference = 'Stop'
+      if ($env:CI_PROJECT_ID -ne '38' -or $env:CI_RUNNER_ID -ne '29' -or
+          $env:CI_COMMIT_REF_PROTECTED -ne 'true' -or [Environment]::UserName -ne 'svc-idt-rx' -or
+          $env:CI_JOB_ID -notmatch '^\d+$') { throw 'Unexpected probe job identity.' }
+      $key = 'C:/ProgramData/SAFFTI-IdtRxRunner/work/ssh-idt-rpi4/id_ed25519'
+      $ssh = 'C:/Windows/System32/OpenSSH/ssh.exe'
+      $keygen = 'C:/Windows/System32/OpenSSH/ssh-keygen.exe'
+      $known = Join-Path $env:TEMP ("idt-rpi4-host-$env:CI_JOB_ID.txt")
+      $stream = [IO.File]::Open($known, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+      try {
+          $line = '192.168.10.123 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOHlGXFMBaNKz+F1uwnyxARvZFi92qDdOAbcOCOMHaRT' + "`n"
+          $bytes = [Text.Encoding]::ASCII.GetBytes($line)
+          $stream.Write($bytes, 0, $bytes.Length)
+      } finally { $stream.Dispose() }
+      try {
+          $hostFingerprint = (& $keygen -lf $known -E sha256 | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $hostFingerprint -notmatch 'SHA256:Cs4R7fkjzUKr8\+yrKLE\+e/dSl92IxX4e35DPkZuPn8U') { throw 'Unexpected host fingerprint.' }
+          foreach ($entry in @(Get-ChildItem Env:)) {
+              if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '(?i:TOKEN|SECRET|PRIVATE_KEY|PASSWORD)') {
+                  Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
+              }
+          }
+          $options = @('-F', 'NUL', '-o', 'StrictHostKeyChecking=yes', '-o', "UserKnownHostsFile=$known",
+                       '-o', 'GlobalKnownHostsFile=NUL', '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes',
+                       '-o', 'ConnectTimeout=8', '-i', $key, 'gitlab-runner-idt-rx@192.168.10.123')
+          $ErrorActionPreference = 'Continue'
+          $rejected = (& $ssh @options 'hostname' 2>&1 | Out-String)
+          $rejectedCode = $LASTEXITCODE
+          $allowed = (& $ssh @options 'python3 -u "$HOME/.cache/idt-rx72n-pair/20969174760001/rpi4_pair_agent.py" attach 20969174760001' 2>&1 | Out-String)
+          $allowedCode = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          if ($rejectedCode -ne 1 -or $rejected -notmatch 'Paired SSH command rejected') { throw 'Unexpected general command result.' }
+          if ($allowedCode -ne 0 -or $allowed.Trim() -cne 'IDT_GATE_PROBE_OK') { throw 'Expected limited command did not complete.' }
+          Write-Host 'PASS: pinned host, dedicated key, general-command rejection and limited-command acceptance.'
+      } finally {
+          Remove-Item -LiteralPath $known -Force -ErrorAction SilentlyContinue
+      }
