@@ -46,7 +46,6 @@ class LinuxConfig:
     budget: Budget
     runtime_root: str
     idt_root: str
-    build_callback: str
     ssh: str
     scp: str
     git: str
@@ -67,7 +66,7 @@ class LinuxConfig:
                 or not 0 < self.pair_build_seconds <= NATIVE_SECONDS
                 or self.budget.initial_required() + self.budget.margin_seconds > min(self.job_timeout_seconds, IDT_SESSION_SECONDS)):
             raise OidcError("invalid reviewed Linux IDT configuration")
-        paths = (self.runtime_root, self.idt_root, self.build_callback, self.ssh, self.scp,
+        paths = (self.runtime_root, self.idt_root, self.ssh, self.scp,
                  self.git, self.python, self.home, self.qemu_sysroot, *self.search_path.split(":"))
         if any(not isinstance(path, str) or not path or not PurePosixPath(path).is_absolute()
                or any(c.isspace() or c == "\0" for c in path) for path in paths):
@@ -157,7 +156,7 @@ def prepare_child(env, *, source_sha, config, job, baseline_path, session_factor
     child.update(PATH=config.search_path, HOME=config.home, IDT_HOST_MODE="linux-arm64",
                  QEMU_LD_PREFIX=config.qemu_sysroot,
                  IDT_LINUX_RUNTIME_ROOT=config.runtime_root, IDT_LINUX_IDT_ROOT=config.idt_root,
-                 IDT_LINUX_BUILD_CALLBACK=config.build_callback, IDT_LINUX_SSH=config.ssh,
+                 IDT_LINUX_BUILD_CALLBACK=str(ROOT / "tools/idt/rpi4_build_callback.py"), IDT_LINUX_SSH=config.ssh,
                  IDT_LINUX_SCP=config.scp, IDT_PAIR_BASELINE=str(baseline),
                  IDT_PAIR_SOCKET=str(Path(config.home) / ".cache/idt-rx72n-pair" / str(job["pipeline"]["id"]) / "build.sock"),
                  IDT_PAIR_BUILD_SECONDS=str(config.pair_build_seconds),
@@ -218,6 +217,18 @@ def run_linux_child(command, environment):
         raise
 
 
+def check_host_paths(config):
+    for path in (config.git, config.python, config.ssh, config.scp):
+        if not Path(path).is_file() or not os.access(path, os.X_OK):
+            raise OidcError("reviewed Linux executable unavailable")
+    callback = ROOT / "tools/idt/rpi4_build_callback.py"
+    if not callback.is_file() or not os.access(callback, os.R_OK):
+        raise OidcError("source build callback unavailable")
+    for path in (config.runtime_root, config.idt_root, config.home, config.qemu_sysroot):
+        if not Path(path).is_dir():
+            raise OidcError("reviewed Linux directory unavailable")
+
+
 def main():
     if sys.platform != "linux":
         raise OidcError("unexpected Linux runner identity")
@@ -227,12 +238,7 @@ def main():
             or Path(os.environ.get("CI_PROJECT_DIR", "")).resolve() != ROOT):
         raise OidcError("unexpected Linux runner identity")
     config = read_reviewed_config()
-    for path in (config.git, config.python, config.ssh, config.scp, config.build_callback):
-        if not Path(path).is_file() or not os.access(path, os.X_OK):
-            raise OidcError("reviewed Linux executable unavailable")
-    for path in (config.runtime_root, config.idt_root, config.home, config.qemu_sysroot):
-        if not Path(path).is_dir():
-            raise OidcError("reviewed Linux directory unavailable")
+    check_host_paths(config)
     source_env = dict(os.environ)
     git_env = {"PATH": config.search_path, "HOME": config.home, "GIT_CONFIG_NOSYSTEM": "1",
                "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0"}

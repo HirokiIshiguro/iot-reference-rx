@@ -13,7 +13,7 @@ RPi #4 の専用 Runner から Linux 版 IDT を起動し、RPi #1 の RX72N Eth
 
 Linux版の配布元は使用前に検証し、各実行のprivate runtime内に書込み可能なコピーを作る。コピーも検証してから使うため、配布元の設定やテスト定義を書き換えない。コピーは実行記録と同じprivate runtimeに残し、安全な停止を確認する前には削除しない。
 
-host設定の `runtime.json` は `schema_version`、`account`、`role_arn`、`ref`、`runner_id`、`job_timeout_seconds`、`budget`、`runtime_root`、`idt_root`、`build_callback`、`ssh`、`scp`、`git`、`python`、`home`、`search_path`、`pair_build_seconds`、`qemu_sysroot` を持つ。`qemu_sysroot` は管理者が固定したQEMU用sysrootで、Linux子プロセスの `QEMU_LD_PREFIX` に設定する。`budget` は既存 `Budget` の `bootstrap_seconds`、`native_prepare_seconds`、`report_seconds`、`margin_seconds` を持つ。値は統合時に実測・レビューしてhost側で配置し、この文書の存在を設定済みの証拠にはしない。
+host設定の `runtime.json` は `schema_version`、`account`、`role_arn`、`ref`、`runner_id`、`job_timeout_seconds`、`budget`、`runtime_root`、`idt_root`、`ssh`、`scp`、`git`、`python`、`home`、`search_path`、`pair_build_seconds`、`qemu_sysroot` を持つ。build callbackは同じsource SHAの `tools/idt/rpi4_build_callback.py` をPythonで実行する。`qemu_sysroot` は管理者が固定したQEMU用sysrootで、Linux子プロセスの `QEMU_LD_PREFIX` に設定する。`budget` は既存 `Budget` の `bootstrap_seconds`、`native_prepare_seconds`、`report_seconds`、`margin_seconds` を持つ。値は統合時に実測・レビューしてhost側で配置し、この文書の存在を設定済みの証拠にはしない。
 
 ## 未実施と開始条件
 

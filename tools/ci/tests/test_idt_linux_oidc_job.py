@@ -36,7 +36,7 @@ def token(runner=28):
 
 def config():
     return launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 10800, Budget(100, 100, 10, 10),
-                                "/var/tmp/idt-runtime", "/opt/idt", "/opt/idt/build-hook",
+                                "/var/tmp/idt-runtime", "/opt/idt",
                                 "/usr/bin/ssh", "/usr/bin/scp", "/usr/bin/git", "/usr/bin/python3",
                                 "/var/lib/gitlab-runner-idt-rx", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
 
@@ -65,6 +65,25 @@ def fake_session(env, expected, **kwargs):
 
 
 class LinuxOidcJobTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "linux", "Linux executable permissions")
+    def test_source_python_callback_does_not_require_executable_bit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            hook = root / 'tools/idt/rpi4_build_callback.py'
+            hook.parent.mkdir(parents=True)
+            hook.write_text('# source callback\n')
+            hook.chmod(0o644)
+            executable = root / 'tool'
+            executable.write_text('# fixture\n')
+            executable.chmod(0o700)
+            host = SimpleNamespace(git=str(executable), python=str(executable), ssh=str(executable), scp=str(executable),
+                                   runtime_root=str(root), idt_root=str(root), home=str(root), qemu_sysroot=str(root))
+            with patch.object(launcher, 'ROOT', root):
+                launcher.check_host_paths(host)
+                hook.unlink()
+                with self.assertRaisesRegex(OidcError, 'callback unavailable'):
+                    launcher.check_host_paths(host)
+
     @unittest.skipUnless(sys.platform == "linux", "Linux signal behavior")
     def test_real_interrupt_reaches_owned_child(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -123,7 +142,7 @@ class LinuxOidcJobTests(unittest.TestCase):
         child = launcher.prepare_child(environment(), source_sha=SHA, config=config(), job=job(),
                                        baseline_path="/var/tmp/idt-runtime/baseline.json", session_factory=fake_session)
         self.assertEqual(child["IDT_HOST_MODE"], "linux-arm64")
-        self.assertEqual(child["IDT_LINUX_BUILD_CALLBACK"], "/opt/idt/build-hook")
+        self.assertEqual(child["IDT_LINUX_BUILD_CALLBACK"], str(launcher.ROOT / "tools/idt/rpi4_build_callback.py"))
         self.assertEqual(child["IDT_PAIR_BASELINE"], "/var/tmp/idt-runtime/baseline.json")
         self.assertEqual(child["IDT_PAIR_SOCKET"].replace("\\", "/"), "/var/lib/gitlab-runner-idt-rx/.cache/idt-rx72n-pair/19/build.sock")
         self.assertEqual(child["IDT_PAIR_BUILD_SECONDS"], "600")
@@ -158,7 +177,7 @@ class LinuxOidcJobTests(unittest.TestCase):
             launcher.prepare_child(environment(), source_sha=SHA, config=None, job=job(), baseline_path="/tmp/baseline", session_factory=fake_session)
         with self.assertRaises(OidcError):
             launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 500, Budget(100, 100, 10, 10),
-                                 "/tmp/runtime", "/opt/idt", "/opt/hook", "/usr/bin/ssh", "/usr/bin/scp",
+                                 "/tmp/runtime", "/opt/idt", "/usr/bin/ssh", "/usr/bin/scp",
                                  "/usr/bin/git", "/usr/bin/python3", "/tmp/home", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
 
     def test_fixed_host_config_rejects_wrong_owner_mode_and_extra_fields(self):
