@@ -51,6 +51,14 @@ rpi4_nested_source_verify:
           print('JOB_TOKEN_STATUS_FIELDS_MATCH=' + str(len(expected) == 1 and expected[0].get('name') == 'rpi4_public_windows_build' and (expected[0].get('commit') or {}).get('id') == '3f0f639ff560583983f2e7b4dd2249b7c1e56629' and expected[0].get('status') == 'canceled').lower())
       except (urllib.error.URLError, ValueError):
           print('JOB_TOKEN_VISIBLE_EXPECTED_JOB=false')
+      request = urllib.request.Request('https://gitlab.saffti.jp/api/v4/projects/38/pipelines/' + os.environ['CI_PIPELINE_ID'] + '/jobs?per_page=20', headers={'JOB-TOKEN': os.environ['CI_JOB_TOKEN']})
+      try:
+          with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()).open(request, timeout=10) as response:
+              jobs = json.loads(response.read(65536))
+          current = [x for x in jobs if str(x.get('id')) == os.environ['CI_JOB_ID']] if isinstance(jobs, list) else []
+          print('JOB_TOKEN_RUNNING_FIELDS_MATCH=' + str(len(current) == 1 and current[0].get('status') == 'running' and (current[0].get('runner') or {}).get('id') == 28 and (current[0].get('commit') or {}).get('id') == sha).lower())
+      except (urllib.error.URLError, ValueError):
+          print('JOB_TOKEN_RUNNING_FIELDS_MATCH=false')
       config = SimpleNamespace(search_path='/usr/bin:/bin', home=account.pw_dir)
       env = nested.git_environment(dict(os.environ), config)
       count = nested.initialize(root, '/usr/bin/git', env)
