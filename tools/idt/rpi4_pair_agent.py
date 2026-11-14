@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import os
 from pathlib import Path
 import queue
@@ -12,6 +13,7 @@ import socket
 import stat
 import sys
 import threading
+import time
 
 try:
     from .rpi4_pair import read_frame, write_frame
@@ -72,8 +74,18 @@ def attach(pipeline, input_stream, output_stream):
         server.bind(str(endpoint))
         endpoint.chmod(0o600)
         server.listen(1)
+        server.settimeout(10800)
         try:
-            with (path / "ready").open("wb", buffering=0) as fifo:
+            deadline = time.monotonic() + 120
+            while True:
+                try:
+                    descriptor = os.open(path / "ready", os.O_WRONLY | os.O_NONBLOCK)
+                    break
+                except OSError as error:
+                    if error.errno != errno.ENXIO or time.monotonic() >= deadline:
+                        raise RuntimeError("paired controller did not accept readiness") from None
+                    time.sleep(0.1)
+            with os.fdopen(descriptor, "wb", buffering=0) as fifo:
                 fifo.write(b"R")
             while True:
                 connection, _ = server.accept()

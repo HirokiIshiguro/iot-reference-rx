@@ -8,7 +8,7 @@ RPi #4 の専用 Runner から Linux 版 IDT を起動し、RPi #1 の RX72N Eth
 2. `/etc/idt-rx/runtime.json` のみから非秘密のレビュー済み設定を読む。directoryはroot所有0755、fileはroot:gitlab-runner-idt-rx 0640とし、symlinkを受け付けない。CI変数による設定pathの上書きはできない。未配置・未レビューなら停止する。
 3. 同一sourceの公開signer provisioner、manifest、公開証明書と公開鍵の４入力を事前に用意する。既存の `public_signer_bootstrap_environment` が一致を確認してprivate runtimeに取り込む。
 4. 共通roleから更新しない一時セッションを１回取得し、既存のジョブ・処理・回収時間の予算を確認する。元checkoutと依存gitlinkのSHAを記録する。
-5. Windows担当が提供する `rpi4_pair.snapshot` で、IDTに渡す前のsource snapshotをprivate runtimeに保存する。結果の一時出力もcheckoutの外へ置き、IDTのsource copy後にredacted reportだけをCI用の `artifacts/idt` へ移す。IDTのbuild callbackは `callback <IDTが生成したsource path>` で呼ばれ、`IDT_PAIR_BASELINE`、`IDT_PAIR_BUILD_SECONDS`、`IDT_PAIR_SOCKET=$HOME/.cache/idt-rx72n-pair/<pipeline ID>/build.sock` と既存 `IDT_PROVENANCE_FILE` を受け取る。callbackと対向workerの実装・統合は別担当。
+5. `rpi4_pair.snapshot` でIDTに渡す前のsource snapshotをprivate runtimeに保存する。結果の一時出力もcheckoutの外へ置き、IDTのsource copy後にredacted reportだけをCI用の `artifacts/idt` へ移す。build callbackはprivate socketへ要求し、RPi側の仲介がその時点でWindows jobを起動する。job tokenは仲介が保持し、IDT・Windowsへ渡さない。Windowsは同じsource SHAを確認し、受け取ったヘッダだけをprivate copyへ適用してビルド結果を返す。
 6. 既存 `run_transport.py` のbridge、`flash_transport.py` のtarget/manifest/hash検証、redacted JUnit checker、停止・回収処理を使う。Linux側は通常のSSH/SCPを使い、WSLのpath変換を呼ばない。対象はRX72N Ethernet / Transport groupだけ。
 
 Linux版の配布元は使用前に検証し、各実行のprivate runtime内に書込み可能なコピーを作る。コピーも検証してから使うため、配布元の設定やテスト定義を書き換えない。コピーは実行記録と同じprivate runtimeに残し、安全な停止を確認する前には削除しない。
@@ -18,6 +18,6 @@ host設定の `runtime.json` は `schema_version`、`account`、`role_arn`、`re
 ## 未実施と開始条件
 
 - #15691はdevice不要の公式sample、#15694はFRQの実行確認、#15701は実行しない準備確認であり、RX72N実機Transportの成功ではない。#15701のテスト定義を書き換えるoverlayは本経路では使わない。
-- Windows callback・private socketの立上げ、両hostの同一source snapshot、QEMU/binfmtとloader、公開signerの４入力は統合時に実環境で確認する。CI YAMLとRunner設定はこの差分に含めない。
+- Windows callback・private socketの立上げ、両hostの同一source snapshot、QEMU/binfmtとloader、公開signerの４入力は実環境で確認する。`tools/ci/rpi4_transport_pilot.yml` は実行を禁止したまま、通常CIからも読み込まない。`tools/ci/rpi4_pair_public_smoke.yml` は公開データ専用の接続・ビルド試験で、別の保護refからの明示起動を前提とする。
 - 実機起動前にRPi #1の固定書込み器・UART・占有を確認し、同一sourceの通常FW復帰bundleを用意する。中断時を含め、当該OIDC sessionが作ったAWS資源をCloudTrailの記録と照合して回収し、通常FW復帰・reset/UART静穏・lock解放を別々に確認する。これらの実行と最終判断は統合担当が行う。
 - IDTのprivate runtimeには注入source・一時鍵・UART記録が残り得る。安全な停止を確認するまで所有者が保持し、出力するJUnitは既存のredacted reportに限る。完全なTransport合格や製品releaseは、このオフライン検証からは判断できない。

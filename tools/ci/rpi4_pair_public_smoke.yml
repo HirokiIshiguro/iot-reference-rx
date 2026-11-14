@@ -1,0 +1,71 @@
+# Standalone public-input probe; it is not included in the normal pipeline.
+# Use only through a temporary protected ref after the dedicated runners and
+# Windows -> RPi #4 SSH are ready. It never requests an ID token or hardware.
+include:
+  - project: oss/infra/hardware-config
+    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
+    file: /templates/windows_ccrx_host_lease.yml
+
+workflow:
+  rules:
+    - if: '$CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/'
+      when: never
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "public-controller"'
+      when: always
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
+      when: always
+    - when: never
+
+stages: [probe]
+
+variables:
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: normal
+  GIT_CONFIG_COUNT: "3"
+  GIT_CONFIG_KEY_0: core.longpaths
+  GIT_CONFIG_VALUE_0: "true"
+  GIT_CONFIG_KEY_1: core.autocrlf
+  GIT_CONFIG_VALUE_1: "false"
+  GIT_CONFIG_KEY_2: core.eol
+  GIT_CONFIG_VALUE_2: lf
+
+rpi4_public_controller:
+  stage: probe
+  timeout: 2 hours
+  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "public-controller"'
+    - when: never
+  script:
+    - python3 -B tools/idt/rpi4_public_controller.py
+
+rpi4_public_windows_build:
+  stage: probe
+  timeout: 2 hours
+  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "public"'
+    - when: never
+  script:
+    - !reference [.windows_ccrx_host_lease, script]
+    - |
+      $ErrorActionPreference = 'Stop'
+      $leaseFile = Join-Path $env:TEMP ("idt-public-lease-$env:CI_PIPELINE_ID-$env:CI_JOB_ID.ps1")
+      try {
+          $text = 'function Enter-WindowsCcrxHostLease {' + "`n" + ${function:Enter-WindowsCcrxHostLease}.ToString() + "`n}"
+          $stream = [IO.File]::Open($leaseFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+          try { $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false)); $writer.Write($text); $writer.Flush() }
+          finally { $stream.Dispose() }
+          $env:IDT_PAIR_LEASE_DEFINITION = $leaseFile
+      } finally {
+          $script:WindowsCcrxHostLease.Dispose()
+          $script:WindowsCcrxHostLease = $null
+      }
+      try {
+          . tools/rx_e2studio_cli.ps1
+          Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
+          & 'C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe' -I tools/idt/rpi4_windows_worker.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      } finally {
+          Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue
+      }

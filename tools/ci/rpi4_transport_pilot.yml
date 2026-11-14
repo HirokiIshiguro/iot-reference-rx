@@ -9,21 +9,15 @@ workflow:
   rules:
     - when: never
 
-stages: [prepare, run]
-
-rpi4_pair_prepare:
-  stage: prepare
-  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
-  script:
-    - test "$CI_PROJECT_ID" = 38
-    - test "$CI_RUNNER_ID" = 28
-    - test "$(id -un)" = gitlab-runner-idt-rx
-    - python3 tools/idt/rpi4_pair_agent.py prepare "$CI_PIPELINE_ID"
+stages: [run]
 
 rpi4_windows_worker:
   stage: run
   tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
-  needs: [rpi4_pair_prepare]
+  resource_group: ishiguro-pc-ccrx-e2studio-build
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "transport"'
+    - when: never
   script:
     # The pinned template takes its lease here. Export its function, then
     # release immediately; each build subprocess acquires it again.
@@ -42,6 +36,8 @@ rpi4_windows_worker:
           $script:WindowsCcrxHostLease = $null
       }
       try {
+          . tools/rx_e2studio_cli.ps1
+          Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
           & 'C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe' -I tools/idt/rpi4_windows_worker.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       } finally {
@@ -51,12 +47,14 @@ rpi4_windows_worker:
 rpi4_transport_controller:
   stage: run
   tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
-  needs: [rpi4_pair_prepare]
+  id_tokens:
+    RX_OIDC_ID_TOKEN:
+      aud: sts.amazonaws.com
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
+    - when: never
   script:
     - test "$CI_PROJECT_ID" = 38
     - test "$CI_RUNNER_ID" = 28
     - test "$(id -un)" = gitlab-runner-idt-rx
-    # The separate Linux transport launcher and reviewed time budget must be
-    # integrated here before the disabled workflow may be enabled.
-    - echo 'Linux IDT launcher integration is not yet connected.'
-    - exit 1
+    - python3 -B tools/idt/rpi4_native_controller.py
