@@ -401,6 +401,12 @@ def observe_hardware_runtime(process, runtime, env, credentials, console):
             pending = lines.pop()
         for line in lines:
             console.write(redact(line, credentials))
+            bridge_failure = re.fullmatch(
+                r"IDT bridge startup: (host_key|authentication|hostname_resolution|network|unclassified)",
+                line.strip(),
+            )
+            if bridge_failure:
+                print("IDT bridge startup: " + bridge_failure[1], flush=True)
             for phase in NATIVE_CONSOLE_PHASES:
                 if phase in line:
                     print("IDT phase: " + phase, flush=True)

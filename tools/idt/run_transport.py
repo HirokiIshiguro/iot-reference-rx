@@ -41,6 +41,20 @@ SUITE = "FRQ_2.5.0"
 SSH = os.environ.get("IDT_WINDOWS_SSH", "/mnt/c/Windows/System32/OpenSSH/ssh.exe")
 
 
+def ssh_failure_category(line):
+    """Classify SSH startup errors without publishing their arguments or paths."""
+    line = line.lower()
+    if "host key verification failed" in line:
+        return "host_key"
+    if "permission denied" in line or "no such identity" in line:
+        return "authentication"
+    if "could not resolve hostname" in line:
+        return "hostname_resolution"
+    if re.search(r"connection (?:timed out|refused|reset)|no route to host", line):
+        return "network"
+    return None
+
+
 def write_all(fd, data):
     while data:
         written = os.write(fd, data)
@@ -143,6 +157,7 @@ class Bridge:
         self.closing = threading.Event()
         self.forward_stopped = threading.Event()
         self.failure_reason = None
+        self.ssh_failure = None
         self.master, self.slave = pty.openpty()
         tty.setraw(self.slave)
         os.set_blocking(self.master, False)
@@ -173,6 +188,8 @@ class Bridge:
             line = raw.decode("utf-8", "replace").strip()
             if line == "IDT_UART_READY":
                 self.ready.set()
+            elif not self.ready.is_set() and self.ssh_failure is None:
+                self.ssh_failure = ssh_failure_category(line)
             if line:
                 print("[bridge] " + line, file=sys.stderr, flush=True)
         if not self.closing.is_set():
@@ -267,6 +284,9 @@ class Bridge:
                     self.remote.wait(timeout=REMOTE_KILL_SECONDS)
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("Owned SSH process did not stop; inspect the private runtime and bench") from None
+        # After the SSH process exits, let its stderr reader reach EOF before
+        # closing the pipe so an immediate startup failure can be diagnosed.
+        self.threads[0].join(timeout=BRIDGE_THREAD_JOIN_SECONDS)
         self.threads[1].join(timeout=CAPTURE_DRAIN_SECONDS)
         self.closed.set()
         for descriptor in (self.master, self.slave):
@@ -475,6 +495,8 @@ def main():
                         result.update(verdict="FAIL", cleanupError=str(error))
                         exit_code = 1
                         print("IDT cleanup failed: " + str(error), file=sys.stderr, flush=True)
+                    if not bridge.ready.is_set():
+                        print("IDT bridge startup: " + (bridge.ssh_failure or "unclassified"), flush=True)
             finally:
                 try:
                     if config_written and original_config is not None:
