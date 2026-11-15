@@ -155,7 +155,14 @@ def prepare_child(env, *, source_sha, config, job, baseline_path, session_factor
     allowed = {"CI", "CI_PIPELINE_ID", "CI_PROJECT_DIR", "IDT_TARGET", "IDT_SCOPE", "RUN_RX_IDT",
                *PUBLIC_SIGNER_INPUTS.values()}
     child = child_environment(verified, session, allow_names=allowed)
+    # The Runner checkout represents tracked Git symlinks as ordinary files,
+    # just like the paired Windows source.  Apply that reviewed setting to all
+    # native Git subprocesses, including recursive dependency provenance checks.
+    # Do not forward Runner/CI Git configuration into the credentialed child.
     child.update(PATH=config.search_path, HOME=config.home, IDT_HOST_MODE="linux-arm64",
+                 GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+                 GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="core.symlinks",
+                 GIT_CONFIG_VALUE_0="false", GIT_TERMINAL_PROMPT="0",
                  QEMU_LD_PREFIX=config.qemu_sysroot,
                  IDT_LINUX_RUNTIME_ROOT=config.runtime_root, IDT_LINUX_IDT_ROOT=config.idt_root,
                  IDT_LINUX_BUILD_CALLBACK=str(ROOT / "tools/idt/rpi4_build_callback.py"), IDT_LINUX_SSH=config.ssh,

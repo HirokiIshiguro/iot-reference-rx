@@ -139,7 +139,12 @@ class LinuxOidcJobTests(unittest.TestCase):
                 launcher.main()
 
     def test_dedicated_job_uses_signed_runner_id_and_isolates_child(self):
-        child = launcher.prepare_child(environment(), source_sha=SHA, config=config(), job=job(),
+        untrusted = environment()
+        untrusted.update(GIT_CONFIG_COUNT="2", GIT_CONFIG_KEY_0="core.symlinks",
+                         GIT_CONFIG_VALUE_0="true", GIT_CONFIG_KEY_1="core.hooksPath",
+                         GIT_CONFIG_VALUE_1="/unreviewed", GIT_CONFIG_GLOBAL="/unreviewed/config",
+                         GIT_DIR="/unreviewed/repository")
+        child = launcher.prepare_child(untrusted, source_sha=SHA, config=config(), job=job(),
                                        baseline_path="/var/tmp/idt-runtime/baseline.json", session_factory=fake_session)
         self.assertEqual(child["IDT_HOST_MODE"], "linux-arm64")
         self.assertEqual(child["IDT_LINUX_BUILD_CALLBACK"], str(launcher.ROOT / "tools/idt/rpi4_build_callback.py"))
@@ -152,6 +157,11 @@ class LinuxOidcJobTests(unittest.TestCase):
         for name in ("RX_OIDC_ID_TOKEN", "CI_JOB_TOKEN", "AWS_ROLE_ARN", "AWS_PROFILE", "UNREVIEWED_INPUT"):
             self.assertNotIn(name, child)
         self.assertEqual(child["AWS_CONFIG_FILE"], __import__("os").devnull)
+        self.assertEqual({name: value for name, value in child.items() if name.startswith("GIT_")}, {
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.symlinks",
+            "GIT_CONFIG_VALUE_0": "false", "GIT_TERMINAL_PROMPT": "0",
+        })
 
     def test_native_build_budget_must_leave_time_for_queue_and_readiness(self):
         maximum = launcher.NATIVE_SECONDS - launcher.READY_SECONDS - launcher.RESPONSE_SECONDS
