@@ -78,7 +78,9 @@ build_rx72n_ether:
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
     - pwsh -NoProfile -File tools/ci/tests/test_rx72n_ota_oidc.ps1 -Wrapper tools/aws/rx72n_ota_oidc.ps1
-    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_hardware_transaction_contract tools.ci.tests.test_rx72n_tsip_trace_init tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_rx72n_fwup_prm_contract tools.ci.tests.test_rx_e2studio_cli
+    # The regular MR pipeline checks its own complete CI contract. Those CI
+    # structure tests do not apply to this intentionally restricted one-shot.
+    - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_tsip_trace_init tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_rx72n_fwup_prm_contract tools.ci.tests.test_rx_e2studio_cli
     - pip install cryptography --quiet
     - |
       $tls13ZeroRtt = ($env:RX72N_TLS13_0RTT_ENABLE -eq "true")
