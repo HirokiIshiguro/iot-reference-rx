@@ -42,13 +42,15 @@ variables:
 .rx_windows_canonical_checkout:
   variables:
     GIT_STRATEGY: "clone"
-    GIT_CONFIG_COUNT: "3"
+    GIT_CONFIG_COUNT: "4"
     GIT_CONFIG_KEY_0: "core.longpaths"
     GIT_CONFIG_VALUE_0: "true"
     GIT_CONFIG_KEY_1: "core.autocrlf"
     GIT_CONFIG_VALUE_1: "false"
     GIT_CONFIG_KEY_2: "core.eol"
     GIT_CONFIG_VALUE_2: "lf"
+    GIT_CONFIG_KEY_3: "core.symlinks"
+    GIT_CONFIG_VALUE_3: "false"
 
 
 build_rx72n_ether:
@@ -86,6 +88,11 @@ build_rx72n_ether:
       }
   script:
     - !reference [.windows_ccrx_host_lease, script]
+    - |
+      . tools/rx_e2studio_cli.ps1
+      Initialize-RxBuildDependencies -ProjectRoot "$env:CI_PROJECT_DIR"
+      python -B tools/idt/stage_public_assets.py --write-windows-snapshot "$env:CI_PROJECT_DIR/artifacts/idt-source/windows-source-sha256.txt"
+      if ($LASTEXITCODE -ne 0) { throw 'Windows source snapshot failed.' }
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
     - pwsh -NoProfile -File tools/ci/tests/test_rx72n_ota_oidc.ps1 -Wrapper tools/aws/rx72n_ota_oidc.ps1
@@ -154,6 +161,7 @@ build_rx72n_ether:
   artifacts:
     when: always
     paths:
+      - artifacts/idt-source/windows-source-sha256.txt
       - rx72n_e2studio_build.log
       - rx72n_app.rsu
       - rx72n_codesign_cert.pem
@@ -271,6 +279,9 @@ package_normal_boot_rx72n:
   needs:
     - job: build_rx72n_ether
       artifacts: true
+  script:
+    - !reference [.normal_boot_package, script]
+    - Copy-Item -LiteralPath "$env:CI_PROJECT_DIR/artifacts/idt-source/windows-source-sha256.txt" -Destination "$env:CI_PROJECT_DIR/artifacts/normal_boot_rx72n/windows-source-sha256.txt"
   rules:
     - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
       when: on_success
@@ -319,7 +330,7 @@ rpi4_windows_worker:
           Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue
       }
 
-rpi4_transport_controller:
+.rpi4_linux_transport_common:
   stage: run
   timeout: 3 hours
   tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
@@ -342,6 +353,24 @@ rpi4_transport_controller:
       when: manual
       allow_failure: false
     - when: never
+  before_script: []
+  after_script: []
+
+rpi4_transport_preflight:
+  extends: .rpi4_linux_transport_common
+  script:
+    - test "$CI_PROJECT_ID" = 38
+    - test "$CI_RUNNER_ID" = 28
+    - test "$(id -un)" = gitlab-runner-idt-rx
+    - /home/gitlab-runner-idt-rx/.local/share/idt-rpi4-transport-venv-20261115/bin/python -I -B tools/idt/rpi4_native_controller.py --preflight-only
+
+rpi4_transport_controller:
+  extends: .rpi4_linux_transport_common
+  needs:
+    - job: package_normal_boot_rx72n
+      artifacts: true
+    - job: rpi4_transport_preflight
+      artifacts: false
   script:
     - test "$CI_PROJECT_ID" = 38
     - test "$CI_RUNNER_ID" = 28

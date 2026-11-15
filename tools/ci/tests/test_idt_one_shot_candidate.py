@@ -25,20 +25,24 @@ class OneShotCandidateTests(unittest.TestCase):
     def test_manual_preparation_and_controller_are_scoped(self):
         build = block('build_rx72n_ether', '.normal_boot_package')
         package = block('package_normal_boot_rx72n', 'rpi4_windows_worker')
+        common = block('.rpi4_linux_transport_common', 'rpi4_transport_preflight')
+        preflight = block('rpi4_transport_preflight', 'rpi4_transport_controller')
         controller = CI.split('\nrpi4_transport_controller:\n', 1)[1]
         self.assertIn('when: manual', build)
-        self.assertIn('when: manual', controller)
+        self.assertIn('when: manual', common)
         self.assertIn('allow_failure: false', build)
-        self.assertIn('allow_failure: false', controller)
+        self.assertIn('allow_failure: false', common)
+        self.assertIn('--preflight-only', preflight)
+        self.assertIn('job: rpi4_transport_preflight', controller)
         self.assertIn('job: package_normal_boot_rx72n', controller)
         self.assertIn('job: build_rx72n_ether', package)
         self.assertNotIn('id_tokens:', build)
         self.assertNotIn('id_tokens:', package)
-        self.assertIn('RX_OIDC_ID_TOKEN:', controller)
+        self.assertIn('RX_OIDC_ID_TOKEN:', common)
         self.assertEqual(CI.count('codex/209-rpi4-transport-once-20261115'), 4)
         for filename in ('public_signer_provisioner.mot', 'public_signer_provisioner_manifest.json',
                          'signer.crt.pem', 'signer.pub.pem'):
-            self.assertIn('artifacts/normal_boot_rx72n/' + filename, controller)
+            self.assertIn('artifacts/normal_boot_rx72n/' + filename, common)
 
     @unittest.skipUnless(os.name == 'nt' and PWSH, 'Windows PowerShell 7 required')
     def test_preparation_guards_reject_wrong_context_and_clear_aws_values(self):

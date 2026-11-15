@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import hmac
 import os
 from pathlib import Path, PurePosixPath
 import platform
@@ -30,6 +31,7 @@ from tools.idt.oidc_job import (Budget, MAX_JOB_SECONDS, NATIVE_SECONDS, PROJECT
 from tools.idt.public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_INPUTS
 from tools.idt.cleanup_budget import owned_runtime_cleanup_seconds
 from tools.idt.rpi4_pair import READY_SECONDS, RESPONSE_SECONDS
+from tools.idt.stage_public_assets import digest_snapshot, stage_assets
 
 RUNNER_TAG = "project38-idt-rpi4-protected"
 RUNNER_USER = "gitlab-runner-idt-rx"
@@ -240,8 +242,10 @@ def capture_baseline(source, path):
         from tools.idt.rpi4_pair import snapshot
     except ImportError:
         raise OidcError("paired build integration is unavailable") from None
-    path.write_text(json.dumps(snapshot(source), sort_keys=True) + "\n", encoding="utf-8")
+    captured = snapshot(source)
+    path.write_text(json.dumps(captured, sort_keys=True) + "\n", encoding="utf-8")
     os.chmod(path, 0o600)
+    return digest_snapshot(captured)
 
 
 def cancel_linux_child(_signal, _frame):
@@ -279,7 +283,7 @@ def check_host_paths(config):
             raise OidcError("reviewed Linux directory unavailable")
 
 
-def main():
+def main(*, preflight_only=False):
     if sys.platform != "linux":
         raise OidcError("unexpected Linux runner identity")
     import pwd
@@ -308,13 +312,19 @@ def main():
     baseline_dir = Path(tempfile.mkdtemp(prefix="idt-baseline-", dir=runtime_root))
     launched = finished = False
     try:
+        public_inputs, windows_digest = stage_assets(ROOT, baseline_dir, source_sha)
+        source_env.update(public_inputs)
         baseline_path = baseline_dir / "baseline.json"
-        capture_baseline(ROOT, baseline_path)
+        if not hmac.compare_digest(capture_baseline(ROOT, baseline_path), windows_digest):
+            raise OidcError('Windows and Linux source snapshots differ')
         child = prepare_child(source_env, source_sha=source_sha, config=config, job=job,
                               baseline_path=baseline_path)
         source_env.pop(TOKEN_ENV, None)
         os.environ.pop(TOKEN_ENV, None)
         verify_transport_aws(child, config)
+        if preflight_only:
+            print('Transport preflight completed without hardware execution', flush=True)
+            return 0
         private_output = baseline_dir / "report"
         command = [config.python, str(ROOT / "tools/idt/run_idt.py"), "--target", "rx72n-ethernet",
                    "--scope", "transport", "--output", str(private_output), "--region", REGION]
