@@ -137,6 +137,47 @@ class WindowsBuildJobTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(b"Build containment was not established", result.stdout)
 
+    def test_transport_wrapper_ignores_stale_git_status_and_propagates_exceptions(self):
+        tools = Path(__file__).resolve().parents[2]
+        wrapper = tools / 'idt/rpi4_windows_build.ps1'
+        input_state = str(tools / 'rx_e2studio_cli.ps1').replace("'", "''")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'tools').mkdir()
+            project = root / 'git-free-project'
+            project.mkdir()
+            (project / '.project').write_text('<projectDescription/>', encoding='utf-8')
+            builder = root / 'tools/build_rx72n_idt_transport.ps1'
+            builder.write_text(
+                "param($ProjectRoot,$Target,$TestGroup,$ProvenanceFile,$Workspace,$E2Studio,$Python)\n"
+                f". '{input_state}'\n"
+                "$global:LASTEXITCODE=0\n"
+                "$null=Get-RxE2StudioProjectInputState -ProjectPaths @("
+                "(Join-Path $ProjectRoot 'git-free-project')) "
+                "-BuildDirectories @('HardwareDebug') -ExcludedPaths @()\n"
+                "if ($LASTEXITCODE -eq 0) { throw 'fixture did not exercise the Git fallback' }\n"
+                "Write-Output 'BUILD_HELPER_SUCCEEDED'\n", encoding='utf-8')
+            lease = root / 'lease.ps1'
+            lease.write_text('function Enter-WindowsCcrxHostLease { '
+                             '$script:WindowsCcrxHostLease = $null }\n', encoding='utf-8')
+            log = root / 'build.log'
+            args = ['pwsh', '-NoProfile', '-NonInteractive', '-File', str(wrapper),
+                    '-ProjectRoot', str(root), '-Python', sys.executable,
+                    '-ProvenanceFile', 'unused', '-Workspace', str(root),
+                    '-PrivateLog', str(log), '-LeaseDefinition', str(lease)]
+            env = dict(os.environ, GIT_CEILING_DIRECTORIES=str(root))
+            result = subprocess.run(args, input=b'go\n', stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, env=env, timeout=30)
+            self.assertEqual(result.returncode, 0, 'successful helper left a stale Git exit code')
+            self.assertIn('BUILD_HELPER_SUCCEEDED', log.read_text(encoding='utf-8-sig'))
+
+            builder.write_text(
+                "param($ProjectRoot,$Target,$TestGroup,$ProvenanceFile,$Workspace,$E2Studio,$Python)\n"
+                "throw 'synthetic build failure'\n", encoding='utf-8')
+            result = subprocess.run(args, input=b'go\n', stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, env=env, timeout=30)
+            self.assertNotEqual(result.returncode, 0, 'terminating build error was swallowed')
+
     def test_public_build_records_safe_failure_stage(self):
         helper = Path(__file__).resolve().parents[2] / 'idt/rpi4_windows_public_build.ps1'
         with tempfile.TemporaryDirectory() as temporary:

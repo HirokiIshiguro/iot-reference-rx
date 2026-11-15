@@ -27,7 +27,7 @@ try {
         Python = $Python
     }
     & (Join-Path $ProjectRoot 'tools/build_rx72n_idt_transport.ps1') @arguments *> $PrivateLog
-    if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'The build helper failed.' }
+    # The PowerShell helper throws on failure; LASTEXITCODE can belong to a Git probe.
 } finally {
     if ($script:WindowsCcrxHostLease) { $script:WindowsCcrxHostLease.Dispose() }
 }

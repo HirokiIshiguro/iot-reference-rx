@@ -83,6 +83,35 @@ class PairProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "length"):
             pair.read_frame(io.BytesIO((pair.MAX_FRAME_BYTES + 1).to_bytes(4, "big")))
 
+    def test_build_result_requires_all_outputs_and_matching_manifest_hashes(self):
+        target = get_target(pair.TARGET)
+        app, boot = b"dummy application", b"dummy bootloader"
+        manifest = {
+            "target_id": pair.TARGET, "target_sha256": target_fingerprint(target),
+            "source_sha": self.provenance["source_sha"], "source_tree_dirty": False,
+            "mode": "idt-transport-only", "submodule_shas": self.provenance["submodule_shas"],
+            "dependency_target_id": pair.TARGET,
+            "execution_config_sha256": pair.sha256((self.root / pair.OVERLAYS[0]).read_bytes()),
+            "parameter_config_sha256": pair.sha256((self.root / pair.OVERLAYS[1]).read_bytes()),
+            "outputs": {"mot": {"sha256": pair.sha256(app)},
+                        "bootloader": {"sha256": pair.sha256(boot)}},
+        }
+        files = {"rx72n_idt_transport.mot": app, "bootloader.mot": boot,
+                 "build_manifest.json": json.dumps(manifest).encode()}
+        response = pair.response("b" * 32, files)
+        for name in pair.OUTPUTS:
+            with self.subTest(missing=name):
+                incomplete = json.loads(json.dumps(response))
+                del incomplete["files"][name]
+                with self.assertRaisesRegex(ValueError, "unexpected"):
+                    pair.validate_response(incomplete, "b" * 32)
+        callback.validate_build(pair.validate_response(response, "b" * 32), self.root,
+                                self.provenance, target)
+        files["rx72n_idt_transport.mot"] = b"different application"
+        altered = pair.validate_response(pair.response("b" * 32, files), "b" * 32)
+        with self.assertRaisesRegex(ValueError, "identity mismatch"):
+            callback.validate_build(altered, self.root, self.provenance, target)
+
     def test_partial_stream_writes_are_completed(self):
         class PartialWriter(io.BytesIO):
             def write(self, data):
