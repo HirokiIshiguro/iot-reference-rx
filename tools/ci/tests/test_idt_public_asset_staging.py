@@ -9,9 +9,24 @@ import unittest
 from unittest.mock import patch
 
 from tools.idt import stage_public_assets as stage
+from tools.idt import rpi4_snapshot_verify as verify
 
 
 class WindowsSourceDigestTests(unittest.TestCase):
+    def test_snapshot_job_requires_exact_runner_ref_and_sha(self):
+        sha = 'a' * 40
+        env = {'CI_PROJECT_ID': '38', 'CI_RUNNER_ID': '28', 'CI_COMMIT_REF_PROTECTED': 'true',
+               'CI_COMMIT_BRANCH': verify.REF, 'CI_PIPELINE_SOURCE': 'api',
+               'IDT_PAIR_MODE': 'transport-controller', 'CI_COMMIT_SHA': sha,
+               'CI_JOB_ID': '17', 'CI_PIPELINE_ID': '19'}
+        job = {'status': 'running', 'id': 17, 'pipeline': {'id': 19, 'ref': verify.REF},
+               'runner': {'id': 28}, 'commit': {'id': sha}, 'tag_list': [verify.RUNNER_TAG]}
+        verify.verify_job(env, job, sha)
+        for changed in ({**env, 'CI_RUNNER_ID': '26'}, {**env, 'CI_COMMIT_BRANCH': 'main'},
+                        {**env, 'CI_COMMIT_SHA': 'b' * 40}):
+            with self.assertRaises(ValueError):
+                verify.verify_job(changed, job, sha)
+
     def test_digest_is_taken_before_its_own_artifact_is_created(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory).resolve()

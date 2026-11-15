@@ -330,6 +330,26 @@ rpi4_windows_worker:
           Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue
       }
 
+rpi4_snapshot_verify:
+  stage: run
+  timeout: 30 minutes
+  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
+  needs:
+    - job: package_normal_boot_rx72n
+      artifacts: true
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
+      when: on_success
+    - when: never
+  before_script: []
+  after_script: []
+  script:
+    - /home/gitlab-runner-idt-rx/.local/share/idt-rpi4-transport-venv-20261115/bin/python -I -B tools/idt/rpi4_snapshot_verify.py
+  artifacts:
+    paths:
+      - artifacts/idt-snapshot-proof.json
+    expire_in: 7 days
+
 .rpi4_linux_transport_common:
   stage: run
   timeout: 3 hours
@@ -337,6 +357,8 @@ rpi4_windows_worker:
   needs:
     - job: package_normal_boot_rx72n
       artifacts: true
+    - job: rpi4_snapshot_verify
+      artifacts: false
   variables:
     RUN_RX_IDT: "true"
     IDT_TARGET: "rx72n-ethernet"

@@ -25,6 +25,7 @@ class OneShotCandidateTests(unittest.TestCase):
     def test_manual_preparation_and_controller_are_scoped(self):
         build = block('build_rx72n_ether', '.normal_boot_package')
         package = block('package_normal_boot_rx72n', 'rpi4_windows_worker')
+        snapshot = block('rpi4_snapshot_verify', '.rpi4_linux_transport_common')
         common = block('.rpi4_linux_transport_common', 'rpi4_transport_preflight')
         preflight = block('rpi4_transport_preflight', 'rpi4_transport_controller')
         controller = CI.split('\nrpi4_transport_controller:\n', 1)[1]
@@ -34,6 +35,10 @@ class OneShotCandidateTests(unittest.TestCase):
         self.assertIn('allow_failure: false', common)
         self.assertIn('--preflight-only', preflight)
         self.assertIn('job: rpi4_transport_preflight', controller)
+        self.assertIn('job: rpi4_snapshot_verify', common)
+        self.assertIn('job: package_normal_boot_rx72n', snapshot)
+        self.assertNotIn('id_tokens:', snapshot)
+        self.assertNotIn('when: manual', snapshot)
         self.assertIn('job: package_normal_boot_rx72n', controller)
         self.assertIn('job: build_rx72n_ether', package)
         self.assertNotIn('id_tokens:', build)
