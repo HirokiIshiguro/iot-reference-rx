@@ -81,7 +81,8 @@ class LinuxOidcJobTests(unittest.TestCase):
                  patch.object(launcher, 'check_host_paths'), \
                  patch.object(launcher, 'current_job_metadata', return_value=job()), \
                  patch.object(launcher, 'verified_context'), \
-                 patch.object(launcher.subprocess, 'check_output', side_effect=[SHA + '\n', '']), \
+                 patch.object(launcher.subprocess, 'check_output', return_value=SHA + '\n'), \
+                 patch.object(launcher, 'clean_status', return_value=''), \
                  patch.object(launcher, 'stage_assets', return_value=({}, 'a' * 64)), \
                  patch.object(launcher, 'capture_baseline', return_value='b' * 64), \
                  patch.object(launcher, 'prepare_child') as session, \
@@ -107,7 +108,8 @@ class LinuxOidcJobTests(unittest.TestCase):
                  patch.object(launcher, 'check_host_paths'), \
                  patch.object(launcher, 'current_job_metadata', return_value=job()), \
                  patch.object(launcher, 'verified_context'), \
-                 patch.object(launcher.subprocess, 'check_output', side_effect=[SHA + '\n', '']), \
+                 patch.object(launcher.subprocess, 'check_output', return_value=SHA + '\n'), \
+                 patch.object(launcher, 'clean_status', return_value=''), \
                  patch.object(launcher, 'stage_assets', return_value=({}, 'a' * 64)), \
                  patch.object(launcher, 'capture_baseline', return_value='a' * 64), \
                  patch.object(launcher, 'prepare_child', return_value={'CI_JOB_ID': '17'}), \
@@ -134,7 +136,8 @@ class LinuxOidcJobTests(unittest.TestCase):
                  patch.object(launcher, 'check_host_paths'), \
                  patch.object(launcher, 'current_job_metadata', return_value=job()), \
                  patch.object(launcher, 'verified_context'), \
-                 patch.object(launcher.subprocess, 'check_output', side_effect=[SHA + '\n', '']), \
+                 patch.object(launcher.subprocess, 'check_output', return_value=SHA + '\n'), \
+                 patch.object(launcher, 'clean_status', return_value=''), \
                  patch.object(launcher, 'stage_assets', return_value=({}, 'a' * 64)), \
                  patch.object(launcher, 'capture_baseline', return_value='a' * 64), \
                  patch.object(launcher, 'prepare_child', return_value={'CI_JOB_ID': '17'}), \

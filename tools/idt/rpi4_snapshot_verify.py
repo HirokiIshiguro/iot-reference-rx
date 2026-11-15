@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.idt.initialize_linux_dependencies import git_environment, initialize
+from tools.idt.initialize_linux_dependencies import clean_status, git_environment, initialize
 from tools.idt.oidc_job import current_job_metadata
 from tools.idt.stage_public_assets import source_digest, stage_assets
 
@@ -63,9 +63,7 @@ def main():
                                   text=True, encoding='ascii').strip()
     verify_job(env, current_job_metadata(env.get('CI_JOB_TOKEN', '')), sha)
     initialize(ROOT, git, git_env)
-    status = subprocess.check_output([git, '-C', str(ROOT), 'status', '--porcelain=v1',
-                                      '--untracked-files=all', '--ignore-submodules=none'], env=git_env,
-                                     text=True, encoding='utf-8')
+    status = clean_status(ROOT, git, git_env)
     if status:
         raise ValueError('snapshot checkout is not clean')
     private = Path(tempfile.mkdtemp(prefix='idt-snapshot-', dir=account.pw_dir))
