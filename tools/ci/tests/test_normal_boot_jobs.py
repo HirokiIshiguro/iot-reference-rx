@@ -51,9 +51,7 @@ class NormalBootJobsTests(unittest.TestCase):
                 self.assertIn("- job: " + build + "\n      artifacts: true", body)
                 self.assertEqual(variables("package_normal_boot_" + suffix)["NORMAL_BOOT_TARGET"], target)
                 self.assertNotIn("RUN_", body)
-                board = suffix.split("_", 1)[0]
-                runner = {"rx72n": "RX72N_BUILD_RUNNER_TAG", "rx65n": "RX65N_BG96_BUILD_RUNNER_TAG", "rx671": "RX671_WIFI_BUILD_RUNNER_TAG"}[board]
-                self.assertIn("tags: [exec-shell, os-windows, ccrx, $" + runner + "]", body)
+                self.assertIn("tags: [exec-shell, os-windows, ccrx]", body)
                 self.assertNotIn("NORMAL_BOOT_RUNNER_TAG", body)
 
     def test_publication_is_exact_api_output_allowlist_without_private_logs(self):
