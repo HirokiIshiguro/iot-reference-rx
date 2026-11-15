@@ -67,6 +67,32 @@ def fake_session(env, expected, **kwargs):
 
 class LinuxOidcJobTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform == 'linux', 'Linux account and process context')
+    def test_snapshot_mismatch_stops_before_session_and_native_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source, runtime = base / 'source', base / 'runtime'
+            source.mkdir(); runtime.mkdir()
+            reviewed = replace(config(), runtime_root=str(runtime))
+            with patch.object(launcher, 'ROOT', source), \
+                 patch.object(launcher.platform, 'machine', return_value='aarch64'), \
+                 patch('pwd.getpwuid', return_value=SimpleNamespace(pw_name=launcher.RUNNER_USER)), \
+                 patch.dict(os.environ, {'CI_PROJECT_DIR': str(source), 'CI_JOB_TOKEN': 'fixture'}, clear=True), \
+                 patch.object(launcher, 'read_reviewed_config', return_value=reviewed), \
+                 patch.object(launcher, 'check_host_paths'), \
+                 patch.object(launcher, 'current_job_metadata', return_value=job()), \
+                 patch.object(launcher, 'verified_context'), \
+                 patch.object(launcher.subprocess, 'check_output', side_effect=[SHA + '\n', '']), \
+                 patch.object(launcher, 'stage_assets', return_value=({}, 'a' * 64)), \
+                 patch.object(launcher, 'capture_baseline', return_value='b' * 64), \
+                 patch.object(launcher, 'prepare_child') as session, \
+                 patch.object(launcher, 'run_linux_child') as native:
+                with self.assertRaisesRegex(OidcError, 'snapshots differ'):
+                    launcher.main(preflight_only=True)
+                session.assert_not_called()
+                native.assert_not_called()
+            self.assertEqual(list(runtime.iterdir()), [])
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux account and process context')
     def test_preflight_only_checks_aws_without_launching_native_child(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
