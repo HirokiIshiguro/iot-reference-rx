@@ -41,6 +41,12 @@ def _git_run(source, git, env, args, *, allow_missing=False):
     return result.stdout.strip()
 
 
+def clean_status(source: Path, git: str, env: dict[str, str]) -> str:
+    """Check every source change using the reviewed cross-platform checkout mode."""
+    return _git_run(source, git, env, ['-c', 'core.symlinks=false', 'status',
+                                     '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none'])
+
+
 def verify_pins(source: Path, git: str, env: dict[str, str]) -> None:
     """Read-only recursive pin check, including intentionally disabled entries."""
     source = Path(source).resolve(strict=True)

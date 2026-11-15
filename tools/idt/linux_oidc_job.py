@@ -32,6 +32,7 @@ from tools.idt.public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNE
 from tools.idt.cleanup_budget import owned_runtime_cleanup_seconds
 from tools.idt.rpi4_pair import READY_SECONDS, RESPONSE_SECONDS
 from tools.idt.stage_public_assets import digest_snapshot, stage_assets
+from tools.idt.initialize_linux_dependencies import clean_status
 
 RUNNER_TAG = "project38-idt-rpi4-protected"
 RUNNER_USER = "gitlab-runner-idt-rx"
@@ -300,8 +301,7 @@ def main(*, preflight_only=False):
                                          text=True, encoding="utf-8").strip()
     job = current_job_metadata(source_env.get("CI_JOB_TOKEN", ""))
     verified_context(source_env, source_sha=source_sha, config=config, job=job)
-    status = subprocess.check_output([config.git, "status", "--porcelain=v1", "--untracked-files=all"],
-                                     cwd=ROOT, env=git_env, text=True, encoding="utf-8")
+    status = clean_status(ROOT, config.git, git_env)
     if status:
         raise OidcError("source checkout is not clean")
     # The paired build implementation is supplied by the Windows integration.

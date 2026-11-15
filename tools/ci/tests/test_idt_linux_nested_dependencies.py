@@ -46,6 +46,21 @@ class LinuxNestedDependenciesTests(unittest.TestCase):
         self.git(path, "commit", "-m", "fixture")
         return self.git(path, "rev-parse", "HEAD")
 
+    @unittest.skipUnless(os.name != 'nt', 'Linux symlink checkout semantics required')
+    def test_clean_status_handles_reviewed_symlink_checkout_but_rejects_changes(self):
+        repo = self.repository('status-mode')
+        target = repo / 'target.txt'; target.write_text('original\n', encoding='utf-8')
+        link = repo / 'link.txt'; link.symlink_to('target.txt')
+        self.commit(repo)
+        link.unlink(); link.write_text('target.txt', encoding='utf-8')
+        self.assertIn('T link.txt', self.git(repo, 'status', '--porcelain=v1', '--untracked-files=all'))
+        self.assertEqual(nested.clean_status(repo, GIT, self.env), '')
+        target.write_text('changed\n', encoding='utf-8')
+        (repo / 'new-file.txt').write_text('fixture\n', encoding='utf-8')
+        result = nested.clean_status(repo, GIT, self.env)
+        self.assertIn('M target.txt', result)
+        self.assertIn('?? new-file.txt', result)
+
     def test_windows_exclusions_are_read_and_other_syntax_is_rejected(self):
         helper = ROOT / "tools/rx_e2studio_cli.ps1"
         self.assertEqual(nested.source_only_paths(helper), ("Middleware/FreeRTOS-Plus-CLI", "Middleware/freertos_plus"))
