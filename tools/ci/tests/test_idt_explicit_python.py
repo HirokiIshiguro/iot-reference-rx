@@ -17,6 +17,27 @@ def quote(value):
 
 @unittest.skipUnless(os.name == "nt" and PWSH, "Windows PowerShell 7 required")
 class ExplicitPythonTests(unittest.TestCase):
+    def test_builder_fixture_accepts_omitted_and_supplied_diagnostic_stage(self):
+        script = ROOT / 'tools/test_build_rx_idt.ps1'
+        with tempfile.TemporaryDirectory() as folder:
+            work = Path(folder)
+            missing = work / 'nonexistent-source'
+            harness = work / 'stage-check.ps1'
+            harness.write_text('\n'.join([
+                "$ErrorActionPreference = 'Stop'", '$stage = \'unstarted\'',
+                'foreach ($withStage in @($false, $true)) {',
+                '  try {',
+                '    if ($withStage) { & ' + quote(script) + ' -ProjectRoot ' + quote(missing) + ' -DiagnosticStage ([ref]$stage) }',
+                '    else { & ' + quote(script) + ' -ProjectRoot ' + quote(missing) + ' }',
+                "    throw 'Expected missing source to fail.'",
+                '  } catch [System.Management.Automation.ItemNotFoundException] { }',
+                '}',
+                "if ($stage -cne 'metadata') { throw 'Diagnostic stage not updated.' }",
+            ]), encoding='utf-8')
+            result = subprocess.run([PWSH, '-NoProfile', '-NonInteractive', '-File', str(harness)],
+                                    cwd=work, capture_output=True, text=True, timeout=20)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_common_kernel_guard_uses_runner_python_with_empty_path(self):
         runner = ROOT / 'tools/idt/rpi4_windows_python.ps1'
         guard_functions = ROOT / 'tools/rx_e2studio_cli.ps1'

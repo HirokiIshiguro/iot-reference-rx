@@ -5,7 +5,7 @@ param(
     [string[]]$CompileTargets = @(),
     [string]$OutputDirectory = '',
     [string]$WorkspaceRoot = '',
-    [ref]$DiagnosticStage = $null
+    [ref]$DiagnosticStage
 )
 
 # Exercises real project/source metadata with inert runtime headers. No compiler,
