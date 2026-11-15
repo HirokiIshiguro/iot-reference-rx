@@ -60,7 +60,7 @@ build_rx72n_ether:
     - os-windows
     - ccrx
     - $RX72N_BUILD_RUNNER_TAG
-  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  resource_group: ishiguro-pc-ccrx-e2studio-build
   rules:
     - if: '($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
       when: manual
@@ -68,6 +68,17 @@ build_rx72n_ether:
     - when: never
   before_script:
     - |
+      $ErrorActionPreference = 'Stop'
+      if ($env:CI_PROJECT_ID -cne '38' -or $env:CI_RUNNER_ID -cne '3' -or
+          $env:CI_COMMIT_BRANCH -cne 'codex/209-rpi4-transport-once-20261115' -or
+          $env:CI_COMMIT_REF_PROTECTED -cne 'true' -or
+          $env:RX72N_TLS_BACKEND -cne 'software' -or $env:RX72N_TLS13_0RTT_ENABLE -cne 'false' -or
+          $env:RX72N_REQUIRE_TLS_VERSION -cne '' -or $env:RX72N_SIGNING_KEY -cne 'sample_keys/secp256r1.privatekey' -or
+          $env:E2STUDIO_CLI -cne 'C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe' -or
+          $env:RX72N_E2STUDIO_TIMEOUT_SECONDS -cne '1200' -or
+          $env:E2STUDIO_WORKSPACE -cne "C:/ai/codex/ws/ci-rx72n-ether-$env:CI_PIPELINE_ID-$env:CI_JOB_ID") {
+        throw 'Unexpected one-shot normal-build identity or configuration.'
+      }
       foreach ($entry in @(Get-ChildItem Env:)) {
         if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '^(?i:RX_OIDC_)') {
           Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
@@ -162,9 +173,24 @@ build_rx72n_ether:
   timeout: 3 hours
   extends: .rx_windows_canonical_checkout
   stage: build
-  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  resource_group: ishiguro-pc-ccrx-e2studio-build
   before_script:
     - |
+      $ErrorActionPreference = 'Stop'
+      if ($env:CI_PROJECT_ID -cne '38' -or $env:CI_RUNNER_ID -cne '3' -or
+          $env:CI_COMMIT_BRANCH -cne 'codex/209-rpi4-transport-once-20261115' -or
+          $env:CI_COMMIT_REF_PROTECTED -cne 'true' -or
+          $env:NORMAL_BOOT_TARGET -cne 'rx72n-ethernet' -or
+          $env:NORMAL_BOOT_SIGNING_KEY_VARIABLE -cne 'RX72N_SIGNING_KEY' -or
+          $env:NORMAL_BOOT_BACKEND_VARIABLE -cne 'RX72N_TLS_BACKEND' -or
+          $env:NORMAL_BOOT_ARTIFACT_DIR -cne 'artifacts/normal_boot_rx72n' -or
+          $env:NORMAL_BOOT_RSU -cne 'rx72n_app.rsu' -or
+          $env:NORMAL_BOOT_BOOT0 -cne 'Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot' -or
+          $env:NORMAL_BOOT_BOOT1 -cne 'Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot' -or
+          $env:RX72N_TLS_BACKEND -cne 'software' -or
+          $env:RX72N_SIGNING_KEY -cne 'sample_keys/secp256r1.privatekey') {
+        throw 'Unexpected one-shot normal-package identity or configuration.'
+      }
       foreach ($entry in @(Get-ChildItem Env:)) {
         if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '^(?i:RX_OIDC_)') {
           Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
@@ -320,4 +346,4 @@ rpi4_transport_controller:
     - test "$CI_PROJECT_ID" = 38
     - test "$CI_RUNNER_ID" = 28
     - test "$(id -un)" = gitlab-runner-idt-rx
-    - python3 -B tools/idt/rpi4_native_controller.py
+    - /home/gitlab-runner-idt-rx/.local/share/idt-rpi4-transport-venv-20261115/bin/python -I -B tools/idt/rpi4_native_controller.py

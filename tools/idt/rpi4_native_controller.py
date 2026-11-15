@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Wire the fixed Linux IDT launcher to on-demand Windows builds.
 
-The CI workflow and the Windows native worker remain disabled pending the
-public-only paired build and a separate physical-run review.
+This one-shot candidate has a manual controller and a source-pinned host
+configuration; physical execution still requires a separate reviewed grant.
 """
 from __future__ import annotations
 

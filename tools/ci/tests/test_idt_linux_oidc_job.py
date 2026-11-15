@@ -35,7 +35,7 @@ def token(runner=28):
 
 
 def config():
-    return launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 10800, Budget(100, 100, 10, 10),
+    return launcher.LinuxConfig(ACCOUNT, ROLE, "main", SHA, 28, 10800, Budget(100, 100, 10, 10),
                                 "/var/tmp/idt-runtime", "/opt/idt",
                                 "/usr/bin/ssh", "/usr/bin/scp", "/usr/bin/git", "/usr/bin/python3",
                                 "/var/lib/gitlab-runner-idt-rx", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
@@ -159,6 +159,9 @@ class LinuxOidcJobTests(unittest.TestCase):
             replace(config(), pair_build_seconds=maximum)
 
     def test_wrong_runner_claim_tag_ref_and_target_are_rejected(self):
+        with self.assertRaisesRegex(OidcError, 'target or routing'):
+            launcher.prepare_child(environment(), source_sha='b' * 40, config=config(), job=job(),
+                                   baseline_path='/tmp/baseline', session_factory=fake_session)
         bad_env = environment(); bad_env["CI_RUNNER_ID"] = "29"
         with self.assertRaises(OidcError):
             launcher.prepare_child(bad_env, source_sha=SHA, config=config(), job=job(), baseline_path="/tmp/baseline", session_factory=fake_session)
@@ -182,7 +185,7 @@ class LinuxOidcJobTests(unittest.TestCase):
         with self.assertRaises(OidcError):
             launcher.prepare_child(environment(), source_sha=SHA, config=None, job=job(), baseline_path="/tmp/baseline", session_factory=fake_session)
         with self.assertRaises(OidcError):
-            launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 500, Budget(100, 100, 10, 10),
+            launcher.LinuxConfig(ACCOUNT, ROLE, "main", SHA, 28, 500, Budget(100, 100, 10, 10),
                                  "/tmp/runtime", "/opt/idt", "/usr/bin/ssh", "/usr/bin/scp",
                                  "/usr/bin/git", "/usr/bin/python3", "/tmp/home", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
 
@@ -195,6 +198,8 @@ class LinuxOidcJobTests(unittest.TestCase):
             launcher.parse_config({**document, "schema_version": True})
         with self.assertRaises(OidcError):
             launcher.parse_config({**document, "qemu_sysroot": "relative/path"})
+        with self.assertRaises(OidcError):
+            launcher.parse_config({**document, "source_sha": "not-a-commit"})
         directory = SimpleNamespace(st_mode=stat.S_IFDIR | 0o755, st_uid=0)
         file = SimpleNamespace(st_mode=stat.S_IFREG | 0o640, st_uid=0, st_gid=123)
         launcher.validate_config_metadata(directory, file, 123)

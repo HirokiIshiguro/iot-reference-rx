@@ -42,6 +42,7 @@ class LinuxConfig:
     account: str
     role_arn: str
     ref: str
+    source_sha: str
     runner_id: int
     job_timeout_seconds: int
     budget: Budget
@@ -60,6 +61,7 @@ class LinuxConfig:
         if (not re.fullmatch(r"[0-9]{12}", self.account)
                 or not re.fullmatch(r"arn:aws:iam::" + self.account + r":role/saffti-oss-gitlab-oidc", self.role_arn)
                 or not self.ref or any(c in self.ref for c in "\r\n\0")
+                or not isinstance(self.source_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", self.source_sha)
                 or not isinstance(self.runner_id, int) or isinstance(self.runner_id, bool) or self.runner_id <= 0
                 or not isinstance(self.job_timeout_seconds, int) or isinstance(self.job_timeout_seconds, bool)
                 or not 0 < self.job_timeout_seconds <= MAX_JOB_SECONDS or not isinstance(self.budget, Budget)
@@ -125,7 +127,8 @@ def verified_context(env, *, source_sha, config, job):
     """Match the reviewed runner ID and target against the current job API."""
     if not isinstance(config, LinuxConfig):
         raise OidcError("unreviewed Linux IDT configuration")
-    if (env.get("RUN_RX_IDT") != "true" or env.get("IDT_TARGET") != "rx72n-ethernet"
+    if (source_sha != config.source_sha
+            or env.get("RUN_RX_IDT") != "true" or env.get("IDT_TARGET") != "rx72n-ethernet"
             or env.get("IDT_SCOPE") != "transport" or env.get("AWS_ROLE_ARN") != config.role_arn
             or any(not env.get(name) for name in PUBLIC_SIGNER_INPUTS.values())):
         raise OidcError("unexpected Linux IDT target or routing")
