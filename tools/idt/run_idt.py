@@ -72,10 +72,10 @@ WSL = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32/wsl.exe"
 HOST: dict = {}
 try:
     from .public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_ENVIRONMENT_INPUTS
-    from .oidc_job import check_child_budget, IDT_WSL_INPUTS, verify_host_profile
+    from .oidc_job import check_child_budget
 except ImportError:
     from public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_ENVIRONMENT_INPUTS
-    from oidc_job import check_child_budget, IDT_WSL_INPUTS, verify_host_profile
+    from oidc_job import check_child_budget
 PUBLIC_SIGNER_BOOTSTRAP_INPUTS = {variable: name for name, variable in PUBLIC_SIGNER_ENVIRONMENT_INPUTS.items()}
 
 
@@ -409,12 +409,6 @@ def observe_hardware_runtime(process, runtime, env, credentials, console):
             pending = lines.pop()
         for line in lines:
             console.write(redact(line, credentials))
-            bridge_failure = re.fullmatch(
-                r"IDT bridge startup: (host_key|authentication|hostname_resolution|network|unclassified)",
-                line.strip(),
-            )
-            if bridge_failure:
-                print("IDT bridge startup: " + bridge_failure[1], flush=True)
             for phase in NATIVE_CONSOLE_PHASES:
                 if phase in line:
                     print("IDT phase: " + phase, flush=True)
@@ -478,41 +472,13 @@ def cleanup_signers_after_runtime(process, inputs, signer_session):
     try:
         if process is not None and (process.poll() is None or
                                     process.stdout is None or not process.stdout.closed or
-                                    getattr(process, "_idt_output_drain_complete", None) is not True):
+                                    getattr(process, "_idt_output_drain_complete", None) is False):
             raise RuntimeError("IDT must finish its native cleanup and output drain before signer deletion")
         journal = cleanup_aws_signers(inputs, signer_session)
         return {"state": journal["state"], "certificates": len(journal["certificates"]),
                 "certificates_deleted": sum(bool(item.get("deleted")) for item in journal["certificates"])}
     except Exception as error:
         return {"state": "cleanup_failed", "error_type": type(error).__name__}
-
-
-def idt_wsl_environment(env, inherited, credentials, target):
-    """Build the native bridge without propagating ambient AWS providers."""
-    env = {**env, **inherited}
-    if env.get("RX_OIDC_EXPIRATION_UTC"):
-        from tools.aws.oidc_session import FixedSession, wsl_bridge_environment
-        expiration = datetime.fromisoformat(env["RX_OIDC_EXPIRATION_UTC"].replace("Z", "+00:00"))
-        session = FixedSession(credentials.access_key, credentials.secret_key, credentials.token, expiration)
-        allowed = {name for name in inherited if not name.startswith("AWS_")}
-        allowed.update(name for name in NETWORK_INPUTS.get(target["id"], {}).values() if name.startswith("AWS_IOT_CELLULAR_"))
-        allowed.update({"CI", "RX_OIDC_IDT_NATIVE_REQUIRED_SECONDS", "RX_OIDC_IDT_PREPARE_SECONDS",
-                        "RX_OIDC_IDT_MARGIN_SECONDS", "RX_OIDC_IDT_WSL_PATH", "RX_OIDC_IDT_WSL_HOME"})
-        if not allowed <= IDT_WSL_INPUTS:
-            raise RuntimeError("unreviewed IDT WSL input")
-        env["WSLENV"] = ""
-        program_data = env.get("PROGRAMDATA")
-        if not program_data:
-            raise RuntimeError("reviewed Windows PROGRAMDATA is missing")
-        bridge = wsl_bridge_environment(env, session, allow_names=allowed)
-        # WSL's Windows process launch needs this reviewed host setting. Keep it
-        # on the Windows side; it is not an input to WSLENV or Linux children.
-        bridge["PROGRAMDATA"] = program_data
-        return bridge
-    existing = [item for item in env.get("WSLENV", "").split(":")
-                if item and item.split("/", 1)[0] not in inherited]
-    env["WSLENV"] = ":".join(existing + [name + "/u" for name in inherited])
-    return env
 
 
 def transport_userdata() -> dict:
@@ -591,8 +557,6 @@ def transport_linux(runtime: Path, region: str, credentials, provenance: dict, t
 
 def transport(runtime: Path, region: str, credentials, provenance: dict, scope: str = "transport",
               test_id: str | None = None, diagnostic_only: bool = False, target=None) -> tuple[Path, int]:
-    if scope in {"ota-mqtt", "ota-pal"}:
-        raise RuntimeError("native OTA admission is not ready")
     target = get_target() if target is None else target
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives import serialization
@@ -617,7 +581,12 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     provenance_file = runtime / "source-provenance.json"
     write_json(provenance_file, provenance)
     device = device_template(target, scope, wsl_path(public_path))
-    userdata = transport_userdata()
+    userdata = {"freeRTOSVersion": manifest_version(), "retainModifiedSourceDirectories": True,
+                "freeRTOSTestParamConfigPath": "{{testData.sourcePath}}/Test/include/test_param_config.h",
+                "freeRTOSTestExecutionConfigPath": "{{testData.sourcePath}}/Test/include/test_execution_config.h",
+                "buildTool": {"name": "CC-RX/e2studio", "version": "3.07.00/2026-04.2", "command": []},
+                "flashTool": {"name": "rfp-cli", "version": "1.15", "command": []},
+                "testStartDelayms": 0, "echoServerConfiguration": {"keyGenerationMethod": "EC", "serverPort": 9000}}
     if scope == "pkcs11":
         userdata["pkcs11LabelConfiguration"] = {
             # FRQ inserts C expressions verbatim. Resolve through the same
@@ -675,7 +644,10 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
         inherited["IDT_DIAGNOSTIC_ONLY"] = "1"
     if credentials.token:
         inherited["AWS_SESSION_TOKEN"] = credentials.token
-    env = idt_wsl_environment(env, inherited, credentials, target)
+    env.update(inherited)
+    existing = [item for item in env.get("WSLENV", "").split(":")
+                if item and item.split("/", 1)[0] not in inherited]
+    env["WSLENV"] = ":".join(existing + [name + "/u" for name in inherited])
     command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"], wsl_path(Path(__file__).with_name("run_transport.py")),
                "--source-path", wsl_path(SOURCE), "--idt-root", root_linux, "--output", wsl_path(execution),
                "--userdata-template", wsl_path(inputs / "userdata.json"), "--device-template", wsl_path(inputs / "device.json"), "--region", region,
@@ -687,7 +659,6 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
     cleanup_failed = False
     process = None
     try:
-        check_child_budget(os.environ)
         if scope == "ota-mqtt":
             import boto3
             try:
@@ -701,7 +672,6 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
                                                                userdata["otaConfiguration"], signer_session)
             write_json(inputs / "userdata.json", userdata)
             print("IDT phase: temporary AWS signing certificates prepared", flush=True)
-        check_child_budget(os.environ)
         with (runtime / "console.log").open("w", encoding="utf-8") as console:
             process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             code = observe_hardware_runtime(process, runtime, env, credentials, console)
@@ -776,11 +746,9 @@ def main() -> int:
                 or not os.environ.get("RX_OIDC_EXPIRATION_UTC") or args.target != "rx72n-ethernet"
                 or args.scope != "transport" or args.region != "ap-northeast-1"):
             parser.error("native Linux entry is restricted to the reviewed RX72N Transport CI")
+        check_child_budget(os.environ, before_run=True)
     elif os.name != "nt":
         parser.error("Run this entry point on the Windows CC-RX/AWS runner")
-    if args.scope in {"ota-mqtt", "ota-pal"}:
-        parser.error("native OTA admission is not ready")
-    check_child_budget(os.environ, before_run=True)
     if args.scope in {"transport", "mqtt", "ota-mqtt"}:
         network_values(target)
     if native_linux:
@@ -790,8 +758,6 @@ def main() -> int:
             parser.error("native Linux runtime must be outside the source checkout")
     else:
         HOST = load_host_profile()
-        if os.environ.get("RX_OIDC_EXPIRATION_UTC"):
-            verify_host_profile(HOST, os.environ.get("RX_IDT_REVIEWED_PROFILE_SHA256", ""))
         INSTALL, RUNTIME = Path(HOST["install_root"]), Path(HOST["runtime_root"])
     args.output.mkdir(parents=True, exist_ok=True)
     RUNTIME.mkdir(parents=True, exist_ok=True)

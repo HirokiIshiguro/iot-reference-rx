@@ -29,6 +29,19 @@ class LinuxSupervisorTests(unittest.TestCase):
             previous = signal.getsignal(number)
             self.addCleanup(signal.signal, number, previous)
 
+    def test_existing_wsl_ota_does_not_require_native_oidc_admission(self):
+        argv = ['run_transport.py', '--idt-root', '/missing', '--source-path', '/missing',
+                '--userdata-template', '/missing', '--device-template', '/missing',
+                '--output', '/missing', '--group', 'OTACore']
+        stderr = io.StringIO()
+        with patch.dict(os.environ, {'CI': 'true'}, clear=True), patch.object(sys, 'argv', argv), \
+             patch.object(run_transport, 'check_child_budget', side_effect=AssertionError('native only')), \
+             patch.object(run_transport.Path, 'is_file', return_value=False), \
+             contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit):
+            run_transport.main()
+        self.assertIn('reviewed SSH executable is unavailable', stderr.getvalue())
+        self.assertNotIn('OTA admission', stderr.getvalue())
+
     def test_native_group_runs_mocked_callbacks_and_restores_vendor_config(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve()

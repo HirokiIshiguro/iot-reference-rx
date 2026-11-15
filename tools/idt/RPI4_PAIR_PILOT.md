@@ -1,10 +1,11 @@
 # RPi4 / Windows RX72N Transport pilot
 
-This is an integration draft. `tools/ci/rpi4_transport_pilot.yml` is not
-included by the normal pipeline and its workflow rejects every pipeline.
-Windows execution remains disabled in source until a reviewed dedicated
-execution SID and verified compiler cancellation are configured. No IDT,
-AWS, compiler or hardware success follows from the mock tests.
+The normal CI includes `tools/ci/rpi4_transport_pilot.yml`, whose jobs are
+selected only by the protected Transport profiles. The controller and its AWS
+preflight require explicit manual starts; the paired Windows worker is selected
+only in the associated downstream pipeline. Host configuration, permissions,
+cost and recovery must be reviewed separately. No hardware success follows from
+the mock tests or from the existence of this entry point.
 
 The native controller creates the parent socket and takes a source snapshot
 before native IDT starts. Each callback request starts a separate downstream
@@ -28,9 +29,9 @@ It is not installed or authorized by this repository change; the host owner
 must review and place a root-managed copy before configuring the key.
 
 The public smoke covers job dispatch, authenticated socket exchange, a real
-placeholder-only compile and worker shutdown. It does not supply the two
-IDT-generated headers, compare complete source snapshots, validate a native
-build manifest or prove a hardware/AWS run; those remain separate checks.
+placeholder-only compile and worker shutdown. The protected pipeline separately
+compares the complete Windows/RPi source snapshot and validates the same-SHA
+normal bundle. Neither check proves a hardware/AWS Transport run.
 
 FRQ calls `rpi4_build_callback.py <source-path>` with exactly one argument,
 `IDT_TARGET=rx72n-ethernet` and `IDT_SCOPE=transport`. Only changes to the two
@@ -49,12 +50,10 @@ briefly takes the shared CC-RX lease while exporting its existing function;
 each build then takes the same lease for its helper. The native worker job also
 uses the existing GitLab resource group.
 
-Open integration gates: actual native source diff and complete dependency bytes;
-RPi Linux/OIDC launcher and native x86-64 child execution under ARM64; dedicated
-Windows service identity, credential and RPi SSH permissions; compiler licence
-under that identity; cancellation/descendant-stop and private workspace cleanup;
-fixed deadline and recovery ownership. A failed Windows build intentionally
-retains its workspace because child process termination is not yet proven.
+Open integration gates include the real Transport result, independent recovery,
+the normal firmware end state and a fresh check of dedicated runner/bench
+availability. A failed Windows build intentionally retains its workspace when
+child process termination is not proven.
 
 The Windows worker now starts its build helper in a Windows Job Object with
 `KILL_ON_JOB_CLOSE` and without breakaway flags. The helper blocks on stdin
@@ -64,9 +63,11 @@ Job and checks its active-process count. An unconfirmed stop fails closed and
 retains the private workspace. Abrupt worker death closes the Job handle, but
 cannot run Python cleanup: private files must be recovered separately. Local
 dummy parent/child/grandchild tests cover normal execution, failed assignment,
-timeout, and forced worker death. They do **not** prove e2 studio, nested
-Runner-service Job behavior, the lease-release race, or workspace cleanup on a
-real cancellation. `COMPILER_CANCELLATION_VERIFIED` therefore remains false.
+timeout, and forced worker death on the dedicated runner; a separate public
+build exercised the real compiler's successful path. Forced cancellation of a
+real compiler was not tested. The reviewed worker SID and the accepted
+containment evidence are fixed in source; an unconfirmed stop retains files for
+independent recovery.
 
 Local nonsecret tests:
 

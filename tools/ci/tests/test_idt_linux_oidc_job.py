@@ -20,6 +20,7 @@ from tools.idt import linux_oidc_job as launcher
 from tools.idt.oidc_job import Budget
 
 SHA = "a" * 40
+AMI = "ami-0123456789abcdef0"
 ACCOUNT = "000000000000"
 ROLE = "arn:aws:iam::" + ACCOUNT + ":role/saffti-oss-gitlab-oidc"
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
@@ -35,7 +36,7 @@ def token(runner=28):
 
 
 def config():
-    return launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 10800, Budget(100, 100, 10, 10),
+    return launcher.LinuxConfig(ACCOUNT, ROLE, "main", SHA, AMI, 28, 10800, Budget(100, 100, 10, 10),
                                 "/var/tmp/idt-runtime", "/opt/idt",
                                 "/usr/bin/ssh", "/usr/bin/scp", "/usr/bin/git", "/usr/bin/python3",
                                 "/var/lib/gitlab-runner-idt-rx", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
@@ -65,6 +66,88 @@ def fake_session(env, expected, **kwargs):
 
 
 class LinuxOidcJobTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux account and process context')
+    def test_snapshot_mismatch_stops_before_session_and_native_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source, runtime = base / 'source', base / 'runtime'
+            source.mkdir(); runtime.mkdir()
+            reviewed = replace(config(), runtime_root=str(runtime))
+            with patch.object(launcher, 'ROOT', source), \
+                 patch.object(launcher.platform, 'machine', return_value='aarch64'), \
+                 patch('pwd.getpwuid', return_value=SimpleNamespace(pw_name=launcher.RUNNER_USER)), \
+                 patch.dict(os.environ, {'CI_PROJECT_DIR': str(source), 'CI_JOB_TOKEN': 'fixture'}, clear=True), \
+                 patch.object(launcher, 'read_reviewed_config', return_value=reviewed), \
+                 patch.object(launcher, 'check_host_paths'), \
+                 patch.object(launcher, 'current_job_metadata', return_value=job()), \
+                 patch.object(launcher, 'verified_context'), \
+                 patch.object(launcher.subprocess, 'check_output', return_value=SHA + '\n'), \
+                 patch.object(launcher, 'clean_status', return_value=''), \
+                 patch.object(launcher, 'stage_assets', return_value=({}, 'a' * 64)), \
+                 patch.object(launcher, 'capture_baseline', return_value='b' * 64), \
+                 patch.object(launcher, 'prepare_child') as session, \
+                 patch.object(launcher, 'run_linux_child') as native:
+                with self.assertRaisesRegex(OidcError, 'snapshots differ'):
+                    launcher.main(preflight_only=True)
+                session.assert_not_called()
+                native.assert_not_called()
+            self.assertEqual(list(runtime.iterdir()), [])
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux account and process context')
+    def test_preflight_only_checks_aws_without_launching_native_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source, runtime = base / 'source', base / 'runtime'
+            source.mkdir(); runtime.mkdir()
+            reviewed = replace(config(), runtime_root=str(runtime))
+            with patch.object(launcher, 'ROOT', source), \
+                 patch.object(launcher.platform, 'machine', return_value='aarch64'), \
+                 patch('pwd.getpwuid', return_value=SimpleNamespace(pw_name=launcher.RUNNER_USER)), \
+                 patch.dict(os.environ, {'CI_PROJECT_DIR': str(source), 'CI_JOB_TOKEN': 'fixture'}, clear=True), \
+                 patch.object(launcher, 'read_reviewed_config', return_value=reviewed), \
+                 patch.object(launcher, 'check_host_paths'), \
+                 patch.object(launcher, 'current_job_metadata', return_value=job()), \
+                 patch.object(launcher, 'verified_context'), \
+                 patch.object(launcher.subprocess, 'check_output', return_value=SHA + '\n'), \
+                 patch.object(launcher, 'clean_status', return_value=''), \
+                 patch.object(launcher, 'stage_assets', return_value=({}, 'a' * 64)), \
+                 patch.object(launcher, 'capture_baseline', return_value='a' * 64), \
+                 patch.object(launcher, 'prepare_child', return_value={'CI_JOB_ID': '17'}), \
+                 patch.object(launcher, 'verify_transport_aws') as preflight, \
+                 patch.object(launcher, 'run_linux_child') as native:
+                self.assertEqual(launcher.main(preflight_only=True), 0)
+                preflight.assert_called_once()
+                native.assert_not_called()
+            self.assertEqual(list(runtime.iterdir()), [])
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux account and process context')
+    def test_failed_aws_preflight_never_launches_native_child(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source, runtime = base / 'source', base / 'runtime'
+            source.mkdir(); runtime.mkdir()
+            reviewed = replace(config(), runtime_root=str(runtime))
+            with patch.object(launcher, 'ROOT', source), \
+                 patch.object(launcher.platform, 'machine', return_value='aarch64'), \
+                 patch('pwd.getpwuid', return_value=SimpleNamespace(pw_name=launcher.RUNNER_USER)), \
+                 patch.dict(os.environ, {'CI_PROJECT_DIR': str(source), 'CI_JOB_TOKEN': 'fixture'}, clear=True), \
+                 patch.object(launcher, 'read_reviewed_config', return_value=reviewed), \
+                 patch.object(launcher, 'check_host_paths'), \
+                 patch.object(launcher, 'current_job_metadata', return_value=job()), \
+                 patch.object(launcher, 'verified_context'), \
+                 patch.object(launcher.subprocess, 'check_output', return_value=SHA + '\n'), \
+                 patch.object(launcher, 'clean_status', return_value=''), \
+                 patch.object(launcher, 'stage_assets', return_value=({}, 'a' * 64)), \
+                 patch.object(launcher, 'capture_baseline', return_value='a' * 64), \
+                 patch.object(launcher, 'prepare_child', return_value={'CI_JOB_ID': '17'}), \
+                 patch.object(launcher, 'verify_transport_aws', side_effect=OidcError('fixture denied')), \
+                 patch.object(launcher, 'run_linux_child') as native:
+                with self.assertRaisesRegex(OidcError, 'fixture denied'):
+                    launcher.main()
+                native.assert_not_called()
+            self.assertEqual(list(runtime.iterdir()), [])
+
     @unittest.skipUnless(sys.platform == "linux", "Linux executable permissions")
     def test_source_python_callback_does_not_require_executable_bit(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -169,6 +252,9 @@ class LinuxOidcJobTests(unittest.TestCase):
             replace(config(), pair_build_seconds=maximum)
 
     def test_wrong_runner_claim_tag_ref_and_target_are_rejected(self):
+        with self.assertRaisesRegex(OidcError, 'target or routing'):
+            launcher.prepare_child(environment(), source_sha='b' * 40, config=config(), job=job(),
+                                   baseline_path='/tmp/baseline', session_factory=fake_session)
         bad_env = environment(); bad_env["CI_RUNNER_ID"] = "29"
         with self.assertRaises(OidcError):
             launcher.prepare_child(bad_env, source_sha=SHA, config=config(), job=job(), baseline_path="/tmp/baseline", session_factory=fake_session)
@@ -192,7 +278,7 @@ class LinuxOidcJobTests(unittest.TestCase):
         with self.assertRaises(OidcError):
             launcher.prepare_child(environment(), source_sha=SHA, config=None, job=job(), baseline_path="/tmp/baseline", session_factory=fake_session)
         with self.assertRaises(OidcError):
-            launcher.LinuxConfig(ACCOUNT, ROLE, "main", 28, 500, Budget(100, 100, 10, 10),
+            launcher.LinuxConfig(ACCOUNT, ROLE, "main", SHA, AMI, 28, 500, Budget(100, 100, 10, 10),
                                  "/tmp/runtime", "/opt/idt", "/usr/bin/ssh", "/usr/bin/scp",
                                  "/usr/bin/git", "/usr/bin/python3", "/tmp/home", "/usr/bin:/bin", 600, "/opt/idt-qemu/sysroot")
 
@@ -205,6 +291,10 @@ class LinuxOidcJobTests(unittest.TestCase):
             launcher.parse_config({**document, "schema_version": True})
         with self.assertRaises(OidcError):
             launcher.parse_config({**document, "qemu_sysroot": "relative/path"})
+        with self.assertRaises(OidcError):
+            launcher.parse_config({**document, "source_sha": "not-a-commit"})
+        with self.assertRaises(OidcError):
+            launcher.parse_config({**document, "expected_ami": "not-an-ami"})
         directory = SimpleNamespace(st_mode=stat.S_IFDIR | 0o755, st_uid=0)
         file = SimpleNamespace(st_mode=stat.S_IFREG | 0o640, st_uid=0, st_gid=123)
         launcher.validate_config_metadata(directory, file, 123)

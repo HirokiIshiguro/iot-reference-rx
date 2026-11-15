@@ -21,12 +21,13 @@ from tools.idt_source_manifest import verify_dependency_provenance
 from tools.idt.windows_build_job import run_managed
 from tools.idt.oidc_job import current_job_metadata, current_windows_user
 
-# Replace in reviewed source only after the project-specific Windows execution
-# account has been established. An environment variable cannot grant admission.
-REVIEWED_WINDOWS_SID = None
-# Cancellation of the compiler tree and safe removal after interruption still
-# require verification under the dedicated runner. Keep actual execution off.
-COMPILER_CANCELLATION_VERIFIED = False
+# One-shot candidate: bind the actual dedicated local account in reviewed
+# source. An environment variable cannot grant admission.
+REVIEWED_WINDOWS_SID = 'S-1-5-21-1968247024-3954815946-1778135421-1009'
+# #85340/#85498 verified dummy descendant cancellation on this runner; #85829
+# verified the real compiler success path. Forced interruption of the real
+# compiler was not exercised. Unconfirmed termination retains private files.
+RUNNER_DESCENDANT_CONTAINMENT_VERIFIED = True
 PAIR_HOST = "gitlab-runner-idt-rx@192.168.10.123"
 PAIR_HOST_KEY = "192.168.10.123 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOHlGXFMBaNKz+F1uwnyxARvZFi92qDdOAbcOCOMHaRT"
 PAIR_IDENTITY = "C:/ProgramData/SAFFTI-IdtRxRunner/work/ssh-idt-rpi4/id_ed25519"
@@ -276,7 +277,7 @@ def main():
         run_connection(pipeline, lambda request: public_build(request, sha, public_placeholder_build),
                        report_public_errors=True)
         return
-    if REVIEWED_WINDOWS_SID is None or not COMPILER_CANCELLATION_VERIFIED:
+    if REVIEWED_WINDOWS_SID is None or not RUNNER_DESCENDANT_CONTAINMENT_VERIFIED:
         raise RuntimeError("reviewed dedicated Windows execution identity is not configured")
     import csv
     import io

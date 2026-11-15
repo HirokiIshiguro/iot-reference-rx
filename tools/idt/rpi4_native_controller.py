@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Wire the fixed Linux IDT launcher to on-demand Windows builds.
 
-The CI workflow and the Windows native worker remain disabled pending the
-public-only paired build and a separate physical-run review.
+The protected manual controller requires a source-pinned host configuration;
+physical execution still requires a separately reviewed grant.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from tools.idt.initialize_linux_dependencies import git_environment, initialize
 from tools.idt.rpi4_pair_broker import Broker
 
 
-def main():
+def main(*, preflight_only=False):
     if sys.platform != "linux" or platform.machine().lower() not in {"aarch64", "arm64"}:
         raise ValueError("dedicated Linux ARM64 runner required")
     import pwd
@@ -39,6 +39,8 @@ def main():
     linux_oidc_job.verified_context(env, source_sha=sha, config=config, job=job)
     count = initialize(ROOT, config.git, git_environment(env, config))
     print("Pinned nested dependency roots initialized: " + str(count), flush=True)
+    if preflight_only:
+        return linux_oidc_job.main(preflight_only=True)
     broker = Broker(env["CI_JOB_TOKEN"], config.ref, str(job["pipeline"]["id"]), sha,
                     "transport", build_seconds=config.pair_build_seconds,
                     queue_seconds=linux_oidc_job.NATIVE_SECONDS - config.pair_build_seconds
@@ -52,7 +54,9 @@ def main():
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
+        if sys.argv[1:] not in ([], ['--preflight-only']):
+            raise ValueError('unexpected native controller mode')
+        raise SystemExit(main(preflight_only=sys.argv[1:] == ['--preflight-only']))
     except Exception as error:
         print("Paired native controller failed: " + type(error).__name__, file=sys.stderr)
         raise SystemExit(1) from None
