@@ -1,7 +1,7 @@
 """Obtain a fixed OIDC session without consulting the runner's AWS credentials.
 
-This module is not wired into the production jobs yet. Callers must supply
-reviewed project/role settings and a budget covering every remaining operation.
+Callers must supply reviewed project/role settings and a budget covering every
+remaining operation. The dedicated RX72N Transport route is separately gated.
 """
 from __future__ import annotations
 

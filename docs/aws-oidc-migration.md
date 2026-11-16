@@ -1,6 +1,6 @@
 # AWS OIDC移行の準備
 
-この変更はGitLab ID tokenから短期STS sessionを得る共通部品、読取りprobe、IDT jobへの接続案、通常OTAの作成・回収ジョブの切替を含む。IDT jobのレビュー済み設定と時間予算は未登録であり、現状はAWS処理や実機操作の前に停止する。OTAの切替はRX72N Ethernetの作成・回収ジョブが対象。実環境でのOIDC検証、native OTAの独立recoveryと利用側の接続は後続。AWS role/trust、CI/CD Variables、実機および共有operatorの固定キーは変更しない。
+この変更はGitLab ID tokenから短期STS sessionを得る共通部品と読取りprobe、RX671 Windows IDTの明示選択pilotを含む。既存3機種のWindows IDT、通常OTA、RX72N RPi4 pilotの既定入口は変更しない。pilotは既存Runner #3のprofile・予算・共通roleを照合し、限定refの認証許可を確認したうえでRX671の非実機preflightを実行する候補である。Transportとnative OTAは未接続である。通常OTAのOIDC切替とnative OTAの独立recovery接続は後続である。AWS role/trust、CI/CD Variables、実機および共有operatorの固定キーは変更しない。
 
 ## 固定sessionの境界
 
@@ -16,15 +16,15 @@ STS交換時はprocess全体のambient AWS環境を一時的に退避するた�
 
 `child_environment`は許可リストで入力を選び、固定session以外のAWS設定とOIDC tokenを渡さない。WindowsからWSLへの受渡しは `wsl_bridge_environment` と `wsl_child_environment` の2段階で、Linux側のprofileやmetadataを無効化してから利用する設計である。IDTのsource接続案はhost preflightより前に一度だけSTSを取得し、Windows/WSL/native開始前に期限を再判定する。実際のAWS CLI署名とWindows→Ubuntu WSLの受渡しは合成credentialで確認した。実role、監督processのsignal伝播・子孫停止、全入力とartifactの秘匿、実機は未検証である。JWT、STS credential、変換済みの署名URL、鍵や子processの出力・artifactの秘匿は呼出し側の責任であり、環境変数の除外だけでは保証されない。
 
-IDTの `oidc_job.py` は、`/oss` から継承する `AWS_ROLE_ARN` をレビュー済みのARNに照合する。期待account、runner ID、host profile、実行パス、bootstrap・native準備・報告・余裕の予算もレビュー済みsource設定を使う。現在 `REVIEWED_CONFIGS` は空であり、AWS認証前に停止する。この停止より前にGitLabはJWTを発行し、jobはhost leaseを取得する。共有shell runnerのPython環境や実行ファイルを信頼できないjobが書き換えられる場合、`-I` やsource上のpath固定だけではJWTを守れないため、実配備前にrunnerの信頼・書込み境界を確認する。sourceで許可するrefは現在mainのみで、保護integration refやtagは別途設定と検証が必要である。OTA scopeはowner journalと独立recoveryが未接続のため開始しない。
+IDTの `oidc_job.py` は、`/oss` から継承する `AWS_ROLE_ARN` をレビュー済みのARNに照合する。期待account、runner ID、host profile、実行パス、bootstrap・native準備・報告・余裕の予算もレビュー済みsource設定を使う。`REVIEWED_CONFIGS` はtransportを含む他scopeでは空のままにし、明示pilotだけsource固定のpreflight設定を使う。この停止より前にGitLabはJWTを発行し、jobはプロジェクト内resource groupを取得する。共有shell runnerのPython環境や実行ファイルを信頼できないjobが書き換えられる場合、`-I` やsource上のpath固定だけではJWTを守れないため、実配備前にrunnerの信頼・書込み境界を確認する。明示pilotのsourceは一回用の保護refを固定する。現在のtrustはmain向けであるため、このrefの短期trust追加と完了後の復元は別途必要である。OTA scopeはowner journalと独立recoveryが未接続のため開始しない。
 
-Signer cleanupは、cert ARNの一致だけを理由にprofileをcancelしない。profileの参照や一覧取得が不明ならcertを保持する。`ota_admission.py` はversioned S3の条件付きwriteと元run／回収jobの区別をofflineで検討する部品で、実job、所有証拠の取得、独立recovery、IAM境界には未接続である。snapshotのページングは原子的ではなく、管理外主体による変更を防止するものではない。S3のETag条件とversion照合は、管理外主体による旧versionのcopy復元やdelete markerを使う競合を原子的に防止しない。journalのwriter・履歴保護と運用上の管理外変更検出は実適用前の前提である。
+native OTA向けSignerの所有証拠と独立回収は未接続である。既存の通常経路のSigner処理はこのpilotでは切り替えない。`ota_admission.py` はversioned S3の条件付きwriteと元run／回収jobの区別をofflineで検討する部品で、実job、所有証拠の取得、独立recovery、IAM境界には未接続である。snapshotのページングは原子的ではなく、管理外主体による変更を防止するものではない。S3のETag条件とversion照合は、管理外主体による旧versionのcopy復元やdelete markerを使う競合を原子的に防止しない。journalのwriter・履歴保護と運用上の管理外変更検出は実適用前の前提である。
 
 BG96の既存APN入力は `AWS_IOT_CELLULAR_APN_*_CK_RX65N_01` などのAWS接頭辞を持つが、AWS SDKの認証設定ではない。呼出し側が既存の4変数を個別に許可した場合だけ、これらのdevice通信入力を引き継ぐ。`AWS_PROFILE` やAWS endpoint overrideは許可できない。
 
 ## probeと後続
 
-RX72N Ethernetの通常OTAでは、保護mainの検証パイプラインに `RX72N_OTA_OIDC=true` を渡すと、`create_rx72n_ether_ota` と `cleanup_rx72n_ether_ota` がそれぞれGitLab ID tokenを使って共通 `AWS_ROLE_ARN` を引き受ける。従来のOTA journalと回収処理を使用する。OIDCを選択したjobで認証に失敗した場合は停止する。初回実行には対象のIoT Thing／OTA、S3 object、Signer参照とOTA service roleの `iam:PassRole` の許可が必要。タグ実行は別途trustとIAMの確認が必要。
+RX72N Ethernet通常OTAのOIDC wrapperは準備コードとして残すが、現在の通常OTA jobには接続していない。初回実行には対象のIoT Thing／OTA、S3 object、Signer参照とOTA service roleの `iam:PassRole` の許可が必要で、ref・tagのtrustと回収も別途確認する。
 
 初回の [IAM権限とnative OTAの回収手順](idt-oidc-pilot.md) に、通常OTA・IDT Transport・native OTAそれぞれの権限と実行前に確認する項目を記載する。
 

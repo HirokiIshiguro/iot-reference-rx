@@ -35,8 +35,8 @@ class IdtCiContractTests(unittest.TestCase):
         self.assertNotIn("$idtTarget -eq",block)
         self.assertEqual(set(ENVIRONMENT_INPUTS.values()),set(re.findall(r"'((?:IDT_PUBLIC_SIGNER_)[A-Z_]+)'",block)))
         yaml=(ROOT/".gitlab-ci.yml").read_text(encoding="utf-8")
-        native=yaml[yaml.index(".rx_idt_job:"):yaml.index("test_rx72n_idt:")]
-        self.assertIn("  resource_group: ishiguro-pc-ccrx-e2studio-build",native)
+        native=yaml[yaml.index("windows_rx671_idt_oidc_pilot:"):yaml.index(".rx_idt_job:")]
+        self.assertIn("  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP",native)
         self.assertIn("    RX_OIDC_ID_TOKEN:\n      aud: sts.amazonaws.com",native)
         self.assertIn("tools/idt/oidc_job.py",native)
         self.assertNotIn("tools/idt/check_host.py --target",native)

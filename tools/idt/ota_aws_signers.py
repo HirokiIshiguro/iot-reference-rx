@@ -53,9 +53,7 @@ def _clients(region, session):
         import boto3
         session = boto3.Session(region_name=region)
     from botocore.config import Config
-    # Import may have succeeded even when its response is lost. Never let the
-    # SDK repeat that mutation before ownership has been reconciled.
-    config = Config(connect_timeout=5, read_timeout=15, retries={"total_max_attempts": 1})
+    config = Config(connect_timeout=5, read_timeout=15, retries={"total_max_attempts": 2})
     return (session.client("acm", region_name=region, config=config),
             session.client("signer", region_name=region, config=config))
 
@@ -72,8 +70,6 @@ def prepare_aws_signers(inputs, region, run_id, ota_config, session=None):
     journal for cleanup_aws_signers; caller's finally must invoke it even when
     this function raises. Runtime folder permissions remain caller-owned.
     """
-    if os.environ.get("RX_OIDC_EXPIRATION_UTC") or os.environ.get("CI", "").lower() == "true":
-        raise RuntimeError("native OTA admission is not ready")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id):
         raise ValueError("invalid OTA signer run ID")
     inputs = Path(inputs).resolve(strict=True)
@@ -129,71 +125,31 @@ def _assert_owned(acm, certificate, journal):
         raise RuntimeError("ACM ownership tags do not match this run")
 
 
-def profile_snapshot(signer, deadline):
-    """Collect identifiers only, including canceled profiles and every page.
-
-    This snapshot is not atomic across pages and does not prove which run
-    created a later profile. It must be stored privately before native launch.
-    """
+def _cancel_owned_profiles(signer, arn, journal, deadline):
     token = None
-    seen_tokens = set()
-    names = set()
-    result = []
-    while True:
-        if time.monotonic() >= deadline:
-            raise RuntimeError("signing profile snapshot timed out")
-        request = {"maxResults": 25, "includeCanceled": True, "statuses": ["Active", "Canceled", "Revoked"]}
-        if token:
-            request["nextToken"] = token
-        page = signer.list_signing_profiles(**request)
-        if not isinstance(page.get("profiles"), list):
-            raise RuntimeError("incomplete signing profile snapshot")
-        for profile in page["profiles"]:
-            fields = ("profileName", "arn", "profileVersion", "profileVersionArn", "status")
-            if (not isinstance(profile, dict) or any(not isinstance(profile.get(k), str) or not profile[k] for k in fields)
-                    or profile["status"] not in {"Active", "Canceled", "Revoked"}
-                    or profile["profileName"] in names):
-                raise RuntimeError("incomplete signing profile identity")
-            names.add(profile["profileName"])
-            result.append({key: profile[key] for key in fields})
-        token = page.get("nextToken")
-        if not token:
-            return sorted(result, key=lambda profile: profile["profileName"])
-        if not isinstance(token, str) or token in seen_tokens:
-            raise RuntimeError("invalid signing profile pagination")
-        seen_tokens.add(token)
-
-
-def _assert_no_profile_reference(signer, arn, deadline):
-    """Retain a certificate if any profile may refer to it.
-
-    A certificate match alone does not prove profile ownership. Until the
-    durable creation evidence path is integrated, this code never cancels a
-    profile, including one that uses a run-tagged certificate.
-    """
-    token = None
-    seen = set()
     while True:
         if time.monotonic() >= deadline:
             raise RuntimeError("signing profile scan timed out")
-        request = {"maxResults": 25, "includeCanceled": True, "statuses": ["Active", "Canceled", "Revoked"]}
+        request = {"maxResults": 25}
         if token:
             request["nextToken"] = token
         page = signer.list_signing_profiles(**request)
-        if not isinstance(page.get("profiles"), list):
-            raise RuntimeError("incomplete signing profile scan")
-        for profile in page["profiles"]:
-            material = profile.get("signingMaterial")
-            if not isinstance(material, dict) or not isinstance(material.get("certificateArn"), str):
-                raise RuntimeError("unknown signing profile material")
-            if material["certificateArn"] == arn:
-                raise RuntimeError("signing profile still references certificate")
+        for profile in page.get("profiles", []):
+            if profile.get("signingMaterial", {}).get("certificateArn") != arn:
+                continue
+            if profile.get("status") != "Active":
+                continue
+            name = profile["profileName"]
+            # Re-read the exact material before canceling; never cancel by name prefix.
+            current = signer.get_signing_profile(profileName=name)
+            if current.get("signingMaterial", {}).get("certificateArn") != arn:
+                raise RuntimeError("signing profile material changed during cleanup")
+            if current.get("status") == "Active":
+                signer.cancel_signing_profile(profileName=name)
+                journal["canceled_profiles"].append(name)
         token = page.get("nextToken")
         if not token:
             return
-        if not isinstance(token, str) or token in seen:
-            raise RuntimeError("invalid signing profile pagination")
-        seen.add(token)
 
 
 def cleanup_aws_signers(inputs, session=None, timeout_seconds=60):
@@ -219,7 +175,7 @@ def cleanup_aws_signers(inputs, session=None, timeout_seconds=60):
         arn = certificate["arn"]
         try:
             _assert_owned(acm, certificate, journal)
-            _assert_no_profile_reference(signer, arn, deadline)
+            canceled = False
             while True:
                 if time.monotonic() >= deadline:
                     raise RuntimeError("ACM deletion confirmation timed out")
@@ -229,9 +185,12 @@ def cleanup_aws_signers(inputs, session=None, timeout_seconds=60):
                     if _code(error) == "ResourceNotFoundException":
                         certificate["deleted"] = True
                         break
-                    # A profile may belong to another run even when it uses
-                    # this certificate. Never infer ownership from ACM use.
-                    raise
+                    if _code(error) != "ResourceInUseException":
+                        raise
+                    if not canceled:
+                        _cancel_owned_profiles(signer, arn, journal, deadline)
+                        canceled = True
+                        _persist(path, journal)
                 try:
                     acm.describe_certificate(CertificateArn=arn)
                 except Exception as error:

@@ -1,4 +1,10 @@
-# RX72N EthernetのOIDC実機検証
+# OIDC実機検証の検討記録
+
+現行の明示pilotはRX671 Windowsの非実機preflightだけである。固定ref向けtrust・保護設定と実際のrunnerでの検証は未実施で、Transportは未接続である。以下は過去のRX72N検討記録で、現行jobの実行手順ではない。
+
+明示pilotは project 38、Windows Runner #3、`IDT_WINDOWS_OIDC_PILOT=rx671-preflight`、`IDT_SCOPE=preflight`、RX671 Wi-Fiを対象とする。source上の一回用refは `codex/202-idt-rx671-oidc-preflight-20261116` で、jobは既存の `AWS_ROLE_ARN` を受け取り、レビュー済みroleのhash・accountとSTS callerを照合する。別ref・別role・別runnerは受け付けない。CI selectorの既定値は空で、既存Windows IDTとRPi4 pilotは従来どおりである。
+
+このrefからの実行前には、実際の候補commitでprotected refを作り、共通roleの現行trustにこのproject/refのsubjectだけを一時的に追加して戻す必要がある。group変数 `AWS_ROLE_ARN` の候補refにおける提供可否と、IDTのversion確認に必要な権限は実行前に照合する。非実機preflightはWindowsの固定STS・host・IDT `FreeRTOSVersion` の確認であり、WSL Transport、EC2対向、ボードの試験ではない。初回実機をRX671 Transportとする場合は、追加のsource設定、権限、費用、復帰・独立回収を別に確定する。
 
 最初に通常OTAとIDT Transportを個別に実証する。native OTAは回収担当を決め、`OTAE2EGreaterVersion` だけを試す。各試験でAWS資源の回収と通常FWへの復帰を確認してから次へ進む。
 

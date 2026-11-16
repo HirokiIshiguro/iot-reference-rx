@@ -1,0 +1,181 @@
+# Dedicated RX72N Transport: optional protected/manual controller and paired worker.
+# This file is included by the main configuration; ordinary pipelines select none
+# of these jobs. It grants no AWS, Runner, SSH or hardware permissions by itself.
+.rpi4_transport_checkout:
+  variables:
+    GIT_STRATEGY: clone
+    GIT_SUBMODULE_STRATEGY: normal
+    GIT_CONFIG_COUNT: "4"
+    GIT_CONFIG_KEY_0: core.longpaths
+    GIT_CONFIG_VALUE_0: "true"
+    GIT_CONFIG_KEY_1: core.autocrlf
+    GIT_CONFIG_VALUE_1: "false"
+    GIT_CONFIG_KEY_2: core.eol
+    GIT_CONFIG_VALUE_2: lf
+    GIT_CONFIG_KEY_3: core.symlinks
+    GIT_CONFIG_VALUE_3: "false"
+
+.rpi4_controller_rules:
+  rules:
+    - if: '$CI_PROJECT_ID == "38" && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
+      when: on_success
+    - when: never
+
+rpi4_prepare_build:
+  extends: [build_rx72n_ether, .rpi4_transport_checkout]
+  rules:
+    - if: '$CI_PROJECT_ID == "38" && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
+      when: manual
+      allow_failure: false
+    - when: never
+  before_script:
+    - |
+      $ErrorActionPreference = 'Stop'
+      if ($env:CI_PROJECT_ID -cne '38' -or $env:CI_RUNNER_ID -cne '3' -or
+          $env:CI_COMMIT_REF_PROTECTED -cne 'true' -or
+          $env:RX72N_TLS_BACKEND -cne 'software' -or $env:RX72N_TLS13_0RTT_ENABLE -cne 'false' -or
+          $env:RX72N_REQUIRE_TLS_VERSION -cne '' -or $env:RX72N_SIGNING_KEY -cne 'sample_keys/secp256r1.privatekey' -or
+          $env:E2STUDIO_CLI -cne 'C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe' -or
+          $env:RX72N_E2STUDIO_TIMEOUT_SECONDS -cne '1200' -or
+          $env:E2STUDIO_WORKSPACE -cne "C:/ai/codex/ws/ci-rx72n-ether-$env:CI_PIPELINE_ID-$env:CI_JOB_ID") {
+        throw 'Unexpected protected Transport normal-build identity or configuration.'
+      }
+      foreach ($entry in @(Get-ChildItem Env:)) {
+        if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '^(?i:RX_OIDC_)') {
+          Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
+        }
+      }
+      . tools/rx_e2studio_cli.ps1
+      Initialize-RxBuildDependencies -ProjectRoot "$env:CI_PROJECT_DIR"
+      python -B tools/idt/stage_public_assets.py --write-windows-snapshot "$env:CI_PROJECT_DIR/artifacts/idt-source/windows-source-sha256.txt"
+      if ($LASTEXITCODE -ne 0) { throw 'Windows source snapshot failed.' }
+  artifacts:
+    paths:
+      - artifacts/idt-source/windows-source-sha256.txt
+      - rx72n_app.rsu
+      - Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/*.mot
+    expire_in: 7 days
+
+rpi4_prepare_package:
+  extends: [.normal_boot_package, .rpi4_transport_checkout]
+  tags: [exec-shell, os-windows, ccrx, $RX72N_BUILD_RUNNER_TAG]
+  needs:
+    - job: rpi4_prepare_build
+      artifacts: true
+  rules: !reference [.rpi4_controller_rules, rules]
+  variables:
+    NORMAL_BOOT_TARGET: rx72n-ethernet
+    NORMAL_BOOT_SIGNING_KEY_VARIABLE: RX72N_SIGNING_KEY
+    NORMAL_BOOT_BACKEND_VARIABLE: RX72N_TLS_BACKEND
+    NORMAL_BOOT_RSU: rx72n_app.rsu
+    NORMAL_BOOT_BOOT0: Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot
+    NORMAL_BOOT_BOOT1: Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot
+    NORMAL_BOOT_ARTIFACT_DIR: artifacts/normal_boot_rx72n
+  before_script:
+    - |
+      $ErrorActionPreference = 'Stop'
+      if ($env:CI_PROJECT_ID -cne '38' -or $env:CI_RUNNER_ID -cne '3' -or
+          $env:CI_COMMIT_REF_PROTECTED -cne 'true' -or $env:NORMAL_BOOT_TARGET -cne 'rx72n-ethernet' -or
+          $env:NORMAL_BOOT_SIGNING_KEY_VARIABLE -cne 'RX72N_SIGNING_KEY' -or
+          $env:NORMAL_BOOT_BACKEND_VARIABLE -cne 'RX72N_TLS_BACKEND' -or
+          $env:NORMAL_BOOT_ARTIFACT_DIR -cne 'artifacts/normal_boot_rx72n' -or
+          $env:NORMAL_BOOT_RSU -cne 'rx72n_app.rsu' -or
+          $env:NORMAL_BOOT_BOOT0 -cne 'Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit.mot' -or
+          $env:NORMAL_BOOT_BOOT1 -cne 'Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/HardwareDebug/boot_loader_rx72n_envision_kit_bank1.mot' -or
+          $env:RX72N_TLS_BACKEND -cne 'software' -or $env:RX72N_SIGNING_KEY -cne 'sample_keys/secp256r1.privatekey') {
+        throw 'Unexpected protected Transport normal-package identity or configuration.'
+      }
+      foreach ($entry in @(Get-ChildItem Env:)) {
+        if ($entry.Name -match '^(?i:AWS_)' -or $entry.Name -match '^(?i:RX_OIDC_)') {
+          Remove-Item -LiteralPath ('Env:' + $entry.Name) -ErrorAction Stop
+        }
+      }
+  script:
+    - !reference [.normal_boot_package, script]
+    - Copy-Item -LiteralPath "$env:CI_PROJECT_DIR/artifacts/idt-source/windows-source-sha256.txt" -Destination "$env:CI_PROJECT_DIR/artifacts/normal_boot_rx72n/windows-source-sha256.txt"
+
+rpi4_windows_worker:
+  extends: .rpi4_transport_checkout
+  stage: test
+  timeout: 3 hours
+  tags: [exec-shell, os-windows, ccrx, project38-idt-windows-protected]
+  resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
+  rules:
+    - if: '$CI_PROJECT_ID == "38" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "transport"'
+      when: on_success
+    - when: never
+  script:
+    - |
+      $ErrorActionPreference = 'Stop'
+      . tools/rx_e2studio_cli.ps1
+      Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
+      . tools/idt/rpi4_windows_python.ps1
+      & $script:IdtWorkerPython -I tools/idt/rpi4_windows_worker.py
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+rpi4_snapshot_verify:
+  extends: .rpi4_transport_checkout
+  stage: test
+  timeout: 30 minutes
+  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
+  needs:
+    - job: rpi4_prepare_package
+      artifacts: true
+  rules: !reference [.rpi4_controller_rules, rules]
+  before_script: []
+  after_script: []
+  script:
+    - /opt/idt-rx/venv/bin/python3 -I -B tools/idt/rpi4_snapshot_verify.py
+  artifacts:
+    paths: [artifacts/idt-snapshot-proof.json]
+    expire_in: 7 days
+
+.rpi4_linux_transport_common:
+  extends: .rpi4_transport_checkout
+  stage: test
+  timeout: 3 hours
+  tags: [exec-shell, os-linux, project38-idt-rpi4-protected]
+  needs:
+    - job: rpi4_prepare_package
+      artifacts: true
+    - job: rpi4_snapshot_verify
+      artifacts: false
+  variables:
+    RUN_RX_IDT: "true"
+    IDT_TARGET: rx72n-ethernet
+    IDT_SCOPE: transport
+    IDT_PUBLIC_SIGNER_PROVISIONER_MOT_FILE: "$CI_PROJECT_DIR/artifacts/normal_boot_rx72n/public_signer_provisioner.mot"
+    IDT_PUBLIC_SIGNER_PROVISIONER_MANIFEST_FILE: "$CI_PROJECT_DIR/artifacts/normal_boot_rx72n/public_signer_provisioner_manifest.json"
+    IDT_PUBLIC_SIGNER_CERT_FILE: "$CI_PROJECT_DIR/artifacts/normal_boot_rx72n/signer.crt.pem"
+    IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE: "$CI_PROJECT_DIR/artifacts/normal_boot_rx72n/signer.pub.pem"
+  id_tokens:
+    RX_OIDC_ID_TOKEN:
+      aud: sts.amazonaws.com
+  rules:
+    - if: '$CI_PROJECT_ID == "38" && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
+      when: manual
+      allow_failure: false
+    - when: never
+  before_script: []
+  after_script: []
+
+rpi4_transport_preflight:
+  extends: .rpi4_linux_transport_common
+  script:
+    - /opt/idt-rx/venv/bin/python3 -I -B tools/idt/rpi4_native_controller.py --preflight-only
+
+rpi4_transport_controller:
+  extends: .rpi4_linux_transport_common
+  needs:
+    - job: rpi4_prepare_package
+      artifacts: true
+    - job: rpi4_transport_preflight
+      artifacts: false
+  script:
+    - /opt/idt-rx/venv/bin/python3 -I -B tools/idt/rpi4_native_controller.py
+  artifacts:
+    when: always
+    reports:
+      junit: artifacts/idt/FRQ_Report.xml
+    paths: [artifacts/idt/]
+    expire_in: 30 days

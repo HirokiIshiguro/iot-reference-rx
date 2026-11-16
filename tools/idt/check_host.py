@@ -165,7 +165,7 @@ def main() -> int:
     parser.add_argument("--check-aws", action="store_true", help="Also call read-only AWS STS GetCallerIdentity")
     args = parser.parse_args()
     profile = load_host_profile(args.profile)
-    if args.check_aws:
+    if args.check_aws and (os.environ.get("RX_WINDOWS_IDT_OIDC_REQUIRED") == "true" or os.environ.get("RX_OIDC_EXPIRATION_UTC")):
         try:
             from .oidc_job import check_child_budget, verify_host_profile
         except ImportError:

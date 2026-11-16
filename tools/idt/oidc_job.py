@@ -49,9 +49,18 @@ IDT_WSL_INPUTS = {
     "IDT_WORKSPACE_ROOT", "IDT_LINUX_PYTHON", "IDT_WINDOWS_SSH", "IDT_WINDOWS_SCP",
     "IDT_DIAGNOSTIC_ONLY", "IDT_OTA_SIGNING_KEY_FILE", "IDT_OTA_SIGNER_CERT_FILE",
     "RX_OIDC_IDT_NATIVE_REQUIRED_SECONDS", "RX_OIDC_IDT_PREPARE_SECONDS", "RX_OIDC_IDT_MARGIN_SECONDS",
-    "RX_OIDC_IDT_WSL_PATH", "RX_OIDC_IDT_WSL_HOME",
+    "RX_OIDC_IDT_WSL_PATH", "RX_OIDC_IDT_WSL_HOME", "RX_WINDOWS_IDT_OIDC_REQUIRED",
     *PUBLIC_SIGNER_INPUTS.values(),
     *(name for values in NETWORK_INPUTS.values() for name in values.values()),
+}
+
+IDT_LINUX_INPUTS = {
+    "CI", "IDT_RUNTIME_DIR", "IDT_PRIVATE_KEY_FILE", "IDT_PROVENANCE_FILE",
+    "IDT_SCOPE", "IDT_TARGET", "IDT_SOURCE_SHA", "IDT_LINUX_PYTHON",
+    "RX_OIDC_IDT_NATIVE_REQUIRED_SECONDS", "RX_OIDC_IDT_PREPARE_SECONDS", "RX_OIDC_IDT_MARGIN_SECONDS",
+    "IDT_HOST_MODE", "IDT_LINUX_IDT_ROOT", "IDT_LINUX_RUNTIME_ROOT", "IDT_LINUX_BUILD_CALLBACK",
+    "IDT_LINUX_SSH", "IDT_LINUX_SCP", "IDT_PAIR_BASELINE", "IDT_PAIR_BUILD_SECONDS",
+    "IDT_PAIR_QUEUE_SECONDS", "IDT_PAIR_SOCKET", "QEMU_LD_PREFIX", *PUBLIC_SIGNER_INPUTS.values(),
 }
 
 
@@ -94,6 +103,7 @@ class ReviewedConfig:
     search_path: str
     git_executable: str
     budget: Budget
+    ref: str = "main"
 
     def __post_init__(self):
         if (not isinstance(self.budget, Budget) or not isinstance(self.runner_id, int)
@@ -105,6 +115,7 @@ class ReviewedConfig:
                                  self.program_files, self.program_files_x86, self.program_data, self.wsl_path, self.wsl_home,
                                  self.host_profile, self.host_profile_sha256, self.search_path,
                                  self.git_executable))
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", self.ref)
                 or not re.fullmatch(r"[0-9a-f]{64}", self.host_profile_sha256)
                 or any(not ntpath.isabs(x) for x in (self.windows_root, self.user_profile, self.temp_directory,
                                                      self.program_files, self.program_files_x86, self.program_data,
@@ -113,6 +124,35 @@ class ReviewedConfig:
                 or not PurePosixPath(self.wsl_home).is_absolute()
                 or any(not PurePosixPath(item).is_absolute() for item in self.wsl_path.split(":"))):
             raise OidcError("invalid reviewed IDT configuration")
+
+
+
+# A source-pinned, non-hardware RX671 OIDC preflight; other scopes remain closed.
+PILOT_REF = "codex/202-idt-rx671-oidc-preflight-20261116"
+PILOT_ROLE_SHA256 = "feefbe8e22044adfa854dd82e27cc75c185ed769f439468de6e1c20fe8890285"
+
+
+def reviewed_preflight_config(env):
+    if (env.get("IDT_WINDOWS_OIDC_PILOT") != "rx671-preflight"
+            or env.get("CI_COMMIT_BRANCH") != PILOT_REF
+            or env.get("RUN_RX_IDT") != "true"
+            or env.get("IDT_TARGET") != "rx671-wifi" or env.get("IDT_SCOPE") != "preflight"):
+        raise OidcError("unexpected Windows OIDC preflight selection")
+    role = env.get("AWS_ROLE_ARN", "")
+    if hashlib.sha256(role.encode("utf-8")).hexdigest() != PILOT_ROLE_SHA256:
+        raise OidcError("Windows OIDC role differs from reviewed role")
+    account = role.split(":")[4]
+    return ReviewedConfig(
+        account=account, role_arn=role, runner_id=3, job_timeout_seconds=10800,
+        windows_root="C:/Windows", user_profile="C:/Users/ishig",
+        temp_directory="C:/Users/ishig/AppData/Local/Temp",
+        program_files="C:/Program Files", program_files_x86="C:/Program Files (x86)",
+        program_data="C:/ProgramData", wsl_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        wsl_home="/home/ishig", host_profile="C:/ai/codex/tools/venvs/rx72n-idt-windows/host-profile.json",
+        host_profile_sha256="affc1ce41af91d529eb4a9f9bde8af68ee73648c537d30a4389bd071817167b4",
+        search_path="C:/Windows/System32;C:/Windows;C:/Windows/System32/OpenSSH;C:/Program Files/PowerShell/7;C:/Program Files/Git/cmd;C:/Program Files/Amazon/AWSCLIV2;C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts",
+        git_executable="C:/Program Files/Git/cmd/git.exe",
+        budget=Budget(1200, 600, 180, 300), ref=PILOT_REF)
 
 
 def scope_from_env(env):
@@ -137,12 +177,15 @@ def prepare_child(env, *, source_sha, config, user_name, session_factory=None):
         raise OidcError("IDT routing differs from reviewed configuration")
     budget = config.budget
     expected = ExpectedIdentity("38", PROJECT_PATH, config.account, config.role_arn,
-                                "branch", "main", source_sha, ("web", "api", "schedule"), config.runner_id)
+                                "branch", config.ref, source_sha, ("web", "api", "schedule"), config.runner_id)
     if session_factory is None:
         session_factory = obtain_session
     session = session_factory(env, expected, required_seconds=budget.initial_required(),
                               margin_seconds=budget.margin_seconds, duration_seconds=IDT_SESSION_SECONDS)
-    child = child_environment(env, session, allow_names=_INPUTS)
+    allowed_inputs = _INPUTS
+    if scope == "preflight":
+        allowed_inputs = _INPUTS - {name for values in NETWORK_INPUTS.values() for name in values.values()}
+    child = child_environment(env, session, allow_names=allowed_inputs)
     for name in list(child):
         if name.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "USERPROFILE", "HOME", "TEMP", "TMP",
                             "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA",
@@ -165,6 +208,7 @@ def prepare_child(env, *, source_sha, config, user_name, session_factory=None):
     child["PATHEXT"] = ".COM;.EXE;.BAT;.CMD"
     child["SYSTEMDRIVE"] = ntpath.splitdrive(config.windows_root)[0]
     child["WSLENV"] = ""
+    child["RX_WINDOWS_IDT_OIDC_REQUIRED"] = "true"
     child["RX72N_IDT_PYTHON"] = ENTRY_PYTHON
     child["RX72N_IDT_HOST_PROFILE"] = config.host_profile
     child["RX_IDT_REVIEWED_PROFILE_SHA256"] = config.host_profile_sha256
@@ -296,12 +340,16 @@ def main():
     # override or a guess based on a partial 6489-second calculation.
     source_env = dict(os.environ)
     scope = scope_from_env(source_env)
-    config = REVIEWED_CONFIGS.get(scope)
+    config = (reviewed_preflight_config(source_env)
+              if source_env.get("IDT_WINDOWS_OIDC_PILOT") == "rx671-preflight"
+              else REVIEWED_CONFIGS.get(scope))
     if not isinstance(config, ReviewedConfig):
         raise OidcError("unreviewed IDT configuration")
     if ntpath.normcase(ntpath.normpath(source_env.get("CI_PROJECT_DIR", ""))) != ntpath.normcase(ntpath.normpath(str(ROOT))):
         raise OidcError("unexpected checkout")
     user_name = current_windows_user()
+    if config.ref == PILOT_REF and user_name.casefold() != "ishig":
+        raise OidcError("unexpected Windows OIDC runner account")
     profile = load_reviewed_host(config)
     git_env = {"SYSTEMROOT": config.windows_root, "WINDIR": config.windows_root,
                "TEMP": config.temp_directory, "TMP": config.temp_directory}
@@ -309,8 +357,10 @@ def main():
                    GIT_TERMINAL_PROMPT="0")
     source_sha = subprocess.check_output([config.git_executable, "rev-parse", "HEAD"], cwd=ROOT, env=git_env,
                                          text=True, encoding="utf-8").strip()
-    source_env = verified_job_environment(source_env, config, source_sha,
-                                          current_job_metadata(source_env.get("CI_JOB_TOKEN", "")))
+    current_job = current_job_metadata(source_env.get("CI_JOB_TOKEN", ""))
+    if config.ref == PILOT_REF and current_job.get("name") != "windows_rx671_idt_oidc_pilot":
+        raise OidcError("unexpected Windows OIDC preflight job")
+    source_env = verified_job_environment(source_env, config, source_sha, current_job)
     child = prepare_child(source_env, source_sha=source_sha, config=config, user_name=user_name)
     # JWT is never inherited by this script's child processes.
     source_env.pop(TOKEN_ENV, None)

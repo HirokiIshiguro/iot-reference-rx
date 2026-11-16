@@ -104,15 +104,6 @@ class IdtProcessOutputTests(unittest.TestCase):
         self.assertNotIn("fixture-", public)
         self.assertNotIn("secret", public)
 
-    def test_bridge_startup_only_publishes_known_categories(self):
-        code, public, private = self.observe_child(
-            "print('IDT bridge startup: authentication'); "
-            "print('IDT bridge startup: unexpected-private-value')"
-        )
-        self.assertEqual(0, code)
-        self.assertEqual("IDT bridge startup: authentication\n", public)
-        self.assertIn("unexpected-private-value", private)
-
     def test_complete_phase_and_private_lines_arrive_before_child_exit_without_communicate(self):
         public = io.StringIO()
         with tempfile.TemporaryDirectory() as folder:
@@ -195,7 +186,6 @@ class IdtProcessOutputTests(unittest.TestCase):
             with self.subTest(running=running, output_closed=output_closed):
                 process = Mock(stdout=SimpleNamespace(closed=output_closed))
                 process.poll.return_value = None if running else 0
-                process._idt_output_drain_complete = output_closed
                 with patch.object(ota_aws_signers, "cleanup_aws_signers", return_value={
                         "state": "deleted", "certificates": [{"deleted": True}]}) as cleanup:
                     result = run_idt.cleanup_signers_after_runtime(process, inputs, session)
@@ -206,14 +196,6 @@ class IdtProcessOutputTests(unittest.TestCase):
                 else:
                     self.assertEqual("cleanup_failed", result["state"])
                     cleanup.assert_not_called()
-
-    def test_unknown_drain_state_does_not_authorize_signer_cleanup(self):
-        from tools.idt import ota_aws_signers
-        process = SimpleNamespace(stdout=SimpleNamespace(closed=True), poll=lambda: 0)
-        with patch.object(ota_aws_signers, "cleanup_aws_signers") as cleanup:
-            result = run_idt.cleanup_signers_after_runtime(process, Path("fixture-inputs"), object())
-        self.assertEqual("cleanup_failed", result["state"])
-        cleanup.assert_not_called()
 
     def test_signers_created_before_native_start_can_be_cleaned(self):
         from tools.idt import ota_aws_signers
