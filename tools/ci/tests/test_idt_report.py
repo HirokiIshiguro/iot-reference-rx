@@ -327,7 +327,9 @@ class IdtCiContractTests(unittest.TestCase):
     def test_idt_workflow_precedes_other_profiles_and_disables_normal_targets(self) -> None:
         workflow = self.blocks["workflow"]
         conditions = re.findall(r"- if: '([^']+)'", workflow)
-        self.assertEqual(OPT_IN, conditions[0])
+        opt_in_index = conditions.index(OPT_IN)
+        self.assertTrue(all("$IDT_PAIR_MODE" in condition for condition in conditions[:opt_in_index]))
+        self.assertTrue(all('"merge_request_event"' not in condition for condition in conditions[:opt_in_index]))
         selected_rule = workflow.split(f"- if: '{OPT_IN}'", 1)[1].split("\n    - if:", 1)[0]
         self.assertIn('PIPELINE_PROFILE: "idt"', selected_rule)
         for variable in (
@@ -344,12 +346,14 @@ class IdtCiContractTests(unittest.TestCase):
     def test_review_draft_does_not_start_shared_bench_jobs(self) -> None:
         workflow = self.blocks["workflow"]
         conditions = re.findall(r"- if: '([^']+)'", workflow)
-        guard = conditions[1]
+        opt_in_index = conditions.index(OPT_IN)
+        guard_index = opt_in_index + 1
+        guard = conditions[guard_index]
         expected = (
             '$CI_PIPELINE_SOURCE == "merge_request_event" && '
             '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-(idt-|common-core-)/'
         )
-        self.assertEqual(OPT_IN, conditions[0])
+        self.assertTrue(all("$IDT_PAIR_MODE" in condition for condition in conditions[:opt_in_index]))
         self.assertEqual(expected, guard)
         block = workflow.split("- if: '" + guard + "'", 1)[1].split("\n    - if:", 1)[0]
         self.assertIn('PIPELINE_PROFILE: "mr-idt-targets"', block)
@@ -384,7 +388,7 @@ class IdtCiContractTests(unittest.TestCase):
         other_mr_positions = [index for index, item in enumerate(conditions)
                               if '"merge_request_event"' in item and item != guard]
         self.assertTrue(other_mr_positions)
-        self.assertTrue(all(index > 1 for index in other_mr_positions))
+        self.assertTrue(all(index > guard_index for index in other_mr_positions))
 
     def test_idt_uses_windows_aws_runner_and_shared_compiler_lock(self) -> None:
         job = self.blocks[".rx_idt_job"]

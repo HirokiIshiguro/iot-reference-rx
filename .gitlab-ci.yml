@@ -1,5 +1,6 @@
 include:
   - local: /tools/ci/normal_boot_jobs.yml
+  - local: /tools/ci/rpi4_transport_pilot.yml
 
 stages:
   - dependency_check
@@ -61,6 +62,10 @@ variables:
   #   nightly_matrix - scheduled parent pipeline that fans out focused rows.
   #   idt     - explicit web/API IDT run; no normal board/OTA jobs.
   PIPELINE_PROFILE: "branch"
+  IDT_PAIR_MODE:
+    value: ""
+    options: ["", "transport-controller"]
+    description: "保護refのRX72N Transport準備を選択。実機とAWSは個別の手動確認後に開始。"
   # Shared entry; the RX72N inputs below remain compatible.
   RUN_RX_IDT: "false"
   IDT_TARGET: "rx72n-ethernet"
@@ -331,6 +336,46 @@ variables:
 
 workflow:
   rules:
+    # A paired pipeline must not fall through to the normal hardware profiles.
+    # These existing selectors directly enable other hardware or IDT jobs.
+    - if: '$IDT_PAIR_MODE =~ /^(transport|transport-controller)$/ && ($RUN_RX_IDT == "true" || $RUN_RX72N_IDT == "true" || $RX72N_TEST_SCOPE =~ /^(auto|mqtt|ota|full|fleet|tls13_0rtt)$/ || $RX65N_BG96_TEST_SCOPE =~ /^(mqtt|ota|tls13_0rtt|fleet|full)$/ || $RX671_WIFI_TEST_SCOPE =~ /^(network|mqtt|ota|fleet)$/ || $RUN_RX671_BOOTLOADER_SMOKE == "true" || $PIPELINE_PROFILE =~ /^(focused|nightly_matrix)$/)'
+      when: never
+    - if: '$IDT_PAIR_MODE =~ /^(transport|transport-controller)$/ && ($CI_DEBUG_TRACE =~ /(?i)^(t|true|\+?0*1)$/ || $CI_DEBUG_SERVICES =~ /(?i)^(t|true|\+?0*1)$/)'
+      when: never
+    - if: '$CI_PROJECT_ID == "38" && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api") && $IDT_PAIR_MODE == "transport-controller"'
+      variables: &rpi4_transport_isolation
+        PIPELINE_PROFILE: "rpi4-transport"
+        RUN_RX_IDT: "false"
+        RUN_RX72N_IDT: "false"
+        RUN_RX65N_BG96_BUILD: "false"
+        RX65N_BG96_TEST_SCOPE: "build"
+        RX65N_BG96_SKIP_HW_TESTS: "true"
+        RUN_RX72N_BUILD: "false"
+        RUN_RX72N_MQTT_CANDIDATE_BUILD: "false"
+        RX72N_TEST_SCOPE: "build"
+        RX72N_SKIP_HW_TESTS: "true"
+        RX72N_SKIP_OTA_TESTS: "true"
+        RUN_RX72N_HW_TESTS: "false"
+        RUN_RX72N_MULTI_TLS_TEST: "false"
+        RUN_RX72N_OTA_TESTS: "false"
+        RUN_RX72N_FLEET_TESTS: "false"
+        RUN_RX671_WIFI_BUILD: "false"
+        RX671_WIFI_TEST_SCOPE: "build"
+        RX671_WIFI_SKIP_HW_TESTS: "true"
+        RUN_RX671_BOOTLOADER_BUILD: "false"
+        RUN_RX671_BOOTLOADER_SMOKE: "false"
+        RUN_RX671_OTA_ARTIFACT_BUILD: "false"
+        RUN_RX671_OTA_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TEST: "false"
+        RUN_RX671_TSIP_AWS_MQTT_TLS13_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TEST: "false"
+        RUN_RX671_TSIP_FLEET_TLS13_TEST: "false"
+      when: always
+    - if: '$CI_PROJECT_ID == "38" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "pipeline" && $IDT_PAIR_MODE == "transport"'
+      variables: *rpi4_transport_isolation
+      when: always
+    - if: '$IDT_PAIR_MODE =~ /^(transport|transport-controller)$/'
+      when: never
     # Select RUN_RX_IDT / IDT_TARGET / IDT_SCOPE, or the legacy RX72N inputs.
     # Pipeline variables override workflow defaults; do not combine IDT
     # with the existing board build, hardware, OTA or nightly scope inputs.
@@ -787,6 +832,18 @@ idt_ci_contract:
       "$idt_ci_python" -m pip install --disable-pip-version-check -r tools/idt/requirements-ci.txt
       "$idt_ci_python" -m pip check
       "$idt_ci_python" -m unittest \
+        tools.ci.tests.test_oidc_session \
+        tools.ci.tests.test_idt_linux_oidc_job \
+        tools.ci.tests.test_idt_linux_transport \
+        tools.ci.tests.test_idt_linux_supervisor \
+        tools.ci.tests.test_idt_linux_flash \
+        tools.ci.tests.test_idt_linux_nested_dependencies \
+        tools.ci.tests.test_idt_rpi4_pair \
+        tools.ci.tests.test_idt_rpi4_public \
+        tools.ci.tests.test_idt_rpi4_ci_contract \
+        tools.ci.tests.test_idt_rpi4_snapshot_verify \
+        tools.ci.tests.test_idt_explicit_python \
+        tools.ci.tests.test_windows_build_job \
         tools.ci.tests.test_idt_report \
         tools.ci.tests.test_idt_host_profile \
         tools.ci.tests.test_idt_credentials \
