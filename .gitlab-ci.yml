@@ -1,7 +1,4 @@
 include:
-  - project: oss/infra/hardware-config
-    ref: f26789f1b61645b7c5aad9d7e5e9f52c933b18e9
-    file: /templates/windows_ccrx_host_lease.yml
   - local: /tools/ci/normal_boot_jobs.yml
   - local: /tools/ci/rpi4_transport_pilot.yml
 
@@ -42,7 +39,7 @@ variables:
   E2STUDIO_CLI_BG96: "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe"
   E2STUDIO_WORKSPACE: "C:/ai/codex/ws/ci-rx72n-ether-${CI_PIPELINE_ID}-${CI_JOB_ID}"
   E2STUDIO_WORKSPACE_RX65N_BG96: "C:/ai/codex/ws/ci-rx65n-bg96-${CI_PIPELINE_ID}-${CI_JOB_ID}"
-  # Participating CI builds retain their shared resource group and file lease.
+  # CC-RX build jobs share one resource group inside this project.
   # Normal app/boot workspaces are isolated by pipeline and job.
   WINDOWS_CCRX_BUILD_RESOURCE_GROUP: "ishiguro-pc-ccrx-e2studio-build"
   RX72N_E2STUDIO_TIMEOUT_SECONDS: "1200"
@@ -75,7 +72,7 @@ variables:
   IDT_SCOPE: "preflight"
   RUN_RX72N_IDT: "false"
   # Override when a second Windows/WSL host has the same validated capabilities.
-  RX72N_IDT_RUNNER_TAG: "hw-ishiguro-pc"
+  RX72N_IDT_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
   RX72N_IDT_PYTHON: "C:/ai/codex/tools/venvs/rx72n-idt-windows/Scripts/python.exe"
   RX72N_IDT_HOST_PROFILE: "C:/ai/codex/tools/venvs/rx72n-idt-windows/host-profile.json"
   # Bring-up scopes are partial results, not a release qualification PASS.
@@ -244,8 +241,8 @@ variables:
   RX72N_OTA_OBSERVE_TIMEOUT: "900"
   AWS_DEFAULT_REGION: "ap-northeast-1"
   AWS_CLI_RUNNER_TAG: "aws-cli-ishiguro"
-  RX72N_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
-  RX65N_BG96_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  RX72N_BUILD_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
+  RX65N_BG96_BUILD_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
   E2STUDIO_WORKSPACE_RX671_WIFI: "C:/ai/codex/ws/ci-rx671-wifi-${CI_PIPELINE_ID}-${CI_JOB_ID}"
   E2STUDIO_WORKSPACE_RX671_WIFI_FLEET: "C:/Temp/e2ws_iot_ref_rx671_wifi_fleet_2026_04_2"
   E2STUDIO_WORKSPACE_RX671_BOOTLOADER: "C:/ai/codex/ws/ci-rx671-boot-${CI_PIPELINE_ID}-${CI_JOB_ID}/e2ws_iot_ref_rx671_bootloader_2026_04_2"
@@ -292,7 +289,7 @@ variables:
   # frame. Focused HIL uses this to prove the bounded non-abort recovery path.
   RX671_WIFI_F2_FAULT_INJECT_ONCE: "false"
   RX671_WIFI_SKIP_HW_TESTS: "false"
-  RX671_WIFI_BUILD_RUNNER_TAG: "hw-ishiguro-pc"
+  RX671_WIFI_BUILD_RUNNER_TAG: "ef-saffti-001-pc-windows-001"
   RX671_WIFI_DEVICE_RESOURCE_GROUP: "ek-rx671-rpi1-hardware"
   # Runner-local lock shared with the standalone RX671 benchmark projects.
   # GitLab resource_group locks are project-scoped, so they cannot prevent a
@@ -933,7 +930,6 @@ idt_ci_contract:
     - exec-shell
     - os-windows
     - $RX72N_IDT_RUNNER_TAG
-    - ccrx
     - $AWS_CLI_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   timeout: 3 hours
@@ -941,7 +937,6 @@ idt_ci_contract:
     GIT_SUBMODULE_STRATEGY: normal
     PYTHONUTF8: "1"
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - |
       . tools/rx_e2studio_cli.ps1
       Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
@@ -1088,7 +1083,6 @@ idt_source_matrix:
     - exec-shell
     - os-windows
     - $RX72N_IDT_RUNNER_TAG
-    - ccrx
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   timeout: 3 hours
   variables:
@@ -1099,7 +1093,6 @@ idt_source_matrix:
       when: on_success
     - when: never
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - |
       # Preserve complete diagnostics outside the checkout: Runner trace is
       # capped and the next canonical clone removes this job's working tree.
@@ -1440,6 +1433,29 @@ matrix_rx671_wifi_software_ota_tls13:
     RX671_WIFI_TEST_SCOPE: "ota"
     RUN_RX671_OTA_TEST: "true"
     RX671_OTA_REQUIRE_TLS_VERSION: "TLSv1.3"
+
+nightly_rx65n_r_cellular_tests:
+  stage: nightly_matrix
+  inherit:
+    variables: false
+  needs:
+    - job: nightly_dependency_alignment
+      artifacts: true
+  resource_group: nightly-matrix-rx65n-bg96
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "web") && $PIPELINE_PROFILE == "nightly_matrix"'
+      when: on_success
+    - when: never
+  trigger:
+    project: oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/test
+    branch: main
+    strategy: mirror
+    forward:
+      yaml_variables: true
+      pipeline_variables: false
+  variables:
+    R_CELLULAR_REF: "$PRODUCT_R_CELLULAR_SHA"
+    RCT_API_BLOCKING: "true"
 
 .matrix_rx671_software_lanbench:
   stage: nightly_matrix
@@ -1892,14 +1908,12 @@ build_rx72n_ether:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
       when: never
     - when: on_success
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build RX72N projects ==="
     - python tools/ci/check_rx72n_tsip_driver.py
     - python -m unittest tools.ci.tests.test_test_ota tools.ci.tests.test_rx72n_hardware_transaction_contract tools.ci.tests.test_rx72n_tsip_trace_init tools.ci.tests.test_windows_ccrx_build_serialization_contract tools.ci.tests.test_transport_mbedtls_provisioning_guard tools.ci.tests.test_verify_ota_aws_state tools.ci.tests.test_ota_aws_evidence_ci_contract tools.ci.tests.test_manage_ephemeral_iot_thing tools.ci.tests.test_rx72n_fwup_prm_contract tools.ci.tests.test_rx_e2studio_cli
@@ -2036,7 +2050,6 @@ build_rx65n_bg96:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX65N_BG96_BUILD == "true"'
@@ -2047,7 +2060,6 @@ build_rx65n_bg96:
       artifacts: true
       optional: true
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build CK-RX65N BG96 projects ==="
     - python -c "from tools.ci.tests.test_product_oss_api import GCC, MSVC; raise SystemExit(0 if GCC or MSVC else 'Host C compiler required for cellular socket regression.')"
     - if ($LASTEXITCODE -ne 0) { throw 'Cellular socket host compiler prerequisite failed.' }
@@ -2160,7 +2172,6 @@ build_rx671_wifi:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
@@ -2169,7 +2180,6 @@ build_rx671_wifi:
       when: on_success
     - when: never
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build EK-RX671 Type 1YN Wi-Fi project ==="
     - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_hardware_transaction_contract tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract tools.ci.tests.test_ota_zero_storage_policy
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -2261,13 +2271,11 @@ build_rx671_wifi_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx671_wifi_fleet_rules
     - .rx_windows_canonical_checkout
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build encrypted EK-RX671 Type 1YN software Fleet image ==="
     - python -m pip install --user cryptography
     - python -m unittest tools.ci.tests.test_protect_secret_artifact tools.ci.tests.test_fleet_junit tools.ci.tests.test_rx671_software_fleet_tls13_contract
@@ -2461,7 +2469,6 @@ build_rx671_bootloader:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
@@ -2470,7 +2477,6 @@ build_rx671_bootloader:
       when: on_success
     - when: never
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build standalone EK-RX671 dual-bank boot loader ==="
     - python -m unittest tools.ci.tests.test_rx671_bootloader_contract tools.ci.tests.test_windows_ccrx_build_serialization_contract
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -2519,7 +2525,6 @@ package_rx671_ota_artifacts:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX671_WIFI_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX671_OTA_TEST == "true" && $RX671_WIFI_TEST_SCOPE == "ota"'
@@ -2534,7 +2539,6 @@ package_rx671_ota_artifacts:
     - job: build_rx671_bootloader
       artifacts: true
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build RX671 OTA baseline/candidate signed artifacts ==="
     - |
       # A killed previous job cannot run finally/after_script. Remove every
@@ -2826,12 +2830,10 @@ build_rx65n_bg96_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx65n_bg96_fleet_rules
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build CK-RX65N BG96 Fleet Provisioning candidate ==="
     - python -m pip install --user cryptography
     - |
@@ -2899,14 +2901,12 @@ build_rx72n_ether_fleet:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '($RUN_RX72N_FLEET_TESTS == "true" || $RX72N_TEST_SCOPE =~ /^(fleet|full)$/) && ($RX72N_TLS_BACKEND != "tsip" || $RX72N_TSIP_FLEET_ENABLE == "true") && $RX72N_SKIP_HW_TESTS != "true" && $AWS_IOT_ENDPOINT && $AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02 && $AWS_FLEET_CLAIM_CERT_RX72N_02 && $AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02'
       when: on_success
     - when: never
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build RX72N Fleet Provisioning candidate ==="
     - pip install cryptography --quiet
     - |
@@ -3820,7 +3820,6 @@ build_rx65n_bg96_ota:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX65N_BG96_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   extends:
     - .rx65n_bg96_ota_rules
@@ -3828,7 +3827,6 @@ build_rx65n_bg96_ota:
     - job: prepare_rx65n_bg96_mqtt_credentials
       artifacts: true
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - $ErrorActionPreference = "Stop"
     - python -m pip install --user cryptography
     - |
@@ -5852,7 +5850,6 @@ build_rx72n_ether_mqtt_candidate:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   rules:
     - if: '$RUN_RX72N_BUILD == "false"'
@@ -5861,7 +5858,6 @@ build_rx72n_ether_mqtt_candidate:
       when: on_success
     - when: never
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build RX72N MQTT candidate ==="
     - |
       & "$env:CI_PROJECT_DIR\tools\build_headless_rx72n_with_client_credentials.ps1" `
@@ -5945,7 +5941,6 @@ build_rx72n_ether_ota:
     - exec-shell
     - os-windows
     - ccrx
-    - $RX72N_BUILD_RUNNER_TAG
   resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP
   needs:
     - test_rx72n_ether_mqtt
@@ -5964,7 +5959,6 @@ build_rx72n_ether_ota:
       when: on_success
     - when: never
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - Write-Host "=== Build RX72N OTA candidate ==="
     - pip install cryptography --quiet
     - |
@@ -6388,7 +6382,6 @@ validate_rx72n_hw_platform:
   tags:
     - exec-shell
     - os-windows
-    - ccrx
     - $RX72N_BUILD_RUNNER_TAG
   variables:
     GIT_STRATEGY: none
@@ -6406,7 +6399,6 @@ validate_rx65n_bg96_scope:
   tags:
     - exec-shell
     - os-windows
-    - ccrx
     - $RX65N_BG96_BUILD_RUNNER_TAG
   variables:
     GIT_STRATEGY: none
