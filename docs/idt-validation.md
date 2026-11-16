@@ -1,6 +1,6 @@
 # RX72N・RX65N・RX671のIDT検証
 
-3環境の実行入口と、対象SHAごとの検証結果を記録します。RPi #4とWindowsの分担構成ではRX72N EthernetのTransportを実機で確認しました。他のターゲットやscopeへ結果を流用しません。
+3環境の実行入口と、対象SHAごとの検証結果を記録します。RPi #4とWindowsの分担構成ではRX72N EthernetのTransportを実機で確認しました。RX65NとRX671は新基盤での実機IDTが未確認です。他のターゲットやscopeへ結果を流用しません。
 
 ## 3ターゲットのCI入口
 
@@ -223,7 +223,7 @@ Runner #28と#29の台帳への反映は未了です。現在の登録はプロ�
 
 Runner #28で公式サンプルが合格し、同時に#26で汎用処理が動くことを確認しました。公開ダミーの成果物往復はRPi #4の#26と既存Windows Runner #3で確認しました。[並行実行CI #15742](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/15742) · [成果物往復CI #15688](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/15688)
 
-[pipeline #16368](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16368) は !260 の clean source `ac56c5279598536e4270a0a7abce3ec2b2e17903` で、RPi #4 controller [#87443](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/87443) と Windows #29 worker [#87486](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/87486) が成功しました。RX72N Ethernet / software の native `FullTransportInterfaceTLS` は14/14 PASS、failure・error・skipは各0です。対象は `transport` のみで、`qualification=not-established` です。同SHAの通常FWを署名付きで導入し、bootloader handoff、reset成功とUART静穏1秒を確認しました。物理reset保持と復帰後のアプリ機能は未確認です。他の2機種、native OTA、製品nightlyの合格には扱いません。
+[pipeline #16368](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16368) は !260 の clean source `ac56c5279598536e4270a0a7abce3ec2b2e17903` で、RPi #4 controller [#87443](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/87443) が成功しました。対となる [pipeline #16393](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16393) の Windows #29 worker [#87486](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/87486) も成功しました。RX72N Ethernet / software の native `FullTransportInterfaceTLS` は14/14 PASS、failure・error・skipは各0です。対象は `transport` のみで、`qualification=not-established` です。同SHAの通常FWを署名付きで導入し、bootloader handoff、reset成功とUART静穏1秒を確認しました。物理reset保持と復帰後のアプリ機能は未確認です。他の2機種、native OTA、製品nightlyの合格には扱いません。
 
 <details>
 <summary>ホストを再構築する手順と固定版の検査</summary>
