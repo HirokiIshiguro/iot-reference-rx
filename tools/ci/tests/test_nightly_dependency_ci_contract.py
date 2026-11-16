@@ -204,7 +204,7 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         actual: set[tuple[str, str, str]] = set()
         for name, block in top_level_blocks(self.ci).items():
             project_match = re.search(r"(?m)^    project: (\S+)$", block)
-            if project_match is None:
+            if project_match is None or name == "nightly_rx65n_r_cellular_tests":
                 continue
             branch_match = re.search(
                 r"(?m)^    branch: \$([A-Z][A-Z0-9_]*)$",
@@ -230,6 +230,18 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
                     )
                 )
         self.assertEqual(configured, actual)
+
+    def test_cellular_suite_uses_product_gitlink_and_blocking_api(self) -> None:
+        blocks = top_level_blocks(self.ci)
+        job = blocks["nightly_rx65n_r_cellular_tests"]
+        self.assertIn("job: nightly_dependency_alignment", job)
+        self.assertIn("artifacts: true", job)
+        self.assertIn("project: oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/test", job)
+        self.assertIn("branch: main", job)
+        self.assertIn("strategy: mirror", job)
+        self.assertIn("  inherit:\n    variables: false", job)
+        self.assertIn('R_CELLULAR_REF: "$PRODUCT_R_CELLULAR_SHA"', job)
+        self.assertIn('RCT_API_BLOCKING: "true"', job)
 
     def test_nightly_transport_preserves_fifty_bridge_rows_and_adds_three_targets(self) -> None:
         blocks = top_level_blocks(self.ci)

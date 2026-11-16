@@ -441,8 +441,9 @@ def write_dotenv(
     path: Path,
     config: dict[str, Any] | None,
     results: list[dict[str, Any]],
+    cellular_sha: str = "",
 ) -> None:
-    """Export each resolved child SHA for later immutable-SHA assertions."""
+    """Export resolved SHAs for downstream jobs."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     commits_by_name = {
@@ -459,6 +460,8 @@ def write_dotenv(
                     f"{target['resolved_ref_env']}="
                     f"{require_sha40(commit, target['name'] + ' resolved commit')}"
                 )
+    if cellular_sha:
+        lines.append(f"PRODUCT_R_CELLULAR_SHA={require_sha40(cellular_sha, 'r_cellular gitlink')}")
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
@@ -481,12 +484,14 @@ def main(argv: list[str] | None = None) -> int:
     }
     config: dict[str, Any] | None = None
     exit_code = 1
+    cellular_sha = ""
     try:
         config = load_config(args.config.resolve())
         parent_sha = require_sha40(
             run_git(["rev-parse", "HEAD"], parent_repo),
             "parent HEAD",
         )
+        cellular_sha = read_gitlink(parent_repo, parent_sha, "Middleware/Renesas/r_cellular")
         report["parent"] = {
             "commit": parent_sha,
             "repository": os.environ.get("CI_PROJECT_URL", "").strip(),
@@ -508,7 +513,7 @@ def main(argv: list[str] | None = None) -> int:
         report["errors"].append(redact_sensitive_text(str(exc)))
     finally:
         write_report(args.output.resolve(), report)
-        write_dotenv(args.dotenv.resolve(), config, report["targets"])
+        write_dotenv(args.dotenv.resolve(), config, report["targets"], cellular_sha)
 
     for target in report["targets"]:
         print(

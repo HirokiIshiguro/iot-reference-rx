@@ -80,6 +80,8 @@ RX65Nの通常appにある、CLI成功後のリンカ設定調整と明示make�
 Schedule再開、変数変更、追加playはMaintainer / Ownerの承認後に行います。
 今回承認された単発検証でも定期実行はInactiveを維持します。成功判定は必要な50回帰rowと3つのIDT transportの実jobを確認し、未生成・未実行・skipを合格へ数えません。build・cleanupなどの補助jobは別に確認します。
 
+追加の `nightly_rx65n_r_cellular_tests` は既存50行とは別に、製品の `Middleware/Renesas/r_cellular` gitlink SHA を `R_CELLULAR_REF` として test project の `main` に渡します。`RCT_API_BLOCKING=true` で実行し、子 pipeline の実行時 suite SHA と製品・driver SHA を証跡に記録します。bridge の成功だけでは合格とせず、tick 200 / 1000、API の必要ケースに skip がないこと、各実機 job の通常 FW 復帰、peer の回収を成果物と job 結果で確認します。未生成、未実行、skip、許容失敗、復帰・回収未確認はリリース合格にしません。test 側の設定変更や main の更新後も同じ確認が必要です。
+
 全50行を実行するには`NIGHTLY_MATRIX_INCLUDE_STABILIZING=true`が必要です。親bridgeのsuccessだけでなく、各子pipelineに必要な実機jobが生成され、実行SHAと成功が一致することを確認します。IDTは各ターゲットで必須14ケースすべての成功、複数TLS接続は上記4構成で実行件数が0件ではないことを確認します。
 
 タグ・リリースは、対象main SHAの全必須jobと所有AWS資源の後始末が成功し、各実機の通常FWへの復帰と、その後のreset／UART静止を別々に確認した後に行います。未実行・skip・manual・cancel・許容された失敗を合格に数えません。リリースには子projectのSHAと`IDT_SCOPE=transport`／`qualification=not-established`を記載し、全IDT認定と区別します。タグ時の既存release profileも維持します。
