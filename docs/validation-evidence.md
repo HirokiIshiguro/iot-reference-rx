@@ -4,6 +4,8 @@
 詳細な条件と変更履歴は[Changelog](../Changelog.md)、RX671のfixed-SHA監査は
 [Issue #140](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/140)を参照してください。
 
+RX72N Ethernet / software の RPi #4 + Windows #29 による native Transport は [#16368](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16368) で14/14 PASS（clean source `ac56c527`、`qualification=not-established`）。[IDTの詳細と範囲](idt-validation.md#rpi-4への移行とwindowsビルドの役割分担)を参照してください。
+
 ## AWS IoT Core
 
 | 環境 | MQTT | OTA | Fleet | TLS 1.3 MQTT | TLS 1.3 OTA | TLS 1.3 Fleet |
