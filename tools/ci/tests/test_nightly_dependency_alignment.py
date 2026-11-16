@@ -77,6 +77,13 @@ class GitlinkTests(unittest.TestCase):
             alignment.read_gitlink(self.repo, ref, "Middleware/AWS/lib"),
         )
 
+    def test_product_gitlink_is_exported_from_selected_commit(self) -> None:
+        ref = self.commit_gitlink("Middleware/Renesas/r_cellular", self.base, "cellular")
+        output = self.repo / "resolved.env"
+        cellular_sha = alignment.read_gitlink(self.repo, ref, "Middleware/Renesas/r_cellular")
+        alignment.write_dotenv(output, None, [], cellular_sha)
+        self.assertEqual(f"PRODUCT_R_CELLULAR_SHA={self.base}\n", output.read_text(encoding="utf-8"))
+
     def test_missing_and_non_gitlink_fail_closed(self) -> None:
         with self.assertRaisesRegex(alignment.AlignmentError, "missing gitlink"):
             alignment.read_gitlink(self.repo, self.base, "missing")
