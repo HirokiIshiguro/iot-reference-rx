@@ -84,6 +84,11 @@ def main():
     if not re.fullmatch('[a-f0-9]{32}',token):raise RuntimeError('No valid bench token')
     if len(sys.argv)!=2:raise RuntimeError('One IDT source path is required')
     target=get_target()
+    native_linux = os.environ.get('IDT_HOST_MODE') == 'linux-arm64'
+    if native_linux and target['id'] != 'rx72n-ethernet':
+        raise RuntimeError('Native Linux flash is restricted to RX72N Ethernet')
+    ssh = os.environ['IDT_LINUX_SSH'] if native_linux else SSH
+    scp = os.environ['IDT_LINUX_SCP'] if native_linux else SCP
     source=validate_source(sys.argv[1])
     runtime=Path(os.environ['IDT_RUNTIME_DIR']).resolve(strict=True)
     if os.environ.get('IDT_SCOPE') == 'pkcs11':
@@ -91,6 +96,9 @@ def main():
     if source.parent not in (runtime,runtime/'source'):
         raise RuntimeError('Flashed images must come from the private IDT runtime')
     files,flash_manifest=validated_inputs(source,target)
+    if native_linux and (not re.fullmatch('[0-9a-f]{40}', os.environ.get('IDT_SOURCE_SHA', '')) or
+                         flash_manifest['source_sha'] != os.environ['IDT_SOURCE_SHA']):
+        raise RuntimeError('Flash source differs from the reviewed Linux job')
     if os.environ.get('IDT_SCOPE','transport') not in {'pkcs11','ota-pal'}:
         params=(source/'Test/include/test_param_config.h').read_text().splitlines(keepends=True)
         prefix='TRANSPORT' if os.environ.get('IDT_SCOPE','transport') == 'transport' else 'MQTT'
@@ -108,14 +116,14 @@ def main():
         staged_manifest.write_text(json.dumps(flash_manifest,sort_keys=True)+'\n',encoding='utf-8')
         manifest_sha256=sha256(staged_manifest)
         files['flash_manifest.json']=staged_manifest
-        run([SSH,'-T','-o','BatchMode=yes',alias,'umask 077; mkdir '+shlex.quote(remote)],timeout=30)
+        run([ssh,'-T','-o','BatchMode=yes',alias,'umask 077; mkdir '+shlex.quote(remote)],timeout=30)
         completed = False
         try:
             for name,path in files.items():
-                windows=subprocess.check_output(['wslpath','-w',str(path)],text=True).strip()
-                run([SCP,'-q','-o','BatchMode=yes',windows,alias+':'+remote+'/'+name],timeout=60)
+                local_path = str(path) if native_linux else subprocess.check_output(['wslpath','-w',str(path)],text=True).strip()
+                run([scp,'-q','-o','BatchMode=yes',local_path,alias+':'+remote+'/'+name],timeout=60)
             command=shlex.join(['python3',remote+'/rpi_flash.py',token,remote,target['id'],manifest_sha256])
-            run([SSH,'-T','-o','BatchMode=yes',alias,command],timeout=flash_remote_seconds(target['id']))
+            run([ssh,'-T','-o','BatchMode=yes',alias,command],timeout=flash_remote_seconds(target['id']))
             completed = True
         finally:
             # SSH timeout/interruption does not prove the remote process exited.
@@ -131,7 +139,7 @@ def main():
                 "if resolved.parent != Path('/tmp') or resolved.name != expected: raise RuntimeError('Staging path escaped /tmp')",
                 "if resolved.exists(): shutil.rmtree(resolved)"])
             if completed:
-                run([SSH,'-T','-o','BatchMode=yes',alias,'python3 -c '+shlex.quote(cleanup)],timeout=30)
+                run([ssh,'-T','-o','BatchMode=yes',alias,'python3 -c '+shlex.quote(cleanup)],timeout=30)
 def run_callback():
     try:
         main()
