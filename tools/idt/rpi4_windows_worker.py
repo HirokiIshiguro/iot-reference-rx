@@ -40,7 +40,7 @@ def scrubbed_environment():
                     or key.upper().startswith("RX_OIDC_"))}
 
 
-def build_request(request, checkout, temporary_parent, workspace_parent, lease_definition, *, run=None):
+def build_request(request, checkout, temporary_parent, workspace_parent, *, run=None):
     """Build the request in a private source copy using the fixed helper."""
     checkout = Path(checkout).resolve(strict=True)
     sha = subprocess.check_output(["git", "--no-optional-locks", "-C", str(checkout),
@@ -80,8 +80,7 @@ def build_request(request, checkout, temporary_parent, workspace_parent, lease_d
         command = ["pwsh", "-NoProfile", "-NonInteractive", "-File",
                    str(checkout / "tools/idt/rpi4_windows_build.ps1"),
                    "-ProjectRoot", str(source), "-Python", sys.executable, "-ProvenanceFile", str(provenance),
-                   "-Workspace", str(workspace_path), "-PrivateLog", str(private / "build.log"),
-                   "-LeaseDefinition", str(lease_definition)]
+                   "-Workspace", str(workspace_path), "-PrivateLog", str(private / "build.log")]
         if run is None:
             run_managed(command, timeout=int(os.environ["IDT_PAIR_BUILD_SECONDS"]),
                         env=scrubbed_environment())
@@ -238,8 +237,7 @@ def public_placeholder_build():
         command = ["pwsh", "-NoProfile", "-NonInteractive", "-File",
                    str(ROOT / "tools/idt/rpi4_windows_public_build.ps1"), "-ProjectRoot", str(ROOT),
                    "-Python", sys.executable, "-Workspace", str(workspace), "-Output", str(private),
-                   "-PrivateLog", str(private / "build.log"),
-                   "-LeaseDefinition", os.environ["IDT_PAIR_LEASE_DEFINITION"]]
+                   "-PrivateLog", str(private / "build.log")]
         try:
             run_managed(command, timeout=3600, env=scrubbed_environment())
         except Exception:
@@ -288,8 +286,7 @@ def main():
     clean = scrubbed_environment()
     os.environ.clear()
     os.environ.update(clean)
-    run_connection(pipeline, lambda request: build_request(request, ROOT, r"C:\ai\codex\tmp", r"C:\ai\codex\ws",
-                                                           os.environ["IDT_PAIR_LEASE_DEFINITION"]))
+    run_connection(pipeline, lambda request: build_request(request, ROOT, r"C:\ai\codex\tmp", r"C:\ai\codex\ws"))
 
 
 if __name__ == "__main__":

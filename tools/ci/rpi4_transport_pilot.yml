@@ -105,29 +105,13 @@ rpi4_windows_worker:
       when: on_success
     - when: never
   script:
-    - !reference [.windows_ccrx_host_lease, script]
     - |
       $ErrorActionPreference = 'Stop'
-      $leaseFile = Join-Path $env:TEMP ("idt-pair-lease-$env:CI_PIPELINE_ID-$env:CI_JOB_ID.ps1")
-      try {
-          $text = 'function Enter-WindowsCcrxHostLease {' + "`n" + ${function:Enter-WindowsCcrxHostLease}.ToString() + "`n}"
-          $stream = [IO.File]::Open($leaseFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-          try { $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false)); $writer.Write($text); $writer.Flush() }
-          finally { $stream.Dispose() }
-          $env:IDT_PAIR_LEASE_DEFINITION = $leaseFile
-      } finally {
-          $script:WindowsCcrxHostLease.Dispose()
-          $script:WindowsCcrxHostLease = $null
-      }
-      try {
-          . tools/rx_e2studio_cli.ps1
-          Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
-          . tools/idt/rpi4_windows_python.ps1
-          & $script:IdtWorkerPython -I tools/idt/rpi4_windows_worker.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      } finally {
-          Remove-Item -LiteralPath $leaseFile -Force -ErrorAction SilentlyContinue
-      }
+      . tools/rx_e2studio_cli.ps1
+      Initialize-RxBuildDependencies -ProjectRoot $env:CI_PROJECT_DIR
+      . tools/idt/rpi4_windows_python.ps1
+      & $script:IdtWorkerPython -I tools/idt/rpi4_windows_worker.py
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 rpi4_snapshot_verify:
   extends: .rpi4_transport_checkout

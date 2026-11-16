@@ -215,8 +215,7 @@ class PairProtocolTests(unittest.TestCase):
                  patch.object(worker_module.subprocess, "check_output", side_effect=git_output), \
                  patch.object(worker_module, "restrict_runtime"), \
                  patch.object(worker_module, "verify_dependency_provenance") as verify:
-                result = worker_module.build_request(request, checkout, temporary, workspace,
-                                                     parent / "lease.ps1", run=fake_run)
+                result = worker_module.build_request(request, checkout, temporary, workspace, run=fake_run)
             self.assertEqual(len(calls), 1)
             verify.assert_called_once()
             self.assertEqual(pair.validate_response(result, "b" * 32)["bootloader.mot"], b"public dummy")
@@ -232,8 +231,7 @@ class PairProtocolTests(unittest.TestCase):
                  patch.object(worker_module, "restrict_runtime"), \
                  patch.object(worker_module, "verify_dependency_provenance"):
                 with self.assertRaisesRegex(RuntimeError, "synthetic"):
-                    worker_module.build_request(request, checkout, temporary, workspace,
-                                                parent / "lease.ps1", run=failed_run)
+                    worker_module.build_request(request, checkout, temporary, workspace, run=failed_run)
             self.assertEqual(len(list(temporary.iterdir())), 1)
             self.assertEqual(len(list(workspace.iterdir())), 1)
 

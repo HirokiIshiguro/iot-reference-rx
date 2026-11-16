@@ -58,6 +58,8 @@ class Rpi4TransportCiContractTests(unittest.TestCase):
         self.assertIn('$CI_PIPELINE_SOURCE == "pipeline"', worker)
         self.assertIn('$CI_COMMIT_REF_PROTECTED == "true"', worker)
         self.assertIn('resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP', worker)
+        self.assertNotIn('windows_ccrx_host_lease', worker)
+        self.assertNotIn('IDT_PAIR_LEASE_DEFINITION', worker)
         self.assertNotIn('id_tokens:', worker)
 
 

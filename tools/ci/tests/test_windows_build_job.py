@@ -132,7 +132,7 @@ class WindowsBuildJobTests(unittest.TestCase):
                             ("rpi4_windows_public_build.ps1", ["-Output", "unused"])):
             args = ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(root / name),
                     "-ProjectRoot", "unused", "-Python", "unused", "-Workspace", "unused",
-                    "-PrivateLog", "unused", "-LeaseDefinition", "unused", *extra]
+                    "-PrivateLog", "unused", *extra]
             result = subprocess.run(args, input=b"", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(b"Build containment was not established", result.stdout)
@@ -157,14 +157,11 @@ class WindowsBuildJobTests(unittest.TestCase):
                 "-BuildDirectories @('HardwareDebug') -ExcludedPaths @()\n"
                 "if ($LASTEXITCODE -eq 0) { throw 'fixture did not exercise the Git fallback' }\n"
                 "Write-Output 'BUILD_HELPER_SUCCEEDED'\n", encoding='utf-8')
-            lease = root / 'lease.ps1'
-            lease.write_text('function Enter-WindowsCcrxHostLease { '
-                             '$script:WindowsCcrxHostLease = $null }\n', encoding='utf-8')
             log = root / 'build.log'
             args = ['pwsh', '-NoProfile', '-NonInteractive', '-File', str(wrapper),
                     '-ProjectRoot', str(root), '-Python', sys.executable,
                     '-ProvenanceFile', 'unused', '-Workspace', str(root),
-                    '-PrivateLog', str(log), '-LeaseDefinition', str(lease)]
+                    '-PrivateLog', str(log)]
             env = dict(os.environ, GIT_CEILING_DIRECTORIES=str(root))
             result = subprocess.run(args, input=b'go\n', stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, env=env, timeout=30)
@@ -187,17 +184,17 @@ class WindowsBuildJobTests(unittest.TestCase):
                 "param($ProjectRoot,$Python,$CompileTargets,$OutputDirectory,$WorkspaceRoot,[ref]$DiagnosticStage)\n"
                 "$DiagnosticStage.Value='target-build'\nthrow [IO.IOException]::new('private fixture')\n",
                 encoding='utf-8')
-            lease = root / 'lease.ps1'
-            lease.write_text(
-                "function Enter-WindowsCcrxHostLease { $script:WindowsCcrxHostLease=[IO.MemoryStream]::new() }\n"
-                "function Get-FileHash { param($LiteralPath,$Algorithm) "
+            harness = root / 'harness.ps1'
+            harness.write_text(
+                "function global:Get-FileHash { param($LiteralPath,$Algorithm) "
                 "if ($LiteralPath -like '*e2studio-cli.exe') { $h='6b021cc60f8736f4124f2ff61586bf883a415d1957b0a584346403cc91de2320' } "
                 "else { $h='64c3daf4cd80557efa98071378dbe13fb4ba9f78da80560f5616bbb22ff5bc0a' }; "
-                "[pscustomobject]@{Hash=$h} }\n", encoding='utf-8')
+                "[pscustomobject]@{Hash=$h} }\n"
+                "& $args[0] -ProjectRoot $args[1] -Python $args[2] -Workspace $args[1] "
+                "-Output $args[1] -PrivateLog $args[3]\n", encoding='utf-8')
             log = root / 'build.log'
-            args = ['pwsh', '-NoProfile', '-NonInteractive', '-File', str(helper),
-                    '-ProjectRoot', str(root), '-Python', sys.executable, '-Workspace', str(root),
-                    '-Output', str(root), '-PrivateLog', str(log), '-LeaseDefinition', str(lease)]
+            args = ['pwsh', '-NoProfile', '-NonInteractive', '-File', str(harness),
+                    str(helper), str(root), sys.executable, str(log)]
             result = subprocess.run(args, input=b'go\n', stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
             self.assertNotEqual(result.returncode, 0)
             contents = log.read_text(encoding='utf-8-sig')
