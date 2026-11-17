@@ -7,6 +7,7 @@ process exits. There is no other lock, no sudo and no persistent state.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import shlex
@@ -97,7 +98,7 @@ class Board:
         self.run([*self.rfp.common_command(), "-sig", "-reset", "-noquery"], label="park")
 
     # -- firmware ------------------------------------------------------------
-    def install(self, common: Path, app: Path, logs: Path) -> None:
+    def install(self, common: Path, app: Path, logs: Path, rsu: Path | None = None) -> None:
         """Erase the chip and install public boot trust, the boot loader and the signed application."""
         import provision_rx671_ota as provisioner
 
@@ -123,7 +124,7 @@ class Board:
             raise RuntimeError("Storing the signer's public key did not complete.")
         if bank1.is_file():
             self.run(self.rfp.program_command(bank1, leave_reset=True), label="boot loader, bank 1")
-        command = [sys.executable, TOOLS / "test_uart_download_rx72n.py", "--rsu", app / "app.rsu",
+        command = [sys.executable, TOOLS / "test_uart_download_rx72n.py", "--rsu", rsu or app / "app.rsu",
                    "--port", self.uart, "--baud", self.baud, "--timeout", 420, "--post-tx-wait", 120,
                    "--wait-for-ready", "--ready-timeout", 180 if self.name == "rx65n" else 90,
                    "--ready-message", 'send "userprog.rsu" via UART.', "--reset-cmd", self.reset_command(),
@@ -247,20 +248,62 @@ def mqtt_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Path
         rxci_aws.sweep(session, prefix=rxci_aws.owner())
 
 
+def install_rx671(registry: dict, board: Board, kind: str, common: Path, app: Path, logs: Path) -> None:
+    """Decrypt the application (it carries credentials) just for the install."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    key = hashlib.sha256(b"rxci image v1\0" + Path(
+        required_file(board.config["image_secret_variable"][kind])).read_bytes().replace(b"\r", b"").strip()).digest()
+    blob = (app / "app.rsu.enc").read_bytes()
+    with tempfile.TemporaryDirectory(prefix="rxci-") as folder:
+        rsu = Path(folder) / "app.rsu"
+        rsu.write_bytes(AESGCM(key).decrypt(blob[:12], blob[12:], b"rxci"))
+        board.install(common, app, logs, rsu=rsu)
+
+
+def erase_application(board: Board) -> None:
+    """Remove an application that carries credentials from the board."""
+    board.run(board.rfp.erase_ota_install_areas_command(), label="erase the application (it carries credentials)")
+
+
+def fleet_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+    """The application carries the Wi-Fi and claim credentials and registers itself."""
+    import rxci
+    import rxci_aws
+
+    install_rx671(registry, board, "fleet", common, app, logs)
+    observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
+               "--timeout", 900, "--reset-cmd", board.reset_command(), "--app-reset-retries", 2,
+               "--label", "RX671/Type 1YN software", "--summary-json", logs / "fleet_summary.json",
+               "--junit-output", logs / "fleet-junit.xml"]
+    if test["tls"] == "tls13":
+        observe += ["--require-tls-version", "TLSv1.3", "--minimum-tls-handshakes", 2]
+    try:
+        board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART")
+    finally:
+        try:
+            erase_application(board)
+        finally:
+            rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
+
+
 def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
     """The application carries its credentials, so the test starts right after the install."""
-    board.install(common, app, logs)
+    install_rx671(registry, board, "app", common, app, logs)
     observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
                "--timeout", 300, "--mode", "mqtt", "--reset-cmd", board.reset_command(), "--startup-retries", 1,
                "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml"]
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3"]
-    board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART")
+    try:
+        board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART")
+    finally:
+        erase_application(board)
 
 
 RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx72n", "fleet"): fleet_rx72n,
            ("rx65n", "mqtt"): mqtt_rx65n, ("rx65n", "fleet"): fleet_rx65n,
-           ("rx671", "mqtt"): mqtt_rx671}
+           ("rx671", "mqtt"): mqtt_rx671, ("rx671", "fleet"): fleet_rx671}
 
 
 def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:

@@ -41,7 +41,14 @@
         "dev-ek-rx671"
       ],
       "resource_group": "board-rx671",
-      "software_build_per_tls": true
+      "software_build_per_tls": true,
+      "fleet_template_variable": "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+      "claim_certificate_variable": "AWS_FLEET_CLAIM_CERT_RX72N_02",
+      "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
+      "image_secret_variable": {
+        "app": "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM",
+        "fleet": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02"
+      }
     }
   },
   "runners": {
@@ -98,7 +105,9 @@
     "rx72n:sw:tls12:fleet",
     "rx72n:sw:tls13:fleet",
     "rx65n:sw:tls12:fleet",
-    "rx65n:sw:tls13:fleet"
+    "rx65n:sw:tls13:fleet",
+    "rx671:sw:tls12:fleet",
+    "rx671:sw:tls13:fleet"
   ],
   "smoke": [
     "rx72n:sw:tls12:mqtt",
