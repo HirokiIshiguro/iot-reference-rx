@@ -84,10 +84,30 @@ class Board:
         print(f"{self.name}: board lock taken ({path})", flush=True)
 
     # -- programmer --------------------------------------------------------
-    def run(self, command: list, *, timeout: int = RFP_SECONDS, label: str = "", env: dict | None = None) -> None:
+    def run(self, command: list, *, timeout: int = RFP_SECONDS, label: str = "", env: dict | None = None,
+            log: Path | None = None) -> None:
+        """Run one step. With log, its output goes to that file and only the end is printed.
+
+        The UART observers read the port in the same loop that prints. If printing blocks on the
+        job log, the port is not read and lines are lost, so their output never goes to the job log.
+        """
         print(f"+ {label or 'run'}: {' '.join(str(part) for part in command)}", flush=True)
-        subprocess.run([str(part) for part in command], cwd=ROOT, check=True, timeout=timeout,
-                       env={**os.environ, **env} if env else None)
+        arguments = [str(part) for part in command]
+        environment = {**os.environ, **env} if env else None
+        if log is None:
+            subprocess.run(arguments, cwd=ROOT, check=True, timeout=timeout, env=environment)
+            return
+        log.parent.mkdir(parents=True, exist_ok=True)
+        started = time.monotonic()
+        try:
+            with open(log, "wb") as stream:
+                subprocess.run(arguments, cwd=ROOT, check=True, timeout=timeout, env=environment,
+                               stdout=stream, stderr=subprocess.STDOUT)
+        finally:
+            lines = log.read_text(encoding="utf-8", errors="replace").splitlines() if log.is_file() else []
+            print(f"  {time.monotonic() - started:.0f} s, {len(lines)} lines in {log.name}; the last lines:", flush=True)
+            for line in lines[-25:]:
+                print("  | " + line[:200], flush=True)
 
     def reset_command(self) -> str:
         """Command line that releases the board from reset (used by the UART tools)."""
@@ -131,7 +151,7 @@ class Board:
                    "--success-message", "jump to user program", "--success-timeout", 90, "--strict-success"]
         if self.name in ("rx65n", "rx671"):
             command += ["--ack-each-chunk", "--send-chunk-size", 32768, "--ack-prefix", "installing firmware..."]
-        self.run(command, timeout=700, label="send the signed application over UART")
+        self.run(command, timeout=700, label="send the signed application over UART", log=logs / "uart-download.log")
 
 
 def endpoint(registry: dict, tls: str) -> str:
@@ -163,7 +183,7 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Pat
                "--timeout", 600, "--reset-cmd", board.reset_command()]
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3"]
-    board.run(observe, timeout=700, label="observe MQTT on the UART")
+    board.run(observe, timeout=700, label="observe MQTT on the UART", log=logs / "observe.log")
 
 
 def fleet_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
@@ -188,7 +208,7 @@ def fleet_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Pa
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3"]
     try:
-        board.run(observe, timeout=700, label="observe Fleet Provisioning on the UART")
+        board.run(observe, timeout=700, label="observe Fleet Provisioning on the UART", log=logs / "observe.log")
     finally:
         rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
@@ -266,7 +286,7 @@ def ota_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path
                    "--raw-log", folder / "ota_uart_raw.log", "--summary-json", folder / "ota_summary.json"]
         if test["tls"] == "tls13":
             observe += ["--require-tls-version", "TLSv1.3"]
-        board.run(observe, timeout=1100, label="observe the OTA update on the UART")
+        board.run(observe, timeout=1100, label="observe the OTA update on the UART", log=logs / "observe.log")
     finally:
         cleanup_ota(logs, rxci.aws_session)
 
@@ -291,7 +311,7 @@ def fleet_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Pa
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3"]
     try:
-        board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART")
+        board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART", log=logs / "observe.log")
     finally:
         rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
@@ -325,7 +345,7 @@ def mqtt_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Pat
                    "--mqtt-timeout", 900, "--app-reset-retries", 2]
         if test["tls"] == "tls13":
             observe += ["--require-tls-version", "TLSv1.3"]
-        board.run(observe, timeout=1500, label="observe cellular attach and MQTT on the UART")
+        board.run(observe, timeout=1500, label="observe cellular attach and MQTT on the UART", log=logs / "observe.log")
     finally:
         rxci_aws.sweep(session, prefix=rxci_aws.owner())
 
@@ -362,7 +382,7 @@ def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pa
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3", "--minimum-tls-handshakes", 2]
     try:
-        board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART")
+        board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART", log=logs / "observe.log")
     finally:
         try:
             erase_application(board)
@@ -380,7 +400,7 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pat
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3"]
     try:
-        board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART")
+        board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART", log=logs / "observe.log")
     finally:
         erase_application(board)
 
