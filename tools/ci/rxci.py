@@ -130,8 +130,15 @@ def build_variant(test: dict, registry: dict | None = None) -> str:
 
 
 def build_variants(test: dict, registry: dict | None = None) -> list[str]:
-    """Every build a test needs: the per-commit files of the board and its application."""
-    return [f"{test['board']}/common", build_variant(test, registry)]
+    """Every build a test needs: the per-commit files of the board and its application.
+
+    An OTA test also needs the normal application: the board starts from it and updates itself
+    to the OTA candidate.
+    """
+    variants = [f"{test['board']}/common", build_variant(test, registry)]
+    if test["feature"] == "ota":
+        variants.insert(1, build_variant({**test, "feature": "mqtt"}, registry))
+    return variants
 
 
 def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list[dict]]:
@@ -333,8 +340,8 @@ def command_test(args: argparse.Namespace) -> int:
         raise SystemExit(f"Unknown test: {args.name}")
     test = matches[0]
     out = Path(args.out).resolve()
-    common, app = (out / variant for variant in build_variants(test, registry))
-    return rxci_board.run_test(registry, test, common, app, Path(args.log_dir).resolve())
+    builds = [out / variant for variant in build_variants(test, registry)]
+    return rxci_board.run_test(registry, test, builds, Path(args.log_dir).resolve())
 
 
 def command_finish(args: argparse.Namespace) -> int:

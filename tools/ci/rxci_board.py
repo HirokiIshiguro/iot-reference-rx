@@ -149,7 +149,8 @@ def required_file(variable: str) -> str:
     return path
 
 
-def mqtt_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+def mqtt_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
+    common, app = builds
     board.install(common, app, logs)
     provision = [sys.executable, TOOLS / "provision_rx72n.py", "--port", board.uart, "--baud", board.baud,
                  "--thing-name", board.config["thing"], "--endpoint", endpoint(registry, test["tls"]),
@@ -165,11 +166,12 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Path
     board.run(observe, timeout=700, label="observe MQTT on the UART")
 
 
-def fleet_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+def fleet_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """The board registers itself with the claim certificate; what it created is deleted at the end."""
     import rxci
     import rxci_aws
 
+    common, app = builds
     template = os.environ.get(board.config["fleet_template_variable"], "")
     if not template:
         raise SystemExit(f"CI variable {board.config['fleet_template_variable']} is not available to this job.")
@@ -191,11 +193,90 @@ def fleet_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Pat
         rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
 
-def fleet_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+def cleanup_ota(logs: Path, aws_session) -> None:
+    """Delete the OTA update, its job and files, and the pipeline-owned thing. Safe to call twice."""
+    import rxci_aws
+
+    folder = logs / "ota"
+    update, alias = folder / "ota_job_meta.json", folder / "ephemeral_thing_meta.json"
+    if not update.is_file() and not alias.is_file():
+        return
+    env = {**os.environ, **rxci_aws.environment(aws_session())}
+    steps = []
+    if update.is_file():
+        steps.append([sys.executable, TOOLS / "verify_ota_aws_state.py", "cleanup", "--meta-json", update,
+                      "--output-json", folder / "post_cleanup_state.json"])
+    if alias.is_file():
+        steps.append([sys.executable, TOOLS / "manage_ephemeral_iot_thing.py", "cleanup", "--meta-json", alias,
+                      "--output-json", folder / "ephemeral_thing_cleanup.json"])
+    failed = 0
+    for step in steps:
+        print(f"+ aws cleanup: {Path(str(step[1])).name}", flush=True)
+        failed += subprocess.run([str(part) for part in step], cwd=ROOT, env=env, timeout=600).returncode != 0
+    if failed:
+        raise RuntimeError("AWS resources of the OTA test could not be deleted; see the job log.")
+    update.unlink(missing_ok=True)
+    alias.unlink(missing_ok=True)
+
+
+def ota_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
+    """The board runs the normal application and updates itself to the candidate through AWS IoT OTA."""
+    import rxci
+    import rxci_aws
+
+    common, app, candidate = builds
+    config = board.config
+    thing = config["thing"]
+    alias = f"{thing}-ota-{os.environ.get('CI_PIPELINE_ID', '0')}-{os.environ.get('CI_JOB_ID', '0')}"
+    role = os.environ.get(config["ota_service_role_variable"], "")
+    values = {name: os.environ.get(config[name], "") for name in ("ota_bucket_variable", "ota_signing_profile_variable")}
+    if not role or not all(values.values()):
+        raise SystemExit("The OTA bucket, signing profile and service role variables are not available to this job.")
+    if not role.startswith("arn:"):
+        role = "arn:aws:iam::" + role
+    folder = logs / "ota"
+    folder.mkdir(parents=True, exist_ok=True)
+    env = rxci_aws.environment(rxci.aws_session())
+    try:
+        # A thing of its own keeps other pipelines from consuming this one-shot OTA job.
+        board.run([sys.executable, TOOLS / "manage_ephemeral_iot_thing.py", "create", "--base-thing-name", thing,
+                   "--thing-name", alias, "--region", rxci.REGION,
+                   "--owner-project-id", os.environ.get("CI_PROJECT_ID", "0"),
+                   "--owner-pipeline-id", os.environ.get("CI_PIPELINE_ID", "0"),
+                   "--owner-job-id", os.environ.get("CI_JOB_ID", "0"),
+                   "--meta-json", folder / "ephemeral_thing_meta.json"], timeout=300,
+                  label="create the thing of this run", env=env)
+        board.run([sys.executable, TOOLS / "create_ota_update.py", "--artifact-dir", folder, "--thing-name", alias,
+                   "--input-rsu", candidate / "candidate.rsu", "--file-version", config["ota_candidate_version"],
+                   "--bucket", values["ota_bucket_variable"], "--signing-profile", values["ota_signing_profile_variable"],
+                   "--role-arn", role, "--region", rxci.REGION, "--ota-id-prefix", f"{thing}-ota"], timeout=600,
+                  label="create the OTA update", env=env)
+        board.install(common, app, logs)
+        provision = [sys.executable, TOOLS / "provision_rx72n.py", "--port", board.uart, "--baud", board.baud,
+                     "--thing-name", alias, "--endpoint", endpoint(registry, test["tls"]),
+                     "--cert", required_file(config["certificate_variable"]),
+                     "--key", required_file(config["private_key_variable"]),
+                     "--codesigner-cert", candidate / "codesign_cert.pem", "--format",
+                     "--reset-cmd", board.reset_command(), "--reset-after-open", "--boot-wait", 12,
+                     "--cli-timeout", 25, "--attempts", 3, "--no-reset"]
+        board.run(provision, timeout=400, label="provision the device credentials")
+        observe = [sys.executable, TOOLS / "test_ota.py", "--port", board.uart, "--baud", board.baud,
+                   "--timeout", 900, "--expected-version", config["ota_candidate_version"],
+                   "--reset-cmd", board.reset_command(), "--reset-after-open", "--no-reset",
+                   "--raw-log", folder / "ota_uart_raw.log", "--summary-json", folder / "ota_summary.json"]
+        if test["tls"] == "tls13":
+            observe += ["--require-tls-version", "TLSv1.3"]
+        board.run(observe, timeout=1100, label="observe the OTA update on the UART")
+    finally:
+        cleanup_ota(logs, rxci.aws_session)
+
+
+def fleet_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """Fleet Provisioning over the cellular link. The claim credentials come from CI variables."""
     import rxci
     import rxci_aws
 
+    common, app = builds
     board.install(common, app, logs)
     tool = [sys.executable, TOOLS / "bg96_bootloader_integration.py"]
     target = ["--uart-port", board.uart, "--baud", board.baud, "--rfp-cli", board.rfp.executable,
@@ -215,11 +296,12 @@ def fleet_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Pat
         rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
 
-def mqtt_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+def mqtt_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """Cellular board: the device credentials are created for this run and deleted at the end."""
     import rxci
     import rxci_aws
 
+    common, app = builds
     board.install(common, app, logs)
     session = rxci.aws_session()
     name = f"{rxci_aws.owner()}-rx65n"
@@ -266,11 +348,12 @@ def erase_application(board: Board) -> None:
     board.run(board.rfp.erase_ota_install_areas_command(), label="erase the application (it carries credentials)")
 
 
-def fleet_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """The application carries the Wi-Fi and claim credentials and registers itself."""
     import rxci
     import rxci_aws
 
+    common, app = builds
     install_rx671(registry, board, "fleet", common, app, logs)
     observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
                "--timeout", 900, "--reset-cmd", board.reset_command(), "--app-reset-retries", 2,
@@ -287,8 +370,9 @@ def fleet_rx671(registry: dict, board: Board, test: dict, common: Path, app: Pat
             rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
 
-def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """The application carries its credentials, so the test starts right after the install."""
+    common, app = builds
     install_rx671(registry, board, "app", common, app, logs)
     observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
                "--timeout", 300, "--mode", "mqtt", "--reset-cmd", board.reset_command(), "--startup-retries", 1,
@@ -301,7 +385,7 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path
         erase_application(board)
 
 
-RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx72n", "fleet"): fleet_rx72n,
+RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx72n", "fleet"): fleet_rx72n, ("rx72n", "ota"): ota_rx72n,
            ("rx65n", "mqtt"): mqtt_rx65n, ("rx65n", "fleet"): fleet_rx65n,
            ("rx671", "mqtt"): mqtt_rx671, ("rx671", "fleet"): fleet_rx671}
 
@@ -315,7 +399,7 @@ def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:
         encoding="utf-8")
 
 
-def run_test(registry: dict, test: dict, common: Path, app: Path, logs: Path) -> int:
+def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
     recipe = RECIPES.get((test["board"], test["feature"]))
     if recipe is None or test["backend"] != "sw":
         raise SystemExit(f"Test is not implemented yet: {test['name']}")
@@ -327,7 +411,7 @@ def run_test(registry: dict, test: dict, common: Path, app: Path, logs: Path) ->
     signal.signal(signal.SIGTERM, lambda *_: sys.exit("the job was cancelled"))
     board.lock()
     try:
-        recipe(registry, board, test, common, app, logs)
+        recipe(registry, board, test, builds, logs)
     except subprocess.CalledProcessError as error:
         failure = f"step failed with exit code {error.returncode}: {Path(str(error.cmd[1])).name if len(error.cmd) > 1 else error.cmd[0]}"
     except subprocess.TimeoutExpired as error:
@@ -367,6 +451,7 @@ def finish_test(registry: dict, test: dict, logs: Path, aws_session) -> int:
         session = aws_session()
         deleted = rxci_aws.sweep(session, prefix=rxci_aws.owner())
         deleted += rxci_aws.delete_fleet_resources(session, logs / "fleet_summary.json")
+        cleanup_ota(logs, aws_session)
         print(f"deleted {len(deleted)} AWS resource(s) of this job", flush=True)
     except SystemExit as error:
         print(f"AWS cleanup skipped: {error}", flush=True)

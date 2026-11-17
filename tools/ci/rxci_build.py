@@ -7,6 +7,7 @@ directory, so a test job can take what it needs from the artifacts of the build 
                                  on RX671 also the boot loader
   rx72n/software/app             signed application and the boot loader
   rx72n/software/fleet           the same with the Fleet Provisioning demo enabled
+  rx72n/software/ota             OTA candidate (a newer application version) and its code signing certificate
   rx65n/software/app             signed application and the boot loader
   rx65n/software/fleet           the same with the Fleet Provisioning demo enabled
   rx671/software-<tls>/app       signed application with the Wi-Fi and device credentials compiled in
@@ -70,6 +71,22 @@ def build_common(registry: dict, board: str, out: Path) -> None:
                  "-LogFile", work / "bootloader_build.log", "-Python", sys.executable], timeout=900)
             publish(out, {"bootloader.mot": ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx" /
                           "HardwareDebug" / "boot_loader_rx671_ek.mot"})
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def build_rx72n_ota(registry: dict, backend: str, out: Path) -> None:
+    """Application with a higher version number, packaged as the payload of an AWS IoT OTA update."""
+    work = workspace(registry, f"rx72n-{backend}-ota")
+    cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
+    version = registry["boards"]["rx72n"]["ota_candidate_version"]
+    try:
+        work.mkdir(parents=True)
+        run([sys.executable, "tools/build_ota_candidate.py", "--repo-root", ROOT, "--version", version,
+             "--output-prefix", work / "candidate", "--signing-key", SIGNING_KEY, "--e2studio-cli", cli,
+             "--workspace", work / "e2ws", "--tls-backend", "software" if backend == "software" else "tsip",
+             "--code-sign-cert-out", work / "codesign_cert.pem"], timeout=1800)
+        publish(out, {"candidate.rsu": work / "candidate.rsu", "codesign_cert.pem": work / "codesign_cert.pem"})
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -210,6 +227,8 @@ def build(registry: dict, variant: str, out: Path) -> None:
         return build_common(registry, board, out)
     if board == "rx72n" and name in ("software/app", "software/fleet"):
         return build_rx72n_app(registry, "software", name.split("/")[1], out)
+    if board == "rx72n" and name == "software/ota":
+        return build_rx72n_ota(registry, "software", out)
     if board == "rx65n" and name in ("software/app", "software/fleet"):
         return build_rx65n_app(registry, "software", name.split("/")[1], out)
     if board == "rx671" and name.startswith("software-tls1") and name.endswith(("/app", "/fleet")):

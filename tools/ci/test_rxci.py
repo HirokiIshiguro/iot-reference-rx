@@ -111,6 +111,13 @@ class PlanTests(unittest.TestCase):
         self.assertFalse(full[name]["interruptible"])
         self.assertFalse(full["sweep"]["interruptible"])
 
+    def test_ota_needs_the_normal_application_and_the_candidate(self):
+        name = "rx72n:sw:tls12:ota"
+        jobs, summary = rxci.child_pipeline(registry([name]), "check", "^rx72n:sw:tls12:ota$", 1)
+        self.assertEqual(summary["builds"], ["rx72n/common", "rx72n/software/app", "rx72n/software/ota"])
+        self.assertEqual([need["job"] for need in jobs[name]["needs"]],
+                         ["build rx72n/common", "build rx72n/software/app", "build rx72n/software/ota"])
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)

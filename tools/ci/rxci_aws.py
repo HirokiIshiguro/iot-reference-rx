@@ -115,3 +115,11 @@ def delete_fleet_resources(session, summary_path) -> list[str]:
         except missing:
             pass
     return deleted
+
+
+def environment(session) -> dict:
+    """Environment for the existing AWS tools of this repository (they call the AWS CLI)."""
+    credentials = session.get_credentials().get_frozen_credentials()
+    return {"AWS_ACCESS_KEY_ID": credentials.access_key, "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
+            "AWS_SESSION_TOKEN": credentials.token, "AWS_DEFAULT_REGION": session.region_name,
+            "AWS_CLI_USE_PYTHON_MODULE": "1"}

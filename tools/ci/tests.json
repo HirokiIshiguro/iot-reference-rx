@@ -16,7 +16,11 @@
       "private_key_variable": "AWS_PRIVATE_KEY_RX72N_02",
       "fleet_template_variable": "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
       "claim_certificate_variable": "AWS_FLEET_CLAIM_CERT_RX72N_02",
-      "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02"
+      "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
+      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_RX72N_02",
+      "ota_signing_profile_variable": "AWS_OTA_SIGNING_PROFILE_RX72N_02",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_candidate_version": "0.9.3"
     },
     "rx65n": {
       "title": "CK-RX65N V1 + BG96 (cellular)",
@@ -107,7 +111,9 @@
     "rx65n:sw:tls12:fleet",
     "rx65n:sw:tls13:fleet",
     "rx671:sw:tls12:fleet",
-    "rx671:sw:tls13:fleet"
+    "rx671:sw:tls13:fleet",
+    "rx72n:sw:tls12:ota",
+    "rx72n:sw:tls13:ota"
   ],
   "smoke": [
     "rx72n:sw:tls12:mqtt",
