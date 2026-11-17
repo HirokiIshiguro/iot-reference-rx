@@ -198,7 +198,9 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             "resource_group": registry["build_resource_group"],
             "needs": [],
             # A fresh clone keeps the line endings of the dependencies as committed (CC-RX needs them).
+            # The 41 dependencies are cloned 8 at a time: one after the other took 90 of the 150 seconds.
             "variables": {"GIT_STRATEGY": "clone", "GIT_SUBMODULE_STRATEGY": "normal",
+                          "GIT_SUBMODULE_UPDATE_FLAGS": "--jobs 8",
                           "GIT_CONFIG_COUNT": "3",
                           "GIT_CONFIG_KEY_0": "core.longpaths", "GIT_CONFIG_VALUE_0": "true",
                           "GIT_CONFIG_KEY_1": "core.autocrlf", "GIT_CONFIG_VALUE_1": "false",
