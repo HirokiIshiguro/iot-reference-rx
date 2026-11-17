@@ -7,7 +7,9 @@ a later pipeline removes what is older than a few hours.
 from __future__ import annotations
 
 import os
+import sys
 import time
+from pathlib import Path
 
 PREFIX = "rxci-p"
 
@@ -120,6 +122,9 @@ def delete_fleet_resources(session, summary_path) -> list[str]:
 def environment(session) -> dict:
     """Environment for the existing AWS tools of this repository (they call the AWS CLI)."""
     credentials = session.get_credentials().get_frozen_credentials()
+    # Some tools run "python -m awscli" (AWS_CLI_USE_PYTHON_MODULE), others run "aws" by name:
+    # the virtualenv of this tool has both, so its folder goes first on the PATH.
     return {"AWS_ACCESS_KEY_ID": credentials.access_key, "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
             "AWS_SESSION_TOKEN": credentials.token, "AWS_DEFAULT_REGION": session.region_name,
-            "AWS_CLI_USE_PYTHON_MODULE": "1"}
+            "AWS_CLI_USE_PYTHON_MODULE": "1",
+            "PATH": str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", "")}
