@@ -13,6 +13,7 @@ directory, so a test job can take what it needs from the artifacts of the build 
   rx65n/software/ota             OTA candidate payload, its signature and the code signing certificate
   rx671/software-<tls>/app       signed application with the Wi-Fi and device credentials compiled in
   rx671/software-<tls>/fleet     signed application with the Wi-Fi and claim credentials compiled in
+  rx671/software-<tls>/ota       OTA bundle without credentials: provisioner, boot loader, baseline and candidate
 
 RX671 applications carry credentials, so they leave the build job only encrypted (app.rsu.enc).
 The key is derived from a CI variable that the test job also has.
@@ -119,6 +120,35 @@ def build_rx65n_app(registry: dict, backend: str, kind: str, out: Path) -> None:
         if log.is_file():
             out.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(log, out / "e2studio_build.log")
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def build_rx671_ota(registry: dict, tls: str, out: Path) -> None:
+    """Everything the RX671 OTA test needs. Credentials are entered on the board, not compiled in."""
+    board = registry["boards"]["rx671"]
+    work = workspace(registry, f"rx671-{tls}-ota")
+    cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
+    bundle = ROOT / "build" / "rx671-ota"      # the only output folder the build script accepts
+    baseline = f"baseline-{board['ota_baseline_version']}"
+    candidate = f"candidate-{board['ota_candidate_version']}"
+    try:
+        work.mkdir(parents=True)
+        run([sys.executable, "tools/build_rx671_ota_images.py", "--baseline-version", board["ota_baseline_version"],
+             "--candidate-version", board["ota_candidate_version"],
+             "--tls-version", "TLSv1.3" if tls == "tls13" else "TLSv1.2", "--e2studio", cli,
+             "--workspace-root", work / "e2ws", "--signing-key", SIGNING_KEY,
+             "--e2studio-timeout-seconds", "1200"], timeout=3000)
+        publish(out, {
+            "provisioner.mot": bundle / "provisioner" / "aws_wifi_rx671_ek.mot",
+            "bootloader.mot": bundle / "bootloader" / "boot_loader_rx671_ek.mot",
+            "baseline.rsu": bundle / baseline / "aws_wifi_rx671_ek.rsu",
+            "signer.crt.pem": bundle / baseline / "rx671-ota-signer.crt.pem",
+            "signer.pub.pem": bundle / baseline / "rx671-ota-signer.pub.pem",
+            "candidate.ota.bin": bundle / candidate / "aws_wifi_rx671_ek.ota.bin",
+            "candidate.ota-signature.der": bundle / candidate / "aws_wifi_rx671_ek.ota-signature.der",
+        })
+    finally:
+        shutil.rmtree(bundle, ignore_errors=True)
         shutil.rmtree(work, ignore_errors=True)
 
 
@@ -255,6 +285,8 @@ def build(registry: dict, variant: str, out: Path) -> None:
         return build_rx65n_app(registry, "software", name.split("/")[1], out)
     if board == "rx65n" and name == "software/ota":
         return build_rx65n_ota(registry, "software", out)
+    if board == "rx671" and name in ("software-tls12/ota", "software-tls13/ota"):
+        return build_rx671_ota(registry, name.split("/")[0].split("-")[1], out)
     if board == "rx671" and name.startswith("software-tls1") and name.endswith(("/app", "/fleet")):
         backend, kind = name.split("/")
         return build_rx671_app(registry, backend.split("-")[1], kind, out)

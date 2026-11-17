@@ -446,6 +446,66 @@ def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pa
             rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
 
+def ota_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
+    """OTA over Wi-Fi. Wi-Fi and device credentials are entered through the provisioner, not compiled in."""
+    import rxci
+    import rxci_aws
+
+    (bundle,) = builds
+    config = board.config
+    role = os.environ.get(config["ota_service_role_variable"], "")
+    bucket = os.environ.get(config["ota_bucket_variable"], "")
+    if not role or not bucket:
+        raise SystemExit("The OTA bucket and service role variables are not available to this job.")
+    if not role.startswith("arn:"):
+        role = "arn:aws:iam::" + role
+    folder = logs / "ota"
+    folder.mkdir(parents=True, exist_ok=True)
+    session = rxci.aws_session()
+    name = f"{rxci_aws.owner()}-rx671"
+    programmer = ["--rfp-cli", board.rfp.executable, "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool,
+                  "--rfp-interface", board.rfp.interface, "--rfp-speed", board.rfp.speed,
+                  "--rfp-auth-id", board.rfp.auth_id]
+    erase_chip = [*board.rfp.common_command(), "-erase-chip", "-reset", "-noquery"]
+    try:
+        credentials = rxci_aws.create_thing(session, name, config["iot_policy"])
+        board.run([sys.executable, TOOLS / "create_bg96_ota_update.py", "--artifact-dir", folder, "--thing-name", name,
+                   "--input-payload", bundle / "candidate.ota.bin", "--file-version", config["ota_candidate_version"],
+                   "--bucket", bucket, "--custom-signature-der", bundle / "candidate.ota-signature.der",
+                   "--code-signer-cert", bundle / "signer.crt.pem", "--certificate-name", "rx671-ota-signer.crt.pem",
+                   "--role-arn", role, "--region", rxci.REGION, "--ota-id-prefix", "rx671-ota"], timeout=600,
+                  label="create the OTA update", env=rxci_aws.environment(session))
+        board.run(erase_chip, label="erase chip")
+        with tempfile.TemporaryDirectory(prefix="rxci-") as temporary:
+            certificate, key = Path(temporary) / "certificate.pem", Path(temporary) / "private_key.pem"
+            certificate.write_text(credentials["certificate"], encoding="utf-8")
+            key.write_text(credentials["private_key"], encoding="utf-8")
+            board.run([sys.executable, TOOLS / "provision_rx671_ota.py", "--provisioner-mot", bundle / "provisioner.mot",
+                       "--bootloader-mot", bundle / "bootloader.mot", "--endpoint", endpoint(registry, test["tls"]),
+                       "--thing-name", name, "--certificate", certificate, "--private-key", key,
+                       "--codesigner-certificate", bundle / "signer.crt.pem",
+                       "--codesigner-public-key", bundle / "signer.pub.pem", "--port", board.uart, "--baud", board.baud,
+                       *programmer, "--boot-timeout", 180, "--artifact-dir", logs / "provisioner"], timeout=900,
+                      label="provision Wi-Fi, device credentials and the code signing key")
+        observe = [sys.executable, TOOLS / "test_rx671_ota.py", "--baseline-rsu", bundle / "baseline.rsu",
+                   "--baseline-version", config["ota_baseline_version"],
+                   "--candidate-version", config["ota_candidate_version"],
+                   "--require-tls-version", "TLSv1.3" if test["tls"] == "tls13" else "TLSv1.2",
+                   "--port", board.uart, "--baud", board.baud, *programmer, "--boot-timeout", 180,
+                   "--startup-reset-retries", 2, "--ota-timeout", 900, "--raw-log", folder / "ota_uart_raw.log",
+                   "--summary-json", folder / "ota_summary.json", "--junit-output", folder / "ota-junit.xml"]
+        board.run(observe, timeout=1500, label="observe the OTA update on the UART", log=logs / "observe.log")
+    finally:
+        try:
+            # The data flash holds the Wi-Fi passphrase and the device key of this run.
+            board.run(erase_chip, label="erase chip (it holds credentials)")
+        finally:
+            try:
+                cleanup_ota(logs, rxci.aws_session)
+            finally:
+                rxci_aws.sweep(rxci.aws_session(), prefix=rxci_aws.owner())
+
+
 def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """The application carries its credentials, so the test starts right after the install."""
     common, app = builds
@@ -463,7 +523,7 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pat
 
 RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx72n", "fleet"): fleet_rx72n, ("rx72n", "ota"): ota_rx72n,
            ("rx65n", "mqtt"): mqtt_rx65n, ("rx65n", "fleet"): fleet_rx65n, ("rx65n", "ota"): ota_rx65n,
-           ("rx671", "mqtt"): mqtt_rx671, ("rx671", "fleet"): fleet_rx671}
+           ("rx671", "mqtt"): mqtt_rx671, ("rx671", "fleet"): fleet_rx671, ("rx671", "ota"): ota_rx671}
 
 
 def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:

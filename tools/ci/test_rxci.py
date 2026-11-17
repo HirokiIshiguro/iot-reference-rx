@@ -118,6 +118,12 @@ class PlanTests(unittest.TestCase):
         self.assertEqual([need["job"] for need in jobs[name]["needs"]],
                          ["build rx72n/common", "build rx72n/software/app", "build rx72n/software/ota"])
 
+    def test_rx671_ota_needs_only_its_bundle(self):
+        name = "rx671:sw:tls13:ota"
+        jobs, summary = rxci.child_pipeline(registry([name]), "check", "^rx671:sw:tls13:ota$", 1)
+        self.assertEqual(summary["builds"], ["rx671/software-tls13/ota"])
+        self.assertEqual([need["job"] for need in jobs[name]["needs"]], ["build rx671/software-tls13/ota"])
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)

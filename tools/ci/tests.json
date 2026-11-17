@@ -55,7 +55,13 @@
       "image_secret_variable": {
         "app": "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM",
         "fleet": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02"
-      }
+      },
+      "iot_policy": "ck-rx65n-policy",
+      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_RX72N_02",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_baseline_version": "0.1.0",
+      "ota_candidate_version": "0.1.1",
+      "ota_is_self_contained": true
     }
   },
   "runners": {
@@ -118,7 +124,9 @@
     "rx72n:sw:tls12:ota",
     "rx72n:sw:tls13:ota",
     "rx65n:sw:tls12:ota",
-    "rx65n:sw:tls13:ota"
+    "rx65n:sw:tls13:ota",
+    "rx671:sw:tls12:ota",
+    "rx671:sw:tls13:ota"
   ],
   "smoke": [
     "rx72n:sw:tls12:mqtt",

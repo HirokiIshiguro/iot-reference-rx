@@ -135,6 +135,10 @@ def build_variants(test: dict, registry: dict | None = None) -> list[str]:
     An OTA test also needs the normal application: the board starts from it and updates itself
     to the OTA candidate.
     """
+    board = registry["boards"][test["board"]] if registry else {}
+    if test["feature"] == "ota" and board.get("ota_is_self_contained"):
+        # One build holds everything of the OTA test: provisioner, boot loader, baseline and candidate.
+        return [build_variant(test, registry)]
     variants = [f"{test['board']}/common", build_variant(test, registry)]
     if test["feature"] == "ota":
         variants.insert(1, build_variant({**test, "feature": "mqtt"}, registry))
