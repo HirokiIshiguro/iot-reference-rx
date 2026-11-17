@@ -56,7 +56,9 @@ def build_common(registry: dict, board: str, out: Path) -> None:
         if board == "rx671":
             cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
             run(["pwsh", "-NoProfile", "-File", "tools/build_headless_rx671_bootloader.ps1", "-ProjectRoot", ROOT,
-                 "-E2Studio", cli, "-Workspace", work / "e2ws-boot",
+                 "-E2Studio", cli,
+                 # The build script accepts only this workspace name below the workspace root.
+                 "-Workspace", work / "e2ws_iot_ref_rx671_bootloader_2026_04_2",
                  "-LogFile", work / "bootloader_build.log", "-Python", sys.executable], timeout=900)
             publish(out, {"bootloader.mot": ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx" /
                           "HardwareDebug" / "boot_loader_rx671_ek.mot"})
