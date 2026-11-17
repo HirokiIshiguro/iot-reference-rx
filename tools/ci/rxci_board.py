@@ -336,7 +336,7 @@ def ota_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path
                   label="provision the code signing certificate")
         observe = [sys.executable, TOOLS / "bg96_ota_monitor.py", *serial, *programmer,
                    "--expected-version", config["ota_candidate_version"], "--timeout", 900, "--app-reset-retries", 2,
-                   "--raw-log", folder / "ota_uart_raw.log", "--summary-json", folder / "ota_summary.json"]
+                   "--activate-reset-delay", 15, "--raw-log", folder / "ota_uart_raw.log", "--summary-json", folder / "ota_summary.json"]
         if test["tls"] == "tls13":
             observe += ["--require-tls-version", "TLSv1.3"]
         board.run(observe, timeout=1100, label="observe the OTA update on the UART", log=logs / "observe.log")
