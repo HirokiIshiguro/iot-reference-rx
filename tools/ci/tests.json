@@ -28,7 +28,8 @@
         "dev-ck-rx65n-bg96"
       ],
       "resource_group": "board-rx65n",
-      "iot_policy": "ck-rx65n-policy"
+      "iot_policy": "ck-rx65n-policy",
+      "fleet_demo_id": "rx65n-bg96-fp"
     },
     "rx671": {
       "title": "EK-RX671 + Type 1YN (Wi-Fi)",
@@ -95,7 +96,9 @@
     "rx65n:sw:tls12:mqtt",
     "rx65n:sw:tls13:mqtt",
     "rx72n:sw:tls12:fleet",
-    "rx72n:sw:tls13:fleet"
+    "rx72n:sw:tls13:fleet",
+    "rx65n:sw:tls12:fleet",
+    "rx65n:sw:tls13:fleet"
   ],
   "smoke": [
     "rx72n:sw:tls12:mqtt",

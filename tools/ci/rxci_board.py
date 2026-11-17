@@ -190,6 +190,30 @@ def fleet_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Pat
         rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
 
+def fleet_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+    """Fleet Provisioning over the cellular link. The claim credentials come from CI variables."""
+    import rxci
+    import rxci_aws
+
+    board.install(common, app, logs)
+    tool = [sys.executable, TOOLS / "bg96_bootloader_integration.py"]
+    target = ["--uart-port", board.uart, "--baud", board.baud, "--rfp-cli", board.rfp.executable,
+              "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool, "--rfp-interface", board.rfp.interface,
+              "--rfp-speed", board.rfp.speed, "--rfp-auth-id", board.rfp.auth_id]
+    env = {"RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE": endpoint(registry, test["tls"])}
+    board.run([*tool, "--action", "provision-fleet", *target], timeout=400,
+              label="provision the claim credentials", env=env)
+    observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--label", "CK-RX65N BG96", "--log-port", board.uart,
+               "--log-baud", board.baud, "--timeout", 900, "--app-reset-retries", 2,
+               "--reset-cmd", board.reset_command(), "--summary-json", logs / "fleet_summary.json"]
+    if test["tls"] == "tls13":
+        observe += ["--require-tls-version", "TLSv1.3"]
+    try:
+        board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART")
+    finally:
+        rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
+
+
 def mqtt_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
     """Cellular board: the device credentials are created for this run and deleted at the end."""
     import rxci
@@ -235,7 +259,8 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path
 
 
 RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx72n", "fleet"): fleet_rx72n,
-           ("rx65n", "mqtt"): mqtt_rx65n, ("rx671", "mqtt"): mqtt_rx671}
+           ("rx65n", "mqtt"): mqtt_rx65n, ("rx65n", "fleet"): fleet_rx65n,
+           ("rx671", "mqtt"): mqtt_rx671}
 
 
 def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:
