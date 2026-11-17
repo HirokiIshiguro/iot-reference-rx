@@ -23,7 +23,6 @@ variables:
   REPEAT:
     value: "1"
     description: "How many times each selected test runs."
-  GIT_SUBMODULE_STRATEGY: none
 
 workflow:
   rules:
@@ -47,6 +46,7 @@ plan:
   tags: [exec-shell, os-linux, ef-saffti-001-rpi-linux-004]
   variables:
     GIT_DEPTH: "1"
+    GIT_SUBMODULE_STRATEGY: none
   script:
     - python3 tools/ci/rxci.py plan --profile "${PROFILE:-$DEFAULT_PROFILE}" --test "$TEST" --repeat "$REPEAT"
   artifacts:
@@ -55,13 +55,20 @@ plan:
       - plan.json
     expire_in: 14 days
 
+# The child pipeline is complete by itself. Variables of this file must not reach it:
+# forwarded variables would override the settings of its jobs (for example the checkout).
 run:
   stage: run
   needs:
     - job: plan
       artifacts: true
+  inherit:
+    variables: false
   trigger:
     include:
       - artifact: child-pipeline.yml
         job: plan
     strategy: depend
+    forward:
+      yaml_variables: false
+      pipeline_variables: false
