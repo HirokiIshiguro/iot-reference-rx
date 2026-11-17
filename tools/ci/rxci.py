@@ -163,7 +163,7 @@ def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list
 
 
 def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
-                   keep: bool = False) -> tuple[dict, dict]:
+                   keep: bool = False, rebuild: bool = False) -> tuple[dict, dict]:
     """Build the child pipeline (a dict that is dumped as JSON, which GitLab reads as YAML)."""
     run, pending = select(registry, profile, pattern)
     if pattern and pending and not run:
@@ -197,10 +197,11 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             "tags": registry["runners"]["build"],
             "resource_group": registry["build_resource_group"],
             "needs": [],
-            # A fresh clone keeps the line endings of the dependencies as committed (CC-RX needs them).
-            # The 41 dependencies are cloned 8 at a time: one after the other took 90 of the 150 seconds.
-            "variables": {"GIT_STRATEGY": "clone", "GIT_SUBMODULE_STRATEGY": "normal",
-                          "GIT_SUBMODULE_UPDATE_FLAGS": "--jobs 8",
+            # A fresh clone keeps the line endings as committed (CC-RX needs them). The job checks out
+            # only this repository: the build clones the dependencies itself, and only when it cannot
+            # reuse an earlier build with the same inputs (rxci_build.py).
+            "variables": {"GIT_STRATEGY": "clone", "GIT_SUBMODULE_STRATEGY": "none",
+                          "RXCI_REBUILD": "1" if rebuild else "0",
                           "GIT_CONFIG_COUNT": "3",
                           "GIT_CONFIG_KEY_0": "core.longpaths", "GIT_CONFIG_VALUE_0": "true",
                           "GIT_CONFIG_KEY_1": "core.autocrlf", "GIT_CONFIG_VALUE_1": "false",
@@ -276,7 +277,8 @@ def command_plan(args: argparse.Namespace) -> int:
     if args.repeat < 1 or args.repeat > 50:
         raise SystemExit("REPEAT must be between 1 and 50")
     registry = load_registry()
-    jobs, summary = child_pipeline(registry, args.profile, args.test, args.repeat, keep=args.keep == "true")
+    jobs, summary = child_pipeline(registry, args.profile, args.test, args.repeat, keep=args.keep == "true",
+                                   rebuild=args.rebuild == "true")
     Path(args.output).write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")
     Path(args.summary).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(f"profile={summary['profile']} test={summary['test'] or '(all in profile)'} repeat={summary['repeat']}")
@@ -387,6 +389,8 @@ def main(argv: list[str] | None = None) -> int:
     plan.add_argument("--repeat", type=int, default=1)
     plan.add_argument("--keep", default="false", choices=("true", "false"),
                       help="true: newer commits do not cancel this pipeline")
+    plan.add_argument("--rebuild", default="false", choices=("true", "false"),
+                      help="true: build every firmware again instead of reusing a build with the same inputs")
     plan.add_argument("--output", default="child-pipeline.yml")
     plan.add_argument("--summary", default="plan.json")
     plan.set_defaults(run=command_plan)

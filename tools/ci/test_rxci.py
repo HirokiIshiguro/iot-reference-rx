@@ -132,6 +132,26 @@ class PlanTests(unittest.TestCase):
         self.assertEqual([need["job"] for need in jobs[names[1]]["needs"]],
                          ["build rx72n/common", "build rx72n/tsip-tls13/app", "build rx72n/tsip-tls13/ota"])
 
+    def test_build_job_leaves_dependencies_to_the_build_and_passes_rebuild(self):
+        name = "rx72n:sw:tls12:mqtt"
+        jobs, _ = rxci.child_pipeline(registry([name]), "check", "^rx72n:sw:tls12:mqtt$", 1)
+        variables = jobs["build rx72n/software/app"]["variables"]
+        self.assertEqual(variables["GIT_SUBMODULE_STRATEGY"], "none")
+        self.assertEqual(variables["RXCI_REBUILD"], "0")
+        jobs, _ = rxci.child_pipeline(registry([name]), "check", "^rx72n:sw:tls12:mqtt$", 1, rebuild=True)
+        self.assertEqual(jobs["build rx72n/software/app"]["variables"]["RXCI_REBUILD"], "1")
+
+    def test_build_inputs_ignore_pipeline_files_and_keep_no_credentials(self):
+        import rxci_build
+
+        full = rxci.load_registry()
+        key = rxci_build.cache_key(full, "rx72n/software/app")
+        self.assertEqual(len(key), 40)
+        self.assertNotEqual(key, rxci_build.cache_key(full, "rx72n/software/ota"))
+        self.assertEqual(rxci_build.cache_key(full, "rx671/software-tls12/app"), "")
+        self.assertEqual(rxci_build.cache_key(full, "rx671/software-tls12/fleet"), "")
+        self.assertNotEqual(rxci_build.cache_key(full, "rx671/software-tls12/ota"), "")
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)

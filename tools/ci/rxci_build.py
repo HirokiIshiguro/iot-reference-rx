@@ -18,10 +18,17 @@ directory, so a test job can take what it needs from the artifacts of the build 
 
 RX671 applications carry credentials, so they leave the build job only encrypted (app.rsu.enc).
 The key is derived from a CI variable that the test job also has.
+
+A build is reused when its inputs are the same as those of an earlier build on this runner:
+the committed files (dependencies by their pinned commits), the variant and the settings of
+the board in tests.json. Files that only steer the pipeline or the tests are not inputs.
+Images that carry credentials are never kept. REBUILD=true (and every scheduled pipeline)
+builds again and replaces what was kept. Use it after the compiler or e2 studio changed.
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -30,6 +37,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SIGNING_KEY = ROOT / "sample_keys" / "secp256r1.privatekey"
+
+
+CACHE_ENTRIES = 80
+# Committed files that do not change what a build produces.
+NOT_BUILD_INPUTS = ("docs/", ".gitlab-ci.yml", "tools/ci/rxci.py", "tools/ci/rxci_board.py", "tools/ci/rxci_aws.py",
+                    "tools/ci/test_rxci.py", "tools/ci/tests.json", "tools/ci/requirements.txt")
 
 
 def run(command: list, *, timeout: int) -> None:
@@ -301,10 +314,78 @@ def build_rx72n_app(registry: dict, backend: str, tls: str, kind: str, out: Path
         shutil.rmtree(work, ignore_errors=True)
 
 
-def build(registry: dict, variant: str, out: Path) -> None:
+def cache_key(registry: dict, variant: str) -> str:
+    """Name of the build inputs, or "" when the build must not be kept."""
     board, _, name = variant.partition("/")
-    if board not in registry["boards"]:
+    if name.rpartition("/")[2] in registry["boards"][board].get("image_secret_variable", {}):
+        return ""       # the image carries credentials from CI variables
+    tree = subprocess.run(["git", "ls-tree", "-r", "HEAD"], cwd=ROOT, check=True, capture_output=True,
+                          text=True).stdout.splitlines()
+    inputs = [line for line in tree
+              if not line.split("\t", 1)[1].startswith(NOT_BUILD_INPUTS) and not line.endswith(".md")]
+    digest = hashlib.sha256()
+    for part in ("rxci build v1", variant, json.dumps(registry["boards"][board], sort_keys=True),
+                 os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"], "\n".join(inputs)):
+        digest.update(part.encode("utf-8") + b"\0")
+    return digest.hexdigest()[:40]
+
+
+def restore(entry: Path, out: Path) -> bool:
+    """Copy an earlier build with the same inputs into the output folder."""
+    if not (entry / "build.json").is_file():
+        return False
+    shutil.copytree(entry, out, dirs_exist_ok=True)
+    os.utime(entry)     # the least recently used entries are deleted first
+    made = json.loads((entry / "build.json").read_text(encoding="utf-8"))
+    print(f"Reused the build of job {made['job']} (commit {made['commit'][:8]}): the build inputs are the same.")
+    for file in sorted(out.iterdir()):
+        print(f"  {file}  ({file.stat().st_size} bytes)")
+    return True
+
+
+def store(entry: Path, out: Path) -> None:
+    """Keep a finished build for later jobs and drop the least recently used entries."""
+    (out / "build.json").write_text(json.dumps({
+        "job": os.environ.get("CI_JOB_ID", "local"), "pipeline": os.environ.get("CI_PIPELINE_ID", "local"),
+        "commit": os.environ.get("CI_COMMIT_SHA", "local"), "inputs": entry.name}, indent=2) + "\n", encoding="utf-8")
+    entry.parent.mkdir(parents=True, exist_ok=True)
+    temporary = entry.with_name(entry.name + ".tmp")
+    shutil.rmtree(temporary, ignore_errors=True)
+    shutil.copytree(out, temporary)
+    shutil.rmtree(entry, ignore_errors=True)
+    temporary.rename(entry)
+    entries = sorted((path for path in entry.parent.iterdir() if path.is_dir()),
+                     key=lambda path: path.stat().st_mtime, reverse=True)
+    for old in entries[CACHE_ENTRIES:]:
+        shutil.rmtree(old, ignore_errors=True)
+
+
+def fetch_dependencies() -> None:
+    """Clone the pinned dependencies. The job checked out only this repository."""
+    if not os.environ.get("CI"):
+        return          # a developer's checkout keeps its dependencies as they are
+    include = subprocess.run(["git", "config", "--get", "include.path"], cwd=ROOT, capture_output=True,
+                             text=True).stdout.strip()
+    # The runner keeps its access settings for this GitLab in a file that clones do not inherit.
+    access = ["-c", f"include.path={include}"] if include else []
+    run(["git", *access, "submodule", "update", "--init", "--depth", "20", "--jobs", "8"], timeout=1500)
+
+
+def build(registry: dict, variant: str, out: Path) -> None:
+    if variant.partition("/")[0] not in registry["boards"]:
         raise SystemExit(f"Unknown board in build variant: {variant}")
+    key = cache_key(registry, variant)
+    entry = Path(registry["workspace_root"]) / "rxci-build-cache" / key if key else None
+    if entry and os.environ.get("RXCI_REBUILD") != "1" and restore(entry, out):
+        return
+    fetch_dependencies()
+    build_from_source(registry, variant, out)
+    if entry:
+        store(entry, out)
+
+
+def build_from_source(registry: dict, variant: str, out: Path) -> None:
+    board, _, name = variant.partition("/")
     if name == "common":
         return build_common(registry, board, out)
     flavor, _, kind = name.partition("/")

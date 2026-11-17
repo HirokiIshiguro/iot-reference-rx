@@ -6,6 +6,7 @@
 #   PROFILE  check | build | smoke | full     scope of the pipeline
 #   TEST     regular expression of test names (e.g. ^rx671:sw:tls12:mqtt$)
 #   REPEAT   how many times each selected test runs (one job per run)
+#   REBUILD  true builds every firmware again instead of reusing a build with the same inputs
 #
 # Run one test three times:  Run pipeline with TEST=^rx72n:sw:tls12:mqtt$ and REPEAT=3
 
@@ -23,6 +24,9 @@ variables:
   REPEAT:
     value: "1"
     description: "How many times each selected test runs."
+  REBUILD:
+    value: ""
+    description: "true builds every firmware again. Empty reuses a build with the same inputs (a schedule always builds)."
 
 workflow:
   rules:
@@ -35,6 +39,7 @@ workflow:
         on_new_commit: none
       variables:
         DEFAULT_PROFILE: full
+        DEFAULT_REBUILD: "true"
         KEEP: "true"
     - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"
       auto_cancel:
@@ -58,7 +63,7 @@ plan:
     GIT_DEPTH: "1"
     GIT_SUBMODULE_STRATEGY: none
   script:
-    - python3 tools/ci/rxci.py plan --profile "${PROFILE:-$DEFAULT_PROFILE}" --test "$TEST" --repeat "$REPEAT" --keep "${KEEP:-false}"
+    - python3 tools/ci/rxci.py plan --profile "${PROFILE:-$DEFAULT_PROFILE}" --test "$TEST" --repeat "$REPEAT" --keep "${KEEP:-false}" --rebuild "${REBUILD:-${DEFAULT_REBUILD:-false}}"
   artifacts:
     paths:
       - child-pipeline.yml
