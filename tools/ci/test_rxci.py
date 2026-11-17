@@ -1,0 +1,77 @@
+"""Tests for the planning logic of tools/ci/rxci.py."""
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import rxci  # noqa: E402
+
+
+def registry(ready=()):
+    data = rxci.load_registry()
+    for test in data["tests"]:
+        test["ready"] = test["name"] in ready
+    return data
+
+
+class RegistryTests(unittest.TestCase):
+    def test_release_set_is_three_boards_times_twelve(self):
+        tests = rxci.load_registry()["tests"]
+        self.assertEqual(len(tests), 36)
+        self.assertEqual(len({test["name"] for test in tests}), 36)
+        self.assertEqual(len({test["id"] for test in tests}), 36)
+        for board in ("rx72n", "rx65n", "rx671"):
+            self.assertEqual(sum(test["board"] == board for test in tests), 12)
+
+    def test_software_build_is_shared_between_tls_versions(self):
+        tests = {test["name"]: test for test in rxci.load_registry()["tests"]}
+        self.assertEqual(rxci.build_variant(tests["rx72n:sw:tls12:mqtt"]),
+                         rxci.build_variant(tests["rx72n:sw:tls13:mqtt"]))
+        self.assertNotEqual(rxci.build_variant(tests["rx72n:tsip:tls12:mqtt"]),
+                            rxci.build_variant(tests["rx72n:tsip:tls13:mqtt"]))
+
+
+class PlanTests(unittest.TestCase):
+    def test_check_profile_has_no_build_and_no_test(self):
+        jobs, summary = rxci.child_pipeline(registry(), "check", "", 1)
+        self.assertEqual(summary["builds"], [])
+        self.assertEqual(summary["tests"], [])
+        self.assertIn("check", jobs)
+
+    def test_one_test_pulls_only_its_build(self):
+        name = "rx671:sw:tls12:mqtt"
+        jobs, summary = rxci.child_pipeline(registry([name, "rx72n:sw:tls12:mqtt"]), "check", "^rx671:sw:tls12:mqtt$", 1)
+        self.assertEqual(summary["tests"], [name])
+        self.assertEqual(summary["builds"], ["rx671/software/app"])
+        self.assertEqual(jobs[name]["needs"], [{"job": "build rx671/software/app", "artifacts": True}])
+
+    def test_repeat_makes_one_job_per_run_and_one_build(self):
+        name = "rx72n:sw:tls12:mqtt"
+        jobs, summary = rxci.child_pipeline(registry([name]), "check", "^rx72n:sw:tls12:mqtt$", 3)
+        runs = [job for job in jobs if job.startswith(name)]
+        self.assertEqual(runs, [f"{name} #1", f"{name} #2", f"{name} #3"])
+        self.assertEqual(summary["builds"], ["rx72n/software/app"])
+
+    def test_tests_of_one_board_share_one_resource_group(self):
+        ready = ["rx72n:sw:tls12:mqtt", "rx72n:sw:tls13:mqtt", "rx671:sw:tls12:mqtt"]
+        jobs, _ = rxci.child_pipeline(registry(ready), "full", "", 1)
+        self.assertEqual(jobs[ready[0]]["resource_group"], jobs[ready[1]]["resource_group"])
+        self.assertNotEqual(jobs[ready[0]]["resource_group"], jobs[ready[2]]["resource_group"])
+
+    def test_full_runs_ready_tests_and_reports_the_rest(self):
+        ready = ["rx72n:sw:tls12:mqtt"]
+        _, summary = rxci.child_pipeline(registry(ready), "full", "", 1)
+        self.assertEqual(summary["tests"], ready)
+        self.assertEqual(len(summary["not_implemented"]), 35)
+
+    def test_selecting_only_unimplemented_tests_is_an_error(self):
+        with self.assertRaises(SystemExit):
+            rxci.child_pipeline(registry(), "check", "^rx65n:tsip:tls13:fleet$", 1)
+
+    def test_unknown_pattern_is_an_error(self):
+        with self.assertRaises(SystemExit):
+            rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

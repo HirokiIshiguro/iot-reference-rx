@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "boards": {
+    "rx72n": {
+      "title": "RX72N Envision Kit (Ethernet)",
+      "runner_tags": ["exec-shell", "os-linux", "hw-raspi", "dev-ek-rx72n-set1"],
+      "resource_group": "board-rx72n",
+      "lock": "/tmp/e2lite-rfp-cli.lock.d/rx72n-device-01.lock"
+    },
+    "rx65n": {
+      "title": "CK-RX65N V1 + BG96 (cellular)",
+      "runner_tags": ["exec-shell", "os-linux", "hw-raspi", "dev-ck-rx65n-bg96"],
+      "resource_group": "board-rx65n",
+      "lock": "/tmp/ck-rx65n-rpi3-hardware.lock"
+    },
+    "rx671": {
+      "title": "EK-RX671 + Type 1YN (Wi-Fi)",
+      "runner_tags": ["exec-shell", "os-linux", "hw-raspi", "dev-ek-rx671"],
+      "resource_group": "board-rx671",
+      "lock": "/tmp/ek-rx671-rpi1-hardware.lock"
+    }
+  },
+  "runners": {
+    "check": ["exec-shell", "os-linux", "ef-saffti-001-rpi-linux-004"],
+    "build": ["exec-shell", "os-windows", "ccrx", "ef-saffti-001-pc-windows-001"]
+  },
+  "build_resource_group": "windows-ccrx-build",
+  "axes": {
+    "board": ["rx72n", "rx65n", "rx671"],
+    "backend": ["sw", "tsip"],
+    "tls": ["tls12", "tls13"],
+    "feature": ["mqtt", "ota", "fleet"]
+  },
+  "ready": [],
+  "smoke": ["rx72n:sw:tls12:mqtt", "rx65n:sw:tls12:mqtt", "rx671:sw:tls12:mqtt"]
+}
