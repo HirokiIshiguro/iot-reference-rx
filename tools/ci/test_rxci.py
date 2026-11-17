@@ -98,6 +98,19 @@ class PlanTests(unittest.TestCase):
         without_tests, _ = rxci.child_pipeline(registry(), "check", "", 1)
         self.assertNotIn("sweep", without_tests)
 
+    def test_hand_started_pipeline_is_not_cancelled_by_newer_commits(self):
+        name = "rx72n:sw:tls12:mqtt"
+        kept, _ = rxci.child_pipeline(registry([name]), "check", "^rx72n:sw:tls12:mqtt$", 1, keep=True)
+        self.assertEqual(kept["workflow"]["auto_cancel"]["on_new_commit"], "none")
+        self.assertFalse(kept["default"]["interruptible"])
+        normal, _ = rxci.child_pipeline(registry([name]), "build", "", 1)
+        self.assertEqual(normal["workflow"]["auto_cancel"]["on_new_commit"], "interruptible")
+        self.assertTrue(normal["default"]["interruptible"])
+        self.assertNotIn("interruptible", normal["build rx72n/software/app"])
+        full, _ = rxci.child_pipeline(registry([name]), "full", "", 1)
+        self.assertFalse(full[name]["interruptible"])
+        self.assertFalse(full["sweep"]["interruptible"])
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)

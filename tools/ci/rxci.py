@@ -151,7 +151,8 @@ def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list
     return [t for t in matched if t["ready"]], [t for t in matched if not t["ready"]]
 
 
-def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> tuple[dict, dict]:
+def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
+                   keep: bool = False) -> tuple[dict, dict]:
     """Build the child pipeline (a dict that is dumped as JSON, which GitLab reads as YAML)."""
     run, pending = select(registry, profile, pattern)
     if pattern and pending and not run:
@@ -168,7 +169,10 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
 
     jobs: dict = {
         "stages": ["check", "build", "test", "cleanup"],
-        "default": {"interruptible": True},
+        # GitLab cancels older pipelines of a branch when a newer pipeline is created, child pipelines
+        # included. A run that a person or a schedule started (keep) must survive that.
+        "workflow": {"auto_cancel": {"on_new_commit": "none" if keep else "interruptible"}},
+        "default": {"interruptible": not keep},
         "check": {
             "stage": "check",
             "tags": registry["runners"]["check"],
@@ -209,7 +213,7 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
                 "artifacts": {"when": "always", "paths": ["out/logs/"],
                               "reports": {"junit": "out/logs/junit.xml"}, "expire_in": "14 days"},
                 "timeout": "40 minutes",
-                "interruptible": False,
+                "interruptible": False,     # never stop a job that is writing to a board
             }
     if run:
         # Removes the AWS resources of this pipeline even when a test job was cancelled, and
@@ -259,7 +263,7 @@ def command_plan(args: argparse.Namespace) -> int:
     if args.repeat < 1 or args.repeat > 50:
         raise SystemExit("REPEAT must be between 1 and 50")
     registry = load_registry()
-    jobs, summary = child_pipeline(registry, args.profile, args.test, args.repeat)
+    jobs, summary = child_pipeline(registry, args.profile, args.test, args.repeat, keep=args.keep == "true")
     Path(args.output).write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")
     Path(args.summary).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(f"profile={summary['profile']} test={summary['test'] or '(all in profile)'} repeat={summary['repeat']}")
@@ -368,6 +372,8 @@ def main(argv: list[str] | None = None) -> int:
     plan.add_argument("--profile", default="check")
     plan.add_argument("--test", default="")
     plan.add_argument("--repeat", type=int, default=1)
+    plan.add_argument("--keep", default="false", choices=("true", "false"),
+                      help="true: newer commits do not cancel this pipeline")
     plan.add_argument("--output", default="child-pipeline.yml")
     plan.add_argument("--summary", default="plan.json")
     plan.set_defaults(run=command_plan)
