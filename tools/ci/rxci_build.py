@@ -44,6 +44,21 @@ def workspace(registry: dict, name: str) -> Path:
     return path
 
 
+def init_nested_dependencies() -> None:
+    """Fetch the submodules of the submodules, as the headless build scripts do at their start."""
+    run(["pwsh", "-NoProfile", "-Command",
+         f". '{ROOT / 'tools' / 'rx_e2studio_cli.ps1'}'; Initialize-RxBuildDependencies -ProjectRoot '{ROOT}'"],
+        timeout=900)
+
+
+def keep_logs(folder: Path, out: Path) -> None:
+    """Copy the build logs of a helper into the job artifacts, also after a failure."""
+    if folder.is_dir():
+        out.mkdir(parents=True, exist_ok=True)
+        for log in folder.glob("*.log"):
+            shutil.copyfile(log, out / log.name)
+
+
 def publish(out: Path, files: dict[str, Path]) -> None:
     out.mkdir(parents=True, exist_ok=True)
     for name, source in files.items():
@@ -177,6 +192,7 @@ def build_rx65n_ota(registry: dict, backend: str, out: Path) -> None:
     token = version.replace(".", "_")
     try:
         work.mkdir(parents=True)
+        init_nested_dependencies()      # this helper does not do it itself
         run([sys.executable, "tools/build_bg96_ota_candidate.py", "--repo-root", ROOT,
              "--app-dir", f"Projects/{project}/e2studio_ccrx", "--version", version, "--output-dir", work / "out",
              "--signing-key", SIGNING_KEY, "--e2studio-cli", cli, "--workspace", work / "e2ws",
@@ -186,6 +202,7 @@ def build_rx65n_ota(registry: dict, backend: str, out: Path) -> None:
                       "candidate_payload.sig.der": work / "out" / f"bg96_{token}_ota_payload.sig.der",
                       "codesign_cert.pem": work / "out" / "bg96_ota_codesign_cert.pem"})
     finally:
+        keep_logs(work / "out", out)
         shutil.rmtree(work, ignore_errors=True)
 
 
