@@ -167,7 +167,7 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
         variants = []
 
     jobs: dict = {
-        "stages": ["check", "build", "test"],
+        "stages": ["check", "build", "test", "cleanup"],
         "default": {"interruptible": True},
         "check": {
             "stage": "check",
@@ -204,11 +204,26 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
                 "id_tokens": OIDC,
                 "variables": {"GIT_STRATEGY": "fetch", "GIT_SUBMODULE_STRATEGY": "none", "GIT_DEPTH": "1"},
                 "script": [f"python3 {TOOL} test {test['name']} --out out --log-dir out/logs"],
+                # Runs also after a cancelled or timed-out script: parks the board and deletes AWS resources.
+                "after_script": [f"python3 {TOOL} finish {test['name']} --log-dir out/logs"],
                 "artifacts": {"when": "always", "paths": ["out/logs/"],
                               "reports": {"junit": "out/logs/junit.xml"}, "expire_in": "14 days"},
                 "timeout": "40 minutes",
                 "interruptible": False,
             }
+    if run:
+        # Removes the AWS resources of this pipeline even when a test job was cancelled, and
+        # whatever older pipelines left behind.
+        jobs["sweep"] = {
+            "stage": "cleanup",
+            "tags": registry["runners"]["check"],
+            "when": "always",
+            "id_tokens": OIDC,
+            "variables": {"GIT_STRATEGY": "fetch", "GIT_SUBMODULE_STRATEGY": "none", "GIT_DEPTH": "1"},
+            "script": [f"python3 {TOOL} sweep --pipeline $CI_PIPELINE_ID --stale-hours 6"],
+            "interruptible": False,
+        }
+
     if profile == "doctor":
         runners = {"check runner": registry["runners"]["check"], "build runner": registry["runners"]["build"]}
         for name, board in registry["boards"].items():
@@ -318,6 +333,25 @@ def command_test(args: argparse.Namespace) -> int:
     return rxci_board.run_test(registry, test, common, app, Path(args.log_dir).resolve())
 
 
+def command_finish(args: argparse.Namespace) -> int:
+    enter_venv()
+    import rxci_board
+
+    registry = load_registry()
+    test = next(test for test in registry["tests"] if test["name"] == args.name)
+    return rxci_board.finish_test(registry, test, Path(args.log_dir).resolve(), aws_session)
+
+
+def command_sweep(args: argparse.Namespace) -> int:
+    enter_venv()
+    import rxci_aws
+
+    prefix = f"{rxci_aws.PREFIX}{args.pipeline}-" if args.pipeline else ""
+    deleted = rxci_aws.sweep(aws_session(), prefix=prefix, stale_hours=args.stale_hours)
+    print(f"sweep: deleted {len(deleted)} thing(s)")
+    return 0
+
+
 def command_list(args: argparse.Namespace) -> int:
     for test in load_registry()["tests"]:
         state = "ready" if test["ready"] else "todo "
@@ -349,6 +383,16 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("variant")
     build.add_argument("--out", required=True)
     build.set_defaults(run=command_build)
+
+    finish = commands.add_parser("finish", help="after a test job: park the board and delete its AWS resources")
+    finish.add_argument("name")
+    finish.add_argument("--log-dir", default="out/logs")
+    finish.set_defaults(run=command_finish)
+
+    sweep = commands.add_parser("sweep", help="delete AWS resources that tests of a pipeline created")
+    sweep.add_argument("--pipeline", default="", help="pipeline whose resources are deleted")
+    sweep.add_argument("--stale-hours", type=float, default=0, help="also delete resources older than this")
+    sweep.set_defaults(run=command_sweep)
 
     test = commands.add_parser("test", help="run one test on its board, from flashing to parking")
     test.add_argument("name")

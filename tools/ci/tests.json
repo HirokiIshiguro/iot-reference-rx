@@ -24,7 +24,8 @@
         "hw-raspi",
         "dev-ck-rx65n-bg96"
       ],
-      "resource_group": "board-rx65n"
+      "resource_group": "board-rx65n",
+      "iot_policy": "ck-rx65n-policy"
     },
     "rx671": {
       "title": "EK-RX671 + Type 1YN (Wi-Fi)",
@@ -87,7 +88,9 @@
     "rx72n:sw:tls12:mqtt",
     "rx72n:sw:tls13:mqtt",
     "rx671:sw:tls12:mqtt",
-    "rx671:sw:tls13:mqtt"
+    "rx671:sw:tls13:mqtt",
+    "rx65n:sw:tls12:mqtt",
+    "rx65n:sw:tls13:mqtt"
   ],
   "smoke": [
     "rx72n:sw:tls12:mqtt",

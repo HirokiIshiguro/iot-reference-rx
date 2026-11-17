@@ -10,9 +10,11 @@ import fcntl
 import json
 import os
 import shlex
+import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -47,6 +49,18 @@ class Board:
             install_ranges=((start - size, 0xFFFBFFFF - size), (start, 0xFFFBFFFF)))
 
     # -- exclusive use ---------------------------------------------------
+    def try_lock(self) -> bool:
+        """Take the board lock only if nobody holds it."""
+        path = Path(self.target["bench_lock"])
+        if socket.gethostname() != self.target["hostname"] or not path.exists():
+            return False
+        self._lock = open(path, "a")
+        try:
+            fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        return True
+
     def lock(self) -> None:
         if socket.gethostname() != self.target["hostname"]:
             raise SystemExit(f"{self.name} is attached to {self.target['hostname']}, not to this host.")
@@ -69,9 +83,10 @@ class Board:
         print(f"{self.name}: board lock taken ({path})", flush=True)
 
     # -- programmer --------------------------------------------------------
-    def run(self, command: list, *, timeout: int = RFP_SECONDS, label: str = "") -> None:
+    def run(self, command: list, *, timeout: int = RFP_SECONDS, label: str = "", env: dict | None = None) -> None:
         print(f"+ {label or 'run'}: {' '.join(str(part) for part in command)}", flush=True)
-        subprocess.run([str(part) for part in command], cwd=ROOT, check=True, timeout=timeout)
+        subprocess.run([str(part) for part in command], cwd=ROOT, check=True, timeout=timeout,
+                       env={**os.environ, **env} if env else None)
 
     def reset_command(self) -> str:
         """Command line that releases the board from reset (used by the UART tools)."""
@@ -110,7 +125,7 @@ class Board:
             self.run(self.rfp.program_command(bank1, leave_reset=True), label="boot loader, bank 1")
         command = [sys.executable, TOOLS / "test_uart_download_rx72n.py", "--rsu", app / "app.rsu",
                    "--port", self.uart, "--baud", self.baud, "--timeout", 420, "--post-tx-wait", 120,
-                   "--wait-for-ready", "--ready-timeout", 90,
+                   "--wait-for-ready", "--ready-timeout", 180 if self.name == "rx65n" else 90,
                    "--ready-message", 'send "userprog.rsu" via UART.', "--reset-cmd", self.reset_command(),
                    "--success-message", "jump to user program", "--success-timeout", 90, "--strict-success"]
         if self.name in ("rx65n", "rx671"):
@@ -149,6 +164,39 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Path
     board.run(observe, timeout=700, label="observe MQTT on the UART")
 
 
+def mqtt_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+    """Cellular board: the device credentials are created for this run and deleted at the end."""
+    import rxci
+    import rxci_aws
+
+    board.install(common, app, logs)
+    session = rxci.aws_session()
+    name = f"{rxci_aws.owner()}-rx65n"
+    tool = [sys.executable, TOOLS / "bg96_bootloader_integration.py"]
+    target = ["--uart-port", board.uart, "--baud", board.baud, "--rfp-cli", board.rfp.executable,
+              "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool, "--rfp-interface", board.rfp.interface,
+              "--rfp-speed", board.rfp.speed, "--rfp-auth-id", board.rfp.auth_id]
+    try:
+        credentials = rxci_aws.create_thing(session, name, board.config["iot_policy"])
+        with tempfile.TemporaryDirectory(prefix="rxci-") as folder:
+            certificate, key = Path(folder) / "certificate.pem", Path(folder) / "private_key.pem"
+            certificate.write_text(credentials["certificate"], encoding="utf-8")
+            key.write_text(credentials["private_key"], encoding="utf-8")
+            env = {"RX65N_BG96_AWS_IOT_THING_NAME": name, "AWS_IOT_CERT": str(certificate),
+                   "AWS_IOT_PRIVKEY": str(key), "RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE": endpoint(registry, test["tls"])}
+            board.run([*tool, "--action", "provision-mqtt", *target, "--provision-cli-timeout", 25,
+                       "--provision-char-delay", 0.002, "--provision-line-delay", 0.5,
+                       "--no-reset-after-provision"], timeout=400, label="provision the device credentials", env=env)
+        board.run([*tool, "--action", "reset-app", *target], timeout=120, label="start the application")
+        observe = [*tool, "--action", "verify-mqtt", *target, "--require-mqtt-pubsub", "--app-startup-timeout", 420,
+                   "--mqtt-timeout", 900, "--app-reset-retries", 2]
+        if test["tls"] == "tls13":
+            observe += ["--require-tls-version", "TLSv1.3"]
+        board.run(observe, timeout=1500, label="observe cellular attach and MQTT on the UART")
+    finally:
+        rxci_aws.sweep(session, prefix=rxci_aws.owner())
+
+
 def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
     """The application carries its credentials, so the test starts right after the install."""
     board.install(common, app, logs)
@@ -160,7 +208,7 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path
     board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART")
 
 
-RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx671", "mqtt"): mqtt_rx671}
+RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx65n", "mqtt"): mqtt_rx65n, ("rx671", "mqtt"): mqtt_rx671}
 
 
 def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:
@@ -180,6 +228,8 @@ def run_test(registry: dict, test: dict, common: Path, app: Path, logs: Path) ->
     board = Board(registry, test["board"])
     started = time.monotonic()
     failure = ""
+    # A cancelled job receives SIGTERM: leave through the finally blocks instead of dying in place.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit("the job was cancelled"))
     board.lock()
     try:
         recipe(registry, board, test, common, app, logs)
@@ -198,5 +248,29 @@ def run_test(registry: dict, test: dict, common: Path, app: Path, logs: Path) ->
             failure = failure or f"could not park the board: {error}"
     seconds = time.monotonic() - started
     write_junit(logs / "junit.xml", test["name"], seconds, failure)
+    (logs / "finished").write_text("the test process parked the board and cleaned up\n", encoding="utf-8")
     print(f"{'FAIL' if failure else 'PASS'}  {test['name']}  {seconds:.0f} s  {failure}", flush=True)
     return 1 if failure else 0
+
+
+def finish_test(registry: dict, test: dict, logs: Path, aws_session) -> int:
+    """after_script of a test job. Does the cleanup again when the test process could not finish it."""
+    import rxci_aws
+
+    if (logs / "finished").is_file():
+        return 0
+    print("The test process did not finish its cleanup (cancelled or timed out). Cleaning up now.", flush=True)
+    board = Board(registry, test["board"])
+    if board.try_lock():
+        try:
+            board.park()
+        except (subprocess.SubprocessError, OSError) as error:
+            print(f"could not park the board: {error}", flush=True)
+    else:
+        print(f"{board.name} is in use by another job; it is not parked here.", flush=True)
+    try:
+        deleted = rxci_aws.sweep(aws_session(), prefix=rxci_aws.owner())
+        print(f"deleted {len(deleted)} AWS thing(s) of this job", flush=True)
+    except SystemExit as error:
+        print(f"AWS cleanup skipped: {error}", flush=True)
+    return 0
