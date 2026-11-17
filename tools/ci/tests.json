@@ -13,7 +13,10 @@
       "resource_group": "board-rx72n",
       "thing": "rx72n-02",
       "certificate_variable": "AWS_CLIENT_CERT_RX72N_02",
-      "private_key_variable": "AWS_PRIVATE_KEY_RX72N_02"
+      "private_key_variable": "AWS_PRIVATE_KEY_RX72N_02",
+      "fleet_template_variable": "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+      "claim_certificate_variable": "AWS_FLEET_CLAIM_CERT_RX72N_02",
+      "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02"
     },
     "rx65n": {
       "title": "CK-RX65N V1 + BG96 (cellular)",
@@ -90,7 +93,9 @@
     "rx671:sw:tls12:mqtt",
     "rx671:sw:tls13:mqtt",
     "rx65n:sw:tls12:mqtt",
-    "rx65n:sw:tls13:mqtt"
+    "rx65n:sw:tls13:mqtt",
+    "rx72n:sw:tls12:fleet",
+    "rx72n:sw:tls13:fleet"
   ],
   "smoke": [
     "rx72n:sw:tls12:mqtt",

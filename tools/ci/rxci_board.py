@@ -164,6 +164,32 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Path
     board.run(observe, timeout=700, label="observe MQTT on the UART")
 
 
+def fleet_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+    """The board registers itself with the claim certificate; what it created is deleted at the end."""
+    import rxci
+    import rxci_aws
+
+    template = os.environ.get(board.config["fleet_template_variable"], "")
+    if not template:
+        raise SystemExit(f"CI variable {board.config['fleet_template_variable']} is not available to this job.")
+    board.install(common, app, logs)
+    provision = [sys.executable, TOOLS / "provision_rx72n.py", "--fleet-provisioning", "--port", board.uart,
+                 "--baud", board.baud, "--endpoint", endpoint(registry, test["tls"]), "--template-name", template,
+                 "--claim-cert", required_file(board.config["claim_certificate_variable"]),
+                 "--claim-key", required_file(board.config["claim_private_key_variable"]),
+                 "--no-reset", "--reset-cmd", board.reset_command(), "--reset-after-open", "--boot-wait", 12,
+                 "--cli-timeout", 25, "--attempts", 3]
+    board.run(provision, timeout=400, label="provision the claim credentials")
+    observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
+               "--timeout", 600, "--reset-cmd", board.reset_command(), "--summary-json", logs / "fleet_summary.json"]
+    if test["tls"] == "tls13":
+        observe += ["--require-tls-version", "TLSv1.3"]
+    try:
+        board.run(observe, timeout=700, label="observe Fleet Provisioning on the UART")
+    finally:
+        rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
+
+
 def mqtt_rx65n(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
     """Cellular board: the device credentials are created for this run and deleted at the end."""
     import rxci
@@ -208,7 +234,8 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path
     board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART")
 
 
-RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx65n", "mqtt"): mqtt_rx65n, ("rx671", "mqtt"): mqtt_rx671}
+RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx72n", "fleet"): fleet_rx72n,
+           ("rx65n", "mqtt"): mqtt_rx65n, ("rx671", "mqtt"): mqtt_rx671}
 
 
 def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:
@@ -269,8 +296,10 @@ def finish_test(registry: dict, test: dict, logs: Path, aws_session) -> int:
     else:
         print(f"{board.name} is in use by another job; it is not parked here.", flush=True)
     try:
-        deleted = rxci_aws.sweep(aws_session(), prefix=rxci_aws.owner())
-        print(f"deleted {len(deleted)} AWS thing(s) of this job", flush=True)
+        session = aws_session()
+        deleted = rxci_aws.sweep(session, prefix=rxci_aws.owner())
+        deleted += rxci_aws.delete_fleet_resources(session, logs / "fleet_summary.json")
+        print(f"deleted {len(deleted)} AWS resource(s) of this job", flush=True)
     except SystemExit as error:
         print(f"AWS cleanup skipped: {error}", flush=True)
     return 0

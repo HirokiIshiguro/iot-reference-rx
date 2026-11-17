@@ -80,3 +80,38 @@ def sweep(session, *, prefix: str = "", stale_hours: float = 0) -> list[str]:
             delete_thing(iot, name)
             deleted.append(name)
     return deleted
+
+
+def delete_fleet_resources(session, summary_path) -> list[str]:
+    """Delete the thing and certificate a board created through Fleet Provisioning.
+
+    Their names are chosen by the provisioning template, so the test tool records them in
+    its summary file as soon as the board reports them.
+    """
+    import json
+    from pathlib import Path
+
+    path = Path(summary_path)
+    if not path.is_file():
+        return []
+    summary = json.loads(path.read_text(encoding="utf-8"))
+    iot = session.client("iot")
+    deleted = []
+    thing = summary.get("thing_name")
+    certificate = summary.get("certificate_id")
+    if thing:
+        delete_thing(iot, thing)
+        deleted.append(thing)
+    if certificate:
+        missing = iot.exceptions.ResourceNotFoundException
+        try:
+            arn = iot.describe_certificate(certificateId=certificate)["certificateDescription"]["certificateArn"]
+            for policy in iot.list_attached_policies(target=arn)["policies"]:
+                iot.detach_policy(policyName=policy["policyName"], target=arn)
+            iot.update_certificate(certificateId=certificate, newStatus="INACTIVE")
+            iot.delete_certificate(certificateId=certificate, forceDelete=True)
+            deleted.append(certificate[:12])
+            print(f"aws: deleted certificate {certificate[:12]}", flush=True)
+        except missing:
+            pass
+    return deleted

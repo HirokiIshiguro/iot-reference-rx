@@ -6,6 +6,7 @@ directory, so a test job can take what it needs from the artifacts of the build 
   <board>/common                 provisioner image, signer certificate and public key (one per commit);
                                  on RX671 also the boot loader
   rx72n/software/app             signed application and the boot loader
+  rx72n/software/fleet           the same with the Fleet Provisioning demo enabled
   rx65n/software/app             signed application and the boot loader
   rx671/software-<tls>/app       signed application with the Wi-Fi and device credentials compiled in
 """
@@ -123,9 +124,9 @@ def build_rx671_app(registry: dict, tls: str, out: Path) -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def build_rx72n_app(registry: dict, backend: str, out: Path) -> None:
+def build_rx72n_app(registry: dict, backend: str, kind: str, out: Path) -> None:
     project = "aws_ether_rx72n_envision_kit" if backend == "software" else "aws_ether_rx72n_envision_kit_tsip"
-    work = workspace(registry, f"rx72n-{backend}")
+    work = workspace(registry, f"rx72n-{backend}-{kind}")
     log = ROOT / "rx72n_e2studio_build.log"
     boot_dir = ROOT / "Projects" / "boot_loader_rx72n_envision_kit" / "e2studio_ccrx" / "HardwareDebug"
     app_mot = ROOT / "Projects" / project / "e2studio_ccrx" / "HardwareDebug" / f"{project}.mot"
@@ -134,9 +135,11 @@ def build_rx72n_app(registry: dict, backend: str, out: Path) -> None:
     rsu = ROOT / "rx72n_app.rsu"
     cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
     try:
-        run(["pwsh", "-NoProfile", "-File", "tools/build_headless_rx72n.ps1", "-ProjectRoot", ROOT,
+        script = "tools/build_headless_rx72n_fleet.ps1" if kind == "fleet" else "tools/build_headless_rx72n.ps1"
+        extra = ["-FleetDemoId", registry["boards"]["rx72n"]["thing"] + "-fp"] if kind == "fleet" else []
+        run(["pwsh", "-NoProfile", "-File", script, "-ProjectRoot", ROOT,
              "-E2Studio", cli, "-Workspace", work, "-LogFile", log, "-E2StudioTimeoutSeconds", "1200",
-             "-TlsBackend", "software" if backend == "software" else "tsip"], timeout=1500)
+             "-TlsBackend", "software" if backend == "software" else "tsip", *extra], timeout=1500)
         run([sys.executable, "tools/shift_srec_addresses.py", "--input", boot, "--output", boot_bank1,
              "--range-start", "0xFFE00000", "--range-end", "0xFFFFFFFF", "--shift=-0x200000",
              "--drop-out-of-range"], timeout=120)
@@ -157,8 +160,8 @@ def build(registry: dict, variant: str, out: Path) -> None:
         raise SystemExit(f"Unknown board in build variant: {variant}")
     if name == "common":
         return build_common(registry, board, out)
-    if board == "rx72n" and name == "software/app":
-        return build_rx72n_app(registry, "software", out)
+    if board == "rx72n" and name in ("software/app", "software/fleet"):
+        return build_rx72n_app(registry, "software", name.split("/")[1], out)
     if board == "rx65n" and name == "software/app":
         return build_rx65n_app(registry, "software", out)
     if board == "rx671" and name in ("software-tls12/app", "software-tls13/app"):
