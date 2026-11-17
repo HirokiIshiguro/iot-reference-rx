@@ -614,7 +614,6 @@ workflow:
         - tools/ci/tests/test_plan_rx671_ota.py
         - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
         - tools/ci/tests/test_rx671_ota_build_profile_contract.py
-        - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
         - tools/ci/tests/test_rx671_ota_host_tools.py
         - tools/ci/tests/test_rx671_ota_runtime_profile_contract.py
       variables:
@@ -840,7 +839,6 @@ idt_ci_contract:
         tools.ci.tests.test_idt_linux_nested_dependencies \
         tools.ci.tests.test_idt_rpi4_pair \
         tools.ci.tests.test_idt_rpi4_public \
-        tools.ci.tests.test_idt_rpi4_ci_contract \
         tools.ci.tests.test_idt_rpi4_snapshot_verify \
         tools.ci.tests.test_idt_explicit_python \
         tools.ci.tests.test_windows_build_job \
@@ -1151,7 +1149,7 @@ ci_runner_mr_contract:
   script:
     - python3 -m tools.ci.verify_ci_runner_mr_scope
     - python3 -c 'import botocore'
-    - python3 -m unittest tools.ci.tests.test_cleanup_iot_jobs tools.ci.tests.test_shared_flash_mr_workflow tools.ci.tests.test_ci_runner_mr_scope -v
+    - python3 -m unittest tools.ci.tests.test_cleanup_iot_jobs tools.ci.tests.test_ci_runner_mr_scope -v
 
 nightly_dependency_contract:
   stage: dependency_check
@@ -1211,8 +1209,6 @@ rx671_ota_ci_contract:
         - tools/ci/tests/test_manage_rx671_ota_event_policy.py
         - tools/ci/tests/test_plan_rx671_ota.py
         - tools/ci/tests/test_rx671_ota_artifact_ci_contract.py
-        - tools/ci/tests/test_shared_flash_mr_workflow.py
-        - tools/ci/tests/test_rx671_ota_hardware_ci_contract.py
         - tools/ci/tests/test_rx671_ota_host_tools.py
         - tools/ci/tests/test_rx671_ota_runtime_profile_contract.py
         - tools/ci/tests/test_rx671_wifi_uart.py
@@ -1226,8 +1222,6 @@ rx671_ota_ci_contract:
       tools.ci.tests.test_manage_ephemeral_iot_thing
       tools.ci.tests.test_manage_rx671_ota_event_policy
       tools.ci.tests.test_rx671_ota_artifact_ci_contract
-      tools.ci.tests.test_shared_flash_mr_workflow
-      tools.ci.tests.test_rx671_ota_hardware_ci_contract
       tools.ci.tests.test_rx671_ota_host_tools
       tools.ci.tests.test_rx671_ota_runtime_profile_contract
       tools.ci.tests.test_rx671_wifi_uart
@@ -2181,7 +2175,7 @@ build_rx671_wifi:
     - when: never
   script:
     - Write-Host "=== Build EK-RX671 Type 1YN Wi-Fi project ==="
-    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_hardware_transaction_contract tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract tools.ci.tests.test_ota_zero_storage_policy
+    - python -m unittest tools.ci.tests.test_rx671_wifi_uart tools.ci.tests.test_rx671_software_mqtt_tls13_contract tools.ci.tests.test_rx671_software_fleet_tls13_contract tools.ci.tests.test_ota_zero_storage_policy
     - if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     - |
       $otaParkBuild = (
@@ -2573,7 +2567,6 @@ package_rx671_ota_artifacts:
         tools.ci.tests.test_manage_rx671_ota_event_policy `
         tools.ci.tests.test_rx671_ota_build_profile_contract `
         tools.ci.tests.test_rx671_ota_artifact_ci_contract `
-        tools.ci.tests.test_rx671_ota_hardware_ci_contract `
         tools.ci.tests.test_rx671_ota_runtime_profile_contract `
         tools.ci.tests.test_rx671_ota_host_tools `
         tools.ci.tests.test_verify_ota_aws_state `

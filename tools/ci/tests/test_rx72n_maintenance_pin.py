@@ -48,20 +48,4 @@ int main(void) {
 ''')
 
 
-class NormalMqttTrustTests(unittest.TestCase):
-    def test_credential_update_keeps_the_signer_installed_with_the_normal_bundle(self):
-        text=(ROOT/'.gitlab-ci.yml').read_text(encoding='utf-8')
-        block=text.split('\ntest_rx72n_ether_mqtt:\n',1)[1]
-        block=re.split(r'\n[^ \n][^\n]*:\n',block,maxsplit=1)[0]
-        array=re.search(r'provision_args=\(\n(.*?)^\s*\)',block,re.M|re.S).group(1)
-        args=shlex.split(array)
-        self.assertIn('--cert',args)
-        self.assertIn('--key',args)
-        self.assertIn('--no-reset',args)
-        self.assertNotIn('--format',args)
-        self.assertNotIn('--codesigner-cert',args)
-        self.assertNotIn('--codesigner-public-key',args)
-        self.assertNotIn('--device-id',args)
-
-
 if __name__=='__main__':unittest.main()

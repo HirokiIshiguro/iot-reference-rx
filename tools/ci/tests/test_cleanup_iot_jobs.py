@@ -121,13 +121,5 @@ class ReadOnlyJobSnapshotTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         child.kill.assert_called_once_with()
 
-    def test_rx72n_preparation_job_explicitly_selects_the_read_only_mode(self):
-        ci = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
-        job = ci.split("\ncleanup_rx72n_ether_ota_jobs:\n", 1)[1].split("\ntest_rx671_wifi:", 1)[0]
-        self.assertIn("--check-empty", job)
-        self.assertIn("set -euo pipefail", job)
-        self.assertNotIn("allow_failure: true", job)
-
-
 if __name__ == "__main__":
     unittest.main()

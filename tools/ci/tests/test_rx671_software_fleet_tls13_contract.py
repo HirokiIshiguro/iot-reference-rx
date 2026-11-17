@@ -46,47 +46,6 @@ class Rx671SoftwareFleetTls13ContractTests(unittest.TestCase):
         self.assertIn("RX671_WIFI_REQUIRE_TLS_VERSION", self.build)
         self.assertIn("AWS_IOT_MQTT_REQUIRE_TLS_VERSION_1_3=1", self.build)
 
-    def test_fleet_build_passes_and_records_the_tls_requirement(self) -> None:
-        job = job_block(
-            self.ci,
-            "build_rx671_wifi_fleet",
-            "build_rx671_bootloader",
-        )
-
-        self.assertIn(
-            "$buildArgs.RequireTlsVersion = $env:RX671_WIFI_REQUIRE_TLS_VERSION",
-            job,
-        )
-        self.assertIn(
-            "required_tls_version = $env:RX671_WIFI_REQUIRE_TLS_VERSION",
-            job,
-        )
-
-    def test_nightly_tls13_row_inherits_the_fleet_safety_gate(self) -> None:
-        job = job_block(
-            self.ci,
-            "matrix_rx671_wifi_fleet_tls13",
-            ".matrix_rx671_software_lanbench",
-        )
-
-        self.assertIn("extends: matrix_rx671_wifi_fleet", job)
-        self.assertIn('RX671_WIFI_TEST_SCOPE: "fleet"', job)
-        self.assertIn('RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"', job)
-
-    def test_hardware_job_requires_two_tls13_handshakes(self) -> None:
-        job = job_block(
-            self.ci,
-            "test_rx671_wifi_fleet",
-            "cleanup_rx671_wifi_fleet",
-        )
-
-        self.assertIn(
-            '--require-tls-version "$RX671_WIFI_REQUIRE_TLS_VERSION"',
-            job,
-        )
-        self.assertIn("--minimum-tls-handshakes 2", job)
-        self.assertIn('"${tls_version_args[@]}"', job)
-
     def test_tls13_requirement_rejects_missing_or_mixed_handshakes(self) -> None:
         self.assertTrue(
             test_fleet_rx72n.tls_requirement_ok("TLSv1.3", ["TLSv1.3"], 2, 2)

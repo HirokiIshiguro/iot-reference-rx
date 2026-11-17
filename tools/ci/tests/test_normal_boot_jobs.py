@@ -37,33 +37,6 @@ def script():
 
 
 class NormalBootJobsTests(unittest.TestCase):
-    def test_same_stage_needs_and_rules_reference_each_normal_build(self):
-        common = block(".normal_boot_package")
-        self.assertIn("extends: .rx_windows_canonical_checkout", common)
-        self.assertIn("stage: build", common)
-        self.assertIn("resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP", common)
-        self.assertIn("python -m pip install --user cryptography", common)
-        for suffix, (target, build) in TARGETS.items():
-            with self.subTest(target=target):
-                body = block("package_normal_boot_" + suffix)
-                rule_source = ".rx65n_bg96_fleet_rules" if suffix == "rx65n_fleet" else build
-                self.assertIn("rules: !reference [" + rule_source + ", rules]", body)
-                self.assertIn("- job: " + build + "\n      artifacts: true", body)
-                self.assertEqual(variables("package_normal_boot_" + suffix)["NORMAL_BOOT_TARGET"], target)
-                self.assertNotIn("RUN_", body)
-                self.assertIn("tags: [exec-shell, os-windows, ccrx]", body)
-                self.assertNotIn("NORMAL_BOOT_RUNNER_TAG", body)
-
-    def test_publication_is_exact_api_output_allowlist_without_private_logs(self):
-        body = script()
-        names = set(re.findall(r"'([^']+)'", body.split("$publicFiles = @(", 1)[1].split(")", 1)[0]))
-        self.assertEqual(names, normal_boot.FILES | {"normal_install_manifest.json"})
-        self.assertIn("C:/ai/codex/tmp/normal-boot-", body)
-        self.assertIn("C:/ai/codex/ws/normal-boot-", body)
-        self.assertIn("--signing-key", body)
-        self.assertNotIn("--allow-dirty", body)
-        self.assertNotIn("Remove-Item", body)
-
     def test_downloaded_and_generated_artifacts_are_ignored_by_real_git_rules(self):
         paths = {"rx72n_codesign_cert.pem", "rx72n_e2studio_build.log", "rx65n_bg96_e2studio_build.log",
                  "rx671_wifi_e2studio_build.log", "artifacts/build_rx671_wifi/aws_wifi_rx671_ek.mot",

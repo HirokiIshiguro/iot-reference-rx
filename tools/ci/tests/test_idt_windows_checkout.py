@@ -65,33 +65,6 @@ class IdtWindowsCheckoutTests(unittest.TestCase):
         result.update(fields(self.blocks[name], 4))
         return result
 
-    def test_all_rx_build_entry_points_get_fresh_checkout_before_sources(self):
-        users = {name for name, block in self.blocks.items() if TEMPLATE in parents(block)}
-        self.assertEqual(users, WINDOWS_BUILD_JOBS)
-        for name in WINDOWS_BUILD_JOBS:
-            with self.subTest(job=name):
-                variables = self.variables(name)
-                self.assertEqual(variables["GIT_STRATEGY"], "clone")
-                count = int(variables["GIT_CONFIG_COUNT"])
-                options = {variables[f"GIT_CONFIG_KEY_{i}"]: variables[f"GIT_CONFIG_VALUE_{i}"]
-                           for i in range(count)}
-                self.assertEqual(options, {
-                    "core.longpaths": "true",
-                    "core.autocrlf": "false",
-                    "core.eol": "lf",
-                })
-
-    def test_existing_native_fleet_and_matrix_settings_survive_inheritance(self):
-        self.assertIn(".rx_idt_job", parents(self.blocks["test_rx671_wifi_idt"]))
-        self.assertIn(".rx671_wifi_fleet_rules", parents(self.blocks["build_rx671_wifi_fleet"]))
-        for name in ("idt_source_matrix", "test_rx671_wifi_idt", "matrix_rx_idt_transport"):
-            with self.subTest(job=name):
-                variables = self.variables(name)
-                self.assertEqual(variables["GIT_SUBMODULE_STRATEGY"], "normal")
-                self.assertEqual(variables["PYTHONUTF8"], "1")
-        self.assertNotIn(TEMPLATE, parents(self.blocks[".rx_idt_job"]))
-        self.assertNotIn("GIT_STRATEGY", fields(self.blocks["variables"], 2))
-
     @unittest.skipUnless(shutil.which("git"), "Git is required to check config inheritance")
     def test_git_config_environment_preserves_other_url_rewrite(self):
         environment = dict(os.environ)

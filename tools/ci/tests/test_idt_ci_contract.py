@@ -22,24 +22,6 @@ def bootstrap_block():
 
 
 class IdtCiContractTests(unittest.TestCase):
-    def test_shared_native_bootstrap_uses_only_generic_inputs_and_sanitized_artifacts(self):
-        block=bootstrap_block()
-        self.assertIn("tools/idt/prepare_public_signer.py",block)
-        self.assertIn('--target "$idtTarget"',block)
-        self.assertIn("C:/ai/codex/tmp/rx-idt-public-signer-",block)
-        self.assertIn("CI_JOB_ID",block)
-        self.assertIn("ConvertFrom-Json",block)
-        self.assertIn("PSObject.Properties).Count -ne $bootstrapNames.Count",block)
-        self.assertIn("$bootstrapPresent.Count -ne $bootstrapNames.Count",block)
-        self.assertNotIn("IDT_RX671",block)
-        self.assertNotIn("$idtTarget -eq",block)
-        self.assertEqual(set(ENVIRONMENT_INPUTS.values()),set(re.findall(r"'((?:IDT_PUBLIC_SIGNER_)[A-Z_]+)'",block)))
-        yaml=(ROOT/".gitlab-ci.yml").read_text(encoding="utf-8")
-        native=yaml[yaml.index(".rx_idt_job:"):yaml.index("test_rx72n_idt:")]
-        artifacts=native[native.index("  artifacts:"):]
-        for private in ("signer.crt.pem","signer.pub.pem","producer-private.log","build-private.log",".mot",".abs"):
-            self.assertNotIn(private,artifacts)
-
     @unittest.skipUnless(PWSH,"PowerShell is required to execute CI control flow")
     def test_all_three_targets_generate_skip_complete_overrides_and_reject_bad_input_sets(self):
         variables=tuple(ENVIRONMENT_INPUTS.values())

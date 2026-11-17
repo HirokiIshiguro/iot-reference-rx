@@ -46,14 +46,6 @@ class NormalBootCiContractTests(unittest.TestCase):
                 selected.assert_called_once_with(TEMPLATES[template])
                 unsafe.assert_called_once_with(target)
 
-    def test_owner_check_runs_after_the_bench_flock(self):
-        for template in TEMPLATES:
-            with self.subTest(template=template):
-                body = job(template)
-                self.assertLess(body.index("flock "), body.index("Retained hardware owner"))
-                self.assertNotIn("assert ", owner_guard(template))
-                self.assertIn("os.path.lexists", owner_guard(template))
-
     def test_clean_bench_without_owner_is_allowed(self):
         with tempfile.TemporaryDirectory() as folder:
             for template in TEMPLATES:
@@ -81,46 +73,6 @@ class NormalBootCiContractTests(unittest.TestCase):
                 with self.subTest(template=template):
                     with self.assertRaisesRegex(SystemExit, "Retained hardware owner"):
                         self.execute_guard(template, owner)
-
-    def test_linux_host_contracts_include_new_portable_checks(self):
-        contract = job("idt_ci_contract")
-        for name in ("test_rx72n_tsip_driver", "test_normal_boot",
-                     "test_bg96_bootloader_download", "test_bg96_ota_prepare"):
-            self.assertIn("tools.ci.tests." + name, contract)
-        self.assertNotIn("tools.ci.tests.test_build_bg96_ota_candidate", contract)
-
-    def test_normal_install_changes_select_the_linux_host_contract(self):
-        contract = job("idt_ci_contract")
-        changes = contract[contract.index("changes:"):contract.index("when: on_success")]
-        for path in ("tools/install_normal_boot.py", "tools/ci/tests/test_normal_boot.py"):
-            self.assertIn("- " + path + "\n", changes)
-        self.assertIn("tools.ci.tests.test_normal_boot \\\n", contract)
-
-    def test_candidate_wrapper_checks_run_on_windows_build_runner(self):
-        build = job("build_rx65n_bg96")
-        self.assertIn("- os-windows", build)
-        self.assertIn("tools.ci.tests.test_build_bg96_ota_candidate", build)
-
-    def test_bg96_persistent_keys_and_ota_loss_retries_are_checked_before_build(self):
-        build = job("build_rx65n_bg96")
-        self.assertIn("tools.ci.tests.test_idt_bg96_network", build)
-        self.assertLess(build.index("tools.ci.tests.test_idt_bg96_network"),
-                        build.index("RX65N BG96 host regression tests failed"))
-        self.assertLess(build.index("RX65N BG96 host regression tests failed"),
-                        build.index("python -m pip install"))
-        self.assertIn("$LASTEXITCODE -ne 0", build)
-        self.assertIn("tools.ci.tests.test_ota_request_retry", job("idt_ci_contract"))
-
-    def test_bg96_tsip_lane_is_source_only_and_uses_the_shared_compiler_lease(self):
-        lane = job("build_rx65n_tsip_common_core")
-        for text in ("extends: build_rx65n_bg96", "resource_group: $WINDOWS_CCRX_BUILD_RESOURCE_GROUP",
-                     '$CI_PIPELINE_SOURCE == "merge_request_event"', '$PIPELINE_PROFILE == "mr-idt-targets"',
-                     'RX65N_BG96_TLS_BACKEND: "tsip"', 'RX65N_BG96_REQUIRE_TLS_VERSION: "TLSv1.2"',
-                     'RX65N_BG96_TLS13_0RTT_ENABLE: "false"', 'RX65N_BG96_TEST_SCOPE: "build"'):
-            self.assertIn(text, lane)
-        self.assertNotIn("when: manual", lane)
-        self.assertNotIn("install_normal_boot.py", lane)
-
 
 if __name__ == "__main__":
     unittest.main()

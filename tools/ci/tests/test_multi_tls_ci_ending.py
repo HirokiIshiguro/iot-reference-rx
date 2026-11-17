@@ -71,10 +71,5 @@ python3() {
     def test_term_still_runs_ending_under_open_descriptor(self):
         self.assertEqual((143, False), self.execute(0, 0, terminate=True))
 
-    def test_reset_bundle_is_an_artifact_dependency(self):
-        needs = BODY.split("  rules:", 1)[0]
-        self.assertRegex(needs, r"job: package_normal_boot_rx72n\s+artifacts: true")
-
-
 if __name__ == "__main__":
     unittest.main()

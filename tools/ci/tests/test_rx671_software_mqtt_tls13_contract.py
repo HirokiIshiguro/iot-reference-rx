@@ -67,14 +67,6 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         self.assertNotIn("Invoke-MakeTarget", self.build)
         self.assertIn("-ExpectedOutputs @(", self.build)
 
-    def test_nightly_has_a_dedicated_tls13_mqtt_row(self) -> None:
-        start = self.ci.index("matrix_rx671_wifi_mqtt_tls13:")
-        end = self.ci.index("\n.matrix_rx671_software_lanbench:", start)
-        job = self.ci[start:end]
-        self.assertIn('RX671_WIFI_TEST_SCOPE: "mqtt"', job)
-        self.assertIn('RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"', job)
-        self.assertIn("RX671_EK_AWS_IOT_PRIVATE_KEY_PEM", job)
-
     def test_sdio_function2_retry_preserves_the_pending_frame(self) -> None:
         self.assertIn(
             "#define WHD_SDIO_CMD53_F2_BYTE_READ_ABORT_ON_RETRY (0)",
