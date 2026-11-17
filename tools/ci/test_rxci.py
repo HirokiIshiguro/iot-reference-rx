@@ -68,6 +68,15 @@ class PlanTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^rx65n:tsip:tls13:fleet$", 1)
 
+    def test_doctor_profile_visits_every_runner_with_an_id_token(self):
+        jobs, summary = rxci.child_pipeline(registry(), "doctor", "", 1)
+        doctors = {name: job for name, job in jobs.items() if name.startswith("doctor: ")}
+        self.assertEqual(len(doctors), 5)
+        self.assertEqual(summary["tests"], [])
+        for job in doctors.values():
+            self.assertIn("GITLAB_OIDC_TOKEN", job["id_tokens"])
+            self.assertNotIn("resource_group", job)
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)
