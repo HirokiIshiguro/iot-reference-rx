@@ -68,6 +68,17 @@ def publish(out: Path, files: dict[str, Path]) -> None:
         print(f"  {out / name}  ({source.stat().st_size} bytes)")
 
 
+def build_rx671_bootloader(registry: dict, work: Path) -> Path:
+    """Build the RX671 boot loader in its project folder and return the image."""
+    cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
+    run(["pwsh", "-NoProfile", "-File", "tools/build_headless_rx671_bootloader.ps1", "-ProjectRoot", ROOT,
+         "-E2Studio", cli,
+         # The build script accepts only this workspace name below the workspace root.
+         "-Workspace", work / "e2ws_iot_ref_rx671_bootloader_2026_04_2",
+         "-LogFile", work / "bootloader_build.log", "-Python", sys.executable], timeout=900)
+    return ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx" / "HardwareDebug" / "boot_loader_rx671_ek.mot"
+
+
 def build_common(registry: dict, board: str, out: Path) -> None:
     """Provisioner that stores the signer's public key, plus the signer certificate."""
     target = registry["boards"][board]["target"]
@@ -80,14 +91,7 @@ def build_common(registry: dict, board: str, out: Path) -> None:
         publish(out, {name: public / name for name in (
             "public_signer_provisioner.mot", "signer.crt.pem", "signer.pub.pem")})
         if board == "rx671":
-            cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
-            run(["pwsh", "-NoProfile", "-File", "tools/build_headless_rx671_bootloader.ps1", "-ProjectRoot", ROOT,
-                 "-E2Studio", cli,
-                 # The build script accepts only this workspace name below the workspace root.
-                 "-Workspace", work / "e2ws_iot_ref_rx671_bootloader_2026_04_2",
-                 "-LogFile", work / "bootloader_build.log", "-Python", sys.executable], timeout=900)
-            publish(out, {"bootloader.mot": ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx" /
-                          "HardwareDebug" / "boot_loader_rx671_ek.mot"})
+            publish(out, {"bootloader.mot": build_rx671_bootloader(registry, work)})
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -148,6 +152,7 @@ def build_rx671_ota(registry: dict, tls: str, out: Path) -> None:
     candidate = f"candidate-{board['ota_candidate_version']}"
     try:
         work.mkdir(parents=True)
+        build_rx671_bootloader(registry, work)      # the image helper copies it and does not build it
         run([sys.executable, "tools/build_rx671_ota_images.py", "--baseline-version", board["ota_baseline_version"],
              "--candidate-version", board["ota_candidate_version"],
              "--tls-version", "TLSv1.3" if tls == "tls13" else "TLSv1.2", "--e2studio", cli,
@@ -163,6 +168,7 @@ def build_rx671_ota(registry: dict, tls: str, out: Path) -> None:
             "candidate.ota-signature.der": bundle / candidate / "aws_wifi_rx671_ek.ota-signature.der",
         })
     finally:
+        keep_logs(work, out)
         shutil.rmtree(bundle, ignore_errors=True)
         shutil.rmtree(work, ignore_errors=True)
 
