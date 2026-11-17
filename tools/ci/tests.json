@@ -36,7 +36,8 @@
       "fleet_demo_id": "rx65n-bg96-fp",
       "ota_bucket": "rx65n-ota",
       "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
-      "ota_candidate_version": "0.9.99"
+      "ota_candidate_version": "0.9.99",
+      "thing_variable": "AWS_IOT_THING_NAME_CK_RX65N_01"
     },
     "rx671": {
       "title": "EK-RX671 + Type 1YN (Wi-Fi)",
@@ -126,7 +127,19 @@
     "rx65n:sw:tls12:ota",
     "rx65n:sw:tls13:ota",
     "rx671:sw:tls12:ota",
-    "rx671:sw:tls13:ota"
+    "rx671:sw:tls13:ota",
+    "rx72n:tsip:tls12:mqtt",
+    "rx72n:tsip:tls13:mqtt",
+    "rx72n:tsip:tls12:fleet",
+    "rx72n:tsip:tls13:fleet",
+    "rx72n:tsip:tls12:ota",
+    "rx72n:tsip:tls13:ota",
+    "rx65n:tsip:tls12:mqtt",
+    "rx65n:tsip:tls13:mqtt",
+    "rx65n:tsip:tls12:fleet",
+    "rx65n:tsip:tls13:fleet",
+    "rx65n:tsip:tls12:ota",
+    "rx65n:tsip:tls13:ota"
   ],
   "smoke": [
     "rx72n:sw:tls12:mqtt",

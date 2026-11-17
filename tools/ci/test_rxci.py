@@ -124,6 +124,14 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(summary["builds"], ["rx671/software-tls13/ota"])
         self.assertEqual([need["job"] for need in jobs[name]["needs"]], ["build rx671/software-tls13/ota"])
 
+    def test_tsip_builds_are_per_tls_version(self):
+        names = ["rx72n:tsip:tls12:ota", "rx72n:tsip:tls13:ota"]
+        jobs, summary = rxci.child_pipeline(registry(names), "check", "^rx72n:tsip:", 1)
+        self.assertEqual(summary["builds"], ["rx72n/common", "rx72n/tsip-tls12/app", "rx72n/tsip-tls12/ota",
+                                             "rx72n/tsip-tls13/app", "rx72n/tsip-tls13/ota"])
+        self.assertEqual([need["job"] for need in jobs[names[1]]["needs"]],
+                         ["build rx72n/common", "build rx72n/tsip-tls13/app", "build rx72n/tsip-tls13/ota"])
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)

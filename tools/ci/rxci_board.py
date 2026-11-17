@@ -169,16 +169,38 @@ def required_file(variable: str) -> str:
     return path
 
 
+def private_key_arguments(board: Board, test: dict) -> list:
+    """A TSIP build never receives the private key in the clear; it gets the wrapped key afterwards."""
+    if test["backend"] == "tsip":
+        return ["--skip-private-key"]
+    return ["--key", required_file(board.config["private_key_variable"])]
+
+
+def provision_tsip_keys(board: Board, test: dict, *, reset_after: bool = False) -> None:
+    """Send the wrapped TLS keys of a TSIP build. The application must be waiting in its CLI.
+
+    The wrapped client key belongs to the fixed certificate of the board, so a TSIP test
+    cannot use a certificate created for the run.
+    """
+    if test["backend"] != "tsip":
+        return
+    board.run([sys.executable, TOOLS / "provision_tsip_over_uart.py", "--target", board.name, "--port", board.uart,
+               "--baud", board.baud, "--chunk-size", 128, "--timeout", 30, "--no-enter-cli",
+               "--reset-after" if reset_after else "--no-reset-after"], timeout=600,
+              label="provision the wrapped TLS keys (TSIP)")
+
+
 def mqtt_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     common, app = builds
     board.install(common, app, logs)
     provision = [sys.executable, TOOLS / "provision_rx72n.py", "--port", board.uart, "--baud", board.baud,
                  "--thing-name", board.config["thing"], "--endpoint", endpoint(registry, test["tls"]),
                  "--cert", required_file(board.config["certificate_variable"]),
-                 "--key", required_file(board.config["private_key_variable"]),
+                 *private_key_arguments(board, test),
                  "--reset-cmd", board.reset_command(), "--reset-after-open", "--boot-wait", 12,
                  "--cli-timeout", 25, "--attempts", 3, "--no-reset"]
     board.run(provision, timeout=400, label="provision the device credentials")
+    provision_tsip_keys(board, test, reset_after=True)
     observe = [sys.executable, TOOLS / "test_mqtt_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
                "--timeout", 600, "--reset-cmd", board.reset_command()]
     if test["tls"] == "tls13":
@@ -275,11 +297,12 @@ def ota_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path
         provision = [sys.executable, TOOLS / "provision_rx72n.py", "--port", board.uart, "--baud", board.baud,
                      "--thing-name", alias, "--endpoint", endpoint(registry, test["tls"]),
                      "--cert", required_file(config["certificate_variable"]),
-                     "--key", required_file(config["private_key_variable"]),
+                     *private_key_arguments(board, test),
                      "--codesigner-cert", candidate / "codesign_cert.pem", "--format",
                      "--reset-cmd", board.reset_command(), "--reset-after-open", "--boot-wait", 12,
                      "--cli-timeout", 25, "--attempts", 3, "--no-reset"]
         board.run(provision, timeout=400, label="provision the device credentials")
+        provision_tsip_keys(board, test)
         observe = [sys.executable, TOOLS / "test_ota.py", "--port", board.uart, "--baud", board.baud,
                    "--timeout", 900, "--expected-version", config["ota_candidate_version"],
                    "--reset-cmd", board.reset_command(), "--reset-after-open", "--no-reset",
@@ -313,8 +336,23 @@ def ota_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path
     programmer = ["--rfp-cli", board.rfp.executable, "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool,
                   "--rfp-interface", board.rfp.interface, "--rfp-speed", board.rfp.speed,
                   "--rfp-auth-id", board.rfp.auth_id]
+    tsip = test["backend"] == "tsip"
     try:
-        credentials = rxci_aws.create_thing(session, name, config["iot_policy"])
+        if tsip:
+            base = os.environ.get(config["thing_variable"], "")
+            if not base:
+                raise SystemExit(f"CI variable {config['thing_variable']} is not available to this job.")
+            name = f"{base}-ota-{os.environ.get('CI_PIPELINE_ID', '0')}-{os.environ.get('CI_JOB_ID', '0')}"
+            board.run([sys.executable, TOOLS / "manage_ephemeral_iot_thing.py", "create", "--base-thing-name", base,
+                       "--thing-name", name, "--region", rxci.REGION,
+                       "--owner-project-id", os.environ.get("CI_PROJECT_ID", "0"),
+                       "--owner-pipeline-id", os.environ.get("CI_PIPELINE_ID", "0"),
+                       "--owner-job-id", os.environ.get("CI_JOB_ID", "0"),
+                       "--meta-json", folder / "ephemeral_thing_meta.json"], timeout=300,
+                      label="create the thing of this run", env=rxci_aws.environment(session))
+            credentials = None
+        else:
+            credentials = rxci_aws.create_thing(session, name, config["iot_policy"])
         board.run([sys.executable, TOOLS / "create_bg96_ota_update.py", "--artifact-dir", folder, "--thing-name", name,
                    "--input-payload", candidate / "candidate_payload.bin",
                    "--file-version", config["ota_candidate_version"], "--bucket", config["ota_bucket"],
@@ -322,15 +360,22 @@ def ota_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path
                    "--code-signer-cert", candidate / "codesign_cert.pem", "--role-arn", role,
                    "--region", rxci.REGION, "--ota-id-prefix", "rx65n-bg96-ota"], timeout=600,
                   label="create the OTA update", env=rxci_aws.environment(session))
-        with tempfile.TemporaryDirectory(prefix="rxci-") as temporary:
-            certificate, key = Path(temporary) / "certificate.pem", Path(temporary) / "private_key.pem"
-            certificate.write_text(credentials["certificate"], encoding="utf-8")
-            key.write_text(credentials["private_key"], encoding="utf-8")
-            env = {"RX65N_BG96_AWS_IOT_THING_NAME": name, "AWS_IOT_CERT": str(certificate),
-                   "AWS_IOT_PRIVKEY": str(key), "RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE": endpoint(registry, test["tls"])}
-            board.run([*tool, "--action", "provision-mqtt", *serial, *programmer, "--provision-cli-timeout", 25,
-                       "--provision-char-delay", 0.002, "--provision-line-delay", 0.5,
-                       "--no-reset-after-provision"], timeout=400, label="provision the device credentials", env=env)
+        provision = [*tool, "--action", "provision-mqtt", *serial, *programmer, "--provision-cli-timeout", 25,
+                     "--provision-char-delay", 0.002, "--provision-line-delay", 0.5, "--no-reset-after-provision"]
+        env = {"RX65N_BG96_AWS_IOT_THING_NAME": name,
+               "RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE": endpoint(registry, test["tls"])}
+        if tsip:
+            # The tool takes the fixed certificate of the board from its CI variable.
+            board.run([*provision, "--skip-private-key"], timeout=400, label="provision the device credentials",
+                      env=env)
+            provision_tsip_keys(board, test)
+        else:
+            with tempfile.TemporaryDirectory(prefix="rxci-") as temporary:
+                certificate, key = Path(temporary) / "certificate.pem", Path(temporary) / "private_key.pem"
+                certificate.write_text(credentials["certificate"], encoding="utf-8")
+                key.write_text(credentials["private_key"], encoding="utf-8")
+                board.run(provision, timeout=400, label="provision the device credentials",
+                          env={**env, "AWS_IOT_CERT": str(certificate), "AWS_IOT_PRIVKEY": str(key)})
         board.run([sys.executable, TOOLS / "bg96_ota_prepare.py", *serial, *programmer,
                    "--code-signer-cert", candidate / "codesign_cert.pem"], timeout=300,
                   label="provision the code signing certificate")
@@ -385,17 +430,24 @@ def mqtt_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Pat
     target = ["--uart-port", board.uart, "--baud", board.baud, "--rfp-cli", board.rfp.executable,
               "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool, "--rfp-interface", board.rfp.interface,
               "--rfp-speed", board.rfp.speed, "--rfp-auth-id", board.rfp.auth_id]
+    provision = [*tool, "--action", "provision-mqtt", *target, "--provision-cli-timeout", 25,
+                 "--provision-char-delay", 0.002, "--provision-line-delay", 0.5, "--no-reset-after-provision"]
+    env = {"RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE": endpoint(registry, test["tls"])}
     try:
-        credentials = rxci_aws.create_thing(session, name, board.config["iot_policy"])
-        with tempfile.TemporaryDirectory(prefix="rxci-") as folder:
-            certificate, key = Path(folder) / "certificate.pem", Path(folder) / "private_key.pem"
-            certificate.write_text(credentials["certificate"], encoding="utf-8")
-            key.write_text(credentials["private_key"], encoding="utf-8")
-            env = {"RX65N_BG96_AWS_IOT_THING_NAME": name, "AWS_IOT_CERT": str(certificate),
-                   "AWS_IOT_PRIVKEY": str(key), "RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE": endpoint(registry, test["tls"])}
-            board.run([*tool, "--action", "provision-mqtt", *target, "--provision-cli-timeout", 25,
-                       "--provision-char-delay", 0.002, "--provision-line-delay", 0.5,
-                       "--no-reset-after-provision"], timeout=400, label="provision the device credentials", env=env)
+        if test["backend"] == "tsip":
+            # The fixed thing and certificate of the board: the tool reads them from their CI variables.
+            board.run([*provision, "--skip-private-key"], timeout=400, label="provision the device credentials",
+                      env=env)
+            provision_tsip_keys(board, test)
+        else:
+            credentials = rxci_aws.create_thing(session, name, board.config["iot_policy"])
+            with tempfile.TemporaryDirectory(prefix="rxci-") as folder:
+                certificate, key = Path(folder) / "certificate.pem", Path(folder) / "private_key.pem"
+                certificate.write_text(credentials["certificate"], encoding="utf-8")
+                key.write_text(credentials["private_key"], encoding="utf-8")
+                board.run(provision, timeout=400, label="provision the device credentials",
+                          env={**env, "RX65N_BG96_AWS_IOT_THING_NAME": name, "AWS_IOT_CERT": str(certificate),
+                               "AWS_IOT_PRIVKEY": str(key)})
         board.run([*tool, "--action", "reset-app", *target], timeout=120, label="start the application")
         observe = [*tool, "--action", "verify-mqtt", *target, "--require-mqtt-pubsub", "--app-startup-timeout", 420,
                    "--mqtt-timeout", 900, "--app-reset-retries", 2]

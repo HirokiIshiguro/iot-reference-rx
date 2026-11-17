@@ -11,6 +11,7 @@ directory, so a test job can take what it needs from the artifacts of the build 
   rx65n/software/app             signed application and the boot loader
   rx65n/software/fleet           the same with the Fleet Provisioning demo enabled
   rx65n/software/ota             OTA candidate payload, its signature and the code signing certificate
+  rx72n|rx65n/tsip-<tls>/<kind>  the same three kinds built from the TSIP project; the TLS version is compiled in
   rx671/software-<tls>/app       signed application with the Wi-Fi and device credentials compiled in
   rx671/software-<tls>/fleet     signed application with the Wi-Fi and claim credentials compiled in
   rx671/software-<tls>/ota       OTA bundle without credentials: provisioner, boot loader, baseline and candidate
@@ -96,25 +97,31 @@ def build_common(registry: dict, board: str, out: Path) -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def build_rx72n_ota(registry: dict, backend: str, out: Path) -> None:
+def tls_arguments(backend: str, tls: str, flag: str) -> list[str]:
+    """A TSIP build selects its mbed TLS configuration by the TLS version; a software build does not."""
+    return [flag, "TLSv1.3"] if backend == "tsip" and tls == "tls13" else []
+
+
+def build_rx72n_ota(registry: dict, backend: str, tls: str, out: Path) -> None:
     """Application with a higher version number, packaged as the payload of an AWS IoT OTA update."""
-    work = workspace(registry, f"rx72n-{backend}-ota")
+    work = workspace(registry, f"rx72n-{backend}{tls}-ota")
     cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
     version = registry["boards"]["rx72n"]["ota_candidate_version"]
     try:
         work.mkdir(parents=True)
         run([sys.executable, "tools/build_ota_candidate.py", "--repo-root", ROOT, "--version", version,
              "--output-prefix", work / "candidate", "--signing-key", SIGNING_KEY, "--e2studio-cli", cli,
-             "--workspace", work / "e2ws", "--tls-backend", "software" if backend == "software" else "tsip",
+             "--workspace", work / "e2ws", "--tls-backend", backend,
+             *tls_arguments(backend, tls, "--require-tls-version"),
              "--code-sign-cert-out", work / "codesign_cert.pem"], timeout=1800)
         publish(out, {"candidate.rsu": work / "candidate.rsu", "codesign_cert.pem": work / "codesign_cert.pem"})
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def build_rx65n_app(registry: dict, backend: str, kind: str, out: Path) -> None:
+def build_rx65n_app(registry: dict, backend: str, tls: str, kind: str, out: Path) -> None:
     project = "aws_bg96_ck_rx65n" if backend == "software" else "aws_bg96_ck_rx65n_tsip"
-    work = workspace(registry, f"rx65n-{backend}-{kind}")
+    work = workspace(registry, f"rx65n-{backend}{tls}-{kind}")
     log = ROOT / "rx65n_bg96_e2studio_build.log"
     boot_dir = ROOT / "Projects" / "boot_loader_ck_rx65n" / "e2studio_ccrx" / "HardwareDebug"
     app_mot = ROOT / "Projects" / project / "e2studio_ccrx" / "HardwareDebug" / f"{project}.mot"
@@ -128,7 +135,7 @@ def build_rx65n_app(registry: dict, backend: str, kind: str, out: Path) -> None:
                  if kind == "fleet" else [])
         run(["pwsh", "-NoProfile", "-File", script, "-ProjectRoot", ROOT,
              "-E2Studio", cli, "-Workspace", work, "-LogFile", log,
-             "-TlsBackend", "software" if backend == "software" else "tsip", *extra], timeout=2400)
+             "-TlsBackend", backend, *tls_arguments(backend, tls, "-RequireTlsVersion"), *extra], timeout=2400)
         run([sys.executable, "tools/shift_srec_addresses.py", "--input", boot, "--output", boot_bank1,
              "--range-start", "0xFFFC0000", "--range-end", "0xFFFFFFFF", "--shift=-0x100000",
              "--drop-out-of-range"], timeout=120)
@@ -189,10 +196,10 @@ def encrypt_file(source: Path, target: Path, key: bytes) -> None:
     target.write_bytes(nonce + AESGCM(key).encrypt(nonce, source.read_bytes(), b"rxci"))
 
 
-def build_rx65n_ota(registry: dict, backend: str, out: Path) -> None:
+def build_rx65n_ota(registry: dict, backend: str, tls: str, out: Path) -> None:
     """OTA candidate of CK-RX65N. No credentials are compiled in: the board keeps using its data flash."""
     project = "aws_bg96_ck_rx65n" if backend == "software" else "aws_bg96_ck_rx65n_tsip"
-    work = workspace(registry, f"rx65n-{backend}-ota")
+    work = workspace(registry, f"rx65n-{backend}{tls}-ota")
     cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
     version = registry["boards"]["rx65n"]["ota_candidate_version"]
     token = version.replace(".", "_")
@@ -202,8 +209,8 @@ def build_rx65n_ota(registry: dict, backend: str, out: Path) -> None:
         run([sys.executable, "tools/build_bg96_ota_candidate.py", "--repo-root", ROOT,
              "--app-dir", f"Projects/{project}/e2studio_ccrx", "--version", version, "--output-dir", work / "out",
              "--signing-key", SIGNING_KEY, "--e2studio-cli", cli, "--workspace", work / "e2ws",
-             "--e2studio-timeout", "1800", "--tls-backend", "software" if backend == "software" else "tsip"],
-            timeout=2400)
+             "--e2studio-timeout", "1800", "--tls-backend", backend,
+             *tls_arguments(backend, tls, "--require-tls-version")], timeout=2400)
         publish(out, {"candidate_payload.bin": work / "out" / f"bg96_{token}_ota_payload.bin",
                       "candidate_payload.sig.der": work / "out" / f"bg96_{token}_ota_payload.sig.der",
                       "codesign_cert.pem": work / "out" / "bg96_ota_codesign_cert.pem"})
@@ -264,9 +271,9 @@ def build_rx671_app(registry: dict, tls: str, kind: str, out: Path) -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def build_rx72n_app(registry: dict, backend: str, kind: str, out: Path) -> None:
+def build_rx72n_app(registry: dict, backend: str, tls: str, kind: str, out: Path) -> None:
     project = "aws_ether_rx72n_envision_kit" if backend == "software" else "aws_ether_rx72n_envision_kit_tsip"
-    work = workspace(registry, f"rx72n-{backend}-{kind}")
+    work = workspace(registry, f"rx72n-{backend}{tls}-{kind}")
     log = ROOT / "rx72n_e2studio_build.log"
     boot_dir = ROOT / "Projects" / "boot_loader_rx72n_envision_kit" / "e2studio_ccrx" / "HardwareDebug"
     app_mot = ROOT / "Projects" / project / "e2studio_ccrx" / "HardwareDebug" / f"{project}.mot"
@@ -279,7 +286,7 @@ def build_rx72n_app(registry: dict, backend: str, kind: str, out: Path) -> None:
         extra = ["-FleetDemoId", registry["boards"]["rx72n"]["thing"] + "-fp"] if kind == "fleet" else []
         run(["pwsh", "-NoProfile", "-File", script, "-ProjectRoot", ROOT,
              "-E2Studio", cli, "-Workspace", work, "-LogFile", log, "-E2StudioTimeoutSeconds", "1200",
-             "-TlsBackend", "software" if backend == "software" else "tsip", *extra], timeout=1500)
+             "-TlsBackend", backend, *tls_arguments(backend, tls, "-RequireTlsVersion"), *extra], timeout=1500)
         run([sys.executable, "tools/shift_srec_addresses.py", "--input", boot, "--output", boot_bank1,
              "--range-start", "0xFFE00000", "--range-end", "0xFFFFFFFF", "--shift=-0x200000",
              "--drop-out-of-range"], timeout=120)
@@ -300,14 +307,15 @@ def build(registry: dict, variant: str, out: Path) -> None:
         raise SystemExit(f"Unknown board in build variant: {variant}")
     if name == "common":
         return build_common(registry, board, out)
-    if board == "rx72n" and name in ("software/app", "software/fleet"):
-        return build_rx72n_app(registry, "software", name.split("/")[1], out)
-    if board == "rx72n" and name == "software/ota":
-        return build_rx72n_ota(registry, "software", out)
-    if board == "rx65n" and name in ("software/app", "software/fleet"):
-        return build_rx65n_app(registry, "software", name.split("/")[1], out)
-    if board == "rx65n" and name == "software/ota":
-        return build_rx65n_ota(registry, "software", out)
+    flavor, _, kind = name.partition("/")
+    backend, _, tls = flavor.partition("-")
+    # RX72N and RX65N: "software" serves both TLS versions; "tsip-tls12" and "tsip-tls13" differ.
+    if board in ("rx72n", "rx65n") and (flavor == "software" or (backend == "tsip" and tls in ("tls12", "tls13"))):
+        app, ota = ((build_rx72n_app, build_rx72n_ota) if board == "rx72n" else (build_rx65n_app, build_rx65n_ota))
+        if kind in ("app", "fleet"):
+            return app(registry, backend, tls, kind, out)
+        if kind == "ota":
+            return ota(registry, backend, tls, out)
     if board == "rx671" and name in ("software-tls12/ota", "software-tls13/ota"):
         return build_rx671_ota(registry, name.split("/")[0].split("-")[1], out)
     if board == "rx671" and name.startswith("software-tls1") and name.endswith(("/app", "/fleet")):
