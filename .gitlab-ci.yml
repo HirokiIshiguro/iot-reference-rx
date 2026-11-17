@@ -29,9 +29,17 @@ workflow:
     # A branch with an open merge request runs only the merge request pipeline.
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
+    # A pipeline that a person or a schedule started keeps running when new commits arrive.
     - if: $CI_PIPELINE_SOURCE == "schedule"
+      auto_cancel:
+        on_new_commit: none
       variables:
         DEFAULT_PROFILE: full
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"
+      auto_cancel:
+        on_new_commit: none
+      variables:
+        DEFAULT_PROFILE: check
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       variables:
         DEFAULT_PROFILE: build
