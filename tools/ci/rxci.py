@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 PROFILES = ("check", "build", "smoke", "full", "doctor")
 TOOL = "tools/ci/rxci.py"
 # The shared OIDC setup of the oss group: jobs issue GITLAB_OIDC_TOKEN and assume the
@@ -114,10 +115,15 @@ def load_registry(path: Path | None = None) -> dict:
 
 
 def build_variant(test: dict) -> str:
-    """Firmware variant a test needs. Software builds do not depend on the TLS version."""
+    """Application variant a test needs. Software builds do not depend on the TLS version."""
     backend = "software" if test["backend"] == "sw" else f"tsip-{test['tls']}"
     kind = {"mqtt": "app", "ota": "ota", "fleet": "fleet"}[test["feature"]]
     return f"{test['board']}/{backend}/{kind}"
+
+
+def build_variants(test: dict) -> list[str]:
+    """Every build a test needs: the per-commit files of the board and its application."""
+    return [f"{test['board']}/common", build_variant(test)]
 
 
 def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list[dict]]:
@@ -144,10 +150,11 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
         names = ", ".join(test["name"] for test in pending)
         raise SystemExit(f"Selected tests are not implemented yet: {names}")
 
-    if pattern:
-        variants = sorted({build_variant(test) for test in run})
-    elif profile in ("build", "smoke", "full"):
-        variants = sorted({build_variant(test) for test in registry["tests"] if test["ready"]})
+    if pattern or profile == "smoke":
+        variants = sorted({variant for test in run for variant in build_variants(test)})
+    elif profile in ("build", "full"):
+        variants = sorted({variant for test in registry["tests"] if test["ready"]
+                           for variant in build_variants(test)})
     else:
         variants = []
 
@@ -162,18 +169,20 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
         },
     }
     for variant in variants:
-        board = variant.split("/")[0]
         jobs[f"build {variant}"] = {
             "stage": "build",
             "tags": registry["runners"]["build"],
             "resource_group": registry["build_resource_group"],
             "needs": [],
-            "variables": {"GIT_STRATEGY": "fetch", "GIT_SUBMODULE_STRATEGY": "none"},
+            # A fresh clone keeps the line endings of the dependencies as committed (CC-RX needs them).
+            "variables": {"GIT_STRATEGY": "clone", "GIT_SUBMODULE_STRATEGY": "normal",
+                          "GIT_CONFIG_COUNT": "3",
+                          "GIT_CONFIG_KEY_0": "core.longpaths", "GIT_CONFIG_VALUE_0": "true",
+                          "GIT_CONFIG_KEY_1": "core.autocrlf", "GIT_CONFIG_VALUE_1": "false",
+                          "GIT_CONFIG_KEY_2": "core.eol", "GIT_CONFIG_VALUE_2": "lf"},
             "script": [f"python {TOOL} build {variant} --out out/{variant}"],
-            "artifacts": {"paths": [f"out/{variant}/"], "expire_in": "3 days"},
-            "timeout": "40 minutes",
-            "interruptible": True,
-            "rxci_board": board,
+            "artifacts": {"when": "always", "paths": [f"out/{variant}/"], "expire_in": "3 days"},
+            "timeout": "50 minutes",
         }
     for test in run:
         board = registry["boards"][test["board"]]
@@ -183,18 +192,15 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
                 "stage": "test",
                 "tags": board["runner_tags"],
                 "resource_group": board["resource_group"],
-                "needs": [{"job": f"build {build_variant(test)}", "artifacts": True}],
+                "needs": [{"job": f"build {variant}", "artifacts": True} for variant in build_variants(test)],
+                "id_tokens": OIDC,
                 "variables": {"GIT_STRATEGY": "fetch", "GIT_SUBMODULE_STRATEGY": "none", "GIT_DEPTH": "1"},
-                "script": [f"python3 {TOOL} test {test['name']} --artifacts out/{build_variant(test)} --log-dir out/logs"],
+                "script": [f"python3 {TOOL} test {test['name']} --out out --log-dir out/logs"],
                 "artifacts": {"when": "always", "paths": ["out/logs/"],
                               "reports": {"junit": "out/logs/junit.xml"}, "expire_in": "14 days"},
-                "timeout": "30 minutes",
+                "timeout": "40 minutes",
                 "interruptible": False,
             }
-    for job in jobs.values():
-        if isinstance(job, dict):
-            job.pop("rxci_board", None)
-
     if profile == "doctor":
         runners = {"check runner": registry["runners"]["check"], "build runner": registry["runners"]["build"]}
         for name, board in registry["boards"].items():
@@ -203,13 +209,14 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
                 if config["runner_tags"] == board["runner_tags"]), board["runner_tags"])
         for name, tags in runners.items():
             python = "python" if "os-windows" in tags else "python3"
+            role = "build" if "os-windows" in tags else ("board" if "hw-raspi" in tags else "check")
             jobs[f"doctor: {name}"] = {
                 "stage": "check",
                 "tags": tags,
                 "needs": [],
                 "id_tokens": OIDC,
                 "variables": {"GIT_STRATEGY": "fetch", "GIT_SUBMODULE_STRATEGY": "none", "GIT_DEPTH": "1"},
-                "script": [f"{python} {TOOL} doctor"],
+                "script": [f"{python} {TOOL} doctor --role {role}"],
             }
 
     summary = {
@@ -258,19 +265,17 @@ def command_doctor(args: argparse.Namespace) -> int:
             report(True, f"python module {module}")
         except ImportError:
             report(False, f"python module {module}")
-    if os.name == "nt":
-        cli = os.environ.get("E2STUDIO_CLI", "")
-        report(bool(cli) and Path(cli).exists(), "E2STUDIO_CLI points to e2studio-cli")
+    registry = load_registry()
+    if args.role == "build":
+        cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
+        report(Path(cli).exists(), "e2 studio command line", cli)
+        report(Path(registry["workspace_root"]).is_dir(), "workspace root", registry["workspace_root"])
         report(shutil.which("pwsh") is not None, "pwsh")
-    else:
+    if args.role == "board":
         report(shutil.which("rfp-cli") is not None, "rfp-cli on PATH")
-        report(shutil.which("flock") is not None, "flock")
         serial_dir = Path("/dev/serial/by-id")
         count = len(list(serial_dir.iterdir())) if serial_dir.is_dir() else 0
         print(f"info     USB serial devices: {count}")
-        for name, board in load_registry()["boards"].items():
-            lock = Path(board["lock"])
-            print(f"info     lock of {name}: {'present' if lock.exists() else 'absent'}")
     try:
         session = aws_session()
         identity = session.client("sts").get_caller_identity()
@@ -282,6 +287,27 @@ def command_doctor(args: argparse.Namespace) -> int:
     except Exception as error:  # botocore errors carry the reason in their text
         report(False, "AWS access", f"{type(error).__name__}: {str(error)[:160]}")
     return 1 if failures else 0
+
+
+def command_build(args: argparse.Namespace) -> int:
+    import rxci_build
+
+    rxci_build.build(load_registry(), args.variant, Path(args.out).resolve())
+    return 0
+
+
+def command_test(args: argparse.Namespace) -> int:
+    enter_venv()
+    import rxci_board
+
+    registry = load_registry()
+    matches = [test for test in registry["tests"] if test["name"] == args.name]
+    if not matches:
+        raise SystemExit(f"Unknown test: {args.name}")
+    test = matches[0]
+    out = Path(args.out).resolve()
+    common, app = (out / variant for variant in build_variants(test))
+    return rxci_board.run_test(registry, test, common, app, Path(args.log_dir).resolve())
 
 
 def command_list(args: argparse.Namespace) -> int:
@@ -308,7 +334,19 @@ def main(argv: list[str] | None = None) -> int:
     listing.set_defaults(run=command_list)
 
     doctor = commands.add_parser("doctor", help="print what this runner has (tools, modules, AWS access)")
+    doctor.add_argument("--role", choices=("check", "build", "board"), default="check")
     doctor.set_defaults(run=command_doctor)
+
+    build = commands.add_parser("build", help="build one firmware variant (Windows runner)")
+    build.add_argument("variant")
+    build.add_argument("--out", required=True)
+    build.set_defaults(run=command_build)
+
+    test = commands.add_parser("test", help="run one test on its board, from flashing to parking")
+    test.add_argument("name")
+    test.add_argument("--out", default="out", help="directory that holds the build outputs")
+    test.add_argument("--log-dir", default="out/logs")
+    test.set_defaults(run=command_test)
 
     args = parser.parse_args(argv)
     return args.run(args)

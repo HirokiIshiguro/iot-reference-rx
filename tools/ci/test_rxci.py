@@ -42,15 +42,21 @@ class PlanTests(unittest.TestCase):
         name = "rx671:sw:tls12:mqtt"
         jobs, summary = rxci.child_pipeline(registry([name, "rx72n:sw:tls12:mqtt"]), "check", "^rx671:sw:tls12:mqtt$", 1)
         self.assertEqual(summary["tests"], [name])
-        self.assertEqual(summary["builds"], ["rx671/software/app"])
-        self.assertEqual(jobs[name]["needs"], [{"job": "build rx671/software/app", "artifacts": True}])
+        self.assertEqual(summary["builds"], ["rx671/common", "rx671/software/app"])
+        self.assertEqual(jobs[name]["needs"], [{"job": "build rx671/common", "artifacts": True},
+                                               {"job": "build rx671/software/app", "artifacts": True}])
 
     def test_repeat_makes_one_job_per_run_and_one_build(self):
         name = "rx72n:sw:tls12:mqtt"
         jobs, summary = rxci.child_pipeline(registry([name]), "check", "^rx72n:sw:tls12:mqtt$", 3)
         runs = [job for job in jobs if job.startswith(name)]
         self.assertEqual(runs, [f"{name} #1", f"{name} #2", f"{name} #3"])
-        self.assertEqual(summary["builds"], ["rx72n/software/app"])
+        self.assertEqual(summary["builds"], ["rx72n/common", "rx72n/software/app"])
+
+    def test_two_tls_versions_of_software_share_every_build(self):
+        ready = ["rx72n:sw:tls12:mqtt", "rx72n:sw:tls13:mqtt"]
+        _, summary = rxci.child_pipeline(registry(ready), "full", "", 1)
+        self.assertEqual(summary["builds"], ["rx72n/common", "rx72n/software/app"])
 
     def test_tests_of_one_board_share_one_resource_group(self):
         ready = ["rx72n:sw:tls12:mqtt", "rx72n:sw:tls13:mqtt", "rx671:sw:tls12:mqtt"]
