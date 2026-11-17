@@ -114,16 +114,24 @@ def load_registry(path: Path | None = None) -> dict:
     return registry
 
 
-def build_variant(test: dict) -> str:
-    """Application variant a test needs. Software builds do not depend on the TLS version."""
-    backend = "software" if test["backend"] == "sw" else f"tsip-{test['tls']}"
+def build_variant(test: dict, registry: dict | None = None) -> str:
+    """Application variant a test needs.
+
+    A software build serves both TLS versions unless the board compiles the version in
+    (software_build_per_tls in tests.json).
+    """
+    per_tls = bool(registry and registry["boards"][test["board"]].get("software_build_per_tls"))
+    if test["backend"] == "sw":
+        backend = f"software-{test['tls']}" if per_tls else "software"
+    else:
+        backend = f"tsip-{test['tls']}"
     kind = {"mqtt": "app", "ota": "ota", "fleet": "fleet"}[test["feature"]]
     return f"{test['board']}/{backend}/{kind}"
 
 
-def build_variants(test: dict) -> list[str]:
+def build_variants(test: dict, registry: dict | None = None) -> list[str]:
     """Every build a test needs: the per-commit files of the board and its application."""
-    return [f"{test['board']}/common", build_variant(test)]
+    return [f"{test['board']}/common", build_variant(test, registry)]
 
 
 def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list[dict]]:
@@ -151,10 +159,10 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
         raise SystemExit(f"Selected tests are not implemented yet: {names}")
 
     if pattern or profile == "smoke":
-        variants = sorted({variant for test in run for variant in build_variants(test)})
+        variants = sorted({variant for test in run for variant in build_variants(test, registry)})
     elif profile in ("build", "full"):
         variants = sorted({variant for test in registry["tests"] if test["ready"]
-                           for variant in build_variants(test)})
+                           for variant in build_variants(test, registry)})
     else:
         variants = []
 
@@ -192,7 +200,7 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int) -> t
                 "stage": "test",
                 "tags": board["runner_tags"],
                 "resource_group": board["resource_group"],
-                "needs": [{"job": f"build {variant}", "artifacts": True} for variant in build_variants(test)],
+                "needs": [{"job": f"build {variant}", "artifacts": True} for variant in build_variants(test, registry)],
                 "id_tokens": OIDC,
                 "variables": {"GIT_STRATEGY": "fetch", "GIT_SUBMODULE_STRATEGY": "none", "GIT_DEPTH": "1"},
                 "script": [f"python3 {TOOL} test {test['name']} --out out --log-dir out/logs"],
@@ -306,7 +314,7 @@ def command_test(args: argparse.Namespace) -> int:
         raise SystemExit(f"Unknown test: {args.name}")
     test = matches[0]
     out = Path(args.out).resolve()
-    common, app = (out / variant for variant in build_variants(test))
+    common, app = (out / variant for variant in build_variants(test, registry))
     return rxci_board.run_test(registry, test, common, app, Path(args.log_dir).resolve())
 
 

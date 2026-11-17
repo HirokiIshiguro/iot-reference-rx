@@ -4,7 +4,12 @@
     "rx72n": {
       "title": "RX72N Envision Kit (Ethernet)",
       "target": "rx72n-ethernet",
-      "runner_tags": ["exec-shell", "os-linux", "hw-raspi", "dev-ek-rx72n-set1"],
+      "runner_tags": [
+        "exec-shell",
+        "os-linux",
+        "hw-raspi",
+        "dev-ek-rx72n-set1"
+      ],
       "resource_group": "board-rx72n",
       "thing": "rx72n-02",
       "certificate_variable": "AWS_CLIENT_CERT_RX72N_02",
@@ -13,33 +18,80 @@
     "rx65n": {
       "title": "CK-RX65N V1 + BG96 (cellular)",
       "target": "rx65n-bg96",
-      "runner_tags": ["exec-shell", "os-linux", "hw-raspi", "dev-ck-rx65n-bg96"],
+      "runner_tags": [
+        "exec-shell",
+        "os-linux",
+        "hw-raspi",
+        "dev-ck-rx65n-bg96"
+      ],
       "resource_group": "board-rx65n"
     },
     "rx671": {
       "title": "EK-RX671 + Type 1YN (Wi-Fi)",
       "target": "rx671-wifi",
-      "runner_tags": ["exec-shell", "os-linux", "hw-raspi", "dev-ek-rx671"],
-      "resource_group": "board-rx671"
+      "runner_tags": [
+        "exec-shell",
+        "os-linux",
+        "hw-raspi",
+        "dev-ek-rx671"
+      ],
+      "resource_group": "board-rx671",
+      "software_build_per_tls": true
     }
   },
   "runners": {
-    "check": ["exec-shell", "os-linux", "ef-saffti-001-rpi-linux-004"],
-    "build": ["exec-shell", "os-windows", "ccrx", "ef-saffti-001-pc-windows-001"]
+    "check": [
+      "exec-shell",
+      "os-linux",
+      "ef-saffti-001-rpi-linux-004"
+    ],
+    "build": [
+      "exec-shell",
+      "os-windows",
+      "ccrx",
+      "ef-saffti-001-pc-windows-001"
+    ]
   },
   "build_resource_group": "windows-ccrx-build",
   "e2studio_cli": "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe",
   "workspace_root": "C:/ai/codex/ws",
   "endpoints": {
-    "tls12": {"variable": "AWS_IOT_ENDPOINT"},
-    "tls13": {"value": "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"}
+    "tls12": {
+      "variable": "AWS_IOT_ENDPOINT"
+    },
+    "tls13": {
+      "value": "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+    }
   },
   "axes": {
-    "board": ["rx72n", "rx65n", "rx671"],
-    "backend": ["sw", "tsip"],
-    "tls": ["tls12", "tls13"],
-    "feature": ["mqtt", "ota", "fleet"]
+    "board": [
+      "rx72n",
+      "rx65n",
+      "rx671"
+    ],
+    "backend": [
+      "sw",
+      "tsip"
+    ],
+    "tls": [
+      "tls12",
+      "tls13"
+    ],
+    "feature": [
+      "mqtt",
+      "ota",
+      "fleet"
+    ]
   },
-  "ready": ["rx72n:sw:tls12:mqtt", "rx72n:sw:tls13:mqtt"],
-  "smoke": ["rx72n:sw:tls12:mqtt", "rx65n:sw:tls12:mqtt", "rx671:sw:tls12:mqtt"]
+  "ready": [
+    "rx72n:sw:tls12:mqtt",
+    "rx72n:sw:tls13:mqtt",
+    "rx671:sw:tls12:mqtt",
+    "rx671:sw:tls13:mqtt"
+  ],
+  "smoke": [
+    "rx72n:sw:tls12:mqtt",
+    "rx65n:sw:tls12:mqtt",
+    "rx671:sw:tls12:mqtt"
+  ]
 }

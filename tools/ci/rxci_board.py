@@ -88,12 +88,16 @@ class Board:
 
         sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True,
                              text=True).stdout.strip()
+        # RX72N builds the boot loader together with the application; RX671 builds it once per commit.
+        bootloader = next(folder / "bootloader.mot" for folder in (app, common)
+                          if (folder / "bootloader.mot").is_file())
+        bank1 = bootloader.with_name("bootloader_bank1.mot")
         self.run([*self.rfp.common_command(), "-erase-chip", "-reset", "-noquery"], label="erase chip")
         args = SimpleNamespace(
             artifact_dir=logs / "provisioner", rfp_cli=self.rfp.executable, rfp_device=self.rfp.device,
             rfp_tool=self.rfp.tool, rfp_interface=self.rfp.interface, rfp_speed=self.rfp.speed,
             rfp_auth_id=self.rfp.auth_id, rfp_timeout=RFP_SECONDS,
-            provisioner_mot=common / "public_signer_provisioner.mot", bootloader_mot=app / "bootloader.mot",
+            provisioner_mot=common / "public_signer_provisioner.mot", bootloader_mot=bootloader,
             port=self.uart, baud=self.baud, boot_timeout=45, command_timeout=15, commit_timeout=30,
             char_delay=0.002, codesigner_certificate=common / "signer.crt.pem",
             codesigner_public_key=common / "signer.pub.pem")
@@ -102,8 +106,8 @@ class Board:
             runner=lambda command, *, label, timeout: self.run(command, timeout=timeout, label=label))
         if summary.get("success") is not True:
             raise RuntimeError("Storing the signer's public key did not complete.")
-        self.run(self.rfp.program_command(app / "bootloader_bank1.mot", leave_reset=True),
-                 label="boot loader, bank 1")
+        if bank1.is_file():
+            self.run(self.rfp.program_command(bank1, leave_reset=True), label="boot loader, bank 1")
         command = [sys.executable, TOOLS / "test_uart_download_rx72n.py", "--rsu", app / "app.rsu",
                    "--port", self.uart, "--baud", self.baud, "--timeout", 420, "--post-tx-wait", 120,
                    "--wait-for-ready", "--ready-timeout", 90,
@@ -145,7 +149,18 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, common: Path, app: Path
     board.run(observe, timeout=700, label="observe MQTT on the UART")
 
 
-RECIPES = {("rx72n", "mqtt"): mqtt_rx72n}
+def mqtt_rx671(registry: dict, board: Board, test: dict, common: Path, app: Path, logs: Path) -> None:
+    """The application carries its credentials, so the test starts right after the install."""
+    board.install(common, app, logs)
+    observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
+               "--timeout", 300, "--mode", "mqtt", "--reset-cmd", board.reset_command(), "--startup-retries", 1,
+               "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml"]
+    if test["tls"] == "tls13":
+        observe += ["--require-tls-version", "TLSv1.3"]
+    board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART")
+
+
+RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx671", "mqtt"): mqtt_rx671}
 
 
 def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:

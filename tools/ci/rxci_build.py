@@ -3,8 +3,10 @@
 A variant is "<board>/<name>". Every variant writes its files into one output
 directory, so a test job can take what it needs from the artifacts of the build jobs:
 
-  <board>/common          provisioner image, signer certificate and public key (one per commit)
-  <board>/software/app    signed application image and the boot loader (one per commit)
+  <board>/common                 provisioner image, signer certificate and public key (one per commit);
+                                 on RX671 also the boot loader
+  rx72n/software/app             signed application and the boot loader
+  rx671/software-<tls>/app       signed application with the Wi-Fi and device credentials compiled in
 """
 from __future__ import annotations
 
@@ -51,6 +53,42 @@ def build_common(registry: dict, board: str, out: Path) -> None:
              "--signing-key", SIGNING_KEY], timeout=1800)
         publish(out, {name: public / name for name in (
             "public_signer_provisioner.mot", "signer.crt.pem", "signer.pub.pem")})
+        if board == "rx671":
+            cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
+            run(["pwsh", "-NoProfile", "-File", "tools/build_headless_rx671_bootloader.ps1", "-ProjectRoot", ROOT,
+                 "-E2Studio", cli, "-Workspace", work / "e2ws-boot",
+                 "-LogFile", work / "bootloader_build.log", "-Python", sys.executable], timeout=900)
+            publish(out, {"bootloader.mot": ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx" /
+                          "HardwareDebug" / "boot_loader_rx671_ek.mot"})
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def build_rx671_app(registry: dict, tls: str, out: Path) -> None:
+    """MQTT application of EK-RX671. The Wi-Fi and device credentials are compiled in from CI variables."""
+    for name in ("RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE", "RX671_EK_AWS_IOT_THING_NAME",
+                 "RX671_EK_AWS_IOT_CERT_PEM", "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM"):
+        if not os.environ.get(name):
+            raise SystemExit(f"CI variable {name} is not available to this job.")
+    entry = registry["endpoints"][tls]
+    endpoint = entry.get("value") or os.environ.get("RX671_EK_AWS_IOT_ENDPOINT") or os.environ.get(entry["variable"], "")
+    if not endpoint:
+        raise SystemExit(f"The AWS IoT endpoint for {tls} is not set.")
+    work = workspace(registry, f"rx671-{tls}")
+    log = ROOT / "rx671_wifi_e2studio_build.log"
+    mot = ROOT / "Projects" / "aws_wifi_rx671_ek" / "e2studio_ccrx" / "HardwareDebug" / "aws_wifi_rx671_ek.mot"
+    rsu = ROOT / "rx671_app.rsu"
+    cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
+    command = ["pwsh", "-NoProfile", "-File", "tools/build_headless_rx671_wifi.ps1", "-ProjectRoot", ROOT,
+               "-E2Studio", cli, "-Workspace", work, "-LogFile", log, "-WlanAllowBusSleepDelayMs", "600000",
+               "-UseLocalJoinConfig", "-UseAwsIotLocalConfig", "-AwsIotEndpoint", endpoint]
+    if tls == "tls13":
+        command += ["-RequireTlsVersion", "TLSv1.3"]
+    try:
+        run(command, timeout=1500)
+        run([sys.executable, "tools/build_rx671_fwup_v2_rsu.py", "--mot", mot, "--key", SIGNING_KEY,
+             "--output", rsu], timeout=120)
+        publish(out, {"app.rsu": rsu})
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -91,4 +129,6 @@ def build(registry: dict, variant: str, out: Path) -> None:
         return build_common(registry, board, out)
     if board == "rx72n" and name == "software/app":
         return build_rx72n_app(registry, "software", out)
+    if board == "rx671" and name in ("software-tls12/app", "software-tls13/app"):
+        return build_rx671_app(registry, name.split("/")[0].split("-")[1], out)
     raise SystemExit(f"Build variant is not implemented yet: {variant}")

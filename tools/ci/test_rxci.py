@@ -24,11 +24,18 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(sum(test["board"] == board for test in tests), 12)
 
     def test_software_build_is_shared_between_tls_versions(self):
-        tests = {test["name"]: test for test in rxci.load_registry()["tests"]}
-        self.assertEqual(rxci.build_variant(tests["rx72n:sw:tls12:mqtt"]),
-                         rxci.build_variant(tests["rx72n:sw:tls13:mqtt"]))
-        self.assertNotEqual(rxci.build_variant(tests["rx72n:tsip:tls12:mqtt"]),
-                            rxci.build_variant(tests["rx72n:tsip:tls13:mqtt"]))
+        data = rxci.load_registry()
+        tests = {test["name"]: test for test in data["tests"]}
+        self.assertEqual(rxci.build_variant(tests["rx72n:sw:tls12:mqtt"], data),
+                         rxci.build_variant(tests["rx72n:sw:tls13:mqtt"], data))
+        self.assertNotEqual(rxci.build_variant(tests["rx72n:tsip:tls12:mqtt"], data),
+                            rxci.build_variant(tests["rx72n:tsip:tls13:mqtt"], data))
+
+    def test_rx671_software_build_depends_on_the_tls_version(self):
+        data = rxci.load_registry()
+        tests = {test["name"]: test for test in data["tests"]}
+        self.assertEqual(rxci.build_variant(tests["rx671:sw:tls12:mqtt"], data), "rx671/software-tls12/app")
+        self.assertEqual(rxci.build_variant(tests["rx671:sw:tls13:mqtt"], data), "rx671/software-tls13/app")
 
 
 class PlanTests(unittest.TestCase):
@@ -42,9 +49,9 @@ class PlanTests(unittest.TestCase):
         name = "rx671:sw:tls12:mqtt"
         jobs, summary = rxci.child_pipeline(registry([name, "rx72n:sw:tls12:mqtt"]), "check", "^rx671:sw:tls12:mqtt$", 1)
         self.assertEqual(summary["tests"], [name])
-        self.assertEqual(summary["builds"], ["rx671/common", "rx671/software/app"])
+        self.assertEqual(summary["builds"], ["rx671/common", "rx671/software-tls12/app"])
         self.assertEqual(jobs[name]["needs"], [{"job": "build rx671/common", "artifacts": True},
-                                               {"job": "build rx671/software/app", "artifacts": True}])
+                                               {"job": "build rx671/software-tls12/app", "artifacts": True}])
 
     def test_repeat_makes_one_job_per_run_and_one_build(self):
         name = "rx72n:sw:tls12:mqtt"
