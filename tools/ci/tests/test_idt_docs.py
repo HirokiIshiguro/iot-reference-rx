@@ -17,7 +17,7 @@ class IdtDocsTests(unittest.TestCase):
 
     def test_mixed_code_other_docs_and_unrelated_ci_fail(self):
         for path in ("Projects/main.c", "docs/unrelated.md", "tools/test.py", ".gitmodules",
-                     "docs/common-core-audit/hidden.py", "docs/common-core-audit/unknown.md"):
+                     "docs/details/common-core-audit/hidden.py", "docs/details/common-core-audit/unknown.md"):
             with self.subTest(path=path), self.assertRaises(RuntimeError):
                 docs.verify_scope({"README.md", path}, self.BASE, self.BASE)
         with self.assertRaises(RuntimeError):
@@ -63,7 +63,7 @@ class IdtDocsTests(unittest.TestCase):
             "CI_MERGE_REQUEST_DIFF_BASE_SHA": "a" * 40,
             "CI_MERGE_REQUEST_SOURCE_BRANCH_SHA": "b" * 40,
         }), patch.object(docs, "ensure_commit"), patch.object(docs, "read_blob", return_value=self.BASE), \
-                patch.object(docs, "run_git", return_value=b"docs/common-core-audit/project-options.json\0"), \
+                patch.object(docs, "run_git", return_value=b"docs/details/common-core-audit/project-options.json\0"), \
                 patch.object(docs, "lint_document", return_value=[]), \
                 patch.object(Path, "is_file", return_value=True), \
                 patch.object(Path, "read_text", return_value="invalid json"):
@@ -94,7 +94,7 @@ class IdtDocsTests(unittest.TestCase):
         head = (root / ".gitlab-ci.yml").read_text(encoding="utf-8")
         self.assertIn(docs.BEGIN, head)
         self.assertIn('PIPELINE_PROFILE: "mr-idt-docs"', head)
-        self.assertIn('docs/common-core-audit/**/*', head.split(docs.BEGIN)[1].split(docs.END)[0])
+        self.assertIn('docs/details/common-core-audit/**/*', head.split(docs.BEGIN)[1].split(docs.END)[0])
         self.assertIn('$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\\/)?[0-9]+-(readme|docs)-/', head)
         for name in ("RUN_RX72N_BUILD", "RUN_RX65N_BG96_BUILD", "RUN_RX671_WIFI_BUILD", "RUN_RX671_BOOTLOADER_BUILD"):
             lane = head.split(docs.BEGIN)[1].split(docs.END)[0]

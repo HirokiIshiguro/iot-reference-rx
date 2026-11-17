@@ -2,7 +2,7 @@
 
 本リポジトリのCIは、WindowsでCC-RXビルドとAWS操作を行い、Raspberry Piに接続した
 実機でflash、UART監視、MQTT、OTA、Fleet Provisioningを検証します。
-job定義の正本は[`.gitlab-ci.yml`](../.gitlab-ci.yml)、接続構成とツールの現行値は
+job定義の正本は[`.gitlab-ci.yml`](../../.gitlab-ci.yml)、接続構成とツールの現行値は
 [hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config)です。
 
 ## 実機環境
@@ -44,7 +44,7 @@ Fleetも3環境とも試験job内で署名付きの専用appを一括導入し�
 
 RX671 Fleetの時間上限は全体3時間、主処理140分、`after_script`の復元30分です。復元時のbench lock待ちは60秒で打ち切り、一括導入の共通時間予算を別に確保します。[GitLabの時間上限設定](https://docs.gitlab.com/ci/runners/configure_runners/#set-script-and-after_script-timeouts)に従い、主処理と復元の合計をjob全体の上限より短くしています。
 
-通常の`full`はIDTを含みません。nightlyは50回帰rowの完了後に、3ターゲットの`IDT_SCOPE=transport`を実行します。既存のCC-RX resource groupと実機lockで直列化し、各native結果と終了状態を判定します。これは全IDT認定ではありません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt-validation.md)を参照してください。
+通常の`full`はIDTを含みません。nightlyは50回帰rowの完了後に、3ターゲットの`IDT_SCOPE=transport`を実行します。既存のCC-RX resource groupと実機lockで直列化し、各native結果と終了状態を判定します。これは全IDT認定ではありません。専用引数・対応範囲・証跡の扱いは[IDT検証](idt/idt-validation.md)を参照してください。
 
 nightlyのRX72N MQTT 4構成では、`NIGHTLY_RX72N_MULTI_TLS_TEST=true`（既定）を子pipelineへ渡し、通常MQTTの後に複数TLS接続を検証します。`false`で狙った実験から除外できますが、完全回帰の合格には含めません。focusedの`RUN_RX72N_MULTI_TLS_TEST`は従来どおり既定`false`です。
 
@@ -93,4 +93,4 @@ LANBENCH用EC2とRX72N／RX65N Fleetのcleanupも、失敗を許容しません�
 
 - release tag pipeline: [#11140](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11140)
 - RX671 fixed-SHA 5-run campaign: [Issue #140](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/140)
-- 機能別の代表pipeline: [validation-evidence.md](validation-evidence.md)
+- 機能別の代表pipeline: [validation-evidence.md](validation/validation-evidence.md)

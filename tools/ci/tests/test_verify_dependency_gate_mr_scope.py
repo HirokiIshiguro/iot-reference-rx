@@ -196,13 +196,13 @@ other_job:
             "matrix_job:\n", "nightly_rx65n_r_cellular_tests:\n  trigger:\n    branch: main\n\nmatrix_job:\n", 1
         )
         (self.repo / ".gitlab-ci.yml").write_text(changed, encoding="utf-8")
-        (self.repo / "docs/ci-pipeline.md").write_text("cellular test\n", encoding="utf-8")
-        git(self.repo, "add", ".gitlab-ci.yml", "docs/ci-pipeline.md")
+        (self.repo / "docs/details/ci-pipeline.md").write_text("cellular test\n", encoding="utf-8")
+        git(self.repo, "add", ".gitlab-ci.yml", "docs/details/ci-pipeline.md")
         git(self.repo, "commit", "--quiet", "-m", "cellular bridge")
         self.assertEqual(0, self.run_main(git(self.repo, "rev-parse", "HEAD")))
 
     def test_other_document_is_rejected(self) -> None:
-        head = self.commit_change("docs/rx65n-cellular.md")
+        head = self.commit_change("docs/details/cellular/rx65n-cellular.md")
         self.assertEqual(1, self.run_main(head))
 
     def test_unrelated_change_in_ci_file_fails(self) -> None:

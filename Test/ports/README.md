@@ -8,7 +8,7 @@ RX72N/RX671 use the shared coreMQTT 5 tree; BG96 uses its maintained local
 coreMQTT 2.3.1 tree. The ports do not alter either protocol/version.
 A selected group result does not establish complete IDT qualification or make
 `202604.00-LTS` compatible with IDT 4.9.0's version checks.
-Current results and host setup are maintained in [IDT validation](../../docs/idt-validation.md).
+Current results and host setup are maintained in [IDT validation](../../docs/details/idt/idt-validation.md).
 
 | Host scope | Builder `-TestGroup` | Device entry / source |
 |---|---|---|

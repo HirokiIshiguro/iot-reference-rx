@@ -14,10 +14,10 @@ except ImportError:
     from verify_dependency_gate_mr_scope import ensure_commit, read_blob, remove_top_level_block, require_sha, run_git
 
 
-AUDIT_DOCS = {"docs/common-core-audit/" + name for name in (
+AUDIT_DOCS = {"docs/details/common-core-audit/" + name for name in (
     "README.md", "core-versions-config.md", "core-versions-config.json",
     "project-options.md", "project-options.json", "submodule-graph.md", "submodule-graph.json")}
-DOCS = {"README.md", "docs/idt-validation.md", "docs/validation-evidence.md", "docs/ota-performance.md", "tools/idt/RX671_BOOTSTRAP.md"} | AUDIT_DOCS
+DOCS = {"README.md", "docs/details/idt/idt-validation.md", "docs/details/validation/validation-evidence.md", "docs/details/validation/ota-performance.md", "tools/idt/RX671_BOOTSTRAP.md"} | AUDIT_DOCS
 BOOTSTRAP = {"tools/ci/check_idt_docs.py", "tools/ci/tests/test_idt_docs.py"}
 BEGIN = "    # BEGIN IDT DOCS WORKFLOW\n"
 END = "    # END IDT DOCS WORKFLOW\n"

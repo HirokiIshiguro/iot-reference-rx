@@ -45,5 +45,5 @@ SHA-256は`fbf54e7ad255fc4e729f271e77370dd554ad000f60d2aa1f2795f9a9755b3b27`で�
 ## 適用範囲
 
 ターゲットごとのpayload・媒体・firmware・測定日が異なるため、媒体間の速度比較には使いません。
-成功したOTAの実行時間とIDTの合格は別の指標です。[IDT結果](idt-validation.md)を参照してください。
+成功したOTAの実行時間とIDTの合格は別の指標です。[IDT結果](../idt/idt-validation.md)を参照してください。
 TSIP構成の時間は未測定です。
