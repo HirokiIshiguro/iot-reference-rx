@@ -10,6 +10,7 @@ directory, so a test job can take what it needs from the artifacts of the build 
   rx72n/software/ota             OTA candidate (a newer application version) and its code signing certificate
   rx65n/software/app             signed application and the boot loader
   rx65n/software/fleet           the same with the Fleet Provisioning demo enabled
+  rx65n/software/ota             OTA candidate payload, its signature and the code signing certificate
   rx671/software-<tls>/app       signed application with the Wi-Fi and device credentials compiled in
   rx671/software-<tls>/fleet     signed application with the Wi-Fi and claim credentials compiled in
 
@@ -137,6 +138,27 @@ def encrypt_file(source: Path, target: Path, key: bytes) -> None:
     target.write_bytes(nonce + AESGCM(key).encrypt(nonce, source.read_bytes(), b"rxci"))
 
 
+def build_rx65n_ota(registry: dict, backend: str, out: Path) -> None:
+    """OTA candidate of CK-RX65N. No credentials are compiled in: the board keeps using its data flash."""
+    project = "aws_bg96_ck_rx65n" if backend == "software" else "aws_bg96_ck_rx65n_tsip"
+    work = workspace(registry, f"rx65n-{backend}-ota")
+    cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
+    version = registry["boards"]["rx65n"]["ota_candidate_version"]
+    token = version.replace(".", "_")
+    try:
+        work.mkdir(parents=True)
+        run([sys.executable, "tools/build_bg96_ota_candidate.py", "--repo-root", ROOT,
+             "--app-dir", f"Projects/{project}/e2studio_ccrx", "--version", version, "--output-dir", work / "out",
+             "--signing-key", SIGNING_KEY, "--e2studio-cli", cli, "--workspace", work / "e2ws",
+             "--e2studio-timeout", "1800", "--tls-backend", "software" if backend == "software" else "tsip"],
+            timeout=2400)
+        publish(out, {"candidate_payload.bin": work / "out" / f"bg96_{token}_ota_payload.bin",
+                      "candidate_payload.sig.der": work / "out" / f"bg96_{token}_ota_payload.sig.der",
+                      "codesign_cert.pem": work / "out" / "bg96_ota_codesign_cert.pem"})
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def build_rx671_app(registry: dict, tls: str, kind: str, out: Path) -> None:
     """Application of EK-RX671. The Wi-Fi and AWS credentials are compiled in from CI variables."""
     board = registry["boards"]["rx671"]
@@ -231,6 +253,8 @@ def build(registry: dict, variant: str, out: Path) -> None:
         return build_rx72n_ota(registry, "software", out)
     if board == "rx65n" and name in ("software/app", "software/fleet"):
         return build_rx65n_app(registry, "software", name.split("/")[1], out)
+    if board == "rx65n" and name == "software/ota":
+        return build_rx65n_ota(registry, "software", out)
     if board == "rx671" and name.startswith("software-tls1") and name.endswith(("/app", "/fleet")):
         backend, kind = name.split("/")
         return build_rx671_app(registry, backend.split("-")[1], kind, out)

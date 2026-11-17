@@ -291,6 +291,62 @@ def ota_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path
         cleanup_ota(logs, rxci.aws_session)
 
 
+def ota_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
+    """OTA over the cellular link with a thing and certificate created for this run."""
+    import rxci
+    import rxci_aws
+
+    common, app, candidate = builds
+    config = board.config
+    role = os.environ.get(config["ota_service_role_variable"], "")
+    if not role:
+        raise SystemExit(f"CI variable {config['ota_service_role_variable']} is not available to this job.")
+    if not role.startswith("arn:"):
+        role = "arn:aws:iam::" + role
+    folder = logs / "ota"
+    folder.mkdir(parents=True, exist_ok=True)
+    board.install(common, app, logs)
+    session = rxci.aws_session()
+    name = f"{rxci_aws.owner()}-rx65n"
+    tool = [sys.executable, TOOLS / "bg96_bootloader_integration.py"]
+    serial = ["--uart-port", board.uart, "--baud", board.baud]
+    programmer = ["--rfp-cli", board.rfp.executable, "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool,
+                  "--rfp-interface", board.rfp.interface, "--rfp-speed", board.rfp.speed,
+                  "--rfp-auth-id", board.rfp.auth_id]
+    try:
+        credentials = rxci_aws.create_thing(session, name, config["iot_policy"])
+        board.run([sys.executable, TOOLS / "create_bg96_ota_update.py", "--artifact-dir", folder, "--thing-name", name,
+                   "--input-payload", candidate / "candidate_payload.bin",
+                   "--file-version", config["ota_candidate_version"], "--bucket", config["ota_bucket"],
+                   "--custom-signature-der", candidate / "candidate_payload.sig.der",
+                   "--code-signer-cert", candidate / "codesign_cert.pem", "--role-arn", role,
+                   "--region", rxci.REGION, "--ota-id-prefix", "rx65n-bg96-ota"], timeout=600,
+                  label="create the OTA update", env=rxci_aws.environment(session))
+        with tempfile.TemporaryDirectory(prefix="rxci-") as temporary:
+            certificate, key = Path(temporary) / "certificate.pem", Path(temporary) / "private_key.pem"
+            certificate.write_text(credentials["certificate"], encoding="utf-8")
+            key.write_text(credentials["private_key"], encoding="utf-8")
+            env = {"RX65N_BG96_AWS_IOT_THING_NAME": name, "AWS_IOT_CERT": str(certificate),
+                   "AWS_IOT_PRIVKEY": str(key), "RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE": endpoint(registry, test["tls"])}
+            board.run([*tool, "--action", "provision-mqtt", *serial, *programmer, "--provision-cli-timeout", 25,
+                       "--provision-char-delay", 0.002, "--provision-line-delay", 0.5,
+                       "--no-reset-after-provision"], timeout=400, label="provision the device credentials", env=env)
+        board.run([sys.executable, TOOLS / "bg96_ota_prepare.py", *serial, *programmer,
+                   "--code-signer-cert", candidate / "codesign_cert.pem"], timeout=300,
+                  label="provision the code signing certificate")
+        observe = [sys.executable, TOOLS / "bg96_ota_monitor.py", *serial, *programmer,
+                   "--expected-version", config["ota_candidate_version"], "--timeout", 900, "--app-reset-retries", 2,
+                   "--raw-log", folder / "ota_uart_raw.log", "--summary-json", folder / "ota_summary.json"]
+        if test["tls"] == "tls13":
+            observe += ["--require-tls-version", "TLSv1.3"]
+        board.run(observe, timeout=1100, label="observe the OTA update on the UART", log=logs / "observe.log")
+    finally:
+        try:
+            cleanup_ota(logs, rxci.aws_session)
+        finally:
+            rxci_aws.sweep(rxci.aws_session(), prefix=rxci_aws.owner())
+
+
 def fleet_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """Fleet Provisioning over the cellular link. The claim credentials come from CI variables."""
     import rxci
@@ -406,7 +462,7 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pat
 
 
 RECIPES = {("rx72n", "mqtt"): mqtt_rx72n, ("rx72n", "fleet"): fleet_rx72n, ("rx72n", "ota"): ota_rx72n,
-           ("rx65n", "mqtt"): mqtt_rx65n, ("rx65n", "fleet"): fleet_rx65n,
+           ("rx65n", "mqtt"): mqtt_rx65n, ("rx65n", "fleet"): fleet_rx65n, ("rx65n", "ota"): ota_rx65n,
            ("rx671", "mqtt"): mqtt_rx671, ("rx671", "fleet"): fleet_rx671}
 
 
