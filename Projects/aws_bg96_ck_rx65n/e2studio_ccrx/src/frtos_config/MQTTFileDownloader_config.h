@@ -45,4 +45,9 @@
 #error "Requesting multiple data blocks is not supported in this version of the library. Please set mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST to 1."
 #endif
 
+/* The signed image (0xF0000 bytes minus the 512-byte header) is 138 blocks of 7168 bytes; the demo default of 128 would stall the download. */
+#ifndef OTA_MAX_NUM_FILE_BLOCKS
+#define OTA_MAX_NUM_FILE_BLOCKS                  (138U)
+#endif
+
 #endif /* #ifndef MQTT_FILE_DOWNLOADER_DEFAULT_H */
