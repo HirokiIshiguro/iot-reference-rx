@@ -854,8 +854,8 @@ void main_task(void *pvParameters)
         debug_puts(line);
 
 #if (RX671_FLEET_PROVISIONING_ENABLE == 1)
-        /* Fleet diagnostic: heap headroom and task count on the same direct
-         * path as the heartbeat, to tell a heap shortage from a stalled task. */
+        /* Heap headroom and task count on the same direct path as the heartbeat
+         * (this board has little RAM to spare). */
         if ((3U == tick) || (30U == tick) || (120U == tick))
         {
             p = line;
@@ -868,46 +868,6 @@ void main_task(void *pvParameters)
             p = append_text(p, "\r\n");
             *p = '\0';
             debug_puts(line);
-            {
-                extern volatile uint32_t g_tcp_random_requests;
-                extern volatile uint32_t g_tcp_random_successes;
-                extern volatile uint32_t g_tcp_random_session_failures;
-                extern volatile uint32_t g_tcp_random_generate_failures;
-
-                p = line;
-                p = append_text(p, "RX671 rng req=");
-                p = append_dec32(p, g_tcp_random_requests);
-                p = append_text(p, " ok=");
-                p = append_dec32(p, g_tcp_random_successes);
-                p = append_text(p, " sess_fail=");
-                p = append_dec32(p, g_tcp_random_session_failures);
-                p = append_text(p, " gen_fail=");
-                p = append_dec32(p, g_tcp_random_generate_failures);
-                p = append_text(p, "\r\n");
-                *p = '\0';
-                debug_puts(line);
-            }
-            {
-                static TaskStatus_t task_status[16];
-                UBaseType_t task_count = uxTaskGetSystemState(task_status, 16U, NULL);
-                UBaseType_t task_index;
-
-                for (task_index = 0U; task_index < task_count; task_index++)
-                {
-                    p = line;
-                    p = append_text(p, "RX671 task ");
-                    p = append_text(p, task_status[task_index].pcTaskName);
-                    p = append_text(p, " st=");
-                    p = append_dec32(p, (uint32_t)task_status[task_index].eCurrentState);
-                    p = append_text(p, " pri=");
-                    p = append_dec32(p, (uint32_t)task_status[task_index].uxCurrentPriority);
-                    p = append_text(p, " hwm=");
-                    p = append_dec32(p, (uint32_t)task_status[task_index].usStackHighWaterMark);
-                    p = append_text(p, "\r\n");
-                    *p = '\0';
-                    debug_puts(line);
-                }
-            }
         }
 #endif
 
