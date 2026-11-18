@@ -201,7 +201,7 @@ def _prepared(files, target, source_sha):
     memory = _srecords(files["public_signer_provisioner.mot"], ((start, 0xFFFFFFFF), *OPTIONS))
     _options(memory)
     vector = int.from_bytes(_field(memory, 0xFFFFFFFC), "little")
-    if not start+0x300 <= vector <= 0xFFFBFFFF or vector not in memory:
+    if not start+0x300 <= vector < bootloader_start(target) or vector not in memory:
         raise RuntimeError("Public signer provisioner reset vector is outside its loaded application")
     marker = b"PUBLIC_SIGNER_PROVISIONER source_sha=" + source_sha.encode("ascii") + b"\r\n"
     runs = _runs(memory)
@@ -225,10 +225,15 @@ def validate_public_signer_material(certificate_path, public_key_path):
     return {"public_signer_spki_sha256": material._spki_sha256(public), "runtime_trust": "not_established"}
 
 
+def bootloader_start(target):
+    return 0xFFFE0000
+
+
 def validate_initial_rsu(files, target):
     start, _ = LAYOUTS[target["id"]]
     image = _bytes(files["idt_transport.rsu"])
-    if len(image) != 0xFFFC0000-start:
+    boot_start = bootloader_start(target)
+    if len(image) != boot_start-start:
         raise RuntimeError("Initial RSU size differs from the reviewed dual-bank Code Flash layout")
     if (image[:8] != b"Renesas\xfe" or image[8:40] != b"sig-sha256-ecdsa"+b"\0"*16 or
             struct.unpack_from("<I", image, 0x28)[0] != 64 or
@@ -236,11 +241,11 @@ def validate_initial_rsu(files, target):
         raise RuntimeError("Initial RSU header/signature/raw Data Flash policy mismatch")
     try:
         _tools_module("build_rx671_fwup_v2_rsu").validate_legacy_descriptor(
-            image[0x200:0x300], start + 0x300, 0xFFFBFFFF, sequence=1)
+            image[0x200:0x300], start + 0x300, boot_start - 1, sequence=1)
     except ValueError as error:
         raise RuntimeError("Initial legacy RSU descriptor layout mismatch") from error
-    vector = int.from_bytes(image[0xFFFBFFFC-start:0xFFFC0000-start], "little")
-    if not start+0x300 <= vector <= 0xFFFBFFFF:
+    vector = int.from_bytes(image[boot_start-4-start:boot_start-start], "little")
+    if not start+0x300 <= vector < boot_start:
         raise RuntimeError("Initial RSU application reset vector is outside its application")
     public = material.public_signer(files["signer.crt.pem"], files["signer.pub.pem"])
     material.verify_raw_p256(public, image[0x2C:0x6C], image[0x200:])
@@ -250,13 +255,14 @@ def validate_initial_rsu(files, target):
 def validate_boot_trust(files, target, source_sha):
     plan = _prepared(files, target, source_sha)
     _, shift = LAYOUTS[target["id"]]
-    bank0 = _srecords(files["bootloader.mot"], ((0xFFFC0000, 0xFFFFFFFF), *OPTIONS),
-                     (0xFFFC0000, *range(0xFFFFFF80, 0x100000000)))
+    boot_start = bootloader_start(target)
+    bank0 = _srecords(files["bootloader.mot"], ((boot_start, 0xFFFFFFFF), *OPTIONS),
+                     (boot_start, *range(0xFFFFFF80, 0x100000000)))
     _options(bank0)
-    mirror_start, mirror_end = 0xFFFC0000-shift, 0xFFFFFFFF-shift
+    mirror_start, mirror_end = boot_start-shift, 0xFFFFFFFF-shift
     bank1 = _srecords(files["bootloader_bank1.mot"], ((mirror_start, mirror_end),),
                      (mirror_start, *range(0xFFFFFF80-shift, 0x100000000-shift)))
-    if bank1 != {address-shift: value for address, value in bank0.items() if address >= 0xFFFC0000}:
+    if bank1 != {address-shift: value for address, value in bank0.items() if address >= boot_start}:
         raise RuntimeError("Bank1 bootloader is not the exact reviewed bank0 shift")
     return plan
 
@@ -392,7 +398,8 @@ def provision_boot_trust(root, target, source_sha, call, check_owner=None, *, ar
     except ImportError:
         import cleanup_budget as budget
     start, shift = LAYOUTS[target["id"]]
-    ranges = ((start-shift, 0xFFFBFFFF-shift), (start, 0xFFFBFFFF))
+    end = bootloader_start(target) - 1
+    ranges = ((start-shift, end-shift), (start, end))
     rfp = host.RfpConfig(executable="/usr/local/bin/rfp-cli", device=target["rfp_device"],
                          tool="e2l:"+target["e2lite"], speed=target["rfp_speed"], install_ranges=ranges)
     expected = [rfp.program_command(root/"public_signer_provisioner.mot", leave_reset=True),

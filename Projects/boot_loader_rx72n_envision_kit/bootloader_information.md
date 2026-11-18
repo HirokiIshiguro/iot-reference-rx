@@ -18,6 +18,10 @@ This document provides information about the bootloader used for "*PubSub/MQTT w
 In the OTA demo, the bootloader runs first and verifies the firmware signature.  
 If the signature verification passes, the firmware starts.
 
+### Current flash layout
+
+The current RX72N project reserves 0xFFFE0000–0xFFFFFFFF (128 KiB) for the bootloader, mirrored at 0xFFDE0000–0xFFDFFFFF. The application area is 0xFFE00000–0xFFFDFFFF (1,920 KiB), with exception and reset vectors at 0xFFFDFF80 and 0xFFFDFFFC. The OTA payload is 1,965,568 bytes. The following memory usage table describes the imported reference, not a measurement of this project.
+
 ### Memory usage
 
 | Compiler | RAM size | ROM size |

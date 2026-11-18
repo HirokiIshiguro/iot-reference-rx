@@ -73,3 +73,7 @@ small steps.
 
 [iot-reference-rx]: https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx
 [rx72n-envision-kit]: https://gitlab.saffti.jp/oss/import/github/renesas/rx72n-envision-kit
+
+## OTA flash layout
+
+The application area is 0xFFE00000–0xFFFDFFFF (1,920 KiB (0x1E0000)); the exception and reset vectors are 0xFFFDFF80 and 0xFFFDFFFC. The 128 KiB bootloader occupies 0xFFFE0000–0xFFFFFFFF and its bank 1 copy starts at 0xFFDE0000. The OTA payload is 1,965,568 bytes.

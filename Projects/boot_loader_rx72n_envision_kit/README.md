@@ -12,3 +12,7 @@ Notes:
 - the e2studio metadata is aligned so the imported project builds as `boot_loader_rx72n_envision_kit`
 - RSU generation for local bring-up now uses the app-side PRM CSV because the legacy bootloader does not carry the `r_fwup` sample tool tree
 - MCUboot remains out of scope for this issue
+
+## Flash layout
+
+The bootloader occupies the final 128 KiB of each bank: 0xFFFE0000–0xFFFFFFFF in bank 0 and 0xFFDE0000 at the start of its bank 1 copy. The application exception and reset vectors are 0xFFFDFF80 and 0xFFFDFFFC.

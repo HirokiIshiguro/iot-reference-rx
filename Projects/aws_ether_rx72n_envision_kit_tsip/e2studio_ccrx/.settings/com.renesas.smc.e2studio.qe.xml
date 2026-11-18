@@ -264,7 +264,7 @@
             <Setting id="FWUP_CFG_USER_GET_CRYPT_CONTEXT_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_USER_FLASH_WRITE_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_USER_GET_CRYPT_CONTEXT_FUNCTION" value="ota_get_crypt_context_function"/>
-            <Setting id="FWUP_CFG_AREA_SIZE" value="0x1C0000U"/>
+            <Setting id="FWUP_CFG_AREA_SIZE" value="0x1E0000U"/>
             <Setting id="FWUP_CFG_DF_ADDR_L" value="0x00100000"/>
             <Setting id="FWUP_CFG_USER_EXT_FLASH_CLOSE_FUNCTION" value="my_ext_flash_close_function"/>
             <Setting id="FWUP_CFG_USER_FLASH_ERASE_FUNCTION" value="ota_flash_erase_function"/>
