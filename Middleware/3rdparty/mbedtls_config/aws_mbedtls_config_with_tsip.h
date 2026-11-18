@@ -2244,7 +2244,7 @@
  *
  * This module provides debugging functions.
  */
-#define MBEDTLS_DEBUG_C
+//#define MBEDTLS_DEBUG_C
 
 /**
  * \def MBEDTLS_DES_C
@@ -2985,7 +2985,7 @@
  *
  * Requires: MBEDTLS_SSL_CACHE_C
  */
-#define MBEDTLS_SSL_CACHE_C
+//#define MBEDTLS_SSL_CACHE_C
 
 /**
  * \def MBEDTLS_SSL_COOKIE_C
@@ -2995,7 +2995,7 @@
  * Module:  library/ssl_cookie.c
  * Caller:
  */
-#define MBEDTLS_SSL_COOKIE_C
+//#define MBEDTLS_SSL_COOKIE_C
 
 /**
  * \def MBEDTLS_SSL_TICKET_C
@@ -3007,7 +3007,7 @@
  *
  * Requires: MBEDTLS_CIPHER_C || MBEDTLS_USE_PSA_CRYPTO
  */
-#define MBEDTLS_SSL_TICKET_C
+//#define MBEDTLS_SSL_TICKET_C
 
 /**
  * \def MBEDTLS_SSL_CLI_C
@@ -3035,7 +3035,7 @@
  *
  * This module is required for SSL/TLS server support.
  */
-#define MBEDTLS_SSL_SRV_C
+//#define MBEDTLS_SSL_SRV_C
 
 /**
  * \def MBEDTLS_SSL_TLS_C
