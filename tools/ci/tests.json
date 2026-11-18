@@ -128,6 +128,8 @@
     "rx65n:sw:tls13:ota",
     "rx671:sw:tls12:ota",
     "rx671:sw:tls13:ota",
+    "rx671:tsip:tls12:fleet",
+    "rx671:tsip:tls13:fleet",
     "rx72n:tsip:tls12:mqtt",
     "rx72n:tsip:tls13:mqtt",
     "rx72n:tsip:tls12:fleet",

@@ -42,17 +42,17 @@ class Rx671TsipFleetTests(unittest.TestCase):
                                      "F0563100:Illegal option", "Renesas Optimizing Linker Abort"])
             self.assertEqual(rxci_build.linker_error_lines(Path(folder) / "missing.log"), [])
 
-    def test_qualification_runs_only_explicit_pair_without_marking_ready(self):
+    def test_fleet_pair_is_ready_and_selectable(self):
         registry = rxci.load_registry()
         names = [f"rx671:tsip:tls{version}:fleet" for version in (12, 13)]
-        self.assertTrue(all(not t["ready"] for t in registry["tests"] if t["name"] in names))
+        self.assertTrue(all(t["ready"] for t in registry["tests"] if t["name"] in names))
         jobs, summary = rxci.child_pipeline(registry, "full", r"^rx671:tsip:tls1[23]:fleet$", 1)
         self.assertEqual(summary["tests"], names)
         self.assertEqual(summary["builds"], ["rx671/common", "rx671/tsip-tls12/fleet", "rx671/tsip-tls13/fleet"])
         for name in names:
             self.assertEqual(jobs[name]["resource_group"], registry["boards"]["rx671"]["resource_group"])
         _, full = rxci.child_pipeline(registry, "full", "", 1)
-        self.assertTrue(set(names).isdisjoint(full["tests"]))
+        self.assertTrue(set(names) <= set(full["tests"]))
 
     def test_dispatch_allows_only_fleet_tsip(self):
         data = rxci.load_registry()

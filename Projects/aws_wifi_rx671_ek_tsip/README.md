@@ -346,8 +346,8 @@ manual override/debug runs, but they are not required for the normal build.
 
 The checked-in e2 studio project uses `bank.dual` and
 `BSP_CFG_CODE_FLASH_BANK_MODE=0`. Each 1 MiB bank has a 768 KiB application
-install area and reserves its final 128 KiB for the boot loader. The normal
-application uses exception/reset vectors `0xFFFDFF80` / `0xFFFDFFFC`.
+install area and reserves its final 64 KiB for the boot loader. The normal
+application uses exception/reset vectors `0xFFFEFF80` / `0xFFFEFFFC`.
 
 The dedicated artifact helper selects the role and version settings below,
 retaining and validating the checked-in dual-bank layout:
@@ -356,7 +356,7 @@ retaining and validating the checked-in dual-bank layout:
   `RX671_OTA_PROVISIONER_ENABLE=1`; this image initializes LittleFS/KVS and
   leaves SCI6 exclusively in the shared `conf set` / `commit` CLI;
 - `bank.dual` and `BSP_CFG_CODE_FLASH_BANK_MODE=0`;
-- a 896 KiB (`0x000E0000`) install area;
+- a 960 KiB (`0x000F0000`) install area;
 - the application and all Type 1YN resources at main-bank offset `+0x300`
   (`0xFFF00300`), after the FWUP header and v2 descriptor;
 - `PFRAM2=RPFRAM2`, with `PFRAM2` in the main image group; and
@@ -416,14 +416,14 @@ The handoff still erases both install areas to remove provisioner and prior
 application records before the boot loader examines lifecycle state.
 
 After the LittleFS/KVS commit and before programming the boot loader, the host
-uses RFP `-range` with `-erase` for exactly these two 896 KiB install areas:
+uses RFP `-range` with `-erase` for exactly these two 960 KiB install areas:
 
-- `0xFFE00000-0xFFEDFFFF` (temporary install area); and
-- `0xFFF00000-0xFFFDFFFF` (execute install area).
+- `0xFFE00000-0xFFEEFFFF` (temporary install area); and
+- `0xFFF00000-0xFFFEFFFF` (execute install area).
 
 This is not `-erase-chip`. It preserves Data Flash/LittleFS, flash options, the
-boot-loader mirror at `0xFFEE0000-0xFFEFFFFF`, and the boot loader at
-`0xFFFE0000-0xFFFFFFFF`. The following boot-loader MOT programming leaves the
+boot-loader mirror at `0xFFEF0000-0xFFEFFFFF`, and the boot loader at
+`0xFFFF0000-0xFFFFFFFF`. The following boot-loader MOT programming leaves the
 target in reset so the test can open SCI6 before release.
 
 The boot loader prints the LittleFS key-load prefix before calling LittleFS, so
@@ -459,8 +459,8 @@ The OTA-only memory profile uses a 224 KiB FreeRTOS heap (208 KiB until
 2026-11-18; see "2026-11-18のheap拡張" in `e2studio_ccrx/OTA_FLASH_LAYOUT.md`), a 32 KiB TCP receive
 stream, 24 network buffer descriptors, an 8 KiB MQTT Agent network buffer,
 eight WHD port buffers, and a 4 KiB `mqttFileDownloader` block. It requests one
-block at a time, uses two 8 KiB static OTA event buffers, and tracks all 224
-blocks needed by the maximum 916,992-byte transfer payload. The TCP stream
+block at a time, uses two 8 KiB static OTA event buffers, and tracks all 240
+blocks needed by the maximum 982,528-byte transfer payload. The TCP stream
 is intentionally smaller than the benchmark-oriented 64 KiB default: the
 128 KiB heap profile reached AWS IoT TCP establishment, then exhausted its
 allocator while entering TLS and stopped the scheduler. The larger heap and
@@ -512,10 +512,10 @@ could exhaust FreeRTOS heap in the lower RX/TCP/MQTT path immediately after the
 first request, before the application PUBLISH callback. The OTA profile now
 serializes requests at one block, reduces the static event pool from three to
 two buffers, and moves the reclaimed RAM into the 208 KiB FreeRTOS heap. It
-uses a 224-entry received-block bitmap for the 916,992-byte payload. Incoming stream
+uses a 240-entry received-block bitmap for the 982,528-byte payload. Incoming stream
 messages are bounds-checked before copying into an event buffer, and the layout
 analyzer rejects drift in all of these effective defines. The block size changes
-transfer granularity only; the signed RSU area is 896 KiB.
+transfer granularity only; the signed RSU area is 960 KiB.
 At source SHA `ef69d76c`, pipeline #9581 / package job #61342 recorded a
 208 KiB heap, two OTA event buffers, a 192-byte received-block bitmap, RAM
 high-water `0x00058A5B`, and 30,116 bytes of static RAM headroom; both the MQTT

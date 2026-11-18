@@ -159,10 +159,8 @@ def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list
         matched = [test for test in tests if test["smoke"]]
     else:
         matched = []
-    # A targeted qualification run does not mark either test ready for full runs.
-    qualification = pattern == r"^rx671:tsip:tls1[23]:fleet$"
-    return ([t for t in matched if t["ready"] or qualification],
-            [t for t in matched if not t["ready"] and not qualification])
+    return ([t for t in matched if t["ready"]],
+            [t for t in matched if not t["ready"]])
 
 
 def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
