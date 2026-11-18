@@ -200,6 +200,8 @@ static void ota_provisioner_run(void)
     UserInitialization();
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     vTsipMbedtlsThreadingCompatInit();
+    /* conf commit starts PKCS #11, whose entropy source needs the TSIP driver open. */
+    (void)R_Demo_Common_API_TSIP_Open(NULL, NULL);
 #endif
     xStartDemoEventGroup = xEventGroupCreate();
     CLI_Support_Settings();
