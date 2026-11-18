@@ -589,7 +589,7 @@ def write_junit(path: Path, name: str, seconds: float, failure: str) -> None:
 
 def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
     recipe = RECIPES.get((test["board"], test["feature"]))
-    if recipe is None or test["backend"] != "sw":
+    if recipe is None or not test["ready"]:
         raise SystemExit(f"Test is not implemented yet: {test['name']}")
     logs.mkdir(parents=True, exist_ok=True)
     board = Board(registry, test["board"])
