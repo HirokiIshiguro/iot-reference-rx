@@ -122,7 +122,6 @@ PROVENANCE_PROJECT_PATHS = (
 )
 BOOTLOADER_PROVENANCE_PATHS = (
     BOOTLOADER_PROJECT_RELATIVE / ".cproject",
-    BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/smc_gen/r_config/r_bsp_config.h",
     BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
@@ -146,10 +145,10 @@ OTA_START_VALUE = (
     "SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8,RPFRAM2/04,"
     "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2,"
     "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300,"
-    "EXCEPTVECT/0FFFDFF80,RESETVECT/0FFFDFFFC"
+    "EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC"
 )
 PROVISIONER_START_VALUE = OTA_START_VALUE.replace(
-    "EXCEPTVECT/0FFFDFF80,RESETVECT/0FFFDFFFC",
+    "EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC",
     "EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC",
 )
 ROM_MAPPING_ANCHOR = (
@@ -251,7 +250,7 @@ def make_ota_cproject(
         '<listOptionValue builtIn="false" value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"/>',
         '<listOptionValue builtIn="false" value="-define=mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST=1"/>',
         '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_DATA_BUFFERS=2"/>',
-        '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_FILE_BLOCKS=224"/>',
+        '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_FILE_BLOCKS=240"/>',
         '<listOptionValue builtIn="false" value="-define=WHD_PORT_BUFFER_COUNT=8"/>',
         '<listOptionValue builtIn="false" value="-define=WHD_SCAN_ENABLE=0"/>',
         '<listOptionValue builtIn="false" value="-define=WHD_JOIN_USE_SCAN_RESULT=0"/>',
@@ -335,7 +334,7 @@ def make_ota_bank_config(text: str, label: str) -> str:
 
 def make_ota_fwup_config(text: str) -> str:
     matches = re.findall(r"^\s*#define\s+RX_OTA_CFG_AREA_SIZE\s+\((0x[0-9A-Fa-f]+)U\)", text, re.M)
-    if len(matches) != 1 or int(matches[0], 16) != 0xE0000:
+    if len(matches) != 1 or int(matches[0], 16) != 0xF0000:
         raise ValueError("rx_ota_config.h: expected the canonical dual-bank install area")
     return text
 

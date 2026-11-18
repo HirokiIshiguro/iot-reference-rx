@@ -174,9 +174,9 @@ class BoardInstallRangesTests(unittest.TestCase):
             board_module = importlib.import_module("rxci_board")
             data = rxci.load_registry()
             for name, expected in {
-                "rx671": ((0xFFE00000, 0xFFEDFFFF), (0xFFF00000, 0xFFFDFFFF)),
-                "rx65n": ((0xFFE00000, 0xFFEBFFFF), (0xFFF00000, 0xFFFBFFFF)),
-                "rx72n": ((0xFFC00000, 0xFFDBFFFF), (0xFFE00000, 0xFFFBFFFF)),
+                "rx671": ((0xFFE00000, 0xFFEEFFFF), (0xFFF00000, 0xFFFEFFFF)),
+                "rx65n": ((0xFFE00000, 0xFFEEFFFF), (0xFFF00000, 0xFFFEFFFF)),
+                "rx72n": ((0xFFC00000, 0xFFDEFFFF), (0xFFE00000, 0xFFFEFFFF)),
             }.items():
                 with self.subTest(board=name):
                     board = board_module.Board(data, name)
