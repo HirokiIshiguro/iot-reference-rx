@@ -24,6 +24,23 @@ ROOT = Path(__file__).resolve().parents[3]
 PROJECT = ROOT / builder.PROJECT_RELATIVE
 
 
+class FailedBuildDiagnosticsTests(unittest.TestCase):
+    def test_copies_selected_project_map_and_linker_commands(self) -> None:
+        for name in ("aws_wifi_rx671_ek", "aws_wifi_rx671_ek_tsip"):
+            with self.subTest(project=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                project = root / name / "e2studio_ccrx"
+                debug = project / "HardwareDebug"
+                debug.mkdir(parents=True)
+                names = (f"{name}.map", f"Linker{name}.tmp", "LinkerSubCommand.tmp", "makefile")
+                for filename in names:
+                    (debug / filename).write_text(filename, encoding="utf-8")
+                artifact = root / "artifacts"
+                builder._copy_failed_build_diagnostics(project, artifact)
+                for filename in names:
+                    self.assertEqual(filename, (artifact / "failed-build-diagnostics" / filename).read_text(encoding="utf-8"))
+
+
 class VersionTests(unittest.TestCase):
     def test_accepts_fwup_version_domain(self) -> None:
         version = builder.parse_version("255.254.65535")
