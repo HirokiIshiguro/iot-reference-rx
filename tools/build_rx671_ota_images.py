@@ -244,7 +244,7 @@ def make_ota_cproject(
         '<listOptionValue builtIn="false" value="-define='
         + TLS_VERSION_DEFINES[tls_version]
         + '"/>',
-        '<listOptionValue builtIn="false" value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"/>',
+        '<listOptionValue builtIn="false" value="-define=RX671_FREERTOS_HEAP_SIZE_KB=224"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"/>',
         '<listOptionValue builtIn="false" value="-define=FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH=32768"/>',
         '<listOptionValue builtIn="false" value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=8192"/>',

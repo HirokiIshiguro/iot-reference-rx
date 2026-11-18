@@ -264,7 +264,7 @@ class GateTests(unittest.TestCase):
 
     def test_ota_runtime_memory_profile_is_exact(self):
         passing = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=2,
             max_file_blocks=192,
         )
@@ -274,23 +274,23 @@ class GateTests(unittest.TestCase):
             max_file_blocks=192,
         )
         stale_buffers = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=3,
             max_file_blocks=192,
         )
         stale_file_blocks = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=2,
             max_file_blocks=128,
         )
         missing = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=None,
             max_file_blocks=192,
         )
 
         self.assertEqual("PASS", passing.status)
-        self.assertIn("heap=208 KiB", passing.detail)
+        self.assertIn("heap=224 KiB", passing.detail)
         self.assertEqual("FAIL", stale_heap.status)
         self.assertEqual("FAIL", stale_buffers.status)
         self.assertEqual("FAIL", stale_file_blocks.status)

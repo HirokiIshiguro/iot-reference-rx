@@ -83,7 +83,7 @@ class ProfileTests(unittest.TestCase):
             result,
         )
         self.assertIn(
-            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"', result
+            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=224"', result
         )
         self.assertIn(
             'value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"', result
