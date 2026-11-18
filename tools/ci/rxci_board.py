@@ -615,10 +615,9 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
     except SystemExit as error:
         failure = str(error)
     finally:
-        try:
-            board.park()
-        except (subprocess.SubprocessError, OSError) as error:
-            failure = failure or f"could not park the board: {error}"
+        # LCD check (experiment branch only, never merged): the board is not held in reset after the test,
+        # so that a person can look at the LCD later.
+        print("LCD check: the board is left running", flush=True)
     seconds = time.monotonic() - started
     write_junit(logs / "junit.xml", test["name"], seconds, failure)
     (logs / "finished").write_text("the test process parked the board and cleaned up\n", encoding="utf-8")
