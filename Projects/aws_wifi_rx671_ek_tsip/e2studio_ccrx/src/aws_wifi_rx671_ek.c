@@ -36,6 +36,7 @@
 
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 #include "tsip_provisioning_cli.h"
+#include "r_common_api_tsip.h"
 extern void vTsipMbedtlsThreadingCompatInit(void);
 #endif
 
@@ -488,6 +489,18 @@ void main_task(void *pvParameters)
     UserInitialization();
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     vTsipMbedtlsThreadingCompatInit();
+    {
+        /* Open the TSIP driver before any other task needs the hardware random
+         * number source (DHCP asks for one inside the IP task). */
+        e_commonapi_err_t tsip_open_result = R_Demo_Common_API_TSIP_Open(NULL, NULL);
+
+        p = line;
+        p = append_text(p, "RX671 TSIP open=");
+        p = append_dec32(p, (uint32_t)tsip_open_result);
+        p = append_text(p, "\r\n");
+        *p = '\0';
+        debug_puts(line);
+    }
 #endif
     xStartDemoEventGroup = xEventGroupCreate();
     debug_puts("\r\n=== aws_wifi_rx671_ek boot ===\r\n");
@@ -855,6 +868,25 @@ void main_task(void *pvParameters)
             p = append_text(p, "\r\n");
             *p = '\0';
             debug_puts(line);
+            {
+                extern volatile uint32_t g_tcp_random_requests;
+                extern volatile uint32_t g_tcp_random_successes;
+                extern volatile uint32_t g_tcp_random_session_failures;
+                extern volatile uint32_t g_tcp_random_generate_failures;
+
+                p = line;
+                p = append_text(p, "RX671 rng req=");
+                p = append_dec32(p, g_tcp_random_requests);
+                p = append_text(p, " ok=");
+                p = append_dec32(p, g_tcp_random_successes);
+                p = append_text(p, " sess_fail=");
+                p = append_dec32(p, g_tcp_random_session_failures);
+                p = append_text(p, " gen_fail=");
+                p = append_dec32(p, g_tcp_random_generate_failures);
+                p = append_text(p, "\r\n");
+                *p = '\0';
+                debug_puts(line);
+            }
             {
                 static TaskStatus_t task_status[16];
                 UBaseType_t task_count = uxTaskGetSystemState(task_status, 16U, NULL);
