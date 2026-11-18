@@ -226,7 +226,7 @@ def validate_public_signer_material(certificate_path, public_key_path):
 
 
 def bootloader_start(target):
-    return 0xFFFE0000
+    return 0xFFFF0000
 
 
 def validate_initial_rsu(files, target):

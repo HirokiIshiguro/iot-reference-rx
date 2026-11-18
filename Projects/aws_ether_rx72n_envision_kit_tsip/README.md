@@ -76,4 +76,4 @@ small steps.
 
 ## OTA flash layout
 
-The application area is 0xFFE00000–0xFFFDFFFF (1,920 KiB (0x1E0000)); the exception and reset vectors are 0xFFFDFF80 and 0xFFFDFFFC. The 128 KiB bootloader occupies 0xFFFE0000–0xFFFFFFFF and its bank 1 copy starts at 0xFFDE0000. The OTA payload is 1,965,568 bytes.
+The application area is 0xFFE00000–0xFFFEFFFF (1,984 KiB (0x1F0000)); the exception and reset vectors are 0xFFFEFF80 and 0xFFFEFFFC. The 64 KiB bootloader occupies 0xFFFF0000–0xFFFFFFFF and its bank 1 copy starts at 0xFFDF0000. The OTA payload is 2,031,104 bytes.

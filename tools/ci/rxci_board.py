@@ -28,8 +28,8 @@ RFP_SECONDS = 300          # one rfp-cli command; the slowest measured one takes
 # Start and size of one bank of the dual-bank code flash (tools/idt/public_signer_provision.py LAYOUTS).
 BANK = {"rx72n-ethernet": (0xFFE00000, 0x200000), "rx65n-bg96": (0xFFF00000, 0x100000),
         "rx671-wifi": (0xFFF00000, 0x100000)}
-# Last address of the application area of the upper bank; the 128 KiB boot loader follows it on every board.
-APPLICATION_END = 0xFFFDFFFF
+# Last address of the application area of the upper bank; the 64 KiB boot loader follows it on every board.
+APPLICATION_END = 0xFFFEFFFF
 
 
 class Board:

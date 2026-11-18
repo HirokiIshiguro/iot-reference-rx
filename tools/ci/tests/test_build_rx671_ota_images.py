@@ -106,7 +106,7 @@ class ProfileTests(unittest.TestCase):
             'value="-define=OTA_MAX_NUM_DATA_BUFFERS=2"', result
         )
         self.assertIn(
-            'value="-define=OTA_MAX_NUM_FILE_BLOCKS=224"', result
+            'value="-define=OTA_MAX_NUM_FILE_BLOCKS=240"', result
         )
         self.assertIn(
             'value="-define=WHD_PORT_BUFFER_COUNT=8"', result
@@ -124,7 +124,7 @@ class ProfileTests(unittest.TestCase):
             "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300",
             result,
         )
-        self.assertIn("EXCEPTVECT/0FFFDFF80,RESETVECT/0FFFDFFFC", result)
+        self.assertIn("EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC", result)
 
     def test_tls13_profile_selects_only_the_tls13_define(self) -> None:
         result = builder.make_ota_cproject(
@@ -158,7 +158,7 @@ class ProfileTests(unittest.TestCase):
                     "#define BSP_CFG_CODE_FLASH_BANK_MODE    (1)", result
                 )
         fwup = builder.make_ota_fwup_config(self.fwup)
-        self.assertRegex(fwup, r"#define\s+RX_OTA_CFG_AREA_SIZE\s+\(0x0*E0000U\)")
+        self.assertRegex(fwup, r"#define\s+RX_OTA_CFG_AREA_SIZE\s+\(0x0*F0000U\)")
 
     def test_profile_restores_files_after_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

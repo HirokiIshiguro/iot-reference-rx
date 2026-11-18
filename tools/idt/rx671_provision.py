@@ -237,9 +237,14 @@ def source_inputs(source, runtime, target, source_sha, environ=None):
         'rx671_ota_host.py': source / 'tools/rx671_ota_host.py',
         'build_rx671_fwup_v2_rsu.py': source / 'tools/build_rx671_fwup_v2_rsu.py',
         'rx671_bootloader_config.h': source / target['bootloader_project'] / 'src/rx_bootloader_config.h',
-        'rx671_target.h': source / target['bootloader_project'] / 'src/rx671.h',
+        'rx671_target.h': _bootloader_target_header(source / target['bootloader_project']),
     })
     return files
+
+
+def _bootloader_target_header(project):
+    local = project / 'src/rx671.h'
+    return local if local.exists() else project / 'lib/rx_bootloader/config/rx671.h'
 
 
 class _DeadlineSerial:

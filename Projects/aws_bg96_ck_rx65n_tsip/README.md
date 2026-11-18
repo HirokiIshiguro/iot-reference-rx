@@ -57,4 +57,4 @@ while the unmodified driver checkout is a submodule. See the
 
 ## OTA flash layout
 
-The application area is 0xFFF00000–0xFFFDFFFF (896 KiB (0xE0000)); the exception and reset vectors are 0xFFFDFF80 and 0xFFFDFFFC. The 128 KiB bootloader occupies 0xFFFE0000–0xFFFFFFFF and its bank 1 copy starts at 0xFFEE0000. The OTA payload is 916,992 bytes.
+The application area is 0xFFF00000–0xFFFEFFFF (960 KiB (0xF0000)); the exception and reset vectors are 0xFFFEFF80 and 0xFFFEFFFC. The 64 KiB bootloader occupies 0xFFFF0000–0xFFFFFFFF and its bank 1 copy starts at 0xFFEF0000. The OTA payload is 982,528 bytes.

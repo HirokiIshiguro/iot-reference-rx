@@ -30,10 +30,10 @@ class Rx72nFwupPrmContractTests(unittest.TestCase):
 
         self.assertEqual(values["device Type"], "Dual Mode")
         self.assertEqual(values["Code Flash Size(Dual Mode Only)"], "0x00400000")
-        self.assertEqual(values["Bootloader Start Address"], "0xFFFE0000")
+        self.assertEqual(values["Bootloader Start Address"], "0xFFFF0000")
         self.assertEqual(values["Bootloader End Address"], "0xFFFFFFFF")
         self.assertEqual(values["User Program Start Address"], "0xFFE00000")
-        self.assertEqual(values["User Program End Address"], "0xFFFDFFFF")
+        self.assertEqual(values["User Program End Address"], "0xFFFEFFFF")
         self.assertEqual(values["Flash Write Size"], "128")
 
     def test_prm_builder_and_boot_loader_linker_layouts_match(self):
@@ -60,7 +60,7 @@ class Rx72nFwupPrmContractTests(unittest.TestCase):
             )
         }
         self.assertEqual({layout.bootloader_start}, linker_starts)
-        self.assertIn("P*/0FFFE0000", cproject)
+        self.assertIn("P*/0FFFF0000", cproject)
 
     def test_builder_rejects_incompatible_prm(self):
         prm_text = self.prm_path.read_text(encoding="utf-8")
