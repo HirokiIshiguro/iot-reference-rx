@@ -305,7 +305,7 @@ def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path
     else:
         # Heap size and SDIO clock are the values the Fleet image was proven with on this board.
         # The TSIP project has more static RAM, so 250 KiB of heap does not fit in the 384 KiB of RAM.
-        heap_kb = "224" if backend == "tsip" else "250"
+        heap_kb = "238" if backend == "tsip" else "250"
         command += ["-SkipAwsIotConfig", "-FleetProvisioningEnable",
                     "-FreeRtosHeapSizeKb", heap_kb, "-SdioRunClockDiv", "SDHI_DIV_8"]
         build_env = {**os.environ, "RX671_EK_FLEET_ENDPOINT": endpoint,

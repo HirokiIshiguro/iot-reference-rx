@@ -840,6 +840,25 @@ void main_task(void *pvParameters)
         *p = '\0';
         debug_puts(line);
 
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+        /* Fleet diagnostic: heap headroom and task count on the same direct
+         * path as the heartbeat, to tell a heap shortage from a stalled task. */
+        if ((3U == tick) || (30U == tick) || (120U == tick))
+        {
+            p = line;
+            p = append_text(p, "RX671 Fleet heap: free=");
+            p = append_dec32(p, (uint32_t)xPortGetFreeHeapSize());
+            p = append_text(p, " min=");
+            p = append_dec32(p, (uint32_t)xPortGetMinimumEverFreeHeapSize());
+            p = append_text(p, " tasks=");
+            p = append_dec32(p, (uint32_t)uxTaskGetNumberOfTasks());
+            p = append_text(p, "
+");
+            *p = ' ';
+            debug_puts(line);
+        }
+#endif
+
         tick++;
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
