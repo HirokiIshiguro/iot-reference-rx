@@ -193,6 +193,10 @@ def build_rx671_ota(registry: dict, tls: str, out: Path) -> None:
             "candidate.ota.bin": bundle / candidate / "aws_wifi_rx671_ek.ota.bin",
             "candidate.ota-signature.der": bundle / candidate / "aws_wifi_rx671_ek.ota-signature.der",
         })
+        # Memory layout of the baseline, to read when a test runs out of heap.
+        for name in ("aws_wifi_rx671_ek.map", "ota-layout-report.json"):
+            if (bundle / baseline / name).is_file():
+                shutil.copyfile(bundle / baseline / name, out / f"baseline-{name}")
     finally:
         keep_logs(work, out)
         shutil.rmtree(bundle, ignore_errors=True)
