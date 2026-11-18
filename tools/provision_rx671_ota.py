@@ -248,16 +248,26 @@ def _commit(serial_port, args: argparse.Namespace, event_log) -> None:
         raise
 
 
-def _provision_tsip_keys(serial_port, args: argparse.Namespace, event_log, completed: list[str]) -> None:
+def _provision_tsip_keys(serial_port, args: argparse.Namespace, event_log, completed: list[str]) -> str | None:
     """Send the wrapped TLS keys through the TSIP CLI of the provisioner. Nothing secret is logged."""
     import provision_tsip_over_uart as tsip
 
     payloads = tsip.load_payloads(argparse.Namespace(
         only=None, target="rx671", rootca_sig_hex_env=None, rootca_der_hex_env=None,
         root_signer_hex_env=None, client_pub_hex_env=None, client_pri_hex_env=None))
-    tsip.send_payloads(serial_port, payloads, args.tsip_chunk_size, args.command_timeout, args.char_delay)
+    tsip.send_payloads(serial_port, payloads, args.tsip_chunk_size, args.command_timeout, args.char_delay,
+                       prepare=False)
     completed.append("tsip_keys")
-    event_log.write("wrapped TLS keys stored and prepared by the board (payloads redacted)\n")
+    event_log.write("wrapped TLS keys stored by the board (payloads redacted)\n")
+    # The answer of prepare names no key material. A failure is kept and raised after conf commit,
+    # so that one run shows both the prepare answer and whether conf commit answers.
+    try:
+        answer = tsip.send_command(serial_port, "tsipprov prepare", args.command_timeout, args.char_delay)
+    except RuntimeError as exc:
+        event_log.write(f"tsipprov prepare failed: {_printable(str(exc).encode('ascii', 'replace'), 400)!r}\n")
+        return str(exc)
+    event_log.write(f"tsipprov prepare answer: {_printable(answer.encode('ascii', 'replace'), 400)!r}\n")
+    return None
 
 
 def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=None, serial_opener=None,
@@ -294,6 +304,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
         auth_id=args.rfp_auth_id,
     )
     completed: list[str] = []
+    prepare_error: str | None = None
     event_log.write("program provisioner MOT without chip erase; leave target reset\n")
     execute(
         rfp.program_command(args.provisioner_mot, leave_reset=True),
@@ -336,7 +347,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
         if getattr(args, "tsip", False) and not signer_only:
             # The wrapped keys go first. tsipprov prepare opens the TSIP driver; conf commit then starts
             # PKCS #11, whose entropy source needs that driver to be open (first run: no answer to conf commit).
-            _provision_tsip_keys(serial_port, args, event_log, completed)
+            prepare_error = _provision_tsip_keys(serial_port, args, event_log, completed)
 
         verification_values = {}
         pem_values = []
@@ -390,6 +401,8 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             )
         if verification_values:
             completed.append("public_config_readback_verified")
+        if prepare_error:
+            raise RuntimeError(prepare_error)
         event_log.write("PEM persistence requires bootloader key loading and signature proof\n")
     finally:
         serial_port.close()
