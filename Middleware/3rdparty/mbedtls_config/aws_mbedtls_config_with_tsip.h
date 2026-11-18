@@ -631,7 +631,7 @@
  *
  * Uncomment this macro to enable the NULL cipher and ciphersuites
  */
-#define MBEDTLS_CIPHER_NULL_CIPHER
+//#define MBEDTLS_CIPHER_NULL_CIPHER
 
 /**
  * \def MBEDTLS_CIPHER_PADDING_PKCS7
@@ -1396,7 +1396,7 @@
  *
  * Comment to disable the context serialization APIs.
  */
-#define MBEDTLS_SSL_CONTEXT_SERIALIZATION
+//#define MBEDTLS_SSL_CONTEXT_SERIALIZATION
 
 /**
  * \def MBEDTLS_SSL_DEBUG_ALL
@@ -1672,7 +1672,7 @@
  *
  * Comment this macro to disable support for SSL session tickets
  */
-#define MBEDTLS_SSL_SESSION_TICKETS
+//#define MBEDTLS_SSL_SESSION_TICKETS
 
 /**
  * \def MBEDTLS_SSL_SERVER_NAME_INDICATION
@@ -1749,7 +1749,7 @@
  *
  * Uncomment to enable invasive tests.
  */
-#define MBEDTLS_TEST_HOOKS
+//#define MBEDTLS_TEST_HOOKS
 
 /**
  * \def MBEDTLS_THREADING_ALT
@@ -1833,7 +1833,7 @@
  *
  * Comment this to disable run-time checking and save ROM space
  */
-#define MBEDTLS_VERSION_FEATURES
+//#define MBEDTLS_VERSION_FEATURES
 
 /**
  * \def MBEDTLS_X509_TRUSTED_CERTIFICATE_CALLBACK
@@ -2244,7 +2244,7 @@
  *
  * This module provides debugging functions.
  */
-#define MBEDTLS_DEBUG_C
+//#define MBEDTLS_DEBUG_C
 
 /**
  * \def MBEDTLS_DES_C
@@ -2433,7 +2433,7 @@
  *
  * Requires: MBEDTLS_AES_C and MBEDTLS_CIPHER_C
  */
-#define MBEDTLS_NIST_KW_C
+//#define MBEDTLS_NIST_KW_C
 
 /**
  * \def MBEDTLS_MD_C
@@ -2555,7 +2555,7 @@
  *
  * This modules adds support for the VIA PadLock on x86.
  */
-#define MBEDTLS_PADLOCK_C
+//#define MBEDTLS_PADLOCK_C
 
 /**
  * \def MBEDTLS_PEM_PARSE_C
@@ -2664,7 +2664,7 @@
  *
  * This module enables PKCS#12 functions.
  */
-#define MBEDTLS_PKCS12_C
+//#define MBEDTLS_PKCS12_C
 
 /**
  * \def MBEDTLS_PLATFORM_C
@@ -2761,7 +2761,7 @@
  * Caller:  library/md.c
  *
  */
-#define MBEDTLS_RIPEMD160_C
+//#define MBEDTLS_RIPEMD160_C
 
 /**
  * \def MBEDTLS_RSA_C
@@ -2985,7 +2985,7 @@
  *
  * Requires: MBEDTLS_SSL_CACHE_C
  */
-#define MBEDTLS_SSL_CACHE_C
+//#define MBEDTLS_SSL_CACHE_C
 
 /**
  * \def MBEDTLS_SSL_COOKIE_C
@@ -2995,7 +2995,7 @@
  * Module:  library/ssl_cookie.c
  * Caller:
  */
-#define MBEDTLS_SSL_COOKIE_C
+//#define MBEDTLS_SSL_COOKIE_C
 
 /**
  * \def MBEDTLS_SSL_TICKET_C
@@ -3007,7 +3007,7 @@
  *
  * Requires: MBEDTLS_CIPHER_C || MBEDTLS_USE_PSA_CRYPTO
  */
-#define MBEDTLS_SSL_TICKET_C
+//#define MBEDTLS_SSL_TICKET_C
 
 /**
  * \def MBEDTLS_SSL_CLI_C
@@ -3035,7 +3035,7 @@
  *
  * This module is required for SSL/TLS server support.
  */
-#define MBEDTLS_SSL_SRV_C
+//#define MBEDTLS_SSL_SRV_C
 
 /**
  * \def MBEDTLS_SSL_TLS_C
@@ -3108,7 +3108,7 @@
  *
  * This module provides run-time version information.
  */
-#define MBEDTLS_VERSION_C
+//#define MBEDTLS_VERSION_C
 
 /**
  * \def MBEDTLS_X509_USE_C
@@ -3155,7 +3155,7 @@
  *
  * This module is required for X.509 CRL parsing.
  */
-#define MBEDTLS_X509_CRL_PARSE_C
+//#define MBEDTLS_X509_CRL_PARSE_C
 
 /**
  * \def MBEDTLS_X509_CSR_PARSE_C
@@ -3169,7 +3169,7 @@
  *
  * This module is used for reading X.509 certificate request.
  */
-#define MBEDTLS_X509_CSR_PARSE_C
+//#define MBEDTLS_X509_CSR_PARSE_C
 
 /**
  * \def MBEDTLS_X509_CREATE_C
@@ -3195,7 +3195,7 @@
  *
  * This module is required for X.509 certificate creation.
  */
-#define MBEDTLS_X509_CRT_WRITE_C
+//#define MBEDTLS_X509_CRT_WRITE_C
 
 /**
  * \def MBEDTLS_X509_CSR_WRITE_C
