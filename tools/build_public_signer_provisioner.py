@@ -157,8 +157,8 @@ def make_profile(text: str, source_sha: str = "0" * 40) -> str:
     if len(values) != 1:
         raise ValueError("Maintenance profile requires one application vector layout")
     start = values[0]
-    standalone = re.sub(r"EXCEPTVECT/0?[Ff]{3}[Bb][Ff]{2}80", "EXCEPTVECT/0FFFFFF80", start)
-    standalone = re.sub(r"RESETVECT/0?[Ff]{3}[Bb][Ff]{3}[Cc]", "RESETVECT/0FFFFFFFC", standalone)
+    standalone = re.sub(r"EXCEPTVECT/0?[Ff]{3}[BbDd][Ff]{2}80", "EXCEPTVECT/0FFFFFF80", start)
+    standalone = re.sub(r"RESETVECT/0?[Ff]{3}[BbDd][Ff]{3}[Cc]", "RESETVECT/0FFFFFFFC", standalone)
     if standalone == start or "RESETVECT/0FFFFFFFC" not in standalone:
         raise ValueError("Unsupported application vector layout")
     text = text.replace('value="' + start + '"', 'value="' + standalone + '"', 1)
