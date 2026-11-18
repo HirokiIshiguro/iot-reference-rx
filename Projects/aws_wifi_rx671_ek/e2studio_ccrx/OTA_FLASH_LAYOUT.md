@@ -192,8 +192,22 @@ jobではこの見積りではなく、再buildしたMAPの`ram_capacity` gate�
 mapped 346,181 bytes、未使用47,028 bytesを示した
 （[pipeline 16753](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16753)）。
 下の`ef69d76c`時点の記録（high-water `0x00058A5B`、minimum-ever-free heap 25,584 bytes）と
-比べると、静的RAMが約17 KiB減り、heapの使用量が同程度増えている。どの変更で静的RAMから
-heapへ移ったかは未確認。
+比べると、静的RAMが約17 KiB減り、heapの使用量が同程度増えている。
+
+heapの使用量が増えた有力な原因は、commit `65c59407`（3台の共通化）でRX671の
+`configMINIMAL_STACK_SIZE`が140 wordsから768 wordsになったことである。この値の倍数で
+確保するtask stackが連動して増えた（1 word = 4 bytesで計算）。
+
+| task | stack（旧 → 新） | 増分 |
+|---|---:|---:|
+| logging（`configMINIMAL_STACK_SIZE * 6`） | 840 → 4,608 words | +15,072 bytes |
+| OTA demo（`* 3`） | 420 → 2,304 words | +7,536 bytes |
+| OTA flash（`* 2`） | 280 → 1,536 words | +5,024 bytes |
+
+loggingとOTA demoの増分の合計22,608 bytesは、minimum-ever-free heapの差
+（25,584 → 2,080 bytes、差23,504 bytes）に近い。ただし各taskのstackの使用量は測っておらず、
+これは計算からの推定である。静的RAMが減った原因は特定できていない。各taskのstackを
+high-waterの実測から決め直せば、heapを208 KiBへ戻せる可能性がある（未着手）。
 
 heapを16 KiB増やして224 KiBとし、layout analyzerの固定値も224 / 2 / 192とした。
 [pipeline 16757](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16757)の
