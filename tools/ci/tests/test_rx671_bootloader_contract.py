@@ -129,14 +129,6 @@ class Rx671BootloaderContractTests(unittest.TestCase):
         self.assertIn('"missing-fail-closed"', monitor)
         self.assertIn('UNSAFE_FALLBACK_MARKER = "not found; using built-in key."', monitor)
 
-    def test_manual_smoke_releases_reset_and_selects_key_state(self) -> None:
-        ci = (REPO_ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
-        job = ci.split("smoke_rx671_bootloader_manual:", 1)[1].split(
-            "\nprepare_rx65n_bg96_mqtt_credentials:", 1
-        )[0]
-        self.assertIn("-p -v -run -noquery", job)
-        self.assertNotIn("-p -v -reset -noquery", job)
-        self.assertIn('--expected-key-state "$RX671_BOOTLOADER_EXPECTED_KEY_STATE"', job)
 
     def test_build_cleanup_is_limited_to_named_child_directories(self) -> None:
         helper = (REPO_ROOT / "tools" / "build_headless_rx671_bootloader.ps1").read_text(

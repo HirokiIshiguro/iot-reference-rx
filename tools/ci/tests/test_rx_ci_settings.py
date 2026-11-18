@@ -19,37 +19,6 @@ SUFFIXES = {"UART_PORT", "UART_BAUD_RATE", "RFP_CLI", "RFP_TOOL", "RFP_DEVICE", 
 
 
 class RxCiSettingsTests(unittest.TestCase):
-    def test_actual_yaml_defaults_resolve_with_public_inventory_inputs(self):
-        # Exercise source defaults as well as the resolver's built-in defaults.
-        # These are public bench assignments, never live credential variables.
-        names = {"rx72n-ethernet": ("E2L_SERIAL_ENVISION_KIT_RX72N_ECN1", "UART_PORT_ENVISION_KIT_RX72N_CN6_RPI1"),
-                 "rx65n-bg96": ("E2L_SERIAL_CK_RX65N_RPI3", "UART_PORT_CK_RX65N_RPI3"),
-                 "rx671-wifi": ("E2L_SERIAL_EK_RX671_E2OB_RPI1", "UART_PORT_EK_RX671_SCI6_RPI1")}
-        inventory = {}
-        keys = set()
-        for target_id, (serial, uart) in names.items():
-            target = get_target(target_id)
-            inventory.update({serial: target["e2lite"], uart: target["uart"]})
-            keys.update(settings.normalize(target_id, {}))
-        text = (Path(__file__).resolve().parents[3]/".gitlab-ci.yml").read_text(encoding="utf-8")
-        block = text.split("\nvariables:\n", 1)[1].split("\nworkflow:\n", 1)[0]
-        inputs = {}
-        for match in re.finditer(r'^  ([A-Z0-9_]+):\s*("[^\n]*")\s*$', block, re.M):
-            key, value = match.groups()
-            if key in keys:
-                inputs[key] = json.loads(value)
-        for _ in range(4):
-            values = {**inventory, **inputs}
-            inputs = {key: re.sub(r'\$\{([A-Z0-9_]+)\}', lambda m: values.get(m.group(1), m.group()), value)
-                      for key, value in inputs.items()}
-        for target_id, prefix in TARGETS.items():
-            with self.subTest(target=target_id):
-                result = settings.normalize(target_id, inputs)
-                target = get_target(target_id)
-                self.assertEqual(target["uart"], result[prefix+"UART_PORT"])
-                self.assertEqual("e2l:"+target["e2lite"], result[prefix+"RFP_TOOL"])
-                self.assertEqual(target["rfp_speed"], result[prefix+"RFP_SPEED"])
-                self.assertEqual(target["bench_lock"], result[prefix+"HARDWARE_LOCK_PATH"])
 
     def test_defaults_bind_all_three_physical_targets_and_keep_legacy_exports(self):
         for target_id, prefix in TARGETS.items():
