@@ -8,7 +8,7 @@
         "exec-shell",
         "os-linux",
         "hw-raspi",
-        "dev-ek-rx72n-set1"
+        "dev-ek-rx72n-set2"
       ],
       "resource_group": "board-rx72n",
       "thing": "rx72n-02",
