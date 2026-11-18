@@ -852,9 +852,8 @@ void main_task(void *pvParameters)
             p = append_dec32(p, (uint32_t)xPortGetMinimumEverFreeHeapSize());
             p = append_text(p, " tasks=");
             p = append_dec32(p, (uint32_t)uxTaskGetNumberOfTasks());
-            p = append_text(p, "
-");
-            *p = ' ';
+            p = append_text(p, "\r\n");
+            *p = '\0';
             debug_puts(line);
         }
 #endif
