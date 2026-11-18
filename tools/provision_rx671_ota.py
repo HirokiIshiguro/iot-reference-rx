@@ -7,6 +7,10 @@ address-range operations that preserve Data Flash and both boot-loader regions,
 and the boot-loader MOT is then programmed.  The boot loader is deliberately
 left in reset; ``test_rx671_ota.py`` opens SCI6 before releasing it so no
 one-shot marker is lost and keeps that same UART open through the transaction.
+
+With ``--tsip`` the image is the TSIP provisioner: no plaintext device private key is
+entered. After ``conf commit`` the wrapped TLS keys are sent with ``tsipprov`` (the
+four slots of ``provision_tsip_over_uart.py``) and the board prepares them.
 """
 
 from __future__ import annotations
@@ -201,6 +205,28 @@ def _verify_value(
     )
 
 
+def _thing_name(args: argparse.Namespace) -> str:
+    """The Thing name: given directly, or read from an environment variable so that it stays off the command line."""
+    if getattr(args, "thing_name_env", None):
+        value = os.environ.get(args.thing_name_env, "")
+        if not value:
+            raise ValueError(f"Thing name environment variable is empty: {args.thing_name_env}")
+        return value
+    return args.thing_name
+
+
+def _provision_tsip_keys(serial_port, args: argparse.Namespace, event_log, completed: list[str]) -> None:
+    """Send the wrapped TLS keys through the TSIP CLI of the provisioner. Nothing secret is logged."""
+    import provision_tsip_over_uart as tsip
+
+    payloads = tsip.load_payloads(argparse.Namespace(
+        only=None, target="rx671", rootca_sig_hex_env=None, rootca_der_hex_env=None,
+        root_signer_hex_env=None, client_pub_hex_env=None, client_pri_hex_env=None))
+    tsip.send_payloads(serial_port, payloads, args.tsip_chunk_size, args.command_timeout, args.char_delay)
+    completed.append("tsip_keys")
+    event_log.write("wrapped TLS keys stored and prepared by the board (payloads redacted)\n")
+
+
 def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=None, serial_opener=None,
               rfp_config=None, ready_source_sha: str | None = None) -> dict:
     """Run the standalone dual-bank provisioner, optionally storing only public signer trust.
@@ -286,7 +312,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             )
             completed.append("wifi_credentials")
             event_log.write("Wi-Fi SSID/passphrase stored (values redacted)\n")
-            for name, value in (("endpoint", args.endpoint), ("thingname", args.thing_name)):
+            for name, value in (("endpoint", args.endpoint), ("thingname", _thing_name(args))):
                 send_ascii_command(
                     serial_port, f"conf set {name} {value}",
                     timeout=args.command_timeout, char_delay=args.char_delay,
@@ -294,7 +320,9 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
                 verification_values[name] = value
             completed.extend(("endpoint", "thing"))
             event_log.write("endpoint and Thing name stored (values redacted)\n")
-            pem_values.extend((("cert", args.certificate), ("key", args.private_key)))
+            pem_values.append(("cert", args.certificate))
+            if not getattr(args, "tsip", False):
+                pem_values.append(("key", args.private_key))
         pem_values.extend((
             ("codesigncert", args.codesigner_certificate),
             ("codesignpubkey", args.codesigner_public_key),
@@ -330,6 +358,8 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             )
         if verification_values:
             completed.append("public_config_readback_verified")
+        if getattr(args, "tsip", False) and not signer_only:
+            _provision_tsip_keys(serial_port, args, event_log, completed)
         event_log.write("PEM persistence requires bootloader key loading and signature proof\n")
     finally:
         serial_port.close()
@@ -359,6 +389,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
     return {
         "success": True,
         "signer_only": signer_only,
+        "tsip": bool(getattr(args, "tsip", False)),
         "classification": "provisioned_and_bootloader_left_reset",
         "completed_steps": completed,
         "data_flash_preserved_during_rfp_programming": True,
@@ -382,9 +413,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--provisioner-mot", type=_required_file, required=True)
     parser.add_argument("--bootloader-mot", type=_required_file, required=True)
     parser.add_argument("--endpoint", required=True)
-    parser.add_argument("--thing-name", required=True)
+    thing = parser.add_mutually_exclusive_group(required=True)
+    thing.add_argument("--thing-name")
+    thing.add_argument("--thing-name-env", help="environment variable that holds the Thing name")
     parser.add_argument("--certificate", type=_required_file, required=True)
-    parser.add_argument("--private-key", type=_required_file, required=True)
+    parser.add_argument("--private-key", type=_required_file)
+    parser.add_argument("--tsip", action="store_true",
+                        help="TSIP provisioner: no plaintext private key; send the wrapped TLS keys with tsipprov")
+    parser.add_argument("--tsip-chunk-size", type=int, default=128)
     parser.add_argument("--codesigner-certificate", type=_required_file, required=True)
     parser.add_argument("--codesigner-public-key", type=_required_file, required=True)
     parser.add_argument("--wifi-ssid-env", default="RX671_EK_WIFI_SSID")
@@ -411,6 +447,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.rfp_timeout <= 0:
         parser.error("--rfp-timeout must be positive")
+    if args.tsip and args.private_key is not None:
+        parser.error("--private-key must not be given with --tsip")
+    if not args.tsip and args.private_key is None:
+        parser.error("--private-key is required without --tsip")
+    if args.tsip_chunk_size <= 0:
+        parser.error("--tsip-chunk-size must be positive")
     if args.cleanup_plaintext and args.cleanup_root is None:
         parser.error("--cleanup-root is required with --cleanup-plaintext")
     return args

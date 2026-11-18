@@ -71,6 +71,27 @@ TARGET_ENV_NAMES = {
             "RX65N_TSIP_CLIENT_RSA2048_PRIVATE_HEX",
         ),
     },
+    "rx671": {
+        "rootca-sig": (
+            "RENESAS_RX671_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX",
+            # Experiment: the signature depends only on the root CA certificate and the root signer key,
+            # not on the MCU, so the RX72N value may fit if both boards use the same root signer.
+            # Remove this name when the RX671 variable exists.
+            "RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX",
+        ),
+        "rootca-der": (
+            "RENESAS_RX671_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_DER_HEX",
+        ),
+        "root-signer": (
+            "RENESAS_RX671_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX",
+        ),
+        "client-pub": (
+            "RENESAS_RX671_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PUBLIC_HEX",
+        ),
+        "client-pri": (
+            "RENESAS_RX671_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PRIVATE_HEX",
+        ),
+    },
 }
 
 ALL_SLOTS = ("rootca-sig", "rootca-der", "root-signer", "client-pub", "client-pri")
@@ -218,6 +239,30 @@ def provision_slot(
     print(send_command(ser, "tsipprov end", timeout, inter_byte_delay), end="")
 
 
+def send_payloads(
+    ser: serial.Serial,
+    payloads: list[tuple[str, bytes, str]],
+    chunk_size: int,
+    timeout: float,
+    inter_byte_delay: float,
+    *,
+    refresh_credentials: bool = False,
+    prepare: bool = True,
+) -> None:
+    """Send every slot, then read the status and let the board prepare its TSIP keys.
+
+    The board must already be in its CLI. Wrapped key bytes are never printed.
+    """
+    for slot, data, source in payloads:
+        provision_slot(ser, slot, data, chunk_size, timeout, inter_byte_delay, source)
+
+    print(send_command(ser, "tsipprov status", timeout, inter_byte_delay), end="")
+    if refresh_credentials:
+        print(send_command(ser, "tsipprov credentials", timeout, inter_byte_delay), end="")
+    if prepare:
+        print(send_command(ser, "tsipprov prepare", timeout, inter_byte_delay), end="")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
@@ -266,14 +311,8 @@ def main() -> int:
             print("[format] littlefs")
             print(send_command(ser, "format", args.timeout, args.inter_byte_delay), end="")
 
-        for slot, data, source in payloads:
-            provision_slot(ser, slot, data, args.chunk_size, args.timeout, args.inter_byte_delay, source)
-
-        print(send_command(ser, "tsipprov status", args.timeout, args.inter_byte_delay), end="")
-        if args.refresh_credentials:
-            print(send_command(ser, "tsipprov credentials", args.timeout, args.inter_byte_delay), end="")
-        if not args.skip_prepare:
-            print(send_command(ser, "tsipprov prepare", args.timeout, args.inter_byte_delay), end="")
+        send_payloads(ser, payloads, args.chunk_size, args.timeout, args.inter_byte_delay,
+                      refresh_credentials=args.refresh_credentials, prepare=not args.skip_prepare)
         if args.reset_after:
             print("[reset] CLI reset")
             write_command(ser, "reset", args.inter_byte_delay)

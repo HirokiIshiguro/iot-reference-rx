@@ -62,7 +62,10 @@
       "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
       "ota_baseline_version": "0.1.0",
       "ota_candidate_version": "0.1.1",
-      "ota_is_self_contained": true
+      "ota_is_self_contained": true,
+      "tsip_thing_variable": "RX671_TSIP_AWS_IOT_THING_NAME",
+      "tsip_certificate_variable": "RX671_TSIP_LANBENCH_CLIENT_CERT_PEM",
+      "tsip_mqtt_from_ota_bundle": true
     }
   },
   "runners": {
@@ -130,6 +133,10 @@
     "rx671:sw:tls13:ota",
     "rx671:tsip:tls12:fleet",
     "rx671:tsip:tls13:fleet",
+    "rx671:tsip:tls12:mqtt",
+    "rx671:tsip:tls13:mqtt",
+    "rx671:tsip:tls12:ota",
+    "rx671:tsip:tls13:ota",
     "rx72n:tsip:tls12:mqtt",
     "rx72n:tsip:tls13:mqtt",
     "rx72n:tsip:tls12:fleet",
