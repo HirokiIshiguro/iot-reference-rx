@@ -206,7 +206,8 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Pat
                  "--cert", required_file(board.config["certificate_variable"]),
                  *private_key_arguments(board, test),
                  "--reset-cmd", board.reset_command(), "--reset-after-open", "--boot-wait", 12,
-                 "--cli-timeout", 25, "--attempts", 3, "--no-reset"]
+                 "--cli-timeout", 25, "--attempts", 3, "--no-reset",
+                 "--summary-json", logs / "provision_summary.json"]
     board.run(provision, timeout=400, label="provision the device credentials")
     provision_tsip_keys(board, test, reset_after=True)
     observe = [sys.executable, TOOLS / "test_mqtt_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
@@ -231,7 +232,8 @@ def fleet_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Pa
                  "--claim-cert", required_file(board.config["claim_certificate_variable"]),
                  "--claim-key", required_file(board.config["claim_private_key_variable"]),
                  "--no-reset", "--reset-cmd", board.reset_command(), "--reset-after-open", "--boot-wait", 12,
-                 "--cli-timeout", 25, "--attempts", 3]
+                 "--cli-timeout", 25, "--attempts", 3,
+                 "--summary-json", logs / "provision_summary.json"]
     board.run(provision, timeout=400, label="provision the claim credentials")
     observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
                "--timeout", 600, "--reset-cmd", board.reset_command(), "--summary-json", logs / "fleet_summary.json"]
@@ -308,7 +310,8 @@ def ota_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path
                      *private_key_arguments(board, test),
                      "--codesigner-cert", candidate / "codesign_cert.pem", "--format",
                      "--reset-cmd", board.reset_command(), "--reset-after-open", "--boot-wait", 12,
-                     "--cli-timeout", 25, "--attempts", 3, "--no-reset"]
+                     "--cli-timeout", 25, "--attempts", 3, "--no-reset",
+                     "--summary-json", logs / "provision_summary.json"]
         board.run(provision, timeout=400, label="provision the device credentials")
         provision_tsip_keys(board, test)
         observe = [sys.executable, TOOLS / "test_ota.py", "--port", board.uart, "--baud", board.baud,
