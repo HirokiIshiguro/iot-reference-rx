@@ -9,6 +9,7 @@ the short-lived CLI window.
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -39,6 +40,12 @@ DEFAULT_CHAR_DELAY = 0.002
 DEFAULT_LINE_DELAY = 0.5
 DEFAULT_RESPONSE_TIMEOUT = 10.0
 RC_FAILED_AFTER_FORMAT = 2
+# When a PEM command gets neither OK nor Error, the CLI input line is aborted and the same
+# PEM is sent again (no reset, so what format wrote stays). At most this many times.
+DEFAULT_PEM_RETRIES = 2
+DEFAULT_PROMPT_TIMEOUT = 3.0
+# Upper bound for waiting until the echo of what was just sent has all arrived.
+ECHO_DRAIN_LIMIT = 0.2
 DEFAULT_BOOT_WAIT = 3.0
 DEFAULT_CLI_TIMEOUT = 15.0
 DEFAULT_CLI_RETRY_INTERVAL = 1.0
@@ -109,39 +116,120 @@ def send_command(ser, command, char_delay, line_delay, expect_ok=True, required_
     return response
 
 
-def send_pem_command(ser, key_name, pem_path, char_delay, line_delay, response_timeout=DEFAULT_RESPONSE_TIMEOUT):
+RUN_STATS = {}
+
+
+def reset_run_stats():
+    RUN_STATS.clear()
+    RUN_STATS.update({"pem_commands": 0, "pem_retries": 0, "pem_retried_keys": [],
+                      "pem_echo_mismatches": 0, "pem_failed_keys": []})
+
+
+reset_run_stats()
+
+
+def write_summary(path):
+    if not path:
+        return
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(RUN_STATS, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+
+def send_chars_counting_echo(ser, text, char_delay):
+    """Send text one character at a time; return how many bytes came back meanwhile."""
+    echoed = 0
+    for ch in text:
+        ser.write(ch.encode("ascii"))
+        time.sleep(char_delay)
+        waiting = ser.in_waiting
+        if waiting:
+            echoed += len(ser.read(waiting))
+    return echoed
+
+
+def drain_echo(ser, echoed, expected, limit=ECHO_DRAIN_LIMIT):
+    """Count the echo still in flight; returns as soon as `expected` bytes have arrived."""
+    deadline = time.monotonic() + limit
+    while echoed < expected and time.monotonic() < deadline:
+        waiting = ser.in_waiting
+        if waiting:
+            echoed += len(ser.read(waiting))
+            continue
+        time.sleep(0.005)
+    return echoed
+
+
+def recover_cli_prompt(ser, timeout):
+    """Terminate whatever is in the board's input line and confirm that the prompt comes back."""
+    ser.reset_input_buffer()
+    ser.write(b"\r\n")
+    text, _ = wait_for_command_result(ser, timeout, (">",), error_tokens=())
+    return ">" in text
+
+
+def send_pem_command(ser, key_name, pem_path, char_delay, line_delay, response_timeout=DEFAULT_RESPONSE_TIMEOUT,
+                     retries=DEFAULT_PEM_RETRIES):
     with open(pem_path, "r", encoding="utf-8") as f:
         pem_content = f.read()
 
     return send_pem_content_command(ser, key_name, pem_content, pem_path, char_delay, line_delay,
-                                    response_timeout)
+                                    response_timeout, retries)
 
 
 def send_pem_content_command(ser, key_name, pem_content, source_label, char_delay, line_delay,
-                             response_timeout=DEFAULT_RESPONSE_TIMEOUT):
+                             response_timeout=DEFAULT_RESPONSE_TIMEOUT, retries=DEFAULT_PEM_RETRIES,
+                             prompt_timeout=DEFAULT_PROMPT_TIMEOUT):
     pem_content = pem_content.replace("\r\n", "\n").replace("\r", "\n").strip()
-    total_len = len(f"conf set {key_name} ") + len(pem_content)
+    head = f"conf set {key_name} "
+    total_len = len(head) + len(pem_content)
     if total_len > 4090:
         print(f"  WARNING: Command length ({total_len}) near buffer limit (4096)")
 
     print(f"  Sending: conf set {key_name} <{source_label}> ({len(pem_content)} bytes)")
-    send_chars(ser, f"conf set {key_name} ", char_delay)
-    send_chars(ser, pem_content, char_delay)
-    # Drop the echo of the text just sent so base64 data cannot be mistaken for a reply.
-    ser.reset_input_buffer()
-    ser.write(b"\r\n")
-    response, waited = wait_for_command_result(ser, response_timeout, ("OK",))
+    RUN_STATS["pem_commands"] += 1
+    retried = 0
+    while True:
+        ser.reset_input_buffer()
+        echoed = send_chars_counting_echo(ser, head + pem_content, char_delay)
+        echoed = drain_echo(ser, echoed, total_len)
+        # Only counts are printed, never the content. Fewer echoed than sent means the board
+        # missed characters on receive or its echo was lost on transmit.
+        mismatch = echoed != total_len
+        if mismatch:
+            RUN_STATS["pem_echo_mismatches"] += 1
+        print(f"  Echo count: sent={total_len} echoed={echoed}" + (" (MISMATCH)" if mismatch else ""))
+        # Drop the echo of the text just sent so base64 data cannot be mistaken for a reply.
+        ser.reset_input_buffer()
+        ser.write(b"\r\n")
+        response, waited = wait_for_command_result(ser, response_timeout, ("OK",))
 
-    if "OK" in response:
-        print("  OK")
-        return True
-    if "Error" in response:
-        print(f"  ERROR: {mask_sensitive_output(response.strip())}")
-        return False
+        if "OK" in response:
+            print("  OK")
+            return True
+        if "Error" in response:
+            print(f"  ERROR: {mask_sensitive_output(response.strip())}")
+            RUN_STATS["pem_failed_keys"].append(key_name)
+            return False
 
-    print(f"  ERROR: no OK or Error within {waited:.1f}s, "
-          f"got: {mask_sensitive_output(response.strip()) or 'No response'}")
-    return False
+        reply = mask_sensitive_output(response.strip()) or "No response"
+        failure = (f"  ERROR: no OK or Error within {waited:.1f}s, got: {reply} "
+                   f"(retries used: {retried}/{retries})")
+        if retried >= retries:
+            print(failure)
+            RUN_STATS["pem_failed_keys"].append(key_name)
+            return False
+        print(f"  WARNING: no OK or Error within {waited:.1f}s for conf set {key_name}; "
+              f"aborting the input line to get the prompt back")
+        if not recover_cli_prompt(ser, prompt_timeout):
+            print(f"  No CLI prompt within {prompt_timeout:.1f}s after the abort line; not retrying")
+            print(failure)
+            RUN_STATS["pem_failed_keys"].append(key_name)
+            return False
+        retried += 1
+        RUN_STATS["pem_retries"] += 1
+        RUN_STATS["pem_retried_keys"].append(key_name)
+        print(f"  RETRY {retried}/{retries}: prompt is back; sending conf set {key_name} again")
 
 
 def derive_public_key_from_certificate(cert_path):
@@ -507,11 +595,11 @@ def _provision(args, state):
                 return 1
 
             print("\n--- Set claim certificate ---")
-            if not send_pem_command(ser, "claimcert", args.claim_cert, args.char_delay, args.line_delay, args.response_timeout):
+            if not send_pem_command(ser, "claimcert", args.claim_cert, args.char_delay, args.line_delay, args.response_timeout, args.pem_retries):
                 return 1
 
             print("\n--- Set claim private key ---")
-            if not send_pem_command(ser, "claimkey", args.claim_key, args.char_delay, args.line_delay, args.response_timeout):
+            if not send_pem_command(ser, "claimkey", args.claim_key, args.char_delay, args.line_delay, args.response_timeout, args.pem_retries):
                 return 1
         else:
             print(f"\n--- Set thing name: {args.thing_name} ---")
@@ -521,19 +609,19 @@ def _provision(args, state):
                 return 1
 
             print("\n--- Set device certificate ---")
-            if not send_pem_command(ser, "cert", args.cert, args.char_delay, args.line_delay, args.response_timeout):
+            if not send_pem_command(ser, "cert", args.cert, args.char_delay, args.line_delay, args.response_timeout, args.pem_retries):
                 return 1
 
             if args.skip_private_key:
                 print("\n--- Skip private key PEM (TSIP runtime key provisioning is expected) ---")
             else:
                 print("\n--- Set private key ---")
-                if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay, args.response_timeout):
+                if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay, args.response_timeout, args.pem_retries):
                     return 1
 
             if args.codesigner_cert:
                 print("\n--- Set code signing certificate ---")
-                if not send_pem_command(ser, "codesigncert", args.codesigner_cert, args.char_delay, args.line_delay, args.response_timeout):
+                if not send_pem_command(ser, "codesigncert", args.codesigner_cert, args.char_delay, args.line_delay, args.response_timeout, args.pem_retries):
                     return 1
             else:
                 print("\n--- Code signing trust unchanged; it must already be provisioned ---")
@@ -550,6 +638,7 @@ def _provision(args, state):
                 args.char_delay,
                 args.line_delay,
                 args.response_timeout,
+                args.pem_retries,
             ):
                 return 1
         elif args.codesigner_cert:
@@ -564,6 +653,7 @@ def _provision(args, state):
                     args.char_delay,
                     args.line_delay,
                     args.response_timeout,
+                    args.pem_retries,
                 ):
                     return 1
             else:
@@ -597,6 +687,8 @@ def _provision(args, state):
         ser.close()
         print(f"\nSerial port {args.port} closed")
 
+    print(f"PEM summary: commands={RUN_STATS['pem_commands']} retries={RUN_STATS['pem_retries']} "
+          f"echo_mismatches={RUN_STATS['pem_echo_mismatches']}")
     print("\n" + "=" * 60)
     print("PROVISIONING COMPLETE")
     print("=" * 60)
@@ -604,6 +696,17 @@ def _provision(args, state):
 
 
 def main():
+    reset_run_stats()
+    try:
+        return _main()
+    finally:
+        write_summary(_SUMMARY_PATH[0])
+
+
+_SUMMARY_PATH = [None]
+
+
+def _main():
     parser = argparse.ArgumentParser(
         description="Provision AWS IoT credentials to phase8b RX72N via UART CLI"
     )
@@ -629,6 +732,10 @@ def main():
                         help=f"Delay after each command in seconds (default: {DEFAULT_LINE_DELAY})")
     parser.add_argument("--response-timeout", type=float, default=DEFAULT_RESPONSE_TIMEOUT,
                         help=f"Upper bound in seconds to wait for OK/Error after each command (default: {DEFAULT_RESPONSE_TIMEOUT})")
+    parser.add_argument("--pem-retries", type=int, default=DEFAULT_PEM_RETRIES,
+                        help=f"Times to abort the input line and send a PEM again when the board answers neither "
+                             f"OK nor Error (default: {DEFAULT_PEM_RETRIES})")
+    parser.add_argument("--summary-json", help="Write counts of PEM sends, retries and echo mismatches here")
     parser.add_argument("--boot-wait", type=float, default=DEFAULT_BOOT_WAIT,
                         help=f"Seconds to wait for boot messages (default: {DEFAULT_BOOT_WAIT})")
     parser.add_argument("--cli-timeout", type=float, default=DEFAULT_CLI_TIMEOUT,
@@ -656,7 +763,10 @@ def main():
 
     if args.attempts < 1:
         parser.error("--attempts must be at least 1")
+    if args.pem_retries < 0:
+        parser.error("--pem-retries must not be negative")
 
+    _SUMMARY_PATH[0] = args.summary_json
     resolve_device_args(args, parser)
     for attempt in range(1, args.attempts + 1):
         if args.attempts > 1:
