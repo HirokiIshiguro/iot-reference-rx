@@ -26,8 +26,8 @@ TOOLS = ROOT / "tools"
 LOCK_WAIT_SECONDS = 3000
 RFP_SECONDS = 300          # one rfp-cli command; the slowest measured one takes 54 s
 # Start and size of one bank of the dual-bank code flash (tools/idt/public_signer_provision.py LAYOUTS).
-BANK = {"rx72n-ethernet": (0xFFE00000, 0x200000), "rx65n-bg96": (0xFFF00000, 0x100000),
-        "rx671-wifi": (0xFFF00000, 0x100000)}
+BANK = {"rx72n-ethernet": (0xFFE00000, 0x200000, 0xFFFBFFFF), "rx65n-bg96": (0xFFF00000, 0x100000, 0xFFFBFFFF),
+        "rx671-wifi": (0xFFF00000, 0x100000, 0xFFFDFFFF)}
 
 
 class Board:
@@ -42,12 +42,12 @@ class Board:
         sys.path.insert(0, str(TOOLS))
         import rx671_ota_host as host  # shared RFP and UART helpers of this repository
 
-        start, size = BANK[self.target["id"]]
+        start, size, end = BANK[self.target["id"]]
         self.host = host
         self.rfp = host.RfpConfig(
             executable="rfp-cli", device=self.target["rfp_device"], tool="e2l:" + self.target["e2lite"],
             speed=self.target["rfp_speed"],
-            install_ranges=((start - size, 0xFFFBFFFF - size), (start, 0xFFFBFFFF)))
+            install_ranges=((start - size, end - size), (start, end)))
 
     # -- exclusive use ---------------------------------------------------
     def try_lock(self) -> bool:
