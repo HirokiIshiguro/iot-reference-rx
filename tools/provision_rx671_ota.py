@@ -215,6 +215,39 @@ def _thing_name(args: argparse.Namespace) -> str:
     return args.thing_name
 
 
+def _printable(data: bytes, limit: int = 2000) -> str:
+    """Printable ASCII of a UART capture, bounded. Only used for the commit, whose command carries no secret."""
+    text = "".join(chr(b) if 32 <= b < 127 or b in (10, 13) else "." for b in data)
+    return text[-limit:]
+
+
+def _commit(serial_port, args: argparse.Namespace, event_log) -> None:
+    """Send ``conf commit`` and wait for its success line; keep what the board answered if it does not come.
+
+    The command has no value in it, so the board's answer can be written to the event log without
+    exposing anything that was stored before.
+    """
+    captured = bytearray()
+    serial_port.reset_input_buffer()
+    for byte in b"conf commit":
+        serial_port.write(bytes((byte,)))
+        if args.char_delay:
+            time.sleep(args.char_delay)
+    serial_port.write(b"\r\n")
+    serial_port.flush()
+    try:
+        read_until(
+            serial_port,
+            success_tokens=(b"Configuration save",),
+            error_tokens=(b"\r\nError", b"\nError", b"Error.", b"Format NG"),
+            timeout=args.commit_timeout,
+            on_data=captured.extend,
+        )
+    except (TimeoutError, RuntimeError):
+        event_log.write(f"conf commit answer ({len(captured)} bytes): {_printable(bytes(captured))!r}\n")
+        raise
+
+
 def _provision_tsip_keys(serial_port, args: argparse.Namespace, event_log, completed: list[str]) -> None:
     """Send the wrapped TLS keys through the TSIP CLI of the provisioner. Nothing secret is logged."""
     import provision_tsip_over_uart as tsip
@@ -339,13 +372,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             event_log.write(f"{name} stored (payload redacted)\n")
 
         event_log.write("commit LittleFS/KVS changes\n")
-        send_ascii_command(
-            serial_port,
-            "conf commit",
-            timeout=args.commit_timeout,
-            char_delay=args.char_delay,
-            success_tokens=(b"Configuration save",),
-        )
+        _commit(serial_port, args, event_log)
         completed.append("commit")
         event_log.write("LittleFS commit OK\n")
         for name, expected in verification_values.items():

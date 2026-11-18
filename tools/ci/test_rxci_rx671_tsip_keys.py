@@ -244,7 +244,7 @@ class ProvisionerTests(unittest.TestCase):
             with mock.patch.dict(os.environ, {"UNIT_SSID": "unit-ssid", "UNIT_PASS": "unit-passphrase",
                                               "UNIT_THING": THING}), \
                  mock.patch.object(provision, "run_checked"), mock.patch.object(provision, "open_serial"), \
-                 mock.patch.object(provision, "enter_cli"), \
+                 mock.patch.object(provision, "enter_cli"), mock.patch.object(provision, "_commit"), \
                  mock.patch.object(provision, "send_ascii_bytes_command"), \
                  mock.patch.object(provision, "send_ascii_command",
                                    side_effect=lambda _s, command, **_k: names.append(command.split(" ")[:3])), \
@@ -269,6 +269,27 @@ class ProvisionerTests(unittest.TestCase):
         self.assertIn("cert", stored)
         self.assertNotIn("key", stored)
         self.assertIn(["conf", "set", "thingname"], names)
+
+    def test_commit_keeps_the_board_answer_when_no_success_line_comes(self):
+        import provision_rx671_ota as provision
+
+        class Serial:
+            def __init__(self): self.chunks = [b"conf commit\r\nsomething odd\r\n"]
+            in_waiting = 0
+            def reset_input_buffer(self): pass
+            def write(self, _b): pass
+            def flush(self): pass
+            def read(self, _n): return self.chunks.pop(0) if self.chunks else b""
+
+        class Log:
+            def __init__(self): self.lines = []
+            def write(self, text): self.lines.append(text)
+
+        log = Log()
+        args = argparse.Namespace(char_delay=0, commit_timeout=0.2)
+        with self.assertRaises(TimeoutError):
+            provision._commit(Serial(), args, log)
+        self.assertIn("something odd", "".join(log.lines))
 
     def test_software_path_still_stores_the_key_and_sends_no_tsip_command(self):
         summary, names, sent = self.provision(tsip=False)
