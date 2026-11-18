@@ -37,6 +37,8 @@ DEFAULT_PORT = os.environ.get("RX72N_LOG_PORT", os.environ.get("UART_PORT", "COM
 DEFAULT_BAUD = int(os.environ.get("UART_BAUD_RATE", "921600"))
 DEFAULT_CHAR_DELAY = 0.002
 DEFAULT_LINE_DELAY = 0.5
+DEFAULT_RESPONSE_TIMEOUT = 10.0
+RC_FAILED_AFTER_FORMAT = 2
 DEFAULT_BOOT_WAIT = 3.0
 DEFAULT_CLI_TIMEOUT = 15.0
 DEFAULT_CLI_RETRY_INTERVAL = 1.0
@@ -67,32 +69,56 @@ def send_chars(ser, text, char_delay):
         time.sleep(char_delay)
 
 
-def send_command(ser, command, char_delay, line_delay, expect_ok=True, required_tokens=None):
+def wait_for_command_result(ser, timeout, success_tokens, error_tokens=("Error",)):
+    """Read until a success or error token arrives (or timeout); return (text, seconds waited)."""
+    start = time.monotonic()
+    collected = ""
+    while True:
+        waiting = ser.in_waiting
+        if waiting:
+            collected += ser.read(waiting).decode("ascii", errors="replace")
+            if any(token in collected for token in (*success_tokens, *error_tokens)):
+                break
+        if time.monotonic() - start >= timeout:
+            break
+        time.sleep(0.02)
+    return collected, time.monotonic() - start
+
+
+def send_command(ser, command, char_delay, line_delay, expect_ok=True, required_tokens=None,
+                 response_timeout=DEFAULT_RESPONSE_TIMEOUT):
     ser.reset_input_buffer()
     send_chars(ser, command, char_delay)
     ser.write(b"\r\n")
-    time.sleep(line_delay)
-    response = ser.read(ser.in_waiting or 1024).decode("ascii", errors="replace")
+    if required_tokens:
+        response, waited = wait_for_command_result(ser, response_timeout, required_tokens)
+    else:
+        time.sleep(line_delay)
+        response = ser.read(ser.in_waiting or 1024).decode("ascii", errors="replace")
+        waited = line_delay
 
     if expect_ok and "Error" in response:
         print(f"  ERROR in response: {mask_sensitive_output(response.strip())}")
         return None
 
     if required_tokens and not any(token in response for token in required_tokens):
-        print(f"  ERROR: expected one of {required_tokens}, got: {mask_sensitive_output(response.strip()) or 'No response'}")
+        print(f"  ERROR: expected one of {required_tokens} within {waited:.1f}s, "
+              f"got: {mask_sensitive_output(response.strip()) or 'No response'}")
         return None
 
     return response
 
 
-def send_pem_command(ser, key_name, pem_path, char_delay, line_delay):
+def send_pem_command(ser, key_name, pem_path, char_delay, line_delay, response_timeout=DEFAULT_RESPONSE_TIMEOUT):
     with open(pem_path, "r", encoding="utf-8") as f:
         pem_content = f.read()
 
-    return send_pem_content_command(ser, key_name, pem_content, pem_path, char_delay, line_delay)
+    return send_pem_content_command(ser, key_name, pem_content, pem_path, char_delay, line_delay,
+                                    response_timeout)
 
 
-def send_pem_content_command(ser, key_name, pem_content, source_label, char_delay, line_delay):
+def send_pem_content_command(ser, key_name, pem_content, source_label, char_delay, line_delay,
+                             response_timeout=DEFAULT_RESPONSE_TIMEOUT):
     pem_content = pem_content.replace("\r\n", "\n").replace("\r", "\n").strip()
     total_len = len(f"conf set {key_name} ") + len(pem_content)
     if total_len > 4090:
@@ -101,9 +127,10 @@ def send_pem_content_command(ser, key_name, pem_content, source_label, char_dela
     print(f"  Sending: conf set {key_name} <{source_label}> ({len(pem_content)} bytes)")
     send_chars(ser, f"conf set {key_name} ", char_delay)
     send_chars(ser, pem_content, char_delay)
+    # Drop the echo of the text just sent so base64 data cannot be mistaken for a reply.
+    ser.reset_input_buffer()
     ser.write(b"\r\n")
-    time.sleep(line_delay)
-    response = ser.read(ser.in_waiting or 1024).decode("ascii", errors="replace")
+    response, waited = wait_for_command_result(ser, response_timeout, ("OK",))
 
     if "OK" in response:
         print("  OK")
@@ -112,7 +139,8 @@ def send_pem_content_command(ser, key_name, pem_content, source_label, char_dela
         print(f"  ERROR: {mask_sensitive_output(response.strip())}")
         return False
 
-    print(f"  ERROR: unexpected response: {mask_sensitive_output(response.strip()) or 'No response'}")
+    print(f"  ERROR: no OK or Error within {waited:.1f}s, "
+          f"got: {mask_sensitive_output(response.strip()) or 'No response'}")
     return False
 
 
@@ -349,6 +377,16 @@ def resolve_device_args(args, parser):
 
 
 def provision(args):
+    state = {"formatted": False}
+    result = _provision(args, state)
+    if result != 0 and state["formatted"]:
+        print("ERROR: data flash was formatted, so retrying cannot succeed; "
+              "the firmware must be written again before provisioning.")
+        return RC_FAILED_AFTER_FORMAT
+    return result
+
+
+def _provision(args, state):
     print("=" * 60)
     print("phase8b Device Provisioning")
     print("=" * 60)
@@ -447,50 +485,55 @@ def provision(args):
         if args.format:
             print("\n--- Format data flash ---")
             resp = send_command(ser, "format", args.char_delay, args.line_delay * 2,
-                                required_tokens=("OK",))
+                                required_tokens=("OK",),
+                                response_timeout=args.response_timeout)
             if resp and "OK" in str(resp):
                 print("  Format OK")
+                state["formatted"] = True
             else:
                 print(f"  Format response: {mask_sensitive_output(str(resp).strip()) if resp else 'No response'}")
 
         print(f"\n--- Set endpoint: {args.endpoint} ---")
         if send_command(ser, f"conf set endpoint {args.endpoint}",
-                        args.char_delay, args.line_delay, required_tokens=("OK",)) is None:
+                        args.char_delay, args.line_delay, required_tokens=("OK",),
+                        response_timeout=args.response_timeout) is None:
             return 1
 
         if args.fleet_provisioning:
             print(f"\n--- Set provisioning template: {args.template_name} ---")
             if send_command(ser, f"conf set template {args.template_name}",
-                            args.char_delay, args.line_delay, required_tokens=("OK",)) is None:
+                            args.char_delay, args.line_delay, required_tokens=("OK",),
+                        response_timeout=args.response_timeout) is None:
                 return 1
 
             print("\n--- Set claim certificate ---")
-            if not send_pem_command(ser, "claimcert", args.claim_cert, args.char_delay, args.line_delay):
+            if not send_pem_command(ser, "claimcert", args.claim_cert, args.char_delay, args.line_delay, args.response_timeout):
                 return 1
 
             print("\n--- Set claim private key ---")
-            if not send_pem_command(ser, "claimkey", args.claim_key, args.char_delay, args.line_delay):
+            if not send_pem_command(ser, "claimkey", args.claim_key, args.char_delay, args.line_delay, args.response_timeout):
                 return 1
         else:
             print(f"\n--- Set thing name: {args.thing_name} ---")
             if send_command(ser, f"conf set thingname {args.thing_name}",
-                            args.char_delay, args.line_delay, required_tokens=("OK",)) is None:
+                            args.char_delay, args.line_delay, required_tokens=("OK",),
+                        response_timeout=args.response_timeout) is None:
                 return 1
 
             print("\n--- Set device certificate ---")
-            if not send_pem_command(ser, "cert", args.cert, args.char_delay, args.line_delay):
+            if not send_pem_command(ser, "cert", args.cert, args.char_delay, args.line_delay, args.response_timeout):
                 return 1
 
             if args.skip_private_key:
                 print("\n--- Skip private key PEM (TSIP runtime key provisioning is expected) ---")
             else:
                 print("\n--- Set private key ---")
-                if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay):
+                if not send_pem_command(ser, "key", args.key, args.char_delay, args.line_delay, args.response_timeout):
                     return 1
 
             if args.codesigner_cert:
                 print("\n--- Set code signing certificate ---")
-                if not send_pem_command(ser, "codesigncert", args.codesigner_cert, args.char_delay, args.line_delay):
+                if not send_pem_command(ser, "codesigncert", args.codesigner_cert, args.char_delay, args.line_delay, args.response_timeout):
                     return 1
             else:
                 print("\n--- Code signing trust unchanged; it must already be provisioned ---")
@@ -506,6 +549,7 @@ def provision(args):
                 args.codesigner_public_key,
                 args.char_delay,
                 args.line_delay,
+                args.response_timeout,
             ):
                 return 1
         elif args.codesigner_cert:
@@ -519,6 +563,7 @@ def provision(args):
                     f"{args.codesigner_cert}:public-key",
                     args.char_delay,
                     args.line_delay,
+                    args.response_timeout,
                 ):
                     return 1
             else:
@@ -582,6 +627,8 @@ def main():
                         help=f"Delay between characters in seconds (default: {DEFAULT_CHAR_DELAY})")
     parser.add_argument("--line-delay", type=float, default=DEFAULT_LINE_DELAY,
                         help=f"Delay after each command in seconds (default: {DEFAULT_LINE_DELAY})")
+    parser.add_argument("--response-timeout", type=float, default=DEFAULT_RESPONSE_TIMEOUT,
+                        help=f"Upper bound in seconds to wait for OK/Error after each command (default: {DEFAULT_RESPONSE_TIMEOUT})")
     parser.add_argument("--boot-wait", type=float, default=DEFAULT_BOOT_WAIT,
                         help=f"Seconds to wait for boot messages (default: {DEFAULT_BOOT_WAIT})")
     parser.add_argument("--cli-timeout", type=float, default=DEFAULT_CLI_TIMEOUT,
@@ -617,6 +664,8 @@ def main():
         result = provision(args)
         if result == 0:
             return 0
+        if result == RC_FAILED_AFTER_FORMAT:
+            return 1
         if attempt < args.attempts:
             print(f"Provisioning attempt {attempt} failed; retrying after reset window settle...")
             time.sleep(2.0)
