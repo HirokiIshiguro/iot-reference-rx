@@ -191,11 +191,14 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             "script": ["python3 -B -m unittest discover -s tools/ci -p 'test_rxci*.py' -v"],
         },
     }
-    for variant in variants:
+    lanes = int(registry.get("build_lanes", 1))
+    for index, variant in enumerate(variants):
         jobs[f"build {variant}"] = {
             "stage": "build",
             "tags": registry["runners"]["build"],
-            "resource_group": registry["build_resource_group"],
+            # The build machine takes a few builds at a time. A lane is a resource group, so the
+            # limit also holds across pipelines.
+            "resource_group": f"{registry['build_resource_group']}-{index % lanes + 1}",
             "needs": [],
             # A fresh clone keeps the line endings as committed (CC-RX needs them). The job checks out
             # only this repository: the build clones the dependencies itself, and only when it cannot

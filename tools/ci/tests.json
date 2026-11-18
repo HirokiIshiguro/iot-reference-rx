@@ -145,5 +145,6 @@
     "rx72n:sw:tls12:mqtt",
     "rx65n:sw:tls12:mqtt",
     "rx671:sw:tls12:mqtt"
-  ]
+  ],
+  "build_lanes": 3
 }

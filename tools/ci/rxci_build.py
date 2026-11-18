@@ -42,7 +42,13 @@ SIGNING_KEY = ROOT / "sample_keys" / "secp256r1.privatekey"
 CACHE_ENTRIES = 80
 # Committed files that do not change what a build produces.
 NOT_BUILD_INPUTS = ("docs/", ".gitlab-ci.yml", "tools/ci/rxci.py", "tools/ci/rxci_board.py", "tools/ci/rxci_aws.py",
-                    "tools/ci/test_rxci.py", "tools/ci/tests.json", "tools/ci/requirements.txt")
+                    "tools/ci/test_rxci.py", "tools/ci/tests.json", "tools/ci/requirements.txt", "tools/ci/tests/",
+                    # Tools that run next to the board or talk to AWS; no build script uses them.
+                    "tools/bg96_bootloader_integration.py", "tools/bg96_ota_monitor.py", "tools/bg96_ota_prepare.py",
+                    "tools/create_bg96_ota_update.py", "tools/create_ota_update.py",
+                    "tools/manage_ephemeral_iot_thing.py", "tools/provision_rx72n.py",
+                    "tools/provision_tsip_over_uart.py", "tools/test_fleet_rx72n.py", "tools/test_mqtt_rx72n.py",
+                    "tools/test_ota.py", "tools/test_rx671_ota.py", "tools/verify_ota_aws_state.py")
 
 
 def run(command: list, *, timeout: int) -> None:
@@ -349,7 +355,7 @@ def store(entry: Path, out: Path) -> None:
         "job": os.environ.get("CI_JOB_ID", "local"), "pipeline": os.environ.get("CI_PIPELINE_ID", "local"),
         "commit": os.environ.get("CI_COMMIT_SHA", "local"), "inputs": entry.name}, indent=2) + "\n", encoding="utf-8")
     entry.parent.mkdir(parents=True, exist_ok=True)
-    temporary = entry.with_name(entry.name + ".tmp")
+    temporary = entry.with_name(f"{entry.name}.{os.environ.get('CI_JOB_ID', os.getpid())}.tmp")
     shutil.rmtree(temporary, ignore_errors=True)
     shutil.copytree(out, temporary)
     shutil.rmtree(entry, ignore_errors=True)

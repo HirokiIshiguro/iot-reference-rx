@@ -152,6 +152,13 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(rxci_build.cache_key(full, "rx671/software-tls12/fleet"), "")
         self.assertNotEqual(rxci_build.cache_key(full, "rx671/software-tls12/ota"), "")
 
+    def test_builds_are_spread_over_the_lanes(self):
+        names = ["rx72n:sw:tls12:mqtt", "rx72n:sw:tls12:fleet", "rx72n:sw:tls12:ota"]
+        jobs, summary = rxci.child_pipeline({**registry(names), "build_lanes": 3}, "check", "^rx72n:sw:tls12:", 1)
+        groups = [jobs[f"build {variant}"]["resource_group"] for variant in summary["builds"]]
+        self.assertEqual(len(groups), 4)
+        self.assertEqual(sorted(set(groups)), ["windows-ccrx-build-1", "windows-ccrx-build-2", "windows-ccrx-build-3"])
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)
