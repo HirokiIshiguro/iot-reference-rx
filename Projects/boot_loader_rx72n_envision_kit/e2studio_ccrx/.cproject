@@ -149,7 +149,7 @@
 									<listOptionValue builtIn="false" value="DEXRAM_2=REXRAM_2"/>
 									<listOptionValue builtIn="false" value="DEXRAM_8=REXRAM_8"/>
 								</option>
-								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.1220714372" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" useByScannerDiscovery="false" value="SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8,RPFRAM2/0,C_BOOTLOADER_KEY_STORAGE*/0100000,BEXRAM_1,REXRAM_1,BEXRAM_2,REXRAM_2,BEXRAM,REXRAM,BEXRAM_8,REXRAM_8,B_FRAME_BUFFER_1/0800000,C_BOOT_LOADER_MAGIC_CODE_1,PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,PIntPRG,P*/0FFFC0000,EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC" valueType="string"/>
+								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.1220714372" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" useByScannerDiscovery="false" value="SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8,RPFRAM2/0,C_BOOTLOADER_KEY_STORAGE*/0100000,BEXRAM_1,REXRAM_1,BEXRAM_2,REXRAM_2,BEXRAM,REXRAM,BEXRAM_8,REXRAM_8,B_FRAME_BUFFER_1/0800000,C_BOOT_LOADER_MAGIC_CODE_1,PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,PIntPRG,P*/0FFFE0000,EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC" valueType="string"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore.1566394694" name="追加するオプション（すべての指定オプションの前に追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore" useByScannerDiscovery="false" valueType="stringList">
 									<listOptionValue builtIn="false" value=""/>
 								</option>

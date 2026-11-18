@@ -44,10 +44,11 @@ class Board:
 
         start, size = BANK[self.target["id"]]
         self.host = host
+        end = 0xFFFBFFFF if self.name == "rx671" else 0xFFFDFFFF
         self.rfp = host.RfpConfig(
             executable="rfp-cli", device=self.target["rfp_device"], tool="e2l:" + self.target["e2lite"],
             speed=self.target["rfp_speed"],
-            install_ranges=((start - size, 0xFFFBFFFF - size), (start, 0xFFFBFFFF)))
+            install_ranges=((start - size, end - size), (start, end)))
 
     # -- exclusive use ---------------------------------------------------
     def try_lock(self) -> bool:

@@ -49,3 +49,7 @@ and TCP socket path use `r_cellular`; the FreeRTOS Cellular Interface and its
 Quectel reference port are not used. Product configuration stays in the project,
 while the unmodified driver checkout is a submodule. See the
 [cellular integration policy](../../docs/rx65n-cellular.md) for its pin and scope.
+
+## OTA flash layout
+
+The application area is 0xFFF00000–0xFFFDFFFF (896 KiB (0xE0000)); the exception and reset vectors are 0xFFFDFF80 and 0xFFFDFFFC. The 128 KiB bootloader occupies 0xFFFE0000–0xFFFFFFFF and its bank 1 copy starts at 0xFFEE0000. The OTA payload is 916,992 bytes.

@@ -70,7 +70,8 @@ def signed_application(files, target):
     """Check actual CF-only bytes and signature; sequence is a normal-bundle field."""
     start, _ = trust.LAYOUTS[target["id"]]
     image = trust._bytes(files["normal_app.rsu"])
-    if len(image) != 0xFFFC0000 - start:
+    boot_start = trust.bootloader_start(target)
+    if len(image) != boot_start - start:
         raise RuntimeError("Normal RSU size differs from the dual-bank Code Flash layout")
     if (image[:8] != b"Renesas\xfe" or image[8:40] != b"sig-sha256-ecdsa" + b"\0" * 16 or
             struct.unpack_from("<I", image, 0x28)[0] != 64 or
@@ -81,11 +82,11 @@ def signed_application(files, target):
         raise RuntimeError("Normal RSU sequence must be positive")
     try:
         trust._tools_module("build_rx671_fwup_v2_rsu").validate_legacy_descriptor(
-            image[0x200:0x300], start + 0x300, 0xFFFBFFFF)
+            image[0x200:0x300], start + 0x300, boot_start - 1)
     except ValueError as error:
         raise RuntimeError("Normal RSU dual-bank descriptor mismatch") from error
-    vector = int.from_bytes(image[0xFFFBFFFC-start:0xFFFC0000-start], "little")
-    if not start + 0x300 <= vector <= 0xFFFBFFFF:
+    vector = int.from_bytes(image[boot_start-4-start:boot_start-start], "little")
+    if not start + 0x300 <= vector < boot_start:
         raise RuntimeError("Normal RSU reset vector is outside its application")
     public = material.public_signer(files["signer.crt.pem"], files["signer.pub.pem"])
     material.verify_raw_p256(public, image[0x2C:0x6C], image[0x200:])

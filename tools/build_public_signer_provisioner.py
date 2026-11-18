@@ -236,7 +236,7 @@ def validate_image(path: Path, target_id: str, source_sha: str) -> dict:
     if field(0xFE7F5D00) != bytes.fromhex("8FFFFFFF") or field(0xFE7F5D20) != bytes.fromhex("FFFFFFFF"):
         raise RuntimeError("Maintenance MOT must use dual/little-endian and initial bank0")
     vector = int.from_bytes(field(0xFFFFFFFC), "little")
-    if not CODE_FLASH_START[target_id]+0x300 <= vector <= 0xFFFBFFFF or vector not in memory:
+    if not CODE_FLASH_START[target_id]+0x300 <= vector < (0xFFFC0000 if target_id == "rx671-wifi" else 0xFFFE0000) or vector not in memory:
         raise RuntimeError("Maintenance reset vector is outside its loaded application")
     marker = b"PUBLIC_SIGNER_PROVISIONER source_sha=" + source_sha.encode("ascii") + b"\r\n"
     runs, current, previous = [], bytearray(), None

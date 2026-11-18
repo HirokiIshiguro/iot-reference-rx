@@ -10,15 +10,15 @@
 #define RX_BOOTLOADER_MCU_RX65N_H
 
 /* Code Flash address map (2MB dual-bank) */
-#define RX_BOOTLOADER_LOW_ADDRESS                           FLASH_CF_BLOCK_13
-#define RX_BOOTLOADER_MIRROR_LOW_ADDRESS                    FLASH_CF_BLOCK_51
+#define RX_BOOTLOADER_LOW_ADDRESS                           FLASH_CF_BLOCK_9
+#define RX_BOOTLOADER_MIRROR_LOW_ADDRESS                    FLASH_CF_BLOCK_47
 
 #define RX_BOOTLOADER_MIRROR_HIGH_ADDRESS                   FLASH_CF_BLOCK_38
-#define RX_BOOTLOADER_UPDATE_TEMPORARY_AREA_HIGH_ADDRESS    FLASH_CF_BLOCK_52
+#define RX_BOOTLOADER_UPDATE_TEMPORARY_AREA_HIGH_ADDRESS    FLASH_CF_BLOCK_48
 
 /* Mirror block counts */
 #define RX_BOOTLOADER_MIRROR_BLOCK_NUM_FOR_SMALL            (8)
-#define RX_BOOTLOADER_MIRROR_BLOCK_NUM_FOR_MEDIUM           (6)
+#define RX_BOOTLOADER_MIRROR_BLOCK_NUM_FOR_MEDIUM           (2)
 
 /* Mirror copy source/destination for small-block area
  * NOTE: Verify against RX65N-RSK boot_loader.c before use. */

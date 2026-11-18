@@ -156,7 +156,7 @@ def build_rx65n_app(registry: dict, backend: str, tls: str, kind: str, out: Path
              "-E2Studio", cli, "-Workspace", work, "-LogFile", log,
              "-TlsBackend", backend, *tls_arguments(backend, tls, "-RequireTlsVersion"), *extra], timeout=2400)
         run([sys.executable, "tools/shift_srec_addresses.py", "--input", boot, "--output", boot_bank1,
-             "--range-start", "0xFFFC0000", "--range-end", "0xFFFFFFFF", "--shift=-0x100000",
+             "--range-start", "0xFFFE0000", "--range-end", "0xFFFFFFFF", "--shift=-0x100000",
              "--drop-out-of-range"], timeout=120)
         run([sys.executable, "tools/create_bg96_rsu.py", "--mot", app_mot, "--key", SIGNING_KEY,
              "--output", rsu], timeout=120)
