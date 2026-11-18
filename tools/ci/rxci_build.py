@@ -81,7 +81,7 @@ def keep_logs(folder: Path, out: Path) -> None:
             shutil.copyfile(log, out / log.name)
 
 
-LINKER_ERROR = re.compile(r"^\s*[EF]05\d{5}|Abort")
+LINKER_ERROR = re.compile(r"\b[CEF]05\d{5}\b|Abort")
 
 
 def linker_error_lines(log: Path) -> list[str]:
