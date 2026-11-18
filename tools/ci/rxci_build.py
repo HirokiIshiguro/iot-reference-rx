@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -77,6 +78,32 @@ def keep_logs(folder: Path, out: Path) -> None:
         out.mkdir(parents=True, exist_ok=True)
         for log in folder.glob("*.log"):
             shutil.copyfile(log, out / log.name)
+
+
+LINKER_ERROR = re.compile(r"^\s*[EF]05\d{5}|Abort")
+
+
+def linker_error_lines(log: Path) -> list[str]:
+    """Lines of an e2 studio build log that name a compiler, assembler or linker abort (E05..., F05..., Abort)."""
+    if not log.is_file():
+        return []
+    text = log.read_text(encoding="utf-8", errors="replace")
+    return [line.rstrip() for line in text.splitlines() if LINKER_ERROR.search(line)]
+
+
+def report_build_failure(log: Path) -> None:
+    """Print the linker errors into the job log; the build log itself is overwritten by the next job."""
+    lines = linker_error_lines(log)
+    print("--- linker errors of the e2 studio build log ---" if lines else "--- no linker error line found in the e2 studio build log ---")
+    for line in lines[:40]:
+        print(line, flush=True)
+
+
+def keep_map(map_file: Path, out: Path) -> None:
+    """Keep the linker map in the job artifacts when the linker wrote one."""
+    if map_file.is_file():
+        out.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(map_file, out / map_file.name)
 
 
 def publish(out: Path, files: dict[str, Path]) -> None:
@@ -277,8 +304,10 @@ def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path
         command += ["-UseAwsIotLocalConfig", "-AwsIotEndpoint", endpoint]
     else:
         # Heap size and SDIO clock are the values the Fleet image was proven with on this board.
+        # The TSIP project has more static RAM, so 250 KiB of heap does not fit in the 384 KiB of RAM.
+        heap_kb = "224" if backend == "tsip" else "250"
         command += ["-SkipAwsIotConfig", "-FleetProvisioningEnable",
-                    "-FreeRtosHeapSizeKb", "250", "-SdioRunClockDiv", "SDHI_DIV_8"]
+                    "-FreeRtosHeapSizeKb", heap_kb, "-SdioRunClockDiv", "SDHI_DIV_8"]
         build_env = {**os.environ, "RX671_EK_FLEET_ENDPOINT": endpoint,
                      "RX671_EK_FLEET_TEMPLATE_NAME": os.environ[board["fleet_template_variable"]],
                      "RX671_EK_FLEET_CLAIM_CERT_PEM": os.environ[board["claim_certificate_variable"]],
@@ -286,7 +315,11 @@ def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path
     if tls == "tls13":
         command += ["-RequireTlsVersion", "TLSv1.3"]
     try:
-        run(command, timeout=1500, env=build_env)
+        try:
+            run(command, timeout=1500, env=build_env)
+        except subprocess.CalledProcessError:
+            report_build_failure(log)
+            raise
         run([sys.executable, "tools/build_rx671_fwup_v2_rsu.py", "--mot", mot, "--key", SIGNING_KEY,
              "--output", rsu], timeout=120)
         out.mkdir(parents=True, exist_ok=True)
@@ -295,6 +328,7 @@ def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path
     finally:
         # Credentials were written into generated headers and build outputs of this checkout.
         rsu.unlink(missing_ok=True)
+        keep_map(mot.with_suffix(".map"), out)
         subprocess.run(["git", "clean", "-fdxq", "--", str(sources)], cwd=ROOT, check=False)
         shutil.rmtree(mot.parent, ignore_errors=True)
         shutil.rmtree(work, ignore_errors=True)

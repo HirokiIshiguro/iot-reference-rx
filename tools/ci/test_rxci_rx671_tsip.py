@@ -24,6 +24,24 @@ class Rx671TsipFleetTests(unittest.TestCase):
                                             cwd=root, check=False)
                     self.assertEqual(result.returncode, 0)
 
+    def test_linker_error_lines_are_picked_from_a_build_log(self):
+        text = "\n".join([
+            "make: entering",
+            '  -input=".\\src\\error.obj"',
+            'E0562320:Section address overflowed out of range : "R"',
+            "F0563100:Illegal option",
+            "",
+            "Renesas Optimizing Linker Abort",
+            "make: *** Error 1",
+        ])
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / "build.log"
+            log.write_text(text, encoding="utf-8")
+            lines = rxci_build.linker_error_lines(log)
+            self.assertEqual(lines, ["E0562320:Section address overflowed out of range : \"R\"",
+                                     "F0563100:Illegal option", "Renesas Optimizing Linker Abort"])
+            self.assertEqual(rxci_build.linker_error_lines(Path(folder) / "missing.log"), [])
+
     def test_qualification_runs_only_explicit_pair_without_marking_ready(self):
         registry = rxci.load_registry()
         names = [f"rx671:tsip:tls{version}:fleet" for version in (12, 13)]
