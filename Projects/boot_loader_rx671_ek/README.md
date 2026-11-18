@@ -96,7 +96,7 @@ Loading user code signer public key from LittleFS: not found; refusing to boot.
 2026-11-18 に e2 studio 2026-04.2 / CC-RX V3.07.00 で headless clean build を実行し、0 error で `.mot/.abs/.map` を生成しました。配置検証結果は次のとおりです。
 
 ```text
-RX671_BOOTLOADER_LAYOUT_PASS window=0xFFFF0000-0xFFFFFFFF reserved=131072 payload=59451 option_records=8
+RX671_BOOTLOADER_LAYOUT_PASS window=0xFFFF0000-0xFFFFFFFF reserved=65536 payload=50948 option_records=8
 ```
 
-`payload` は Code Flash に実データとして格納されるバイト数です。予約領域は 131072 byte です。RPi#1 実機 smoke は manual gate を明示的に起動した pipeline の artifact を正式証跡とします。
+`payload` は Code Flash に実データとして格納されるバイト数です。予約領域は 65536 byte です。RPi#1 実機 smoke は manual gate を明示的に起動した pipeline の artifact を正式証跡とします。
