@@ -126,8 +126,22 @@ class Rx72nFwupPrmContractTests(unittest.TestCase):
                          struct.unpack_from("<III", payload, 8))
         self.assertNotIn(marker, payload)
         self.assertEqual(rsu_builder.RSU_DESCRIPTOR_SIZE + len(code), len(payload))
-
-
+    def test_rx72n_rsu_tools_use_board_specific_prm(self):
+        powershell_reference = r"tools\fwup\rx72n_envision_kit_dual_bank.prm.csv"
+        consumers = {
+            "tools/generate_rx72n_rsu.ps1": powershell_reference,
+            "tools/run_rx72n_local_baseline.ps1": powershell_reference,
+            "tools/build_ota_candidate.py": (
+                'tools_dir / "fwup" / "rx72n_envision_kit_dual_bank.prm.csv"'
+            ),
+        }
+        for relative_path, expected_reference in consumers.items():
+            with self.subTest(relative_path=relative_path):
+                text = (self.repo_root / relative_path).read_text(encoding="utf-8")
+                self.assertIn(expected_reference, text)
+                self.assertNotIn(
+                    r"src\smc_gen\r_fwup\tool\RX72N_DualBank_ImageGenerator_PRM.csv", text
+                )
 
 if __name__ == "__main__":
     unittest.main()
