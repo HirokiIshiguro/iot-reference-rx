@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-BOOT_START = 0xFFFC0000
+BOOT_START = 0xFFFE0000
 BOOT_END = 0xFFFFFFFF
 BOOT_WINDOW_BYTES = BOOT_END - BOOT_START + 1
 OPTION_RANGES = (
@@ -92,7 +92,7 @@ def validate_records(records: list[DataRecord]) -> tuple[int, int]:
 def validate_map(path: Path) -> None:
     text = path.read_text(encoding="utf-8", errors="replace")
     expected = {
-        "PResetPRG": 0xFFFC0000,
+        "PResetPRG": 0xFFFE0000,
         "EXCEPTVECT": 0xFFFFFF80,
         "RESETVECT": 0xFFFFFFFC,
     }

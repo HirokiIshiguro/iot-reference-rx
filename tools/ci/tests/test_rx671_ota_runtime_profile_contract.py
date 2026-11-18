@@ -361,11 +361,11 @@ class Rx671OtaRuntimeProfileContractTests(unittest.TestCase):
             self.ota_image_builder,
         )
         self.assertIn(
-            "-define=OTA_MAX_NUM_FILE_BLOCKS=192",
+            "-define=OTA_MAX_NUM_FILE_BLOCKS=224",
             self.ota_image_builder,
         )
         self.assertIn(
-            "#define OTA_MAX_NUM_FILE_BLOCKS                  (192U)",
+            "#define OTA_MAX_NUM_FILE_BLOCKS                  (224U)",
             self.mqtt_file_downloader_config,
         )
         self.assertIn("#ifndef OTA_MAX_NUM_DATA_BUFFERS", self.ota_demo)

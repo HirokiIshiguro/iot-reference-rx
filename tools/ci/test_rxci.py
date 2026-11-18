@@ -164,5 +164,27 @@ class PlanTests(unittest.TestCase):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)
 
 
+class BoardInstallRangesTests(unittest.TestCase):
+    def test_board_erase_ranges_preserve_each_bootloader(self):
+        import importlib
+        import types
+        from unittest.mock import patch
+
+        with patch.dict(sys.modules, {"fcntl": types.ModuleType("fcntl")}):
+            board_module = importlib.import_module("rxci_board")
+            data = rxci.load_registry()
+            for name, expected in {
+                "rx671": ((0xFFE00000, 0xFFEDFFFF), (0xFFF00000, 0xFFFDFFFF)),
+                "rx65n": ((0xFFE00000, 0xFFEBFFFF), (0xFFF00000, 0xFFFBFFFF)),
+                "rx72n": ((0xFFC00000, 0xFFDBFFFF), (0xFFE00000, 0xFFFBFFFF)),
+            }.items():
+                with self.subTest(board=name):
+                    board = board_module.Board(data, name)
+                    self.assertEqual(expected, board.rfp.install_ranges)
+                    command = board.rfp.erase_ota_install_areas_command()
+                    for start, end in expected:
+                        self.assertIn(f"{start:08X},{end:08X}", command)
+
+
 if __name__ == "__main__":
     unittest.main()

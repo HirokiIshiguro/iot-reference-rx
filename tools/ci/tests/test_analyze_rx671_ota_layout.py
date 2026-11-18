@@ -266,17 +266,17 @@ class GateTests(unittest.TestCase):
         passing = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
             data_buffer_count=2,
-            max_file_blocks=192,
+            max_file_blocks=224,
         )
         stale_heap = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=192,
             data_buffer_count=2,
-            max_file_blocks=192,
+            max_file_blocks=224,
         )
         stale_buffers = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
             data_buffer_count=3,
-            max_file_blocks=192,
+            max_file_blocks=224,
         )
         stale_file_blocks = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
@@ -286,7 +286,7 @@ class GateTests(unittest.TestCase):
         missing = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
             data_buffer_count=None,
-            max_file_blocks=192,
+            max_file_blocks=224,
         )
 
         self.assertEqual("PASS", passing.status)
@@ -340,7 +340,8 @@ class GateTests(unittest.TestCase):
             / layout.BOOTLOADER_SUBMODULE_RELATIVE
             / "config/rx671.h"
         ).read_text(encoding="utf-8").splitlines()
-        self.assertEqual(canonical, parent)
+        self.assertTrue(layout._rx671_project_config_matches(parent, canonical))
+        self.assertFalse(layout._rx671_project_config_matches(canonical, canonical))
 
     def test_fwup_geometry_rejects_equal_total_with_wrong_fit_blocks(self):
         gate = layout._fwup_data_flash_geometry_gate(

@@ -268,7 +268,7 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
         for marker in (
             "bank.single",
             "bank.dual",
-            "0x000C0000",
+            "0x000E0000",
             "0xFFF00300",
             "PFRAM2",
             "RPFRAM2",
@@ -299,10 +299,10 @@ class Rx671OtaArtifactCiContractTests(unittest.TestCase):
         self.assertIn("LIBRARY_LOG_LEVEL=LOG_NONE", combined)
         self.assertIn("configPRINTF", combined)
         for boundary in (
-            "0xFFE00000-0xFFEBFFFF",
-            "0xFFF00000-0xFFFBFFFF",
-            "0xFFEC0000-0xFFEFFFFF",
-            "0xFFFC0000-0xFFFFFFFF",
+            "0xFFE00000-0xFFEDFFFF",
+            "0xFFF00000-0xFFFDFFFF",
+            "0xFFEE0000-0xFFEFFFFF",
+            "0xFFFE0000-0xFFFFFFFF",
         ):
             self.assertIn(boundary, combined)
         self.assertRegex(
