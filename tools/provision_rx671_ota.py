@@ -9,7 +9,7 @@ left in reset; ``test_rx671_ota.py`` opens SCI6 before releasing it so no
 one-shot marker is lost and keeps that same UART open through the transaction.
 
 With ``--tsip`` the image is the TSIP provisioner: no plaintext device private key is
-entered. After ``conf commit`` the wrapped TLS keys are sent with ``tsipprov`` (the
+entered. Right after the format the wrapped TLS keys are sent with ``tsipprov`` (the
 four slots of ``provision_tsip_over_uart.py``) and the board prepares them.
 """
 
@@ -333,9 +333,13 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
         completed.append("format")
         event_log.write("LittleFS format OK\n")
 
+        if getattr(args, "tsip", False) and not signer_only:
+            # The wrapped keys go first. tsipprov prepare opens the TSIP driver; conf commit then starts
+            # PKCS #11, whose entropy source needs that driver to be open (first run: no answer to conf commit).
+            _provision_tsip_keys(serial_port, args, event_log, completed)
+
         verification_values = {}
         pem_values = []
-        tsip_late_pem = []
         if not signer_only:
             _set_wifi_credentials(
                 serial_port,
@@ -354,12 +358,8 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
                 verification_values[name] = value
             completed.extend(("endpoint", "thing"))
             event_log.write("endpoint and Thing name stored (values redacted)\n")
-            if getattr(args, "tsip", False):
-                # EXPERIMENT: the first run hung in conf commit while the device certificate was pending
-                # (TSIP not opened yet). Commit everything else first; the certificate follows the tsipprov step.
-                tsip_late_pem = [("cert", args.certificate)]
-            else:
-                pem_values.append(("cert", args.certificate))
+            pem_values.append(("cert", args.certificate))
+            if not getattr(args, "tsip", False):
                 pem_values.append(("key", args.private_key))
         pem_values.extend((
             ("codesigncert", args.codesigner_certificate),
@@ -390,16 +390,6 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             )
         if verification_values:
             completed.append("public_config_readback_verified")
-        if getattr(args, "tsip", False) and not signer_only:
-            _provision_tsip_keys(serial_port, args, event_log, completed)
-            for name, path in tsip_late_pem:
-                _set_pem(serial_port, name, path, char_delay=args.char_delay, timeout=args.command_timeout)
-                completed.append(name)
-                event_log.write(f"{name} stored after the TSIP keys (payload redacted)\n")
-            if tsip_late_pem:
-                event_log.write("commit the device certificate\n")
-                _commit(serial_port, args, event_log)
-                completed.append("commit_certificate")
         event_log.write("PEM persistence requires bootloader key loading and signature proof\n")
     finally:
         serial_port.close()

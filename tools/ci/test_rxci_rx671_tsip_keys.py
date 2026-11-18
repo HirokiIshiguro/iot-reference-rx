@@ -259,7 +259,7 @@ class ProvisionerTests(unittest.TestCase):
         self.assertTrue(summary["success"])
         self.assertTrue(summary["tsip"])
         steps = summary["completed_steps"]
-        self.assertLess(steps.index("commit"), steps.index("tsip_keys"))
+        self.assertLess(steps.index("tsip_keys"), steps.index("commit"))
         self.assertEqual([command.split(" ")[2] for command in sent if command.startswith("tsipprov begin")],
                          ["rootca-sig", "root-signer", "client-pub", "client-pri"])
         self.assertEqual([command for command in sent if not command.startswith("tsipprov write")][-2:],
