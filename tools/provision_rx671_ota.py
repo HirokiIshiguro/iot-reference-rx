@@ -335,6 +335,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
 
         verification_values = {}
         pem_values = []
+        tsip_late_pem = []
         if not signer_only:
             _set_wifi_credentials(
                 serial_port,
@@ -353,8 +354,12 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
                 verification_values[name] = value
             completed.extend(("endpoint", "thing"))
             event_log.write("endpoint and Thing name stored (values redacted)\n")
-            pem_values.append(("cert", args.certificate))
-            if not getattr(args, "tsip", False):
+            if getattr(args, "tsip", False):
+                # EXPERIMENT: the first run hung in conf commit while the device certificate was pending
+                # (TSIP not opened yet). Commit everything else first; the certificate follows the tsipprov step.
+                tsip_late_pem = [("cert", args.certificate)]
+            else:
+                pem_values.append(("cert", args.certificate))
                 pem_values.append(("key", args.private_key))
         pem_values.extend((
             ("codesigncert", args.codesigner_certificate),
@@ -387,6 +392,14 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             completed.append("public_config_readback_verified")
         if getattr(args, "tsip", False) and not signer_only:
             _provision_tsip_keys(serial_port, args, event_log, completed)
+            for name, path in tsip_late_pem:
+                _set_pem(serial_port, name, path, char_delay=args.char_delay, timeout=args.command_timeout)
+                completed.append(name)
+                event_log.write(f"{name} stored after the TSIP keys (payload redacted)\n")
+            if tsip_late_pem:
+                event_log.write("commit the device certificate\n")
+                _commit(serial_port, args, event_log)
+                completed.append("commit_certificate")
         event_log.write("PEM persistence requires bootloader key loading and signature proof\n")
     finally:
         serial_port.close()
