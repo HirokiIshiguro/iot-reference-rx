@@ -29,6 +29,26 @@ class FlashLayoutTests(unittest.TestCase):
                 self.assertIn("0FFFE0000", (project / ".cproject").read_text(encoding="utf-8"))
                 self.assertIn(f'#include "{header}"', (project / "src/rx_bootloader_config.h").read_text(encoding="utf-8"))
 
+class InstallRangeTests(unittest.TestCase):
+    def test_board_erase_ranges_preserve_both_bootloaders(self):
+        import sys
+        import types
+        if sys.platform == "win32":
+            sys.modules.setdefault("fcntl", types.ModuleType("fcntl"))
+        sys.path.insert(0, str(ROOT / "tools/ci"))
+        import rxci
+        import rxci_board
+        expected = {
+            "rx65n": ("FFE00000,FFEDFFFF", "FFF00000,FFFDFFFF"),
+            "rx72n": ("FFC00000,FFDDFFFF", "FFE00000,FFFDFFFF"),
+            "rx671": ("FFE00000,FFEBFFFF", "FFF00000,FFFBFFFF"),
+        }
+        for name, ranges in expected.items():
+            with self.subTest(board=name):
+                board = rxci_board.Board(rxci.load_registry(), name)
+                command = board.rfp.erase_ota_install_areas_command()
+                self.assertEqual(["-range", ranges[0], "-range", ranges[1], "-erase", "-noquery"], command[-6:])
+
 
 if __name__ == "__main__":
     unittest.main()

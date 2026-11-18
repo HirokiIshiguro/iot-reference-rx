@@ -45,7 +45,18 @@ class Board:
         start, size = BANK[self.target["id"]]
         self.host = host
         end = 0xFFFBFFFF if self.name == "rx671" else 0xFFFDFFFF
-        self.rfp = host.RfpConfig(
+        class TargetRfpConfig(host.RfpConfig):
+            def erase_ota_install_areas_command(self):
+                expected = ((start - size, end - size), (start, end))
+                if self.install_ranges != expected:
+                    raise ValueError("Invalid reviewed OTA install ranges")
+                command = self.common_command()
+                for low, high in expected:
+                    command.extend(("-range", f"{low:08X},{high:08X}"))
+                return [*command, "-erase", "-noquery"]
+
+        config_type = host.RfpConfig if name == "rx671" else TargetRfpConfig
+        self.rfp = config_type(
             executable="rfp-cli", device=self.target["rfp_device"], tool="e2l:" + self.target["e2lite"],
             speed=self.target["rfp_speed"],
             install_ranges=((start - size, end - size), (start, end)))
