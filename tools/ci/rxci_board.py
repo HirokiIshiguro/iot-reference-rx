@@ -122,8 +122,14 @@ class Board:
         """Erase the chip and install public boot trust, the boot loader and the signed application."""
         import provision_rx671_ota as provisioner
 
-        sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True,
-                             text=True).stdout.strip()
+        # The provisioner announces the commit it was built from. A reused build comes from an
+        # earlier commit with the same build inputs, so the build says which one (build.json).
+        made = common / "build.json"
+        if made.is_file():
+            sha = json.loads(made.read_text(encoding="utf-8"))["commit"]
+        else:
+            sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True,
+                                 text=True).stdout.strip()
         # RX72N builds the boot loader together with the application; RX671 builds it once per commit.
         bootloader = next(folder / "bootloader.mot" for folder in (app, common)
                           if (folder / "bootloader.mot").is_file())
