@@ -106,9 +106,25 @@ def expand_ota_path_template(
     )
 
 
-def encode_custom_signature_for_cli(der_signature: bytes) -> str:
-    """Return the double-base64 form needed for AWS CLI blob JSON input."""
-    return base64.b64encode(base64.b64encode(der_signature)).decode("ascii")
+def aws_cli_major_version() -> int:
+    """Major version of the AWS CLI on the PATH (2 when it cannot be read)."""
+    try:
+        result = subprocess.run(["aws", "--version"], capture_output=True, text=True)
+    except OSError:
+        return 2
+    match = re.search(r"aws-cli/(\d+)\.", result.stdout + result.stderr)
+    return int(match.group(1)) if match else 2
+
+
+def encode_custom_signature_for_cli(der_signature: bytes, cli_major: int = 2) -> str:
+    """Return the JSON input form of the signature for the AWS CLI in use.
+
+    The device expects the base64 text of the DER signature in the job document.
+    AWS CLI 2 decodes base64 once for a blob in JSON input, so it needs the text
+    encoded a second time. AWS CLI 1 sends the text as it is.
+    """
+    text = base64.b64encode(der_signature)
+    return (base64.b64encode(text) if cli_major >= 2 else text).decode("ascii")
 
 
 def ota_meta_updates(payload: dict) -> dict[str, object]:
@@ -303,7 +319,8 @@ def main() -> int:
         code_signing = {
             "customCodeSigning": {
                 "signature": {
-                    "inlineDocument": encode_custom_signature_for_cli(args.custom_signature_der.read_bytes()),
+                    "inlineDocument": encode_custom_signature_for_cli(
+                        args.custom_signature_der.read_bytes(), aws_cli_major_version()),
                 },
                 "certificateChain": {
                     "certificateName": certificate_name,
