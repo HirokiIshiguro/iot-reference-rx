@@ -32,7 +32,7 @@ provisioning、OTA、cleanup jobを合わせて判定する。
 |---|---|---|
 | CC-RX device mode | `bank.dual` | 同じ |
 | BSP bank mode | `BSP_CFG_CODE_FLASH_BANK_MODE=0` | 同じ |
-| FWUP area size | `0x000C0000`（768 KiB） | 同じ |
+| FWUP area size | `0x000E0000`（896 KiB） | 同じ |
 | アプリ配置 | main `0xFFF00000` + `0x300` = `0xFFF00300` | 同じ |
 | WHD firmware / NVRAM / CLM | アプリに続く同一main image group | 同じ |
 | RAM初期値section | `PFRAM2=RPFRAM2`、`PFRAM2`はmain image group内 | 同じ |
@@ -43,7 +43,7 @@ provisioning、OTA、cleanup jobを合わせて判定する。
 
 別途、資格情報投入専用のprovisionerを同じ`bank.dual`構成で生成する。
 初回に単独起動できるよう、その一時profileだけはexception/reset vectorを
-`0xFFFFFF80` / `0xFFFFFFFC`へ置く。通常appのvectorは`0xFFFBFF80` / `0xFFFBFFFC`である。
+`0xFFFFFF80` / `0xFFFFFFFC`へ置く。通常appのvectorは`0xFFFDFF80` / `0xFFFDFFFC`である。
 `RX671_OTA_PROVISIONER_ENABLE=1`のときはWHD/IPを開始せず、LittleFS/KVS初期化後に
 共通CLIをSCI6へ常駐させる。`cert`、`key`、`thingname`、`endpoint`、
 `codesigncert`、`codesignpubkey`を`conf set` / `commit`で保存できる。Wi-Fiは
@@ -114,11 +114,11 @@ provisionerもapp用Code Flashを使うため、LittleFS/KVS commit後のhandoff
 そのためhostはcommit成功後、bootloader MOT書込み前にRFPの複数`-range`と`-erase`を
 用いて、次の2領域だけを選択消去する。
 
-- temporary install area: `0xFFE00000-0xFFEBFFFF`
-- execute install area: `0xFFF00000-0xFFFBFFFF`
+- temporary install area: `0xFFE00000-0xFFEDFFFF`
+- execute install area: `0xFFF00000-0xFFFDFFFF`
 
 `-erase-chip`は使用しない。Data Flash/LittleFS、flash option、bootloader mirror
-`0xFFEC0000-0xFFEFFFFF`、bootloader `0xFFFC0000-0xFFFFFFFF`を保持する。次に
+`0xFFEE0000-0xFFEFFFFF`、bootloader `0xFFFE0000-0xFFFFFFFF`を保持する。次に
 bootloader MOTを書いてreset保持し、SCI6をopenしてからreleaseする。これにより
 bootloaderは両headerを`LIFECYCLE_STATE_BLANK`として認識し、baseline RSU受信へ進む。
 
@@ -169,7 +169,7 @@ OTA profileは次のように固定する。
 - MQTT Agent network buffer: 8 KiB
 - `mqttFileDownloader` block: 4 KiB
 - `mqttFileDownloader` blocks/request: 1、OTA event data buffer: 2
-- 受信済みblock管理上限: 192（最大transfer payload 785,920 bytesを4 KiBで網羅）
+- 受信済みblock管理上限: 224（最大transfer payload 916,992 bytesを4 KiBで網羅）
 - network buffer descriptor: 24、WHD port buffer: 8
 - mbedTLS minimum / maximum: ともにTLS 1.2
 
@@ -195,7 +195,7 @@ mapped 346,181 bytes、未使用47,028 bytesを示した
 比べると、静的RAMが約17 KiB減り、heapの使用量が同程度増えている。どの変更で静的RAMから
 heapへ移ったかは未確認。
 
-heapを16 KiB増やして224 KiBとし、layout analyzerの固定値も224 / 2 / 192とした。
+heapを16 KiB増やして224 KiBとし、当時のlayout analyzer固定値は224 / 2 / 192、現在は224 / 2 / 224である。
 [pipeline 16757](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16757)の
 実機2試験の`[RX671_OTA_CAPACITY]`は次のとおりで、判定の下限16,384 bytesを満たす。
 
@@ -368,20 +368,20 @@ OTA helperは版数と実行時の役割を選択し、署名対象の固定配�
 ## 3. 固定code flash配置
 
 正本は`ota-layout-contract.json`である。RX671の2 MiB code flashを1 MiBずつの
-main / buffer bankとして扱い、各bank末尾256 KiBをbootloader予約相当として
-除外する。署名・更新対象となるinstall areaは各768 KiBである。
+main / buffer bankとして扱い、各bank末尾128 KiBをbootloader予約相当として
+除外する。署名・更新対象となるinstall areaは各896 KiBである。
 
 | 範囲 / anchor | 値 | 用途 |
 |---|---:|---|
 | buffer bank start | `0xFFE00000` | download / swap対象bank |
 | main bank start | `0xFFF00000` | 現在実行する論理main bank |
-| install area size | `0x000C0000` | header、descriptor、applicationを含む768 KiB |
+| install area size | `0x000E0000` | header、descriptor、applicationを含む896 KiB |
 | FWUP header | main `+0x000`–`+0x1FF` | 512-byte FWUP header |
 | FWUP v2 descriptor | main `+0x200`–`+0x2FF` | 256-byte descriptor |
 | application start | `0xFFF00300` | main `+0x300` |
-| exception vector | `0xFFFBFF80` | install area末尾128-byte window |
-| reset vector | `0xFFFBFFFC` | install area末尾 |
-| bootloader reserved | `0xFFFC0000`–`0xFFFFFFFF` | RX671専用bootloaderと固定vector |
+| exception vector | `0xFFFDFF80` | install area末尾128-byte window |
+| reset vector | `0xFFFDFFFC` | install area末尾 |
+| bootloader reserved | `0xFFFE0000`–`0xFFFFFFFF` | RX671専用bootloaderと固定vector |
 
 OTA linker profileでは、アプリ、`TYPE1YN_FW_BLOB`、`TYPE1YN_NVRAM_BLOB`、
 `TYPE1YN_CLM_BLOB`を`0xFFF00300`から始まる同一groupに置く。Cコード側は
