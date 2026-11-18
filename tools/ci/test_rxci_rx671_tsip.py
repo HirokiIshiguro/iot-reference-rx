@@ -1,5 +1,6 @@
 import io
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -12,6 +13,17 @@ import rxci_build
 
 
 class Rx671TsipFleetTests(unittest.TestCase):
+    def test_generated_local_credentials_are_ignored_for_both_projects(self):
+        root = Path(__file__).resolve().parents[2]
+        relative = ("src/whd_join_config_local.h", "src/frtos_config/aws_iot_config_local.h",
+                    "src/frtos_config/tcp_throughput_config_local.h", "src/frtos_config/rx671_fleet_config_local.h")
+        for project in ("aws_wifi_rx671_ek", "aws_wifi_rx671_ek_tsip"):
+            for suffix in relative:
+                with self.subTest(project=project, filename=suffix):
+                    result = subprocess.run(["git", "check-ignore", "-q", f"Projects/{project}/e2studio_ccrx/{suffix}"],
+                                            cwd=root, check=False)
+                    self.assertEqual(result.returncode, 0)
+
     def test_qualification_runs_only_explicit_pair_without_marking_ready(self):
         registry = rxci.load_registry()
         names = [f"rx671:tsip:tls{version}:fleet" for version in (12, 13)]
