@@ -176,7 +176,9 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
     BaseType_t xResult;
     uint32_t ulRootSignerSize = 0U;
     e_commonapi_err_t xCommonApiResult;
+#if !defined(BSP_MCU_RX671)
     e_tsip_err_t xTsipResult;
+#endif
 
     if (pdTRUE == xRootCaTrustAnchorReady)
     {
@@ -218,11 +220,15 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
         return pdFALSE;
     }
 
+#if !defined(BSP_MCU_RX671)
+    /* The r_tsip_rx target of RX671 has no such function. R_TSIP_Open() above
+     * has already taken the same key index on every target. */
     xTsipResult = R_TSIP_TlsRegisterCaCertificationPublicKeyIndex(TSIP_TLS_MODE_CLIENT, &xRootSignerPublicKeyIndex);
     if (TSIP_SUCCESS != xTsipResult)
     {
         return pdFALSE;
     }
+#endif
 
     xRootCaTrustAnchorReady = pdTRUE;
     return pdTRUE;

@@ -51,9 +51,9 @@ NOT_BUILD_INPUTS = ("docs/", ".gitlab-ci.yml", "tools/ci/rxci.py", "tools/ci/rxc
                     "tools/test_ota.py", "tools/test_rx671_ota.py", "tools/verify_ota_aws_state.py")
 
 
-def run(command: list, *, timeout: int) -> None:
+def run(command: list, *, timeout: int, env: dict | None = None) -> None:
     print("+ " + " ".join(str(part) for part in command), flush=True)
-    subprocess.run([str(part) for part in command], cwd=ROOT, check=True, timeout=timeout)
+    subprocess.run([str(part) for part in command], cwd=ROOT, check=True, timeout=timeout, env=env)
 
 
 def workspace(registry: dict, name: str) -> Path:
@@ -242,7 +242,7 @@ def build_rx65n_ota(registry: dict, backend: str, tls: str, out: Path) -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def build_rx671_app(registry: dict, tls: str, kind: str, out: Path) -> None:
+def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path) -> None:
     """Application of EK-RX671. The Wi-Fi and AWS credentials are compiled in from CI variables."""
     board = registry["boards"]["rx671"]
     required = ["RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE"]
@@ -259,28 +259,34 @@ def build_rx671_app(registry: dict, tls: str, kind: str, out: Path) -> None:
     endpoint = entry.get("value") or os.environ.get("RX671_EK_AWS_IOT_ENDPOINT") or os.environ.get(entry["variable"], "")
     if not endpoint:
         raise SystemExit(f"The AWS IoT endpoint for {tls} is not set.")
-    work = workspace(registry, f"rx671-{tls}-{kind}")
+    work = workspace(registry, f"rx671-{backend}-{tls}-{kind}")
     log = ROOT / "rx671_wifi_e2studio_build.log"
-    sources = ROOT / "Projects" / "aws_wifi_rx671_ek" / "e2studio_ccrx" / "src"
-    mot = ROOT / "Projects" / "aws_wifi_rx671_ek" / "e2studio_ccrx" / "HardwareDebug" / "aws_wifi_rx671_ek.mot"
+    project = "aws_wifi_rx671_ek_tsip" if backend == "tsip" else "aws_wifi_rx671_ek"
+    project_dir = ROOT / "Projects" / project / "e2studio_ccrx"
+    sources = project_dir / "src"
+    mot = project_dir / "HardwareDebug" / f"{project}.mot"
     rsu = ROOT / "rx671_app.rsu"
     cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
     command = ["pwsh", "-NoProfile", "-File", "tools/build_headless_rx671_wifi.ps1", "-ProjectRoot", ROOT,
                "-E2Studio", cli, "-Workspace", work, "-LogFile", log, "-WlanAllowBusSleepDelayMs", "600000",
                "-UseLocalJoinConfig"]
+    build_env = None
+    if backend == "tsip":
+        command += ["-TlsBackend", "tsip"]
     if kind == "app":
         command += ["-UseAwsIotLocalConfig", "-AwsIotEndpoint", endpoint]
     else:
         # Heap size and SDIO clock are the values the Fleet image was proven with on this board.
-        command += ["-SkipAwsIotConfig", "-FleetProvisioningEnable", "-FleetEndpoint", endpoint,
-                    "-FleetTemplateName", os.environ[board["fleet_template_variable"]],
-                    "-FleetClaimCertificate", os.environ[board["claim_certificate_variable"]],
-                    "-FleetClaimPrivateKey", os.environ[board["claim_private_key_variable"]],
+        command += ["-SkipAwsIotConfig", "-FleetProvisioningEnable",
                     "-FreeRtosHeapSizeKb", "250", "-SdioRunClockDiv", "SDHI_DIV_8"]
+        build_env = {**os.environ, "RX671_EK_FLEET_ENDPOINT": endpoint,
+                     "RX671_EK_FLEET_TEMPLATE_NAME": os.environ[board["fleet_template_variable"]],
+                     "RX671_EK_FLEET_CLAIM_CERT_PEM": os.environ[board["claim_certificate_variable"]],
+                     "RX671_EK_FLEET_CLAIM_PRIVATE_KEY_PEM": os.environ[board["claim_private_key_variable"]]}
     if tls == "tls13":
         command += ["-RequireTlsVersion", "TLSv1.3"]
     try:
-        run(command, timeout=1500)
+        run(command, timeout=1500, env=build_env)
         run([sys.executable, "tools/build_rx671_fwup_v2_rsu.py", "--mot", mot, "--key", SIGNING_KEY,
              "--output", rsu], timeout=120)
         out.mkdir(parents=True, exist_ok=True)
@@ -409,7 +415,8 @@ def build_from_source(registry: dict, variant: str, out: Path) -> None:
             return ota(registry, backend, tls, out)
     if board == "rx671" and name in ("software-tls12/ota", "software-tls13/ota"):
         return build_rx671_ota(registry, name.split("/")[0].split("-")[1], out)
-    if board == "rx671" and name.startswith("software-tls1") and name.endswith(("/app", "/fleet")):
-        backend, kind = name.split("/")
-        return build_rx671_app(registry, backend.split("-")[1], kind, out)
+    if board == "rx671" and tls in ("tls12", "tls13") and (
+            (backend == "software" and kind in ("app", "fleet")) or
+            (backend == "tsip" and kind == "fleet")):
+        return build_rx671_app(registry, backend, tls, kind, out)
     raise SystemExit(f"Build variant is not implemented yet: {variant}")

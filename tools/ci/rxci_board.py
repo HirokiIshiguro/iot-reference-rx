@@ -491,7 +491,8 @@ def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pa
     install_rx671(registry, board, "fleet", common, app, logs)
     observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
                "--timeout", 900, "--reset-cmd", board.reset_command(), "--app-reset-retries", 2,
-               "--label", "RX671/Type 1YN software", "--summary-json", logs / "fleet_summary.json",
+               "--label", f"RX671/Type 1YN {('TSIP' if test['backend'] == 'tsip' else 'software')}",
+               "--summary-json", logs / "fleet_summary.json",
                "--junit-output", logs / "fleet-junit.xml"]
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3", "--minimum-tls-handshakes", 2]

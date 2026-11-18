@@ -14,6 +14,8 @@ param(
     [string]$AwsIotEndpoint = "",
     [string]$AwsIotThingName = "",
     [string]$RequireTlsVersion = "",
+    [ValidateSet("software", "tsip")]
+    [string]$TlsBackend = "software",
     [switch]$UseLocalJoinConfig,
     [switch]$UseKvsJoinConfig,
     [switch]$SkipWifiConfig,
@@ -129,7 +131,7 @@ $expectedOtaImageMarker = "RX671_OTA_IMAGE_VERSION=$effectiveOtaImageVersion"
 $projectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 Initialize-RxBuildDependencies -ProjectRoot $projectRoot
 Assert-RxCommonKernel -ProjectRoot $projectRoot
-$projectName = "aws_wifi_rx671_ek"
+$projectName = if ($TlsBackend -eq "tsip") { "aws_wifi_rx671_ek_tsip" } else { "aws_wifi_rx671_ek" }
 $projectDir = Join-Path $projectRoot "Projects\$projectName\e2studio_ccrx"
 $whdDir = Join-Path $projectRoot "Projects\$projectName\external\wifi-host-driver"
 $whdManifest = Join-Path $PSScriptRoot "whd_source_manifest.json"
@@ -1397,6 +1399,11 @@ try {
     if (($cprojectDefines.Count -gt 0) -or ($cprojectLinkerOptions.Count -gt 0)) {
         $cprojectBytes = [System.IO.File]::ReadAllBytes($cproject)
         $patchedCProject = [System.IO.File]::ReadAllText($cproject)
+        if (($TlsBackend -eq "tsip") -and ($effectiveRequireTlsVersion -eq "TLSv1.3")) {
+            $from = "aws_mbedtls_config_with_tsip.h"
+            if (-not $patchedCProject.Contains($from)) { throw "TSIP config not found in $cproject" }
+            $patchedCProject = $patchedCProject.Replace($from, "aws_mbedtls_config_with_tsip13.h")
+        }
         foreach ($define in $cprojectDefines) {
             $patchedCProject = Add-CProjectDefine -Text $patchedCProject -Define $define
         }

@@ -707,7 +707,7 @@ def _copy_build_outputs(project_dir: Path, artifact_dir: Path) -> dict[str, Path
     output_dir = project_dir / "HardwareDebug"
     outputs: dict[str, Path] = {}
     for extension in ("mot", "abs", "map"):
-        source = output_dir / f"{ARTIFACT_BASENAME}.{extension}"
+        source = output_dir / f"{project_dir.parent.name}.{extension}"
         if not source.is_file():
             raise FileNotFoundError(f"RX671 OTA build artifact missing: {source}")
         destination = artifact_dir / source.name
@@ -817,6 +817,8 @@ def _build_provisioner(
                         str(build_log),
                         "-E2StudioTimeoutSeconds",
                         str(timeout_seconds),
+                        "-TlsBackend",
+                        "tsip" if project_dir == repo_root / "Projects/aws_wifi_rx671_ek_tsip/e2studio_ccrx" else "software",
                         "-SkipWifiConfig",
                         "-SkipAwsIotConfig",
                     ],
@@ -869,9 +871,9 @@ def _copy_failed_build_diagnostics(project_dir: Path, artifact_dir: Path) -> Non
     diagnostic_dir = artifact_dir / "failed-build-diagnostics"
     copied = False
     for name in (
-        f"{ARTIFACT_BASENAME}.map",
+        f"{project_dir.parent.name}.map",
         "LinkerSubCommand.tmp",
-        f"Linker{ARTIFACT_BASENAME}.tmp",
+        f"Linker{project_dir.parent.name}.tmp",
         "makefile",
     ):
         source = hardware_debug / name
@@ -1065,6 +1067,10 @@ def _build_one(
                 version.text,
                 "-SkipAwsIotConfig",
             ]
+            if "_tsip" in project_dir.parent.name:
+                build_command += ["-TlsBackend", "tsip"]
+                if tls_version == "TLSv1.3":
+                    build_command += ["-RequireTlsVersion", "TLSv1.3"]
             # The KVS JOIN defines are part of the temporary .cproject above,
             # so the copied effective configuration and its hash describe the
             # exact compiler input.  The child builder only has to suppress
@@ -1189,6 +1195,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     default_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=default_root)
+    parser.add_argument("--tls-backend", choices=("software", "tsip"), default="software")
     parser.add_argument("--baseline-version", default="0.1.0")
     parser.add_argument("--candidate-version", default="0.1.1")
     parser.add_argument(
@@ -1238,6 +1245,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     repo_root = args.repo_root.resolve()
+    global PROJECT_RELATIVE, WHD_SUBMODULE_RELATIVE, FORMAL_INPUT_SUBMODULES, WHD_BLOB_PATHS
+    PROJECT_RELATIVE = Path("Projects/aws_wifi_rx671_ek_tsip/e2studio_ccrx") if args.tls_backend == "tsip" else Path("Projects/aws_wifi_rx671_ek/e2studio_ccrx")
+    if args.tls_backend == "tsip":
+        def tsip_path(path: Path) -> Path:
+            return Path(path.as_posix().replace("Projects/aws_wifi_rx671_ek/", "Projects/aws_wifi_rx671_ek_tsip/"))
+        WHD_SUBMODULE_RELATIVE = tsip_path(WHD_SUBMODULE_RELATIVE)
+        FORMAL_INPUT_SUBMODULES = tuple(tsip_path(path) for path in FORMAL_INPUT_SUBMODULES) + (Path("Middleware/3rdparty/mbedtls_with_TSIP"),)
+        WHD_BLOB_PATHS = tuple(tsip_path(path) for path in WHD_BLOB_PATHS)
     project_dir = repo_root / PROJECT_RELATIVE
     output_root = args.output_root.resolve()
     _validate_output_root(output_root, repo_root)
