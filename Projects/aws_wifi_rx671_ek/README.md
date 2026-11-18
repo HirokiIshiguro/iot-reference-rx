@@ -455,7 +455,8 @@ block must reach `(768/768KB)`, after which the independent `completed
 installing firmware`, ECDSA scheme, integrity `OK`, lifecycle update, reset,
 and application-jump markers remain mandatory.
 
-The OTA-only memory profile uses a 208 KiB FreeRTOS heap, a 32 KiB TCP receive
+The OTA-only memory profile uses a 224 KiB FreeRTOS heap (208 KiB until
+2026-11-18; see "2026-11-18のheap拡張" in `e2studio_ccrx/OTA_FLASH_LAYOUT.md`), a 32 KiB TCP receive
 stream, 24 network buffer descriptors, an 8 KiB MQTT Agent network buffer,
 eight WHD port buffers, and a 4 KiB `mqttFileDownloader` block. It requests one
 block at a time, uses two 8 KiB static OTA event buffers, and tracks all 192

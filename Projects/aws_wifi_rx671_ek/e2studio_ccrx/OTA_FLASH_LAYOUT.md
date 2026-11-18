@@ -164,7 +164,7 @@ RX/TX streamだけでも約138,208 bytesとなり、128 KiBを超える。malloc
 
 OTA profileは次のように固定する。
 
-- FreeRTOS heap: 208 KiB
+- FreeRTOS heap: 224 KiB（2026-11-18に208 KiBから拡張。理由は下の「2026-11-18のheap拡張」）
 - TCP RX stream: 32 KiB（TXは8 KiB）
 - MQTT Agent network buffer: 8 KiB
 - `mqttFileDownloader` block: 4 KiB
@@ -180,6 +180,31 @@ request直後に下位TCP/MQTT受信処理が3 blockをburst受信してheapを�
 旧map比の静的RAM増加は約8 KiBに抑えながら動的RAM余裕を16 KiB増やす。正式package
 jobではこの見積りではなく、再buildしたMAPの`ram_capacity` gate、effective
 `.cproject`の208/2/192 memory profile、および実機のminimum-ever-free heapを必須とする。
+
+### 2026-11-18のheap拡張
+
+208 KiBのprofileは、OTA jobの受信直後に`prvEnsureFlashResources`がOTA flash taskを
+生成する時点で`FreeRTOS malloc failed`となった（free 2,784 bytes、minimum-ever-free
+2,080 bytes。flash taskのstackは`configMINIMAL_STACK_SIZE * 2`）。TLS 1.2 / TLS 1.3の
+両方で再現した（[pipeline 16747](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16747)）。
+
+同じsourceのbaseline MAPは、RAM 393,216 bytesに対してhigh-water `0x0005484B`、
+mapped 346,181 bytes、未使用47,028 bytesを示した
+（[pipeline 16753](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16753)）。
+下の`ef69d76c`時点の記録（high-water `0x00058A5B`、minimum-ever-free heap 25,584 bytes）と
+比べると、静的RAMが約17 KiB減り、heapの使用量が同程度増えている。どの変更で静的RAMから
+heapへ移ったかは未確認。
+
+heapを16 KiB増やして224 KiBとし、layout analyzerの固定値も224 / 2 / 192とした。
+[pipeline 16757](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16757)の
+実機2試験の`[RX671_OTA_CAPACITY]`は次のとおりで、判定の下限16,384 bytesを満たす。
+
+| TLS | minimum-ever-free heap | minimum network buffer | WHD maximum in-use |
+|---|---:|---:|---:|
+| 1.2 | 21,584 bytes | 19 | 1/8 |
+| 1.3 | 18,408 bytes | 14 | 1/8 |
+
+以下は208 KiB時点の記録であり、当時の値のまま残す。
 
 source SHA `ef69d76c`のpipeline #9581 / package job #61342では、candidateの
 effective `.cproject`から上記profileを一意に導出し、`mqtt_ota_buffer_fit`と
