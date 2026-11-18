@@ -32,7 +32,7 @@ class Rx671BootloaderContractTests(unittest.TestCase):
         self.assertIn('value="R5F5671EHxFB_DUAL"', cproject)
         self.assertIn('value="R5F5671E_DUAL"', cproject)
         self.assertIn(
-            "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2/0FFFC0000,"
+            "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2/0FFFE0000,"
             "EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC",
             cproject,
         )
