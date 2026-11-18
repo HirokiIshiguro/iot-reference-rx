@@ -57,17 +57,20 @@ class FakeSerial:
 PEM = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----"
 
 
-def run_pem(ser, timeout):
+def run_pem(ser, timeout=None):
+    """Send one PEM value; without `timeout` the tool's own default limit applies."""
     out = io.StringIO()
+    limit = () if timeout is None else (timeout,)
     with contextlib.redirect_stdout(out):
-        ok = subject.send_pem_content_command(ser, "cert", PEM, "label", 0, 0.5, timeout)
+        ok = subject.send_pem_content_command(ser, "cert", PEM, "label", 0, 0.5, *limit)
     return ok, out.getvalue()
 
 
 class ProvisionWaitTests(unittest.TestCase):
     def test_late_ok_is_accepted(self):
+        # No explicit limit: the half-second judgement this replaces fails here by assertion.
         ser = FakeSerial(reply_delay=1.5)
-        ok, _ = run_pem(ser, timeout=5.0)
+        ok, _ = run_pem(ser)
         self.assertTrue(ok)
 
     def test_ok_returns_without_extra_wait(self):
