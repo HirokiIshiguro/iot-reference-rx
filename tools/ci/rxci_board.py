@@ -617,6 +617,10 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
     except SystemExit as error:
         failure = str(error)
     finally:
+        # LCD check (experiment branch only, never merged): the board keeps running so that a person can look at the LCD.
+        print(f"LCD-OBSERVATION-START {sys.argv[1]}: the board keeps running for 12 minutes", flush=True)
+        time.sleep(720)
+        print("LCD-OBSERVATION-END", flush=True)
         try:
             board.park()
         except (subprocess.SubprocessError, OSError) as error:
