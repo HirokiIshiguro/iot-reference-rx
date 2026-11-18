@@ -31,4 +31,4 @@ The boot loader receives a signed RSU image over UART and starts the application
 
 ## Flash layout
 
-The bootloader occupies the final 128 KiB of each bank: 0xFFFE0000–0xFFFFFFFF in bank 0 and 0xFFEE0000 at the start of its bank 1 copy. The application exception and reset vectors are 0xFFFDFF80 and 0xFFFDFFFC.
+The bootloader occupies the final 64 KiB of each bank: 0xFFFF0000–0xFFFFFFFF in bank 0 and 0xFFEF0000 at the start of its bank 1 copy. The application exception and reset vectors are 0xFFFEFF80 and 0xFFFEFFFC.

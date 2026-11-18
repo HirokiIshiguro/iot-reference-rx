@@ -20,7 +20,7 @@ If the signature verification passes, the firmware starts.
 
 ### Current flash layout
 
-The current RX72N project reserves 0xFFFE0000–0xFFFFFFFF (128 KiB) for the bootloader, mirrored at 0xFFDE0000–0xFFDFFFFF. The application area is 0xFFE00000–0xFFFDFFFF (1,920 KiB), with exception and reset vectors at 0xFFFDFF80 and 0xFFFDFFFC. The OTA payload is 1,965,568 bytes. The following memory usage table describes the imported reference, not a measurement of this project.
+The current RX72N project reserves 0xFFFF0000–0xFFFFFFFF (64 KiB) for the bootloader, mirrored at 0xFFDF0000–0xFFDFFFFF. The application area is 0xFFE00000–0xFFFEFFFF (1,984 KiB), with exception and reset vectors at 0xFFFEFF80 and 0xFFFEFFFC. The OTA payload is 2,031,104 bytes. The following memory usage table describes the imported reference, not a measurement of this project.
 
 ### Memory usage
 

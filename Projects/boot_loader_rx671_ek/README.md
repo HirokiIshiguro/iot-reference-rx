@@ -7,7 +7,7 @@ EK-RX671（R5F5671EHxFB）のデュアルバンク Code Flash 用セキュアブ
 この段階で提供するものは次のとおりです。
 
 - CC-RX / e2 studio の `HardwareDebug` ビルド
-- 上位 128 KiB に固定したブートローダー配置
+- 上位 64 KiB に固定したブートローダー配置
 - SCI6、921600 bps のダウンロード／診断 UART
 - Data Flash を消去しない RSU 更新設定
 - アプリケーションと共有する LittleFS からの署名検証用公開鍵読み込み
@@ -42,8 +42,8 @@ anti-rollback も未実装です。production 化には Code Flash / TSIP の ro
 
 | 領域 | アドレス | サイズ |
 |---|---:|---:|
-| ブートローダー予約領域 | `0xFFFE0000` - `0xFFFFFFFF` | 128 KiB |
-| `PResetPRG` | `0xFFFE0000` | エントリ |
+| ブートローダー予約領域 | `0xFFFF0000` - `0xFFFFFFFF` | 64 KiB |
+| `PResetPRG` | `0xFFFF0000` | エントリ |
 | `EXCEPTVECT` | `0xFFFFFF80` | 固定ベクタ |
 | `RESETVECT` | `0xFFFFFFFC` | リセットベクタ |
 
@@ -96,7 +96,7 @@ Loading user code signer public key from LittleFS: not found; refusing to boot.
 2026-11-18 に e2 studio 2026-04.2 / CC-RX V3.07.00 で headless clean build を実行し、0 error で `.mot/.abs/.map` を生成しました。配置検証結果は次のとおりです。
 
 ```text
-RX671_BOOTLOADER_LAYOUT_PASS window=0xFFFE0000-0xFFFFFFFF reserved=131072 payload=59451 option_records=8
+RX671_BOOTLOADER_LAYOUT_PASS window=0xFFFF0000-0xFFFFFFFF reserved=65536 payload=50948 option_records=8
 ```
 
-`payload` は Code Flash に実データとして格納されるバイト数です。予約領域は 131072 byte です。RPi#1 実機 smoke は manual gate を明示的に起動した pipeline の artifact を正式証跡とします。
+`payload` は Code Flash に実データとして格納されるバイト数です。予約領域は 65536 byte です。RPi#1 実機 smoke は manual gate を明示的に起動した pipeline の artifact を正式証跡とします。

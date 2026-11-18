@@ -31,9 +31,9 @@ DEFAULT_RFP_CLI = os.environ.get("RX671_WIFI_LINUX_RFP_CLI", "./tools/rfp_cli_lo
 DEFAULT_RFP_TIMEOUT = 120.0
 DEFAULT_UART_BUFFER_LIMIT = 16 * 1024 * 1024
 RX671_TEMPORARY_INSTALL_START = 0xFFE00000
-RX671_TEMPORARY_INSTALL_END = 0xFFEDFFFF
+RX671_TEMPORARY_INSTALL_END = 0xFFEEFFFF
 RX671_EXECUTE_INSTALL_START = 0xFFF00000
-RX671_EXECUTE_INSTALL_END = 0xFFFDFFFF
+RX671_EXECUTE_INSTALL_END = 0xFFFEFFFF
 CLI_INPUT_BUFFER_BYTES = 4096
 CLI_PROMPT_TOKENS = (b"\r\n>", b"\n>")
 CLI_SET_SUCCESS_TOKENS = (
@@ -90,7 +90,7 @@ class RfpConfig:
         if (len(self.install_ranges) != 2 or any(
                 not isinstance(start, int) or isinstance(start, bool) or
                 not isinstance(end, int) or isinstance(end, bool) or
-                not 0xFFC00000 <= start < end <= 0xFFFDFFFF
+                not 0xFFC00000 <= start < end <= 0xFFFEFFFF
                 for start, end in self.install_ranges)):
             raise ValueError("Invalid reviewed OTA install ranges")
         command = self.common_command()

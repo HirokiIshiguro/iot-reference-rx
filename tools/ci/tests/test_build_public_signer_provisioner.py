@@ -69,8 +69,8 @@ class PublicSignerProfileTests(unittest.TestCase):
         source = (ROOT / target['application_project'] / '.cproject').read_text(encoding='utf-8')
         with self.assertRaisesRegex(ValueError, 'canonical dual-bank'):
             builder.make_profile(source.replace('modes="bank.dual"', 'modes="bank.single"'))
-        for old, invalid in (("EXCEPTVECT/0FFFDFF80", "EXCEPTVECT/0FFFCFF80"),
-                             ("RESETVECT/0FFFDFFFC", "RESETVECT/0FFFCFFFC")):
+        for old, invalid in (("EXCEPTVECT/0FFFEFF80", "EXCEPTVECT/0FFFCFF80"),
+                             ("RESETVECT/0FFFEFFFC", "RESETVECT/0FFFCFFFC")):
             with self.assertRaisesRegex(ValueError, 'Unsupported application vector layout'):
                 builder.make_profile(source.replace(old, invalid))
         tree = ET.fromstring(source)

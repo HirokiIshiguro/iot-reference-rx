@@ -319,7 +319,7 @@ def record_packaging(value, target=None):
         if path.is_symlink() or not path.is_file():
             raise RuntimeError("packaged firmware artifact is missing or a symlink: " + kind)
     image = rsu.read_bytes()
-    expected_size = 0xFFFE0000 - int(target["bank_range_start"], 0)
+    expected_size = 0xFFFF0000 - int(target["bank_range_start"], 0)
     if (len(image) != expected_size or len(image) < 0x200 or
             struct.unpack_from("<III", image, 0x12C) != (0, 0xFFFFFFFF, 0xFFFFFFFF)):
         raise RuntimeError("UART RSU must contain only the signed Code Flash image and preserve Data Flash")

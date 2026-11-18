@@ -230,7 +230,7 @@
             <Setting id="FWUP_CFG_CF_W_UNIT_SIZE" value="128U"/>
             <Setting id="FWUP_CFG_USER_GET_CRYPT_CONTEXT_FUNCTION" value="ota_get_crypt_context_function"/>
             <Setting id="FWUP_CFG_MAIN_AREA_ADDR_L" value="0xFFF00000U"/>
-            <Setting id="FWUP_CFG_AREA_SIZE" value="0xE0000U"/>
+            <Setting id="FWUP_CFG_AREA_SIZE" value="0xF0000U"/>
             <Setting id="FWUP_CFG_USER_SHA256_UPDATE_ENABLED" value="1"/>
             <Setting id="FWUP_CFG_DF_ADDR_L" value="0x00100000"/>
             <Setting id="FWUP_CFG_USER_FLASH_ERASE_FUNCTION" value="ota_flash_erase_function"/>

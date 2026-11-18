@@ -169,7 +169,7 @@ Configuration Options
    0 = Disable I/O library initialization in resetprg.c. If you are not using stdio then use this value.
    1 = Enable I/O library initialization in resetprg.c. This is default and needed if you are using stdio.
    NOTE: This setting is available only when using CCRX. */
-#define BSP_CFG_IO_LIB_ENABLE           (1)
+#define BSP_CFG_IO_LIB_ENABLE           (0)
 
 /* If desired the user may redirect the stdio charget() and/or charput() functions to their own respective functions
    by enabling below and providing and replacing the my_sw_... function names with the names of their own functions. */
