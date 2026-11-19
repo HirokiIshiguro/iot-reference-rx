@@ -184,11 +184,16 @@ class Board:
 
 
 def endpoint(registry: dict, tls: str) -> str:
-    entry = registry["endpoints"][tls]
-    value = entry.get("value") or os.environ.get(entry["variable"], "")
-    if not value:
-        raise SystemExit(f"The AWS IoT endpoint for {tls} is not set ({entry.get('variable')}).")
-    return value
+    import rxci
+
+    return rxci.endpoint(registry, tls)
+
+
+def require_tls(test: dict) -> list:
+    """Make the observing tool fail unless every TLS handshake it sees used the version in the test name."""
+    import rxci
+
+    return ["--require-tls-version", rxci.tls_version(test["tls"])]
 
 
 def required_file(variable: str) -> str:
@@ -233,8 +238,7 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Pat
     provision_tsip_keys(board, test, reset_after=True)
     observe = [sys.executable, TOOLS / "test_mqtt_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
                "--timeout", 600, "--reset-cmd", board.reset_command()]
-    if test["tls"] == "tls13":
-        observe += ["--require-tls-version", "TLSv1.3"]
+    observe += require_tls(test)
     board.run(observe, timeout=700, label="observe MQTT on the UART", log=logs / "observe.log")
 
 
@@ -258,8 +262,7 @@ def fleet_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Pa
     board.run(provision, timeout=400, label="provision the claim credentials")
     observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
                "--timeout", 600, "--reset-cmd", board.reset_command(), "--summary-json", logs / "fleet_summary.json"]
-    if test["tls"] == "tls13":
-        observe += ["--require-tls-version", "TLSv1.3"]
+    observe += require_tls(test)
     try:
         board.run(observe, timeout=700, label="observe Fleet Provisioning on the UART", log=logs / "observe.log")
     finally:
@@ -339,8 +342,7 @@ def ota_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path
                    "--timeout", 900, "--expected-version", config["ota_candidate_version"],
                    "--reset-cmd", board.reset_command(), "--reset-after-open", "--no-reset",
                    "--raw-log", folder / "ota_uart_raw.log", "--summary-json", folder / "ota_summary.json"]
-        if test["tls"] == "tls13":
-            observe += ["--require-tls-version", "TLSv1.3"]
+        observe += require_tls(test)
         board.run(observe, timeout=1100, label="observe the OTA update on the UART", log=logs / "observe.log")
     finally:
         cleanup_ota(logs, rxci.aws_session)
@@ -414,8 +416,7 @@ def ota_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Path
         observe = [sys.executable, TOOLS / "bg96_ota_monitor.py", *serial, *programmer,
                    "--expected-version", config["ota_candidate_version"], "--timeout", 900, "--app-reset-retries", 2,
                    "--activate-reset-delay", 15, "--raw-log", folder / "ota_uart_raw.log", "--summary-json", folder / "ota_summary.json"]
-        if test["tls"] == "tls13":
-            observe += ["--require-tls-version", "TLSv1.3"]
+        observe += require_tls(test)
         board.run(observe, timeout=1100, label="observe the OTA update on the UART", log=logs / "observe.log")
     finally:
         try:
@@ -441,8 +442,7 @@ def fleet_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Pa
     observe = [sys.executable, TOOLS / "test_fleet_rx72n.py", "--label", "CK-RX65N BG96", "--log-port", board.uart,
                "--log-baud", board.baud, "--timeout", 900, "--app-reset-retries", 2,
                "--reset-cmd", board.reset_command(), "--summary-json", logs / "fleet_summary.json"]
-    if test["tls"] == "tls13":
-        observe += ["--require-tls-version", "TLSv1.3"]
+    observe += require_tls(test)
     try:
         board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART", log=logs / "observe.log")
     finally:
@@ -483,8 +483,7 @@ def mqtt_rx65n(registry: dict, board: Board, test: dict, builds: list, logs: Pat
         board.run([*tool, "--action", "reset-app", *target], timeout=120, label="start the application")
         observe = [*tool, "--action", "verify-mqtt", *target, "--require-mqtt-pubsub", "--app-startup-timeout", 420,
                    "--mqtt-timeout", 900, "--app-reset-retries", 2]
-        if test["tls"] == "tls13":
-            observe += ["--require-tls-version", "TLSv1.3"]
+        observe += require_tls(test)
         board.run(observe, timeout=1500, label="observe cellular attach and MQTT on the UART", log=logs / "observe.log")
     finally:
         rxci_aws.sweep(session, prefix=rxci_aws.owner())
@@ -520,8 +519,7 @@ def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pa
                "--label", f"RX671/Type 1YN {('TSIP' if test['backend'] == 'tsip' else 'software')}",
                "--summary-json", logs / "fleet_summary.json",
                "--junit-output", logs / "fleet-junit.xml"]
-    if test["tls"] == "tls13":
-        observe += ["--require-tls-version", "TLSv1.3", "--minimum-tls-handshakes", 2]
+    observe += [*require_tls(test), "--minimum-tls-handshakes", 2]
     try:
         board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART", log=logs / "observe.log")
     finally:
@@ -615,7 +613,7 @@ def ota_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path
         observe = [sys.executable, TOOLS / "test_rx671_ota.py", "--baseline-rsu", bundle / "baseline.rsu",
                    "--baseline-version", config["ota_baseline_version"],
                    "--candidate-version", config["ota_candidate_version"],
-                   "--require-tls-version", "TLSv1.3" if test["tls"] == "tls13" else "TLSv1.2",
+                   *require_tls(test),
                    "--port", board.uart, "--baud", board.baud, *programmer, "--boot-timeout", 180,
                    "--startup-reset-retries", 2, "--ota-timeout", 900, "--raw-log", folder / "ota_uart_raw.log",
                    "--summary-json", folder / "ota_summary.json", "--junit-output", folder / "ota-junit.xml"]
@@ -641,7 +639,7 @@ def mqtt_rx671_tsip(registry: dict, board: Board, test: dict, builds: list, logs
         board.download(bundle / "baseline.rsu", logs)
         observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
                    "--timeout", 300, "--mode", "mqtt-agent", "--reset-cmd", board.reset_command(),
-                   "--startup-retries", 1, "--require-tls-version", "TLSv1.3" if test["tls"] == "tls13" else "TLSv1.2",
+                   "--startup-retries", 1, *require_tls(test),
                    "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml"]
         board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART", log=logs / "observe.log")
     finally:
@@ -658,8 +656,7 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pat
     observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
                "--timeout", 300, "--mode", "mqtt", "--reset-cmd", board.reset_command(), "--startup-retries", 1,
                "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml"]
-    if test["tls"] == "tls13":
-        observe += ["--require-tls-version", "TLSv1.3"]
+    observe += require_tls(test)
     try:
         board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART", log=logs / "observe.log")
     finally:

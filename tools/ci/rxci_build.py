@@ -287,10 +287,9 @@ def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path
         if not os.environ.get(name):
             raise SystemExit(f"CI variable {name} is not available to this job.")
     key = image_key(registry, "rx671", kind)
-    entry = registry["endpoints"][tls]
-    endpoint = entry.get("value") or os.environ.get("RX671_EK_AWS_IOT_ENDPOINT") or os.environ.get(entry["variable"], "")
-    if not endpoint:
-        raise SystemExit(f"The AWS IoT endpoint for {tls} is not set.")
+    import rxci
+
+    endpoint = rxci.endpoint(registry, tls)
     work = workspace(registry, f"rx671-{backend}-{tls}-{kind}")
     log = ROOT / "rx671_wifi_e2studio_build.log"
     project = "aws_wifi_rx671_ek_tsip" if backend == "tsip" else "aws_wifi_rx671_ek"

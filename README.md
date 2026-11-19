@@ -104,7 +104,7 @@ git clone --recursive https://github.com/HirokiIshiguro/iot-reference-rx.git
 
 ## 詳細資料
 
-[CI/CD運用（pipelineを手で起こす時の変数の表）](docs/details/ci-pipeline.md) / [検証証跡](docs/details/validation/validation-evidence.md) /
+[試験仕様（36試験の合否の基準）](docs/test-specification.md) / [CI/CD運用（pipelineを手で起こす時の変数の表）](docs/details/ci-pipeline.md) / [検証証跡](docs/details/validation/validation-evidence.md) /
 [TSIP構成](docs/details/tsip/tsip-integration-plan.md) / [変更履歴](Changelog.md) /
 [ハードウェア・ツール現行値](https://gitlab.saffti.jp/oss/infra/hardware-config)
 

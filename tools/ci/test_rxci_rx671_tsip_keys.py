@@ -335,8 +335,10 @@ class AgentObserverTests(unittest.TestCase):
     def test_the_smoke_mode_is_unchanged(self):
         import test_rx671_wifi_uart as observer
         with self.assertRaises(ValueError):
-            observer.required_markers("mqtt", "TLSv1.2")
+            observer.required_markers("mqtt", "TLSv1.1")
         self.assertIn("AWS TLS=0", observer.required_markers("mqtt", "TLSv1.3"))
+        self.assertIn("AWS TLS=0", observer.required_markers("mqtt", "TLSv1.2"))
+        self.assertIn("AWS TLS version=TLSv1.2", observer.required_markers("mqtt", "TLSv1.2"))
 
 
 if __name__ == "__main__":

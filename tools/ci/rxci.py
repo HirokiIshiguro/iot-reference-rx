@@ -114,6 +114,24 @@ def load_registry(path: Path | None = None) -> dict:
     return registry
 
 
+def endpoint(registry: dict, tls: str) -> str:
+    """AWS IoT endpoint that serves one TLS version: the fixed value of tests.json, or the CI variable it names.
+
+    Every build and every test takes the endpoint from here, so that a test named after a TLS version connects
+    to the endpoint of that version and to no other.
+    """
+    entry = registry["endpoints"][tls]
+    value = entry.get("value") or os.environ.get(entry["variable"], "")
+    if not value:
+        raise SystemExit(f"The AWS IoT endpoint for {tls} is not set ({entry.get('variable')}).")
+    return value
+
+
+def tls_version(tls: str) -> str:
+    """Version string that the firmware logs for a test axis value: "tls12" -> "TLSv1.2"."""
+    return {"tls12": "TLSv1.2", "tls13": "TLSv1.3"}[tls]
+
+
 def build_variant(test: dict, registry: dict | None = None) -> str:
     """Application variant a test needs.
 
