@@ -206,6 +206,44 @@ static BaseType_t xDisplayInitialized = pdFALSE;
 
 /*-----------------------------------------------------------*/
 
+/* Heap watermark reporting. Started only after the CLI task is gone and the
+ * network is up, so the credential CLI never sees these lines. */
+#define appmainHEAP_MONITOR_TASK_STACK_SIZE    ( 512 )
+#define appmainHEAP_MONITOR_INTERVAL_MS        ( 30000U )
+
+static void prvHeapMonitorTask( void * pvParameters )
+{
+    char cLine[ 160 ];
+    HeapStats_t xStats;
+    uint32_t ulSeconds = 0U;
+
+    ( void ) pvParameters;
+
+    for( ; ; )
+    {
+        vPortGetHeapStats( &xStats );
+        ( void ) snprintf( cLine, sizeof( cLine ),
+                           "RX72N heap: at=t%lus free=%lu min=%lu largest=%lu blocks=%lu total=%lu tasks=%lu
+",
+                           ( unsigned long ) ulSeconds,
+                           ( unsigned long ) xStats.xAvailableHeapSpaceInBytes,
+                           ( unsigned long ) xStats.xMinimumEverFreeBytesRemaining,
+                           ( unsigned long ) xStats.xSizeOfLargestFreeBlockInBytes,
+                           ( unsigned long ) xStats.xNumberOfFreeBlocks,
+                           ( unsigned long ) configTOTAL_HEAP_SIZE,
+                           ( unsigned long ) uxTaskGetNumberOfTasks() );
+        configPRINT_STRING( cLine );
+        vTaskDelay( pdMS_TO_TICKS( appmainHEAP_MONITOR_INTERVAL_MS ) );
+        ulSeconds += appmainHEAP_MONITOR_INTERVAL_MS / 1000U;
+    }
+}
+
+static void prvStartHeapMonitor( void )
+{
+    ( void ) xTaskCreate( prvHeapMonitorTask, "HeapMon",
+                          appmainHEAP_MONITOR_TASK_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL );
+}
+
 /**********************************************************************************************************************
  * Function Name: main_task
  * Description  : The application entry point from a power on reset is PowerON_Reset_PC()
@@ -305,6 +343,7 @@ void main_task(void *pvParameters)
 
         FreeRTOS_printf(("---------STARTING DEMO---------\r\n"));
         prvDisplayWrite("Starting demo\r\n");
+        prvStartHeapMonitor();
 
             #if ( LANBENCH_TLS13_0RTT_ENABLE != 0U )
                 xSetMQTTAgentState(MQTT_AGENT_STATE_INITIALIZED);
