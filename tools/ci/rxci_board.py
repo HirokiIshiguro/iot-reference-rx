@@ -508,6 +508,14 @@ def erase_application(board: Board) -> None:
     board.run(board.rfp.erase_ota_install_areas_command(), label="erase the application (it carries credentials)")
 
 
+def show_heap_watermark(path: Path) -> None:
+    """One line in the job log (the UART observers write only to their own log). Recorded only, never a verdict."""
+    sys.path.insert(0, str(TOOLS))
+    import rx671_heap_watermark
+
+    rx671_heap_watermark.print_from_json(path)
+
+
 def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """The application carries the Wi-Fi and claim credentials and registers itself."""
     import rxci
@@ -519,12 +527,13 @@ def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pa
                "--timeout", 900, "--reset-cmd", board.reset_command(), "--app-reset-retries", 2,
                "--label", f"RX671/Type 1YN {('TSIP' if test['backend'] == 'tsip' else 'software')}",
                "--summary-json", logs / "fleet_summary.json",
-               "--junit-output", logs / "fleet-junit.xml"]
+               "--junit-output", logs / "fleet-junit.xml", "--heap-watermark"]
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3", "--minimum-tls-handshakes", 2]
     try:
         board.run(observe, timeout=1500, label="observe Fleet Provisioning on the UART", log=logs / "observe.log")
     finally:
+        show_heap_watermark(logs / "fleet_summary.json")
         try:
             erase_application(board)
         finally:
@@ -621,6 +630,7 @@ def ota_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path
                    "--summary-json", folder / "ota_summary.json", "--junit-output", folder / "ota-junit.xml"]
         board.run(observe, timeout=1500, label="observe the OTA update on the UART", log=logs / "observe.log")
     finally:
+        show_heap_watermark(folder / "ota_summary.json")
         try:
             # The data flash holds the Wi-Fi passphrase and the device key of this run.
             board.run(erase_chip, label="erase chip (it holds credentials)")
@@ -642,9 +652,11 @@ def mqtt_rx671_tsip(registry: dict, board: Board, test: dict, builds: list, logs
         observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
                    "--timeout", 300, "--mode", "mqtt-agent", "--reset-cmd", board.reset_command(),
                    "--startup-retries", 1, "--require-tls-version", "TLSv1.3" if test["tls"] == "tls13" else "TLSv1.2",
-                   "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml"]
+                   "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml",
+                   "--heap-json", logs / "heap_watermark.json"]
         board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART", log=logs / "observe.log")
     finally:
+        show_heap_watermark(logs / "heap_watermark.json")
         # The data flash holds the Wi-Fi passphrase.
         board.run(erase_chip, label="erase chip (it holds credentials)")
 
@@ -657,12 +669,14 @@ def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pat
     install_rx671(registry, board, "app", common, app, logs)
     observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
                "--timeout", 300, "--mode", "mqtt", "--reset-cmd", board.reset_command(), "--startup-retries", 1,
-               "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml"]
+               "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml",
+               "--heap-json", logs / "heap_watermark.json"]
     if test["tls"] == "tls13":
         observe += ["--require-tls-version", "TLSv1.3"]
     try:
         board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART", log=logs / "observe.log")
     finally:
+        show_heap_watermark(logs / "heap_watermark.json")
         erase_application(board)
 
 

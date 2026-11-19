@@ -449,6 +449,28 @@ static void start_freertos_tcp_after_join(void)
 #endif
 }
 
+/* Heap watermark on the same direct path as the heartbeat (no logging task queue: that would use the heap
+ * that is being measured). The buffer lives on the stack. min is xPortGetMinimumEverFreeHeapSize(). */
+static void rx671_log_heap(uint32_t tick)
+{
+    char line[128];
+    char * p = line;
+
+    p = append_text(p, "RX671 heap: at=tick");
+    p = append_dec32(p, tick);
+    p = append_text(p, " free=");
+    p = append_dec32(p, (uint32_t)xPortGetFreeHeapSize());
+    p = append_text(p, " min=");
+    p = append_dec32(p, (uint32_t)xPortGetMinimumEverFreeHeapSize());
+    p = append_text(p, " total=");
+    p = append_dec32(p, (uint32_t)configTOTAL_HEAP_SIZE);
+    p = append_text(p, " tasks=");
+    p = append_dec32(p, (uint32_t)uxTaskGetNumberOfTasks());
+    p = append_text(p, "\r\n");
+    *p = '\0';
+    debug_puts(line);
+}
+
 void main_task(void *pvParameters)
 {
     (void)xTraceEnable(TRC_START);
@@ -465,6 +487,7 @@ void main_task(void *pvParameters)
     char line[64];
     char * p;
     uint32_t tick = 0U;
+    uint32_t last_heap_min = 0U;
 
     (void)pvParameters;
 
@@ -822,6 +845,14 @@ void main_task(void *pvParameters)
         p = append_text(p, "\r\n");
         *p = '\0';
         debug_puts(line);
+
+        /* Every 10 s, and in between whenever the watermark has just dropped: the new image is activated
+         * a few seconds after the last download block, so the lowest value is recorded before the reset. */
+        if ((0U == (tick % 10U)) || ((uint32_t)xPortGetMinimumEverFreeHeapSize() != last_heap_min))
+        {
+            last_heap_min = (uint32_t)xPortGetMinimumEverFreeHeapSize();
+            rx671_log_heap(tick);
+        }
 
         tick++;
         vTaskDelay(pdMS_TO_TICKS(1000));

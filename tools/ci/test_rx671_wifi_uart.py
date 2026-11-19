@@ -18,6 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import rx671_heap_watermark  # noqa: E402  (shared reader of the "RX671 heap:" lines)
+
 
 NETWORK_MARKERS = (
     "whd_wifi_join=00000000",
@@ -443,6 +446,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--output-log", type=Path, required=True)
     parser.add_argument("--junit-output", type=Path, required=True)
+    parser.add_argument(
+        "--heap-json",
+        type=Path,
+        default=None,
+        help="Where to record the heap watermark (default: heap_watermark.json next to --output-log). Never a verdict.",
+    )
     return parser.parse_args(argv)
 
 
@@ -471,6 +480,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.require_tls_version,
         args.require_f2_fault_injection,
     )
+
+    rx671_heap_watermark.report(result.log, args.heap_json or args.output_log.parent / "heap_watermark.json")
 
     status = "PASS" if result.passed else "FAIL"
     print(f"RX671 Wi-Fi UART smoke {status}: {result.message}")

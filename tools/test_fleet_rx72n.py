@@ -151,7 +151,7 @@ def reset_device_via_command(reset_cmd):
     return True
 
 
-def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
+def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None, heap_lines=None):
     results = {name: False for name, _ in MARKERS}
     errors = []
     certificate_id = None
@@ -201,6 +201,8 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None):
                         sensitive_log_block,
                     )
                     print(safe_line)
+                    if heap_lines is not None and "RX671 heap:" in safe_line:
+                        heap_lines.append(safe_line)
                     if sensitive_label is not None:
                         safe_error = f"{SENSITIVE_LOG_ERROR_PREFIX} {sensitive_label}"
                         if safe_error not in errors:
@@ -435,6 +437,8 @@ def main():
     parser.add_argument("--label", default=os.environ.get("FLEET_TEST_LABEL", "RX72N"))
     parser.add_argument("--summary-json", help="Optional path to write fleet provisioning summary JSON")
     parser.add_argument("--junit-output", help="Optional path to write a JUnit XML report")
+    parser.add_argument("--heap-watermark", action="store_true",
+                        help="Record the RX671 heap watermark lines (never a verdict) in the summary JSON")
     parser.add_argument("--app-reset-retries", type=int, default=int(os.environ.get("FLEET_APP_RESET_RETRIES", "0")))
     parser.add_argument("--require-tls-version", default=os.environ.get("FLEET_REQUIRE_TLS_VERSION", ""))
     parser.add_argument(
@@ -505,6 +509,7 @@ def main():
     # Create the cleanup handoff before the board is reset. If the monitor is
     # interrupted later, every observed resource identifier is durably updated.
     persist_partial()
+    heap_lines = [] if args.heap_watermark else None
     for attempt in range(1, args.app_reset_retries + 2):
         if attempt > 1:
             print(f"[RETRY] restarting fleet test after pre-claim startup failure ({attempt}/{args.app_reset_retries + 1})")
@@ -515,6 +520,7 @@ def main():
                 args.timeout,
                 args.reset_cmd,
                 progress_callback=persist_partial,
+                heap_lines=heap_lines,
             )
         except Exception as exc:  # Keep cleanup evidence even when UART access fails.
             results = dict(last_progress_state["results"])
@@ -618,6 +624,10 @@ def main():
         attempts=attempts,
         partial=False,
     )
+    if heap_lines is not None:
+        import rx671_heap_watermark
+
+        summary["heap_watermark"] = rx671_heap_watermark.report(chr(10).join(heap_lines))
     if args.summary_json:
         write_json_atomic(args.summary_json, summary)
     if args.junit_output:

@@ -28,6 +28,7 @@ from rx671_ota_host import (
     write_junit,
 )
 from test_ota import OtaLogAnalyzer
+import rx671_heap_watermark
 
 
 RSU_SIZE = 0x000F0000
@@ -619,6 +620,12 @@ def main(argv: list[str] | None = None) -> int:
                 summary["success"] = False
                 summary["plaintext_cleanup"] = {"success": False, "message": str(exc)}
                 status = 1
+    # Recorded only (never a verdict): the smallest heap watermark of the whole UART capture, baseline and new image.
+    try:
+        raw = args.raw_log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        raw = ""
+    summary["heap_watermark"] = rx671_heap_watermark.report(raw)
     write_json(args.summary_json, summary)
     write_junit(
         args.junit_output,
