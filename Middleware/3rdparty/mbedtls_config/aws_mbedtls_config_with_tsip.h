@@ -1490,7 +1490,7 @@
  *          configuration of this extension).
  *
  */
-#define MBEDTLS_SSL_RENEGOTIATION
+//#define MBEDTLS_SSL_RENEGOTIATION  /* rx671 rom diet: not used by the AWS IoT connection */
 
 /**
  * \def MBEDTLS_SSL_MAX_FRAGMENT_LENGTH
