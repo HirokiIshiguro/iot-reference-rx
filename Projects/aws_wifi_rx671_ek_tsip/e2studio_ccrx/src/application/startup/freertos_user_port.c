@@ -55,6 +55,7 @@ External functions
 **********************************************************************************************************************/
 /* Main task. */
 extern void main_task(void *pvParameters);
+extern void vConfigureHeapRegions(void);
 
 TaskHandle_t main_task_handle;
 
@@ -257,6 +258,10 @@ void vAssertCalled(void)
 void Processing_Before_Start_Kernel(void)
 {
     BaseType_t ret;
+
+    /* heap_5 must receive its regions before the first FreeRTOS object
+     * performs a dynamic allocation. */
+    vConfigureHeapRegions();
 
     (void)xTraceInitialize();
 

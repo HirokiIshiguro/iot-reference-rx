@@ -337,8 +337,10 @@
 
 /* Set configAPPLICATION_ALLOCATED_HEAP to 1 to have the application allocate
  * the array used as the FreeRTOS heap.  Set to 0 to have the linker allocate the
- * array used as the FreeRTOS heap.  Defaults to 0 if left undefined. */
-#define configAPPLICATION_ALLOCATED_HEAP             0
+ * array used as the FreeRTOS heap.  Defaults to 0 if left undefined.  heap_5.c
+ * gets its regions from vConfigureHeapRegions() (Common/FreeRTOS_common/freertos_heap.c),
+ * so this is 1. */
+#define configAPPLICATION_ALLOCATED_HEAP             1
 
 /* Set configSTACK_ALLOCATION_FROM_SEPARATE_HEAP to 1 to have task stacks
  * allocated from somewhere other than the FreeRTOS heap.  This is useful if you
