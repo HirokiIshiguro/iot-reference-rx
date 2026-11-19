@@ -35,6 +35,11 @@ REGION = os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-1")
 # The job timeout is the sum of the two, so that the wait can never use up the time of the test itself.
 LOCK_WAIT_SECONDS = 3000
 TEST_SECONDS = 2400
+# AWS STS fetches the keys that sign the ID token from GitLab on each call. When GitLab answers late,
+# STS gives up with IDPCommunicationError or with InvalidIdentityToken "Couldn't retrieve verification
+# key ..."; the token itself is fine. The job then waits and asks again, up to about two minutes in all.
+STS_ATTEMPTS = 7
+STS_WAIT_SECONDS = 20
 
 
 # --------------------------------------------------------------------------
@@ -88,11 +93,35 @@ def aws_session():
     name = "gitlab-{}-{}-{}".format(os.environ.get("CI_PROJECT_ID", "0"), os.environ.get("CI_PIPELINE_ID", "0"),
                                     os.environ.get("CI_JOB_ID", "0"))
     sts = boto3.client("sts", region_name=REGION, config=Config(signature_version=UNSIGNED))
-    credentials = sts.assume_role_with_web_identity(
-        RoleArn=role, RoleSessionName=name, WebIdentityToken=token, DurationSeconds=3600)["Credentials"]
+    credentials = assume_role(sts, RoleArn=role, RoleSessionName=name, WebIdentityToken=token, DurationSeconds=3600)
     return boto3.Session(aws_access_key_id=credentials["AccessKeyId"],
                          aws_secret_access_key=credentials["SecretAccessKey"],
                          aws_session_token=credentials["SessionToken"], region_name=REGION)
+
+
+def identity_provider_unreachable(error: Exception) -> bool:
+    """True when STS failed only because it could not get the keys of the ID token from GitLab."""
+    detail = getattr(error, "response", None) or {}
+    code = detail.get("Error", {}).get("Code", "")
+    message = detail.get("Error", {}).get("Message", "")
+    return code == "IDPCommunicationError" or (
+        code == "InvalidIdentityToken" and "retrieve verification key" in message)
+
+
+def assume_role(sts, sleep=None, **request) -> dict:
+    """Credentials of AssumeRoleWithWebIdentity, asking again while GitLab cannot be reached by STS."""
+    import time
+    for attempt in range(1, STS_ATTEMPTS + 1):
+        try:
+            return sts.assume_role_with_web_identity(**request)["Credentials"]
+        except Exception as error:
+            if attempt == STS_ATTEMPTS or not identity_provider_unreachable(error):
+                raise
+            print(f"rxci: AWS STS could not get the keys of the ID token from GitLab "
+                  f"(attempt {attempt} of {STS_ATTEMPTS}): {error}; asking again in {STS_WAIT_SECONDS} s",
+                  file=sys.stderr, flush=True)
+            (sleep or time.sleep)(STS_WAIT_SECONDS)
+    raise AssertionError("unreachable")
 
 
 def load_registry(path: Path | None = None) -> dict:

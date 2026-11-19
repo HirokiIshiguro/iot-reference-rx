@@ -346,5 +346,54 @@ class BuildCacheConcurrencyTests(unittest.TestCase):
         self.store_while_another_job_is_busy("fedcba9876543210")
 
 
+class StsError(Exception):
+    """Same shape as botocore's ClientError, which the check job cannot import."""
+
+    def __init__(self, code, message):
+        super().__init__(f"An error occurred ({code}): {message}")
+        self.response = {"Error": {"Code": code, "Message": message}}
+
+
+class FakeSts:
+
+    def __init__(self, *failures):
+        self.failures = list(failures)
+        self.calls = 0
+
+    def assume_role_with_web_identity(self, **request):
+        self.calls += 1
+        if self.failures:
+            raise self.failures.pop(0)
+        return {"Credentials": {"AccessKeyId": "id"}}
+
+
+class AssumeRoleTests(unittest.TestCase):
+
+    KEYS = "Couldn't retrieve verification key from your identity provider"
+
+    def test_asks_again_while_sts_cannot_get_the_keys_from_gitlab(self):
+        sts = FakeSts(StsError("InvalidIdentityToken", self.KEYS), StsError("IDPCommunicationError", "late"))
+        waits = []
+        self.assertEqual(rxci.assume_role(sts, sleep=waits.append), {"AccessKeyId": "id"})
+        self.assertEqual(sts.calls, 3)
+        self.assertEqual(waits, [rxci.STS_WAIT_SECONDS] * 2)
+
+    def test_gives_up_after_the_last_attempt(self):
+        sts = FakeSts(*[StsError("InvalidIdentityToken", self.KEYS)] * rxci.STS_ATTEMPTS)
+        with self.assertRaises(StsError):
+            rxci.assume_role(sts, sleep=lambda seconds: None)
+        self.assertEqual(sts.calls, rxci.STS_ATTEMPTS)
+        self.assertLessEqual((rxci.STS_ATTEMPTS - 1) * rxci.STS_WAIT_SECONDS, 150)
+
+    def test_does_not_ask_again_when_the_token_or_the_role_is_wrong(self):
+        for failure in (StsError("InvalidIdentityToken", "Incorrect token audience"),
+                        StsError("AccessDenied", "Not authorized to perform sts:AssumeRoleWithWebIdentity"),
+                        StsError("ExpiredTokenException", "Token is expired")):
+            sts = FakeSts(failure)
+            with self.assertRaises(StsError):
+                rxci.assume_role(sts, sleep=lambda seconds: self.fail("must not wait"))
+            self.assertEqual(sts.calls, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

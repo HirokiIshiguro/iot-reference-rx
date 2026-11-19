@@ -139,6 +139,7 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 
 - 子 pipeline の stage は `check`・`build`・`test`・`cleanup` です。試験 job は、必要な build job だけを `needs` で待ちます。
 - AWS の API へは、GitLab が job ごとに発行する ID token（OIDC）で入ります。使う role は、保護された group 変数 `AWS_ROLE_ARN` が決めます。共通の設定は[ハードウェア構成の台帳](https://gitlab.saffti.jp/oss/infra/hardware-config/-/blob/main/docs/ci-variables.md)にあります。
+- AWS の STS は、ID token を確かめる鍵を、その都度 GitLab から取ります。GitLab の応答が遅くて STS が鍵を取れなかった時（`IDPCommunicationError`、または `InvalidIdentityToken` の「Couldn't retrieve verification key」）だけ、job は 20 秒おきに 7 回まで聞き直し、聞き直すたびにログに 1 行出します。token や role の誤りでは聞き直しません。
 - 基板側の道具は、仮想環境を runner の利用者ごとに作って使います。仮想環境は [`tools/ci/requirements.txt`](../../tools/ci/requirements.txt) が変わった時だけ作り直します。
 - 単体試験は `python3 -m unittest discover -s tools/ci -p 'test_rxci*.py'` で、`check` job が流します。
 
