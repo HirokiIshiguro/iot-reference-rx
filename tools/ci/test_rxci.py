@@ -1,4 +1,6 @@
 """Tests for the planning logic of tools/ci/rxci.py."""
+import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -162,6 +164,147 @@ class PlanTests(unittest.TestCase):
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)
+
+
+class BoardInstallRangesTests(unittest.TestCase):
+    def test_board_erase_ranges_preserve_each_bootloader(self):
+        import importlib
+        import types
+        from unittest.mock import patch
+
+        with patch.dict(sys.modules, {"fcntl": types.ModuleType("fcntl")}):
+            board_module = importlib.import_module("rxci_board")
+            data = rxci.load_registry()
+            for name, expected in {
+                "rx671": ((0xFFE00000, 0xFFEEFFFF), (0xFFF00000, 0xFFFEFFFF)),
+                "rx65n": ((0xFFE00000, 0xFFEEFFFF), (0xFFF00000, 0xFFFEFFFF)),
+                "rx72n": ((0xFFC00000, 0xFFDEFFFF), (0xFFE00000, 0xFFFEFFFF)),
+            }.items():
+                with self.subTest(board=name):
+                    board = board_module.Board(data, name)
+                    self.assertEqual(expected, board.rfp.install_ranges)
+                    command = board.rfp.erase_ota_install_areas_command()
+                    for start, end in expected:
+                        self.assertIn(f"{start:08X},{end:08X}", command)
+
+
+class BoardRestTests(unittest.TestCase):
+    def test_only_the_board_with_a_display_keeps_running_after_a_test(self):
+        import importlib
+        import types
+        from unittest.mock import patch
+
+        with patch.dict(sys.modules, {"fcntl": types.ModuleType("fcntl")}):
+            board_module = importlib.import_module("rxci_board")
+            data = rxci.load_registry()
+            for name, parked in {"rx72n": False, "rx65n": True, "rx671": True}.items():
+                with self.subTest(board=name):
+                    board = board_module.Board(data, name)
+                    calls = []
+                    board.park = lambda: calls.append("park")
+                    board.rest()
+                    self.assertEqual(["park"] if parked else [], calls)
+
+
+class RunVariableTests(unittest.TestCase):
+    """The variables of the "New pipeline" page: lists that select tests, and combinations that must stop."""
+
+    def plan(self, *arguments):
+        import contextlib
+        import io
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as folder:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                rxci.main(["plan", *arguments, "--output", str(Path(folder) / "child.yml"),
+                           "--summary", str(Path(folder) / "plan.json")])
+            return json.loads((Path(folder) / "plan.json").read_text(encoding="utf-8"))
+
+    def test_lists_select_the_tests_of_one_board(self):
+        summary = self.plan("--profile", "full", "--board", "rx72n")
+        self.assertTrue(summary["tests"])
+        self.assertTrue(all(name.startswith("rx72n:") for name in summary["tests"]))
+        self.assertTrue(all(variant.startswith("rx72n/") for variant in summary["builds"]))
+
+    def test_four_lists_select_exactly_one_test(self):
+        summary = self.plan("--profile", "full", "--board", "rx72n", "--backend", "sw", "--tls", "tls12",
+                            "--feature", "mqtt", "--repeat", "3")
+        self.assertEqual(["rx72n:sw:tls12:mqtt"], summary["tests"])
+        self.assertEqual(3, summary["repeat"])
+
+    def test_lists_at_all_leave_the_free_text_selection_alone(self):
+        summary = self.plan("--profile", "full", "--test", "^rx65n:sw:tls12:mqtt$")
+        self.assertEqual(["rx65n:sw:tls12:mqtt"], summary["tests"])
+
+    def test_a_selection_without_profile_full_stops_with_the_reason(self):
+        for profile in ("check", "build", "smoke", "doctor"):
+            for selection in (["--board", "rx671"], ["--test", "^rx671:"]):
+                with self.subTest(profile=profile, selection=selection):
+                    with self.assertRaisesRegex(SystemExit, "only PROFILE=full runs a selection"):
+                        self.plan("--profile", profile, *selection)
+
+    def test_lists_and_free_text_together_stop(self):
+        with self.assertRaisesRegex(SystemExit, "both select tests"):
+            self.plan("--profile", "full", "--board", "rx671", "--test", "^rx72n:")
+
+    def test_a_value_outside_a_list_stops(self):
+        for name, value in (("--board", "rx99"), ("--backend", "software"), ("--tls", "tls14"), ("--feature", ""),
+                            ("--board", "")):
+            with self.subTest(name=name, value=value):
+                with self.assertRaisesRegex(SystemExit, "must be one of all"):
+                    self.plan("--profile", "full", name, value)
+
+    def test_repeat_without_tests_stops(self):
+        with self.assertRaisesRegex(SystemExit, "REPEAT repeats tests"):
+            self.plan("--profile", "build", "--repeat", "3")
+
+    def test_the_form_offers_exactly_the_values_the_tool_accepts(self):
+        text = (Path(__file__).resolve().parents[2] / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        registry = rxci.load_registry()
+
+        def options(name):
+            block = text.split(f"\n  {name}:\n", 1)[1].split("\n    description:", 1)[0]
+            return re.findall(r'^      - "([^"]*)"$', block, re.M)
+
+        self.assertEqual(list(rxci.PROFILES), options("PROFILE"))
+        for name, axis in (("BOARD", "board"), ("BACKEND", "backend"), ("TLS", "tls"), ("FEATURE", "feature")):
+            self.assertEqual(["all", *registry["axes"][axis]], options(name))
+
+
+class BuildCacheConcurrencyTests(unittest.TestCase):
+    """Five build jobs share the cache folder; one of them once died on another job's temporary folder."""
+
+    def store_while_another_job_is_busy(self, vanishing: str):
+        import os
+        import tempfile
+        from unittest.mock import patch
+
+        import rxci_build
+
+        with tempfile.TemporaryDirectory() as folder:
+            cache, out = Path(folder) / "cache", Path(folder) / "out"
+            out.mkdir()
+            (out / "app.mot").write_text("S0", encoding="utf-8")
+            (cache / vanishing).mkdir(parents=True)     # listed, then gone before anyone looks at it
+            (cache / "older").mkdir()
+            real_stat = Path.stat
+
+            def stat(path, *args, **kwargs):
+                if path.name == vanishing:
+                    raise FileNotFoundError(str(path))
+                return real_stat(path, *args, **kwargs)
+
+            with patch.object(Path, "stat", stat), patch.dict(os.environ, {"CI_JOB_ID": "1"}):
+                rxci_build.store(cache / "mine", out)
+            self.assertTrue((cache / "mine" / "app.mot").is_file())
+            self.assertTrue((cache / "older").is_dir())
+
+    def test_store_ignores_the_temporary_folder_of_another_job(self):
+        self.store_while_another_job_is_busy("0123456789abcdef.90699.tmp")
+
+    def test_store_survives_an_entry_that_another_job_removed(self):
+        self.store_while_another_job_is_busy("fedcba9876543210")
 
 
 if __name__ == "__main__":

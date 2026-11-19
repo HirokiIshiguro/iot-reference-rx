@@ -237,7 +237,9 @@ static BaseType_t prvTsipProvisioningCommand(char * pcWriteBuffer,
         }
         else
         {
-            sprintf(pcWriteBuffer, "Error: TSIP runtime key prepare failed.\r\n");
+            sprintf(pcWriteBuffer, "Error: TSIP runtime key prepare failed (stage=%lu code=%ld).\r\n",
+                    (unsigned long)ulTsipProvisioningPrepareFailureStage(),
+                    (long)lTsipProvisioningPrepareFailureCode());
         }
     }
     else if (0 == strncmp(pcRequest, "credentials", (size_t)xRequestLength))

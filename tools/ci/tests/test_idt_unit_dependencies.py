@@ -6,7 +6,7 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
-BOOT_PIN = "8e19b0cdeeaab06f22fa0636f4cd469218edc6c1"
+BOOT_PIN = "b46927ea19b6b0a3b69d4790c13ca50a67b9c155"
 REQUIRED = {
     "Middleware/FreeRTOS/FreeRTOS-Kernel": (
         "9b777ae5c5b8e9e456065a00294d1e5f5f9facf5", ("include/task.h",)),

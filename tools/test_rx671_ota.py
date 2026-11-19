@@ -30,7 +30,7 @@ from rx671_ota_host import (
 from test_ota import OtaLogAnalyzer
 
 
-RSU_SIZE = 0x000C0000
+RSU_SIZE = 0x000F0000
 BOOTLOADER_FLASH_BLOCK_SIZE = 0x00008000
 READY_MARKER = 'send "userprog.rsu" via UART.'
 KEY_LOAD_MARKER = "Loading user code signer public key from LittleFS:"

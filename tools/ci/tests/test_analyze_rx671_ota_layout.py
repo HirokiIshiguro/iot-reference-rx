@@ -266,17 +266,17 @@ class GateTests(unittest.TestCase):
         passing = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
             data_buffer_count=2,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
         stale_heap = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=192,
             data_buffer_count=2,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
         stale_buffers = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
             data_buffer_count=3,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
         stale_file_blocks = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
@@ -286,7 +286,7 @@ class GateTests(unittest.TestCase):
         missing = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=224,
             data_buffer_count=None,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
 
         self.assertEqual("PASS", passing.status)
@@ -321,26 +321,25 @@ class GateTests(unittest.TestCase):
         self.assertIn("DIV8", high_speed_override.detail)
         self.assertEqual("FAIL", missing.status)
 
-    def test_parent_bootloader_headers_are_required_provenance_inputs(self):
-        self.assertIn(
+    def test_bootloader_layout_comes_only_from_the_submodule_header(self):
+        self.assertNotIn(
             layout.BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
+            layout.BOOTLOADER_PROVENANCE_PATHS,
+        )
+        self.assertIn(
+            layout.BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
             layout.BOOTLOADER_PROVENANCE_PATHS,
         )
         self.assertIn(
             layout.BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
             layout.BOOTLOADER_PROVENANCE_PATHS,
         )
-        parent = (
-            ROOT
-            / layout.BOOTLOADER_PROJECT_RELATIVE
-            / "src/rx671.h"
-        ).read_text(encoding="utf-8").splitlines()
-        canonical = (
-            ROOT
-            / layout.BOOTLOADER_SUBMODULE_RELATIVE
-            / "config/rx671.h"
-        ).read_text(encoding="utf-8").splitlines()
-        self.assertEqual(canonical, parent)
+        self.assertFalse(layout._project_shadows_bootloader_config(ROOT / layout.BOOTLOADER_PROJECT_RELATIVE))
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            (project / "src").mkdir()
+            (project / "src/rx671.h").write_text("", encoding="utf-8")
+            self.assertTrue(layout._project_shadows_bootloader_config(project))
 
     def test_fwup_geometry_rejects_equal_total_with_wrong_fit_blocks(self):
         gate = layout._fwup_data_flash_geometry_gate(

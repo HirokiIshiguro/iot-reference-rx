@@ -233,7 +233,7 @@
 									<listOptionValue builtIn="false" value="D_8=R_8"/>
 									<listOptionValue builtIn="false" value="PFRAM2=RPFRAM2"/>
 								</option>
-								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.1990832357" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" value="SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8,RPFRAM2/04,PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2,TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300,EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC" valueType="string"/>
+								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.1990832357" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" value="SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8,RPFRAM2/04,PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2,TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300,EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC" valueType="string"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore.2030047513" name="追加するオプション（すべての指定オプションの前に追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore" valueType="stringList">
 									<listOptionValue builtIn="false" value=""/>
 								</option>

@@ -15,11 +15,11 @@ except ImportError:
 
 
 BASE_ADDRESS = 0xFFF00000
-IMAGE_SIZE = 24 * 32768
+IMAGE_SIZE = 30 * 32768
 HEADER_SIZE = 0x200
 USER_START = 0xFFF00300
-USER_END = 0xFFFBFFFF
-USER_EXECUTION = 0xFFFBFFFC
+USER_END = 0xFFFEFFFF
+USER_EXECUTION = 0xFFFEFFFC
 HARDWARE_ID = 9
 SIG_TYPE = b"sig-sha256-ecdsa"
 
@@ -98,7 +98,7 @@ def main():
     reset_vector = image[USER_EXECUTION - BASE_ADDRESS:USER_EXECUTION - BASE_ADDRESS + 4]
     if reset_vector == b"\xff\xff\xff\xff":
         raise RuntimeError(
-            "user reset vector is blank; BG96 app must place RESETVECT at 0xFFFBFFFC for bootloader launch"
+            "user reset vector is blank; BG96 app must place RESETVECT at 0xFFFEFFFC for bootloader launch"
         )
 
     image[0:7] = b"Renesas"

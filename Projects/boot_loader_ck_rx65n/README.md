@@ -28,3 +28,7 @@ Expected boot loader output:
 ## Notes
 
 The boot loader receives a signed RSU image over UART and starts the application from the RX65N OTA bank after signature validation. It is paired with `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/`.
+
+## Flash layout
+
+The bootloader occupies the final 64 KiB of each bank: 0xFFFF0000–0xFFFFFFFF in bank 0 and 0xFFEF0000 at the start of its bank 1 copy. The application exception and reset vectors are 0xFFFEFF80 and 0xFFFEFFFC.

@@ -5,7 +5,7 @@ EK-RX671 のデュアルバンク Code Flash 用 CC-RX プロジェクトです�
 主な固定条件は次のとおりです。
 
 - Device: `R5F5671EHxFB_DUAL`
-- Boot-loader window: `0xFFFC0000` - `0xFFFFFFFF`（256 KiB）
+- Boot-loader window: `0xFFFF0000` - `0xFFFFFFFF`（64 KiB）
 - UART: SCI6、921600 bps
 - RTOS: なし
 - Data Flash の RSU インストール: 無効（既存 LittleFS/KVS を保持）

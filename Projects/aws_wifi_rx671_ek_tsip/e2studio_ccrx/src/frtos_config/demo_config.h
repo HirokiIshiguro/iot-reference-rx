@@ -1,0 +1,157 @@
+#ifndef DEMO_CONFIG_H
+#define DEMO_CONFIG_H
+
+/* RX671 has no fixed external-RAM framebuffer beside the OTA buffers. */
+#ifndef OTA_STATIC_BUFFERS_IN_BSS
+#define OTA_STATIC_BUFFERS_IN_BSS 1
+#endif
+
+#include "FreeRTOS.h"
+#include "event_groups.h"
+#include "aws_iot_config.h"
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+#define keyCLIENT_CERTIFICATE_PEM (NULL)
+#endif
+#include "rx671_fleet_config.h"
+#include "core_mqtt.h"
+#include "iot_default_root_certificates.h"
+#include "logging_levels.h"
+
+#ifndef LIBRARY_LOG_NAME
+#define LIBRARY_LOG_NAME    "MQTTDemo"
+#endif
+
+#ifndef LIBRARY_LOG_LEVEL
+#define LIBRARY_LOG_LEVEL   LOG_INFO
+#endif
+
+#include "iot_logging_task.h"
+#include "logging_stack.h"
+
+#if (ENABLE_IDT_TRANSPORT_TEST == 1) || (ENABLE_IDT_CLOUD_DEMO == 1) || \
+    (ENABLE_IDT_PKCS11_TEST == 1) || (ENABLE_IDT_OTAPAL_TEST == 1)
+#include "rx_idt_config.h"
+#if (ENABLE_IDT_CLOUD_DEMO == 1)
+#include "test_execution_config.h"
+#include "test_param_config.h"
+#endif
+#endif
+
+#ifndef RX671_OTA_RUNTIME_ENABLE
+#define RX671_OTA_RUNTIME_ENABLE            (0)
+#endif
+#ifndef RX671_OTA_PROVISIONER_ENABLE
+#define RX671_OTA_PROVISIONER_ENABLE        (0)
+#endif
+#if (RX671_OTA_RUNTIME_ENABLE == 1) && (RX671_OTA_PROVISIONER_ENABLE == 1)
+#error "RX671 OTA runtime and provisioner profiles are mutually exclusive"
+#endif
+
+#if (IDT_TEST_ENABLED == 1)
+/* IDT provisions the existing store directly and starts only its selected
+ * production demo. The interactive credential CLI never owns SCI6 here. */
+#define ENABLE_FLEET_PROVISIONING_DEMO      (0)
+#if (ENABLE_IDT_CLOUD_DEMO == 1)
+#define ENABLE_OTA_UPDATE_DEMO              OTA_E2E_TEST_ENABLED
+#else
+#define ENABLE_OTA_UPDATE_DEMO              (0)
+#endif
+#else
+#define ENABLE_FLEET_PROVISIONING_DEMO      RX671_FLEET_PROVISIONING_ENABLE
+#define ENABLE_OTA_UPDATE_DEMO              RX671_OTA_RUNTIME_ENABLE
+#endif
+#define democonfigUSE_AWS_IOT_CORE_BROKER   (1)
+#define democonfigDISABLE_SNI               (0)
+
+#define democonfigFP_DEMO_ID                "RX671Type1YN"
+#define democonfigCLIENT_IDENTIFIER         AWS_IOT_THING_NAME
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+#define democonfigMQTT_BROKER_ENDPOINT      RX671_FLEET_ENDPOINT
+#define democonfigPROVISIONING_TEMPLATE_NAME RX671_FLEET_TEMPLATE_NAME
+/*
+ * The Fleet demo performs CSR generation and TLS operations from its task.
+ * Keep enough stack for the crypto call chain instead of using the small
+ * generic demo default (configMINIMAL_STACK_SIZE * 3).
+ */
+#define democonfigFLEET_PROVISIONING_DEMO_STACKSIZE (6144U)
+#else
+#define democonfigMQTT_BROKER_ENDPOINT      AWS_IOT_ENDPOINT
+#define democonfigPROVISIONING_TEMPLATE_NAME "...insert here..."
+#endif
+#define democonfigMQTT_BROKER_PORT          (AWS_IOT_MQTT_PORT)
+#define democonfigCSR_SUBJECT_NAME          "CN=" democonfigFP_DEMO_ID
+
+#define democonfigDEMO_STACKSIZE            (configMINIMAL_STACK_SIZE * 3)
+#define democonfigDEMO_TASK_PRIORITY        (tskIDLE_PRIORITY + 1)
+#if (RX671_FLEET_PROVISIONING_ENABLE == 1)
+/*
+ * AWS IoT rejects an MQTT 5 CONNECT that advertises less than 512 bytes, and
+ * the accepted CSR response (certificate PEM, certificate ID, and ownership
+ * token) needs substantially more than that minimum.  Match the 2304-byte
+ * buffer used by the proven RX72N/RX65N Fleet configurations.
+ */
+#define democonfigNETWORK_BUFFER_SIZE       (2304U)
+#else
+#define democonfigNETWORK_BUFFER_SIZE       (configMINIMAL_STACK_SIZE * 3)
+#endif
+
+#define democonfigMQTT_LIB                  "core-mqtt@" MQTT_LIBRARY_VERSION
+#define AWS_IOT_MQTT_ALPN                   "\x0ex-amzn-mqtt-ca"
+#define AWS_IOT_CUSTOM_AUTH_ALPN            "\x04mqtt"
+#define democonfigOS_NAME                   "FreeRTOS"
+#define democonfigOS_VERSION                "V11.1.0"
+#define democonfigHARDWARE_PLATFORM_NAME    "EK-RX671 Type 1YN"
+#define AWS_IOT_METRICS_STRING              "?SDK=" democonfigOS_NAME "&Version=" democonfigOS_VERSION "&MQTTLib=" democonfigMQTT_LIB
+#define AWS_IOT_METRICS_STRING_LENGTH       ((uint16_t)(sizeof(AWS_IOT_METRICS_STRING) - 1))
+
+#define appmainPROVISIONING_MODE            (0)
+#define otapalconfigCODE_SIGNING_CERTIFICATE "Insert code signing certificate..."
+#if (ENABLE_IDT_CLOUD_DEMO != 1) || (OTA_E2E_TEST_ENABLED != 1)
+#ifndef APP_VERSION_MAJOR
+#define APP_VERSION_MAJOR                   0
+#endif
+#ifndef APP_VERSION_MINOR
+#define APP_VERSION_MINOR                   1
+#endif
+#ifndef APP_VERSION_BUILD
+#define APP_VERSION_BUILD                   0
+#endif
+#else
+#ifndef APP_VERSION_MAJOR
+#define APP_VERSION_MAJOR                   OTA_APP_VERSION_MAJOR
+#endif
+#ifndef APP_VERSION_MINOR
+#define APP_VERSION_MINOR                   OTA_APP_VERSION_MINOR
+#endif
+#ifndef APP_VERSION_BUILD
+#define APP_VERSION_BUILD                   OTA_APP_VERSION_BUILD
+#endif
+#if (APP_VERSION_MAJOR != OTA_APP_VERSION_MAJOR) || \
+    (APP_VERSION_MINOR != OTA_APP_VERSION_MINOR) || \
+    (APP_VERSION_BUILD != OTA_APP_VERSION_BUILD)
+#error "The RX671 OTA application version must match the IDT parameters"
+#endif
+#endif
+
+#define democonfigROOT_CA_PEM               tlsATS1_ROOT_CERTIFICATE_PEM
+#define MQTT_AGENT_COMMAND_QUEUE_LENGTH     (25)
+#ifndef MQTT_AGENT_NETWORK_BUFFER_SIZE
+#define MQTT_AGENT_NETWORK_BUFFER_SIZE      (32768)
+#endif
+#define MQTT_COMMAND_CONTEXTS_POOL_SIZE     (10)
+/*
+ * The bank.single provisioner is the only image that owns SCI6 and enables
+ * the shared credential CLI.  The dual-bank OTA runtime starts unattended
+ * from credentials already committed to LittleFS/KVS.
+ */
+#if (IDT_TEST_ENABLED == 1)
+#define ENABLE_CREDENTIAL_BY_CLI            (0)
+#else
+#define ENABLE_CREDENTIAL_BY_CLI            RX671_OTA_PROVISIONER_ENABLE
+#endif
+#if (RX671_OTA_PROVISIONER_ENABLE == 1) && (IDT_TEST_ENABLED != 1)
+#define configCLI_BAUD_RATE                    (921600)
+#endif
+#define SELF_TEST_PASSED                    ((EventBits_t)(1U))
+
+#endif /* DEMO_CONFIG_H */
