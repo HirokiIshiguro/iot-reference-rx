@@ -18,8 +18,8 @@ def line(at, free, minimum, total=229376, tasks=12, largest=None, blocks=3):
             f"total={total} tasks={tasks}\r\n")
 
 
-def bsp(ustack, istack, cheap):
-    return f"RX671 bsp: ustack={ustack}/4096 istack={istack}/1024 cheap={cheap}/8192\r\n"
+def bsp(ustack, istack, cheap, over=0):
+    return f"RX671 bsp: ustack={ustack}/4096 istack={istack}/1024 over={over} cheap={cheap}/8192\r\n"
 
 
 class HeapWatermarkTests(unittest.TestCase):
@@ -74,6 +74,12 @@ class HeapWatermarkTests(unittest.TestCase):
                          (summary["ustack_used_max"], summary["istack_used_max"], summary["cheap_used_max"]))
         self.assertEqual((4096, 1024, 8192), (summary["ustack_size"], summary["istack_size"], summary["cheap_size"]))
 
+    def test_istack_over_into_su_is_the_largest_seen_and_old_lines_without_over_parse(self):
+        text = bsp(100, 1024, 10, over=0) + bsp(100, 1024, 10, over=96) + bsp(100, 1024, 10, over=0)
+        self.assertEqual(96, heap.summarize(text)["bsp"]["over_max"])
+        old = "RX671 bsp: ustack=1/4096 istack=2/1024 cheap=3/8192"
+        self.assertEqual(0, heap.summarize(old)["bsp"]["over_max"])
+
     def test_extra_lines_are_printed_after_the_main_line(self):
         buffer = StringIO()
         with redirect_stdout(buffer):
@@ -81,7 +87,7 @@ class HeapWatermarkTests(unittest.TestCase):
         out = buffer.getvalue().splitlines()
         self.assertEqual("heap watermark: min free 8 B of 100 B (8.0%) at tick10", out[0])
         self.assertEqual(["heap largest free block: min 4 B at tick10 (up to 3 free blocks)",
-                          "bsp watermark: ustack 10/4096 B, istack 20/1024 B, C library heap 30/8192 B"], out[1:])
+                          "bsp watermark: ustack 10/4096 B, istack 20/1024 B (over into SU: 0 B), C library heap 30/8192 B"], out[1:])
 
     def test_report_prints_and_writes_json(self):
         with tempfile.TemporaryDirectory() as temporary:

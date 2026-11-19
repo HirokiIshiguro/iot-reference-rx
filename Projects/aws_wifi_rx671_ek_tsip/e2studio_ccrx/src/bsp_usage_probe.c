@@ -21,6 +21,9 @@ extern int8_t * sbrk(size_t size);
 /* Start of the C library heap (the break before anything was allocated). Zero until rx671_bsp_postc() ran. */
 static uint32_t s_cheap_base;
 
+/* Depth of SU used from the reset to the start of the scheduler. */
+static uint32_t s_ustack_start_used;
+
 void rx671_bsp_prec(void)
 {
     volatile uint32_t * p;
@@ -62,6 +65,21 @@ static uint32_t stack_used(uint32_t bottom, uint32_t top)
     return top - (uint32_t)p;
 }
 
+void rx671_bsp_scheduler_started(void)
+{
+    const uint32_t bottom = (uint32_t)__sectop("SU");
+    const uint32_t top = (uint32_t)__secend("SU");
+    volatile uint32_t * p = (volatile uint32_t *)bottom;
+
+    s_ustack_start_used = stack_used(bottom, top);
+    /* The start-up stack is dead: this task runs on its own stack. Paint SU again to see what lands there later. */
+    while (p < (volatile uint32_t *)top)
+    {
+        *p = BSP_PROBE_FILL;
+        p++;
+    }
+}
+
 static char * append_used(char * p, const char * label, uint32_t used, uint32_t total)
 {
     p = append_text(p, label);
@@ -82,8 +100,10 @@ void rx671_bsp_log(void)
     const uint32_t brk = (uint32_t)sbrk(0U);
 
     p = append_text(p, "RX671 bsp: ");
-    p = append_used(p, "ustack=", stack_used(su_bottom, su_top), su_top - su_bottom);
+    p = append_used(p, "ustack=", s_ustack_start_used, su_top - su_bottom);
     p = append_used(p, " istack=", stack_used(si_bottom, si_top), si_top - si_bottom);
+    p = append_text(p, " over=");
+    p = append_dec32(p, stack_used(su_bottom, su_top));
     p = append_used(p, " cheap=", (0U != s_cheap_base) ? (brk - s_cheap_base) : 0U, (uint32_t)BSP_CFG_HEAP_BYTES);
     p = append_text(p, "\r\n");
     *p = '\0';

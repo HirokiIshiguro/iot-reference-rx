@@ -24,7 +24,7 @@ HEAP_LINE_RE = re.compile(
 )
 BSP_LINE_RE = re.compile(
     r"RX671 bsp: ustack=(?P<ustack>\d+)/(?P<ustack_size>\d+) istack=(?P<istack>\d+)/(?P<istack_size>\d+)"
-    r" cheap=(?P<cheap>\d+)/(?P<cheap_size>\d+)"
+    r"(?: over=(?P<over>\d+))? cheap=(?P<cheap>\d+)/(?P<cheap_size>\d+)"
 )
 _TICK_RE = re.compile(r"tick(\d+)$")
 
@@ -49,7 +49,8 @@ def parse_lines(text: str) -> list[dict]:
 
 
 def parse_bsp_lines(text: str) -> list[dict]:
-    return [{key: int(value) for key, value in match.groupdict().items()} for match in BSP_LINE_RE.finditer(text)]
+    return [{key: (0 if value is None else int(value)) for key, value in match.groupdict().items()}
+            for match in BSP_LINE_RE.finditer(text)]
 
 
 def summarize_bsp(text: str) -> dict:
@@ -61,6 +62,7 @@ def summarize_bsp(text: str) -> dict:
     return {"lines": len(entries),
             "ustack_used_max": max(e["ustack"] for e in entries), "ustack_size": last["ustack_size"],
             "istack_used_max": max(e["istack"] for e in entries), "istack_size": last["istack_size"],
+            "over_max": max(e["over"] for e in entries),
             "cheap_used_max": max(e["cheap"] for e in entries), "cheap_size": last["cheap_size"]}
 
 
@@ -115,7 +117,7 @@ def format_extra_lines(summary: dict) -> list[str]:
     bsp = summary.get("bsp") or {}
     if bsp.get("lines"):
         lines.append(f"bsp watermark: ustack {bsp['ustack_used_max']}/{bsp['ustack_size']} B, "
-                     f"istack {bsp['istack_used_max']}/{bsp['istack_size']} B, "
+                     f"istack {bsp['istack_used_max']}/{bsp['istack_size']} B (over into SU: {bsp.get('over_max', 0)} B), "
                      f"C library heap {bsp['cheap_used_max']}/{bsp['cheap_size']} B")
     return lines
 

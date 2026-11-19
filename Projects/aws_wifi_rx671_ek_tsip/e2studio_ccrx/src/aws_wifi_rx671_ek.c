@@ -511,6 +511,8 @@ static void rx671_log_heap(uint32_t tick)
 
 void main_task(void *pvParameters)
 {
+    /* The scheduler runs: the start-up stack (SU) is dead. Record its depth and repaint it (measurement only). */
+    rx671_bsp_scheduler_started();
     (void)xTraceEnable(TRC_START);
 #if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
     (void)pvParameters;
