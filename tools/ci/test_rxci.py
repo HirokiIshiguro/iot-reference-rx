@@ -186,5 +186,23 @@ class BoardInstallRangesTests(unittest.TestCase):
                         self.assertIn(f"{start:08X},{end:08X}", command)
 
 
+class BoardRestTests(unittest.TestCase):
+    def test_only_the_board_with_a_display_keeps_running_after_a_test(self):
+        import importlib
+        import types
+        from unittest.mock import patch
+
+        with patch.dict(sys.modules, {"fcntl": types.ModuleType("fcntl")}):
+            board_module = importlib.import_module("rxci_board")
+            data = rxci.load_registry()
+            for name, parked in {"rx72n": False, "rx65n": True, "rx671": True}.items():
+                with self.subTest(board=name):
+                    board = board_module.Board(data, name)
+                    calls = []
+                    board.park = lambda: calls.append("park")
+                    board.rest()
+                    self.assertEqual(["park"] if parked else [], calls)
+
+
 if __name__ == "__main__":
     unittest.main()

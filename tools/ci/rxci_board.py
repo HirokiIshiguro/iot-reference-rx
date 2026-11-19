@@ -119,6 +119,18 @@ class Board:
         """Hold the board in reset so that it stays quiet until the next test."""
         self.run([*self.rfp.common_command(), "-sig", "-reset", "-noquery"], label="park")
 
+    def rest(self) -> None:
+        """What happens to the board when a test is over.
+
+        The rule is to tidy up after use: the board is parked. The one exception is a board with
+        a display (keep_running_after_test in tests.json): it keeps running, so that a person can
+        see on the display what the firmware does.
+        """
+        if self.config.get("keep_running_after_test"):
+            print(f"{self.name}: left running after the test (keep_running_after_test)", flush=True)
+        else:
+            self.park()
+
     # -- firmware ------------------------------------------------------------
     def install(self, common: Path, app: Path, logs: Path, rsu: Path | None = None) -> None:
         """Erase the chip and install public boot trust, the boot loader and the signed application."""
@@ -622,7 +634,7 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
         failure = str(error)
     finally:
         try:
-            board.park()
+            board.rest()
         except (subprocess.SubprocessError, OSError) as error:
             failure = failure or f"could not park the board: {error}"
     seconds = time.monotonic() - started

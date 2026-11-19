@@ -11,6 +11,7 @@
         "dev-ek-rx72n-set2"
       ],
       "resource_group": "board-rx72n",
+      "keep_running_after_test": true,
       "thing": "rx72n-02",
       "certificate_variable": "AWS_CLIENT_CERT_RX72N_02",
       "private_key_variable": "AWS_PRIVATE_KEY_RX72N_02",
