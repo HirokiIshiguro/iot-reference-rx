@@ -571,7 +571,7 @@
  *
  * Enable Cipher Block Chaining mode (CBC) for symmetric ciphers.
  */
-#define MBEDTLS_CIPHER_MODE_CBC
+//#define MBEDTLS_CIPHER_MODE_CBC  /* rx671 rom diet: not used by the AWS IoT connection */
 
 /**
  * \def MBEDTLS_CIPHER_MODE_CFB
