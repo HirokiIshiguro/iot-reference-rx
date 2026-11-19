@@ -36,6 +36,7 @@ MQTT_AGENT_MARKERS = (
     "Request Job Document event Received",
 )
 TLS_HANDSHAKE_RE = re.compile(r"TLS handshake successful: version\s+(\S+)")
+AWS_TLS_VERSION_RE = re.compile(r"AWS TLS version=(\S+)")
 IOCTL_MISMATCH_MARKER = "Received a response for a different IOCTL - retry"
 F2_DIAG_RE = re.compile(
     r"f2retry=(\d+) f2rec=(\d+) f2fail=(\d+) f2abort=(\d+) "
@@ -89,7 +90,7 @@ def required_markers(mode: str, require_tls_version: str = "") -> tuple[str, ...
     if mode == "mqtt":
         markers = NETWORK_MARKERS + MQTT_MARKERS
         if require_tls_version:
-            if require_tls_version != "TLSv1.3":
+            if require_tls_version not in ("TLSv1.2", "TLSv1.3"):
                 raise ValueError(f"unsupported TLS version: {require_tls_version}")
             markers += (f"AWS TLS version={require_tls_version}",)
         return markers
@@ -120,8 +121,12 @@ def evaluate_log(
             if match and match.group(1) != "0":
                 failures.append(f"{label} failed: {match.group(1)}")
 
-    if mode == "mqtt-agent" and require_tls_version:
-        for version in TLS_HANDSHAKE_RE.findall(text):
+    if mode in ("mqtt", "mqtt-agent") and require_tls_version:
+        # The marker above makes one line of the required version a must; no line may name another version.
+        seen = TLS_HANDSHAKE_RE.findall(text)
+        if mode == "mqtt":
+            seen += AWS_TLS_VERSION_RE.findall(text)
+        for version in seen:
             if version != require_tls_version:
                 failures.append(f"TLS handshake used {version}, not {require_tls_version}")
 
@@ -419,7 +424,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--require-tls-version",
         choices=("TLSv1.2", "TLSv1.3"),
         default="",
-        help="Require the negotiated AWS IoT TLS version in mqtt mode (TLSv1.3 only) or mqtt-agent mode.",
+        help="Require the negotiated AWS IoT TLS version (every handshake line, and at least one) in mqtt or mqtt-agent mode.",
     )
     parser.add_argument(
         "--require-f2-fault-injection",
