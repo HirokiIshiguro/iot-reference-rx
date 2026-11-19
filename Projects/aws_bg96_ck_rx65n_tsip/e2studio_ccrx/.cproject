@@ -227,7 +227,7 @@
 									<listOptionValue builtIn="false" value="DEXRAM_2=REXRAM_2"/>
 									<listOptionValue builtIn="false" value="PFRAM2=RPFRAM2"/>
 								</option>
-								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.780554962" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" value="SU,SI,R_1,B_2,R,RPFRAM2,B/04,EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC,C_LITTLEFS_MANAGEMENT_AREA/00100000,C_FIRMWARE_UPDATE_CONTROL_BLOCK,C_FIRMWARE_UPDATE_CONTROL_BLOCK_MIRROR/00102000,C_USER_APPLICATION_AREA/00102300,B_1,R_2,BEXRAM_1,REXRAM_1,BEXRAM_2,REXRAM_2,BEXRAM,REXRAM/00800000,PResetPRG,C_1,C_2,C,C$*,D*,W*,L,P,PFRAM2/FFF00300" valueType="string"/>
+								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection.780554962" name="セクション (-start)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.linkerSection" value="SU,SI,R_1,B_2,R,RPFRAM2,B/04,EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC,C_LITTLEFS_MANAGEMENT_AREA/00100000,C_FIRMWARE_UPDATE_CONTROL_BLOCK,C_FIRMWARE_UPDATE_CONTROL_BLOCK_MIRROR/00102000,C_USER_APPLICATION_AREA/00102300,B_FREERTOS_HEAP*,B_1,R_2,BEXRAM_1,REXRAM_1,BEXRAM_2,REXRAM_2,BEXRAM,REXRAM/00800000,PResetPRG,C_1,C_2,C,C$*,D*,W*,L,P,PFRAM2/FFF00300" valueType="string"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore.1591470419" name="追加するオプション（すべての指定オプションの前に追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.userBefore" valueType="stringList">
 									<listOptionValue builtIn="false" value=""/>
 								</option>
@@ -321,7 +321,7 @@
 						<entry excluding="mbedtls_bio_freertos_plus_cellular.c|mbedtls_bio_freertos_plus_wifi_da16600.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/3rdparty/mbedtls_utils"/>
 						<entry excluding="include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/logging"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas/RX600v2"/>
-						<entry excluding="heap_1.c|heap_2.c|heap_3.c|heap_5.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Kernel/portable/MemMang"/>
+						<entry excluding="heap_1.c|heap_2.c|heap_3.c|heap_4.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Kernel/portable/MemMang"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/3rdparty/mbedtls_with_TSIP/library"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/network_transport/using_mbedtls_pkcs11_with_tsip"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/rm_littlefs_rx/src"/>

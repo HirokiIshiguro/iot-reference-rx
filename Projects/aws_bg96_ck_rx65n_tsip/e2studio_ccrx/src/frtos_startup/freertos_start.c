@@ -77,6 +77,7 @@ void Processing_Before_Start_Kernel(void);
 
 /* Main task. */
 extern void main_task(void *pvParameters);
+extern void vConfigureHeapRegions(void);
 
 
 /******************************************************************************
@@ -324,6 +325,10 @@ void vApplicationTickHook(void)
 void Processing_Before_Start_Kernel(void)
 {
     BaseType_t ret;
+
+    /* heap_5 must receive its regions before the first FreeRTOS object
+     * performs a dynamic allocation. */
+    vConfigureHeapRegions();
 
     (void)xTraceInitialize();
 

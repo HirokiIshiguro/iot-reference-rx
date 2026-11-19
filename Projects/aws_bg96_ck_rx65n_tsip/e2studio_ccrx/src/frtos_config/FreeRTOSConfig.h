@@ -61,6 +61,7 @@
 #define configMINIMAL_STACK_SIZE                   (768)
 #define configTOTAL_HEAP_SIZE_N						(256)
 #define configTOTAL_HEAP_SIZE                      (( size_t ) ( configTOTAL_HEAP_SIZE_N * 1024 ))
+#define configAPPLICATION_ALLOCATED_HEAP           1
 #define configMAX_TASK_NAME_LEN                    (12)
 #define configUSE_TRACE_FACILITY                   1
 #ifndef CONFIG_USE_PERCEPIO_TRACE_RECORDER
