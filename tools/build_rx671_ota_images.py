@@ -208,8 +208,38 @@ def _replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
+# Sources that are compiled into the OTA bundle although nothing in it calls them:
+# the Fleet Provisioning demo (it is built into the separate Fleet image), its
+# library, and the CBOR pretty printer. pkcs11_operations.c stays: the CLI
+# store (Demos/cli/store.c) calls it. (source folder entry, excluded name)
+OTA_UNUSED_SOURCE_EXCLUDES = (
+    ("", "Demos/Fleet_Provisioning_With_CSR_Demo/FleetProvisioningDemoExample.c"),
+    ("", "Demos/Fleet_Provisioning_With_CSR_Demo/tinycbor_serializer.c"),
+    ("Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/source", "fleet_provisioning.c"),
+    ("Middleware/3rdparty/tinycbor/src", "cborpretty.c"),
+)
+
+
+def exclude_unused_ota_sources(text: str) -> str:
+    """Add the OTA-unused sources to the excluding list of their source folder entries."""
+    for folder, excluded in OTA_UNUSED_SOURCE_EXCLUDES:
+        pattern = re.compile(
+            r'(<entry excluding=")([^"]*)(" flags="VALUE_WORKSPACE_PATH(?:\|RESOLVED)?" kind="sourcePath" name="'
+            + re.escape(folder)
+            + '"/>)'
+        )
+        matches = pattern.findall(text)
+        if len(matches) != 1:
+            raise ValueError(f".cproject source entry {folder or '<root>'}: expected one match, found {len(matches)}")
+        text = pattern.sub(
+            lambda m: m.group(1) + m.group(2) + "|" + excluded + m.group(3), text, count=1
+        )
+    return text
+
+
 def make_ota_cproject(
-    text: str, version: Version, tls_version: str = "TLSv1.2"
+    text: str, version: Version, tls_version: str = "TLSv1.2",
+    exclude_unused_sources: bool = False,
 ) -> str:
     tls_version = parse_tls_version(tls_version)
     existing_version_defines = re.findall(
@@ -286,11 +316,14 @@ def make_ota_cproject(
         + VERSION_MARKER_LINKER_OPTION,
         ".cproject linker userBefore value",
     )
-    return (
+    text = (
         text[: linker_option.start(2)]
         + updated_body
         + text[linker_option.end(2) :]
     )
+    if exclude_unused_sources:
+        text = exclude_unused_ota_sources(text)
+    return text
 
 
 def make_provisioner_cproject(text: str) -> str:
@@ -358,7 +391,8 @@ class TemporaryOtaProfile:
             for relative in PROFILE_PATHS
         }
 
-    def apply(self, version: Version, tls_version: str = "TLSv1.2") -> None:
+    def apply(self, version: Version, tls_version: str = "TLSv1.2",
+              exclude_unused_sources: bool = False) -> None:
         cproject = self.snapshots[Path(".cproject")].decode("utf-8")
         fwup = self.snapshots[Path("src/frtos_config/rx_ota_config.h")].decode(
             "utf-8"
@@ -367,7 +401,7 @@ class TemporaryOtaProfile:
             Path("src/smc_gen/r_config/r_bsp_config.h")
         ].decode("utf-8")
         (self.project_dir / ".cproject").write_text(
-            make_ota_cproject(cproject, version, tls_version),
+            make_ota_cproject(cproject, version, tls_version, exclude_unused_sources),
             encoding="utf-8",
             newline="",
         )
@@ -1311,7 +1345,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         with TemporaryOtaProfile(project_dir) as profile:
             for label, version in versions:
-                profile.apply(version, tls_version)
+                profile.apply(version, tls_version, args.tls_backend == "tsip")
                 artifact_dir = output_root / f"{label}-{version.text}"
                 _build_one(
                     repo_root=repo_root,
