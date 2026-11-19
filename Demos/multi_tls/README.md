@@ -38,9 +38,12 @@ hook call. A clean local e2 studio 2026-04 build completed with zero errors
 before the refreshed RPi #1 hardware run.
 
 Two simultaneous software-TLS handshakes exceed the original single 320 KiB
-FreeRTOS heap. The software-TLS RX72N project therefore uses `heap_5` with its
-existing 320 KiB lower-RAM region plus a 248 KiB region in the mapped upper-RAM
-gap. The linker keeps that region below the fixed framebuffer at `0x0085E000`.
+FreeRTOS heap. All FreeRTOS projects use `heap_5` with the shared region code in
+`Common/FreeRTOS_common/freertos_heap.c`; the RX72N projects give it a second
+region in the mapped upper-RAM gap (248 KiB for software TLS, 148 KiB for TSIP)
+next to the lower-RAM region (`FREERTOS_HEAP_UPPER_REGION_SIZE` in each
+project's `freertos_heap_config.h`). The linker keeps that region below the
+fixed framebuffer at `0x0085E000`.
 
 ## AWS IoT policy requirement
 
