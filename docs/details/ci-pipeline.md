@@ -174,7 +174,7 @@ build は、入力が同じなら、前に作った物を使い回します。
 
 - 基板ごとに `resource_group`（`board-rx72n`・`board-rx65n`・`board-rx671`）を持ちます。1 枚の基板で同時に動く試験は 1 本だけです。
 - `resource_group` は GitLab の中だけの排他です。このため、試験の process は、基板をつないだ Raspberry Pi 上の基板ごとの lock file（`tools/idt/targets.json` の `bench_lock`）も取ります。lock を取れるまで最長 3000 秒待ちます。lock は process が終わると自動で外れます。基板と違う host の runner では、試験は始まりません。
-- 試験 job の時間の上限は 40 分です。試験 job は、取り消されない設定（`interruptible: false`）です。
+- 試験 job の時間の上限は 90 分です。基板の lock を待つ時間（最長 3000 秒）と、試験そのものの時間（40 分）の和です。ほかの project の job が基板を使っている間の待ちで、試験の時間が減らないようにしています。試験 job は、取り消されない設定（`interruptible: false`）です。
 
 ## 基板ごとの試験の流れ
 

@@ -41,6 +41,15 @@ class RegistryTests(unittest.TestCase):
 
 
 class PlanTests(unittest.TestCase):
+
+    def test_a_test_job_may_wait_for_its_board_without_losing_test_time(self):
+        name = "rx65n:tsip:tls13:ota"
+        jobs, _ = rxci.child_pipeline(registry([name]), "check", "^rx65n:tsip:tls13:ota$", 1)
+        minutes = int(jobs[name]["timeout"].split()[0])
+        self.assertEqual(jobs[name]["timeout"], f"{minutes} minutes")
+        self.assertEqual(minutes * 60, rxci.LOCK_WAIT_SECONDS + rxci.TEST_SECONDS)
+        self.assertGreaterEqual(rxci.TEST_SECONDS, 2400)
+
     def test_check_profile_has_no_build_and_no_test(self):
         jobs, summary = rxci.child_pipeline(registry(), "check", "", 1)
         self.assertEqual(summary["builds"], [])

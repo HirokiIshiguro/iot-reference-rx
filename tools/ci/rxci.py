@@ -31,6 +31,10 @@ TOOL = "tools/ci/rxci.py"
 # role named by the protected group variable AWS_ROLE_ARN (see hardware-config, docs/ci-variables.md).
 OIDC = {"GITLAB_OIDC_TOKEN": {"aud": "sts.amazonaws.com"}}
 REGION = os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-1")
+# A test job first waits for its board, which jobs of other projects on the same host also use, and then runs.
+# The job timeout is the sum of the two, so that the wait can never use up the time of the test itself.
+LOCK_WAIT_SECONDS = 3000
+TEST_SECONDS = 2400
 
 
 # --------------------------------------------------------------------------
@@ -261,7 +265,7 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
                 "after_script": [f"python3 {TOOL} finish {test['name']} --log-dir out/logs"],
                 "artifacts": {"when": "always", "paths": ["out/logs/"],
                               "reports": {"junit": "out/logs/junit.xml"}, "expire_in": "14 days"},
-                "timeout": "40 minutes",
+                "timeout": f"{(LOCK_WAIT_SECONDS + TEST_SECONDS) // 60} minutes",
                 "interruptible": False,     # never stop a job that is writing to a board
             }
     if run:

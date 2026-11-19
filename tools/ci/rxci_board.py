@@ -23,7 +23,6 @@ from xml.sax.saxutils import escape, quoteattr
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "tools"
-LOCK_WAIT_SECONDS = 3000
 RFP_SECONDS = 300          # one rfp-cli command; the slowest measured one takes 54 s
 # Start and size of one bank of the dual-bank code flash (tools/idt/public_signer_provision.py LAYOUTS).
 BANK = {"rx72n-ethernet": (0xFFE00000, 0x200000), "rx65n-bg96": (0xFFF00000, 0x100000),
@@ -70,7 +69,9 @@ class Board:
         path = Path(self.target["bench_lock"])
         path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = open(path, "a")
-        deadline = time.monotonic() + LOCK_WAIT_SECONDS
+        import rxci
+
+        deadline = time.monotonic() + rxci.LOCK_WAIT_SECONDS
         waited = False
         while True:
             try:
@@ -78,7 +79,7 @@ class Board:
                 break
             except BlockingIOError:
                 if time.monotonic() > deadline:
-                    raise SystemExit(f"{self.name} stayed in use for {LOCK_WAIT_SECONDS} s.") from None
+                    raise SystemExit(f"{self.name} stayed in use for {rxci.LOCK_WAIT_SECONDS} s.") from None
                 if not waited:
                     print(f"{self.name} is in use by another job; waiting.", flush=True)
                     waited = True
