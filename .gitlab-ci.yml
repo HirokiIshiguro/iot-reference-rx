@@ -3,12 +3,22 @@
 # This file only decides the default scope and starts one child pipeline.
 # What runs is decided by tools/ci/rxci.py from the test list in tools/ci/tests.json.
 #
-#   PROFILE  check | build | smoke | full     scope of the pipeline
-#   TEST     regular expression of test names (e.g. ^rx671:sw:tls12:mqtt$)
-#   REPEAT   how many times each selected test runs (one job per run)
-#   REBUILD  true builds every firmware again instead of reusing a build with the same inputs
+# The variables below are the form of Build > Pipelines > New pipeline.
 #
-# Run one test three times:  Run pipeline with TEST=^rx72n:sw:tls12:mqtt$ and REPEAT=3
+#   What you want                          PROFILE  other variables
+#   -------------------------------------  -------  ----------------------------------------------
+#   unit tests of the CI tools only        check    -
+#   build every firmware, no board         build    -
+#   a few tests on the boards              smoke    -
+#   every test on the boards               full     -
+#   the tests of one board                 full     BOARD=rx671
+#   one kind of test on every board        full     FEATURE=ota (and/or BACKEND, TLS)
+#   one test, three times                  full     BOARD=rx72n BACKEND=sw TLS=tls12 FEATURE=mqtt REPEAT=3
+#   a selection the lists cannot express   full     TEST=^rx72n:(sw|tsip):tls12:ota$ (lists at all)
+#   what the runners have                  doctor   -
+#
+# A selection (BOARD, BACKEND, TLS, FEATURE or TEST) with a PROFILE other than full stops in the
+# plan job with the reason, and so does a value that is not in a list.
 
 stages:
   - plan
@@ -16,17 +26,62 @@ stages:
 
 variables:
   PROFILE:
-    value: ""
-    description: "check | build | smoke | full. Empty uses the default of the trigger."
-  TEST:
-    value: ""
-    description: "Regular expression of test names. Empty runs every test of the profile."
+    value: "check"
+    options:
+      - "check"
+      - "build"
+      - "smoke"
+      - "full"
+      - "doctor"
+    description: "How far the pipeline goes. check: unit tests of the CI tools. build: also build every firmware. smoke: a few tests on the boards. full: the tests on the boards. doctor: show what the runners have."
+  BOARD:
+    value: "all"
+    options:
+      - "all"
+      - "rx72n"
+      - "rx65n"
+      - "rx671"
+    description: "Board whose tests run (needs PROFILE=full). all: every board."
+  BACKEND:
+    value: "all"
+    options:
+      - "all"
+      - "sw"
+      - "tsip"
+    description: "TLS implementation of the tests (needs PROFILE=full). sw: Mbed TLS in software. tsip: with the TSIP hardware."
+  TLS:
+    value: "all"
+    options:
+      - "all"
+      - "tls12"
+      - "tls13"
+    description: "TLS version of the tests (needs PROFILE=full)."
+  FEATURE:
+    value: "all"
+    options:
+      - "all"
+      - "mqtt"
+      - "ota"
+      - "fleet"
+    description: "Kind of test (needs PROFILE=full). mqtt: connect and publish. ota: update the firmware over the air. fleet: Fleet Provisioning."
   REPEAT:
     value: "1"
-    description: "How many times each selected test runs."
+    options:
+      - "1"
+      - "2"
+      - "3"
+      - "5"
+      - "10"
+    description: "How many times each selected test runs (one job per run)."
   REBUILD:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "true: build every firmware again. false: reuse a build with the same inputs."
+  TEST:
     value: ""
-    description: "true builds every firmware again. Empty reuses a build with the same inputs (a schedule always builds)."
+    description: "Only for a selection the lists cannot express: regular expression of test names, for example ^rx72n:(sw|tsip):tls12:ota$. Leave BOARD, BACKEND, TLS and FEATURE at all when you use it."
 
 workflow:
   rules:
@@ -38,23 +93,22 @@ workflow:
       auto_cancel:
         on_new_commit: none
       variables:
-        DEFAULT_PROFILE: full
-        DEFAULT_REBUILD: "true"
+        PROFILE: full
+        REBUILD: "true"
         KEEP: "true"
     - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"
       auto_cancel:
         on_new_commit: none
       variables:
-        DEFAULT_PROFILE: check
         KEEP: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       variables:
-        DEFAULT_PROFILE: build
+        PROFILE: build
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       variables:
-        DEFAULT_PROFILE: smoke
-    - variables:
-        DEFAULT_PROFILE: check
+        PROFILE: smoke
+    # Every other pipeline (a push to a branch without a merge request) uses the defaults above.
+    - when: always
 
 plan:
   stage: plan
@@ -63,7 +117,7 @@ plan:
     GIT_DEPTH: "1"
     GIT_SUBMODULE_STRATEGY: none
   script:
-    - python3 tools/ci/rxci.py plan --profile "${PROFILE:-$DEFAULT_PROFILE}" --test "$TEST" --repeat "$REPEAT" --keep "${KEEP:-false}" --rebuild "${REBUILD:-${DEFAULT_REBUILD:-false}}"
+    - python3 tools/ci/rxci.py plan --profile "$PROFILE" --board "$BOARD" --backend "$BACKEND" --tls "$TLS" --feature "$FEATURE" --test "$TEST" --repeat "$REPEAT" --keep "${KEEP:-false}" --rebuild "$REBUILD"
   artifacts:
     paths:
       - child-pipeline.yml
