@@ -5,7 +5,7 @@
 # コンテンツ
 [Home](ja/Home.md)
 ## FreeRTOSプロジェクトの使用方法
-[Getting Start Guide](../Getting_Started_Guide.md)
+[Getting Start Guide](../../../Getting_Started_Guide.md)
 ## チュートリアル
 1. [デバイスをAWS-IoTに登録する](ja/デバイスをAWS-IoTに登録する.md)
 1. [FreeRTOSプロジェクトの入手](ja/FreeRTOSプロジェクトの新規作成・インポート.md)  

@@ -2,7 +2,7 @@
 
 safftiリリースで利用者から見える変更を、新しい順にまとめます。
 最初のsafftiタグはRenesas公式`v202406.04-LTS-rx-1.2.0`との差分、それ以降は直前のsafftiタグとの差分です。
-個別pipelineの一覧は[実機検証マトリクス](docs/validation-evidence.md)へ集約します。
+個別pipelineの一覧は[実機検証マトリクス](docs/details/validation/validation-evidence.md)へ集約します。
 
 ## リリース一覧
 
@@ -25,8 +25,8 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
   TCP、software TLS、TSIP hardware TLSのSINK / SOURCEを同じ形式で示します。
 - `Getting_Started_Guide.md`を日本語化し、GitLabが生成する日本語見出しanchorへ
   同一repository内の参照を追従させました。
-- CI運用と個別の実機証跡を、それぞれ`docs/ci-pipeline.md`と
-  `docs/validation-evidence.md`へ分離しました。
+- CI運用と個別の実機証跡を、それぞれ`docs/details/ci-pipeline.md`と
+  `docs/details/validation/validation-evidence.md`へ分離しました。
 
 ### 今後の課題
 

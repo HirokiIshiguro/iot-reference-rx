@@ -47,7 +47,7 @@ MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検
 
 固定target identityがapplication、bootloader、packager、UART、debugger、bench lockを選びます。
 共有CC-RX resource groupに加え、実機の既存lockと通常CIとの排他を確認します。
-全3環境の実機scopeは、[共通初期boot trust](../tools/idt/RX671_BOOTSTRAP.md)を用意してから実行します。CIは[prepare_public_signer.py](../tools/idt/prepare_public_signer.py)で公開署名鍵投入用MOT・正式manifest・公開証明書・公開鍵を自動生成します。確認済み資料で置き換える場合は`IDT_PUBLIC_SIGNER_PROVISIONER_MOT_FILE`、`IDT_PUBLIC_SIGNER_PROVISIONER_MANIFEST_FILE`、`IDT_PUBLIC_SIGNER_CERT_FILE`、`IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE`の4入力を全て指定してください。部分指定は拒否し、host-only preflightでは生成しません。
+全3環境の実機scopeは、[共通初期boot trust](../../../tools/idt/RX671_BOOTSTRAP.md)を用意してから実行します。CIは[prepare_public_signer.py](../../../tools/idt/prepare_public_signer.py)で公開署名鍵投入用MOT・正式manifest・公開証明書・公開鍵を自動生成します。確認済み資料で置き換える場合は`IDT_PUBLIC_SIGNER_PROVISIONER_MOT_FILE`、`IDT_PUBLIC_SIGNER_PROVISIONER_MANIFEST_FILE`、`IDT_PUBLIC_SIGNER_CERT_FILE`、`IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE`の4入力を全て指定してください。部分指定は拒否し、host-only preflightでは生成しません。
 
 共通profileは`rx-dual-public-signer-provisioner-v1`です。IDT buildと同じsource SHAの`formal=true`・`source_tree_dirty=false`を要求し、private outputはcheckout外に新規作成します。保守用MOTの実設定とsource識別子、公開P-256鍵の一致、bootloader policy、両bankの正確な配置を検査します。初期RSUは署名付きCode Flashのみとし、Data Flashを同梱しません。
 
@@ -55,7 +55,7 @@ MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検
 
 共通LittleFSは2.11.3、領域の開始位置は`0x00100000`、容量はRX65N/RX72Nが16KiB、RX671が8KiBです。RX72Nの旧開始位置とRX65N/RX72Nの旧容量からの変更により、初回formatと再provisionが必要です。今回の部品・host検証を実機の移行確認やIDT合格へ流用しません。OTAのbuild ledger / 起動識別子はターゲットとfingerprintを照合し、通常firmwareへの復帰は既存flash / provision経路で確認します。
 
-[共有予算](../tools/idt/cleanup_budget.py)は3環境ともtransaction 1565秒、公開鍵投入CLIは絶対上限200秒です。終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗、UART出力継続、privileged子processの終了不明では所有記録を保持して再利用を止めます。
+[共有予算](../../../tools/idt/cleanup_budget.py)は3環境ともtransaction 1565秒、公開鍵投入CLIは絶対上限200秒です。終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗、UART出力継続、privileged子processの終了不明では所有記録を保持して再利用を止めます。
 
 過去のRX671起動不良は、現行のdual-bank共通経路と区別して保存しています。
 
@@ -228,9 +228,9 @@ Runner #28で公式サンプルが合格し、同時に#26で汎用処理が動�
 <details>
 <summary>ホストを再構築する手順と固定版の検査</summary>
 
-ホスト固有の配置は[非secret profile](../tools/idt/host-profile.example.json)で管理し、`RX72N_IDT_HOST_PROFILE`で選びます。
+ホスト固有の配置は[非secret profile](../../../tools/idt/host-profile.example.json)で管理し、`RX72N_IDT_HOST_PROFILE`で選びます。
 別PCでもworkspace規約に合わせて`C:\ai\codex`配下を使用します。任意driveへの移設を保証する構成ではありません。
-Windows / WSLのPython依存は[Windows](../tools/idt/requirements-windows.txt)と[WSL](../tools/idt/requirements-wsl.txt)の固定版から専用venvへ導入します。
+Windows / WSLのPython依存は[Windows](../../../tools/idt/requirements-windows.txt)と[WSL](../../../tools/idt/requirements-wsl.txt)の固定版から専用venvへ導入します。
 PowerShell 7、Windows OpenSSH、WSL 2のx86_64 Linux、Python 3.11以降、e2 studio 2026-04.2 / CC-RX 3.07.00を事前に導入してください。
 検証ホストはWSL 2.6.3.0、Ubuntu 24.04.4 LTS、Linux Python 3.12.3です。
 Ubuntuで`python3-venv`が未導入の場合は、別途`sudo apt-get update && sudo apt-get install python3-venv`を実行します。
@@ -243,8 +243,8 @@ $idtPython = 'C:\ai\codex\tools\venvs\rx72n-idt-windows\Scripts\python.exe'
 & $idtPython tools/idt/check_host.py --check-aws --output artifacts/idt-host-check.json
 ```
 
-[setup_host.py](../tools/idt/setup_host.py)は専用venvとprofileを作り、OS、Renesas製品、AWS認証、SSH鍵、既存Python環境を変更しません。
-[check_host.py](../tools/idt/check_host.py)は選択profileで実行ユーザー、ツール配置・版、Python依存、WSL / Linux版、SSH接続先hostnameを記録します。
+[setup_host.py](../../../tools/idt/setup_host.py)は専用venvとprofileを作り、OS、Renesas製品、AWS認証、SSH鍵、既存Python環境を変更しません。
+[check_host.py](../../../tools/idt/check_host.py)は選択profileで実行ユーザー、ツール配置・版、Python依存、WSL / Linux版、SSH接続先hostnameを記録します。
 `--check-aws`はread-onlyのSTS照会です。UART、flash、試験用AWS資源には触れません。
 WSL、SSH、AWSはWindowsユーザーごとの設定なので、GitLab Runnerサービスの実行ユーザーでも検査します。
 CC-RXライセンスとリンク可能サイズは実際のfirmwareビルドで確認します。
@@ -256,7 +256,7 @@ Windows PowerShell 5.1はe2 studio終了コードを取得できなかったた�
 ホストを変えても、RPi #1のhostname、UART by-id、E2 Lite serial、共有lockは変更しません。
 
 IDTは[AWS公式署名付きAPI](https://docs.aws.amazon.com/freertos/latest/userguide/idt-programmatic-download-process.html)から固定版を取得します。
-[manifest](../tools/idt/bundle-manifest.json)と[検証コード](../tools/idt/idt_bundle.py)でZIPのSHA-256および各OSの静的74ファイルを確認します。
+[manifest](../../../tools/idt/bundle-manifest.json)と[検証コード](../../../tools/idt/idt_bundle.py)でZIPのSHA-256および各OSの静的74ファイルを確認します。
 公式ZIPを再取得して既知hashと照合済みです。cached binaryの存在だけでは成功にせず、追加・欠落・改変された実行ファイルや試験定義を拒否します。
 可変のconfigs / logs / resultsはhash対象から除きます。
 `latestidt`が別版へ更新された場合は自動で追従せず停止します。固定版を再構築する場合は、保管した公式ZIPのhashをmanifestと照合してprofileの`install_root`へ展開し、`verify_install`で検査します。
@@ -267,7 +267,7 @@ IDTは[AWS公式署名付きAPI](https://docs.aws.amazon.com/freertos/latest/use
 ## 判定と証跡
 
 IDT 4.9.0は試験不合格でもプロセス終了コード0を返します。
-[結果判定](../tools/idt/check_idt_report.py)は必須group、1件以上のtestcase、件数整合を確認し、failure / error / skipped / disabledのいずれかがあれば不合格とします。
+[結果判定](../../../tools/idt/check_idt_report.py)は必須group、1件以上のtestcase、件数整合を確認し、failure / error / skipped / disabledのいずれかがあれば不合格とします。
 実行や終了処理の失敗も合格にしません。scope単位のPASSは全IDT合格ではありません。
 OTA PALのfilesystem専用IGNOREはnative IDTがFAILへ変換しました。これをPASSへ書き換えず、full groupの合格には扱いません。
 
@@ -293,7 +293,7 @@ TLS cipherの`PASS_WITH_WARNINGS`もそのまま保持します。
 警告中の8 cipher suiteは[AWS IoTの現行対応表](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)にあり、`0x00FF`はSCSVです。警告を危険な暗号方式の使用確定として扱いません。
 
 **OTA署名:** 文書化された`customSignCommand`の波括弧placeholderがnative IDTの`GetUserData`による先行展開と衝突し、その経路では試験開始に至りませんでした。
-[AWS Signer用の準備・cleanup](../tools/idt/ota_aws_signers.py)を実装しています。初期のOTA02は認証情報の不一致でbuild前に停止しましたが、公開鍵の受渡し経路を修正したpipeline #11255ではGreaterVersionの単一ケースがPASSしました。署名不正・旧版・同版等を含むgroup全体は未実行です。
+[AWS Signer用の準備・cleanup](../../../tools/idt/ota_aws_signers.py)を実装しています。初期のOTA02は認証情報の不一致でbuild前に停止しましたが、公開鍵の受渡し経路を修正したpipeline #11255ではGreaterVersionの単一ケースがPASSしました。署名不正・旧版・同版等を含むgroup全体は未実行です。
 一時ACM証明書は実行固有のtagとjournalで所有を確認し、IDT終了・native cleanup後に削除します。
 
 **OTA PAL:** inactive bankの実flashに対する既存assertionを実行するportです。
@@ -307,4 +307,4 @@ manifestの偽装や古いLTSへの巻戻しは行っていません。
 
 </details>
 
-port / buildの詳細は[Test/ports](../Test/ports/README.md)、通常CIは[CI/CD運用](ci-pipeline.md)を参照してください。
+port / buildの詳細は[Test/ports](../../../Test/ports/README.md)、通常CIは[CI/CD運用](../ci-pipeline.md)を参照してください。

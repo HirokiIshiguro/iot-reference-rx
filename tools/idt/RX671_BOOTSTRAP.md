@@ -46,6 +46,6 @@ RX671で確認した旧linear画像の起動不良は、現在の共通経路と
 
 [#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)では、OTA後の起動bank状態からlinear provisionerを一括書込みすると、verify成功後も旧bootloaderを指す現象を実機で再現しました。同じ通常FWもdual/000からの初回と2回目で配置が変わったため、2回書込みによる収束には依存せず、chip eraseを先に完了する経路を採用しました。
 
-この調査は過去のsourceと画像に対する証拠です。保守用を含む現在のdual-bank統一、新しいLittleFS領域、全3環境の初期trust経路の実機合格には流用しません。過去IDTの対象SHAと結果は[検証記録](../../docs/idt-validation.md)を参照してください。
+この調査は過去のsourceと画像に対する証拠です。保守用を含む現在のdual-bank統一、新しいLittleFS領域、全3環境の初期trust経路の実機合格には流用しません。過去IDTの対象SHAと結果は[検証記録](../../docs/details/idt/idt-validation.md)を参照してください。
 
 </details>

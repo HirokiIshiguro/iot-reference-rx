@@ -31,9 +31,9 @@ WIKI_BASE = "https://github.com/renesas/iot-reference-rx/wiki/"
 
 
 def compute_relative_path(from_file, target_lang, target_file):
-    """Compute relative path from from_file to target in docs/<lang>/."""
+    """Compute relative path from from_file to target in docs/details/getting-started/<lang>/."""
     from_dir = os.path.dirname(from_file)
-    target_path = os.path.join("docs", target_lang, target_file)
+    target_path = os.path.join("docs", "details", "getting-started", target_lang, target_file)
     return os.path.relpath(target_path, from_dir).replace("\\", "/")
 
 
@@ -94,5 +94,5 @@ def process_directory(docs_dir):
 
 
 if __name__ == "__main__":
-    docs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
+    docs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs", "details", "getting-started")
     process_directory(docs_dir)

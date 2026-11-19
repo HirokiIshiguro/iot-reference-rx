@@ -494,9 +494,9 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^((codex|claude)\/)?[0-9]+-(readme|docs)-/'
       changes:
         - README.md
-        - docs/idt-validation.md
-        - docs/ota-performance.md
-        - docs/common-core-audit/**/*
+        - docs/details/idt/idt-validation.md
+        - docs/details/validation/ota-performance.md
+        - docs/details/common-core-audit/**/*
         - tools/ci/check_idt_docs.py
         - tools/ci/tests/test_idt_docs.py
       variables:
