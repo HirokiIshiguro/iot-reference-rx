@@ -12,7 +12,7 @@ import sys
 SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_PATHS = {
     ".gitlab-ci.yml",
-    "docs/ci-pipeline.md",
+    "docs/details/ci-pipeline.md",
     "tools/ci/check_nightly_dependency_alignment.py",
     "tools/ci/nightly-dependency-targets.json",
     "tools/ci/tests/fixtures/nightly_dependency_alignment_run5.json",

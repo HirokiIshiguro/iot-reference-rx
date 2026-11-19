@@ -12,7 +12,7 @@ RX671はsoftware app 1個、RX65N／RX72Nはsoftware・TSIP app各2個です。�
 
 | 項目 | RX671 | RX65N／BG96 | RX72N／Ethernet | 根拠・範囲 |
 |---|---|---|---|---|
-| FreeRTOS Kernel | V11.3.0 | V11.3.0 | V11.3.0 | [manifest](../../manifest.yml)、共通Kernel `task.h`、5 appのSC selector/backup guard |
+| FreeRTOS Kernel | V11.3.0 | V11.3.0 | V11.3.0 | [manifest](../../../manifest.yml)、共通Kernel `task.h`、5 appのSC selector/backup guard |
 | Plus-TCP / coreMQTT / Agent | 4.4.1 / 5.0.2 / 2.0.0 | 同じroot pin | 同じroot pin | 版は共通。通信方式に必要なsourceだけを選択 |
 | corePKCS11 / coreJSON / coreSNTP | 3.6.4 / 3.3.1 / 2.0.0 | 同じroot pin | 同じroot pin | 版と利用の有無を混同しない。その他AWS librariesはmanifest・[原本照合](submodule-conformance-20261014.md)参照 |
 | Mbed TLS software | 3.6.4 | 3.6.4 | 3.6.4 | 共通submodule `Middleware/3rdparty/mbedtls` |
@@ -38,7 +38,7 @@ RX671はsoftware app 1個、RX65N／RX72Nはsoftware・TSIP app各2個です。�
 | 保守provisioner方針 | dual | dual | dual | 共通public signer helper/profileがstandalone hardware vectorsを使う。host guard確認と各実image/実機を区別 |
 | 通常OTA bank切替 | appが担当 | appが担当へ変更 | appが担当 | 製品OTA PALの`FLASH_CMD_BANK_TOGGLE`呼出し。RX671通常診断profileはOTA既定0 |
 | boot信頼設定 | LittleFS公開鍵、ECDSA必須、組込鍵fallback=0、raw DataFlash install=0 | 同左 | 同左 | 3公開boot config。実鍵投入／署名OTA試験は未完 |
-| OSS管理 | git submodule | git submodule | git submodule | [`.gitmodules`](../../.gitmodules)。RX65N project内コピーをroot linkへ移行 |
+| OSS管理 | git submodule | git submodule | git submodule | [`.gitmodules`](../../../.gitmodules)。RX65N project内コピーをroot linkへ移行 |
 | 原本一致と例外 | fixed pinに利用側body差なし。WHD CC-RX forkを参照 | TSIP forkを参照 | TSIP forkを参照 | [全root／再帰参照の照合と限界](submodule-conformance-20261014.md)。forkとの一致はstock upstreamとの無改造一致ではない |
 | e2 studio起動 | `e2studio-cli.exe` | 同左 | 同左 | 共通launcher。RX65Nも毎回metadataからcold生成、古いmake cache再利用を撤去 |
 | SC RTOS選択 | `freertoslts` / Kernel 11.3.0 | 同左 | 同左 | 製品descriptor `202604.00-LTS-saffti-1.0.0`は設定header専用。Renesas公式package名とは区別。model parse/guard確認済み、GUI Generate未観測 |
@@ -148,8 +148,8 @@ TraceRecorder本体12,932B、control task stack2,048B、BSP library heap8,192B�
 
 ### 参照する現ファイル
 
-- [manifest](../../manifest.yml)、[`.gitmodules`](../../.gitmodules)、[submodule照合](submodule-conformance-20261014.md)
+- [manifest](../../../manifest.yml)、[`.gitmodules`](../../../.gitmodules)、[submodule照合](submodule-conformance-20261014.md)
 - app/bootの`.project`・`.cproject`・`.scfg`、各`FreeRTOSConfig.h`・`r_bsp_config.h`・`r_flash_rx_config.h`・公開`rx_bootloader_config.h`
-- [Kernel/SC guard](../../tools/ci/check_common_kernel.py)、[共通CLI adapter](../../tools/rx_e2studio_cli.ps1)、[RX65N cold生成helper](../../tools/build_headless_rx65n_bg96.ps1)
-- [通常OTA PAL](../../Common/ports/ota_pal/ota_pal.c)、[native profile/helper](../../tools/build_rx72n_idt_transport.ps1)、[public signer provisioner helper](../../tools/build_public_signer_provisioner.py)
+- [Kernel/SC guard](../../../tools/ci/check_common_kernel.py)、[共通CLI adapter](../../../tools/rx_e2studio_cli.ps1)、[RX65N cold生成helper](../../../tools/build_headless_rx65n_bg96.ps1)
+- [通常OTA PAL](../../../Common/ports/ota_pal/ota_pal.c)、[native profile/helper](../../../tools/build_rx72n_idt_transport.ps1)、[public signer provisioner helper](../../../tools/build_public_signer_provisioner.py)
 - [現WIP比較の公開証拠](current-convergence-20261014.json)。raw firmware、private絶対パス、credential、RAM dumpは収録しない

@@ -16,7 +16,7 @@ TSIP（ハードウェア暗号）をGitLab CIで検証します。
 | CK-RX65N V1 | BG96 Cellular | [software](Projects/aws_bg96_ck_rx65n/) / [TSIP](Projects/aws_bg96_ck_rx65n_tsip/) |
 | EK-RX671 | Murata Type 1YN Wi-Fi | [software](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls) / [TSIP](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls) |
 
-RX65N/BG96の通信実装は[`r_cellular`のBG96対応fork](docs/rx65n-cellular.md)です。
+RX65N/BG96の通信実装は[`r_cellular`のBG96対応fork](docs/details/cellular/rx65n-cellular.md)です。
 FreeRTOS Cellular Interfaceへの移行は行いません。
 
 ## 代表性能
@@ -51,7 +51,7 @@ AWS IoT MQTT OTA / software TLS 1.2の単発実測です。時間はダウンロ
 | EK-RX671 | Murata Type 1YN Wi-Fi | 785,920 B | 20.45秒 | 53.12秒 | [job #62156](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/62156) |
 | CK-RX65N V1 | BG96 Cellular | 785,920 B | 143.51秒 | 204.96秒 | [job #70279](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70279) |
 
-測定区間・SHA・条件は[OTA性能](docs/ota-performance.md)を参照してください。TSIP構成の時間は未測定です。
+測定区間・SHA・条件は[OTA性能](docs/details/validation/ota-performance.md)を参照してください。TSIP構成の時間は未測定です。
 
 ## 現在の検証状態
 
@@ -63,7 +63,7 @@ AWS IoT MQTT OTA / software TLS 1.2の単発実測です。時間はダウンロ
 | TLS 1.3 resumption / 0-RTT | 旧構成のLANBENCH対向で全6環境を5回連続確認済み（共通化後のTSIP 0-RTTは未対応） |
 | release tag pipeline | [`#11140`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11140) が35/35 job success |
 
-個別セルは[検証結果](docs/validation-evidence.md)を参照してください。AWS IoT Coreは
+個別セルは[検証結果](docs/details/validation/validation-evidence.md)を参照してください。AWS IoT Coreは
 SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認しています。
 
 ## IoT Device Tester（IDT）
@@ -78,7 +78,7 @@ IDTの明示CI入口は3ターゲットに対応します。`RUN_RX_IDT=true`、
 | EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | `test_rx671_wifi_idt` | 未検証 |
 
 `IDT_SCOPE=plan`は機器・AWSを操作しない計画確認です。`preflight`はnativeの版照合で、現行LTSとの不一致はNGとして記録します。
-実機scopeの準備条件と終了状態は[IDT検証](docs/idt-validation.md)を参照してください。
+実機scopeの準備条件と終了状態は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
 旧`RUN_RX72N_IDT` / `RX72N_IDT_SCOPE`によるRX72N選択も保持します。
 
 以下の実測環境: **RX72N Envision Kit / Ethernet / software TLS**、ishiguro-pc（Windows x86_64でビルド、
@@ -95,7 +95,7 @@ IDT **4.9.0 / FRQ_2.5.0**での結果（2026-09-28まで）です。
 | OTA MQTT E2E | 新版更新・同版・信頼されない証明書の3ケースPASS、全13ケースは未完了 |
 | 全IDT | **未合格**（異なるSHA・試作を含む部分試験） |
 
-実行方法、運用・リリース要件、各結果の証跡は[IDT検証](docs/idt-validation.md)を参照してください。
+実行方法、運用・リリース要件、各結果の証跡は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
 
 ## 最短の開始方法
 
@@ -108,8 +108,8 @@ git clone --recursive https://github.com/HirokiIshiguro/iot-reference-rx.git
 
 ## 詳細資料
 
-[CI/CD運用](docs/ci-pipeline.md) / [検証証跡](docs/validation-evidence.md) /
-[TSIP構成](docs/tsip-integration-plan.md) / [変更履歴](Changelog.md) /
+[CI/CD運用](docs/details/ci-pipeline.md) / [検証証跡](docs/details/validation/validation-evidence.md) /
+[TSIP構成](docs/details/tsip/tsip-integration-plan.md) / [変更履歴](Changelog.md) /
 [ハードウェア・ツール現行値](https://gitlab.saffti.jp/oss/infra/hardware-config)
 
 ## ライセンス

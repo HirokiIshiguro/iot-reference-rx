@@ -149,4 +149,4 @@ RX65N flat copyのblob比較はlocalで取得済みのsubtreeに限定してい�
 
 工程上はproject/source treeの参照監査です。コンパイルmap、実機で動いたimageの版、RX671起動問題との因果はそれぞれ別に照合します。
 
-証拠: [submodule-graph.json](./submodule-graph.json)。公開repoのソース/metadataと既存Git objectから取得し、credential値は取得・記録していません。
+証拠: [submodule-graph.json](submodule-graph.json)。公開repoのソース/metadataと既存Git objectから取得し、credential値は取得・記録していません。

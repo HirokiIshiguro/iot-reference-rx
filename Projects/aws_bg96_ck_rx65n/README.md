@@ -48,7 +48,7 @@ The application uses the shared FreeRTOS Kernel V11.3.0 and libraries. The modem
 and TCP socket path use `r_cellular`; the FreeRTOS Cellular Interface and its
 Quectel reference port are not used. Product configuration stays in the project,
 while the unmodified driver checkout is a submodule. See the
-[cellular integration policy](../../docs/rx65n-cellular.md) for its pin and scope.
+[cellular integration policy](../../docs/details/cellular/rx65n-cellular.md) for its pin and scope.
 
 ## OTA flash layout
 

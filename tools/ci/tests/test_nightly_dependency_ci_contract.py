@@ -308,8 +308,8 @@ class NightlyDependencyCiContractTests(unittest.TestCase):
         self.assertIn("      pipeline_variables: false", trigger)
 
     def test_nightly_idt_source_mr_uses_existing_three_target_build_profile(self) -> None:
-        changed = {".gitlab-ci.yml", "tools/idt/run_idt.py", "docs/idt-validation.md",
-                   "docs/ci-pipeline.md", "tools/ci/tests/test_idt_process_output.py",
+        changed = {".gitlab-ci.yml", "tools/idt/run_idt.py", "docs/details/idt/idt-validation.md",
+                   "docs/details/ci-pipeline.md", "tools/ci/tests/test_idt_process_output.py",
                    "tools/ci/tests/test_idt_cleanup_budget.py",
                    "tools/ci/tests/test_nightly_dependency_ci_contract.py"}
         selected = mr_variables(self.ci, changed, branch="codex/180-idt-nightly")
