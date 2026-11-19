@@ -31,3 +31,9 @@ void vConfigureHeapRegions(void)
 
     vPortDefineHeapRegions(xHeapRegions);
 }
+
+/* Size of the upper-RAM heap region, for the heap watermark line. */
+size_t xRx72nUpperHeapSize(void)
+{
+    return sizeof(ucUpperHeap);
+}
