@@ -403,11 +403,31 @@ def store(entry: Path, out: Path) -> None:
     shutil.rmtree(temporary, ignore_errors=True)
     shutil.copytree(out, temporary)
     shutil.rmtree(entry, ignore_errors=True)
-    temporary.rename(entry)
-    entries = sorted((path for path in entry.parent.iterdir() if path.is_dir()),
-                     key=lambda path: path.stat().st_mtime, reverse=True)
-    for old in entries[CACHE_ENTRIES:]:
+    try:
+        temporary.rename(entry)
+    except OSError:
+        # Another job stored a build of the same inputs at this moment; that one serves just as well.
+        shutil.rmtree(temporary, ignore_errors=True)
+    for old in stored_builds(entry.parent)[CACHE_ENTRIES:]:
         shutil.rmtree(old, ignore_errors=True)
+
+
+def stored_builds(folder: Path) -> list[Path]:
+    """Finished builds in the cache folder, newest first.
+
+    Several build jobs use the folder at the same time, so an entry can appear or disappear
+    between listing and looking at it.
+    """
+    found = []
+    for path in folder.iterdir():
+        if path.name.endswith(".tmp"):
+            continue          # a build that another job is storing right now
+        try:
+            if path.is_dir():
+                found.append((path.stat().st_mtime, path))
+        except OSError:
+            continue          # removed by another job in the meantime
+    return [path for _, path in sorted(found, key=lambda item: item[0], reverse=True)]
 
 
 def fetch_dependencies() -> None:
