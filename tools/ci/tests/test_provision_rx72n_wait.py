@@ -38,7 +38,7 @@ class FakeSerial:
         self.pending = b""
 
     def write(self, data):
-        if data.endswith(b"\n"):
+        if data == b"\r\n":
             self.sent_at = subject.time.monotonic()
         return len(data)
 
@@ -62,7 +62,8 @@ def run_pem(ser, timeout=None):
     out = io.StringIO()
     limit = () if timeout is None else (timeout,)
     with contextlib.redirect_stdout(out):
-        ok = subject.send_pem_content_command(ser, "cert", PEM, "label", 0, 0.5, *limit)
+        # retries=0: the retry after a silent board is covered by test_provision_rx72n_retry.py.
+        ok = subject.send_pem_content_command(ser, "cert", PEM, "label", 0, 0.5, *limit, retries=0)
     return ok, out.getvalue()
 
 
