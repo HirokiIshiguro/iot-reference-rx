@@ -27,7 +27,11 @@ STACK_LINE_RE = re.compile(
     r"RX671 stack: ustack=(?P<ustack>\d+)/(?P<ustack_size>\d+) upaint=(?P<upaint>\d+)"
     r" istack=(?P<istack>\d+)/(?P<istack_size>\d+) ipaint=(?P<ipaint>\d+) over=(?P<over>\d+)"
 )
-CHEAP_LINE_RE = re.compile(r"RX671 cheap: used=(?P<used>\d+)/(?P<size>\d+)")
+CHEAP_LINE_RE = re.compile(
+    r"RX671 cheap: used=(?P<used>\d+)/(?P<size>\d+)"
+    r"(?: dtc_ok=(?P<dtc_ok>\d+) dtc_fail=(?P<dtc_fail>\d+) dtc_err=0x(?P<dtc_err>[0-9A-Fa-f]{8})"
+    r" dtc_open=(?P<dtc_open_ret>\d+)/(?P<dtc_open_calls>\d+) dtc_table=(?P<dtc_table>\d+))?"
+)
 _TICK_RE = re.compile(r"tick(\d+)$")
 
 
@@ -55,7 +59,13 @@ def parse_stack_lines(text: str) -> list[dict]:
 
 
 def parse_cheap_lines(text: str) -> list[dict]:
-    return [{key: int(value) for key, value in match.groupdict().items()} for match in CHEAP_LINE_RE.finditer(text)]
+    entries = []
+    for match in CHEAP_LINE_RE.finditer(text):
+        entry = {}
+        for key, value in match.groupdict().items():
+            entry[key] = None if value is None else int(value, 16 if key == "dtc_err" else 10)
+        entries.append(entry)
+    return entries
 
 
 def summarize_bsp(text: str) -> dict:
@@ -75,6 +85,12 @@ def summarize_bsp(text: str) -> dict:
             "over_max": max(e["over"] for e in stacks)})
     if cheaps:
         summary.update({"cheap_used_max": max(e["used"] for e in cheaps), "cheap_size": cheaps[-1]["size"]})
+        last = cheaps[-1]
+        if last["dtc_ok"] is not None:
+            # DTC of the SDIO CMD53 path (its vector table is a malloc of the C library): the counters of the last line.
+            summary["dtc"] = {"ok": last["dtc_ok"], "fail": last["dtc_fail"], "err": "0x%08X" % last["dtc_err"],
+                              "open_ret": last["dtc_open_ret"], "open_calls": last["dtc_open_calls"],
+                              "table": last["dtc_table"]}
     return summary
 
 
@@ -132,7 +148,12 @@ def format_extra_lines(summary: dict) -> list[str]:
                      f"istack {bsp['istack_used_max']}/{bsp['istack_size']} B (filled {bsp['istack_painted']} B), "
                      f"over into SU {bsp['over_max']} B")
     if "cheap_used_max" in bsp:
-        lines.append(f"C library heap watermark: {bsp['cheap_used_max']}/{bsp['cheap_size']} B")
+        text = f"C library heap watermark: {bsp['cheap_used_max']}/{bsp['cheap_size']} B"
+        dtc = bsp.get("dtc")
+        if dtc:
+            text += (f"; DTC ok={dtc['ok']} fail={dtc['fail']} err={dtc['err']} "
+                     f"open={dtc['open_ret']}/{dtc['open_calls']} table={dtc['table']}")
+        lines.append(text)
     return lines
 
 

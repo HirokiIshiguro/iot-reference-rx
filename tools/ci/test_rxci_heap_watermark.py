@@ -80,6 +80,15 @@ class HeapWatermarkTests(unittest.TestCase):
         self.assertEqual(96, heap.summarize(text)["bsp"]["over_max"])
         self.assertNotIn("ustack_used_max", heap.summarize("RX671 cheap: used=3/8192")["bsp"])
         
+    def test_dtc_values_of_the_cheap_line(self):
+        text = ("RX671 cheap: used=100/8192 dtc_ok=0 dtc_fail=0 dtc_err=0x03000002 dtc_open=2/5 dtc_table=0\r\n"
+                "RX671 cheap: used=8184/8192 dtc_ok=7 dtc_fail=1 dtc_err=0x00000000 dtc_open=1/1 dtc_table=1\r\n")
+        summary = heap.summarize(text)["bsp"]
+        self.assertEqual(8184, summary["cheap_used_max"])
+        self.assertEqual({"ok": 7, "fail": 1, "err": "0x00000000", "open_ret": 1, "open_calls": 1, "table": 1},
+                         summary["dtc"])
+        self.assertIn("DTC ok=7 fail=1 err=0x00000000 open=1/1 table=1", heap.format_extra_lines({"bsp": summary})[0])
+
     def test_extra_lines_are_printed_after_the_main_line(self):
         buffer = StringIO()
         with redirect_stdout(buffer):

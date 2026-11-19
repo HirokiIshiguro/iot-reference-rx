@@ -153,6 +153,9 @@ void sdio_host_cmd53_xfer_diag(uint32_t * p_engine, uint32_t * p_done,
                                uint32_t * p_ok, uint32_t * p_fail,
                                uint32_t * p_fallback, uint32_t * p_error);
 
+/* R_DTC_Open() diagnostics: calls, last return value (0xFFFFFFFF = never called), vector table exists (1) or not (0). */
+void sdio_host_cmd53_dtc_open_diag(uint32_t * p_calls, uint32_t * p_ret, uint32_t * p_table);
+
 /* CMD53 transfer-engine fallback diagnostics. */
 void sdio_host_cmd53_xfer_fallback_diag(uint32_t * p_function, uint32_t * p_disabled,
                                         uint32_t * p_small, uint32_t * p_ineligible,

@@ -545,6 +545,13 @@ static volatile uint32_t g_cmd53_dtc_fb_small_count = 0U;
 static volatile uint32_t g_cmd53_dtc_fb_ineligible_count = 0U;
 static volatile uint32_t g_cmd53_dtc_fb_prepare_count = 0U;
 static volatile uint32_t g_cmd53_dtc_error = 0U;
+/* R_DTC_Open() bookkeeping (measurement only): number of calls, the last return value (0xFFFFFFFF = never called) and
+ * whether the DTC vector table (a malloc of the C library) exists afterwards. R_DTC_Open() returns DTC_ERR_OPENED both
+ * when the DTC is open already and when the malloc of the vector table failed; the table pointer tells them apart. */
+static volatile uint32_t g_cmd53_dtc_open_calls = 0U;
+static volatile uint32_t g_cmd53_dtc_open_ret = 0xFFFFFFFFUL;
+static volatile uint32_t g_cmd53_dtc_open_table = 0U;
+extern uint32_t * gp_dtc_table_work[2];
 static volatile uint32_t g_cmd53_dtc_ok_count = 0U;
 static volatile uint32_t g_cmd53_dtc_fail_count = 0U;
 static volatile uint32_t g_cmd53_dtc_last_seq = 0U;
@@ -900,6 +907,9 @@ static bool sdio_cmd53_dtc_open_once(void)
     }
 
     ret = R_DTC_Open();
+    g_cmd53_dtc_open_calls++;
+    g_cmd53_dtc_open_ret = (uint32_t)ret;
+    g_cmd53_dtc_open_table = (NULL != gp_dtc_table_work[0]) ? 1U : 0U;
     if ((DTC_SUCCESS != ret) && (DTC_ERR_OPENED != ret))
     {
         g_cmd53_dtc_error = 0x01000000UL | (uint32_t)ret;
@@ -2796,5 +2806,18 @@ void sdio_host_cmd53_xfer_fallback_diag(uint32_t * p_function, uint32_t * p_disa
     {
         *p_prepare = 0U;
     }
+#endif
+}
+
+void sdio_host_cmd53_dtc_open_diag(uint32_t * p_calls, uint32_t * p_ret, uint32_t * p_table)
+{
+#if (SDIO_HOST_CMD53_XFER_ENGINE == SDIO_HOST_CMD53_XFER_DTC)
+    *p_calls = g_cmd53_dtc_open_calls;
+    *p_ret = g_cmd53_dtc_open_ret;
+    *p_table = g_cmd53_dtc_open_table;
+#else
+    *p_calls = 0U;
+    *p_ret = 0xFFFFFFFFUL;
+    *p_table = 0U;
 #endif
 }

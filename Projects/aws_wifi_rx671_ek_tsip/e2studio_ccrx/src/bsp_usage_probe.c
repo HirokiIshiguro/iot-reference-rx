@@ -19,6 +19,7 @@
 #include "platform.h"
 #include "debug_uart.h"
 #include "bsp_usage_probe.h"
+#include "sdio_host.h"
 
 #define BSP_PROBE_FILL      (0x55555555UL)
 #define BSP_PROBE_MARGIN    (128U)
@@ -117,7 +118,16 @@ void rx671_bsp_scheduler_started(void)
 
 void rx671_bsp_log(void)
 {
-    char line[112];
+    char line[160];
+    uint32_t dtc_done = 0U;
+    uint32_t dtc_ok = 0U;
+    uint32_t dtc_fail = 0U;
+    uint32_t dtc_fallback = 0U;
+    uint32_t dtc_error = 0U;
+    uint32_t dtc_engine = 0U;
+    uint32_t dtc_open_calls = 0U;
+    uint32_t dtc_open_ret = 0U;
+    uint32_t dtc_open_table = 0U;
     char * p = line;
     const uint32_t su_bottom = su_scan_bottom();
     const uint32_t su_top = (uint32_t)__secend("SU");
@@ -147,10 +157,25 @@ void rx671_bsp_log(void)
     debug_puts(line);
 
     p = line;
+    sdio_host_cmd53_xfer_diag(&dtc_engine, &dtc_done, &dtc_ok, &dtc_fail, &dtc_fallback, &dtc_error);
+    sdio_host_cmd53_dtc_open_diag(&dtc_open_calls, &dtc_open_ret, &dtc_open_table);
     p = append_text(p, "RX671 cheap: used=");
     p = append_dec32(p, (0U != cheap_base) ? (brk - cheap_base) : 0U);
     p = append_text(p, "/");
     p = append_dec32(p, (uint32_t)BSP_CFG_HEAP_BYTES);
+    /* DTC of the SDIO CMD53 path: its vector table is a malloc of the C library. */
+    p = append_text(p, " dtc_ok=");
+    p = append_dec32(p, dtc_ok);
+    p = append_text(p, " dtc_fail=");
+    p = append_dec32(p, dtc_fail);
+    p = append_text(p, " dtc_err=0x");
+    p = append_hex32(p, dtc_error);
+    p = append_text(p, " dtc_open=");
+    p = append_dec32(p, dtc_open_ret);
+    p = append_text(p, "/");
+    p = append_dec32(p, dtc_open_calls);
+    p = append_text(p, " dtc_table=");
+    p = append_dec32(p, dtc_open_table);
     p = append_text(p, "\r\n");
     *p = '\0';
     debug_puts(line);
