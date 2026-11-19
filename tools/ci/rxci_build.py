@@ -366,6 +366,7 @@ def build_rx72n_app(registry: dict, backend: str, tls: str, kind: str, out: Path
         if log.is_file():
             out.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(log, out / "e2studio_build.log")
+        keep_map(app_mot.with_suffix(".map"), out)
         shutil.rmtree(work, ignore_errors=True)
 
 
