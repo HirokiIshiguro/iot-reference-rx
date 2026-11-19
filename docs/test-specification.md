@@ -94,21 +94,23 @@
 
 ### TLS の版の見方
 
-TLS の版の確かめ方は、試験ごとに違います。TLS 1.2 の試験の多くは、版を確かめません。接続先として TLS 1.2 用のものを使うだけです。
+36 試験の全部が、名前の TLS の版で handshake した事を合否に使います。版は、試験の名前（`tls12`・`tls13`）から `rxci_board.py` の `require_tls` が作り（`TLSv1.2`・`TLSv1.3`）、観測の道具に `--require-tls-version` で渡します。接続先も同じ版から決めます。TLS 1.2 は CI 変数 `AWS_IOT_ENDPOINT`、TLS 1.3 は `tests.json` の `endpoints` の値です。決め方は `rxci.py` の `endpoint` の 1 か所で、build（RX671 の app・Fleet を含む）と試験が同じ関数を使います。
 
-| 試験の種類 | TLS 1.2 | TLS 1.3 |
-|---|---|---|
-| RX72N の MQTT | 見ない | UART の `TLS handshake successful: version` の行のどれかが `TLSv1.3` |
-| RX65N の MQTT | 見ない | 成功を判定した時点で最後に見た handshake の行が `TLSv1.3` |
-| RX671 software の MQTT | 見ない | アプリが出す `AWS TLS version=TLSv1.3` の行がある |
-| RX671 TSIP の MQTT | handshake の行に `TLSv1.2` があり、ほかの版の行が無い | 同じく `TLSv1.3` |
-| Fleet（RX72N・RX65N） | 見ない | handshake の行が 1 件以上あり、すべて `TLSv1.3` |
-| Fleet（RX671） | 見ない | すべて `TLSv1.3` で、handshake の行が 2 件以上（申請用の接続と、受け取った証明書での接続） |
-| OTA（RX72N・RX65N） | 見ない | handshake の行が 1 件以上あり、すべて `TLSv1.3` |
-| OTA（RX671） | すべて `TLSv1.2`。更新前の基準のアプリと、更新後のアプリの両方で handshake の行がある | 同じく `TLSv1.3` |
+共通の判定は、「UART のログに、handshake の版の行が 1 件以上あり、すべてが要求した版」です。要求した版と違う版の行が 1 件でもあれば不合格で、版の行が 1 件も無い場合も不合格です。版の行は、ファームウェアが出す `TLS handshake successful: version …` で、RX671 software の MQTT だけは、smoke のアプリが出す `AWS TLS version=…` の行も見ます。
 
-- TSIP の TLS 1.3 の build は、TLS 1.3 を build の設定で指定します。RX671 の software は、TLS の版ごとに build が分かれます。RX72N と RX65N の software は、1 つの build を両方の版に使い、接続先で版を分けます（[`rxci_build.py`](../tools/ci/rxci_build.py)）。
-- 「見ない」の試験は、TLS 1.2 で接続した事を確かめていません。
+| 試験の種類 | 版を見る行と条件 |
+|---|---|
+| RX72N の MQTT | handshake の行が 1 件以上あり、すべて要求した版（TLS 1.2・1.3 とも） |
+| RX65N の MQTT | 成功を判定した時点までの handshake の行が 1 件以上あり、すべて要求した版 |
+| RX671 software の MQTT | `AWS TLS version=<要求した版>` の行がある。`AWS TLS version=` と handshake の行のどれにも、ほかの版が無い |
+| RX671 TSIP の MQTT | 要求した版の handshake の行があり、ほかの版の行が無い |
+| Fleet（RX72N・RX65N） | handshake の行が 1 件以上あり、すべて要求した版 |
+| Fleet（RX671） | すべて要求した版で、handshake の行が 2 件以上（申請用の接続と、受け取った証明書での接続） |
+| OTA（RX72N・RX65N） | handshake の行が 1 件以上あり、すべて要求した版 |
+| OTA（RX671） | すべて要求した版。更新前の基準のアプリと、更新後のアプリの両方で handshake の行がある |
+
+- RX671 の software は、TLS の版ごとに build が分かれます。TSIP も分かれます。RX72N と RX65N の software は、1 つの build を両方の版に使い、接続先で版を分けます（[`rxci_build.py`](../tools/ci/rxci_build.py)）。RX671 の software の build は、TLS 1.2 と 1.3 の両方を話せるので、接続先が版を決めます。この接続先を取り違えると、名前と違う版でつながります。そこで、版の判定を全試験に入れています。
+- 1 本の試験の中で複数の接続を張る流れ（RX72N の複数の TLS 接続の demo、Fleet の 2 回の接続、OTA の再起動の前後）も、全部の接続が要求した版でなければ不合格です。
 
 ### MQTT
 
@@ -116,33 +118,33 @@ TLS の版の確かめ方は、試験ごとに違います。TLS 1.2 の試験�
 
 - 流れ: [`mqtt_rx72n`](../tools/ci/rxci_board.py)。全消去、署名者の公開鍵・boot loader・アプリの書き込み、UART の CLI で thing・接続先・証明書・秘密鍵の設定（TSIP は秘密鍵を送らず、包んだ鍵を別に送る）、リセット。
 - 観測: [`tools/test_mqtt_rx72n.py`](../tools/test_mqtt_rx72n.py) が、リセットのあと最大 600 秒、UART を読みます。4 つの印がそろった時点で止めます。
-- 合格: 次の 4 つの文字列が、UART のどこかの行にある。TLS 1.3 の試験は、さらに `TLSv1.3` の handshake の行がある。
+- 合格: 次の 4 つの文字列が、UART のどこかの行にある。TLS の条件（[TLS の版の見方](#tls-の版の見方)）を満たす。
   - `IP Address:`
   - `Incoming PUBLISH received on topic $aws/things/`
   - `Successfully subscribed to topic`
   - `Successfully sent QoS`
-- 不合格: 4 つがそろわないまま時間が尽きる。boot loader が `jump to user program` を出したあと、45 秒たってもアプリの出力が無い。TLS 1.3 の試験で `TLSv1.3` の handshake の行が無い。
+- 不合格: 4 つがそろわないまま時間が尽きる。boot loader が `jump to user program` を出したあと、45 秒たってもアプリの出力が無い。TLS の条件を満たさない（要求した版と違う版の handshake の行がある、または行が無い）。
 - 見ない: `Failed to connect to MQTT broker`・`TLS connection failed` などのエラーの行は、表示するだけで、合否に使いません。
 
 #### M2 RX65N の MQTT
 
 - 流れ: [`mqtt_rx65n`](../tools/ci/rxci_board.py)。全消去と書き込みのあと、software は試験ごとの thing と証明書を AWS に作り、TSIP は基板に固定の thing と証明書を使います。Cellular 用の設定と証明書を専用の道具（[`tools/bg96_bootloader_integration.py`](../tools/bg96_bootloader_integration.py)）で入れ、アプリを起動します。
 - 観測: 同じ道具の `verify-mqtt`（`--require-mqtt-pubsub`）が、アプリの起動の印を最大 420 秒、その後 MQTT の印を最大 900 秒待ちます。
-- 合格: `Successfully sent QoS` の行があり、さらに `Successfully subscribed to topic` か `---------Finish PubSub Demo Task` のどちらかの行がある。TLS 1.3 の試験は、この時点で最後に見た handshake の行が `TLSv1.3`。
-- 不合格: アプリの起動の印が出ない。`Cellular init failed` が出る（アプリを最大 2 回リセットして再試行し、尽きると不合格）。MQTT の接続失敗（`failed to connect`・`MQTT Agent connect fail`・`MQTT connection failed`）が 3 回。`AT+QISEND` の直後の `ERROR` が、回復の印なしに 30 回。時間切れ。TLS 1.3 の試験で最後の handshake の行が `TLSv1.3` でない（行が無い場合も）。
+- 合格: `Successfully sent QoS` の行があり、さらに `Successfully subscribed to topic` か `---------Finish PubSub Demo Task` のどちらかの行がある。さらに TLS の条件を満たす（この時点までに見た handshake の行が 1 件以上あり、すべて要求した版）。
+- 不合格: アプリの起動の印が出ない。`Cellular init failed` が出る（アプリを最大 2 回リセットして再試行し、尽きると不合格）。MQTT の接続失敗（`failed to connect`・`MQTT Agent connect fail`・`MQTT connection failed`）が 3 回。`AT+QISEND` の直後の `ERROR` が、回復の印なしに 30 回。時間切れ。この時点までの handshake の行に、要求した版と違う版がある、または行が無い。
 
 #### M3 RX671 software の MQTT
 
 - 流れ: [`mqtt_rx671`](../tools/ci/rxci_board.py)。Wi-Fi と AWS の認証情報を build に入れたアプリ（暗号化して受け渡す）を、全消去のあとに書きます。終わりにアプリの領域を消します。
 - 観測: [`tools/ci/test_rx671_wifi_uart.py`](../tools/ci/test_rx671_wifi_uart.py) の `--mode mqtt` が、リセットのあと最大 300 秒、UART を読みます。
-- 合格: 次の 6 つの文字列がすべて出る。TLS 1.3 の試験は、さらに `AWS TLS version=TLSv1.3`。
+- 合格: 次の 6 つの文字列がすべて出る。さらに、要求した版の `AWS TLS version=` の行が出て、TLS の条件を満たす。
   - `whd_wifi_join=00000000`
   - `WHD bring-up done`
   - `FreeRTOS+TCP network up`
   - `AWS MQTT smoke: network ready`
   - `AWS TLS=0`（TLS の接続の結果が 0）
   - `AWS MQTT=0`（MQTT の接続と publish の結果が 0）
-- 不合格: 上の文字列がそろわないまま時間が尽きる。`whd_wifi_join`・`whd_wifi_on`・`AWS TLS`・`AWS MQTT` の値が 0 以外。Wi-Fi の起動で IOCTL の取り違え（`Received a response for a different IOCTL - retry`）が出て、ネットワークが上がる前に失敗した時は、基板全体のリセットを 1 回だけ行って再試行する。
+- 不合格: 上の文字列がそろわないまま時間が尽きる。`whd_wifi_join`・`whd_wifi_on`・`AWS TLS`・`AWS MQTT` の値が 0 以外。要求した版と違う版の `AWS TLS version=`・handshake の行がある。Wi-Fi の起動で IOCTL の取り違え（`Received a response for a different IOCTL - retry`）が出て、ネットワークが上がる前に失敗した時は、基板全体のリセットを 1 回だけ行って再試行する。
 
 #### M4 RX671 TSIP の MQTT
 
@@ -189,7 +191,7 @@ TLS の版の確かめ方は、試験ごとに違います。TLS 1.2 の試験�
 #### F3 RX671 の Fleet Provisioning
 
 - 流れ: [`fleet_rx671`](../tools/ci/rxci_board.py)。Wi-Fi と claim 証明書を build に入れたアプリ（暗号化して受け渡す）を書き、観測。終わりにアプリの領域を消す。
-- 観測: 最大 900 秒。TLS 1.3 の試験は、handshake が 2 件以上。`fleet-junit.xml` も出す。
+- 観測: 最大 900 秒。handshake が 2 件以上（TLS 1.2・1.3 とも）。`fleet-junit.xml` も出す。
 
 ### OTA
 
@@ -259,7 +261,6 @@ TLS の版の確かめ方は、試験ごとに違います。TLS 1.2 の試験�
 
 - AWS 側の状態: OTA の job の実行状態、thing・証明書の登録内容、Fleet で作られた資源の中身。
 - RX72N の複数の TLS 接続の demo（`ENABLE_MULTI_TLS_DEMO`）: RX72N の software・TSIP のプロジェクトの設定（`demo_config.h`）は、この demo を有効にしています。RX72N の MQTT・Fleet・OTA の判定に、この demo の行は使っていません。
-- TLS 1.2 で接続した事: RX671 の OTA と TSIP の MQTT 以外。
 - RX72N の MQTT と Fleet のエラーの行: M1 では合否に使いません。Fleet では、列挙した致命の文字列以外のエラーの行を、5 つの印がそろえば許します。
 - RX671 の TSIP の MQTT での topic の購読と publish（M4）。
 - RX72N・RX65N の OTA での、更新後の heap などの資源の余裕。
