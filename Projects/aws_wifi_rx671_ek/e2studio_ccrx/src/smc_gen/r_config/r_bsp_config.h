@@ -148,7 +148,7 @@ Configuration Options
 /* User Stack size in bytes.
  * NOTE: This setting is available only when using CCRX and GNUC.
  *       This is invalid when using Renesas RTOS with CCRX. */
-#define BSP_CFG_USTACK_BYTES            (0x1000)
+#define BSP_CFG_USTACK_BYTES            (0x200)
 #endif
 
 /* Interrupt Stack size in bytes.
