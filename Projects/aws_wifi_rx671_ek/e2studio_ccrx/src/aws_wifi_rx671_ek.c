@@ -33,6 +33,7 @@
 #include "serial.h"
 #include "r_sci_rx_pinset.h"
 #include "trcRecorder.h"
+#include "bsp_usage_probe.h"
 
 #if (ENABLE_IDT_TRANSPORT_TEST == 1) || (ENABLE_IDT_CLOUD_DEMO == 1) || \
     (ENABLE_IDT_PKCS11_TEST == 1) || (ENABLE_IDT_OTAPAL_TEST == 1)
@@ -455,6 +456,10 @@ static void rx671_log_heap(uint32_t tick)
 {
     char line[128];
     char * p = line;
+    HeapStats_t heap_stats;
+
+    /* Task context only: vPortGetHeapStats() suspends the scheduler while it walks the free list (heap_4). */
+    vPortGetHeapStats(&heap_stats);
 
     p = append_text(p, "RX671 heap: at=tick");
     p = append_dec32(p, tick);
@@ -462,6 +467,10 @@ static void rx671_log_heap(uint32_t tick)
     p = append_dec32(p, (uint32_t)xPortGetFreeHeapSize());
     p = append_text(p, " min=");
     p = append_dec32(p, (uint32_t)xPortGetMinimumEverFreeHeapSize());
+    p = append_text(p, " largest=");
+    p = append_dec32(p, (uint32_t)heap_stats.xSizeOfLargestFreeBlockInBytes);
+    p = append_text(p, " blocks=");
+    p = append_dec32(p, (uint32_t)heap_stats.xNumberOfFreeBlocks);
     p = append_text(p, " total=");
     p = append_dec32(p, (uint32_t)configTOTAL_HEAP_SIZE);
     p = append_text(p, " tasks=");
@@ -852,6 +861,7 @@ void main_task(void *pvParameters)
         {
             last_heap_min = (uint32_t)xPortGetMinimumEverFreeHeapSize();
             rx671_log_heap(tick);
+            rx671_bsp_log();
         }
 
         tick++;

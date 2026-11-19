@@ -732,11 +732,11 @@ Configuration Options
    Setting BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED = 1 will result in a callback to the user defined
    my_sw_warmstart_postc_function just after the initialization of the C runtime environment by resetprg.
 */
-#define BSP_CFG_USER_WARM_START_CALLBACK_PRE_INITC_ENABLED    (0)
-#define BSP_CFG_USER_WARM_START_PRE_C_FUNCTION     my_sw_warmstart_prec_function
+#define BSP_CFG_USER_WARM_START_CALLBACK_PRE_INITC_ENABLED    (1)
+#define BSP_CFG_USER_WARM_START_PRE_C_FUNCTION     rx671_bsp_prec
 
-#define BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED    (0)
-#define BSP_CFG_USER_WARM_START_POST_C_FUNCTION    my_sw_warmstart_postc_function
+#define BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED    (1)
+#define BSP_CFG_USER_WARM_START_POST_C_FUNCTION    rx671_bsp_postc
 
 /* By default FIT modules will check input parameters to be valid. This is helpful during development but some users
    will want to disable this for production code. The reason for this would be to save execution time and code space.
