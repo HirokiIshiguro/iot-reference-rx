@@ -58,9 +58,10 @@ def _required_file(value: str) -> Path:
     return path
 
 
-def enter_cli(serial_port, *, timeout: float, char_delay: float) -> None:
+def enter_cli(serial_port, *, timeout: float, char_delay: float, boot_capture: bytearray | None = None) -> None:
     try:
-        read_until(serial_port, success_tokens=CLI_INVITES, timeout=timeout)
+        read_until(serial_port, success_tokens=CLI_INVITES, timeout=timeout,
+                   on_data=None if boot_capture is None else boot_capture.extend)
     except TimeoutError:
         # A quiet provisioner may already be in its command loop.
         pass
@@ -330,7 +331,10 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
                        error_tokens=(b"PUBLIC_SIGNER_PROVISIONER ERROR", b"fatal error"),
                        timeout=args.boot_timeout)
             completed.append("maintenance_source_witness")
-        enter_cli(serial_port, timeout=args.boot_timeout, char_delay=args.char_delay)
+        boot_capture = bytearray()
+        enter_cli(serial_port, timeout=args.boot_timeout, char_delay=args.char_delay, boot_capture=boot_capture)
+        # Boot text of the provisioner: no secret is in it (no command has been sent yet).
+        event_log.write(f"provisioner boot text: {_printable(bytes(boot_capture), 600)!r}\n")
         completed.append("cli_ready")
 
         # Never log command strings or UART responses: a CLI echo can contain PEM.
