@@ -74,10 +74,6 @@ TARGET_ENV_NAMES = {
     "rx671": {
         "rootca-sig": (
             "RENESAS_RX671_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX",
-            # Experiment: the signature depends only on the root CA certificate and the root signer key,
-            # not on the MCU, so the RX72N value may fit if both boards use the same root signer.
-            # Remove this name when the RX671 variable exists.
-            "RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX",
         ),
         "rootca-der": (
             "RENESAS_RX671_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_DER_HEX",

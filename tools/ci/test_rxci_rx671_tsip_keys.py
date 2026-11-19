@@ -297,22 +297,20 @@ class ProvisionerTests(unittest.TestCase):
         self.assertEqual(sent, [])
         self.assertIn("key", [name[2] for name in names if name[:2] == ["conf", "set"]])
 
-    def test_rx671_root_ca_signature_falls_back_to_the_rx72n_variable(self):
+    def test_rx671_root_ca_signature_comes_only_from_the_rx671_variable(self):
         import provision_tsip_over_uart as tool
         table = tool.TARGET_ENV_NAMES["rx671"]
         names = table["rootca-sig"]
-        self.assertEqual(len(names), 2)
+        self.assertEqual(len(names), 1)
         self.assertIn("RX671", names[0])
-        self.assertIn("RX72N", names[1])
         arguments = argparse.Namespace(only=None, target="rx671", rootca_sig_hex_env=None, rootca_der_hex_env=None,
                                        root_signer_hex_env=None, client_pub_hex_env=None, client_pri_hex_env=None)
         fake = {table[slot][0]: "00" * 4 for slot in ("root-signer", "client-pub", "client-pri")}
-        with mock.patch.dict(os.environ, {**fake, names[1]: "11" * 4}, clear=True):
-            payloads = tool.load_payloads(arguments)
-        self.assertEqual([(slot, source) for slot, _, source in payloads],
-                         [("rootca-sig", names[1]), ("root-signer", table["root-signer"][0]),
-                          ("client-pub", table["client-pub"][0]), ("client-pri", table["client-pri"][0])])
-        with mock.patch.dict(os.environ, {**fake, names[0]: "22" * 4, names[1]: "11" * 4}, clear=True):
+        rx72n = tool.TARGET_ENV_NAMES["rx72n"]["rootca-sig"][0]
+        with mock.patch.dict(os.environ, {**fake, rx72n: "11" * 4}, clear=True):
+            with self.assertRaises(RuntimeError):
+                tool.load_payloads(arguments)
+        with mock.patch.dict(os.environ, {**fake, names[0]: "22" * 4, rx72n: "11" * 4}, clear=True):
             self.assertEqual(tool.load_payloads(arguments)[0][2], names[0])
 
 
