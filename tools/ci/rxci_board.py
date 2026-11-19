@@ -87,13 +87,18 @@ class Board:
 
     # -- programmer --------------------------------------------------------
     def run(self, command: list, *, timeout: int = RFP_SECONDS, label: str = "", env: dict | None = None,
-            log: Path | None = None) -> None:
+            log: Path | None = None, hide: tuple = ()) -> None:
         """Run one step. With log, its output goes to that file and only the end is printed.
+
+        Values in hide (a name that CI keeps in a variable) are not echoed into the job log.
 
         The UART observers read the port in the same loop that prints. If printing blocks on the
         job log, the port is not read and lines are lost, so their output never goes to the job log.
         """
-        print(f"+ {label or 'run'}: {' '.join(str(part) for part in command)}", flush=True)
+        echo = " ".join(str(part) for part in command)
+        for value in hide:
+            echo = echo.replace(str(value), "<hidden>") if value else echo
+        print(f"+ {label or 'run'}: {echo}", flush=True)
         arguments = [str(part) for part in command]
         environment = {**os.environ, **env} if env else None
         if log is None:
@@ -164,7 +169,11 @@ class Board:
             raise RuntimeError("Storing the signer's public key did not complete.")
         if bank1.is_file():
             self.run(self.rfp.program_command(bank1, leave_reset=True), label="boot loader, bank 1")
-        command = [sys.executable, TOOLS / "test_uart_download_rx72n.py", "--rsu", rsu or app / "app.rsu",
+        self.download(rsu or app / "app.rsu", logs)
+
+    def download(self, rsu: Path, logs: Path) -> None:
+        """Send a signed application to the boot loader, which waits for it on the UART."""
+        command = [sys.executable, TOOLS / "test_uart_download_rx72n.py", "--rsu", rsu,
                    "--port", self.uart, "--baud", self.baud, "--timeout", 420, "--post-tx-wait", 120,
                    "--wait-for-ready", "--ready-timeout", 180 if self.name == "rx65n" else 90,
                    "--ready-message", 'send "userprog.rsu" via UART.', "--reset-cmd", self.reset_command(),
@@ -522,13 +531,48 @@ def fleet_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Pa
             rxci_aws.delete_fleet_resources(rxci.aws_session(), logs / "fleet_summary.json")
 
 
+def rx671_programmer(board: Board) -> list:
+    return ["--rfp-cli", board.rfp.executable, "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool,
+            "--rfp-interface", board.rfp.interface, "--rfp-speed", board.rfp.speed, "--rfp-auth-id", board.rfp.auth_id]
+
+
+def tsip_thing(board: Board) -> tuple[str, str]:
+    """Name of the CI variable that holds the fixed thing of the TSIP board, and the thing itself."""
+    variable = board.config["tsip_thing_variable"]
+    thing = os.environ.get(variable, "")
+    if not thing:
+        raise SystemExit(f"CI variable {variable} is not available to this job.")
+    return variable, thing
+
+
+def provision_rx671_tsip(registry: dict, board: Board, test: dict, bundle: Path, logs: Path) -> None:
+    """Provisioner image, then Wi-Fi, endpoint, thing and certificate through the CLI and the wrapped keys through tsipprov.
+
+    A plaintext private key never reaches the board: the wrapped client key belongs to the fixed certificate.
+    The thing name goes through an environment variable so that it is not echoed.
+    """
+    variable, _ = tsip_thing(board)
+    board.run([sys.executable, TOOLS / "provision_rx671_ota.py", "--provisioner-mot", bundle / "provisioner.mot",
+               "--bootloader-mot", bundle / "bootloader.mot", "--endpoint", endpoint(registry, test["tls"]),
+               "--thing-name-env", variable, "--certificate", required_file(board.config["tsip_certificate_variable"]),
+               "--tsip", "--codesigner-certificate", bundle / "signer.crt.pem",
+               "--codesigner-public-key", bundle / "signer.pub.pem", "--port", board.uart, "--baud", board.baud,
+               *rx671_programmer(board), "--boot-timeout", 180, "--artifact-dir", logs / "provisioner"],
+              timeout=900, label="provision Wi-Fi, the device certificate, the wrapped TLS keys and the code signing key")
+
+
 def ota_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
-    """OTA over Wi-Fi. Wi-Fi and device credentials are entered through the provisioner, not compiled in."""
+    """OTA over Wi-Fi. Wi-Fi and device credentials are entered through the provisioner, not compiled in.
+
+    The TSIP backend uses the fixed thing and certificate of the board (they belong to its wrapped keys), so the
+    thing is neither created nor deleted; only the OTA update, its job and its files are.
+    """
     import rxci
     import rxci_aws
 
     (bundle,) = builds
     config = board.config
+    tsip = test["backend"] == "tsip"
     role = os.environ.get(config["ota_service_role_variable"], "")
     bucket = os.environ.get(config["ota_bucket_variable"], "")
     if not role or not bucket:
@@ -539,30 +583,35 @@ def ota_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path
     folder.mkdir(parents=True, exist_ok=True)
     session = rxci.aws_session()
     name = f"{rxci_aws.owner()}-rx671"
-    programmer = ["--rfp-cli", board.rfp.executable, "--rfp-device", board.rfp.device, "--rfp-tool", board.rfp.tool,
-                  "--rfp-interface", board.rfp.interface, "--rfp-speed", board.rfp.speed,
-                  "--rfp-auth-id", board.rfp.auth_id]
+    programmer = rx671_programmer(board)
     erase_chip = [*board.rfp.common_command(), "-erase-chip", "-reset", "-noquery"]
     try:
-        credentials = rxci_aws.create_thing(session, name, config["iot_policy"])
+        if tsip:
+            name = tsip_thing(board)[1]
+            credentials = None
+        else:
+            credentials = rxci_aws.create_thing(session, name, config["iot_policy"])
         board.run([sys.executable, TOOLS / "create_bg96_ota_update.py", "--artifact-dir", folder, "--thing-name", name,
                    "--input-payload", bundle / "candidate.ota.bin", "--file-version", config["ota_candidate_version"],
                    "--bucket", bucket, "--custom-signature-der", bundle / "candidate.ota-signature.der",
                    "--code-signer-cert", bundle / "signer.crt.pem", "--certificate-name", "rx671-ota-signer.crt.pem",
                    "--role-arn", role, "--region", rxci.REGION, "--ota-id-prefix", "rx671-ota"], timeout=600,
-                  label="create the OTA update", env=rxci_aws.environment(session))
+                  label="create the OTA update", env=rxci_aws.environment(session), hide=(name,) if tsip else ())
         board.run(erase_chip, label="erase chip")
-        with tempfile.TemporaryDirectory(prefix="rxci-") as temporary:
-            certificate, key = Path(temporary) / "certificate.pem", Path(temporary) / "private_key.pem"
-            certificate.write_text(credentials["certificate"], encoding="utf-8")
-            key.write_text(credentials["private_key"], encoding="utf-8")
-            board.run([sys.executable, TOOLS / "provision_rx671_ota.py", "--provisioner-mot", bundle / "provisioner.mot",
-                       "--bootloader-mot", bundle / "bootloader.mot", "--endpoint", endpoint(registry, test["tls"]),
-                       "--thing-name", name, "--certificate", certificate, "--private-key", key,
-                       "--codesigner-certificate", bundle / "signer.crt.pem",
-                       "--codesigner-public-key", bundle / "signer.pub.pem", "--port", board.uart, "--baud", board.baud,
-                       *programmer, "--boot-timeout", 180, "--artifact-dir", logs / "provisioner"], timeout=900,
-                      label="provision Wi-Fi, device credentials and the code signing key")
+        if tsip:
+            provision_rx671_tsip(registry, board, test, bundle, logs)
+        else:
+            with tempfile.TemporaryDirectory(prefix="rxci-") as temporary:
+                certificate, key = Path(temporary) / "certificate.pem", Path(temporary) / "private_key.pem"
+                certificate.write_text(credentials["certificate"], encoding="utf-8")
+                key.write_text(credentials["private_key"], encoding="utf-8")
+                board.run([sys.executable, TOOLS / "provision_rx671_ota.py", "--provisioner-mot", bundle / "provisioner.mot",
+                           "--bootloader-mot", bundle / "bootloader.mot", "--endpoint", endpoint(registry, test["tls"]),
+                           "--thing-name", name, "--certificate", certificate, "--private-key", key,
+                           "--codesigner-certificate", bundle / "signer.crt.pem",
+                           "--codesigner-public-key", bundle / "signer.pub.pem", "--port", board.uart, "--baud", board.baud,
+                           *programmer, "--boot-timeout", 180, "--artifact-dir", logs / "provisioner"], timeout=900,
+                          label="provision Wi-Fi, device credentials and the code signing key")
         observe = [sys.executable, TOOLS / "test_rx671_ota.py", "--baseline-rsu", bundle / "baseline.rsu",
                    "--baseline-version", config["ota_baseline_version"],
                    "--candidate-version", config["ota_candidate_version"],
@@ -582,8 +631,28 @@ def ota_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path
                 rxci_aws.sweep(rxci.aws_session(), prefix=rxci_aws.owner())
 
 
+def mqtt_rx671_tsip(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
+    """TSIP: no credentials in the build. The baseline of the OTA bundle connects with the keys sent through tsipprov."""
+    (bundle,) = builds
+    erase_chip = [*board.rfp.common_command(), "-erase-chip", "-reset", "-noquery"]
+    try:
+        board.run(erase_chip, label="erase chip")
+        provision_rx671_tsip(registry, board, test, bundle, logs)
+        board.download(bundle / "baseline.rsu", logs)
+        observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,
+                   "--timeout", 300, "--mode", "mqtt-agent", "--reset-cmd", board.reset_command(),
+                   "--startup-retries", 1, "--require-tls-version", "TLSv1.3" if test["tls"] == "tls13" else "TLSv1.2",
+                   "--output-log", logs / "uart.log", "--junit-output", logs / "uart-junit.xml"]
+        board.run(observe, timeout=500, label="observe Wi-Fi and MQTT on the UART", log=logs / "observe.log")
+    finally:
+        # The data flash holds the Wi-Fi passphrase.
+        board.run(erase_chip, label="erase chip (it holds credentials)")
+
+
 def mqtt_rx671(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """The application carries its credentials, so the test starts right after the install."""
+    if test["backend"] == "tsip":
+        return mqtt_rx671_tsip(registry, board, test, builds, logs)
     common, app = builds
     install_rx671(registry, board, "app", common, app, logs)
     observe = [sys.executable, TOOLS / "ci" / "test_rx671_wifi_uart.py", "--port", board.uart, "--baud", board.baud,

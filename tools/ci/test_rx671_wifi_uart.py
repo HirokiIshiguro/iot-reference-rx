@@ -29,6 +29,13 @@ MQTT_MARKERS = (
     "AWS TLS=0",
     "AWS MQTT=0",
 )
+# The application of the OTA bundle (OTA runtime profile) has no MQTT smoke task. Its MQTT agent logs the
+# connection and the OTA agent publishes its first job request right after it.
+MQTT_AGENT_MARKERS = (
+    "Successfully connected to MQTT broker.",
+    "Request Job Document event Received",
+)
+TLS_HANDSHAKE_RE = re.compile(r"TLS handshake successful: version\s+(\S+)")
 IOCTL_MISMATCH_MARKER = "Received a response for a different IOCTL - retry"
 F2_DIAG_RE = re.compile(
     r"f2retry=(\d+) f2rec=(\d+) f2fail=(\d+) f2abort=(\d+) "
@@ -72,6 +79,13 @@ def required_markers(mode: str, require_tls_version: str = "") -> tuple[str, ...
         if require_tls_version:
             raise ValueError("TLS version can only be required in mqtt mode")
         return NETWORK_MARKERS
+    if mode == "mqtt-agent":
+        markers = NETWORK_MARKERS + MQTT_AGENT_MARKERS
+        if require_tls_version:
+            if require_tls_version not in ("TLSv1.2", "TLSv1.3"):
+                raise ValueError(f"unsupported TLS version: {require_tls_version}")
+            markers += (f"TLS handshake successful: version {require_tls_version}",)
+        return markers
     if mode == "mqtt":
         markers = NETWORK_MARKERS + MQTT_MARKERS
         if require_tls_version:
@@ -105,6 +119,11 @@ def evaluate_log(
             match = re.search(rf"{re.escape(label)}=(-?[0-9A-Fa-f]+)", text)
             if match and match.group(1) != "0":
                 failures.append(f"{label} failed: {match.group(1)}")
+
+    if mode == "mqtt-agent" and require_tls_version:
+        for version in TLS_HANDSHAKE_RE.findall(text):
+            if version != require_tls_version:
+                failures.append(f"TLS handshake used {version}, not {require_tls_version}")
 
     if require_f2_fault_injection:
         diagnostics = [
@@ -395,12 +414,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--port", required=True)
     parser.add_argument("--baud", type=int, default=921600)
     parser.add_argument("--timeout", type=float, default=300.0)
-    parser.add_argument("--mode", choices=("network", "mqtt"), default="network")
+    parser.add_argument("--mode", choices=("network", "mqtt", "mqtt-agent"), default="network")
     parser.add_argument(
         "--require-tls-version",
-        choices=("TLSv1.3",),
+        choices=("TLSv1.2", "TLSv1.3"),
         default="",
-        help="Require the negotiated AWS IoT TLS version in mqtt mode.",
+        help="Require the negotiated AWS IoT TLS version in mqtt mode (TLSv1.3 only) or mqtt-agent mode.",
     )
     parser.add_argument(
         "--require-f2-fault-injection",

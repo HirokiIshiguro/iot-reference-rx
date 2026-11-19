@@ -15,6 +15,7 @@ directory, so a test job can take what it needs from the artifacts of the build 
   rx671/software-<tls>/app       signed application with the Wi-Fi and device credentials compiled in
   rx671/software-<tls>/fleet     signed application with the Wi-Fi and claim credentials compiled in
   rx671/software-<tls>/ota       OTA bundle without credentials: provisioner, boot loader, baseline and candidate
+  rx671/tsip-<tls>/ota           the same from the TSIP project (provisioner with tsipprov); the TSIP MQTT test uses it too
 
 RX671 applications carry credentials, so they leave the build job only encrypted (app.rsu.enc).
 The key is derived from a CI variable that the test job also has.
@@ -195,10 +196,14 @@ def build_rx65n_app(registry: dict, backend: str, tls: str, kind: str, out: Path
         shutil.rmtree(work, ignore_errors=True)
 
 
-def build_rx671_ota(registry: dict, tls: str, out: Path) -> None:
-    """Everything the RX671 OTA test needs. Credentials are entered on the board, not compiled in."""
+def build_rx671_ota(registry: dict, tls: str, out: Path, backend: str = "software") -> None:
+    """Everything the RX671 OTA test needs. Credentials are entered on the board, not compiled in.
+
+    The TSIP backend builds the same bundle from the TSIP project; its provisioner also has the tsipprov CLI.
+    """
     board = registry["boards"]["rx671"]
-    work = workspace(registry, f"rx671-{tls}-ota")
+    project = "aws_wifi_rx671_ek_tsip" if backend == "tsip" else "aws_wifi_rx671_ek"
+    work = workspace(registry, f"rx671-{backend}-{tls}-ota")
     cli = os.environ.get("E2STUDIO_CLI") or registry["e2studio_cli"]
     bundle = ROOT / "build" / "rx671-ota"      # the only output folder the build script accepts
     baseline = f"baseline-{board['ota_baseline_version']}"
@@ -208,11 +213,11 @@ def build_rx671_ota(registry: dict, tls: str, out: Path) -> None:
         build_rx671_bootloader(registry, work)      # the image helper copies it and does not build it
         run([sys.executable, "tools/build_rx671_ota_images.py", "--baseline-version", board["ota_baseline_version"],
              "--candidate-version", board["ota_candidate_version"],
-             "--tls-version", "TLSv1.3" if tls == "tls13" else "TLSv1.2", "--e2studio", cli,
+             "--tls-backend", backend, "--tls-version", "TLSv1.3" if tls == "tls13" else "TLSv1.2", "--e2studio", cli,
              "--workspace-root", work / "e2ws", "--signing-key", SIGNING_KEY,
              "--e2studio-timeout-seconds", "1200"], timeout=3000)
         publish(out, {
-            "provisioner.mot": bundle / "provisioner" / "aws_wifi_rx671_ek.mot",
+            "provisioner.mot": bundle / "provisioner" / f"{project}.mot",
             "bootloader.mot": bundle / "bootloader" / "boot_loader_rx671_ek.mot",
             "baseline.rsu": bundle / baseline / "aws_wifi_rx671_ek.rsu",
             "signer.crt.pem": bundle / baseline / "rx671-ota-signer.crt.pem",
@@ -221,7 +226,7 @@ def build_rx671_ota(registry: dict, tls: str, out: Path) -> None:
             "candidate.ota-signature.der": bundle / candidate / "aws_wifi_rx671_ek.ota-signature.der",
         })
         # Memory layout of the baseline, to read when a test runs out of heap.
-        for name in ("aws_wifi_rx671_ek.map", "ota-layout-report.json"):
+        for name in (f"{project}.map", "ota-layout-report.json"):
             if (bundle / baseline / name).is_file():
                 shutil.copyfile(bundle / baseline / name, out / f"baseline-{name}")
     finally:
@@ -467,8 +472,8 @@ def build_from_source(registry: dict, variant: str, out: Path) -> None:
             return app(registry, backend, tls, kind, out)
         if kind == "ota":
             return ota(registry, backend, tls, out)
-    if board == "rx671" and name in ("software-tls12/ota", "software-tls13/ota"):
-        return build_rx671_ota(registry, name.split("/")[0].split("-")[1], out)
+    if board == "rx671" and name in ("software-tls12/ota", "software-tls13/ota", "tsip-tls12/ota", "tsip-tls13/ota"):
+        return build_rx671_ota(registry, tls, out, backend)
     if board == "rx671" and tls in ("tls12", "tls13") and (
             (backend == "software" and kind in ("app", "fleet")) or
             (backend == "tsip" and kind == "fleet")):

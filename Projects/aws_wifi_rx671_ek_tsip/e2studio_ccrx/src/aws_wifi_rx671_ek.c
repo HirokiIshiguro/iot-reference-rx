@@ -196,10 +196,15 @@ static void ota_provisioner_run(void)
 {
     int32_t littlefs_result;
     int32_t kvs_result = -1;
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    e_commonapi_err_t tsip_open_result;
+#endif
 
     UserInitialization();
 #if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     vTsipMbedtlsThreadingCompatInit();
+    /* conf commit starts PKCS #11, whose entropy source needs the TSIP driver open. */
+    tsip_open_result = R_Demo_Common_API_TSIP_Open(NULL, NULL);
 #endif
     xStartDemoEventGroup = xEventGroupCreate();
     CLI_Support_Settings();
@@ -235,6 +240,15 @@ static void ota_provisioner_run(void)
                          sizeof("\r\nRX671 OTA provisioner ERROR: "
                                 "LittleFS/KVS initialization failed.\r\n") - 1U);
     }
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+    {
+        char tsip_line[] = "RX671 TSIP open=0\r\n";
+
+        /* 0 is COMMONAPI_SUCCESS; the value is a single digit */
+        tsip_line[sizeof("RX671 TSIP open=") - 1U] = (char)('0' + ((int)tsip_open_result & 7));
+        vSerialPutString((const signed char *)tsip_line, sizeof(tsip_line) - 1U);
+    }
+#endif
 
     /* SCI6 belongs exclusively to the common CLI in this profile. */
     for (;;)

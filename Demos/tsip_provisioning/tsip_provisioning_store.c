@@ -17,6 +17,8 @@
 #define SKMT_IV_SIZE                                   (16U)
 #define SKMT_CRC_SIZE                                  (4U)
 #define SKMT_LEGACY_SCALAR_PLACEHOLDER_SIZE            (2U)
+/* keytype and shared_key_number (two uint32_t) in front of the key block, as the RX671 key blobs have them */
+#define SKMT_KEY_BLOCK_HEADER_SIZE                     (8U)
 
 #define TSIP_TLS_RSA2048_PUBLIC_ENCRYPTED_KEY_SIZE     (288U)
 #define TSIP_RSA2048_PUBLIC_ENCRYPTED_KEY_SIZE         (288U)
@@ -27,10 +29,10 @@
 #define TSIP_CLIENT_PRIVATE_KEY_INDEX_STORAGE_NAME     "tsip_client_pri_id"
 
 #define ROOT_SIGNER_MAX_STORED_SIZE \
-    (SKMT_LEGACY_SCALAR_PLACEHOLDER_SIZE + SKMT_WUFPK_SIZE + SKMT_IV_SIZE + \
+    (SKMT_KEY_BLOCK_HEADER_SIZE + SKMT_WUFPK_SIZE + SKMT_IV_SIZE + \
      TSIP_TLS_RSA2048_PUBLIC_ENCRYPTED_KEY_SIZE + SKMT_CRC_SIZE)
 #define CLIENT_PRIVATE_MAX_STORED_SIZE \
-    (SKMT_LEGACY_SCALAR_PLACEHOLDER_SIZE + SKMT_WUFPK_SIZE + SKMT_IV_SIZE + \
+    (SKMT_KEY_BLOCK_HEADER_SIZE + SKMT_WUFPK_SIZE + SKMT_IV_SIZE + \
      TSIP_RSA2048_PRIVATE_ENCRYPTED_KEY_SIZE + SKMT_CRC_SIZE)
 
 typedef struct SkmtWrappedKeyView
@@ -70,6 +72,21 @@ static const TsipProvisioningSlotInfo_t xSlotInfo[TSIP_PROVISIONING_SLOT_COUNT] 
     { "client-pri", "tsip_client_pri_wrapped_id", 0U },
     { "rootca-der", "tsip_rootca_der_id", 0U },
 };
+
+/* Where the last prepare failed (see tsipprov prepare): a stage number and the TSIP driver result. */
+static uint32_t ulPrepareFailureStage = 0U;
+static int32_t lPrepareFailureCode = 0;
+#define PREPARE_FAILED(stage, code)     do { ulPrepareFailureStage = (stage); lPrepareFailureCode = (int32_t)(code); } while (0)
+
+uint32_t ulTsipProvisioningPrepareFailureStage(void)
+{
+    return ulPrepareFailureStage;
+}
+
+int32_t lTsipProvisioningPrepareFailureCode(void)
+{
+    return lPrepareFailureCode;
+}
 
 static tsip_tls_ca_certification_public_key_index_t xRootSignerPublicKeyIndex;
 static BaseType_t xRootCaTrustAnchorReady = pdFALSE;
@@ -185,9 +202,13 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
         return pdTRUE;
     }
 
+    ulPrepareFailureStage = 0U;
+    lPrepareFailureCode = 0;
+
     xCommonApiResult = R_Demo_Common_API_TSIP_Open(NULL, NULL);
     if (COMMONAPI_SUCCESS != xCommonApiResult)
     {
+        PREPARE_FAILED(1U, xCommonApiResult);
         return pdFALSE;
     }
 
@@ -205,6 +226,10 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
                                     (const uint8_t *)&xRootSignerPublicKeyIndex,
                                     sizeof(xRootSignerPublicKeyIndex))))
         {
+            if (0U == ulPrepareFailureStage)
+            {
+                PREPARE_FAILED(4U, 0);
+            }
             (void)R_Demo_Common_API_TSIP_Close();
             return pdFALSE;
         }
@@ -217,6 +242,7 @@ BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void)
     xCommonApiResult = R_Demo_Common_API_TSIP_Open(&xRootSignerPublicKeyIndex, NULL);
     if (COMMONAPI_SUCCESS != xCommonApiResult)
     {
+        PREPARE_FAILED(5U, xCommonApiResult);
         return pdFALSE;
     }
 
@@ -329,6 +355,10 @@ static BaseType_t prvParseSkmtWrappedKey(uint8_t * pucStoredData,
     {
         ulOffset = SKMT_LEGACY_SCALAR_PLACEHOLDER_SIZE;
     }
+    else if (ulStoredLength == (ulCompactLengthWithCrc + SKMT_KEY_BLOCK_HEADER_SIZE))
+    {
+        ulOffset = SKMT_KEY_BLOCK_HEADER_SIZE;
+    }
     else if ((ulStoredLength != ulCompactLengthWithCrc) && (ulStoredLength != ulCompactLength))
     {
         return pdFALSE;
@@ -359,6 +389,7 @@ static BaseType_t prvImportRootSignerPublicKey(void)
                                           TSIP_TLS_RSA2048_PUBLIC_ENCRYPTED_KEY_SIZE,
                                           &xWrappedKey)))
     {
+        PREPARE_FAILED(2U, ulStoredLength);
         return pdFALSE;
     }
 
@@ -366,6 +397,11 @@ static BaseType_t prvImportRootSignerPublicKey(void)
                                                       xWrappedKey.pucIv,
                                                       xWrappedKey.pucEncryptedKey,
                                                       &xRootSignerPublicKeyIndex);
+
+    if (TSIP_SUCCESS != xTsipResult)
+    {
+        PREPARE_FAILED(3U, xTsipResult);
+    }
 
     return (TSIP_SUCCESS == xTsipResult) ? pdTRUE : pdFALSE;
 }
@@ -397,6 +433,7 @@ static BaseType_t prvLoadOrImportClientPublicKey(void)
                                           TSIP_RSA2048_PUBLIC_ENCRYPTED_KEY_SIZE,
                                           &xWrappedKey)))
     {
+        PREPARE_FAILED(6U, ulStoredLength);
         return pdFALSE;
     }
 
@@ -406,6 +443,7 @@ static BaseType_t prvLoadOrImportClientPublicKey(void)
                                                        &rsa2048_public_key);
     if (TSIP_SUCCESS != xTsipResult)
     {
+        PREPARE_FAILED(7U, xTsipResult);
         return pdFALSE;
     }
 
@@ -447,6 +485,7 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
                                           TSIP_RSA2048_PRIVATE_ENCRYPTED_KEY_SIZE,
                                           &xWrappedKey)))
     {
+        PREPARE_FAILED(9U, ulStoredLength);
         return pdFALSE;
     }
 
@@ -456,6 +495,7 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
                                                         &rsa2048_private_key);
     if (TSIP_SUCCESS != xTsipResult)
     {
+        PREPARE_FAILED(10U, xTsipResult);
         return pdFALSE;
     }
 

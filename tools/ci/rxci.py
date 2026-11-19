@@ -126,7 +126,19 @@ def build_variant(test: dict, registry: dict | None = None) -> str:
     else:
         backend = f"tsip-{test['tls']}"
     kind = {"mqtt": "app", "ota": "ota", "fleet": "fleet"}[test["feature"]]
+    if test["feature"] == "mqtt" and mqtt_from_ota_bundle(test, registry):
+        kind = "ota"
     return f"{test['board']}/{backend}/{kind}"
+
+
+def mqtt_from_ota_bundle(test: dict, registry: dict | None) -> bool:
+    """A board that keeps its device credentials out of the build starts its MQTT test from the OTA bundle.
+
+    The bundle holds the provisioner, the boot loader and the baseline application, which connects to AWS IoT
+    and asks for a job. Only the TSIP backend of such a board works this way (tests.json: tsip_mqtt_from_ota_bundle).
+    """
+    board = registry["boards"][test["board"]] if registry else {}
+    return test["backend"] == "tsip" and bool(board.get("tsip_mqtt_from_ota_bundle"))
 
 
 def build_variants(test: dict, registry: dict | None = None) -> list[str]:
@@ -136,7 +148,8 @@ def build_variants(test: dict, registry: dict | None = None) -> list[str]:
     to the OTA candidate.
     """
     board = registry["boards"][test["board"]] if registry else {}
-    if test["feature"] == "ota" and board.get("ota_is_self_contained"):
+    if (test["feature"] == "ota" and board.get("ota_is_self_contained")) or (
+            test["feature"] == "mqtt" and mqtt_from_ota_bundle(test, registry)):
         # One build holds everything of the OTA test: provisioner, boot loader, baseline and candidate.
         return [build_variant(test, registry)]
     variants = [f"{test['board']}/common", build_variant(test, registry)]
