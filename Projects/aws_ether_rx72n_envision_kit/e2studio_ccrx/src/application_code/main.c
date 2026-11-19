@@ -221,8 +221,7 @@ static void prvHeapMonitorTask( void * pvParameters )
     {
         vPortGetHeapStats( &xStats );
         ( void ) snprintf( cLine, sizeof( cLine ),
-                           "RX72N heap: at=t%lus free=%lu min=%lu largest=%lu blocks=%lu total=%lu tasks=%lu
-",
+                           "RX72N heap: at=t%lus free=%lu min=%lu largest=%lu blocks=%lu total=%lu tasks=%lu\r\n",
                            ( unsigned long ) ulSeconds,
                            ( unsigned long ) xStats.xAvailableHeapSpaceInBytes,
                            ( unsigned long ) xStats.xMinimumEverFreeBytesRemaining,
