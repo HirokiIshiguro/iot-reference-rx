@@ -119,6 +119,7 @@ flowchart LR
 | `REPEAT` が 2 以上で、`PROFILE` が `full` と `smoke` 以外 | `plan` が止まる |
 | `REPEAT` が 1 〜 50 の外 | `plan` が止まる（画面の選択肢は 1・2・3・5・10） |
 | `TEST` に一致する試験が無い | `plan` が止まる |
+| 古い CI の実行時の変数（`PIPELINE_PROFILE`、`RX72N_TEST_SCOPE`、`RUN_RX_IDT` など）を指定 | `plan` が止まる（変数の名前を出す） |
 
 ## 起動元ごとの動き
 
@@ -276,4 +277,4 @@ build job の artifact は `out/<build の名前>/` で、`e2studio_build.log`�
 
 ## 古い CI との関係
 
-この文書は、`PROFILE` を中心にした新しい CI だけを説明します。古い CI の変数（`PIPELINE_PROFILE`、基板ごとの `*_TEST_SCOPE`、`RUN_RX_IDT` など）と job（基板・機能ごとに分かれた `build_…`・`flash_…`・`test_…`）は、この CI にはありません。手で pipeline を起こす時は、上の変数だけを使います。古い変数を指定しても、`plan` は読まず、黙って無視します。変更の要約は [Changelog](../../Changelog.md) にあります。
+この文書は、`PROFILE` を中心にした新しい CI だけを説明します。古い CI の変数（`PIPELINE_PROFILE`、基板ごとの `*_TEST_SCOPE`、`RUN_RX_IDT` など）と job（基板・機能ごとに分かれた `build_…`・`flash_…`・`test_…`）は、この CI にはありません。手で pipeline を起こす時は、上の変数だけを使います。古い CI の実行時の変数を指定すると、`plan` が変数の名前を出して止まります。黙って別の範囲を流さないためです（名前の形は [`tools/ci/rxci.py`](../../tools/ci/rxci.py) の `RETIRED_VARIABLE`）。変更の要約は [Changelog](../../Changelog.md) にあります。

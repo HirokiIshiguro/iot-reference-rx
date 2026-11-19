@@ -307,7 +307,23 @@ def selection_pattern(registry: dict, board: str, backend: str, tls: str, featur
     return "^" + ":".join("[^:]+" if value == "all" else re.escape(value) for value in chosen.values()) + "$"
 
 
+# Run variables of the CI that this one replaced. Nothing here reads them, so a pipeline started with
+# one of them would quietly run something else (by default the unit tests only) and look green.
+RETIRED_VARIABLE = re.compile(
+    r"^(PIPELINE_PROFILE|RUN_[A-Z0-9_]+|IDT_[A-Z0-9_]+|NIGHTLY_[A-Z0-9_]+"
+    r"|[A-Z0-9_]+_(TEST_SCOPE|IDT_SCOPE|SKIP_HW_TESTS|SKIP_OTA_TESTS|REQUIRE_TLS_VERSION|TLS_BACKEND|TLS13_0RTT_ENABLE))$")
+
+
+def retired_variables(environment) -> list[str]:
+    """Names of set variables that belonged to the old CI and select nothing in this one."""
+    return sorted(name for name, value in environment.items() if value and RETIRED_VARIABLE.match(name))
+
+
 def command_plan(args: argparse.Namespace) -> int:
+    retired = retired_variables(os.environ)
+    if retired:
+        raise SystemExit(f"{', '.join(retired)}: the CI no longer reads {'this variable' if len(retired) == 1 else 'these variables'}. "
+                         f"Choose what runs with PROFILE, BOARD, BACKEND, TLS and FEATURE (docs/details/ci-pipeline.md).")
     if args.profile not in PROFILES:
         raise SystemExit(f"PROFILE must be one of {', '.join(PROFILES)} (got {args.profile!r})")
     if args.repeat < 1 or args.repeat > 50:

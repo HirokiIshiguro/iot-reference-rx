@@ -206,6 +206,36 @@ class BoardRestTests(unittest.TestCase):
                     self.assertEqual(["park"] if parked else [], calls)
 
 
+class RetiredVariableTests(unittest.TestCase):
+    """A run variable of the old CI stops the plan instead of being ignored."""
+
+    def test_old_run_variables_are_recognised(self):
+        environment = {"RX72N_TEST_SCOPE": "mqtt", "PIPELINE_PROFILE": "nightly_matrix", "RUN_RX_IDT": "true",
+                       "IDT_SCOPE": "plan", "RX671_WIFI_REQUIRE_TLS_VERSION": "TLSv1.3", "RX72N_TLS_BACKEND": "tsip",
+                       "NIGHTLY_RX72N_MULTI_TLS_TEST": "true", "RX65N_BG96_SKIP_HW_TESTS": "true"}
+        self.assertEqual(rxci.retired_variables(environment), sorted(environment))
+
+    def test_variables_of_this_ci_and_of_the_runner_are_not_retired(self):
+        environment = {"PROFILE": "full", "BOARD": "rx671", "BACKEND": "sw", "TLS": "tls12", "FEATURE": "ota",
+                       "REPEAT": "2", "REBUILD": "true", "TEST": "^rx72n:", "KEEP": "true", "CI_PIPELINE_SOURCE": "web",
+                       "AWS_ROLE_ARN": "x", "AWS_IOT_ENDPOINT": "x", "RUNNER_TEMP": "x", "E2STUDIO_CLI": "x",
+                       "RX671_EK_WIFI_SSID": "x", "RX671_TSIP_AWS_IOT_THING_NAME": "x", "GIT_SUBMODULE_STRATEGY": "none"}
+        self.assertEqual(rxci.retired_variables(environment), [])
+
+    def test_an_empty_old_variable_does_not_stop_the_plan(self):
+        self.assertEqual(rxci.retired_variables({"RX72N_TEST_SCOPE": ""}), [])
+
+    def test_the_plan_stops_and_names_the_variable(self):
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(os.environ, {"RX72N_TEST_SCOPE": "mqtt"}):
+            with self.assertRaises(SystemExit) as stopped:
+                rxci.main(["plan", "--profile", "check"])
+        self.assertIn("RX72N_TEST_SCOPE", str(stopped.exception))
+        self.assertIn("PROFILE", str(stopped.exception))
+
+
 class RunVariableTests(unittest.TestCase):
     """The variables of the "New pipeline" page: lists that select tests, and combinations that must stop."""
 
