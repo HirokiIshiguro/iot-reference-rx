@@ -288,13 +288,40 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
     return jobs, summary
 
 
+def selection_pattern(registry: dict, board: str, backend: str, tls: str, feature: str, test: str) -> str:
+    """Regular expression of the tests that the run variables select; "" when they select nothing.
+
+    BOARD, BACKEND, TLS and FEATURE are the lists of the "New pipeline" page (all = no restriction).
+    TEST is free text for what the lists cannot express. Using both at once would be ambiguous.
+    """
+    chosen = {"BOARD": board, "BACKEND": backend, "TLS": tls, "FEATURE": feature}
+    for (name, value), axis in zip(chosen.items(), ("board", "backend", "tls", "feature")):
+        allowed = ["all", *registry["axes"][axis]]
+        if value not in allowed:
+            raise SystemExit(f"{name} must be one of {', '.join(allowed)} (got {value!r})")
+    if all(value == "all" for value in chosen.values()):
+        return test
+    if test:
+        raise SystemExit("TEST and BOARD/BACKEND/TLS/FEATURE both select tests. "
+                         "Leave the four lists at all, or leave TEST empty.")
+    return "^" + ":".join("[^:]+" if value == "all" else re.escape(value) for value in chosen.values()) + "$"
+
+
 def command_plan(args: argparse.Namespace) -> int:
     if args.profile not in PROFILES:
         raise SystemExit(f"PROFILE must be one of {', '.join(PROFILES)} (got {args.profile!r})")
     if args.repeat < 1 or args.repeat > 50:
         raise SystemExit("REPEAT must be between 1 and 50")
     registry = load_registry()
-    jobs, summary = child_pipeline(registry, args.profile, args.test, args.repeat, keep=args.keep == "true",
+    pattern = selection_pattern(registry, args.board, args.backend, args.tls, args.feature, args.test)
+    # A pipeline that looks green but ran nothing of what was asked for is worse than one that stops here.
+    if pattern and args.profile != "full":
+        raise SystemExit(f"BOARD/BACKEND/TLS/FEATURE or TEST select tests, and only PROFILE=full runs a "
+                         f"selection (got PROFILE={args.profile}). Set PROFILE=full, or clear the selection.")
+    if args.repeat > 1 and args.profile not in ("full", "smoke"):
+        raise SystemExit(f"REPEAT repeats tests, and PROFILE={args.profile} runs none. "
+                         f"Set PROFILE=full, or leave REPEAT at 1.")
+    jobs, summary = child_pipeline(registry, args.profile, pattern, args.repeat, keep=args.keep == "true",
                                    rebuild=args.rebuild == "true")
     Path(args.output).write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")
     Path(args.summary).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
@@ -402,7 +429,11 @@ def main(argv: list[str] | None = None) -> int:
 
     plan = commands.add_parser("plan", help="write the child pipeline")
     plan.add_argument("--profile", default="check")
-    plan.add_argument("--test", default="")
+    plan.add_argument("--board", default="all", help="all, or the board of the tests to run")
+    plan.add_argument("--backend", default="all", help="all, sw or tsip")
+    plan.add_argument("--tls", default="all", help="all, tls12 or tls13")
+    plan.add_argument("--feature", default="all", help="all, mqtt, ota or fleet")
+    plan.add_argument("--test", default="", help="regular expression of test names, instead of the four lists")
     plan.add_argument("--repeat", type=int, default=1)
     plan.add_argument("--keep", default="false", choices=("true", "false"),
                       help="true: newer commits do not cancel this pipeline")
