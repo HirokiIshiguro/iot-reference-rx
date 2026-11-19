@@ -2149,7 +2149,7 @@
  * This module enables the AES-CCM ciphersuites, if other requisites are
  * enabled as well.
  */
-#define MBEDTLS_CCM_C
+//#define MBEDTLS_CCM_C  /* rx671 rom diet: not used by the AWS IoT connection */
 
 /**
  * \def MBEDTLS_CHACHA20_C
