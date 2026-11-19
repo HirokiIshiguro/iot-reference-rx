@@ -204,5 +204,40 @@ class BoardRestTests(unittest.TestCase):
                     self.assertEqual(["park"] if parked else [], calls)
 
 
+class BuildCacheConcurrencyTests(unittest.TestCase):
+    """Five build jobs share the cache folder; one of them once died on another job's temporary folder."""
+
+    def store_while_another_job_is_busy(self, vanishing: str):
+        import os
+        import tempfile
+        from unittest.mock import patch
+
+        import rxci_build
+
+        with tempfile.TemporaryDirectory() as folder:
+            cache, out = Path(folder) / "cache", Path(folder) / "out"
+            out.mkdir()
+            (out / "app.mot").write_text("S0", encoding="utf-8")
+            (cache / vanishing).mkdir(parents=True)     # listed, then gone before anyone looks at it
+            (cache / "older").mkdir()
+            real_stat = Path.stat
+
+            def stat(path, *args, **kwargs):
+                if path.name == vanishing:
+                    raise FileNotFoundError(str(path))
+                return real_stat(path, *args, **kwargs)
+
+            with patch.object(Path, "stat", stat), patch.dict(os.environ, {"CI_JOB_ID": "1"}):
+                rxci_build.store(cache / "mine", out)
+            self.assertTrue((cache / "mine" / "app.mot").is_file())
+            self.assertTrue((cache / "older").is_dir())
+
+    def test_store_ignores_the_temporary_folder_of_another_job(self):
+        self.store_while_another_job_is_busy("0123456789abcdef.90699.tmp")
+
+    def test_store_survives_an_entry_that_another_job_removed(self):
+        self.store_while_another_job_is_busy("fedcba9876543210")
+
+
 if __name__ == "__main__":
     unittest.main()
