@@ -296,6 +296,12 @@ def cleanup_ota(logs: Path, aws_session) -> None:
     alias.unlink(missing_ok=True)
 
 
+def ota_cleanup_left(logs: Path) -> list[str]:
+    """Records of OTA resources not deleted yet. cleanup_ota removes a record only after it deletes the resources."""
+    folder = logs / "ota"
+    return [name for name in ("ota_job_meta.json", "ephemeral_thing_meta.json") if (folder / name).is_file()]
+
+
 def ota_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Path) -> None:
     """The board runs the normal application and updates itself to the candidate through AWS IoT OTA."""
     import rxci
@@ -705,8 +711,15 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
         except (subprocess.SubprocessError, OSError) as error:
             failure = failure or f"could not park the board: {error}"
     seconds = time.monotonic() - started
+    left = ota_cleanup_left(logs)
+    if left:
+        failure = failure or f"AWS resources of the OTA test are left: {', '.join(left)}"
     write_junit(logs / "junit.xml", test["name"], seconds, failure)
-    (logs / "finished").write_text("the test process parked the board and cleaned up\n", encoding="utf-8")
+    if left:
+        # No "finished" mark: after_script (finish_test) deletes them again.
+        print(f"The OTA cleanup did not finish ({', '.join(left)}); after_script will try again.", flush=True)
+    else:
+        (logs / "finished").write_text("the test process parked the board and cleaned up\n", encoding="utf-8")
     print(f"{'FAIL' if failure else 'PASS'}  {test['name']}  {seconds:.0f} s  {failure}", flush=True)
     return 1 if failure else 0
 

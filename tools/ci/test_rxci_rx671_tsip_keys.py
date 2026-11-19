@@ -341,5 +341,43 @@ class AgentObserverTests(unittest.TestCase):
         self.assertIn("AWS TLS version=TLSv1.2", observer.required_markers("mqtt", "TLSv1.2"))
 
 
+class CleanupFailureTests(unittest.TestCase):
+    """When the test process cannot delete the OTA resources, after_script must try again."""
+
+    def test_a_failed_ota_cleanup_leaves_no_finished_mark_and_after_script_deletes_again(self):
+        rxci_board = board_module()
+        import rxci_aws
+        registry = rxci.load_registry()
+        test = {"board": "rx671", "feature": "ota", "ready": True, "name": "rx671:sw:tls13:ota"}
+        with tempfile.TemporaryDirectory() as tmp:
+            logs = Path(tmp)
+
+            def recipe(registry, board, test, builds, logs):
+                folder = logs / "ota"
+                folder.mkdir(parents=True)
+                (folder / "ota_job_meta.json").write_text("{}", encoding="utf-8")
+                (folder / "ephemeral_thing_meta.json").write_text("{}", encoding="utf-8")
+                rxci_board.cleanup_ota(logs, lambda: object())
+
+            with mock.patch.dict(rxci_board.RECIPES, {("rx671", "ota"): recipe}), \
+                 mock.patch.object(rxci_board, "Board"), \
+                 mock.patch.object(rxci_board.signal, "signal"), \
+                 mock.patch.object(rxci_aws, "environment", return_value={}), \
+                 mock.patch.object(rxci_board.subprocess, "run", return_value=mock.Mock(returncode=1)):
+                self.assertEqual(rxci_board.run_test(registry, test, [], logs), 1)
+            self.assertFalse((logs / "finished").exists())
+            self.assertIn("could not be deleted", (logs / "junit.xml").read_text(encoding="utf-8"))
+
+            with mock.patch.object(rxci_board, "Board"), \
+                 mock.patch.object(rxci_aws, "sweep", return_value=[]), \
+                 mock.patch.object(rxci_aws, "delete_fleet_resources", return_value=[]), \
+                 mock.patch.object(rxci_aws, "environment", return_value={}), \
+                 mock.patch.object(rxci_board.subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+                rxci_board.finish_test(registry, test, logs, lambda: object())
+            steps = [Path(str(call.args[0][1])).name for call in run.call_args_list]
+            self.assertEqual(steps, ["verify_ota_aws_state.py", "manage_ephemeral_iot_thing.py"])
+            self.assertEqual(rxci_board.ota_cleanup_left(logs), [])
+
+
 if __name__ == "__main__":
     unittest.main()
