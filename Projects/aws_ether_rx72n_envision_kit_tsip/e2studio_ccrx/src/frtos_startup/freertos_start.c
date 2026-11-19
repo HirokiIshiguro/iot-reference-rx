@@ -79,7 +79,6 @@ void Processing_Before_Start_Kernel(void);
 
 /* Main task. */
 extern void main_task(void *pvParameters);
-extern void vConfigureHeapRegions( void );
 
 
 
@@ -328,10 +327,6 @@ void vApplicationTickHook(void)
 void Processing_Before_Start_Kernel(void)
 {
     BaseType_t ret;
-
-    /* Configure both non-contiguous RX72N RAM regions before the first
-     * FreeRTOS object performs a dynamic allocation. */
-    vConfigureHeapRegions();
 
     (void)xTraceInitialize();
 

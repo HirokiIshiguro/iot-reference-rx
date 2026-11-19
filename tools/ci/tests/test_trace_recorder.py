@@ -99,8 +99,6 @@ class TraceMetadataTests(unittest.TestCase):
                 body = text[text.index("void Processing_Before_Start_Kernel(void)\n{"):]
                 self.assertLess(body.index("xTraceInitialize()"), body.index("Kernel_Object_init()"))
                 self.assertLess(body.index("xTraceInitialize()"), body.index("xTaskCreate("))
-                if "rx72n" in name:
-                    self.assertLess(body.index("vConfigureHeapRegions()"), body.index("xTraceInitialize()"))
                 main = project / ("src/aws_wifi_rx671_ek.c" if name == "aws_wifi_rx671_ek" else "src/application_code/main.c")
                 text = main.read_text(encoding="utf-8")
                 self.assertRegex(text, r"void main_task\([^\n]*\)\n\{\n\s*\(void\)xTraceEnable\(TRC_START\);")
