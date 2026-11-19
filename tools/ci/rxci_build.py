@@ -163,6 +163,8 @@ def build_rx72n_ota(registry: dict, backend: str, tls: str, out: Path) -> None:
              "--code-sign-cert-out", work / "codesign_cert.pem"], timeout=1800)
         publish(out, {"candidate.rsu": work / "candidate.rsu", "codesign_cert.pem": work / "codesign_cert.pem"})
     finally:
+        project = "aws_ether_rx72n_envision_kit" if backend == "software" else "aws_ether_rx72n_envision_kit_tsip"
+        keep_map(ROOT / "Projects" / project / "e2studio_ccrx" / "HardwareDebug" / f"{project}.map", out)
         shutil.rmtree(work, ignore_errors=True)
 
 
