@@ -103,11 +103,23 @@ class PlanTests(unittest.TestCase):
 
     def test_pipeline_with_tests_ends_with_a_sweep_that_always_runs(self):
         jobs, _ = rxci.child_pipeline(registry(["rx65n:sw:tls12:mqtt"]), "check", "^rx65n:sw:tls12:mqtt$", 1)
-        self.assertEqual(jobs["sweep"]["when"], "always")
+        self.assertEqual(jobs["sweep"]["rules"], [{"when": "always"}])
         self.assertEqual(jobs["sweep"]["stage"], jobs["stages"][-1])
         self.assertIn("GITLAB_OIDC_TOKEN", jobs["sweep"]["id_tokens"])
         without_tests, _ = rxci.child_pipeline(registry(), "check", "", 1)
         self.assertNotIn("sweep", without_tests)
+
+    def test_every_job_has_rules_so_a_merge_request_pipeline_gets_jobs(self):
+        names = ["rx72n:sw:tls12:mqtt", "rx65n:sw:tls12:mqtt"]
+        for profile, pattern in (("build", ""), ("full", ""), ("doctor", ""), ("check", "^rx72n:sw:tls12:mqtt$")):
+            jobs, _ = rxci.child_pipeline(registry(names), profile, pattern, 2)
+            for name, job in jobs.items():
+                if name in ("stages", "workflow", "default"):
+                    continue
+                self.assertNotIn("when", job, name)
+                self.assertEqual(len(job["rules"]), 1, name)
+                expected = "always" if name == "sweep" else "on_success"
+                self.assertEqual(job["rules"][0], {"when": expected}, name)
 
     def test_hand_started_pipeline_is_not_cancelled_by_newer_commits(self):
         name = "rx72n:sw:tls12:mqtt"

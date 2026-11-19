@@ -328,6 +328,12 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
                 "script": [f"{python} {TOOL} doctor --role {role}"],
             }
 
+    # A job without rules is created only for a branch or a tag. The child of a merge request pipeline
+    # runs on the merge request ref, so without rules it would have no job and GitLab could not create it.
+    for name, job in jobs.items():
+        if name not in ("stages", "workflow", "default"):
+            job["rules"] = [{"when": job.pop("when", "on_success")}]
+
     summary = {
         "profile": profile,
         "test": pattern,
