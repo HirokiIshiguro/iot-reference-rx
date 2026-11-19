@@ -201,7 +201,7 @@ def monitor_uart(port, baud, timeout, reset_cmd, progress_callback=None, heap_li
                         sensitive_log_block,
                     )
                     print(safe_line)
-                    if heap_lines is not None and "RX671 heap:" in safe_line:
+                    if heap_lines is not None and safe_line.startswith(("RX671 heap:", "RX671 stack:", "RX671 cheap:")):
                         heap_lines.append(safe_line)
                     if sensitive_label is not None:
                         safe_error = f"{SENSITIVE_LOG_ERROR_PREFIX} {sensitive_label}"
