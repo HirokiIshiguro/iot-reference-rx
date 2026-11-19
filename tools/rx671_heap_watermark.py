@@ -3,10 +3,11 @@
 The application prints (Projects/aws_wifi_rx671_ek*/e2studio_ccrx/src/aws_wifi_rx671_ek.c, bsp_usage_probe.c)
 
     RX671 heap: at=<place> free=<bytes> min=<bytes> largest=<bytes> blocks=<count> total=<bytes> tasks=<count>
-    RX671 bsp: ustack=<used>/<size> istack=<used>/<size> cheap=<used>/<size>
+    RX671 stack: ustack=<used>/<size> upaint=<n> istack=<used>/<size> ipaint=<n> over=<n>
+    RX671 cheap: used=<n>/<size>
 
 where min is xPortGetMinimumEverFreeHeapSize() and largest the biggest contiguous free block of the FreeRTOS heap.
-bsp is the high water mark of the BSP user stack, the interrupt stack and the C library heap.
+stack and cheap are the high water marks of the BSP user stack, the interrupt stack and the C library heap.
 The values are recorded only: no test passes or fails on them.
 """
 
@@ -22,10 +23,11 @@ HEAP_LINE_RE = re.compile(
     r"(?: largest=(?P<largest>\d+) blocks=(?P<blocks>\d+))?"
     r" total=(?P<total>\d+) tasks=(?P<tasks>\d+)"
 )
-BSP_LINE_RE = re.compile(
-    r"RX671 bsp: ustack=(?P<ustack>\d+)/(?P<ustack_size>\d+) istack=(?P<istack>\d+)/(?P<istack_size>\d+)"
-    r"(?: over=(?P<over>\d+))? cheap=(?P<cheap>\d+)/(?P<cheap_size>\d+)"
+STACK_LINE_RE = re.compile(
+    r"RX671 stack: ustack=(?P<ustack>\d+)/(?P<ustack_size>\d+) upaint=(?P<upaint>\d+)"
+    r" istack=(?P<istack>\d+)/(?P<istack_size>\d+) ipaint=(?P<ipaint>\d+) over=(?P<over>\d+)"
 )
+CHEAP_LINE_RE = re.compile(r"RX671 cheap: used=(?P<used>\d+)/(?P<size>\d+)")
 _TICK_RE = re.compile(r"tick(\d+)$")
 
 
@@ -48,22 +50,32 @@ def parse_lines(text: str) -> list[dict]:
     return entries
 
 
-def parse_bsp_lines(text: str) -> list[dict]:
-    return [{key: (0 if value is None else int(value)) for key, value in match.groupdict().items()}
-            for match in BSP_LINE_RE.finditer(text)]
+def parse_stack_lines(text: str) -> list[dict]:
+    return [{key: int(value) for key, value in match.groupdict().items()} for match in STACK_LINE_RE.finditer(text)]
+
+
+def parse_cheap_lines(text: str) -> list[dict]:
+    return [{key: int(value) for key, value in match.groupdict().items()} for match in CHEAP_LINE_RE.finditer(text)]
 
 
 def summarize_bsp(text: str) -> dict:
     """The largest used value of each BSP area (they only grow, so this is the last line unless a reset intervenes)."""
-    entries = parse_bsp_lines(text)
-    if not entries:
+    stacks = parse_stack_lines(text)
+    cheaps = parse_cheap_lines(text)
+    if not stacks and not cheaps:
         return {"lines": 0}
-    last = entries[-1]
-    return {"lines": len(entries),
-            "ustack_used_max": max(e["ustack"] for e in entries), "ustack_size": last["ustack_size"],
-            "istack_used_max": max(e["istack"] for e in entries), "istack_size": last["istack_size"],
-            "over_max": max(e["over"] for e in entries),
-            "cheap_used_max": max(e["cheap"] for e in entries), "cheap_size": last["cheap_size"]}
+    summary: dict = {"lines": max(len(stacks), len(cheaps))}
+    if stacks:
+        last = stacks[-1]
+        summary.update({
+            "ustack_used_max": max(e["ustack"] for e in stacks), "ustack_size": last["ustack_size"],
+            "ustack_painted": last["upaint"],
+            "istack_used_max": max(e["istack"] for e in stacks), "istack_size": last["istack_size"],
+            "istack_painted": last["ipaint"],
+            "over_max": max(e["over"] for e in stacks)})
+    if cheaps:
+        summary.update({"cheap_used_max": max(e["used"] for e in cheaps), "cheap_size": cheaps[-1]["size"]})
+    return summary
 
 
 def summarize(text_or_lines: str | Iterable[str]) -> dict:
@@ -115,10 +127,12 @@ def format_extra_lines(summary: dict) -> list[str]:
         lines.append(f"heap largest free block: min {summary['min_largest_free_block_bytes']} B "
                      f"at {summary['min_largest_free_block_at']} (up to {summary['max_free_blocks']} free blocks)")
     bsp = summary.get("bsp") or {}
-    if bsp.get("lines"):
-        lines.append(f"bsp watermark: ustack {bsp['ustack_used_max']}/{bsp['ustack_size']} B, "
-                     f"istack {bsp['istack_used_max']}/{bsp['istack_size']} B (over into SU: {bsp.get('over_max', 0)} B), "
-                     f"C library heap {bsp['cheap_used_max']}/{bsp['cheap_size']} B")
+    if "ustack_used_max" in bsp:
+        lines.append(f"stack watermark: ustack {bsp['ustack_used_max']}/{bsp['ustack_size']} B (filled {bsp['ustack_painted']} B), "
+                     f"istack {bsp['istack_used_max']}/{bsp['istack_size']} B (filled {bsp['istack_painted']} B), "
+                     f"over into SU {bsp['over_max']} B")
+    if "cheap_used_max" in bsp:
+        lines.append(f"C library heap watermark: {bsp['cheap_used_max']}/{bsp['cheap_size']} B")
     return lines
 
 
