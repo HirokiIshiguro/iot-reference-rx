@@ -549,7 +549,7 @@ static volatile uint32_t g_cmd53_dtc_error = 0U;
  * whether the DTC vector table (a malloc of the C library) exists afterwards. R_DTC_Open() returns DTC_ERR_OPENED both
  * when the DTC is open already and when the malloc of the vector table failed; the table pointer tells them apart. */
 static volatile uint32_t g_cmd53_dtc_open_calls = 0U;
-static volatile uint32_t g_cmd53_dtc_open_ret = 0xFFFFFFFFUL;
+static volatile uint32_t g_cmd53_dtc_open_ret = UINT32_MAX;
 static volatile uint32_t g_cmd53_dtc_open_table = 0U;
 extern uint32_t * gp_dtc_table_work[2];
 static volatile uint32_t g_cmd53_dtc_ok_count = 0U;
@@ -2817,7 +2817,7 @@ void sdio_host_cmd53_dtc_open_diag(uint32_t * p_calls, uint32_t * p_ret, uint32_
     *p_table = g_cmd53_dtc_open_table;
 #else
     *p_calls = 0U;
-    *p_ret = 0xFFFFFFFFUL;
+    *p_ret = UINT32_MAX;
     *p_table = 0U;
 #endif
 }

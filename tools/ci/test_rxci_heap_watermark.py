@@ -123,6 +123,20 @@ class HeapWatermarkTests(unittest.TestCase):
             self.assertEqual("heap watermark: no line", lines[-1])
 
 
+class SdioHostSourceTests(unittest.TestCase):
+    def test_no_code_flash_literal_in_sdio_host(self):
+        """The OTA layout analysis (sdio_resource_addressing) fails a literal 0xFFE00000..0xFFFFFFFF in sdio_host.c."""
+        import re
+        for project in ("aws_wifi_rx671_ek", "aws_wifi_rx671_ek_tsip"):
+            with self.subTest(project=project):
+                text = (ROOT / "Projects" / project / "e2studio_ccrx/src/sdio_host.c").read_text(encoding="utf-8")
+                text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+                text = re.sub(r"//[^\n]*", "", text)
+                literals = [value for value in re.findall(r"0[xX][0-9A-Fa-f]+", text)
+                            if 0xFFE00000 <= int(value, 16) <= 0xFFFFFFFF]
+                self.assertEqual([], literals)
+
+
 class BspConfigurationTests(unittest.TestCase):
     """The warm start callbacks are set in the .scfg and in r_bsp_config.h (Smart Configurator rewrites the header)."""
 
