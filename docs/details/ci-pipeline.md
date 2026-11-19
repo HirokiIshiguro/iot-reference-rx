@@ -37,30 +37,9 @@ flowchart LR
 
 ## 試験の一覧
 
-試験の名前は `<基板>:<backend>:<tls>:<feature>` の形です。例は `rx72n:sw:tls12:mqtt` です。
+試験の名前は `<基板>:<backend>:<tls>:<feature>` の形です。例は `rx72n:sw:tls12:mqtt` です。36 試験の番号・名前・確かめる事・合否の基準は、[試験仕様](../test-specification.md)にあります。
 
-| 軸 | 値 | 意味 |
-|---|---|---|
-| 基板 | `rx72n` | RX72N Envision Kit（Ethernet） |
-| 基板 | `rx65n` | CK-RX65N V1 + BG96（Cellular） |
-| 基板 | `rx671` | EK-RX671 + Type 1YN（Wi-Fi） |
-| backend | `sw` | Mbed TLS によるソフトウェアの TLS |
-| backend | `tsip` | TSIP（ハードウェア暗号）を使う TLS |
-| tls | `tls12` / `tls13` | TLS の版 |
-| feature | `mqtt` | AWS IoT Core へつないで publish する |
-| feature | `ota` | AWS IoT の OTA で新しいファームウェアへ更新する |
-| feature | `fleet` | Fleet Provisioning で証明書を受け取る |
-
-| 基板・backend | TLS 1.2 | TLS 1.3 |
-|---|---|---|
-| `rx72n:sw` | mqtt・ota・fleet | mqtt・ota・fleet |
-| `rx72n:tsip` | mqtt・ota・fleet | mqtt・ota・fleet |
-| `rx65n:sw` | mqtt・ota・fleet | mqtt・ota・fleet |
-| `rx65n:tsip` | mqtt・ota・fleet | mqtt・ota・fleet |
-| `rx671:sw` | mqtt・ota・fleet | mqtt・ota・fleet |
-| `rx671:tsip` | mqtt・ota・fleet | mqtt・ota・fleet |
-
-- 6 行 × 2 列 × 3 機能で 36 試験です。一覧の正本は [`tools/ci/tests.json`](../../tools/ci/tests.json) で、`python3 tools/ci/rxci.py list` で名前を確かめられます。
+- 一覧の正本は [`tools/ci/tests.json`](../../tools/ci/tests.json) で、`python3 tools/ci/rxci.py list` で番号と名前を確かめられます。
 - `PROFILE=smoke` が流す試験は、各基板の `sw:tls12:mqtt` の 3 試験です（`tests.json` の `smoke`）。
 
 ## pipeline を手で起こす時の変数
@@ -170,7 +149,7 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 4. [`tools/ci/rxci_board.py`](../../tools/ci/rxci_board.py) の `RECIPES` に、（基板, 機能）の流れを足す。
 5. build が新しいなら、[`tools/ci/rxci_build.py`](../../tools/ci/rxci_build.py) に build の流れを足す。
 6. [`.gitlab-ci.yml`](../../.gitlab-ci.yml) の選択肢（`options`）も、軸の値と同じにする。単体試験が、この 2 つの一致を確かめます。
-7. この文書の「試験の一覧」と「目的ごとの変数」の数を合わせる。
+7. [試験仕様](../test-specification.md)の一覧と合否の基準を足し、この文書の「目的ごとの変数」の数を合わせる。
 
 ## build
 
