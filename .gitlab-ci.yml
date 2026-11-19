@@ -4,18 +4,7 @@
 # What runs is decided by tools/ci/rxci.py from the test list in tools/ci/tests.json.
 #
 # The variables below are the form of Build > Pipelines > New pipeline.
-#
-#   What you want                          PROFILE  other variables
-#   -------------------------------------  -------  ----------------------------------------------
-#   unit tests of the CI tools only        check    -
-#   build every firmware, no board         build    -
-#   a few tests on the boards              smoke    -
-#   every test on the boards               full     -
-#   the tests of one board                 full     BOARD=rx671
-#   one kind of test on every board        full     FEATURE=ota (and/or BACKEND, TLS)
-#   one test, three times                  full     BOARD=rx72n BACKEND=sw TLS=tls12 FEATURE=mqtt REPEAT=3
-#   a selection the lists cannot express   full     TEST=^rx72n:(sw|tsip):tls12:ota$ (lists at all)
-#   what the runners have                  doctor   -
+# The values to choose for each purpose, and the jobs that then run, are in docs/ci-pipeline.md.
 #
 # A selection (BOARD, BACKEND, TLS, FEATURE or TEST) with a PROFILE other than full stops in the
 # plan job with the reason, and so does a value that is not in a list.

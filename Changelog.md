@@ -17,6 +17,20 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 
 ## 未リリース
 
+### CI
+
+- CIを全面的に書き直しました。基板3種（RX72N・RX65N・RX671）× TLS実装2種（software・TSIP）×
+  TLS 1.2 / 1.3 × 機能3種（MQTT・OTA・Fleet Provisioning）の36試験を、
+  `<基板>:<backend>:<tls>:<feature>`の名前で選んで流します。
+- **手でpipelineを起こす時の変数が変わりました。** `PROFILE`（`check` / `build` / `smoke` / `full` / `doctor`）、
+  `BOARD`、`BACKEND`、`TLS`、`FEATURE`、`REPEAT`、`REBUILD`、`TEST`を使います。
+  従来の`PIPELINE_PROFILE`、基板ごとの`*_TEST_SCOPE`・`*_TLS_BACKEND`、`RUN_*`は使いません。
+  指定しても読まれず、黙って無視されます。
+- 基板・機能ごとに分かれていた旧jobの名前（`build_…`、`flash_…`、`test_…`など）はありません。
+  子pipelineのjobは試験の名前で並びます。
+- IDT（IoT Device Tester）を流すjobは、新しいCIにありません。
+- 変数の値と動くjobの表、基板ごとの流れ、落ちた時に見るfileは[CI/CD運用](docs/ci-pipeline.md)にあります。
+
 ### 文書
 
 - root READMEを1分で概況把握できる構成へ再編し、Changelog、対応ターゲット、検証状態、
