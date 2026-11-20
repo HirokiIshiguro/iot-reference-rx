@@ -8,7 +8,7 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 
 | Tag | 主な内容 |
 |---|---|
-| [v202604.00-LTS-rx-1.0.0-saffti-1.5.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.0) | 実機CIの書き直し（36試験）、機能仕様書・実装仕様書・試験仕様書 |
+| [v202604.00-LTS-rx-1.0.0-saffti-1.5.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.0) | 実機CIの書き直し（36試験）、RX 3環境の共通化、BG96の`r_cellular`復帰、機能仕様書・実装仕様書・試験仕様書 |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.4.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.4.0) | EK-RX671 + Type 1YN、横断性能、fixed-SHA AWS IoT 5-run |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0) | TLS 1.3 session resumption / 0-RTTとnightly matrix |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.2.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.2.0) | TSIP + TLS 1.3 MQTT / OTA / Fleet Provisioning |
@@ -26,6 +26,19 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 - RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.5.0
+
+### 変更
+
+- RX72N・RX65N・RX671の3環境で、依存関係とビルド構成を共通化しました。原本のsubmodule、
+  dual-bank、CC-RXの最適化とlink順、用途別のMbed TLS設定をそろえ、bootloaderを
+  `lib/rx_bootloader`に置きました
+  （[!223](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/223)）。
+- RX65N/BG96の通信経路を、FreeRTOS Cellular Interfaceから`r_cellular`（submodule）へ戻しました
+  （[!225](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/225)）。
+- RX65N/BG96で、送信の拒否（`CELLULAR_ERR_SEND_REJECTED`）を共通の`TCP_SOCKETS_ERRNO_ERROR`へ、
+  未接続（`SOCKET_NOT_READY`）を`ENOTCONN`へ変換するようにしました。切断後の送信エラーが
+  送信0 byteとして隠れなくなります。`r_cellular`は`1.13.saffti-custom.7`です
+  （[!237](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/237)）。
 
 ### CI
 
@@ -45,8 +58,9 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 
 - root READMEを1分で概況把握できる構成へ再編し、Changelog、対応ターゲット、検証状態、
   固定SHAの代表通信性能へ直接移動できるようにしました。
-- 代表通信性能はRX72N Ethernet、RX671 Wi-Fi、RX65N/BG96 Cellularについて、
-  TCP、software TLS、TSIP hardware TLSのSINK / SOURCEを同じ形式で示します。
+- 1.4.0で載せていた代表通信性能の複数の表を、ターゲット・接続・方式（TCP、software TLS、
+  TSIP hardware TLS）ごとのSINK / SOURCEの1つの表に再編しました。OTAのダウンロードと
+  更新確定までの時間の表を足しました。
 - `Getting_Started_Guide.md`を日本語化し、GitLabが生成する日本語見出しanchorへ
   同一repository内の参照を追従させました。
 - CI運用と個別の実機証跡を、それぞれ`docs/details/ci-pipeline.md`と
