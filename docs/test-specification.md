@@ -2,12 +2,12 @@
 
 [[_TOC_]]
 
-この repo の CI は、3 種類の基板（RX72N・RX65N・RX671）に実際にファームウェアを書き込み、AWS IoT Core へつないで 36 通りの試験を行います。この文書は、36 試験の 1 つずつが何を確かめ、何を見て合格・不合格を決めるかを定めます。運用（pipeline を起こす変数、落ちた時に見る file）は [CI/CD 運用](details/ci-pipeline.md)にあります。
+この repo の CI は、3 種類の基板（RX72N・RX65N・RX671）に実際にファームウェアを書き込み、AWS IoT Core へつないで 36 項目の試験を行います。この文書は、36 項目の 1 つずつのテスト番号、期待値、対象外、確かめる試験と、合否の基準を定めます。運用（pipeline を起こす変数、落ちた時に見る file）は [CI/CD 運用](details/ci-pipeline.md)にあります。
 
-- 試験は、基板 3 種 × TLS の実装 2 種（software・TSIP）× TLS の版 2 種（1.2・1.3）× 機能 3 種（MQTT・OTA・Fleet Provisioning）の 36 通りです。
-- 36 試験の一覧は、[試験項目の一覧](#試験項目の一覧)にあります。番号は `RXCI-001` から `RXCI-036` です。
+- 試験は、機能 3 種（MQTT・OTA・Fleet Provisioning）× 基板 3 種 × TLS の実装 2 種（software・TSIP）× TLS の版 2 種（1.2・1.3）の 36 項目です。機能の決め方は[機能仕様書](architecture.md#2-機能と実装仕様書)にあります。
+- テスト番号は `IREF-MQTT-001` の形です。一覧は[テスト項目の一覧](#テスト項目の一覧)にあります。
 - 合否は、基板の UART に出るログの行で決めます。AWS 側の状態（OTA の job の状態、thing の登録内容）は、合否に使いません。AWS 側は、試験が資源を作り、終わりに消すだけです。
-- 全 36 試験が 1 本の pipeline で通った記録として、[pipeline 17168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/17168) があります。
+- 36 項目を各 3 回流して全部が通った記録が、[pipeline 17303](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/17303) です。結果は[全体の試験結果](details/validation/all-test-results.md)にあります。
 
 | 基板・backend | TLS 1.2 | TLS 1.3 |
 |---|---|---|
@@ -25,61 +25,94 @@
 
 ## 位置づけ
 
-- 対象は、`tools/ci/tests.json` の `ready` に載る 36 試験です。1 試験は、`tools/ci/rxci.py` の `test` が行う 1 回の流れ（書き込み・設定・観測・片付け）で、GitLab の pipeline では、名前が同じ 1 つの job です。
-- 流れを定めるのは [`tools/ci/rxci_board.py`](../tools/ci/rxci_board.py) の `RECIPES`（基板 × 機能の 9 通り）です。観測して合否を決める道具は、`RECIPES` が起こす別の道具です。この文書の合否の基準は、これらの現物がしている事を書いたものです。
-- 子 pipeline の `check` job は、CI の道具自体の単体試験（`tools/ci/test_rxci*.py`）です。基板も AWS も使わず、この 36 試験には数えません。
-- 分類は、36 試験すべてが大分類 `FUNC`・中分類 `OP`（AWS IoT Core を相手にした操作とその結果）です。
+- 試験項目は、[機能仕様書](architecture.md)の要求と、機能ごとの実装仕様書（[MQTT](details/mqtt.md)・[OTA](details/ota.md)・[Fleet Provisioning](details/fleet-provisioning.md)）の決まりから導きます。決まりごとに、どのテスト番号で確かめるか、確かめない所は何かを、各実装仕様書の「決まりと試験の対応」に書きます。
+- 対象は、`tools/ci/tests.json` の `ready` に載る 36 項目です。1 項目は、`tools/ci/rxci.py` の `test` が行う 1 回の流れ（書き込み・設定・観測・片付け）で、GitLab の pipeline では、名前が同じ 1 つの job です。
+- 流れを定めるのは [`tools/ci/rxci_board.py`](../tools/ci/rxci_board.py) の `RECIPES`（基板 × 機能の 9 通り）です。観測して合否を決める道具は、`RECIPES` が起こす別の道具です。
+- 子 pipeline の `check` job は、CI の道具自体の単体試験（`tools/ci/test_rxci*.py`）です。基板も AWS も使わず、この 36 項目には数えません。
+- この repo の component コードは `IREF` です。この repo の試験仕様書は、この文書 1 つです。
 
-## 番号の体系
+### ソフトウェアスタックと責任の区分
 
-- 番号は `RXCI-<3 桁>` です。
-- [`tools/ci/rxci.py`](../tools/ci/rxci.py) の `load_registry` が、[`tools/ci/tests.json`](../tools/ci/tests.json) の `axes` の並び（基板、backend、TLS、機能）の直積を、機能が最も速く変わる順に数えて 1 から振ります。番号を記録した file はありません。
-- このため、`axes` の値の並びを変えたり、値を足したりすると、番号が変わります。番号と名前の対応は、`python3 tools/ci/rxci.py list` で確かめられます。
-- 名前は `<基板>:<backend>:<tls>:<feature>` です（例: `rx72n:sw:tls12:mqtt`）。`<backend>` は `sw`（Mbed TLS）と `tsip`（TSIP）です。
+```mermaid
+flowchart TB
+    APP["アプリと移植層・CI の道具<br/>Projects/・Common/・Demos/・tools/<br/>この repo"]:::own
+    FORK["手を入れて OSS の repo に固定した部品<br/>r_cellular・rx_bootloader・mbedtls_with_TSIP<br/>r_sdio_rx・rm_littlefs_rx・rm_rtos_abstraction_rx<br/>wifi-host-driver・coreMQTT-Agent と Jobs の互換差分"]:::oss
+    UP["上流の OSS をそのまま使う部品<br/>FreeRTOS の kernel と各 library・Mbed TLS<br/>AWS IoT の各 library・littlefs・tinycbor・tinycrypt"]:::black
+    VEND["ベンダの部品<br/>rx-driver-package の BSP と FIT・TSIP のドライバ<br/>Type 1YN の firmware・BG96 の firmware"]:::black
+    HW["MCU（RX72N・RX65N・RX671）と通信モジュール"]:::black
+    APP ~~~ FORK ~~~ UP ~~~ VEND ~~~ HW
+    classDef own fill:#e6f5df,stroke:#316b38,color:#111;
+    classDef oss fill:#e4daf2,stroke:#593a82,color:#111;
+    classDef black fill:#c9cdd0,stroke:#4c5359,color:#111;
+```
+
+| 色 | 区分 | 部品 | 個別の試験 | 問題が出たときの最初の動き |
+|---|---|---|---|---|
+| 緑 | 自社開発 | この repo のアプリ、移植層、CI の道具 | この文書の 36 項目。CI の道具は単体試験 | 自分たちで調べる |
+| 紫 | OSS・中を確かめた | 手を入れて OSS の repo に固定した部品 | `r_cellular` は自分の試験の repo を持つ。ほかは、この文書の 36 項目で結合して確かめる | 自分たちで中を調べる |
+| 灰 | ブラックボックス | 上流の OSS をそのまま使う部品、ベンダの部品、MCU と通信モジュール | 持たない。この文書の 36 項目で結合して確かめる | 上流またはベンダに問い合わせる |
+
+部品の一覧は [`.gitmodules`](../.gitmodules) と、[機能仕様書のコードの地図](architecture.md#8-コードの地図c4-の-4-段目)にあります。
+
+## テスト番号の体系
+
+- テスト番号は `IREF-<仕様書キー>-<連番 3 桁>` です。仕様書キーは `MQTT`・`OTA`・`FLEET` で、実装仕様書 1 つに 1 つです。決め方は[機能仕様書のテスト番号の体系](architecture.md#23-テスト番号の体系)にあります。
+- 番号は [`tools/ci/tests.json`](../tools/ci/tests.json) の `ids` に書いて固定しています。`python3 tools/ci/rxci.py list` で、番号と名前の対応を表示できます。
+- 名前は `<基板>:<backend>:<tls>:<feature>` です（例: `rx72n:sw:tls12:mqtt`）。`<backend>` は `sw`（Mbed TLS）と `tsip`（TSIP）です。CI の job の名前は、この名前です。
 - pipeline で試験を選ぶ変数は、[CI/CD 運用](details/ci-pipeline.md#pipeline-を手で起こす時の変数)にあります。
 
-## 試験項目の一覧
+| 仕様書キー | 大分類 | 中分類 | 件数 | 実装仕様書 |
+|---|---|---|---:|---|
+| `MQTT` | `FUNC` | `OP` | 12 | [details/mqtt.md](details/mqtt.md) |
+| `OTA` | `FUNC` | `OP` | 12 | [details/ota.md](details/ota.md) |
+| `FLEET` | `FUNC` | `OP` | 12 | [details/fleet-provisioning.md](details/fleet-provisioning.md) |
 
-36 試験は、すべて実装済み（`ready`）です。`smoke` の試験は、`RXCI-001`・`RXCI-013`・`RXCI-025`（各基板の `sw:tls12:mqtt`）です。「基準」の列は、合否の基準の節への参照です。
+分類は、36 項目すべてが大分類 `FUNC`・中分類 `OP`（AWS IoT Core を相手にした操作とその結果）です。
 
-| 番号 | 名前 | 基板 | 何を確かめるか | 基準 |
-|---|---|---|---|---|
-| `RXCI-001` | `rx72n:sw:tls12:mqtt` | RX72N | software（Mbed TLS）の構成で、Ethernet から AWS IoT Core へ接続し、topic の購読と publish をする。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [M1](#m1-rx72n-の-mqtt) |
-| `RXCI-002` | `rx72n:sw:tls12:ota` | RX72N | software（Mbed TLS）の構成で、Ethernet から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [O1](#o1-rx72n-の-ota) |
-| `RXCI-003` | `rx72n:sw:tls12:fleet` | RX72N | software（Mbed TLS）の構成で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [F1](#f1-rx72n-の-fleet-provisioning) |
-| `RXCI-004` | `rx72n:sw:tls13:mqtt` | RX72N | software（Mbed TLS）の構成で、Ethernet から AWS IoT Core へ接続し、topic の購読と publish をする。TLS 1.3 で接続した事も見る | [M1](#m1-rx72n-の-mqtt) |
-| `RXCI-005` | `rx72n:sw:tls13:ota` | RX72N | software（Mbed TLS）の構成で、Ethernet から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.3 で接続した事も見る | [O1](#o1-rx72n-の-ota) |
-| `RXCI-006` | `rx72n:sw:tls13:fleet` | RX72N | software（Mbed TLS）の構成で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS 1.3 で接続した事も見る | [F1](#f1-rx72n-の-fleet-provisioning) |
-| `RXCI-007` | `rx72n:tsip:tls12:mqtt` | RX72N | TSIP（包んだ鍵）の構成で、Ethernet から AWS IoT Core へ接続し、topic の購読と publish をする。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [M1](#m1-rx72n-の-mqtt) |
-| `RXCI-008` | `rx72n:tsip:tls12:ota` | RX72N | TSIP（包んだ鍵）の構成で、Ethernet から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [O1](#o1-rx72n-の-ota) |
-| `RXCI-009` | `rx72n:tsip:tls12:fleet` | RX72N | TSIP（包んだ鍵）の構成で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [F1](#f1-rx72n-の-fleet-provisioning) |
-| `RXCI-010` | `rx72n:tsip:tls13:mqtt` | RX72N | TSIP（包んだ鍵）の構成で、Ethernet から AWS IoT Core へ接続し、topic の購読と publish をする。TLS 1.3 で接続した事も見る | [M1](#m1-rx72n-の-mqtt) |
-| `RXCI-011` | `rx72n:tsip:tls13:ota` | RX72N | TSIP（包んだ鍵）の構成で、Ethernet から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.3 で接続した事も見る | [O1](#o1-rx72n-の-ota) |
-| `RXCI-012` | `rx72n:tsip:tls13:fleet` | RX72N | TSIP（包んだ鍵）の構成で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS 1.3 で接続した事も見る | [F1](#f1-rx72n-の-fleet-provisioning) |
-| `RXCI-013` | `rx65n:sw:tls12:mqtt` | RX65N | software（Mbed TLS）の構成で、Cellular（BG96）から AWS IoT Core へ接続し、topic の購読と publish をする。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [M2](#m2-rx65n-の-mqtt) |
-| `RXCI-014` | `rx65n:sw:tls12:ota` | RX65N | software（Mbed TLS）の構成で、Cellular（BG96）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [O2](#o2-rx65n-の-ota) |
-| `RXCI-015` | `rx65n:sw:tls12:fleet` | RX65N | software（Mbed TLS）の構成で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [F2](#f2-rx65n-の-fleet-provisioning) |
-| `RXCI-016` | `rx65n:sw:tls13:mqtt` | RX65N | software（Mbed TLS）の構成で、Cellular（BG96）から AWS IoT Core へ接続し、topic の購読と publish をする。TLS 1.3 で接続した事も見る | [M2](#m2-rx65n-の-mqtt) |
-| `RXCI-017` | `rx65n:sw:tls13:ota` | RX65N | software（Mbed TLS）の構成で、Cellular（BG96）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.3 で接続した事も見る | [O2](#o2-rx65n-の-ota) |
-| `RXCI-018` | `rx65n:sw:tls13:fleet` | RX65N | software（Mbed TLS）の構成で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS 1.3 で接続した事も見る | [F2](#f2-rx65n-の-fleet-provisioning) |
-| `RXCI-019` | `rx65n:tsip:tls12:mqtt` | RX65N | TSIP（包んだ鍵）の構成で、Cellular（BG96）から AWS IoT Core へ接続し、topic の購読と publish をする。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [M2](#m2-rx65n-の-mqtt) |
-| `RXCI-020` | `rx65n:tsip:tls12:ota` | RX65N | TSIP（包んだ鍵）の構成で、Cellular（BG96）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [O2](#o2-rx65n-の-ota) |
-| `RXCI-021` | `rx65n:tsip:tls12:fleet` | RX65N | TSIP（包んだ鍵）の構成で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [F2](#f2-rx65n-の-fleet-provisioning) |
-| `RXCI-022` | `rx65n:tsip:tls13:mqtt` | RX65N | TSIP（包んだ鍵）の構成で、Cellular（BG96）から AWS IoT Core へ接続し、topic の購読と publish をする。TLS 1.3 で接続した事も見る | [M2](#m2-rx65n-の-mqtt) |
-| `RXCI-023` | `rx65n:tsip:tls13:ota` | RX65N | TSIP（包んだ鍵）の構成で、Cellular（BG96）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.3 で接続した事も見る | [O2](#o2-rx65n-の-ota) |
-| `RXCI-024` | `rx65n:tsip:tls13:fleet` | RX65N | TSIP（包んだ鍵）の構成で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS 1.3 で接続した事も見る | [F2](#f2-rx65n-の-fleet-provisioning) |
-| `RXCI-025` | `rx671:sw:tls12:mqtt` | RX671 | software（Mbed TLS）の構成で、Wi-Fi（Type 1YN）から AWS IoT Core へ TLS と MQTT で接続し、publish する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [M3](#m3-rx671-software-の-mqtt) |
-| `RXCI-026` | `rx671:sw:tls12:ota` | RX671 | software（Mbed TLS）の構成で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.2 で接続した事も見る | [O3](#o3-rx671-の-ota) |
-| `RXCI-027` | `rx671:sw:tls12:fleet` | RX671 | software（Mbed TLS）の構成で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [F3](#f3-rx671-の-fleet-provisioning) |
-| `RXCI-028` | `rx671:sw:tls13:mqtt` | RX671 | software（Mbed TLS）の構成で、Wi-Fi（Type 1YN）から AWS IoT Core へ TLS と MQTT で接続し、publish する。TLS 1.3 で接続した事も見る | [M3](#m3-rx671-software-の-mqtt) |
-| `RXCI-029` | `rx671:sw:tls13:ota` | RX671 | software（Mbed TLS）の構成で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.3 で接続した事も見る | [O3](#o3-rx671-の-ota) |
-| `RXCI-030` | `rx671:sw:tls13:fleet` | RX671 | software（Mbed TLS）の構成で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS 1.3 で接続した事も見る | [F3](#f3-rx671-の-fleet-provisioning) |
-| `RXCI-031` | `rx671:tsip:tls12:mqtt` | RX671 | TSIP（包んだ鍵）の構成で、Wi-Fi（Type 1YN）の MQTT agent が AWS IoT Core へ接続し、最初の job の要求まで進む。TLS 1.2 で接続した事も見る | [M4](#m4-rx671-tsip-の-mqtt) |
-| `RXCI-032` | `rx671:tsip:tls12:ota` | RX671 | TSIP（包んだ鍵）の構成で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.2 で接続した事も見る | [O3](#o3-rx671-の-ota) |
-| `RXCI-033` | `rx671:tsip:tls12:fleet` | RX671 | TSIP（包んだ鍵）の構成で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS の版は見ない（TLS 1.2 用の接続先を使う） | [F3](#f3-rx671-の-fleet-provisioning) |
-| `RXCI-034` | `rx671:tsip:tls13:mqtt` | RX671 | TSIP（包んだ鍵）の構成で、Wi-Fi（Type 1YN）の MQTT agent が AWS IoT Core へ接続し、最初の job の要求まで進む。TLS 1.3 で接続した事も見る | [M4](#m4-rx671-tsip-の-mqtt) |
-| `RXCI-035` | `rx671:tsip:tls13:ota` | RX671 | TSIP（包んだ鍵）の構成で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版のファームウェアを受け取り、その版で起動する。TLS 1.3 で接続した事も見る | [O3](#o3-rx671-の-ota) |
-| `RXCI-036` | `rx671:tsip:tls13:fleet` | RX671 | TSIP（包んだ鍵）の構成で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で再接続する。TLS 1.3 で接続した事も見る | [F3](#f3-rx671-の-fleet-provisioning) |
+## テスト項目の一覧
+
+36 項目は、すべて実装済み（`ready`）で、状態は「正式」です。`smoke` の項目は、`IREF-MQTT-001`・`IREF-MQTT-005`・`IREF-MQTT-009`（各基板の `sw:tls12:mqtt`）です。期待値の詳しい行の文字列は、[合否の基準](#合否の基準)の各節にあります。
+
+| テスト番号 | 大分類 | 中分類 | 項目 | 期待値 | 対象外 | 確かめる試験と CI の job | 状態 |
+|---|---|---|---|---|---|---|---|
+| `IREF-MQTT-001` | `FUNC` | `OP` | RX72N・software・TLS 1.2 で、Ethernet から AWS IoT Core へ接続し、topic を購読して publish する | 4 つの行（IP Address・購読・publish・$aws/things/ の受信）がそろう。出た TLS の版の行がすべて TLS 1.2（[M1](#m1-rx72n-の-mqtt)） | publish が AWS IoT に届いた事。エラーの行 | `mqtt_rx72n` / `rx72n:sw:tls12:mqtt` | 正式 |
+| `IREF-MQTT-002` | `FUNC` | `OP` | RX72N・software・TLS 1.3 で、Ethernet から AWS IoT Core へ接続し、topic を購読して publish する | 4 つの行（IP Address・購読・publish・$aws/things/ の受信）がそろう。出た TLS の版の行がすべて TLS 1.3（[M1](#m1-rx72n-の-mqtt)） | publish が AWS IoT に届いた事。エラーの行 | `mqtt_rx72n` / `rx72n:sw:tls13:mqtt` | 正式 |
+| `IREF-MQTT-003` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.2 で、Ethernet から AWS IoT Core へ接続し、topic を購読して publish する | 4 つの行（IP Address・購読・publish・$aws/things/ の受信）がそろう。出た TLS の版の行がすべて TLS 1.2（[M1](#m1-rx72n-の-mqtt)） | publish が AWS IoT に届いた事。エラーの行 | `mqtt_rx72n` / `rx72n:tsip:tls12:mqtt` | 正式 |
+| `IREF-MQTT-004` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.3 で、Ethernet から AWS IoT Core へ接続し、topic を購読して publish する | 4 つの行（IP Address・購読・publish・$aws/things/ の受信）がそろう。出た TLS の版の行がすべて TLS 1.3（[M1](#m1-rx72n-の-mqtt)） | publish が AWS IoT に届いた事。エラーの行 | `mqtt_rx72n` / `rx72n:tsip:tls13:mqtt` | 正式 |
+| `IREF-MQTT-005` | `FUNC` | `OP` | RX65N・software・TLS 1.2 で、Cellular（BG96）から AWS IoT Core へ接続し、topic を購読して publish する | publish の行と、購読か PubSub の終わりの行がある。出た TLS の版の行がすべて TLS 1.2（[M2](#m2-rx65n-の-mqtt)） | publish が AWS IoT に届いた事 | `mqtt_rx65n` / `rx65n:sw:tls12:mqtt` | 正式 |
+| `IREF-MQTT-006` | `FUNC` | `OP` | RX65N・software・TLS 1.3 で、Cellular（BG96）から AWS IoT Core へ接続し、topic を購読して publish する | publish の行と、購読か PubSub の終わりの行がある。出た TLS の版の行がすべて TLS 1.3（[M2](#m2-rx65n-の-mqtt)） | publish が AWS IoT に届いた事 | `mqtt_rx65n` / `rx65n:sw:tls13:mqtt` | 正式 |
+| `IREF-MQTT-007` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.2 で、Cellular（BG96）から AWS IoT Core へ接続し、topic を購読して publish する | publish の行と、購読か PubSub の終わりの行がある。出た TLS の版の行がすべて TLS 1.2（[M2](#m2-rx65n-の-mqtt)） | publish が AWS IoT に届いた事 | `mqtt_rx65n` / `rx65n:tsip:tls12:mqtt` | 正式 |
+| `IREF-MQTT-008` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.3 で、Cellular（BG96）から AWS IoT Core へ接続し、topic を購読して publish する | publish の行と、購読か PubSub の終わりの行がある。出た TLS の版の行がすべて TLS 1.3（[M2](#m2-rx65n-の-mqtt)） | publish が AWS IoT に届いた事 | `mqtt_rx65n` / `rx65n:tsip:tls13:mqtt` | 正式 |
+| `IREF-MQTT-009` | `FUNC` | `OP` | RX671・software・TLS 1.2 で、Wi-Fi（Type 1YN）から AWS IoT Core へ接続し、publish する | Wi-Fi の join、network、`AWS TLS=0`・`AWS MQTT=0` の行がそろう。出た TLS の版の行がすべて TLS 1.2（[M3](#m3-rx671-software-の-mqtt)） | topic の購読（smoke のアプリは購読しない） | `mqtt_rx671` / `rx671:sw:tls12:mqtt` | 正式 |
+| `IREF-MQTT-010` | `FUNC` | `OP` | RX671・software・TLS 1.3 で、Wi-Fi（Type 1YN）から AWS IoT Core へ接続し、publish する | Wi-Fi の join、network、`AWS TLS=0`・`AWS MQTT=0` の行がそろう。出た TLS の版の行がすべて TLS 1.3（[M3](#m3-rx671-software-の-mqtt)） | topic の購読（smoke のアプリは購読しない） | `mqtt_rx671` / `rx671:sw:tls13:mqtt` | 正式 |
+| `IREF-MQTT-011` | `FUNC` | `OP` | RX671・TSIP・TLS 1.2 で、Wi-Fi（Type 1YN）から MQTT agent が AWS IoT Core へ接続し、最初の job の要求まで進む | Wi-Fi の join、network、MQTT の接続、job の要求の行がそろう。出た TLS の版の行がすべて TLS 1.2（[M4](#m4-rx671-tsip-の-mqtt)） | topic の購読と publish（基準のアプリは PubSub を持たない） | `mqtt_rx671_tsip` / `rx671:tsip:tls12:mqtt` | 正式 |
+| `IREF-MQTT-012` | `FUNC` | `OP` | RX671・TSIP・TLS 1.3 で、Wi-Fi（Type 1YN）から MQTT agent が AWS IoT Core へ接続し、最初の job の要求まで進む | Wi-Fi の join、network、MQTT の接続、job の要求の行がそろう。出た TLS の版の行がすべて TLS 1.3（[M4](#m4-rx671-tsip-の-mqtt)） | topic の購読と publish（基準のアプリは PubSub を持たない） | `mqtt_rx671_tsip` / `rx671:tsip:tls13:mqtt` | 正式 |
+| `IREF-OTA-001` | `FUNC` | `OP` | RX72N・software・TLS 1.2 で、Ethernet から AWS IoT の OTA で新しい版を受け取り、その版で起動する | OTA の判定（共通）の 4 つの証明のどれかが成り立ち、更新後の版 0.9.3 で起動する。出た TLS の版の行がすべて TLS 1.2（[O1](#o1-rx72n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx72n` / `rx72n:sw:tls12:ota` | 正式 |
+| `IREF-OTA-002` | `FUNC` | `OP` | RX72N・software・TLS 1.3 で、Ethernet から AWS IoT の OTA で新しい版を受け取り、その版で起動する | OTA の判定（共通）の 4 つの証明のどれかが成り立ち、更新後の版 0.9.3 で起動する。出た TLS の版の行がすべて TLS 1.3（[O1](#o1-rx72n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx72n` / `rx72n:sw:tls13:ota` | 正式 |
+| `IREF-OTA-003` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.2 で、Ethernet から AWS IoT の OTA で新しい版を受け取り、その版で起動する | OTA の判定（共通）の 4 つの証明のどれかが成り立ち、更新後の版 0.9.3 で起動する。出た TLS の版の行がすべて TLS 1.2（[O1](#o1-rx72n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx72n` / `rx72n:tsip:tls12:ota` | 正式 |
+| `IREF-OTA-004` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.3 で、Ethernet から AWS IoT の OTA で新しい版を受け取り、その版で起動する | OTA の判定（共通）の 4 つの証明のどれかが成り立ち、更新後の版 0.9.3 で起動する。出た TLS の版の行がすべて TLS 1.3（[O1](#o1-rx72n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx72n` / `rx72n:tsip:tls13:ota` | 正式 |
+| `IREF-OTA-005` | `FUNC` | `OP` | RX65N・software・TLS 1.2 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.2（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:sw:tls12:ota` | 正式 |
+| `IREF-OTA-006` | `FUNC` | `OP` | RX65N・software・TLS 1.3 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.3（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:sw:tls13:ota` | 正式 |
+| `IREF-OTA-007` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.2 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.2（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:tsip:tls12:ota` | 正式 |
+| `IREF-OTA-008` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.3 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.3（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:tsip:tls13:ota` | 正式 |
+| `IREF-OTA-009` | `FUNC` | `OP` | RX671・software・TLS 1.2 で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | boot loader の印、OTA の判定（共通）と完了の印、更新前後の handshake、更新後の資源の余裕の閾値を満たし、版 0.1.1 で起動する。出た TLS の版の行がすべて TLS 1.2（[O3](#o3-rx671-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態 | `ota_rx671` / `rx671:sw:tls12:ota` | 正式 |
+| `IREF-OTA-010` | `FUNC` | `OP` | RX671・software・TLS 1.3 で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | boot loader の印、OTA の判定（共通）と完了の印、更新前後の handshake、更新後の資源の余裕の閾値を満たし、版 0.1.1 で起動する。出た TLS の版の行がすべて TLS 1.3（[O3](#o3-rx671-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態 | `ota_rx671` / `rx671:sw:tls13:ota` | 正式 |
+| `IREF-OTA-011` | `FUNC` | `OP` | RX671・TSIP・TLS 1.2 で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | boot loader の印、OTA の判定（共通）と完了の印、更新前後の handshake、更新後の資源の余裕の閾値を満たし、版 0.1.1 で起動する。出た TLS の版の行がすべて TLS 1.2（[O3](#o3-rx671-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態 | `ota_rx671` / `rx671:tsip:tls12:ota` | 正式 |
+| `IREF-OTA-012` | `FUNC` | `OP` | RX671・TSIP・TLS 1.3 で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | boot loader の印、OTA の判定（共通）と完了の印、更新前後の handshake、更新後の資源の余裕の閾値を満たし、版 0.1.1 で起動する。出た TLS の版の行がすべて TLS 1.3（[O3](#o3-rx671-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態 | `ota_rx671` / `rx671:tsip:tls13:ota` | 正式 |
+| `IREF-FLEET-001` | `FUNC` | `OP` | RX72N・software・TLS 1.2 で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.2（[F1](#f1-rx72n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx72n` / `rx72n:sw:tls12:fleet` | 正式 |
+| `IREF-FLEET-002` | `FUNC` | `OP` | RX72N・software・TLS 1.3 で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.3（[F1](#f1-rx72n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx72n` / `rx72n:sw:tls13:fleet` | 正式 |
+| `IREF-FLEET-003` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.2 で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.2（[F1](#f1-rx72n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx72n` / `rx72n:tsip:tls12:fleet` | 正式 |
+| `IREF-FLEET-004` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.3 で、Ethernet から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.3（[F1](#f1-rx72n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx72n` / `rx72n:tsip:tls13:fleet` | 正式 |
+| `IREF-FLEET-005` | `FUNC` | `OP` | RX65N・software・TLS 1.2 で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.2（[F2](#f2-rx65n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx65n` / `rx65n:sw:tls12:fleet` | 正式 |
+| `IREF-FLEET-006` | `FUNC` | `OP` | RX65N・software・TLS 1.3 で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.3（[F2](#f2-rx65n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx65n` / `rx65n:sw:tls13:fleet` | 正式 |
+| `IREF-FLEET-007` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.2 で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.2（[F2](#f2-rx65n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx65n` / `rx65n:tsip:tls12:fleet` | 正式 |
+| `IREF-FLEET-008` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.3 で、Cellular（BG96）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。出た TLS の版の行がすべて TLS 1.3（[F2](#f2-rx65n-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx65n` / `rx65n:tsip:tls13:fleet` | 正式 |
+| `IREF-FLEET-009` | `FUNC` | `OP` | RX671・software・TLS 1.2 で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。handshake の行が 2 件以上。出た TLS の版の行がすべて TLS 1.2（[F3](#f3-rx671-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx671` / `rx671:sw:tls12:fleet` | 正式 |
+| `IREF-FLEET-010` | `FUNC` | `OP` | RX671・software・TLS 1.3 で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。handshake の行が 2 件以上。出た TLS の版の行がすべて TLS 1.3（[F3](#f3-rx671-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx671` / `rx671:sw:tls13:fleet` | 正式 |
+| `IREF-FLEET-011` | `FUNC` | `OP` | RX671・TSIP・TLS 1.2 で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。handshake の行が 2 件以上。出た TLS の版の行がすべて TLS 1.2（[F3](#f3-rx671-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx671` / `rx671:tsip:tls12:fleet` | 正式 |
+| `IREF-FLEET-012` | `FUNC` | `OP` | RX671・TSIP・TLS 1.3 で、Wi-Fi（Type 1YN）から Fleet Provisioning を行い、証明書と thing の名前を受け取り、その証明書で接続し直す | 5 つの印がそろい、機密の payload が UART に出ない。handshake の行が 2 件以上。出た TLS の版の行がすべて TLS 1.3（[F3](#f3-rx671-の-fleet-provisioning)） | AWS 側に作られた thing と証明書の中身。template の異常などの異常系 | `fleet_rx671` / `rx671:tsip:tls13:fleet` | 正式 |
+
+「確かめる試験」は [`tools/ci/rxci_board.py`](../tools/ci/rxci_board.py) の流れの関数の名前、「CI の job」は子 pipeline の job の名前です。
 
 ## 合否の基準
 

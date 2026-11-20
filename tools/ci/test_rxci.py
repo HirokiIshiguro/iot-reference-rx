@@ -25,6 +25,33 @@ class RegistryTests(unittest.TestCase):
         for board in ("rx72n", "rx65n", "rx671"):
             self.assertEqual(sum(test["board"] == board for test in tests), 12)
 
+    def test_test_numbers_are_fixed_in_tests_json(self):
+        """Test numbers are IREF-<key>-<3 digits>, one per test, and never derived from the axes."""
+        data = rxci.load_registry()
+        names = {test["name"] for test in data["tests"]}
+        self.assertEqual(set(data["ids"]), names)
+        for test in data["tests"]:
+            key = {"mqtt": "MQTT", "ota": "OTA", "fleet": "FLEET"}[test["feature"]]
+            self.assertRegex(test["id"], rf"^IREF-{key}-\d{{3}}$")
+        for feature in ("mqtt", "ota", "fleet"):
+            numbers = sorted(int(test["id"][-3:]) for test in data["tests"] if test["feature"] == feature)
+            self.assertEqual(numbers, list(range(1, 13)))
+        fixed = {test["name"]: test["id"] for test in data["tests"]}
+        self.assertEqual(fixed["rx72n:sw:tls12:mqtt"], "IREF-MQTT-001")
+        self.assertEqual(fixed["rx65n:sw:tls12:ota"], "IREF-OTA-005")
+        self.assertEqual(fixed["rx671:tsip:tls13:fleet"], "IREF-FLEET-012")
+
+    def test_a_test_without_a_number_stops_the_plan(self):
+        path = Path(rxci.HERE / "tests.json")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        del data["ids"]["rx72n:sw:tls12:mqtt"]
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            copy = Path(folder) / "tests.json"
+            copy.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                rxci.load_registry(copy)
+
     def test_software_build_is_shared_between_tls_versions(self):
         data = rxci.load_registry()
         tests = {test["name"]: test for test in data["tests"]}

@@ -127,14 +127,15 @@ def assume_role(sts, sleep=None, **request) -> dict:
 def load_registry(path: Path | None = None) -> dict:
     registry = json.loads((path or HERE / "tests.json").read_text(encoding="utf-8"))
     axes = registry["axes"]
+    ids = registry["ids"]
     tests = []
-    number = 0
     for board, backend, tls, feature in itertools.product(
             axes["board"], axes["backend"], axes["tls"], axes["feature"]):
-        number += 1
         name = f"{board}:{backend}:{tls}:{feature}"
+        if name not in ids:
+            raise SystemExit(f"tests.json has no test number (ids) for {name}.")
         tests.append({
-            "id": f"RXCI-{number:03d}",
+            "id": ids[name],
             "name": name,
             "board": board,
             "backend": backend,

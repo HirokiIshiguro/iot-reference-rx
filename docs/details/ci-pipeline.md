@@ -145,7 +145,7 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 
 ### 試験を足す時に変える所
 
-1. [`tools/ci/tests.json`](../../tools/ci/tests.json) の `axes` に値を足す（新しい基板なら `boards` に、基板の設定・runner の tag・`resource_group` も足す）。試験の名前と番号（`RXCI-001` から）は、4 つの軸の組み合わせから自動で作られます。
+1. [`tools/ci/tests.json`](../../tools/ci/tests.json) の `axes` に値を足す（新しい基板なら `boards` に、基板の設定・runner の tag・`resource_group` も足す）。試験の名前は、4 つの軸の組み合わせから自動で作られます。テスト番号は、同じ file の `ids` に手で足します。番号の決め方は[機能仕様書のテスト番号の体系](../architecture.md#23-テスト番号の体系)にあり、正式にした番号は変えません。`ids` に番号の無い試験があると、`plan` が止まります。
 2. 同じ file の `ready` に、実装した試験の名前を足す。`ready` に無い試験は、選んでも実行されず、`plan` の表示に `todo` と出ます。選んだ試験がすべて `ready` に無いと、`plan` が止まります。
 3. 必要なら `smoke` に足す。
 4. [`tools/ci/rxci_board.py`](../../tools/ci/rxci_board.py) の `RECIPES` に、（基板, 機能）の流れを足す。
