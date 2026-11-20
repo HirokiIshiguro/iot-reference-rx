@@ -29,7 +29,8 @@
 - 対象は、`tools/ci/tests.json` の `ready` に載る 36 項目です。1 項目は、`tools/ci/rxci.py` の `test` が行う 1 回の流れ（書き込み・設定・観測・片付け）で、GitLab の pipeline では、名前が同じ 1 つの job です。
 - 流れを定めるのは [`tools/ci/rxci_board.py`](../tools/ci/rxci_board.py) の `RECIPES`（基板 × 機能の 9 通り）です。観測して合否を決める道具は、`RECIPES` が起こす別の道具です。
 - 子 pipeline の `check` job は、CI の道具自体の単体試験（`tools/ci/test_rxci*.py`）です。基板も AWS も使わず、この 36 項目には数えません。
-- この repo の コンポーネントコードは `IREF` です。この repo の試験仕様書は、この文書 1 つです。
+- この repo のコンポーネントコードは `IREF` です。この repo の試験仕様書は、この文書 1 つです。
+- 通信性能のベンチマークは、この repo の試験ではありません。`PROFILE=full` の時に、この repo の CI が別の project の pipeline を起こして測ります。起こす project と測る物は [CI/CD 運用のベンチマークの節](details/ci-pipeline.md#ベンチマークの-project)にあり、各 project の測り方と合否はその project の文書にあります。
 
 ### ソフトウェアスタックと責任の区分
 
