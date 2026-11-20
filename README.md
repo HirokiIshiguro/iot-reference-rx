@@ -68,18 +68,14 @@ SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認�
 
 ## IoT Device Tester（IDT）
 
-IDTの明示CI入口は3ターゲットに対応します。`RUN_RX_IDT=true`、`IDT_TARGET`、`IDT_SCOPE`で選択します。
-通常push / MRではnative IDTを起動しません。MRでは単体検査、3ターゲットの実行計画、18構成のソース選択を確認します。
+IDTは3ターゲットが対象です。現在のCI（[CI/CD運用](docs/details/ci-pipeline.md)）は、IDTを流しません。
+IDTの実行方法と、ターゲットごとの準備条件・終了状態は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
 
-| 環境 | `IDT_TARGET` | native CI job | 実機IDTの証跡 |
-|---|---|---|---|
-| RX72N Envision Kit / Ethernet | `rx72n-ethernet` | `test_rx72n_idt` | 以下の限定試験 |
-| CK-RX65N V1 / BG96 | `rx65n-bg96` | `test_rx65n_bg96_idt` | 未検証 |
-| EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | `test_rx671_wifi_idt` | 未検証 |
-
-`IDT_SCOPE=plan`は機器・AWSを操作しない計画確認です。`preflight`はnativeの版照合で、現行LTSとの不一致はNGとして記録します。
-実機scopeの準備条件と終了状態は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
-旧`RUN_RX72N_IDT` / `RX72N_IDT_SCOPE`によるRX72N選択も保持します。
+| 環境 | `IDT_TARGET` | 実機IDTの証跡 |
+|---|---|---|
+| RX72N Envision Kit / Ethernet | `rx72n-ethernet` | 以下の限定試験 |
+| CK-RX65N V1 / BG96 | `rx65n-bg96` | 未検証 |
+| EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | 未検証 |
 
 以下の実測環境: **RX72N Envision Kit / Ethernet / software TLS**、ishiguro-pc（Windows x86_64でビルド、
 Ubuntu WSL 2 / x86_64でIDT実行）、RPi #1（書込み・UART中継）、AWS東京リージョン。
@@ -95,7 +91,7 @@ IDT **4.9.0 / FRQ_2.5.0**での結果（2026-09-28まで）です。
 | OTA MQTT E2E | 新版更新・同版・信頼されない証明書の3ケースPASS、全13ケースは未完了 |
 | 全IDT | **未合格**（異なるSHA・試作を含む部分試験） |
 
-実行方法、運用・リリース要件、各結果の証跡は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
+運用・リリース要件と各結果の証跡は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
 
 ## 最短の開始方法
 
@@ -108,7 +104,7 @@ git clone --recursive https://github.com/HirokiIshiguro/iot-reference-rx.git
 
 ## 詳細資料
 
-[CI/CD運用](docs/details/ci-pipeline.md) / [検証証跡](docs/details/validation/validation-evidence.md) /
+[試験仕様（36試験の合否の基準）](docs/test-specification.md) / [CI/CD運用（pipelineを手で起こす時の変数の表）](docs/details/ci-pipeline.md) / [検証証跡](docs/details/validation/validation-evidence.md) /
 [TSIP構成](docs/details/tsip/tsip-integration-plan.md) / [変更履歴](Changelog.md) /
 [ハードウェア・ツール現行値](https://gitlab.saffti.jp/oss/infra/hardware-config)
 

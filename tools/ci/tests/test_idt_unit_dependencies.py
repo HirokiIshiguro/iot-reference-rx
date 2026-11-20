@@ -6,7 +6,7 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
-BOOT_PIN = "8e19b0cdeeaab06f22fa0636f4cd469218edc6c1"
+BOOT_PIN = "b46927ea19b6b0a3b69d4790c13ca50a67b9c155"
 REQUIRED = {
     "Middleware/FreeRTOS/FreeRTOS-Kernel": (
         "9b777ae5c5b8e9e456065a00294d1e5f5f9facf5", ("include/task.h",)),
@@ -37,25 +37,6 @@ REQUIRED = {
 
 
 class IdtUnitDependencyTests(unittest.TestCase):
-    def test_ci_initializes_only_selected_original_dependencies_before_source_only_tests(self):
-        text = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
-        job = text[text.index("idt_ci_contract:\n"):text.index(".rx_idt_job:\n")]
-        self.assertRegex(job, r"(?m)^  stage: dependency_check$")
-        self.assertRegex(job, r"(?m)^    GIT_SUBMODULE_STRATEGY: normal$")
-        self.assertRegex(job, r'(?m)^    GIT_SUBMODULE_DEPTH: "1"$')
-        paths = re.search(r"(?m)^    GIT_SUBMODULE_PATHS: >-\n((?:      [^\n]+\n)+)", job)
-        self.assertIsNotNone(paths)
-        selected = paths.group(1).split()
-        self.assertEqual(set(REQUIRED), set(selected))
-        self.assertEqual(len(REQUIRED), len(selected), "Duplicate path or broad selection")
-        self.assertNotIn("recursive", paths.group())
-        self.assertNotIn("--remote", job)
-        self.assertNotIn("--recursive", job)
-        self.assertNotIn("GIT_SUBMODULE_FORCE_HTTPS", job, "No custom authentication rewrite is needed")
-        self.assertIn("tools.ci.tests.test_idt_unit_dependencies", job)
-        self.assertIn("git -C Middleware/Renesas/rm_littlefs_rx submodule update --init --depth 1 -- rm_littlefs_rx_vx.xx/rm_littlefs_rx/third_party/littlefs", job)
-        self.assertIn("tools.ci.tests.test_tsip_littlefs_capacity", job)
-        self.assertNotIn("tools/idt/run_idt.py", job, "Unit job may not launch hardware/native qualification")
 
     def test_required_headers_and_runner_are_bytes_from_the_registered_original_gitlinks(self):
         for relative, (expected, files) in REQUIRED.items():

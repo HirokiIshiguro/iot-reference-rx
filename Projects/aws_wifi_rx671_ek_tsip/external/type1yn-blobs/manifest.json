@@ -1,0 +1,49 @@
+{
+  "type": "murata-type-1yn-whd-blobs",
+  "resources": [
+    {
+      "name": "firmware",
+      "file": "43439A0.bin",
+      "sourceRepository": "https://github.com/Infineon/wifi-host-driver.git",
+      "sourceCommit": "31247470af5b7d79b53458f51d06a89aa5fd41f6",
+      "sourcePath": "WHD/COMPONENT_WIFI5/resources/firmware/COMPONENT_43439/43439A0.bin",
+      "stagingPath": "staging/43439A0.bin",
+      "size": 249066,
+      "sha256": "BF545B5E5796E7F9348EC4A77F87D25E557AB97378DC2046A99E70997D2E1CA8",
+      "licensePath": "WHD/COMPONENT_WIFI5/resources/LICENSE-permissive-binary-license-1.0.txt"
+    },
+    {
+      "name": "clm",
+      "file": "43439A0.clm_blob",
+      "sourceRepository": "https://github.com/Infineon/wifi-resources.git",
+      "sourceCommit": "e9b4a5bf07cb62736f1d420a75d27b45bc49d7bd",
+      "sourcePath": "clm/COMPONENT_WIFI5/COMPONENT_43439/COMPONENT_MURATA-1YN/43439A0.clm_blob",
+      "stagingPath": "staging/43439A0.clm_blob",
+      "size": 4752,
+      "sha256": "07BC4851449DB809CE154FF79194A36CC6A2F7015C8B80B4073B5AA6F862CCB6",
+      "licensePath": "LICENSE.txt"
+    },
+    {
+      "name": "nvramText",
+      "file": "cyfmac43439-sdio.1YN.txt",
+      "sourceRepository": "https://github.com/murata-wireless/cyw-fmac-nvram.git",
+      "sourceCommit": "40a917f1a50f9e4df44a7ec63901771791d53f09",
+      "sourcePath": "cyfmac43439-sdio.1YN.txt",
+      "size": 1483,
+      "sha256": "A397520D73D6D77C77C3B63116A7286BDACCE83923AE8C346F8EF6643ED3D445",
+      "licensePath": "LICENCE.cypress"
+    },
+    {
+      "name": "nvramBinary",
+      "file": "nvram_1yn.bin",
+      "sourceRepository": "https://github.com/murata-wireless/cyw-fmac-nvram.git",
+      "sourceCommit": "40a917f1a50f9e4df44a7ec63901771791d53f09",
+      "sourcePath": "cyfmac43439-sdio.1YN.txt",
+      "stagingPath": "staging/nvram_1yn.bin",
+      "size": 816,
+      "sha256": "F8824E0D6F36B5FCA8B36986140733A63F43BBC19293F6DEF40DEC2FD78F055E",
+      "licensePath": "LICENCE.cypress",
+      "transform": "strip blank/comment lines, ASCII encode key=value entries, NUL-separate entries, append final NUL, pad to 4-byte boundary"
+    }
+  ]
+}

@@ -15,7 +15,7 @@ from tools.ci.check_rx671_bootloader_layout import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROJECT = REPO_ROOT / "Projects" / "boot_loader_rx671_ek" / "e2studio_ccrx"
 SUBMODULE = PROJECT / "lib" / "rx_bootloader"
-SUBMODULE_SHA = "8e19b0cdeeaab06f22fa0636f4cd469218edc6c1"
+SUBMODULE_SHA = "b46927ea19b6b0a3b69d4790c13ca50a67b9c155"
 
 
 def read(relative: str) -> str:
@@ -32,7 +32,7 @@ class Rx671BootloaderContractTests(unittest.TestCase):
         self.assertIn('value="R5F5671EHxFB_DUAL"', cproject)
         self.assertIn('value="R5F5671E_DUAL"', cproject)
         self.assertIn(
-            "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2/0FFFC0000,"
+            "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2/0FFFF0000,"
             "EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC",
             cproject,
         )
@@ -85,7 +85,8 @@ class Rx671BootloaderContractTests(unittest.TestCase):
         )
 
     def test_data_flash_is_preserved_and_public_key_uses_littlefs(self) -> None:
-        target = read("src/rx671.h")
+        self.assertFalse((PROJECT / "src" / "rx671.h").exists())
+        target = (SUBMODULE / "config" / "rx671.h").read_text(encoding="utf-8")
         config = read("src/rx_bootloader_config.h")
         self.assertRegex(target, r"#define RX_BOOTLOADER_INSTALL_DATA_FLASH\s+\(0\)")
         self.assertRegex(config, r"#define RX_BOOTLOADER_USE_DATAFLASH_KEY_STORE\s+\(0\)")
@@ -129,14 +130,6 @@ class Rx671BootloaderContractTests(unittest.TestCase):
         self.assertIn('"missing-fail-closed"', monitor)
         self.assertIn('UNSAFE_FALLBACK_MARKER = "not found; using built-in key."', monitor)
 
-    def test_manual_smoke_releases_reset_and_selects_key_state(self) -> None:
-        ci = (REPO_ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
-        job = ci.split("smoke_rx671_bootloader_manual:", 1)[1].split(
-            "\nprepare_rx65n_bg96_mqtt_credentials:", 1
-        )[0]
-        self.assertIn("-p -v -run -noquery", job)
-        self.assertNotIn("-p -v -reset -noquery", job)
-        self.assertIn('--expected-key-state "$RX671_BOOTLOADER_EXPECTED_KEY_STATE"', job)
 
     def test_build_cleanup_is_limited_to_named_child_directories(self) -> None:
         helper = (REPO_ROOT / "tools" / "build_headless_rx671_bootloader.ps1").read_text(

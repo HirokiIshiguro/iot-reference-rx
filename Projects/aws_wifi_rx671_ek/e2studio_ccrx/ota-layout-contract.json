@@ -5,13 +5,13 @@
     "bank_size": 1048576,
     "main_start": "0xFFF00000",
     "buffer_start": "0xFFE00000",
-    "install_area_size": 786432,
+    "install_area_size": 983040,
     "header_size": 512,
     "descriptor_size": 256,
     "application_start": "0xFFF00300",
-    "exception_vector": "0xFFFBFF80",
-    "reset_vector": "0xFFFBFFFC",
-    "bootloader_reserved_start": "0xFFFC0000",
+    "exception_vector": "0xFFFEFF80",
+    "reset_vector": "0xFFFEFFFC",
+    "bootloader_reserved_start": "0xFFFF0000",
     "bootloader_reserved_end": "0xFFFFFFFF"
   },
   "data_flash": {

@@ -122,7 +122,6 @@ PROVENANCE_PROJECT_PATHS = (
 )
 BOOTLOADER_PROVENANCE_PATHS = (
     BOOTLOADER_PROJECT_RELATIVE / ".cproject",
-    BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/smc_gen/r_config/r_bsp_config.h",
     BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
@@ -146,10 +145,10 @@ OTA_START_VALUE = (
     "SU,SI,B_1,R_1,B_2,R_2,B,R,B_8,R_8,RPFRAM2/04,"
     "PResetPRG,C_1,C_2,C,C_8,C$*,D*,W*,L,P,PFRAM2,"
     "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300,"
-    "EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC"
+    "EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC"
 )
 PROVISIONER_START_VALUE = OTA_START_VALUE.replace(
-    "EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC",
+    "EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC",
     "EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC",
 )
 ROM_MAPPING_ANCHOR = (
@@ -244,14 +243,14 @@ def make_ota_cproject(
         '<listOptionValue builtIn="false" value="-define='
         + TLS_VERSION_DEFINES[tls_version]
         + '"/>',
-        '<listOptionValue builtIn="false" value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"/>',
+        '<listOptionValue builtIn="false" value="-define=RX671_FREERTOS_HEAP_SIZE_KB=224"/>',
         '<listOptionValue builtIn="false" value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"/>',
         '<listOptionValue builtIn="false" value="-define=FREERTOS_SOCKETS_WRAPPER_TCP_RX_BUFFER_LENGTH=32768"/>',
         '<listOptionValue builtIn="false" value="-define=MQTT_AGENT_NETWORK_BUFFER_SIZE=8192"/>',
         '<listOptionValue builtIn="false" value="-define=mqttFileDownloader_CONFIG_BLOCK_SIZE=4096"/>',
         '<listOptionValue builtIn="false" value="-define=mqttFileDownloader_MAX_NUM_BLOCKS_REQUEST=1"/>',
         '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_DATA_BUFFERS=2"/>',
-        '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_FILE_BLOCKS=192"/>',
+        '<listOptionValue builtIn="false" value="-define=OTA_MAX_NUM_FILE_BLOCKS=240"/>',
         '<listOptionValue builtIn="false" value="-define=WHD_PORT_BUFFER_COUNT=8"/>',
         '<listOptionValue builtIn="false" value="-define=WHD_SCAN_ENABLE=0"/>',
         '<listOptionValue builtIn="false" value="-define=WHD_JOIN_USE_SCAN_RESULT=0"/>',
@@ -335,7 +334,7 @@ def make_ota_bank_config(text: str, label: str) -> str:
 
 def make_ota_fwup_config(text: str) -> str:
     matches = re.findall(r"^\s*#define\s+RX_OTA_CFG_AREA_SIZE\s+\((0x[0-9A-Fa-f]+)U\)", text, re.M)
-    if len(matches) != 1 or int(matches[0], 16) != 0xC0000:
+    if len(matches) != 1 or int(matches[0], 16) != 0xF0000:
         raise ValueError("rx_ota_config.h: expected the canonical dual-bank install area")
     return text
 
@@ -707,7 +706,7 @@ def _copy_build_outputs(project_dir: Path, artifact_dir: Path) -> dict[str, Path
     output_dir = project_dir / "HardwareDebug"
     outputs: dict[str, Path] = {}
     for extension in ("mot", "abs", "map"):
-        source = output_dir / f"{ARTIFACT_BASENAME}.{extension}"
+        source = output_dir / f"{project_dir.parent.name}.{extension}"
         if not source.is_file():
             raise FileNotFoundError(f"RX671 OTA build artifact missing: {source}")
         destination = artifact_dir / source.name
@@ -817,6 +816,8 @@ def _build_provisioner(
                         str(build_log),
                         "-E2StudioTimeoutSeconds",
                         str(timeout_seconds),
+                        "-TlsBackend",
+                        "tsip" if project_dir == repo_root / "Projects/aws_wifi_rx671_ek_tsip/e2studio_ccrx" else "software",
                         "-SkipWifiConfig",
                         "-SkipAwsIotConfig",
                     ],
@@ -869,9 +870,9 @@ def _copy_failed_build_diagnostics(project_dir: Path, artifact_dir: Path) -> Non
     diagnostic_dir = artifact_dir / "failed-build-diagnostics"
     copied = False
     for name in (
-        f"{ARTIFACT_BASENAME}.map",
+        f"{project_dir.parent.name}.map",
         "LinkerSubCommand.tmp",
-        f"Linker{ARTIFACT_BASENAME}.tmp",
+        f"Linker{project_dir.parent.name}.tmp",
         "makefile",
     ):
         source = hardware_debug / name
@@ -1065,6 +1066,10 @@ def _build_one(
                 version.text,
                 "-SkipAwsIotConfig",
             ]
+            if "_tsip" in project_dir.parent.name:
+                build_command += ["-TlsBackend", "tsip"]
+                if tls_version == "TLSv1.3":
+                    build_command += ["-RequireTlsVersion", "TLSv1.3"]
             # The KVS JOIN defines are part of the temporary .cproject above,
             # so the copied effective configuration and its hash describe the
             # exact compiler input.  The child builder only has to suppress
@@ -1189,6 +1194,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     default_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=default_root)
+    parser.add_argument("--tls-backend", choices=("software", "tsip"), default="software")
     parser.add_argument("--baseline-version", default="0.1.0")
     parser.add_argument("--candidate-version", default="0.1.1")
     parser.add_argument(
@@ -1238,6 +1244,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     repo_root = args.repo_root.resolve()
+    global PROJECT_RELATIVE, WHD_SUBMODULE_RELATIVE, FORMAL_INPUT_SUBMODULES, WHD_BLOB_PATHS
+    PROJECT_RELATIVE = Path("Projects/aws_wifi_rx671_ek_tsip/e2studio_ccrx") if args.tls_backend == "tsip" else Path("Projects/aws_wifi_rx671_ek/e2studio_ccrx")
+    if args.tls_backend == "tsip":
+        def tsip_path(path: Path) -> Path:
+            return Path(path.as_posix().replace("Projects/aws_wifi_rx671_ek/", "Projects/aws_wifi_rx671_ek_tsip/"))
+        WHD_SUBMODULE_RELATIVE = tsip_path(WHD_SUBMODULE_RELATIVE)
+        FORMAL_INPUT_SUBMODULES = tuple(tsip_path(path) for path in FORMAL_INPUT_SUBMODULES) + (Path("Middleware/3rdparty/mbedtls_with_TSIP"),)
+        WHD_BLOB_PATHS = tuple(tsip_path(path) for path in WHD_BLOB_PATHS)
     project_dir = repo_root / PROJECT_RELATIVE
     output_root = args.output_root.resolve()
     _validate_output_root(output_root, repo_root)

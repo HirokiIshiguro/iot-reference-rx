@@ -36,5 +36,8 @@ BaseType_t xTsipProvisioningReadRootCaSignature(uint8_t * pucBuffer,
                                                 uint32_t * pulActualSize);
 BaseType_t xTsipProvisioningPrepareTlsRootCaTrustAnchor(void);
 BaseType_t xTsipProvisioningLoadClientRsa2048KeyPair(void);
+/* Stage and driver result of the last failed prepare (0 when nothing failed). */
+uint32_t ulTsipProvisioningPrepareFailureStage(void);
+int32_t lTsipProvisioningPrepareFailureCode(void);
 
 #endif /* TSIP_PROVISIONING_STORE_H_ */

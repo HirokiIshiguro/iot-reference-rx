@@ -788,6 +788,7 @@ def verify_app_mqtt(
     errors: list[str] = []
     cellular_state: dict[str, str] = {}
     tls_version: str | None = None
+    tls_versions: list[str] = []
     last_qisend_at = 0.0
     qisend_errors = 0
     qisend_error_limit = int(os.environ.get("BG96_MQTT_QISEND_ERROR_LIMIT", "30"))
@@ -814,6 +815,7 @@ def verify_app_mqtt(
             tls_match = re.search(r"TLS handshake successful: version\s+(\S+)", stripped)
             if tls_match:
                 tls_version = tls_match.group(1)
+                tls_versions.append(tls_version)
                 print(f"\n  >>> [FOUND] TLS version {tls_version} <<<")
 
             for marker in MQTT_SUCCESS_MARKERS:
@@ -888,10 +890,11 @@ def verify_app_mqtt(
             "Successfully subscribed to topic" in detected or "---------Finish PubSub Demo Task" in detected
         ):
             if require_tls_version:
-                if tls_version != require_tls_version:
+                # At least one handshake line, and every handshake line seen so far is of the required version.
+                if not tls_versions or any(version != require_tls_version for version in tls_versions):
                     raise RuntimeError(
-                        f"required TLS version {require_tls_version} was not observed; "
-                        f"observed={tls_version or 'none'}"
+                        f"required TLS version {require_tls_version} was not the only one observed; "
+                        f"observed={sorted(set(tls_versions)) or 'none'}"
                     )
                 print(f"\n[PASS] Required TLS version: {require_tls_version}")
             print("\n[PASS] app MQTT Pub/Sub activity verified")
