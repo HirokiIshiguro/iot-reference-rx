@@ -28,7 +28,7 @@
 |---|---|---|---|
 | アプリ | Fleet 用に build したアプリ | 同左 | Wi-Fi と claim 証明書を build に入れたアプリ（CI の中で暗号化して受け渡す） |
 | claim 証明書と設定の入れ方 | UART の CLI（`conf set`・`conf commit`）。TSIP でも包んだ鍵は送らない | UART の CLI（専用の道具 [`tools/bg96_bootloader_integration.py`](../../tools/bg96_bootloader_integration.py)） | build に入れる |
-| TLS の接続の数 | 1 以上 | 1 以上 | 2 以上（claim と、受け取った証明書） |
+| 試験が求める handshake の行の数 | 1 以上 | 1 以上 | 2 以上（claim と受け取った証明書の 2 回の接続を想定した数。行と接続の対応は見ない） |
 
 ## 3. UART に出す行
 
@@ -51,7 +51,7 @@
 |---|---|---|
 | 1〜5 | `IREF-FLEET-001`〜`012` | AWS 側に作られた thing と証明書の中身 |
 | 6 | `IREF-FLEET-001`〜`012` | 観測の道具が知っている形（JSON の key の名前など）だけを探す |
-| 7 | `IREF-FLEET-001`〜`012` | RX72N・RX65N は、2 回の接続の両方に行がある事までは見ない（出た行がすべて要求した版である事を見る） |
+| 7 | `IREF-FLEET-001`〜`012` | 観測したすべての handshake の行が要求した版である事と、行の数（RX72N・RX65N は 1 件以上、RX671 は 2 件以上）を見る。行を claim の接続と接続し直しに対応づける事は見ない |
 
 ## 5. 確かめていない事
 

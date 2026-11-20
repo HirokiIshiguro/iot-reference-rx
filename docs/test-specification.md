@@ -91,10 +91,10 @@ flowchart TB
 | `IREF-OTA-002` | `FUNC` | `OP` | RX72N・software・TLS 1.3 で、Ethernet から AWS IoT の OTA で新しい版を受け取り、その版で起動する | OTA の判定（共通）の 4 つの証明のどれかが成り立ち、更新後の版 0.9.3 で起動する。出た TLS の版の行がすべて TLS 1.3（[O1](#o1-rx72n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx72n` / `rx72n:sw:tls13:ota` | 正式 |
 | `IREF-OTA-003` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.2 で、Ethernet から AWS IoT の OTA で新しい版を受け取り、その版で起動する | OTA の判定（共通）の 4 つの証明のどれかが成り立ち、更新後の版 0.9.3 で起動する。出た TLS の版の行がすべて TLS 1.2（[O1](#o1-rx72n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx72n` / `rx72n:tsip:tls12:ota` | 正式 |
 | `IREF-OTA-004` | `FUNC` | `OP` | RX72N・TSIP・TLS 1.3 で、Ethernet から AWS IoT の OTA で新しい版を受け取り、その版で起動する | OTA の判定（共通）の 4 つの証明のどれかが成り立ち、更新後の版 0.9.3 で起動する。出た TLS の版の行がすべて TLS 1.3（[O1](#o1-rx72n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx72n` / `rx72n:tsip:tls13:ota` | 正式 |
-| `IREF-OTA-005` | `FUNC` | `OP` | RX65N・software・TLS 1.2 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.2（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:sw:tls12:ota` | 正式 |
-| `IREF-OTA-006` | `FUNC` | `OP` | RX65N・software・TLS 1.3 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.3（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:sw:tls13:ota` | 正式 |
-| `IREF-OTA-007` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.2 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.2（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:tsip:tls12:ota` | 正式 |
-| `IREF-OTA-008` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.3 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、エラーの行が無い。出た TLS の版の行がすべて TLS 1.3（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:tsip:tls13:ota` | 正式 |
+| `IREF-OTA-005` | `FUNC` | `OP` | RX65N・software・TLS 1.2 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、O2 に挙げた致命のエラー文字列が無い（再試行の対象の `Cellular init failed`・`Cellular Open Failed` は除く）。出た TLS の版の行がすべて TLS 1.2（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:sw:tls12:ota` | 正式 |
+| `IREF-OTA-006` | `FUNC` | `OP` | RX65N・software・TLS 1.3 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、O2 に挙げた致命のエラー文字列が無い（再試行の対象の `Cellular init failed`・`Cellular Open Failed` は除く）。出た TLS の版の行がすべて TLS 1.3（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:sw:tls13:ota` | 正式 |
+| `IREF-OTA-007` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.2 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、O2 に挙げた致命のエラー文字列が無い（再試行の対象の `Cellular init failed`・`Cellular Open Failed` は除く）。出た TLS の版の行がすべて TLS 1.2（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:tsip:tls12:ota` | 正式 |
+| `IREF-OTA-008` | `FUNC` | `OP` | RX65N・TSIP・TLS 1.3 で、Cellular（BG96）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | 5 つの印と受理の印があり、更新後の版 0.9.99 で起動し、O2 に挙げた致命のエラー文字列が無い（再試行の対象の `Cellular init failed`・`Cellular Open Failed` は除く）。出た TLS の版の行がすべて TLS 1.3（[O2](#o2-rx65n-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態。更新後の資源の余裕 | `ota_rx65n` / `rx65n:tsip:tls13:ota` | 正式 |
 | `IREF-OTA-009` | `FUNC` | `OP` | RX671・software・TLS 1.2 で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | boot loader の印、OTA の判定（共通）と完了の印、更新前後の handshake、更新後の資源の余裕の閾値を満たし、版 0.1.1 で起動する。出た TLS の版の行がすべて TLS 1.2（[O3](#o3-rx671-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態 | `ota_rx671` / `rx671:sw:tls12:ota` | 正式 |
 | `IREF-OTA-010` | `FUNC` | `OP` | RX671・software・TLS 1.3 で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | boot loader の印、OTA の判定（共通）と完了の印、更新前後の handshake、更新後の資源の余裕の閾値を満たし、版 0.1.1 で起動する。出た TLS の版の行がすべて TLS 1.3（[O3](#o3-rx671-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態 | `ota_rx671` / `rx671:sw:tls13:ota` | 正式 |
 | `IREF-OTA-011` | `FUNC` | `OP` | RX671・TSIP・TLS 1.2 で、Wi-Fi（Type 1YN）から AWS IoT の OTA で新しい版を受け取り、その版で起動する | boot loader の印、OTA の判定（共通）と完了の印、更新前後の handshake、更新後の資源の余裕の閾値を満たし、版 0.1.1 で起動する。出た TLS の版の行がすべて TLS 1.2（[O3](#o3-rx671-の-ota)） | 同じ版・古い版・署名が合わない image を拒む事。AWS 側の job の状態 | `ota_rx671` / `rx671:tsip:tls12:ota` | 正式 |
@@ -138,12 +138,12 @@ flowchart TB
 | RX671 software の MQTT | `AWS TLS version=<要求した版>` の行がある。`AWS TLS version=` と handshake の行のどれにも、ほかの版が無い |
 | RX671 TSIP の MQTT | 要求した版の handshake の行があり、ほかの版の行が無い |
 | Fleet（RX72N・RX65N） | handshake の行が 1 件以上あり、すべて要求した版 |
-| Fleet（RX671） | すべて要求した版で、handshake の行が 2 件以上（申請用の接続と、受け取った証明書での接続） |
+| Fleet（RX671） | handshake の行が 2 件以上あり、すべて要求した版。2 件は申請用の接続と受け取った証明書での接続を想定した数で、行と接続の対応は見ない |
 | OTA（RX72N・RX65N） | handshake の行が 1 件以上あり、すべて要求した版 |
 | OTA（RX671） | すべて要求した版。更新前の基準のアプリと、更新後のアプリの両方で handshake の行がある |
 
 - RX671 の software は、TLS の版ごとに build が分かれます。TSIP も分かれます。RX72N と RX65N の software は、1 つの build を両方の版に使い、接続先で版を分けます（[`rxci_build.py`](../tools/ci/rxci_build.py)）。RX671 の software の build は、TLS 1.2 と 1.3 の両方を話せるので、接続先が版を決めます。この接続先を取り違えると、名前と違う版でつながります。そこで、版の判定を全試験に入れています。
-- 1 本の試験の中で複数の接続を張る流れ（RX72N の複数の TLS 接続の demo、Fleet の 2 回の接続、OTA の再起動の前後）も、全部の接続が要求した版でなければ不合格です。
+- 1 本の試験の中で複数の接続を張る流れ（RX72N の複数の TLS 接続の demo、Fleet の 2 回の接続、OTA の再起動の前後）も、観測したすべての handshake の行が要求した版でなければ不合格です。行がどの接続のものかは、OTA（RX671）の更新の前後を除いて見ません。
 
 ### MQTT
 
