@@ -8,6 +8,7 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 
 | Tag | 主な内容 |
 |---|---|
+| [v202604.00-LTS-rx-1.0.0-saffti-1.5.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.0) | 実機CIの書き直し（36試験）、機能仕様書・実装仕様書・試験仕様書 |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.4.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.4.0) | EK-RX671 + Type 1YN、横断性能、fixed-SHA AWS IoT 5-run |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0) | TLS 1.3 session resumption / 0-RTTとnightly matrix |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.2.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.2.0) | TSIP + TLS 1.3 MQTT / OTA / Fleet Provisioning |
@@ -16,6 +17,15 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 | `v202406.01-LTS-rx-1.1.1-saffti-1.0.0` | 最初のsafftiタグ、RX72N実機CIリファレンス |
 
 ## 未リリース
+
+### 今後の課題
+
+- RX Ethernet TXのbusy pollをTX complete IRQ待機へ変更し、有限timeoutと
+  EDMAC異常時の復帰を実機確認します。
+- SDIO / WHD / FreeRTOS+TCP境界の待ち時間を追加分析します。
+- RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.5.0
 
 ### CI
 
@@ -41,13 +51,20 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
   同一repository内の参照を追従させました。
 - CI運用と個別の実機証跡を、それぞれ`docs/details/ci-pipeline.md`と
   `docs/details/validation/validation-evidence.md`へ分離しました。
+- 機能仕様書[`docs/architecture.md`](docs/architecture.md)を足しました。要求、機能と仕様書キー、
+  C4の2〜4段目、起動シーケンス、資源の配分を示します。
+- 機能ごとの実装仕様書（[MQTT](docs/details/mqtt.md)・[OTA](docs/details/ota.md)・
+  [Fleet Provisioning](docs/details/fleet-provisioning.md)）を足しました。UARTに出す行と、決まりと試験の対応を示します。
+- **試験の番号が変わりました。** `RXCI-001`〜`036`をやめ、`IREF-MQTT-001`の形のテスト番号を
+  `tools/ci/tests.json`の`ids`に固定しました。[試験仕様](docs/test-specification.md)は、
+  テスト番号・期待値・対象外・状態の一覧表にしました。
+- [全体の試験結果](docs/details/validation/all-test-results.md)を足しました。
 
-### 今後の課題
+### 検証
 
-- RX Ethernet TXのbusy pollをTX complete IRQ待機へ変更し、有限timeoutと
-  EDMAC異常時の復帰を実機確認します。
-- SDIO / WHD / FreeRTOS+TCP境界の待ち時間を追加分析します。
-- RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
+- 36試験を各3回流した[pipeline 17303](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/17303)で、108 jobすべてが成功しました
+  （うち2 jobは再試行で成功）。OTAの12試験は、修正の後の[pipeline 17336](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/17336)でも
+  すべて成功しました。詳細は[全体の試験結果](docs/details/validation/all-test-results.md)にあります。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.4.0
 
