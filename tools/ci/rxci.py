@@ -25,7 +25,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-PROFILES = ("check", "build", "smoke", "full", "doctor")
+PROFILES = ("check", "build", "smoke", "full", "benchmark", "doctor")
 TOOL = "tools/ci/rxci.py"
 # The shared OIDC setup of the oss group: jobs issue GITLAB_OIDC_TOKEN and assume the
 # role named by the protected group variable AWS_ROLE_ARN (see hardware-config, docs/ci-variables.md).
@@ -228,9 +228,55 @@ def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list
             [t for t in matched if not t["ready"]])
 
 
+def benchmark_boards(registry: dict, profile: str, board: str, whole_boards: bool, benchmark: bool) -> list[str]:
+    """Boards whose benchmark projects the child pipeline starts.
+
+    PROFILE=benchmark runs only the benchmarks. PROFILE=full runs them after the tests, unless BENCHMARK=false
+    or the selection takes only part of a board (a backend, a TLS version, a feature or TEST): a benchmark
+    measures the whole board, and a run that asks for a few tests should not take hours longer.
+    """
+    if profile not in ("full", "benchmark") or not whole_boards or (profile == "full" and not benchmark):
+        return []
+    boards = registry["axes"]["board"] if board == "all" else [board]
+    return [name for name in boards if any(entry["board"] == name for entry in registry.get("benchmarks", []))]
+
+
+def benchmark_jobs(registry: dict, boards: list[str]) -> dict:
+    """Trigger jobs that start the benchmark projects of the boards (multi-project downstream pipelines).
+
+    The first benchmark of a board waits for the whole test stage (it has no needs), so that it does not take
+    a board from the tests; the next ones of the same board wait for the one before, because they use the
+    same board. GitLab expands the $NAME references of the variables here, in this pipeline, so a secret of
+    this project reaches the downstream pipeline without being written anywhere.
+    """
+    jobs: dict = {}
+    for board in boards:
+        previous = None
+        for entry in (e for e in registry.get("benchmarks", []) if e["board"] == board):
+            name = f"benchmark {entry['name']}"
+            variables = dict(entry.get("variables", {}))
+            variables.update({target: f"${source}" for target, source in entry.get("parent_variables", {}).items()})
+            job = {
+                "stage": "benchmark",
+                "when": "always",       # a failed test does not make the measurement of the board meaningless
+                "trigger": {"project": entry["project"], "branch": entry.get("ref", "main"), "strategy": "depend",
+                            "forward": {"yaml_variables": True, "pipeline_variables": False}},
+                "variables": variables,
+                "interruptible": False,  # the downstream pipeline writes to the board
+            }
+            if previous:
+                job["needs"] = [{"job": previous, "artifacts": False}]
+            jobs[name] = job
+            previous = name
+    return jobs
+
+
 def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
-                   keep: bool = False, rebuild: bool = False) -> tuple[dict, dict]:
-    """Build the child pipeline (a dict that is dumped as JSON, which GitLab reads as YAML)."""
+                   keep: bool = False, rebuild: bool = False, benchmarks: list[str] | None = None) -> tuple[dict, dict]:
+    """Build the child pipeline (a dict that is dumped as JSON, which GitLab reads as YAML).
+
+    benchmarks: boards whose benchmark projects run after the tests (benchmark_boards).
+    """
     run, pending = select(registry, profile, pattern)
     if pattern and pending and not run:
         names = ", ".join(test["name"] for test in pending)
@@ -245,7 +291,7 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
         variants = []
 
     jobs: dict = {
-        "stages": ["check", "build", "test", "cleanup"],
+        "stages": ["check", "build", "test", "benchmark", "cleanup"],
         # GitLab cancels older pipelines of a branch when a newer pipeline is created, child pipelines
         # included. A run that a person or a schedule started (keep) must survive that.
         "workflow": {"auto_cancel": {"on_new_commit": "none" if keep else "interruptible"}},
@@ -311,6 +357,9 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             "interruptible": False,
         }
 
+    bench = benchmark_jobs(registry, benchmarks or [])
+    jobs.update(bench)
+
     if profile == "doctor":
         runners = {"check runner": registry["runners"]["check"], "build runner": registry["runners"]["build"]}
         for name, board in registry["boards"].items():
@@ -341,6 +390,7 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
         "repeat": repeat,
         "builds": variants,
         "tests": [test["name"] for test in run],
+        "benchmarks": list(bench),
         "not_implemented": [test["name"] for test in pending],
     }
     return jobs, summary
@@ -389,20 +439,32 @@ def command_plan(args: argparse.Namespace) -> int:
     registry = load_registry()
     pattern = selection_pattern(registry, args.board, args.backend, args.tls, args.feature, args.test)
     # A pipeline that looks green but ran nothing of what was asked for is worse than one that stops here.
-    if pattern and args.profile != "full":
+    whole_boards = not args.test and all(value == "all" for value in (args.backend, args.tls, args.feature))
+    if args.profile == "benchmark":
+        if not whole_boards:
+            raise SystemExit("PROFILE=benchmark runs the benchmarks of whole boards: choose them with BOARD, "
+                             "and leave BACKEND, TLS and FEATURE at all and TEST empty.")
+        pattern = ""
+    elif pattern and args.profile != "full":
         raise SystemExit(f"BOARD/BACKEND/TLS/FEATURE or TEST select tests, and only PROFILE=full runs a "
                          f"selection (got PROFILE={args.profile}). Set PROFILE=full, or clear the selection.")
+    if args.benchmark not in ("true", "false"):
+        raise SystemExit(f"BENCHMARK must be true or false (got {args.benchmark!r})")
     if args.repeat > 1 and args.profile not in ("full", "smoke"):
         raise SystemExit(f"REPEAT repeats tests, and PROFILE={args.profile} runs none. "
                          f"Set PROFILE=full, or leave REPEAT at 1.")
+    boards = benchmark_boards(registry, args.profile, args.board, whole_boards, args.benchmark == "true")
     jobs, summary = child_pipeline(registry, args.profile, pattern, args.repeat, keep=args.keep == "true",
-                                   rebuild=args.rebuild == "true")
+                                   rebuild=args.rebuild == "true", benchmarks=boards)
     Path(args.output).write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")
     Path(args.summary).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(f"profile={summary['profile']} test={summary['test'] or '(all in profile)'} repeat={summary['repeat']}")
-    print(f"builds: {len(summary['builds'])}  tests: {len(summary['tests'])} x {args.repeat}")
+    print(f"builds: {len(summary['builds'])}  tests: {len(summary['tests'])} x {args.repeat}  "
+          f"benchmarks: {len(summary['benchmarks'])}")
     for name in summary["tests"]:
         print(f"  run   {name}")
+    for name in summary["benchmarks"]:
+        print(f"  start {name}")
     for name in summary["not_implemented"]:
         print(f"  todo  {name}")
     return 0
@@ -513,6 +575,8 @@ def main(argv: list[str] | None = None) -> int:
                       help="true: newer commits do not cancel this pipeline")
     plan.add_argument("--rebuild", default="false", choices=("true", "false"),
                       help="true: build every firmware again instead of reusing a build with the same inputs")
+    plan.add_argument("--benchmark", default="true",
+                      help="true: PROFILE=full also starts the benchmark projects of the boards it tests")
     plan.add_argument("--output", default="child-pipeline.yml")
     plan.add_argument("--summary", default="plan.json")
     plan.set_defaults(run=command_plan)

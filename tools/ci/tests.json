@@ -151,6 +151,55 @@
     "rx671:tsip:tls12:fleet": "IREF-FLEET-011",
     "rx671:tsip:tls13:fleet": "IREF-FLEET-012"
   },
+  "benchmarks": [
+    {
+      "name": "rx72n:sw:speed",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/mbedtls",
+      "measures": "TCP and TLS 1.2 throughput (sink, source) and CPU load, Mbed TLS in software",
+      "variables": {
+        "RUN_HW_TESTS": "true"
+      }
+    },
+    {
+      "name": "rx72n:tsip:speed",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls",
+      "measures": "TCP and TLS 1.2 throughput (sink, source) and CPU load, TSIP",
+      "variables": {
+        "RUN_HW_TESTS": "true"
+      }
+    },
+    {
+      "name": "rx72n:sw:tls13-0rtt",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13",
+      "measures": "TLS 1.3 session resumption and 0-RTT early data, Mbed TLS in software",
+      "variables": {
+        "MBEDTLS_BUILD_VARIANT": "software-0rtt",
+        "RUN_HW_TESTS": "true",
+        "RUN_LANBENCH_MBEDTLS_0RTT_SERVER": "true"
+      }
+    },
+    {
+      "name": "rx72n:tsip:tls13-0rtt",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13",
+      "measures": "TLS 1.3 session resumption and 0-RTT early data, TSIP",
+      "variables": {
+        "MBEDTLS_BUILD_VARIANT": "tsip-0rtt",
+        "RUN_HW_TESTS": "true",
+        "RUN_LANBENCH_MBEDTLS_0RTT_SERVER": "true"
+      }
+    },
+    {
+      "name": "rx65n:r_cellular-test",
+      "board": "rx65n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/test",
+      "measures": "tests of the r_cellular driver (tick rates and the API) on the CK-RX65N with BG96",
+      "variables": {}
+    }
+  ],
   "ready": [
     "rx72n:sw:tls12:mqtt",
     "rx72n:sw:tls13:mqtt",

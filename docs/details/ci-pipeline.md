@@ -48,13 +48,14 @@ flowchart LR
 
 | 変数 | 既定 | 選べる値 | 意味 |
 |---|---|---|---|
-| `PROFILE` | `check` | `check` / `build` / `smoke` / `full` / `doctor` | どこまで流すか |
-| `BOARD` | `all` | `all` / `rx72n` / `rx65n` / `rx671` | 試験する基板 |
+| `PROFILE` | `check` | `check` / `build` / `smoke` / `full` / `benchmark` / `doctor` | どこまで流すか |
+| `BOARD` | `all` | `all` / `rx72n` / `rx65n` / `rx671` | 試験する基板（`PROFILE=benchmark` では、ベンチマークを流す基板） |
 | `BACKEND` | `all` | `all` / `sw` / `tsip` | TLS の実装 |
 | `TLS` | `all` | `all` / `tls12` / `tls13` | TLS の版 |
 | `FEATURE` | `all` | `all` / `mqtt` / `ota` / `fleet` | 試験の種類 |
 | `REPEAT` | `1` | `1` / `2` / `3` / `5` / `10` | 選んだ各試験を何回流すか。1 回ごとに 1 job |
 | `REBUILD` | `false` | `false` / `true` | `true`: すべてのファームウェアを作り直す。`false`: 入力が同じ build を使い回す |
+| `BENCHMARK` | `true` | `true` / `false` | `true`: `PROFILE=full` で、試験した基板のベンチマークの project も起こす（`BACKEND`・`TLS`・`FEATURE` が `all` で `TEST` が空の時だけ）。`false`: 試験だけ |
 | `TEST` | 空 | 正規表現 | 上の 4 つの選択で書けない選び方のためだけに使う。試験の名前に対する正規表現 |
 
 `PROFILE` の意味は次のとおりです。
@@ -64,7 +65,8 @@ flowchart LR
 | `check` | 単体試験だけ（基板も build も使わない） |
 | `build` | 単体試験と、すべてのファームウェアの build（基板は使わない） |
 | `smoke` | 単体試験、3 試験に必要な build、基板の 3 試験（各基板の `sw:tls12:mqtt`）、`sweep` |
-| `full` | 単体試験、選んだ試験に必要な build、基板の試験、`sweep`。選択（`BOARD`・`BACKEND`・`TLS`・`FEATURE`・`TEST`）は、この値の時だけ使える |
+| `full` | 単体試験、選んだ試験に必要な build、基板の試験、`sweep`。選択（`BOARD`・`BACKEND`・`TLS`・`FEATURE`・`TEST`）は、この値の時だけ使える。基板を丸ごと選んだ時は、その基板の[ベンチマーク](#ベンチマークの-project)も試験の後に起こす |
+| `benchmark` | 単体試験と、ベンチマークの project だけ（build も基板の試験もしない）。基板は `BOARD` で選ぶ |
 | `doctor` | 各 runner が道具・Python module・AWS へのアクセスを持つかを表示する。基板にも触れず、AWS の資源も変えない |
 
 ### 目的ごとの変数の値と、動く job
@@ -74,7 +76,9 @@ flowchart LR
 | CI の道具の単体試験だけ | `check` | なし | `check` |
 | 基板なしで、すべてのファームウェアを build | `build` | なし | `check`、全 31 種類の build |
 | 基板で少数の試験 | `smoke` | なし | `check`、build 6 本、基板の 3 試験、`sweep` |
-| 基板ですべての試験 | `full` | なし | `check`、全 31 種類の build、基板の 36 試験、`sweep` |
+| 基板ですべての試験 | `full` | なし | `check`、全 31 種類の build、基板の 36 試験、ベンチマーク、`sweep` |
+| 基板ですべての試験（ベンチマークなし） | `full` | `BENCHMARK=false` | `check`、全 31 種類の build、基板の 36 試験、`sweep` |
+| ベンチマークだけ | `benchmark` | `BOARD=rx72n` など | `check`、その基板のベンチマーク |
 | 1 つの基板の試験 | `full` | `BOARD=rx671` | `check`、必要な build、その基板の 12 試験、`sweep` |
 | 1 種類の試験を全基板で | `full` | `FEATURE=ota`（`BACKEND`・`TLS` も同様） | `check`、必要な build、条件に合う試験、`sweep` |
 | 1 つの試験を 3 回 | `full` | `BOARD=rx72n` `BACKEND=sw` `TLS=tls12` `FEATURE=mqtt` `REPEAT=3` | `check`、build 2 本、基板の試験 3 job（`#1`〜`#3`）、`sweep` |
@@ -93,7 +97,8 @@ flowchart LR
 |---|---|
 | `PROFILE` が表に無い値 | `plan` が止まる |
 | `BOARD`・`BACKEND`・`TLS`・`FEATURE` が選べる値に無い | `plan` が止まる |
-| `PROFILE` が `full` 以外で、選択（4 つの選択か `TEST`）を指定 | `plan` が止まる（`PROFILE=full` にするか、選択を戻す） |
+| `PROFILE` が `full` と `benchmark` 以外で、選択（4 つの選択か `TEST`）を指定 | `plan` が止まる（`PROFILE=full` にするか、選択を戻す） |
+| `PROFILE=benchmark` で、`BACKEND`・`TLS`・`FEATURE`・`TEST` を指定 | `plan` が止まる（ベンチマークは基板を丸ごと測る） |
 | `TEST` と、`all` 以外の 4 つの選択を同時に指定 | `plan` が止まる |
 | `REPEAT` が 2 以上で、`PROFILE` が `full` と `smoke` 以外 | `plan` が止まる |
 | `REPEAT` が 1 〜 50 の外 | `plan` が止まる（画面の選択肢は 1・2・3・5・10） |
@@ -135,7 +140,7 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 | [`tools/ci/rxci_build.py`](../../tools/ci/rxci_build.py) | Windows の runner でのファームウェアの build と、build の使い回し |
 | [`tools/ci/rxci_board.py`](../../tools/ci/rxci_board.py) | 基板につないだ runner での、1 試験の流れ（排他・書き込み・設定・観測・片付け） |
 | [`tools/ci/rxci_aws.py`](../../tools/ci/rxci_aws.py) | AWS の試験用資源の作成と削除 |
-| [`tools/ci/tests.json`](../../tools/ci/tests.json) | 試験の一覧（軸の値・実装済みの試験・smoke の試験）、基板ごとの設定、runner の tag、build の同時数 |
+| [`tools/ci/tests.json`](../../tools/ci/tests.json) | 試験の一覧（軸の値・テスト番号・実装済みの試験・smoke の試験）、ベンチマークの project（`benchmarks`）、基板ごとの設定、runner の tag、build の同時数 |
 
 - 子 pipeline の stage は `check`・`build`・`test`・`cleanup` です。試験 job は、必要な build job だけを `needs` で待ちます。
 - AWS の API へは、GitLab が job ごとに発行する ID token（OIDC）で入ります。使う role は、保護された group 変数 `AWS_ROLE_ARN` が決めます。共通の設定は[ハードウェア構成の台帳](https://gitlab.saffti.jp/oss/infra/hardware-config/-/blob/main/docs/ci-variables.md)にあります。
@@ -152,6 +157,22 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 5. build が新しいなら、[`tools/ci/rxci_build.py`](../../tools/ci/rxci_build.py) に build の流れを足す。
 6. [`.gitlab-ci.yml`](../../.gitlab-ci.yml) の選択肢（`options`）も、軸の値と同じにする。単体試験が、この 2 つの一致を確かめます。
 7. [試験仕様](../test-specification.md)の一覧と合否の基準を足し、この文書の「目的ごとの変数」の数を合わせる。
+
+## ベンチマークの project
+
+基板の試験の後に、通信性能のベンチマークの project の pipeline を、multi-project の downstream として起こします（`strategy: depend`。downstream の成否が、この pipeline の job の成否になります）。起こす project と渡す変数は [`tools/ci/tests.json`](../../tools/ci/tests.json) の `benchmarks` にあります。
+
+| 名前 | 基板 | project | 測る物 |
+|---|---|---|---|
+| `rx72n:sw:speed` | RX72N | [rx72n_envision_kit/benchmark/mbedtls](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/mbedtls) | TCP と TLS 1.2 の速度（受信・送信）と CPU 負荷率。software |
+| `rx72n:tsip:speed` | RX72N | [rx72n_envision_kit/benchmark/tsip_mbedtls](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls) | 同上。TSIP |
+| `rx72n:sw:tls13-0rtt` | RX72N | [rx72n_envision_kit/benchmark/tsip_mbedtls13](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13) | TLS 1.3 の再開と 0-RTT。software |
+| `rx72n:tsip:tls13-0rtt` | RX72N | 同上 | 同上。TSIP |
+| `rx65n:r_cellular-test` | RX65N | [fitmodules/r_cellular/test](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/test) | Cellular のドライバ `r_cellular` の試験（tick と API） |
+
+- 基板ごとの最初のベンチマークは、試験の stage がすべて終わってから始まります。同じ基板の 2 つ目からは、1 つ前のベンチマークが終わってから始まります。試験が落ちても、ベンチマークは流します。
+- ベンチマークの project の基板の排他は、その project の lock の file によります（RX72N のベンチマークは RPi#1 の RX72N の個体で、この repo の試験の RX72N（RPi#2）とは別の個体です）。
+- EK-RX671 のベンチマークと、RX65N の通信の速度（`ck-rx65n/bg96-bench`）は、まだ載せていません（[Issue 214](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/work_items/214)）。
 
 ## build
 
