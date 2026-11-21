@@ -34,7 +34,7 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
   - BG96のGNSSを使うAPI（`R_CELLULAR_GnssStart`、`R_CELLULAR_GnssGetLocation`、`R_CELLULAR_GnssStop`）が
     増えました。このrepoのアプリは使っていません。
   - BG96の`+CME ERROR:`応答で、待っているATコマンドがエラーとして終わるようになりました。
-    これまではタイムアウトまで待っていました。
+    旧版はこの応答を認識せず、タイムアウトまで待つ可能性がありました。
   - 変更の詳細は[`r_cellular`のREADME](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular/-/blob/v1.13.saffti-custom.8/README.md)にあります。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.5.0
