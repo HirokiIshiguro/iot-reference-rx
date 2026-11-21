@@ -170,10 +170,12 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 | `rx72n:sw:tls13-0rtt` | RX72N | [rx72n_envision_kit/benchmark/tsip_mbedtls13](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13) | TLS 1.3 の再開と 0-RTT。software |
 | `rx72n:tsip:tls13-0rtt` | RX72N | 同上 | 同上。TSIP |
 | `rx65n:r_cellular-test` | RX65N | [fitmodules/r_cellular/test](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/test) | Cellular のドライバ `r_cellular` の試験（tick と API） |
+| `rx65n:bg96-speed` | RX65N | [ck-rx65n/bg96-bench](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench) | Cellular（BG96）の TCP の速度（受信・送信）。通信相手の EC2 を pipeline ごとに作って消す |
 
 - 基板ごとの最初のベンチマークは、試験の stage がすべて終わってから始まります。同じ基板の 2 つ目からは、1 つ前のベンチマークが終わってから始まります。試験が落ちても、ベンチマークは流します。
 - ベンチマークの project の基板の排他は、その project の lock の file によります（RX72N のベンチマークは RPi#1 の RX72N の個体で、この repo の試験の RX72N（RPi#2）とは別の個体です）。
-- EK-RX671 のベンチマークと、RX65N の通信の速度（`ck-rx65n/bg96-bench`）は、まだ載せていません（[Issue 214](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/work_items/214)）。
+- `rx65n:bg96-speed` の通信相手の EC2 は、ベンチマークの project の `main` の pipeline が、/oss の共通の OIDC の role で作って消します。この repo からは、変数 `RX65N_BG96_RUN_HARDWARE=true` だけを渡します。
+- EK-RX671 のベンチマークは、まだ載せていません（[Issue 214](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/work_items/214)）。
 
 ## build
 

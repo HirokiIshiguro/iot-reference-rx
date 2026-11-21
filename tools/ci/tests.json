@@ -198,6 +198,15 @@
       "project": "oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/test",
       "measures": "tests of the r_cellular driver (tick rates and the API) on the CK-RX65N with BG96",
       "variables": {}
+    },
+    {
+      "name": "rx65n:bg96-speed",
+      "board": "rx65n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench",
+      "measures": "TCP throughput (sink, source) over the BG96 cellular link on the CK-RX65N; the peer is an EC2 server made per pipeline",
+      "variables": {
+        "RX65N_BG96_RUN_HARDWARE": "true"
+      }
     }
   ],
   "ready": [
