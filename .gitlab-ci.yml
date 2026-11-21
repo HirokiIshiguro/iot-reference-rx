@@ -21,8 +21,9 @@ variables:
       - "build"
       - "smoke"
       - "full"
+      - "benchmark"
       - "doctor"
-    description: "How far the pipeline goes. check: unit tests of the CI tools. build: also build every firmware. smoke: a few tests on the boards. full: the tests on the boards. doctor: show what the runners have."
+    description: "How far the pipeline goes. check: unit tests of the CI tools. build: also build every firmware. smoke: a few tests on the boards. full: the tests on the boards, then the benchmark projects of those boards. benchmark: only the benchmark projects (choose the boards with BOARD). doctor: show what the runners have."
   BOARD:
     value: "all"
     options:
@@ -30,7 +31,7 @@ variables:
       - "rx72n"
       - "rx65n"
       - "rx671"
-    description: "Board whose tests run (needs PROFILE=full). all: every board."
+    description: "Board whose tests run (needs PROFILE=full), or whose benchmark projects run (PROFILE=benchmark). all: every board."
   BACKEND:
     value: "all"
     options:
@@ -68,6 +69,12 @@ variables:
       - "false"
       - "true"
     description: "true: build every firmware again. false: reuse a build with the same inputs."
+  BENCHMARK:
+    value: "true"
+    options:
+      - "true"
+      - "false"
+    description: "true: PROFILE=full also starts the benchmark projects of the boards it tests (only when BACKEND, TLS and FEATURE are all and TEST is empty). false: the tests only."
   TEST:
     value: ""
     description: "Only for a selection the lists cannot express: regular expression of test names, for example ^rx72n:(sw|tsip):tls12:ota$. Leave BOARD, BACKEND, TLS and FEATURE at all when you use it."
@@ -106,7 +113,7 @@ plan:
     GIT_DEPTH: "1"
     GIT_SUBMODULE_STRATEGY: none
   script:
-    - python3 tools/ci/rxci.py plan --profile "$PROFILE" --board "$BOARD" --backend "$BACKEND" --tls "$TLS" --feature "$FEATURE" --test "$TEST" --repeat "$REPEAT" --keep "${KEEP:-false}" --rebuild "$REBUILD"
+    - python3 tools/ci/rxci.py plan --profile "$PROFILE" --board "$BOARD" --backend "$BACKEND" --tls "$TLS" --feature "$FEATURE" --test "$TEST" --repeat "$REPEAT" --keep "${KEEP:-false}" --rebuild "$REBUILD" --benchmark "$BENCHMARK"
   artifacts:
     paths:
       - child-pipeline.yml
