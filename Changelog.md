@@ -8,6 +8,7 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 
 | Tag | 主な内容 |
 |---|---|
+| [v202604.00-LTS-rx-1.0.0-saffti-1.5.1](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.1) | `r_cellular`を`1.13.saffti-custom.8`へ更新（GNSSのAPI、`+CME ERROR:`の扱い） |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.5.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.0) | 実機CIの書き直し（36試験）、RX 3環境の共通化、BG96の`r_cellular`復帰、機能仕様書・実装仕様書・試験仕様書 |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.4.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.4.0) | EK-RX671 + Type 1YN、横断性能、fixed-SHA AWS IoT 5-run |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0) | TLS 1.3 session resumption / 0-RTTとnightly matrix |
@@ -24,6 +25,17 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
   EDMAC異常時の復帰を実機確認します。
 - SDIO / WHD / FreeRTOS+TCP境界の待ち時間を追加分析します。
 - RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.5.1
+
+### 変更
+
+- RX65N/BG96の`r_cellular`を`1.13.saffti-custom.7`から`1.13.saffti-custom.8`へ更新しました。
+  - BG96のGNSSを使うAPI（`R_CELLULAR_GnssStart`、`R_CELLULAR_GnssGetLocation`、`R_CELLULAR_GnssStop`）が
+    増えました。このrepoのアプリは使っていません。
+  - BG96の`+CME ERROR:`応答で、待っているATコマンドがエラーとして終わるようになりました。
+    旧版はこの応答を認識せず、タイムアウトまで待つ可能性がありました。
+  - 変更の詳細は[`r_cellular`のREADME](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular/-/blob/v1.13.saffti-custom.8/README.md)にあります。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.5.0
 
