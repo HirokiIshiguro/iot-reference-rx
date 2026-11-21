@@ -99,6 +99,7 @@ flowchart LR
 | `BOARD`・`BACKEND`・`TLS`・`FEATURE` が選べる値に無い | `plan` が止まる |
 | `PROFILE` が `full` と `benchmark` 以外で、選択（4 つの選択か `TEST`）を指定 | `plan` が止まる（`PROFILE=full` にするか、選択を戻す） |
 | `PROFILE=benchmark` で、`BACKEND`・`TLS`・`FEATURE`・`TEST` を指定 | `plan` が止まる（ベンチマークは基板を丸ごと測る） |
+| `PROFILE=benchmark` で、ベンチマークの project が無い基板（いまは `rx671`）を `BOARD` で指定 | `plan` が止まる（何も測らずに成功に見えるのを防ぐ） |
 | `TEST` と、`all` 以外の 4 つの選択を同時に指定 | `plan` が止まる |
 | `REPEAT` が 2 以上で、`PROFILE` が `full` と `smoke` 以外 | `plan` が止まる |
 | `REPEAT` が 1 〜 50 の外 | `plan` が止まる（画面の選択肢は 1・2・3・5・10） |
@@ -160,7 +161,7 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 
 ## ベンチマークの project
 
-基板の試験の後に、通信性能のベンチマークの project の pipeline を、multi-project の downstream として起こします（`strategy: depend`。downstream の成否が、この pipeline の job の成否になります）。起こす project と渡す変数は [`tools/ci/tests.json`](../../tools/ci/tests.json) の `benchmarks` にあります。
+基板の試験の後に、通信性能のベンチマークの project の pipeline を、multi-project の downstream として起こします（`strategy: depend`。downstream の成否が、この pipeline の job の成否になります）。起こす project と渡す変数は [`tools/ci/tests.json`](../../tools/ci/tests.json) の `benchmarks` にあります。渡す変数は `tests.json` に書いた固定の値だけです。秘密の値はここから渡しません（GitLab は、別の project へ渡した変数のマスクの設定を引き継がないため）。秘密が要る時は、downstream の project 側のマスクした変数を使います。
 
 | 名前 | 基板 | project | 測る物 |
 |---|---|---|---|

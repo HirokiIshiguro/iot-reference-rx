@@ -246,8 +246,9 @@ def benchmark_jobs(registry: dict, boards: list[str]) -> dict:
 
     The first benchmark of a board waits for the whole test stage (it has no needs), so that it does not take
     a board from the tests; the next ones of the same board wait for the one before, because they use the
-    same board. GitLab expands the $NAME references of the variables here, in this pipeline, so a secret of
-    this project reaches the downstream pipeline without being written anywhere.
+    same board. The variables are fixed values from tests.json. A secret is not passed from here: GitLab does
+    not keep the masking of a forwarded variable in the downstream project, so a downstream pipeline that needs
+    a secret takes it from a masked variable of its own project or group.
     """
     jobs: dict = {}
     for board in boards:
@@ -255,7 +256,6 @@ def benchmark_jobs(registry: dict, boards: list[str]) -> dict:
         for entry in (e for e in registry.get("benchmarks", []) if e["board"] == board):
             name = f"benchmark {entry['name']}"
             variables = dict(entry.get("variables", {}))
-            variables.update({target: f"${source}" for target, source in entry.get("parent_variables", {}).items()})
             job = {
                 "stage": "benchmark",
                 "when": "always",       # a failed test does not make the measurement of the board meaningless
@@ -454,6 +454,11 @@ def command_plan(args: argparse.Namespace) -> int:
         raise SystemExit(f"REPEAT repeats tests, and PROFILE={args.profile} runs none. "
                          f"Set PROFILE=full, or leave REPEAT at 1.")
     boards = benchmark_boards(registry, args.profile, args.board, whole_boards, args.benchmark == "true")
+    if args.profile == "benchmark" and not boards:
+        with_benchmarks = [name for name in registry["axes"]["board"]
+                           if any(entry["board"] == name for entry in registry.get("benchmarks", []))]
+        raise SystemExit(f"PROFILE=benchmark: BOARD={args.board} has no benchmark project in tools/ci/tests.json. "
+                         f"Choose one of {', '.join(with_benchmarks) or '(none)'}, or all.")
     jobs, summary = child_pipeline(registry, args.profile, pattern, args.repeat, keep=args.keep == "true",
                                    rebuild=args.rebuild == "true", benchmarks=boards)
     Path(args.output).write_text(json.dumps(jobs, indent=2) + "\n", encoding="utf-8")

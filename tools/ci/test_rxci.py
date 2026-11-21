@@ -355,8 +355,7 @@ class BenchmarkTests(unittest.TestCase):
     """The child pipeline starts the benchmark projects of the boards after their tests."""
 
     BENCHMARKS = [
-        {"name": "rx72n:a", "board": "rx72n", "project": "group/a", "variables": {"RUN": "true"},
-         "parent_variables": {"WIFI": "SECRET_OF_THIS_PROJECT"}},
+        {"name": "rx72n:a", "board": "rx72n", "project": "group/a", "variables": {"RUN": "true"}},
         {"name": "rx72n:b", "board": "rx72n", "project": "group/b"},
         {"name": "rx671:c", "board": "rx671", "project": "group/c", "ref": "stable"},
     ]
@@ -398,7 +397,7 @@ class BenchmarkTests(unittest.TestCase):
             self.assertFalse(job["interruptible"])
         self.assertEqual("main", first["trigger"]["branch"])
         self.assertEqual("stable", other["trigger"]["branch"])
-        self.assertEqual({"RUN": "true", "WIFI": "$SECRET_OF_THIS_PROJECT"}, first["variables"])
+        self.assertEqual({"RUN": "true"}, first["variables"])
 
     def test_profile_benchmark_runs_no_build_and_no_test(self):
         jobs, summary = rxci.child_pipeline(self.registry(), "benchmark", "", 1, benchmarks=["rx671"])
@@ -412,6 +411,18 @@ class BenchmarkTests(unittest.TestCase):
             with self.subTest(selection=selection):
                 with self.assertRaisesRegex(SystemExit, "PROFILE=benchmark runs the benchmarks of whole boards"):
                     RunVariableTests.plan(self, "--profile", "benchmark", *selection)
+
+    def test_the_plan_command_stops_a_benchmark_profile_with_a_board_without_benchmarks(self):
+        data = rxci.load_registry()
+        boards = [name for name in data["axes"]["board"]
+                  if not any(entry["board"] == name for entry in data.get("benchmarks", []))]
+        self.assertTrue(boards, "every board has a benchmark: this test needs a board without one")
+        with self.assertRaisesRegex(SystemExit, f"BOARD={boards[0]} has no benchmark project"):
+            RunVariableTests.plan(self, "--profile", "benchmark", "--board", boards[0])
+
+    def test_the_plan_command_runs_a_benchmark_profile_with_a_board_with_benchmarks(self):
+        summary = RunVariableTests.plan(self, "--profile", "benchmark", "--board", "rx72n")
+        self.assertEqual(4, len(summary["benchmarks"]))
 
     def test_every_benchmark_in_tests_json_names_a_board_and_a_project(self):
         data = rxci.load_registry()
