@@ -204,10 +204,11 @@
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
       "ref": "iotref-53-exp-commit-and-rfp-budget",
-      "measures": "TLS 1.2 sink throughput, TSIP (Issue 53 conf commit reply)",
+      "measures": "TLS 1.2 sink throughput, TSIP (Issue 53 handshake diagnostics)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
-        "RX671_BENCHMARK_PROFILE": "tls-sink"
+        "RX671_BENCHMARK_PROFILE": "tls-sink",
+        "RX671_EK_LANBENCH_TLS_DEBUG_LEVEL": "2"
       },
       "parent_variables": {
         "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
