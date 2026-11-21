@@ -203,7 +203,7 @@
       "name": "rx671:tsip:tls-sink",
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
-      "ref": "iotref-53-keep-commit-response",
+      "ref": "iotref-53-exp-commit-and-rfp-budget",
       "measures": "TLS 1.2 sink throughput, TSIP (Issue 53 conf commit reply)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
