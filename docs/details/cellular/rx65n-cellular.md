@@ -8,14 +8,14 @@ bootloaderの信頼設定、コンパイラ・リンカの共通化は維持し�
 | 項目 | 参照 |
 |---|---|
 | ドライバ | [`r_cellular` BG96 fork](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular) |
-| 固定版 | `1.13.saffti-custom.7` / `e685f2fa748a677d049ea284e99217046cde8766` |
+| 固定版 | `1.13.saffti-custom.8` / `24452b4958c5b4f873a450e1f23beee04e2ab49e` |
 | submodule | `Middleware/Renesas/r_cellular` |
 | forkの目的 | Renesas v1.13へのBG96のATコマンド・電源・UART・socket対応 |
 | 製品側 | APNのKVS設定、接続・socketアダプタ、ボードの設定header |
 
 ドライバ本体を利用側でコピー・修正・ビルド時パッチしません。
 設定headerと公開APIによる組込みを、fork本体の変更と区別します。
-SCで利用するFIT版も同じ`1.13.saffti-custom.7`です。
+SCで利用するFIT版も同じ`1.13.saffti-custom.8`です。
 
 この構成への復帰は、過去のOTAや性能測定の再現成功を意味しません。
 利用側の実機検証は、対象sourceとrunを固定したCI証跡で確認します。

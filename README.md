@@ -5,7 +5,7 @@
 TSIP（ハードウェア暗号）をGitLab CIで検証します。
 
 ベースはFreeRTOS `202604.00-LTS-rx`、最新リリースは
-[`v202604.00-LTS-rx-1.0.0-saffti-1.5.0`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.0)です。
+[`v202604.00-LTS-rx-1.0.0-saffti-1.5.1`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.1)です。
 変更点は[Changelog](Changelog.md)を参照してください。
 
 ## 対応ターゲット
