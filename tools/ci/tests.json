@@ -203,7 +203,7 @@
       "name": "rx671:tsip:tls-sink",
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
-      "ref": "iotref-54-exp-align-rfp-budget",
+      "ref": "iotref-54-exp-whd-port-main",
       "measures": "TLS 1.2 sink throughput, TSIP (aligned to iot-reference-rx main, Issue 54)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
