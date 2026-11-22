@@ -173,7 +173,7 @@ CI の定義と道具は、次の file に分かれています。何を流す�
 | `rx65n:bg96-speed` | RX65N | [ck-rx65n/bg96-bench](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench) | Cellular（BG96）の TCP の速度（受信・送信）。通信相手の EC2 を pipeline ごとに作って消す |
 
 - 基板ごとの最初のベンチマークは、試験の stage がすべて終わってから始まります。同じ基板の 2 つ目からは、1 つ前のベンチマークが終わってから始まります。試験が落ちても、ベンチマークは流します。
-- ベンチマークの project の基板の排他は、その project の lock の file によります（RX72N のベンチマークは RPi#1 の RX72N の個体で、この repo の試験の RX72N（RPi#2）とは別の個体です）。
+- ベンチマークの project の基板の排他は、その project の lock の file によります。RX72N のベンチマークは、この repo の試験と同じ RPi#2 の RX72N を使い、同じ lock の file（`tools/idt/targets.json` の `rx72n-ethernet` の `bench_lock`）で排他します（2026-11-22 から。それまでは RPi#1 の別の個体でした）。ベンチマークは試験の stage がすべて終わってから始まるので、試験とは重なりません。
 - `rx65n:bg96-speed` の通信相手の EC2 は、ベンチマークの project の `main` の pipeline が、/oss の共通の OIDC の role で作って消します。この repo からは、変数 `RX65N_BG96_RUN_HARDWARE=true` だけを渡します。
 - EK-RX671 のベンチマークは、まだ載せていません（[Issue 214](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/work_items/214)）。
 
