@@ -200,19 +200,18 @@
       "variables": {}
     },
     {
-      "name": "rx671:tsip:tls-sink",
+      "name": "rx671:sw:all",
       "board": "rx671",
-      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
-      "ref": "iotref-54-exp-no-mfl",
-      "measures": "TLS 1.2 sink throughput, TSIP (MR 59 without the MFL request, Issue 54)",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls",
+      "ref": "iotref-52-exp-fix-and-url",
+      "measures": "TCP and TLS throughput, Mbed TLS in software (MR 49 + MR 50 + MR 51 check)",
       "variables": {
-        "RX671_BENCHMARK_RUN_HARDWARE": "true",
-        "RX671_BENCHMARK_PROFILE": "tls-sink"
+        "RX671_SOFTWARE_BENCHMARK_RUN_HARDWARE": "true"
       },
       "parent_variables": {
-        "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
-        "RX671_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
-        "RX671_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
+        "RX671_SOFTWARE_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
+        "RX671_SOFTWARE_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_SOFTWARE_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
       }
     }
   ],
