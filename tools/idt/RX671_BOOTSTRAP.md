@@ -37,7 +37,7 @@ RSUは3環境とも従来の連続形式です。`0x200` byteのheaderに続く`
 
 終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗・UART出力継続・privileged子processの終了不明では所有記録を保持して再利用を止めます。
 
-全3環境のtransaction上限は[cleanup_budget.py](cleanup_budget.py)が算出する1565秒で、公開鍵投入CLIの絶対上限は200秒です。中断時resetの90秒は別枠です。終了を確認できないRFP子processは`<rfp_lock>.unsafe.json`で再利用を停止し、失敗したSSH callbackのprivate stagingも保持します。個別scopeの成功を全IDT合格やAWS正式認定とは扱いません。
+全3環境のtransaction上限は[cleanup_budget.py](cleanup_budget.py)が算出する3245秒で、公開鍵投入CLIの絶対上限は200秒です。中断時resetの90秒は別枠(rfp-cli 1コマンドの上限300秒とは別)です。終了を確認できないRFP子processは`<rfp_lock>.unsafe.json`で再利用を停止し、失敗したSSH callbackのprivate stagingも保持します。個別scopeの成功を全IDT合格やAWS正式認定とは扱いません。
 
 RX671で確認した旧linear画像の起動不良は、現在の共通経路とは別の実機調査記録です。
 

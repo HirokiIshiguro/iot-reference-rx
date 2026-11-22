@@ -55,7 +55,7 @@ MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検
 
 共通LittleFSは2.11.3、領域の開始位置は`0x00100000`、容量はRX65N/RX72Nが16KiB、RX671が8KiBです。RX72Nの旧開始位置とRX65N/RX72Nの旧容量からの変更により、初回formatと再provisionが必要です。今回の部品・host検証を実機の移行確認やIDT合格へ流用しません。OTAのbuild ledger / 起動識別子はターゲットとfingerprintを照合し、通常firmwareへの復帰は既存flash / provision経路で確認します。
 
-[共有予算](../../../tools/idt/cleanup_budget.py)は3環境ともtransaction 1565秒、公開鍵投入CLIは絶対上限200秒です。終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗、UART出力継続、privileged子processの終了不明では所有記録を保持して再利用を止めます。
+[共有予算](../../../tools/idt/cleanup_budget.py)は3環境ともtransaction 3245秒、公開鍵投入CLIは絶対上限200秒です。終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗、UART出力継続、privileged子processの終了不明では所有記録を保持して再利用を止めます。
 
 過去のRX671起動不良は、現行のdual-bank共通経路と区別して保存しています。
 
