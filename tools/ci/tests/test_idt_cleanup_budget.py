@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
 from pathlib import Path
 import subprocess
 import shlex
@@ -13,7 +14,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from tools.idt import cleanup_budget as budget
+from tools.idt import cleanup_budget as budget, oidc_job
 from tools.idt.targets import get_target, target_fingerprint
 
 
@@ -43,6 +44,18 @@ class CleanupBudgetTests(unittest.TestCase):
             self.assertEqual(budget.FLASH_RFP_COMMAND_SECONDS, phases["initial_chip_erase"])
         with self.assertRaises(ValueError):
             budget.flash_transaction_seconds("")
+
+    def test_rfp_command_limit_matches_the_new_ci_and_fits_the_oidc_job(self):
+        # The new CI (tools/ci/rxci_board.py) allows 300 s per rfp-cli command. A smaller limit here
+        # stopped programming that would have succeeded and left the unsafe sentinel on the bench.
+        source = (Path(__file__).resolve().parents[1] / "rxci_board.py").read_text(encoding="utf-8")
+        ci_seconds = int(re.search(r"^RFP_SECONDS\s*=\s*(\d+)", source, re.MULTILINE).group(1))
+        self.assertEqual(ci_seconds, budget.FLASH_RFP_COMMAND_SECONDS)
+        # The chained worst-case waits must still fit the longest OIDC job (oidc_job.MAX_JOB_SECONDS).
+        self.assertLess(oidc_job.NATIVE_SECONDS + budget.owned_runtime_cleanup_seconds() +
+                        oidc_job.SIGNER_CLEANUP_SECONDS, oidc_job.MAX_JOB_SECONDS)
+        # Aborting after a failure is a separate, fixed reset and does not scale with one command.
+        self.assertEqual(90, budget.FLASH_ABORT_RESET_SECONDS)
 
     def test_other_boards_wait_for_the_longest_shared_lock_transaction(self):
         longest = max(budget.flash_transaction_seconds(name) for name in budget.FLASH_TRANSACTION_PHASES)

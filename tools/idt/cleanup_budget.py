@@ -2,14 +2,14 @@
 
 The transaction deadline starts before acquiring the global RFP lock. Every
 target prepares public signer trust through its standalone dual-bank firmware.
-An interrupted/failed transaction may reset for another 90 seconds while
+An interrupted/failed transaction may reset for another 90 seconds (a fixed limit, separate from the 300-second single rfp-cli command limit) while
 holding RFP. Since all boards share that lock, bridge shutdown allows the
 longest supported transaction regardless of its own selected target.
 """
 
 FLASH_LOCK_WAIT_SECONDS = 60
 FLASH_CONTROL_SECONDS = 15
-FLASH_RFP_COMMAND_SECONDS = 90
+FLASH_RFP_COMMAND_SECONDS = 300
 FLASH_DOWNLOAD_SECONDS = 540
 PUBLIC_SIGNER_PROVISION_SECONDS = 200
 RX671_SIGNER_PROVISION_SECONDS = PUBLIC_SIGNER_PROVISION_SECONDS
