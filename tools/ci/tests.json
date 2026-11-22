@@ -203,8 +203,8 @@
       "name": "rx671:tsip:tls-sink",
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
-      "ref": "iotref-54-exp-no-mfl-notrace",
-      "measures": "TLS 1.2 sink throughput, TSIP (no MFL request, no Tracealyzer recorder, Issue 54)",
+      "ref": "iotref-54-exp-no-mfl-f2-512",
+      "measures": "TLS 1.2 sink throughput, TSIP (no MFL request, WHD F2 block size 512, Issue 54)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
         "RX671_BENCHMARK_PROFILE": "tls-sink"
