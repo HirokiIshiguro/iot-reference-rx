@@ -409,7 +409,8 @@ function Invoke-MakeBuild {
     # the tool paths added by this script. Bind GNU make's exported PATH to the
     # resolved current process paths so lbgrx, ccrx and BusyBox remain available.
     Invoke-Tool -FilePath $makeExe -Arguments @("PATH=$env:Path", "clean") -WorkingDirectory $BuildDir
-    Invoke-Tool -FilePath $makeExe -Arguments @("PATH=$env:Path", "-j2", $Target) -WorkingDirectory $BuildDir
+    $makeJobs = [Math]::Max(1, [Environment]::ProcessorCount)
+    Invoke-Tool -FilePath $makeExe -Arguments @("PATH=$env:Path", "-j$makeJobs", $Target) -WorkingDirectory $BuildDir
 }
 
 
