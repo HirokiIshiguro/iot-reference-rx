@@ -1,0 +1,1660 @@
+{
+  "created": "2026-11-23T11:04:41Z",
+  "repositories": {
+    "github.com/amazon-freertos/pkcs11@9304ef6842d08d881ccd1daa8d3a428f3a9671ee": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/armmbed/mbedtls@848a4e06b375e067552f1a21d4bc69322c673217": {
+      "children": {},
+      "tags": [
+        "mbedtls-2.16.8",
+        "v2.16.8"
+      ]
+    },
+    "github.com/armmbed/mbedtls@d61fa61bef06b64132e3490543c81b8ee40fbee3": {
+      "children": {},
+      "tags": [
+        "mbedtls-2.16.10",
+        "v2.16.10"
+      ]
+    },
+    "github.com/aws/amazon-freertos@a038063c3b0216e0b4d46d72425388a0c2938b13": {
+      "children": {
+        "freertos_kernel": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel.git",
+          "ef4c30524402b523005d9ab2312f8531ffeda6c4"
+        ],
+        "libraries/3rdparty/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "bd5fbc30eb3a448600eab761bb215835459dd174"
+        ],
+        "libraries/3rdparty/lwip": [
+          "https://github.com/lwip-tcpip/lwip.git",
+          "79cd89f99d1032cc5375569e5b24c375b9d230fa"
+        ],
+        "libraries/3rdparty/mbedtls": [
+          "https://github.com/ARMmbed/mbedtls.git",
+          "d61fa61bef06b64132e3490543c81b8ee40fbee3"
+        ],
+        "libraries/3rdparty/pkcs11": [
+          "https://github.com/amazon-freertos/pkcs11.git",
+          "9304ef6842d08d881ccd1daa8d3a428f3a9671ee"
+        ],
+        "libraries/3rdparty/unity": [
+          "https://github.com/ThrowTheSwitch/Unity.git",
+          "2939c420ed9f2697bcb82c1b193bb48c4a8ad7a9"
+        ],
+        "libraries/abstractions/backoff_algorithm": [
+          "https://github.com/FreeRTOS/backoffAlgorithm.git",
+          "a70291444c556bc3392bf9b7b60626b93b120319"
+        ],
+        "libraries/abstractions/ota_pal_psa": [
+          "https://github.com/Linaro/freertos-ota-pal-psa.git",
+          "0b6db7d7cc0260fbb1e54a26ad6ff25cdcde3697"
+        ],
+        "libraries/abstractions/pkcs11/corePKCS11": [
+          "https://github.com/FreeRTOS/corePKCS11.git",
+          "ccb8fb15b4bc0f369c7292b6c1b835e9b35cab15"
+        ],
+        "libraries/abstractions/pkcs11/psa": [
+          "https://github.com/Linaro/freertos-pkcs11-psa.git",
+          "80292d24f4978891b0fd35feeb5f1d6f6f0fff06"
+        ],
+        "libraries/coreHTTP": [
+          "https://github.com/FreeRTOS/coreHTTP.git",
+          "b349f89e67f5feef51438dc09ed89959dedc18d5"
+        ],
+        "libraries/coreJSON": [
+          "https://github.com/FreeRTOS/coreJSON.git",
+          "26fe707548fc4e975c453aa4475ae056bb70247b"
+        ],
+        "libraries/coreMQTT": [
+          "https://github.com/FreeRTOS/coreMQTT.git",
+          "ff9830a338b6a759c5574f991b02d6f99abadc42"
+        ],
+        "libraries/coreMQTT-Agent": [
+          "https://github.com/FreeRTOS/coreMQTT-Agent.git",
+          "da70f0fcc3e135616d078bfb7b2ab883f561503c"
+        ],
+        "libraries/device_defender_for_aws": [
+          "https://github.com/aws/device-defender-for-aws-iot-embedded-sdk.git",
+          "548b4688b26d16d0e6134d7d93dcbae103994e40"
+        ],
+        "libraries/device_shadow_for_aws": [
+          "https://github.com/aws/device-shadow-for-aws-iot-embedded-sdk.git",
+          "508ce43a2257be5d38bfd2a778607fa921cb2dac"
+        ],
+        "libraries/freertos_plus/standard/freertos_plus_tcp": [
+          "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git",
+          "9a25860e761036a9eb780799c9db632e3eff60c9"
+        ],
+        "libraries/jobs_for_aws": [
+          "https://github.com/aws/jobs-for-aws-iot-embedded-sdk.git",
+          "19788445bca7f8f85167c83ac12379d3d1022295"
+        ],
+        "libraries/ota_for_aws": [
+          "https://github.com/aws/ota-for-aws-iot-embedded-sdk.git",
+          "666241d0f643b07d5146a3715b649d80f8135e0b"
+        ],
+        "tools/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "b652295078e26f8444c72ee3088f6a1230624827"
+        ],
+        "vendors/cypress/MTB/libraries/abstraction-rtos": [
+          "https://github.com/cypresssemiconductorco/abstraction-rtos.git",
+          "a3ae4e2b6db1a7332aae6213a106c983b904de56"
+        ],
+        "vendors/cypress/MTB/libraries/capsense": [
+          "https://github.com/cypresssemiconductorco/capsense.git",
+          "83898bb70eca16e4235eca362dd3ecc038de97e3"
+        ],
+        "vendors/cypress/MTB/libraries/clib-support": [
+          "https://github.com/cypresssemiconductorco/clib-support.git",
+          "50b583456a9a11a92b97da6829d090a3878a9340"
+        ],
+        "vendors/cypress/MTB/libraries/connectivity-utilities": [
+          "https://github.com/cypresssemiconductorco/connectivity-utilities.git",
+          "3785cafc201f54cb45d16718f24aeed8d3f1ef47"
+        ],
+        "vendors/cypress/MTB/libraries/core-lib": [
+          "https://github.com/cypresssemiconductorco/core-lib.git",
+          "59f1fc328a11af2da5cd30ae9abbb0daf3474405"
+        ],
+        "vendors/cypress/MTB/libraries/kv-store": [
+          "https://github.com/cypresssemiconductorco/kv-store.git",
+          "bcf66dc713f9763a63b8ff7736eab9509c69dd9e"
+        ],
+        "vendors/cypress/MTB/libraries/lpa": [
+          "https://github.com/cypresssemiconductorco/lpa.git",
+          "47fe63b9f07acb4e50a63cb130523c54dfb2b02a"
+        ],
+        "vendors/cypress/MTB/libraries/retarget-io": [
+          "https://github.com/cypresssemiconductorco/retarget-io.git",
+          "6eb547f3ac50cd436fecefc50cb93380011f21cc"
+        ],
+        "vendors/cypress/MTB/libraries/rgb-led": [
+          "https://github.com/cypresssemiconductorco/rgb-led.git",
+          "432146fe700340767f46a588ae1787caa317c8ba"
+        ],
+        "vendors/cypress/MTB/libraries/serial-flash": [
+          "https://github.com/cypresssemiconductorco/serial-flash.git",
+          "8558f203f1f20a81e96a9f5583da327d4b3f062d"
+        ],
+        "vendors/cypress/MTB/libraries/whd-bsp-integration": [
+          "https://github.com/cypresssemiconductorco/whd-bsp-integration.git",
+          "a4fae4095fe1e86ea5c495219f262339bc7a7f68"
+        ],
+        "vendors/cypress/MTB/libraries/wifi-host-driver": [
+          "https://github.com/cypresssemiconductorco/wifi-host-driver.git",
+          "cd2e40856a7a4b7cbbdbdb854c028ebdac794155"
+        ],
+        "vendors/cypress/MTB/psoc6/psoc6cm0p": [
+          "https://github.com/cypresssemiconductorco/psoc6cm0p.git",
+          "c91fa25bc5895a94d4181a5b5958b9b9c38da40d"
+        ],
+        "vendors/cypress/MTB/psoc6/psoc6hal": [
+          "https://github.com/cypresssemiconductorco/psoc6hal.git",
+          "72abdecad39f41b326a74f65591af09ce6aec224"
+        ],
+        "vendors/cypress/MTB/psoc6/psoc6make": [
+          "https://github.com/cypresssemiconductorco/psoc6make.git",
+          "2d3816c69361e60c22a72f4f4424569e46370959"
+        ],
+        "vendors/cypress/MTB/psoc6/psoc6pdl": [
+          "https://github.com/cypresssemiconductorco/psoc6pdl.git",
+          "16fda1156edf67d72b1d4af3f72528d607a4d4e0"
+        ],
+        "vendors/cypress/MTB/psoc6/udb-sdio-whd": [
+          "https://github.com/cypresssemiconductorco/udb-sdio-whd.git",
+          "c0f0dc862725399997dc20544d61c80239c1155a"
+        ],
+        "vendors/espressif/esp-idf": [
+          "https://github.com/espressif/esp-afr-sdk.git",
+          "f8af47e5ac4a0b8c3c7d7511b87f18500f6e699a"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "202107.00"
+      ]
+    },
+    "github.com/aws/aws-iot-core-mqtt-file-streams-embedded-c@383ffeff43a80123e07cf8ca613d12ce680527b0": {
+      "children": {},
+      "license": "MIT",
+      "tags": [
+        "v1.2.0"
+      ]
+    },
+    "github.com/aws/device-defender-for-aws-iot-embedded-sdk@548b4688b26d16d0e6134d7d93dcbae103994e40": {
+      "children": {
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "3fc5e02bc17483352546ac4c81078fde64cab674"
+        ],
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": [
+        "v1.1.0"
+      ]
+    },
+    "github.com/aws/device-defender-for-aws-iot-embedded-sdk@7059e199149a540471b484b710a51fc665636f22": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": [
+        "v1.4.0"
+      ]
+    },
+    "github.com/aws/device-defender-for-aws-iot-embedded-sdk@86582e258907e762948547c1826d44704908b403": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v1.4.1"
+      ]
+    },
+    "github.com/aws/device-shadow-for-aws-iot-embedded-sdk@268a5a276d3c3f451575b5a042b4e8ad53f134b6": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "tags": [
+        "v1.4.1"
+      ]
+    },
+    "github.com/aws/device-shadow-for-aws-iot-embedded-sdk@508ce43a2257be5d38bfd2a778607fa921cb2dac": {
+      "children": {
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "0b0e550db817d3b6f23e289939f709f2f40ba1c3"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "tags": [
+        "v1.0.2"
+      ]
+    },
+    "github.com/aws/device-shadow-for-aws-iot-embedded-sdk@a0cbd6e5ea4b4615f0d7f801be24e552a9658b42": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v1.4.2"
+      ]
+    },
+    "github.com/aws/fleet-provisioning-for-aws-iot-embedded-sdk@7691e8af27bd0a42b7fe2f21c8b3289fa037df17": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "860062d51b2e8a75d150337b63ca2a472840d13c"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v1.2.2"
+      ]
+    },
+    "github.com/aws/fleet-provisioning-for-aws-iot-embedded-sdk@a97d53af335f135c6ee9d608a3e80be8a3009a89": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "860062d51b2e8a75d150337b63ca2a472840d13c"
+        ]
+      },
+      "tags": [
+        "v1.2.1"
+      ]
+    },
+    "github.com/aws/jobs-for-aws-iot-embedded-sdk@19788445bca7f8f85167c83ac12379d3d1022295": {
+      "children": {
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "3fc5e02bc17483352546ac4c81078fde64cab674"
+        ],
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": [
+        "v1.1.0"
+      ]
+    },
+    "github.com/aws/jobs-for-aws-iot-embedded-sdk@3ce91f56427653705891a8668568cb247b97905f": {
+      "children": {},
+      "tags": [
+        "v1.5.1"
+      ]
+    },
+    "github.com/aws/jobs-for-aws-iot-embedded-sdk@f09232966a558916253537fed68c07e529cd8f39": {
+      "children": {},
+      "license": "MIT",
+      "tags": [
+        "v2.0.1"
+      ]
+    },
+    "github.com/aws/ota-for-aws-iot-embedded-sdk@57d3efa0dcb43e033dac234f64ec99fca431c29b": {
+      "children": {
+        "source/dependency/3rdparty/tinycbor": [
+          "https://github.com/intel/tinycbor.git",
+          "11590e470dfc1a144eb5665655c7ff6627b8e0f6"
+        ],
+        "source/dependency/coreJSON": [
+          "https://github.com/FreeRTOS/coreJSON.git",
+          "5b31f4c37a034911a4992fd415f8177a75014946"
+        ],
+        "test/cbmc/FreeRTOS-Kernel": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel.git",
+          "cb0757ee0b8894090b82e75e83942e3c61a32245"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "150573c742ce15061a0b675aa0f8e29c85008062"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/aws/ota-for-aws-iot-embedded-sdk@666241d0f643b07d5146a3715b649d80f8135e0b": {
+      "children": {
+        "source/dependency/3rdparty/tinycbor": [
+          "https://github.com/intel/tinycbor.git",
+          "9924cfed3b95ad6de299ae675064430fdb886216"
+        ],
+        "source/dependency/coreJSON": [
+          "https://github.com/FreeRTOS/coreJSON.git",
+          "97a906a2761b71434ffa9d838cd0500543b7dadc"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "150573c742ce15061a0b675aa0f8e29c85008062"
+        ]
+      },
+      "tags": [
+        "v3.0.0"
+      ]
+    },
+    "github.com/aws/sigv4-for-aws-iot-embedded-sdk@68e0364a883f0ededb6b43af9e271e469065dac3": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "tags": [
+        "v1.3.0"
+      ]
+    },
+    "github.com/aws/sigv4-for-aws-iot-embedded-sdk@b4ac78a0d5d4cff9b28a44f665067057e07be09f": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v1.3.1"
+      ]
+    },
+    "github.com/awslabs/aws-build-accumulator@0b0e550db817d3b6f23e289939f709f2f40ba1c3": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/awslabs/aws-build-accumulator@3fc5e02bc17483352546ac4c81078fde64cab674": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/awslabs/aws-build-accumulator@b652295078e26f8444c72ee3088f6a1230624827": {
+      "children": {},
+      "tags": [
+        "1.6.0"
+      ]
+    },
+    "github.com/awslabs/aws-build-accumulator@fcc583c4a5d5b9bebbefce5626256283fab1edda": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/awslabs/aws-templates-for-cbmc-proofs@27fdd8ee01705d917bcf0a3c37ff687779a87bda": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/awslabs/aws-templates-for-cbmc-proofs@36bff9ac9d4616a66629582758a82b0178c99112": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/cypresssemiconductorco/abstraction-rtos@a3ae4e2b6db1a7332aae6213a106c983b904de56": {
+      "children": {},
+      "tags": [
+        "release-v1.2.2"
+      ]
+    },
+    "github.com/cypresssemiconductorco/capsense@83898bb70eca16e4235eca362dd3ecc038de97e3": {
+      "children": {},
+      "tags": [
+        "latest-v2.X",
+        "release-v2.10.0"
+      ]
+    },
+    "github.com/cypresssemiconductorco/clib-support@50b583456a9a11a92b97da6829d090a3878a9340": {
+      "children": {},
+      "tags": [
+        "release-v1.0.1"
+      ]
+    },
+    "github.com/cypresssemiconductorco/connectivity-utilities@3785cafc201f54cb45d16718f24aeed8d3f1ef47": {
+      "children": {},
+      "tags": [
+        "release-v2.1.0"
+      ]
+    },
+    "github.com/cypresssemiconductorco/core-lib@59f1fc328a11af2da5cd30ae9abbb0daf3474405": {
+      "children": {},
+      "tags": [
+        "release-v1.1.5"
+      ]
+    },
+    "github.com/cypresssemiconductorco/kv-store@bcf66dc713f9763a63b8ff7736eab9509c69dd9e": {
+      "children": {},
+      "tags": [
+        "release-v1.0.0"
+      ]
+    },
+    "github.com/cypresssemiconductorco/lpa@47fe63b9f07acb4e50a63cb130523c54dfb2b02a": {
+      "children": {},
+      "tags": [
+        "release-v3.0.0"
+      ]
+    },
+    "github.com/cypresssemiconductorco/psoc6cm0p@c91fa25bc5895a94d4181a5b5958b9b9c38da40d": {
+      "children": {},
+      "tags": [
+        "release-v1.2.0"
+      ]
+    },
+    "github.com/cypresssemiconductorco/psoc6hal@72abdecad39f41b326a74f65591af09ce6aec224": {
+      "children": {},
+      "tags": [
+        "latest-v1.X",
+        "release-v1.4.0"
+      ]
+    },
+    "github.com/cypresssemiconductorco/psoc6make@2d3816c69361e60c22a72f4f4424569e46370959": {
+      "children": {},
+      "tags": [
+        "latest-v1.X",
+        "release-v1.5.1"
+      ]
+    },
+    "github.com/cypresssemiconductorco/psoc6pdl@16fda1156edf67d72b1d4af3f72528d607a4d4e0": {
+      "children": {},
+      "tags": [
+        "latest-v1.X",
+        "release-v1.6.1"
+      ]
+    },
+    "github.com/cypresssemiconductorco/retarget-io@6eb547f3ac50cd436fecefc50cb93380011f21cc": {
+      "children": {},
+      "tags": [
+        "release-v1.1.1"
+      ]
+    },
+    "github.com/cypresssemiconductorco/rgb-led@432146fe700340767f46a588ae1787caa317c8ba": {
+      "children": {},
+      "tags": [
+        "release-v1.1.1"
+      ]
+    },
+    "github.com/cypresssemiconductorco/serial-flash@8558f203f1f20a81e96a9f5583da327d4b3f062d": {
+      "children": {},
+      "tags": [
+        "release-v1.0.2"
+      ]
+    },
+    "github.com/cypresssemiconductorco/udb-sdio-whd@c0f0dc862725399997dc20544d61c80239c1155a": {
+      "children": {},
+      "tags": [
+        "release-v1.0.1"
+      ]
+    },
+    "github.com/cypresssemiconductorco/whd-bsp-integration@a4fae4095fe1e86ea5c495219f262339bc7a7f68": {
+      "children": {},
+      "tags": [
+        "release-v1.0.2"
+      ]
+    },
+    "github.com/cypresssemiconductorco/wifi-host-driver@cd2e40856a7a4b7cbbdbdb854c028ebdac794155": {
+      "children": {},
+      "tags": [
+        "release-v1.91.2"
+      ]
+    },
+    "github.com/davegamble/cjson@3c8935676a97c7c97bf006db8312875b4f292f6c": {
+      "children": {},
+      "tags": [
+        "v1.7.12"
+      ]
+    },
+    "github.com/eclipse/tinydtls@7f8c86e501e690301630029fa9bae22424adf618": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/asio@3b66e5b051381fb70de9c2791df70a06181c64e3": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/esp-afr-sdk@f8af47e5ac4a0b8c3c7d7511b87f18500f6e699a": {
+      "children": {
+        "components/asio/asio": [
+          "https://github.com/espressif/asio.git",
+          "3b66e5b051381fb70de9c2791df70a06181c64e3"
+        ],
+        "components/bootloader/subproject/components/micro-ecc/micro-ecc": [
+          "https://github.com/kmackay/micro-ecc.git",
+          "d037ec89546fad14b5c4d5456c2e23a71e554966"
+        ],
+        "components/bt/controller/lib": [
+          "https://github.com/espressif/esp32-bt-lib.git",
+          "c2e961d07cba8e5a08749e1f1d5c6ffe76d4b115"
+        ],
+        "components/bt/host/nimble/nimble": [
+          "https://github.com/espressif/esp-nimble.git",
+          "2d4f5b9365bca5d3e97abb83f6a5a23d3816695a"
+        ],
+        "components/cbor/tinycbor": [
+          "https://github.com/intel/tinycbor.git",
+          "d2dd95cb8841d88d5a801e3ef9c328fd6200e7bd"
+        ],
+        "components/coap/libcoap": [
+          "https://github.com/obgm/libcoap.git",
+          "98954eb30a2e728e172a6cd29430ae5bc999b585"
+        ],
+        "components/esp_wifi/lib": [
+          "https://github.com/espressif/esp32-wifi-lib.git",
+          "1c4c5396cab728b3524fc4a21b324307cd972d0c"
+        ],
+        "components/esptool_py/esptool": [
+          "https://github.com/espressif/esptool.git",
+          "4fa0bd7b0d1f69f5ff22b043adc07c5e562a8931"
+        ],
+        "components/expat/expat": [
+          "https://github.com/libexpat/libexpat.git",
+          "968b8cc46dbee47b83318d5f31a8e7907199614b"
+        ],
+        "components/json/cJSON": [
+          "https://github.com/DaveGamble/cJSON.git",
+          "3c8935676a97c7c97bf006db8312875b4f292f6c"
+        ],
+        "components/libsodium/libsodium": [
+          "https://github.com/jedisct1/libsodium.git",
+          "70170c28c844a4786e75efc626e1aeebc93caebc"
+        ],
+        "components/lwip/lwip": [
+          "https://github.com/espressif/esp-lwip.git",
+          "7285b846a22ebd02377bd9c67e7f9eaaf842492b"
+        ],
+        "components/mqtt/esp-mqtt": [
+          "https://github.com/espressif/esp-mqtt.git",
+          "da850b0add1e71b3659bfac5d797cc834dc3e89b"
+        ],
+        "components/nghttp/nghttp2": [
+          "https://github.com/nghttp2/nghttp2.git",
+          "3bcc416e13cc790e2fb45fcfe9111d38609c5032"
+        ],
+        "components/protobuf-c/protobuf-c": [
+          "https://github.com/protobuf-c/protobuf-c.git",
+          "dac1a65feac4ad72f612aab99f487056fbcf5c1a"
+        ],
+        "components/spiffs/spiffs": [
+          "https://github.com/pellepl/spiffs.git",
+          "f5e26c4e933189593a71c6b82cda381a7b21e41c"
+        ],
+        "components/tinyusb/tinyusb": [
+          "https://github.com/espressif/tinyusb.git",
+          "28f89e13473d40637574bcbfe4142633b39899fd"
+        ],
+        "components/unity/unity": [
+          "https://github.com/ThrowTheSwitch/Unity.git",
+          "7d2bf62b7e6afaf38153041a9d53c21aeeca9a25"
+        ],
+        "examples/build_system/cmake/import_lib/main/lib/tinyxml2": [
+          "https://github.com/leethomason/tinyxml2.git",
+          "7e8e249990ec491ec15990cf95b6d871a66cf64a"
+        ],
+        "examples/peripherals/secure_element/atecc608_ecdsa/components/esp-cryptoauthlib": [
+          "https://github.com/espressif/esp-cryptoauthlib.git",
+          "c3d3a69021cfec3236ca2c0b63be4048ec6643a4"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/espressif/esp-cryptoauthlib@c3d3a69021cfec3236ca2c0b63be4048ec6643a4": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/esp-lwip@7285b846a22ebd02377bd9c67e7f9eaaf842492b": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/esp-mqtt@da850b0add1e71b3659bfac5d797cc834dc3e89b": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/esp-nimble@2d4f5b9365bca5d3e97abb83f6a5a23d3816695a": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/esp32-bt-lib@c2e961d07cba8e5a08749e1f1d5c6ffe76d4b115": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/esp32-wifi-lib@1c4c5396cab728b3524fc4a21b324307cd972d0c": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/espressif/esptool@4fa0bd7b0d1f69f5ff22b043adc07c5e562a8931": {
+      "children": {},
+      "tags": [
+        "v3.0"
+      ]
+    },
+    "github.com/espressif/tinyusb@28f89e13473d40637574bcbfe4142633b39899fd": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/backoffalgorithm@14f4c88b33dd554be30a00a312c88d3986d457d0": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "860062d51b2e8a75d150337b63ca2a472840d13c"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v1.4.2"
+      ]
+    },
+    "github.com/freertos/backoffalgorithm@3cc0bf8c4d41d7cd7aa2f1ded5075c87bf6b2bbb": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "860062d51b2e8a75d150337b63ca2a472840d13c"
+        ]
+      },
+      "tags": [
+        "v1.4.1"
+      ]
+    },
+    "github.com/freertos/backoffalgorithm@a70291444c556bc3392bf9b7b60626b93b120319": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "386c540510929c0cf6f7b8d04cb4af40754bb822"
+        ]
+      },
+      "tags": [
+        "v1.0.0"
+      ]
+    },
+    "github.com/freertos/corehttp@12adee81ddef588abada91672b34fd997b2a27ac": {
+      "children": {
+        "source/dependency/3rdparty/llhttp": [
+          "https://github.com/nodejs/llhttp.git",
+          "0d2b990bbb70ffe82004a176794cecc5e53a4ddf"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "tags": [
+        "v3.1.1"
+      ]
+    },
+    "github.com/freertos/corehttp@3c4a5838658cd6d0ff8fb7c3a14e30baafcbcd28": {
+      "children": {
+        "source/dependency/3rdparty/llhttp": [
+          "https://github.com/nodejs/llhttp.git",
+          "4fce8cac9433aa4728428bb3b26880d32ad05c88"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v3.1.3"
+      ]
+    },
+    "github.com/freertos/corehttp@b349f89e67f5feef51438dc09ed89959dedc18d5": {
+      "children": {
+        "source/dependency/3rdparty/http_parser": [
+          "https://github.com/nodejs/http-parser.git",
+          "ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d"
+        ],
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "fcc583c4a5d5b9bebbefce5626256283fab1edda"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "150573c742ce15061a0b675aa0f8e29c85008062"
+        ]
+      },
+      "tags": [
+        "v2.0.0"
+      ]
+    },
+    "github.com/freertos/corejson@26fe707548fc4e975c453aa4475ae056bb70247b": {
+      "children": {
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "fcc583c4a5d5b9bebbefce5626256283fab1edda"
+        ],
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": [
+        "v3.0.0"
+      ]
+    },
+    "github.com/freertos/corejson@5b31f4c37a034911a4992fd415f8177a75014946": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": [
+        "v3.2.0"
+      ]
+    },
+    "github.com/freertos/corejson@97a906a2761b71434ffa9d838cd0500543b7dadc": {
+      "children": {
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "fcc583c4a5d5b9bebbefce5626256283fab1edda"
+        ],
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/freertos/corejson@cffa492da18c890181d64462f8af63992a69d3b0": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "860062d51b2e8a75d150337b63ca2a472840d13c"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v3.3.1"
+      ]
+    },
+    "github.com/freertos/corejson@e3b7663f6392d8c10e8db57506ec37e4801b145a": {
+      "children": {
+        "test/unit-test/Unity": [
+          "https://github.com/ThrowTheSwitch/Unity",
+          "860062d51b2e8a75d150337b63ca2a472840d13c"
+        ]
+      },
+      "tags": [
+        "v3.3.0"
+      ]
+    },
+    "github.com/freertos/coremqtt-agent@2338d00db41196e4a1fce4bc3ab32f907e77f871": {
+      "children": {
+        "source/dependency/coreMQTT": [
+          "https://github.com/FreeRTOS/coreMQTT.git",
+          "04845c6a8e5f9cf2d232f1c6e80baeb81302e690"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v2.0.0"
+      ]
+    },
+    "github.com/freertos/coremqtt-agent@da70f0fcc3e135616d078bfb7b2ab883f561503c": {
+      "children": {
+        "source/dependency/coreMQTT": [
+          "https://github.com/FreeRTOS/coreMQTT.git",
+          "ff9830a338b6a759c5574f991b02d6f99abadc42"
+        ],
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "27fdd8ee01705d917bcf0a3c37ff687779a87bda"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "b652295078e26f8444c72ee3088f6a1230624827"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "3b443e551d538e93e86ec7bb56a0d7fde3715a3c"
+        ]
+      },
+      "tags": [
+        "v1.0.0"
+      ]
+    },
+    "github.com/freertos/coremqtt-agent@e977d70ee68c95f94d967ea18feadfffe5c7a584": {
+      "children": {
+        "source/dependency/coreMQTT": [
+          "https://github.com/FreeRTOS/coreMQTT.git",
+          "2beef04725328923e05e576b884212d53ec97af7"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "tags": [
+        "v1.3.1"
+      ]
+    },
+    "github.com/freertos/coremqtt@04845c6a8e5f9cf2d232f1c6e80baeb81302e690": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v5.0.2"
+      ]
+    },
+    "github.com/freertos/coremqtt@2beef04725328923e05e576b884212d53ec97af7": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "tags": [
+        "v2.3.1"
+      ]
+    },
+    "github.com/freertos/coremqtt@ff9830a338b6a759c5574f991b02d6f99abadc42": {
+      "children": {
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs.git",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "fcc583c4a5d5b9bebbefce5626256283fab1edda"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "tags": [
+        "v1.1.0"
+      ]
+    },
+    "github.com/freertos/corepkcs11@44fee0545d5bcaf6b4a106b8d17a69b9830e04f8": {
+      "children": {
+        "source/dependency/3rdparty/pkcs11": [
+          "https://github.com/oasis-tcs/pkcs11.git",
+          "478bfc5077901865993e3a193777c1a9f6516cdf"
+        ]
+      },
+      "tags": [
+        "v3.6.2"
+      ]
+    },
+    "github.com/freertos/corepkcs11@ccb8fb15b4bc0f369c7292b6c1b835e9b35cab15": {
+      "children": {
+        "source/dependency/3rdparty/mbedtls": [
+          "https://github.com/ARMmbed/mbedtls.git",
+          "848a4e06b375e067552f1a21d4bc69322c673217"
+        ],
+        "source/dependency/3rdparty/pkcs11": [
+          "https://github.com/amazon-freertos/pkcs11.git",
+          "9304ef6842d08d881ccd1daa8d3a428f3a9671ee"
+        ],
+        "test/cbmc/aws-templates-for-cbmc-proofs": [
+          "https://github.com/awslabs/aws-templates-for-cbmc-proofs",
+          "36bff9ac9d4616a66629582758a82b0178c99112"
+        ],
+        "test/cbmc/litani": [
+          "https://github.com/awslabs/aws-build-accumulator.git",
+          "3fc5e02bc17483352546ac4c81078fde64cab674"
+        ],
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/freertos/corepkcs11@ccc78afee1716436cca832dd3d9388ead2ba05b0": {
+      "children": {
+        "source/dependency/3rdparty/pkcs11": [
+          "https://github.com/oasis-tcs/pkcs11.git",
+          "478bfc5077901865993e3a193777c1a9f6516cdf"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v3.6.4"
+      ]
+    },
+    "github.com/freertos/coresntp@50f5f96f4c33b14c0358f404ff4ff2a29d422ad7": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "v2.0.0"
+      ]
+    },
+    "github.com/freertos/coresntp@b492c223cdbebfb9335166d0e6fc47e93a94de75": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "tags": [
+        "v1.3.1"
+      ]
+    },
+    "github.com/freertos/freertos-cellular-interface@b7494dcdd40aab2fed0bb992760e6cdeba0543d5": {
+      "children": {
+        "test/unit-test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "tags": [
+        "v1.4.0"
+      ]
+    },
+    "github.com/freertos/freertos-community-supported-demos@2f1866faf14759956fc5f26c67c4dba0f8bc6df8": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-kernel-community-supported-ports@9c5bad7b2f42b4e8420f12290b9bc085d3309e8b": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-kernel-community-supported-ports@bae4c7aa19009825ba48071a8fe25dcb8be84880": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-kernel-community-supported-ports@f0618d9e2f4c5b0a3e472a2673a090e8ef836258": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-kernel-partner-supported-ports@91c87416f8810bb60090baf3abd351f997e8fab4": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-kernel-partner-supported-ports@abc22103e1e6634b33457d4127bff1ab62f27f90": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-kernel-partner-supported-ports@dc3afc6e837426b4bda81bbb6cf45bfb6f34c7e9": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-kernel@9b777ae5c5b8e9e456065a00294d1e5f5f9facf5": {
+      "children": {
+        "portable/ThirdParty/Community-Supported-Ports": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel-Community-Supported-Ports",
+          "bae4c7aa19009825ba48071a8fe25dcb8be84880"
+        ],
+        "portable/ThirdParty/Partner-Supported-Ports": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel-Partner-Supported-Ports",
+          "abc22103e1e6634b33457d4127bff1ab62f27f90"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "V11.3.0"
+      ]
+    },
+    "github.com/freertos/freertos-kernel@9c048e0c71ee43630394981a86f5265bc57131e4": {
+      "children": {},
+      "tags": [
+        "V10.4.3"
+      ]
+    },
+    "github.com/freertos/freertos-kernel@cb0757ee0b8894090b82e75e83942e3c61a32245": {
+      "children": {
+        "portable/ThirdParty/Community-Supported-Ports": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel-Community-Supported-Ports",
+          "f0618d9e2f4c5b0a3e472a2673a090e8ef836258"
+        ],
+        "portable/ThirdParty/Partner-Supported-Ports": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel-Partner-Supported-Ports",
+          "91c87416f8810bb60090baf3abd351f997e8fab4"
+        ]
+      },
+      "tags": [
+        "V10.4.5"
+      ]
+    },
+    "github.com/freertos/freertos-kernel@dbf70559b27d39c1fdb68dfb9a32140b6a6777a0": {
+      "children": {
+        "portable/ThirdParty/Community-Supported-Ports": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel-Community-Supported-Ports",
+          "9c5bad7b2f42b4e8420f12290b9bc085d3309e8b"
+        ],
+        "portable/ThirdParty/Partner-Supported-Ports": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel-Partner-Supported-Ports",
+          "dc3afc6e837426b4bda81bbb6cf45bfb6f34c7e9"
+        ]
+      },
+      "tags": [
+        "V11.1.0"
+      ]
+    },
+    "github.com/freertos/freertos-kernel@ef4c30524402b523005d9ab2312f8531ffeda6c4": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-libraries-integration-tests@0a0a92160a81c5cba008e472203513bd0cfb4c7a": {
+      "children": {},
+      "license": "MIT",
+      "tags": [
+        "202406.00"
+      ]
+    },
+    "github.com/freertos/freertos-partner-supported-demos@f75c298b573984c52bbc374e9c7a5a836982dda6": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/freertos-plus-tcp@9a25860e761036a9eb780799c9db632e3eff60c9": {
+      "children": {
+        "test/FreeRTOS-Kernel": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel",
+          "9c048e0c71ee43630394981a86f5265bc57131e4"
+        ],
+        "test/litani": [
+          "https://github.com/awslabs/aws-build-accumulator",
+          "fcc583c4a5d5b9bebbefce5626256283fab1edda"
+        ],
+        "tools/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "tags": [
+        "V2.3.2"
+      ]
+    },
+    "github.com/freertos/freertos-plus-tcp@abcb94c8768532a6cae3c39ffe37602640992a28": {
+      "children": {
+        "test/FreeRTOS-Kernel": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel",
+          "dbf70559b27d39c1fdb68dfb9a32140b6a6777a0"
+        ],
+        "tools/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "tags": [
+        "V4.2.2"
+      ]
+    },
+    "github.com/freertos/freertos-plus-tcp@c12361095aca68aeed858f45d14395fbffa92c0d": {
+      "children": {
+        "test/FreeRTOS-Kernel": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel",
+          "dbf70559b27d39c1fdb68dfb9a32140b6a6777a0"
+        ],
+        "tools/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "V4.4.1"
+      ]
+    },
+    "github.com/freertos/freertos@152cf36d6775bce6026a791845af12201aae703d": {
+      "children": {
+        "FreeRTOS-Plus/Source/AWS/device-defender": [
+          "https://github.com/aws/device-defender-for-aws-iot-embedded-sdk.git",
+          "7059e199149a540471b484b710a51fc665636f22"
+        ],
+        "FreeRTOS-Plus/Source/AWS/device-shadow": [
+          "https://github.com/aws/device-shadow-for-aws-iot-embedded-sdk",
+          "268a5a276d3c3f451575b5a042b4e8ad53f134b6"
+        ],
+        "FreeRTOS-Plus/Source/AWS/fleet-provisioning": [
+          "https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk.git",
+          "a97d53af335f135c6ee9d608a3e80be8a3009a89"
+        ],
+        "FreeRTOS-Plus/Source/AWS/jobs": [
+          "https://github.com/aws/jobs-for-aws-iot-embedded-sdk.git",
+          "3ce91f56427653705891a8668568cb247b97905f"
+        ],
+        "FreeRTOS-Plus/Source/AWS/ota": [
+          "https://github.com/aws/ota-for-aws-iot-embedded-sdk.git",
+          "57d3efa0dcb43e033dac234f64ec99fca431c29b"
+        ],
+        "FreeRTOS-Plus/Source/AWS/sigv4": [
+          "https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk.git",
+          "68e0364a883f0ededb6b43af9e271e469065dac3"
+        ],
+        "FreeRTOS-Plus/Source/Application-Protocols/coreHTTP": [
+          "https://github.com/FreeRTOS/coreHTTP",
+          "12adee81ddef588abada91672b34fd997b2a27ac"
+        ],
+        "FreeRTOS-Plus/Source/Application-Protocols/coreMQTT": [
+          "https://github.com/FreeRTOS/coreMQTT",
+          "2beef04725328923e05e576b884212d53ec97af7"
+        ],
+        "FreeRTOS-Plus/Source/Application-Protocols/coreMQTT-Agent": [
+          "https://github.com/FreeRTOS/coreMQTT-Agent.git",
+          "e977d70ee68c95f94d967ea18feadfffe5c7a584"
+        ],
+        "FreeRTOS-Plus/Source/Application-Protocols/coreSNTP": [
+          "https://github.com/FreeRTOS/coreSNTP.git",
+          "b492c223cdbebfb9335166d0e6fc47e93a94de75"
+        ],
+        "FreeRTOS-Plus/Source/FreeRTOS-Cellular-Interface": [
+          "https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface.git",
+          "b7494dcdd40aab2fed0bb992760e6cdeba0543d5"
+        ],
+        "FreeRTOS-Plus/Source/FreeRTOS-Cellular-Modules/bg96": [
+          "https://github.com/FreeRTOS/Lab-FreeRTOS-Cellular-Interface-Reference-Quectel-BG96.git",
+          "1c71555e690e24c4be3470c2734eee9a24ae07f7"
+        ],
+        "FreeRTOS-Plus/Source/FreeRTOS-Cellular-Modules/hl7802": [
+          "https://github.com/FreeRTOS/Lab-FreeRTOS-Cellular-Interface-Reference-Sierra-Wireless-HL7802.git",
+          "889118ad01379fdba2398c39c52fd1d027895010"
+        ],
+        "FreeRTOS-Plus/Source/FreeRTOS-Cellular-Modules/sara-r4": [
+          "https://github.com/FreeRTOS/Lab-FreeRTOS-Cellular-Interface-Reference-ublox-SARA-R4.git",
+          "62ce0266697ccf3111d3daa932284d136c79ba94"
+        ],
+        "FreeRTOS-Plus/Source/FreeRTOS-Plus-TCP": [
+          "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP",
+          "abcb94c8768532a6cae3c39ffe37602640992a28"
+        ],
+        "FreeRTOS-Plus/Source/FreeRTOS-Plus-Trace": [
+          "https://github.com/percepio/TraceRecorderSource.git",
+          "3aa03556bdb47641d6ff0c95416d16e42a8cdc02"
+        ],
+        "FreeRTOS-Plus/Source/Utilities/backoff_algorithm": [
+          "https://github.com/FreeRTOS/backoffAlgorithm.git",
+          "3cc0bf8c4d41d7cd7aa2f1ded5075c87bf6b2bbb"
+        ],
+        "FreeRTOS-Plus/Source/coreJSON": [
+          "https://github.com/FreeRTOS/coreJSON",
+          "e3b7663f6392d8c10e8db57506ec37e4801b145a"
+        ],
+        "FreeRTOS-Plus/Source/corePKCS11": [
+          "https://github.com/FreeRTOS/corePKCS11.git",
+          "44fee0545d5bcaf6b4a106b8d17a69b9830e04f8"
+        ],
+        "FreeRTOS-Plus/Test/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ],
+        "FreeRTOS-Plus/ThirdParty/glib": [
+          "https://github.com/GNOME/glib.git",
+          "21624e78f013ee8706483086e3086076d08fe242"
+        ],
+        "FreeRTOS-Plus/ThirdParty/libslirp": [
+          "https://gitlab.com/qemu-project/libslirp.git",
+          "3ad1710a96678fe79066b1469cead4058713a1d9"
+        ],
+        "FreeRTOS-Plus/ThirdParty/mbedtls": [
+          "https://github.com/Mbed-TLS/mbedtls.git",
+          "edb8fec9882084344a314368ac7fd957a187519c"
+        ],
+        "FreeRTOS-Plus/ThirdParty/tinycbor": [
+          "https://github.com/intel/tinycbor.git",
+          "d393c16f3eb30d0c47e6f9d92db62272f0ec4dc7"
+        ],
+        "FreeRTOS-Plus/ThirdParty/wolfSSL": [
+          "https://github.com/wolfSSL/wolfssl.git",
+          "37884f864d6fd9b04f44677cb04da15d0c9d6526"
+        ],
+        "FreeRTOS/Demo/ThirdParty/Community-Supported-Demos": [
+          "https://github.com/FreeRTOS/FreeRTOS-Community-Supported-Demos",
+          "2f1866faf14759956fc5f26c67c4dba0f8bc6df8"
+        ],
+        "FreeRTOS/Demo/ThirdParty/Partner-Supported-Demos": [
+          "https://github.com/FreeRTOS/FreeRTOS-Partner-Supported-Demos",
+          "f75c298b573984c52bbc374e9c7a5a836982dda6"
+        ],
+        "FreeRTOS/Source": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel.git",
+          "dbf70559b27d39c1fdb68dfb9a32140b6a6777a0"
+        ],
+        "FreeRTOS/Test/CMock/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock.git",
+          "9d092898ef26ece140d9225e037274b64d4f851e"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "202411.00"
+      ]
+    },
+    "github.com/freertos/lab-freertos-cellular-interface-reference-quectel-bg96@1c71555e690e24c4be3470c2734eee9a24ae07f7": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/lab-freertos-cellular-interface-reference-sierra-wireless-hl7802@889118ad01379fdba2398c39c52fd1d027895010": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/freertos/lab-freertos-cellular-interface-reference-ublox-sara-r4@62ce0266697ccf3111d3daa932284d136c79ba94": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/gnome/glib@21624e78f013ee8706483086e3086076d08fe242": {
+      "children": {
+        "subprojects/gvdb": [
+          "https://github.com/GNOME/gvdb.git",
+          "0854af0fdb6d527a8d1999835ac2c5059976c210"
+        ]
+      },
+      "tags": [
+        "2.78.1"
+      ]
+    },
+    "github.com/gnome/gvdb@0854af0fdb6d527a8d1999835ac2c5059976c210": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/h2o/neverbleed@da5c2ab419a3bb8a4cc6c37a6c7f3e4bd4b41134": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/infineon/wifi-host-driver@31247470af5b7d79b53458f51d06a89aa5fd41f6": {
+      "children": {},
+      "tags": [
+        "latest-v4.X",
+        "release-v4.3.0"
+      ]
+    },
+    "github.com/infineon/wifi-resources@e9b4a5bf07cb62736f1d420a75d27b45bc49d7bd": {
+      "children": {},
+      "tags": [
+        "release-v2.0.0"
+      ]
+    },
+    "github.com/intel/tinycbor@11590e470dfc1a144eb5665655c7ff6627b8e0f6": {
+      "children": {},
+      "tags": [
+        "v0.5.4"
+      ]
+    },
+    "github.com/intel/tinycbor@9924cfed3b95ad6de299ae675064430fdb886216": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/intel/tinycbor@d2dd95cb8841d88d5a801e3ef9c328fd6200e7bd": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/intel/tinycbor@d393c16f3eb30d0c47e6f9d92db62272f0ec4dc7": {
+      "children": {},
+      "tags": [
+        "v0.6-rc1",
+        "v0.6.0"
+      ]
+    },
+    "github.com/intel/tinycbor@d94ca09aa91f5b3c581527aa8bca179a82b79874": {
+      "children": {},
+      "license": "MIT",
+      "tags": [
+        "v0.5.2"
+      ]
+    },
+    "github.com/intel/tinycrypt@cf24c907a61c01bc2c4e1ee0ae24457c27a840a2": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/jedisct1/libsodium@70170c28c844a4786e75efc626e1aeebc93caebc": {
+      "children": {},
+      "tags": [
+        "1.0.12"
+      ]
+    },
+    "github.com/kmackay/micro-ecc@d037ec89546fad14b5c4d5456c2e23a71e554966": {
+      "children": {},
+      "tags": [
+        "v1.0"
+      ]
+    },
+    "github.com/leethomason/tinyxml2@7e8e249990ec491ec15990cf95b6d871a66cf64a": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/libexpat/libexpat@968b8cc46dbee47b83318d5f31a8e7907199614b": {
+      "children": {},
+      "tags": [
+        "R_2_2_5"
+      ]
+    },
+    "github.com/linaro/freertos-ota-pal-psa@0b6db7d7cc0260fbb1e54a26ad6ff25cdcde3697": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/linaro/freertos-pkcs11-psa@80292d24f4978891b0fd35feeb5f1d6f6f0fff06": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/littlefs-project/littlefs@6cb4e86540eca0d9ba62500a298385c9d863c8be": {
+      "children": {},
+      "tags": [
+        "v2.11.3"
+      ]
+    },
+    "github.com/lwip-tcpip/lwip@79cd89f99d1032cc5375569e5b24c375b9d230fa": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/mbed-tls/mbedtls-framework@2a3e2c5ea053c14b745dbdf41f609b1edc6a72fa": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/mbed-tls/mbedtls@c765c831e5c2a0971410692f92f7a81d6ec65ec2": {
+      "children": {
+        "framework": [
+          "https://github.com/Mbed-TLS/mbedtls-framework",
+          "2a3e2c5ea053c14b745dbdf41f609b1edc6a72fa"
+        ]
+      },
+      "tags": [
+        "mbedtls-3.6.4",
+        "v3.6.4"
+      ]
+    },
+    "github.com/mbed-tls/mbedtls@edb8fec9882084344a314368ac7fd957a187519c": {
+      "children": {},
+      "tags": [
+        "mbedtls-3.5.1",
+        "v3.5.1"
+      ]
+    },
+    "github.com/mruby/mruby@22464fe5a0a10f2b077eaba109ce1e912e4a77de": {
+      "children": {},
+      "tags": [
+        "1.2.0"
+      ]
+    },
+    "github.com/murata-wireless/cyw-fmac-nvram@40a917f1a50f9e4df44a7ec63901771791d53f09": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/nghttp2/nghttp2@3bcc416e13cc790e2fb45fcfe9111d38609c5032": {
+      "children": {
+        "third-party/mruby": [
+          "https://github.com/mruby/mruby",
+          "22464fe5a0a10f2b077eaba109ce1e912e4a77de"
+        ],
+        "third-party/neverbleed": [
+          "https://github.com/h2o/neverbleed.git",
+          "da5c2ab419a3bb8a4cc6c37a6c7f3e4bd4b41134"
+        ]
+      },
+      "tags": [
+        "v1.24.0"
+      ]
+    },
+    "github.com/nodejs/http-parser@ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/nodejs/llhttp@0d2b990bbb70ffe82004a176794cecc5e53a4ddf": {
+      "children": {},
+      "tags": [
+        "release/v6.1.1"
+      ]
+    },
+    "github.com/nodejs/llhttp@4fce8cac9433aa4728428bb3b26880d32ad05c88": {
+      "children": {},
+      "tags": [
+        "release/v9.3.1"
+      ]
+    },
+    "github.com/oasis-tcs/pkcs11@478bfc5077901865993e3a193777c1a9f6516cdf": {
+      "children": {},
+      "tags": [
+        "2-40-errata-1"
+      ]
+    },
+    "github.com/obgm/libcoap@98954eb30a2e728e172a6cd29430ae5bc999b585": {
+      "children": {
+        "ext/tinydtls": [
+          "https://github.com/eclipse/tinydtls.git",
+          "7f8c86e501e690301630029fa9bae22424adf618"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/pellepl/spiffs@f5e26c4e933189593a71c6b82cda381a7b21e41c": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/percepio/tracerecordersource@2f888cb9e6240c88e33eacd5acd50555fb13fbf5": {
+      "children": {},
+      "license": "Apache-2.0",
+      "tags": [
+        "Tz4/4.11/v4.11.0"
+      ]
+    },
+    "github.com/percepio/tracerecordersource@3aa03556bdb47641d6ff0c95416d16e42a8cdc02": {
+      "children": {},
+      "tags": [
+        "Tz4/4.8/v4.8.0.hotfix1"
+      ]
+    },
+    "github.com/protobuf-c/protobuf-c@dac1a65feac4ad72f612aab99f487056fbcf5c1a": {
+      "children": {},
+      "tags": [
+        "v1.3.0"
+      ]
+    },
+    "github.com/renesas/rx-driver-package@bcc409d331b0bff68d4b09bf6fc41376f75d42bc": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/throwtheswitch/cexception@632d980166cc74a93bf2376ba96cb7ec5e489c09": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/throwtheswitch/cexception@71b47be7c950f1bf5f7e5303779fa99a16224bb6": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/throwtheswitch/cmock@150573c742ce15061a0b675aa0f8e29c85008062": {
+      "children": {
+        "vendor/c_exception": [
+          "https://github.com/throwtheswitch/cexception.git",
+          "71b47be7c950f1bf5f7e5303779fa99a16224bb6"
+        ],
+        "vendor/unity": [
+          "https://github.com/throwtheswitch/unity.git",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": [
+        "v2.5.2"
+      ]
+    },
+    "github.com/throwtheswitch/cmock@3b443e551d538e93e86ec7bb56a0d7fde3715a3c": {
+      "children": {
+        "vendor/c_exception": [
+          "https://github.com/throwtheswitch/cexception.git",
+          "71b47be7c950f1bf5f7e5303779fa99a16224bb6"
+        ],
+        "vendor/unity": [
+          "https://github.com/throwtheswitch/unity.git",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/throwtheswitch/cmock@9d092898ef26ece140d9225e037274b64d4f851e": {
+      "children": {
+        "vendor/c_exception": [
+          "https://github.com/throwtheswitch/cexception.git",
+          "71b47be7c950f1bf5f7e5303779fa99a16224bb6"
+        ],
+        "vendor/unity": [
+          "https://github.com/throwtheswitch/unity.git",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": [
+        "v2.5.3"
+      ]
+    },
+    "github.com/throwtheswitch/cmock@afa294982e8a28bc06f341cc77fd4276641b42bd": {
+      "children": {
+        "vendor/c_exception": [
+          "https://github.com/throwtheswitch/cexception.git",
+          "71b47be7c950f1bf5f7e5303779fa99a16224bb6"
+        ],
+        "vendor/unity": [
+          "https://github.com/throwtheswitch/unity.git",
+          "cf949f45ca6d172a177b00da21310607b97bc7a7"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/throwtheswitch/cmock@bd5fbc30eb3a448600eab761bb215835459dd174": {
+      "children": {
+        "vendor/c_exception": [
+          "https://github.com/throwtheswitch/cexception.git",
+          "632d980166cc74a93bf2376ba96cb7ec5e489c09"
+        ],
+        "vendor/unity": [
+          "https://github.com/throwtheswitch/unity.git",
+          "e3132cdddd779cb5a813887b2d0d7facb7f3f90a"
+        ]
+      },
+      "tags": []
+    },
+    "github.com/throwtheswitch/unity@22777c4810de3e3a4cb521a05eca2752fccd00ea": {
+      "children": {},
+      "license": "MIT",
+      "tags": []
+    },
+    "github.com/throwtheswitch/unity@2939c420ed9f2697bcb82c1b193bb48c4a8ad7a9": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/throwtheswitch/unity@386c540510929c0cf6f7b8d04cb4af40754bb822": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/throwtheswitch/unity@7d2bf62b7e6afaf38153041a9d53c21aeeca9a25": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/throwtheswitch/unity@860062d51b2e8a75d150337b63ca2a472840d13c": {
+      "children": {},
+      "tags": [
+        "v2.6.0"
+      ]
+    },
+    "github.com/throwtheswitch/unity@cf949f45ca6d172a177b00da21310607b97bc7a7": {
+      "children": {},
+      "tags": [
+        "v2.5.1"
+      ]
+    },
+    "github.com/throwtheswitch/unity@e3132cdddd779cb5a813887b2d0d7facb7f3f90a": {
+      "children": {},
+      "tags": []
+    },
+    "github.com/wolfssl/wolfssl@37884f864d6fd9b04f44677cb04da15d0c9d6526": {
+      "children": {},
+      "tags": [
+        "v5.6.4-stable"
+      ]
+    },
+    "gitlab.com/qemu-project/libslirp@3ad1710a96678fe79066b1469cead4058713a1d9": {
+      "children": {},
+      "tags": [
+        "v4.7.0"
+      ]
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/bootloader/submodule@b46927ea19b6b0a3b69d4790c13ca50a67b9c155": {
+      "children": {},
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular@24452b4958c5b4f873a450e1f23beee04e2ab49e": {
+      "children": {},
+      "tags": [
+        "v1.13.saffti-custom.8"
+      ]
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_flash_rx/r_flash_rx@5304d35e22002d0b0b0d24ae7773c64788ede5b3": {
+      "children": {},
+      "manifestVersion": "5.31.saffti-custom.1",
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_sdio_rx/r_sdio_rx@cc94efa0a37db72a6fede1bc651a891a0a6e8bec": {
+      "children": {},
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_simple_glcdc_config_rx/r_simple_glcdc_config_rx@ade52ca9b3869c4d80855ee41a1bf63db70695db": {
+      "children": {},
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_simple_graphic_rx/r_simple_graphic_rx@a7c3d736eab56aa622caabe0715ba290e1136f49": {
+      "children": {},
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/rm_littlefs_rx/rm_littlefs_rx@60f93c8427ce88f70ea26aae7abc641f577a7765": {
+      "children": {
+        "rm_littlefs_rx_vx.xx/rm_littlefs_rx/third_party/littlefs": [
+          "https://github.com/littlefs-project/littlefs.git",
+          "6cb4e86540eca0d9ba62500a298385c9d863c8be"
+        ]
+      },
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx@5818cdfbda661d098fd028bf6975847d5af2c491": {
+      "children": {},
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/experiment/generic/scripts/python/provisioning@1fadbdf0a6da41166a844e64b925dcaa56fe7593": {
+      "children": {},
+      "tags": []
+    },
+    "gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver@13119afc1570ee2d97fae3d782db02db356f12a6": {
+      "children": {},
+      "tags": [
+        "release-v1.70.0.saffti-custom.1"
+      ]
+    },
+    "gitlab.saffti.jp/oss/import/github/mbed-tls/mbedtls@76f3ee32997547592d325bcec3be478671e81e18": {
+      "children": {},
+      "tags": []
+    }
+  }
+}

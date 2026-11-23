@@ -1,1081 +1,2133 @@
-## Document Creation Information
-SPDXVersion: SPDX-2.2
+SPDXVersion: SPDX-2.3
 DataLicense: CC0-1.0
 SPDXID: SPDXRef-DOCUMENT
-DocumentName: sbom_iot-reference-rx-v202406.01-LTS-rx-1.2.0
-DocumentNamespace: https://www.renesas.com/spdx/iot-reference-rx-v202406.01-LTS-rx-1.2.0
+DocumentName: iot-reference-rx-submodules
+DocumentNamespace: https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/spdx/6f0ad4b180c67954d8dc6a9dd19a99560799920cf3f1d977e8ede96ff88bc7b3
+Creator: Tool: tools/ci/generate_sbom.py
+Created: 2026-11-23T11:04:41Z
+DocumentComment: <text>Git submodule inventory for the source checkout, including nested test and example repositories. CONTAINS follows Git links. Vendored files and dependencies selected by individual firmware builds are outside this inventory.</text>
 
-## Creation Information
-Creator: Organization:    Renesas Electronics Corporation
-Created: 2026-02-09T10:36:46Z
-DocumentComment: <text>
-This is a comment, to record external SBOMs
-ExternalDocumentRef: DocumentRef-AWS-IoT-Core-MQTT-File-Streams-Embedded-C https://github.com/aws/aws-iot-core-mqtt-file-streams-embedded-c/blob/v1.1.0/sbom.spdx SHA256: cbc2bcbef393608912b5e32520a81115fdcbb4e08a96572df071ce098c754f68
-ExternalDocumentRef: DocumentRef-backoffAlgorithm https://github.com/FreeRTOS/backoffAlgorithm/blob/v1.4.1/sbom.spdx SHA256: 8aae10d19ebadc69c64383b1aed448a863197e520242659bb1643d71cce0315b
-ExternalDocumentRef: DocumentRef-coreHTTP https://github.com/FreeRTOS/coreHTTP/blob/v3.1.1/sbom.spdx SHA256: 6049e593b57cc9b0955520e4855e85ebc06451c14f0b7c516ea173a0132565de
-ExternalDocumentRef: DocumentRef-coreJSON https://github.com/FreeRTOS/coreJSON/blob/v3.3.0/sbom.spdx SHA256: 9dc0130d6bc2c1cb53b4812d6a068a3b407c681bf375a1322850ee4f91f6595c
-ExternalDocumentRef: DocumentRef-coreMQTT-Agent https://github.com/FreeRTOS/coreMQTT-Agent/blob/refs/tags/v1.3.1/sbom.spdx SHA256: 8bc1594746f44b10bf95dc880f16390be04aa47a54768a30094fa69653f713ac
-ExternalDocumentRef: DocumentRef-coreMQTT https://github.com/FreeRTOS/coreMQTT/blob/v2.3.1/sbom.spdx SHA256: 4bf0d8de9fbed4b35c5f149f7009b06946834ea3d8384b1d39e1c392f8316563
-ExternalDocumentRef: DocumentRef-corePKCS11 https://github.com/FreeRTOS/corePKCS11/blob/v3.6.3/sbom.spdx SHA256: 22600504ae64dba0fa8897e1ee11408925a4d4c9f756f2db2514311507a4e853
-ExternalDocumentRef: DocumentRef-coreSNTP https://github.com/FreeRTOS/coreSNTP/blob/v1.3.1/sbom.spdx SHA256: c543afe701303213175d953e387482cb4a171d31037ea8928ba2130b2e0d5755
-ExternalDocumentRef: DocumentRef-Device-Defender-for-AWS-IoT-embedded-sdk https://github.com/aws/Device-Defender-for-AWS-IoT-embedded-sdk/blob/v1.4.0/sbom.spdx SHA256: 08a1f79b5087211c80698d14abccdb37e7663c7d664a4032482407cf46e33201
-ExternalDocumentRef: DocumentRef-Device-Shadow-for-AWS-IoT-embedded-sdk https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk/blob/v1.4.1/sbom.spdx SHA256: 0e38d6201f2a7e8948e78d2e9930f96c7849a9ccb9c439a73524ca4286f3f0d1
-ExternalDocumentRef: DocumentRef-Fleet-Provisioning-for-AWS-IoT-embedded-sdk https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/blob/v1.2.1/sbom.spdx SHA256: 1b65d2dc621836a3665017a76415ace30ebb0645a7e2513936759a10cf256f8a
-ExternalDocumentRef: DocumentRef-FreeRTOS-Cellular-Interface https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface/blob/v1.4.0/sbom.spdx SHA256: 881ccf8e2c5f5777f40249c775e2013f4c583b7d691a91e2113a7c3092fc33a1
-ExternalDocumentRef: DocumentRef-FreeRTOS-Plus-TCP https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/blob/V4.2.5/sbom.spdx SHA256: 6f080846fb262ace9cfc404f50fddf9419d3caa8b52c0efffb2d135aa0c35e1d
-ExternalDocumentRef: DocumentRef-Jobs-for-AWS-IoT-embedded-sdk https://github.com/aws/Jobs-for-AWS-IoT-embedded-sdk/blob/v1.5.1/sbom.spdx SHA256: 9d22d3c0d4c9835a8649fa6dc1b352e2d7f773288ac07aa3a766299b66f50202
-ExternalDocumentRef: DocumentRef-SigV4-for-AWS-IoT-embedded-sdk https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk/blob/v1.3.0/sbom.spdx SHA256: 42cadbd7b05029237525410546f0b97e5046df683c34adb96d18bf3cf400d5d6
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-iot-reference-rx
 
-This is necessary to bypass conformance check failure.
-</text>
-
-## Relationships
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-iotrefrx
-
-FileName: ./MQTTFileDownloader_base64.c
-SPDXID: SPDXRef-MQTTFileDownloaderbase64
-FileComment: <text>NOASSERTION</text>
-FileChecksum: SHA1: b7a6e2f5c280439ce65b6cab6a09bf7b36c62be5
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./MQTTFileDownloader.c
-SPDXID: SPDXRef-MQTTFileDownloader
-FileChecksum: SHA1: 28aecd14cf507875fd09a72cb6e90955d0b01d78
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./MQTTFileDownloader_cbor.c
-SPDXID: SPDXRef-MQTTFileDownloadercbor
-FileChecksum: SHA1: 407aba114806acf8b0b5e7adf05df5a9a0188633
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./backoff_algorithm.c
-SPDXID: SPDXRef-backoffalgorithm
-FileChecksum: SHA1: 95dc857f8b8822f296027bfc98eb8fada16bdb43
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_http_client.c
-SPDXID: SPDXRef-corehttpclient
-FileChecksum: SHA1: 9f4ab38adb2cd96ec5e09bd9e40695d1f08a3532
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_json.c
-SPDXID: SPDXRef-corejsonc
-FileChecksum: SHA1: 4e469e1657621c2be7b69834c8d6bebcca59b2fc
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_mqtt_agent.c
-SPDXID: SPDXRef-coremqttagent
-FileChecksum: SHA1: be5a720e74e50451cd1e675ad73d2e7e5daffed0
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_mqtt_agent_command_functions.c
-SPDXID: SPDXRef-coremqttagentcommandfunctions
-FileChecksum: SHA1: 9c6f652d280eea97cfe2f14e5a65650ad60dd44d
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_mqtt.c
-SPDXID: SPDXRef-coremqtt
-FileChecksum: SHA1: 9a0721e577c840ae51c3878edb566bf09a7b3324
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_mqtt_serializer.c
-SPDXID: SPDXRef-coremqttserializer
-FileChecksum: SHA1: d2e3c46f2a7439ef0afebe175f6eee1e40f464dc
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_mqtt_state.c
-SPDXID: SPDXRef-coremqttstate
-FileChecksum: SHA1: 89110568f4e668dec30defb5d61ac2098c173a84
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_pki_utils.c
-SPDXID: SPDXRef-corepkiutils
-FileChecksum: SHA1: 7be8ebdfe6d0ee041b3cd943595f8fc5a1681db7
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_pkcs11.c
-SPDXID: SPDXRef-corepkcs11c
-FileChecksum: SHA1: 8c979b7459f41a3d3feea61bf72595654400c1b5
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/os/core_pkcs11_pal_utils.c
-SPDXID: SPDXRef-corepkcs11palutils
-FileChecksum: SHA1: 6cb70562b449c9e9bfdad4be00ddf155bc1476f7
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/os/posix/core_pkcs11_pal.c
-SPDXID: SPDXRef-corepkcs11pal
-FileChecksum: SHA1: c7535c3b77ec73219375416a8f1fcf01d50a9319
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/mbedtls/core_pkcs11_mbedtls.c
-SPDXID: SPDXRef-corepkcs11mbedtls
-FileChecksum: SHA1: 0787c547079a8a3debd6f5468df24a3af92591ca
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./dependency/3rdparty/mbedtls_utils/mbedtls_utils.c
-SPDXID: SPDXRef-mbedtlsutils
-FileChecksum: SHA1: b5cf007214be0cdaef3baccb4a74163c79618e49
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_sntp_client.c
-SPDXID: SPDXRef-coresntpclient
-FileChecksum: SHA1: a4d3c3c806c04f52f9e23d0fe08573e061842e51
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./core_sntp_serializer.c
-SPDXID: SPDXRef-coresntpserializer
-FileChecksum: SHA1: a3ee1e8e4807f44251e973f4b14e61978d1b8c72
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./defender.c
-SPDXID: SPDXRef-Device-Defender-for-AWS-IoT-embedded-sdk
-FileComment: <text>NOASSERTION</text>
-FileChecksum: SHA1: e1de139aa01ce02b095bf239763a093b69f01834
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./shadow.c
-SPDXID: SPDXRef-Device-Shadow-for-AWS-IoT-embedded-sdk
-FileComment: <text>NOASSERTION</text>
-FileChecksum: SHA1: 67caded0bb92d54b58c95373688bb1090c9e2eb2
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./fleet_provisioning.c
-SPDXID: SPDXRef-Fleet-Provisioning-for-AWS-IoT-embedded-sdk
-FileComment: <text>NOASSERTION</text>
-FileChecksum: SHA1: 46925ce87f9d5533afd81b1cee3327bb36cb7418
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./cellular_common.c
-SPDXID: SPDXRef-cellularcommon
-FileChecksum: SHA1: c4a4f55f7ed16cd664696a21bb48b25eb45ab503
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./cellular_common_api.c
-SPDXID: SPDXRef-cellularcommonapi
-FileChecksum: SHA1: 42044f7bb634ff2b789abb163d6cd052818541d0
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./cellular_3gpp_urc_handler.c
-SPDXID: SPDXRef-cellular3gppurchandler
-FileChecksum: SHA1: 7b0f0346070263982e7d9797682c6f249abc32bf
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./cellular_at_core.c
-SPDXID: SPDXRef-cellularatcore
-FileChecksum: SHA1: 2d664e328af110c38d7fc906f406fcc09518d67e
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./cellular_3gpp_api.c
-SPDXID: SPDXRef-cellular3gppapi
-FileChecksum: SHA1: 3f252974bd582c1a0871c5f0ed6a4563d84a9aaa
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./cellular_pkthandler.c
-SPDXID: SPDXRef-cellularpkthandler
-FileChecksum: SHA1: ee54808c53f20612aeb69ff11ad917a668ee861c
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./cellular_pktio.c
-SPDXID: SPDXRef-cellularpktio
-FileChecksum: SHA1: 37df5360c777ab55e06f062d8aebc78d5a1487da
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_WIN.c
-SPDXID: SPDXRef-FreeRTOSTCPWIN
-FileChecksum: SHA1: 8593b78059b9a7aedf556dd1f7fb76496205762b
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_DNS_Cache.c
-SPDXID: SPDXRef-FreeRTOSDNSCache
-FileChecksum: SHA1: d34785a52630a08eb2636360f3a850110f0a1f3c
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_DNS_Parser.c
-SPDXID: SPDXRef-FreeRTOSDNSParser
-FileChecksum: SHA1: 3f821f0d767509cb78c087e9d3a3c6abada03e5a
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_Transmission_IPv4.c
-SPDXID: SPDXRef-FreeRTOSTCPTransmissionIPv4
-FileChecksum: SHA1: f26ff3ee87f601afa014c819284cedc4e57cae9a
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_Stream_Buffer.c
-SPDXID: SPDXRef-FreeRTOSStreamBuffer
-FileChecksum: SHA1: 959ffb037fa0b7dc9f8744585290b32148d6f128
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_Utils.c
-SPDXID: SPDXRef-FreeRTOSTCPUtils
-FileChecksum: SHA1: 4980ab1536161f314fa8b4572b9191a1b87903f1
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_State_Handling_IPv4.c
-SPDXID: SPDXRef-FreeRTOSTCPStateHandlingIPv4
-FileChecksum: SHA1: 857361f96080b467c3323f70129a8e009ea2c82c
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_RA.c
-SPDXID: SPDXRef-FreeRTOSRA
-FileChecksum: SHA1: 40dcc0cb8b4f054697e7c94526039ec82619d079
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_Sockets.c
-SPDXID: SPDXRef-FreeRTOSSockets
-FileChecksum: SHA1: dac821aae824a36184b50022f1ffa18cd1a758a9
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_DNS_Networking.c
-SPDXID: SPDXRef-FreeRTOSDNSNetworking
-FileChecksum: SHA1: a518a83fb091cc0c6d48d81def5fd6e8dac5d20d
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_DNS_Callback.c
-SPDXID: SPDXRef-FreeRTOSDNSCallback
-FileChecksum: SHA1: 02f878ddbf2190bb993bbfc2589f033573b3121f
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IPv4.c
-SPDXID: SPDXRef-FreeRTOSIPv4
-FileChecksum: SHA1: 67dc511abd21ecdc6ebc078f10a6fee836a9d907
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_DNS.c
-SPDXID: SPDXRef-FreeRTOSDNS
-FileChecksum: SHA1: b7111e1e3cf5d0bc4dfc5f6ce76cb93b02460812
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IPv6.c
-SPDXID: SPDXRef-FreeRTOSIPv6
-FileChecksum: SHA1: 63bbce338e614258988d6ccadfba90e10e98bd1b
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IPv6_Sockets.c
-SPDXID: SPDXRef-FreeRTOSIPv6Sockets
-FileChecksum: SHA1: 1a3df8e7ed84d992ca97452488512cd4aa7fc98b
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_State_Handling.c
-SPDXID: SPDXRef-FreeRTOSTCPStateHandling
-FileChecksum: SHA1: bfc684da6f2d96116e350aec07bab476af217cfb
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_UDP_IP.c
-SPDXID: SPDXRef-FreeRTOSUDPIP
-FileChecksum: SHA1: 63803c0d44de74d08993e40f3bf064872168745a
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_DHCPv6.c
-SPDXID: SPDXRef-FreeRTOSDHCPv6
-FileChecksum: SHA1: 1fda1b1dc3aa0d445d2bdbc6d768b59d522ced3f
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IP_Timers.c
-SPDXID: SPDXRef-FreeRTOSIPTimers
-FileChecksum: SHA1: ab56cdafa6fd4c4bc9aba5da61a2171715ef64a1
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_IP_IPv6.c
-SPDXID: SPDXRef-FreeRTOSTCPIPIPv6
-FileChecksum: SHA1: d997f38e06a5fbbaba4119022b2d290c69ed93b2
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_UDP_IPv4.c
-SPDXID: SPDXRef-FreeRTOSUDPIPv4
-FileChecksum: SHA1: 0b1ace2e043599d566b1aeea319f77abfe64d2ba
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_IP_IPv4.c
-SPDXID: SPDXRef-FreeRTOSTCPIPIPv4
-FileChecksum: SHA1: 5fae0e2628d44e723413b2826365c1a3f26dad65
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_ARP.c
-SPDXID: SPDXRef-FreeRTOSARP
-FileChecksum: SHA1: c3af47174df3eb2cc4b93690411a900090e48859
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_Routing.c
-SPDXID: SPDXRef-FreeRTOSRouting
-FileChecksum: SHA1: 2d687225e53ae78703ef12a15ec2991b5646e5ae
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IPv6_Utils.c
-SPDXID: SPDXRef-FreeRTOSIPv6Utils
-FileChecksum: SHA1: 5a48bedd06d2b18f43b38dff324ff33cd6c2c2e4
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_Utils_IPv6.c
-SPDXID: SPDXRef-FreeRTOSTCPUtilsIPv6
-FileChecksum: SHA1: 0262e1249eb87e18e51381d21c7961b0af5ea5e9
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_Reception.c
-SPDXID: SPDXRef-FreeRTOSTCPReception
-FileChecksum: SHA1: c7b326289fe96b828499251c17ad2aa659d3e330
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_State_Handling_IPv6.c
-SPDXID: SPDXRef-FreeRTOSTCPStateHandlingIPv6
-FileChecksum: SHA1: 00dea0095157df61dd7e8e8386585f0d53703fd4
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_ND.c
-SPDXID: SPDXRef-FreeRTOSND
-FileChecksum: SHA1: a57677622232d0f66e0f5e99f55d62c098f88da0
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_BitConfig.c
-SPDXID: SPDXRef-FreeRTOSBitConfig
-FileChecksum: SHA1: 9c78c394b7c16dd08b6f0a0b6bd82c76ed9d7691
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_Transmission.c
-SPDXID: SPDXRef-FreeRTOSTCPTransmission
-FileChecksum: SHA1: 10735f957a3046e205eef04817d1339c3dd06d0b
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_ICMP.c
-SPDXID: SPDXRef-FreeRTOSICMP
-FileChecksum: SHA1: f0c33b2e438583d8669b361fc046976ce12d0aa2
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_UDP_IPv6.c
-SPDXID: SPDXRef-FreeRTOSUDPIPv6
-FileChecksum: SHA1: 556128a6a7975f0677133a2595ee6a611e633769
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_Transmission_IPv6.c
-SPDXID: SPDXRef-FreeRTOSTCPTransmissionIPv6
-FileChecksum: SHA1: d36a040da1233c99c67d97406eb69be587566099
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IPv4_Utils.c
-SPDXID: SPDXRef-FreeRTOSIPv4Utils
-FileChecksum: SHA1: 2565f11d79c3ad1d1045bb40f339a7613a4b39a2
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_Utils_IPv4.c
-SPDXID: SPDXRef-FreeRTOSTCPUtilsIPv4
-FileChecksum: SHA1: ca0298a09442c104c50296ff3759c9d0842a5fd2
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_Tiny_TCP.c
-SPDXID: SPDXRef-FreeRTOSTinyTCP
-FileChecksum: SHA1: 37ca9e7c135aa4dff63ab4511e7f2d2fe98acaca
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IP.c
-SPDXID: SPDXRef-FreeRTOSIP
-FileChecksum: SHA1: 2cc68f7a742007845c1d4083654a4804023edd26
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IPv4_Sockets.c
-SPDXID: SPDXRef-FreeRTOSIPv4Sockets
-FileChecksum: SHA1: 87f80a2f78c9820b726287493ddab74d7552df4e
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_TCP_IP.c
-SPDXID: SPDXRef-FreeRTOSTCPIP
-FileChecksum: SHA1: 4cb93826ff8a542d2d24b07517b9bfc61b34ef92
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_IP_Utils.c
-SPDXID: SPDXRef-FreeRTOSIPUtils
-FileChecksum: SHA1: a228a96844aecf8f34274c8e1ea8f5e2f8561af9
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./FreeRTOS_DHCP.c
-SPDXID: SPDXRef-FreeRTOSDHCP
-FileChecksum: SHA1: 3b9cb437de7a9c61aa889ce63ffe0b0c1151c04c
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/NetworkInterface/Common/phyHandling.c
-SPDXID: SPDXRef-phyHandling
-FileChecksum: SHA1: fc22798c581a3712ebb1cea1b2494b6a71d04b8d
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/NetworkInterface/SH2A/NetworkInterface.c
-SPDXID: SPDXRef-SH2A-NetworkInterface
-FileChecksum: SHA1: 5d1f48bc483a17ecb5d43fe28c034af33aa0c663
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/NetworkInterface/RX/NetworkInterface.c
-SPDXID: SPDXRef-NetworkInterface
-FileChecksum: SHA1: 3c238f9cb9dab89c5dbcd8a67da23d52078155f5
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/NetworkInterface/RX/ether_callback.c
-SPDXID: SPDXRef-ethercallback
-FileChecksum: SHA1: 0a2896913be2a566eb9d12dc06c6ce1857b894da
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/BufferManagement/BufferAllocation_2.c
-SPDXID: SPDXRef-BufferAllocation2
-FileChecksum: SHA1: 4588cbdb867453817a667b27d08793e7e00dfcb8
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./portable/BufferManagement/BufferAllocation_1.c
-SPDXID: SPDXRef-BufferAllocation1
-FileChecksum: SHA1: f54bf96b632276e2cb0aa2fb9408d9d90c647d3e
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileComment: NOASSERTION
-FileName: ./jobs.c
-SPDXID: SPDXRef-jobs
-FileChecksum: SHA1: c0eec9194525bb4bf9b6d23c930f885668e22833
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./otaJobParser/ota_job_handler.c
-SPDXID: SPDXRef-otaJobParser-otajobhandler.c
-FileComment: <text>NOASSERTION</text>
-FileChecksum: SHA1: 097a1e5596c7177bca6070261b0651c634849348
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./otaJobParser/job_parser.c
-SPDXID: SPDXRef-otaJobParser-jobparser
-FileChecksum: SHA1: 27fc99945cf64ac5e6fd33132a88915ca4a1fbe6
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./sigv4.c
-SPDXID: SPDXRef-sigv4c
-FileChecksum: SHA1: b1d286e59c81abc760466ed143e9412fc73acfe7
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-FileName: ./sigv4_quicksort.c
-SPDXID: SPDXRef-sigv4quicksort
-FileComment: <text>NOASSERTION</text>
-FileChecksum: SHA1: 334b8ce8c06ef6a3f94e4a70e1fd11db527ffeb4
-LicenseConcluded: MIT
-LicenseInfoInFile: MIT
-FileCopyrightText: NOASSERTION
-
-## Package Information
 PackageName: iot-reference-rx
-SPDXID: SPDXRef-iotrefrx
-PackageComment: <text>PURL is pkg:github/renesas/iot-reference-rx@v202406.01-LTS-rx-1.2.0</text>
-PackageVersion: v202406.01-LTS-rx-1.2.0
-PackageFileName: FreeRTOSv202406.04-LTS.zip
-PackageSupplier: Organization: Renesas Electronics Corporation
-PackageDownloadLocation: https://github.com/FreeRTOS/FreeRTOS-LTS/tree/202406.04-LTS
-PackageChecksum: SHA256: 6e29b315eddcd365e1ec536aced0bf150b2eadfb8c35cbafa1d0e5fa4e70c3e1
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/renesas/iot-reference-rx@v202406.01-LTS-rx-1.2.0
-FilesAnalyzed: false
-
-## Package Information
-PackageName: KVstore
-SPDXID: SPDXRef-kvstore
-PackageComment: <text>This package did not originate from an existing submodule.</text>
-PackageVersion: v1
-PackageSupplier: Organization:  Amazon Web Services
+SPDXID: SPDXRef-iot-reference-rx
+PackageVersion: 202604.00-LTS
 PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: MIT
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-kvstore
+PackageCopyrightText: NOASSERTION
+PackageSourceInfo: PackageVersion identifies the FreeRTOS LTS base in manifest.yml.
 
-## Package Information
-PackageName: AWS-IoT-Core-MQTT-Streams-Embedded-C
-SPDXID: SPDXRef-aws-stream
-PackageComment: <text>PURL is pkg:github/aws/aws-iot-core-mqtt-streams-embedded-c@v1.1.0</text>
-PackageVersion: v1.1.0
-PackageFileName: aws-iot-core-mqtt-streams-embedded-c-v1.1.0.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: https://github.com/aws/aws-iot-core-mqtt-streams-embedded-c/tree/v1.1.0
-PackageChecksum: SHA256: cbc2bcbef393608912b5e32520a81115fdcbb4e08a96572df071ce098c754f68
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/aws-iot-core-mqtt-streams-embedded-c@v1.1.0
+PackageName: pkcs11
+SPDXID: SPDXRef-53967aef4a14fcbce642ed8a7dbc158ce69aba6b881fc3466473bb75d0dbae0e
+PackageVersion: 9304ef6842d08d881ccd1daa8d3a428f3a9671ee
+PackageDownloadLocation: git+https://github.com/amazon-freertos/pkcs11.git@9304ef6842d08d881ccd1daa8d3a428f3a9671ee
 FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-aws-stream
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
 
-## Package Information
-PackageName: backoffAlgorithm
-SPDXID: SPDXRef-backoff-algo
-PackageComment: <text>PURL is pkg:github/FreeRTOS/backoffAlgorithm@v1.4.1</text>
-PackageVersion: v1.4.1
-PackageFileName: backoffAlgorithm-v1.4.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 8aae10d19ebadc69c64383b1aed448a863197e520242659bb1643d71cce0315b
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/backoffAlgorithm@v1.4.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-backoff-algo
-
-## Package Information
-PackageName: coreHTTP
-SPDXID: SPDXRef-corehttp
-PackageComment: <text>PURL is pkg:github/FreeRTOS/coreHTTP@v3.1.1</text>
-PackageVersion: v3.1.1
-PackageFileName: coreHTTP-v3.1.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 6049e593b57cc9b0955520e4855e85ebc06451c14f0b7c516ea173a0132565de
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreHTTP@v3.1.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-corehttp
-
-## Package Information
-PackageName: coreJSON
-SPDXID: SPDXRef-corejson
-PackageComment: <text>PURL is pkg:github/FreeRTOS/coreJSON@v3.3.0</text>
-PackageVersion: v3.3.0
-PackageFileName: coreJSON-v3.3.0.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 9dc0130d6bc2c1cb53b4812d6a068a3b407c681bf375a1322850ee4f91f6595c
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreJSON@v3.3.0
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-corejson
-
-## Package Information
-PackageName: coreMQTT-Agent
-SPDXID: SPDXRef-mqtt-agent
-PackageComment: <text>PURL is pkg:github/FreeRTOS/coreMQTT-Agent@v1.3.1</text>
-PackageVersion: v1.3.1
-PackageFileName: coreMQTT-Agent-v1.3.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 8bc1594746f44b10bf95dc880f16390be04aa47a54768a30094fa69653f713ac
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreMQTT-Agent@v1.3.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-mqtt-agent
-
-## Package Information
-PackageName: coreMQTT
-SPDXID: SPDXRef-mqtt
-PackageComment: <text>PURL is pkg:github/FreeRTOS/coreMQTT@v2.3.1</text>
-PackageVersion: v2.3.1
-PackageFileName: coreMQTT-v2.3.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 4bf0d8de9fbed4b35c5f149f7009b06946834ea3d8384b1d39e1c392f8316563
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreMQTT@v2.3.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-mqtt
-
-## Package Information
-PackageName: corePKCS11
-SPDXID: SPDXRef-corepkcs11
-PackageComment: <text>PURL is pkg:github/FreeRTOS/corePKCS11@v3.6.3</text>
-PackageVersion: v3.6.3
-PackageFileName: corePKCS11-v3.6.3.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 22600504ae64dba0fa8897e1ee11408925a4d4c9f756f2db2514311507a4e853
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/corePKCS11@v3.6.3
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-corepkcs11
-
-## Package Information
-PackageName: coreSNTP
-SPDXID: SPDXRef-sntp
-PackageComment: <text>PURL is pkg:github/FreeRTOS/coreSNTP@v1.3.1</text>
-PackageVersion: v1.3.1
-PackageFileName: coreSNTP-v1.3.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: c543afe701303213175d953e387482cb4a171d31037ea8928ba2130b2e0d5755
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/coreSNTP@v1.3.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-sntp
-
-## Package Information
-PackageName: Device-Defender-for-AWS-IoT-embedded-sdk
-SPDXID: SPDXRef-dev-defender
-PackageComment: <text>PURL is pkg:github/aws/Device-Defender-for-AWS-IoT-embedded-sdk@v1.4.0</text>
-PackageVersion: v1.4.0
-PackageFileName: Device-Defender-for-AWS-IoT-embedded-sdk-v1.4.0.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: https://github.com/aws/Device-Defender-for-AWS-IoT-embedded-sdk/tree/v1.4.0
-PackageChecksum: SHA256: 08a1f79b5087211c80698d14abccdb37e7663c7d664a4032482407cf46e33201
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Device-Defender-for-AWS-IoT-embedded-sdk@v1.4.0
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-dev-defender
-
-## Package Information
-PackageName: Device-Shadow-for-AWS-IoT-embedded-sdk
-SPDXID: SPDXRef-dev-shadow
-PackageComment: <text>PURL is pkg:github/aws/Device-Shadow-for-AWS-IoT-embedded-sdk@v1.4.1</text>
-PackageVersion: v1.4.1
-PackageFileName: Device-Shadow-for-AWS-IoT-embedded-sdk-v1.4.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk/tree/v1.4.1
-PackageChecksum: SHA256: 0e38d6201f2a7e8948e78d2e9930f96c7849a9ccb9c439a73524ca4286f3f0d1
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Device-Shadow-for-AWS-IoT-embedded-sdk@v1.4.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-dev-shadow
-
-## Package Information
-PackageName: Fleet-Provisioning-for-AWS-IoT-embedded-sdk
-SPDXID: SPDXRef-fleet-prov
-PackageComment: <text>PURL is pkg:github/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk@v1.2.1</text>
-PackageVersion: v1.2.1
-PackageFileName: Fleet-Provisioning-for-AWS-IoT-embedded-sdk-v1.2.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/tree/v1.2.1
-PackageChecksum: SHA256: 1b65d2dc621836a3665017a76415ace30ebb0645a7e2513936759a10cf256f8a
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk@v1.2.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-fleet-prov
-
-## Package Information
-PackageName: FreeRTOS Logging
-SPDXID: SPDXRef-logging
-PackageComment: <text>This package did not originate from an existing submodule.</text>
-PackageVersion: v1.1.3
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-logging
-
-## Package Information
-PackageName: FreeRTOS-Cellular-Interface
-SPDXID: SPDXRef-cellular
-PackageComment: <text>PURL is pkg:github/FreeRTOS/FreeRTOS-Cellular-Interface@v1.4.0</text>
-PackageVersion: v1.4.0
-PackageFileName: FreeRTOS-Cellular-Interface-v1.4.0.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 881ccf8e2c5f5777f40249c775e2013f4c583b7d691a91e2113a7c3092fc33a1
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/FreeRTOS-Cellular-Interface@v1.4.0
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-cellular
-
-## Package Information
-PackageName: FreeRTOS-Kernel
-SPDXID: SPDXRef-frtos-kernel
-PackageComment: <text>PURL is pkg:github/FreeRTOS/FreeRTOS-Kernel@v11.1.0</text>
-PackageVersion: v11.1.0
-PackageFileName: FreeRTOS-KernelV11.1.0.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: eebd58aa71a623c9381f25f77b708c0ed14ef995a8913e2460fe9f286bb271eb
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/FreeRTOS-Kernel@v11.1.0
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-frtos-kernel
-
-## Package Information
-PackageName: FreeRTOS-Plus-CLI
-SPDXID: SPDXRef-frtos-cli
-PackageComment: <text>This package did not originate from an existing submodule.</text>
-PackageVersion: v1.0.4
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-frtos-cli
-
-## Package Information
-PackageName: FreeRTOS-Plus-TCP
-SPDXID: SPDXRef-frtos-tcp
-PackageComment: <text>PURL is pkg:github/FreeRTOS/FreeRTOS-Plus-TCP@v4.2.5</text>
-PackageVersion: v4.2.5
-PackageFileName: FreeRTOS-Plus-TCP-V4.2.5.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageChecksum: SHA256: 6f080846fb262ace9cfc404f50fddf9419d3caa8b52c0efffb2d135aa0c35e1d
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/FreeRTOS/FreeRTOS-Plus-TCP@v4.2.5
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-frtos-tcp
-
-## Package Information
-PackageName: FreeRTOS crypto
-SPDXID: SPDXRef-freertos-crypto
-PackageComment: <text>This package did not originate from an existing submodule.</text>
-PackageVersion: v1.1.2
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-freertos-crypto
-
-## Package Information
-PackageName: Jobs-for-AWS-IoT-embedded-sdk
-SPDXID: SPDXRef-aws-jobs
-PackageComment: <text>PURL is pkg:github/aws/Jobs-for-AWS-IoT-embedded-sdk@v1.5.1</text>
-PackageVersion: v1.5.1
-PackageFileName: Jobs-for-AWS-IoT-embedded-sdk-v1.5.1.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: https://github.com/aws/Jobs-for-AWS-IoT-embedded-sdk/tree/v1.5.1
-PackageChecksum: SHA256: 9d22d3c0d4c9835a8649fa6dc1b352e2d7f773288ac07aa3a766299b66f50202
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/Jobs-for-AWS-IoT-embedded-sdk@v1.5.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-aws-jobs
-
-## Package Information
-PackageName: littlefs
-SPDXID: SPDXRef-littlefs
-PackageComment: <text>PURL is pkg:github/littlefs-project/littlefs@v2.5.1</text>
-PackageVersion: v2.5.1
-PackageSupplier: Organization:   TrustedFirmware
-PackageDownloadLocation: https://github.com/littlefs-project/littlefs/tree/v2.5.1
-PackageLicenseConcluded: BSD-3-Clause
-PackageLicenseDeclared: BSD-3-Clause
-PackageCopyrightText: <text>Copyright (c) The littlefs authors, Copyright (c) Arm Limited. All rights reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/littlefs-project/littlefs@v2.5.1
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-littlefs
-
-## Package Information
 PackageName: mbedtls
-SPDXID: SPDXRef-mbedtls
-PackageComment: <text>PURL is pkg:github/Mbed-TLS/mbedtls@v3.6.4</text>
-PackageVersion: v3.6.4
-PackageSupplier: Organization:   TrustedFirmware
-PackageDownloadLocation: https://github.com/Mbed-TLS/mbedtls/tree/v3.6.4
-PackageLicenseConcluded: Apache-2.0 AND GPL-2.0-or-later
-PackageLicenseDeclared: Apache-2.0 AND GPL-2.0-or-later
-PackageLicenseComments: <text>Mbed TLS files are provided under a dual [Apache-2.0] OR [GPL-2.0-or-later] license.</text>
-PackageCopyrightText: <text>Copyright The Mbed TLS Contributors</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/Mbed-TLS/mbedtls@v3.6.4
+SPDXID: SPDXRef-aea327612796429fab0edfb0c6a369b70cdb03fefea6336856aaa73057cbc6ce
+PackageVersion: v2.16.8
+PackageDownloadLocation: git+https://github.com/ARMmbed/mbedtls.git@848a4e06b375e067552f1a21d4bc69322c673217
 FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-mbedtls
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
 
-## Package Information
-PackageName: Network transport
-SPDXID: SPDXRef-net-transport
-PackageComment: <text>This package did not originate from an existing submodule.</text>
-PackageVersion: v1
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: MIT
+PackageName: mbedtls
+SPDXID: SPDXRef-1c0e29dd7b3aaf35123f4293a40189a32d6a635dad341bdd038866920e5a2084
+PackageVersion: v2.16.10
+PackageDownloadLocation: git+https://github.com/ARMmbed/mbedtls.git@d61fa61bef06b64132e3490543c81b8ee40fbee3
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: amazon-freertos
+SPDXID: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7
+PackageVersion: 202107.00
+PackageDownloadLocation: git+https://github.com/aws/amazon-freertos.git@a038063c3b0216e0b4d46d72425388a0c2938b13
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-net-transport
+PackageCopyrightText: NOASSERTION
 
-## Package Information
-PackageName: rx-driver-package
-SPDXID: SPDXRef-rdp
-PackageComment: <text>PURL is pkg:github/renesas/rx-driver-package@v1.47</text>
-PackageVersion: v1.47
-PackageSupplier: Organization: Renesas Electronics Corporation
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: LicenseRef-Renesas
-PackageLicenseDeclared: LicenseRef-Renesas
-PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/renesas/rx-driver-package@v1.47
+PackageName: aws-iot-core-mqtt-file-streams-embedded-c
+SPDXID: SPDXRef-ffb5824a1c606a14f7e1b308b8a817c796e041cb212b65798ec36075d44de735
+PackageVersion: v1.2.0
+PackageDownloadLocation: git+https://github.com/aws/aws-iot-core-mqtt-file-streams-embedded-c.git@383ffeff43a80123e07cf8ca613d12ce680527b0
 FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-rdp
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
 
-## Package Information
-PackageName: r_bsp
-SPDXID: SPDXRef-r-bsp
-PackageComment: <text>This package is listed separately because it is not included in rx-driver-package v1.47</text>
-PackageVersion: v7.54
-PackageSupplier: Organization: Renesas Electronics Corporation
-PackageDownloadLocation: https://www.renesas.com/document/scd/rx-family-board-support-package-module-using-firmware-integration-technology
-PackageLicenseConcluded: LicenseRef-Renesas
-PackageLicenseDeclared: LicenseRef-Renesas
-PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
+PackageName: device-defender-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-c0d83d981d68fbf1bcc38771faf65b60fa3f9d0f6f0b76630abd7cf0a8967892
+PackageVersion: v1.1.0
+PackageDownloadLocation: git+https://github.com/aws/device-defender-for-aws-iot-embedded-sdk.git@548b4688b26d16d0e6134d7d93dcbae103994e40
 FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-r-bsp
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
 
-## Package Information
-PackageName: r_wifi_da16xxx
-SPDXID: SPDXRef-r-wifi
-PackageComment: <text>This package is listed separately because it is not included in rx-driver-package v1.47</text>
-PackageVersion: v1.40
-PackageSupplier: Organization: Renesas Electronics Corporation
-PackageDownloadLocation: https://www.renesas.com/document/scd/rx-family-us159-da16xxxmevz-wi-fi-control-module-using-firmware-integration-technology
-PackageLicenseConcluded: LicenseRef-Renesas
-PackageLicenseDeclared: LicenseRef-Renesas
-PackageCopyrightText: <text>Renesas Electronics Corporation. All rights reserved.</text>
+PackageName: device-defender-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-f51ac09780d2ddd03258a85c43cd9957fe6e9bc03cc29a3506dd381b6dfbb508
+PackageVersion: v1.4.0
+PackageDownloadLocation: git+https://github.com/aws/device-defender-for-aws-iot-embedded-sdk.git@7059e199149a540471b484b710a51fc665636f22
 FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-r-wifi
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
 
-## Package Information
+PackageName: Device-Defender-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-84cd2636a503e98c0ca6a75d2f80d959fffc84996014324f54ee4a4cb09d8d6b
+PackageVersion: v1.4.1
+PackageDownloadLocation: git+https://github.com/aws/Device-Defender-for-AWS-IoT-embedded-sdk.git@86582e258907e762948547c1826d44704908b403
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: device-shadow-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-3c227d3c49ffb22901730350912df5ba6d8e30fc50810b2e54bb132e99bd1e6e
+PackageVersion: v1.4.1
+PackageDownloadLocation: git+https://github.com/aws/device-shadow-for-aws-iot-embedded-sdk@268a5a276d3c3f451575b5a042b4e8ad53f134b6
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: device-shadow-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-1ef95acada6f36a1fd7cf48cbd0210945b2a92912eed7fef4ba7663b6ffaee1c
+PackageVersion: v1.0.2
+PackageDownloadLocation: git+https://github.com/aws/device-shadow-for-aws-iot-embedded-sdk.git@508ce43a2257be5d38bfd2a778607fa921cb2dac
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Device-Shadow-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-bdd38b3fcea72d5964b62e30eadd4f57a95639b092bf93cf40794246fee6ecee
+PackageVersion: v1.4.2
+PackageDownloadLocation: git+https://github.com/aws/Device-Shadow-for-AWS-IoT-embedded-sdk.git@a0cbd6e5ea4b4615f0d7f801be24e552a9658b42
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: Fleet-Provisioning-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-9319af95123b6377b45b03d58cbc42e25e00a50fb69a7abb724137befe7f7c22
+PackageVersion: v1.2.2
+PackageDownloadLocation: git+https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk.git@7691e8af27bd0a42b7fe2f21c8b3289fa037df17
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: Fleet-Provisioning-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-23ca5034017b8332f223792660d6f72dce5c277dc042ce7252c1b5b1a76b3921
+PackageVersion: v1.2.1
+PackageDownloadLocation: git+https://github.com/aws/Fleet-Provisioning-for-AWS-IoT-embedded-sdk.git@a97d53af335f135c6ee9d608a3e80be8a3009a89
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: jobs-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-cf0e4158a4631711d0a7597f179cd75a691b72ad73864e6a0c6c3d079a5db62a
+PackageVersion: v1.1.0
+PackageDownloadLocation: git+https://github.com/aws/jobs-for-aws-iot-embedded-sdk.git@19788445bca7f8f85167c83ac12379d3d1022295
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: jobs-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-a447684300752e502bd76bd2ab217c2ee4e4b4b2a5c68d5f8565ef1d48b3569f
+PackageVersion: v1.5.1
+PackageDownloadLocation: git+https://github.com/aws/jobs-for-aws-iot-embedded-sdk.git@3ce91f56427653705891a8668568cb247b97905f
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Jobs-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-2c5d2d4b63707b07b88adc0801e3f04716d27c43a1769a5318d8d9750cc9485f
+PackageVersion: v2.0.1
+PackageDownloadLocation: git+https://github.com/aws/Jobs-for-AWS-IoT-embedded-sdk.git@f09232966a558916253537fed68c07e529cd8f39
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: ota-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-c8ddc21c14768e711c9238ecd7a0390b684f2377c2aae4eed0b22cc2d4f1a98b
+PackageVersion: 57d3efa0dcb43e033dac234f64ec99fca431c29b
+PackageDownloadLocation: git+https://github.com/aws/ota-for-aws-iot-embedded-sdk.git@57d3efa0dcb43e033dac234f64ec99fca431c29b
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: ota-for-aws-iot-embedded-sdk
+SPDXID: SPDXRef-610db3e28d1f7a324537fb5789cb641ac985e18ee78b92ba55eb0bfd86111628
+PackageVersion: v3.0.0
+PackageDownloadLocation: git+https://github.com/aws/ota-for-aws-iot-embedded-sdk.git@666241d0f643b07d5146a3715b649d80f8135e0b
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
 PackageName: SigV4-for-AWS-IoT-embedded-sdk
-SPDXID: SPDXRef-sigv4
-PackageComment: <text>PURL is pkg:github/aws/SigV4-for-AWS-IoT-embedded-sdk@v1.3.0</text>
+SPDXID: SPDXRef-8257c5a448f1987eea4168e6f53ab43fbb9caec81fd68b1b69b76a1e5a63eb62
 PackageVersion: v1.3.0
-PackageFileName: SigV4-for-AWS-IoT-embedded-sdk-v1.3.0.zip
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk/tree/v1.3.0
-PackageChecksum: SHA256: 42cadbd7b05029237525410546f0b97e5046df683c34adb96d18bf3cf400d5d6
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/aws/SigV4-for-AWS-IoT-embedded-sdk@v1.3.0
+PackageDownloadLocation: git+https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk.git@68e0364a883f0ededb6b43af9e271e469065dac3
 FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-sigv4
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
 
-## Package Information
+PackageName: SigV4-for-AWS-IoT-embedded-sdk
+SPDXID: SPDXRef-27d75d23e3b88bf3e16781e9ac04beced44063ccc1d4e1f92061ca47f61a407d
+PackageVersion: v1.3.1
+PackageDownloadLocation: git+https://github.com/aws/SigV4-for-AWS-IoT-embedded-sdk.git@b4ac78a0d5d4cff9b28a44f665067057e07be09f
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: aws-build-accumulator
+SPDXID: SPDXRef-7558cc1d2cad8d7d87f7dc0f3670d38427452da802632a6be2967c3b918744cb
+PackageVersion: 0b0e550db817d3b6f23e289939f709f2f40ba1c3
+PackageDownloadLocation: git+https://github.com/awslabs/aws-build-accumulator@0b0e550db817d3b6f23e289939f709f2f40ba1c3
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: aws-build-accumulator
+SPDXID: SPDXRef-bee7f63f99b5f82745a1495eb20acd11a6f2cbfbc4dc01463c76986649fb34e6
+PackageVersion: 3fc5e02bc17483352546ac4c81078fde64cab674
+PackageDownloadLocation: git+https://github.com/awslabs/aws-build-accumulator.git@3fc5e02bc17483352546ac4c81078fde64cab674
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: aws-build-accumulator
+SPDXID: SPDXRef-24436db1d35866fb2382cc9992f445b9a707722cae0a796b59389d31a0289bf8
+PackageVersion: 1.6.0
+PackageDownloadLocation: git+https://github.com/awslabs/aws-build-accumulator@b652295078e26f8444c72ee3088f6a1230624827
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: aws-build-accumulator
+SPDXID: SPDXRef-6c370ef5e2b64dd40032393efd6d9ca017c53b07afdc25aeb66f8be5f276c316
+PackageVersion: fcc583c4a5d5b9bebbefce5626256283fab1edda
+PackageDownloadLocation: git+https://github.com/awslabs/aws-build-accumulator@fcc583c4a5d5b9bebbefce5626256283fab1edda
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: aws-templates-for-cbmc-proofs
+SPDXID: SPDXRef-f7edaf53e64a39b02ba67f1867288515cfb68022ae2c33107ef7738698717c38
+PackageVersion: 27fdd8ee01705d917bcf0a3c37ff687779a87bda
+PackageDownloadLocation: git+https://github.com/awslabs/aws-templates-for-cbmc-proofs.git@27fdd8ee01705d917bcf0a3c37ff687779a87bda
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: aws-templates-for-cbmc-proofs
+SPDXID: SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+PackageVersion: 36bff9ac9d4616a66629582758a82b0178c99112
+PackageDownloadLocation: git+https://github.com/awslabs/aws-templates-for-cbmc-proofs@36bff9ac9d4616a66629582758a82b0178c99112
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: abstraction-rtos
+SPDXID: SPDXRef-42f4c6b95bc62025ee3cacd15792077816ce80c55b1f1c78af18dd797d79f37f
+PackageVersion: release-v1.2.2
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/abstraction-rtos.git@a3ae4e2b6db1a7332aae6213a106c983b904de56
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: capsense
+SPDXID: SPDXRef-4cb0df54242c9845db2e9b1bc973d30a70b1e19dc2afc8ff8bc7bb8da4b239ab
+PackageVersion: release-v2.10.0
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/capsense.git@83898bb70eca16e4235eca362dd3ecc038de97e3
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: clib-support
+SPDXID: SPDXRef-c2b89e8406f144b5011f01fab5a729ccd3e44aedb89f82baa01988da94096b66
+PackageVersion: release-v1.0.1
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/clib-support.git@50b583456a9a11a92b97da6829d090a3878a9340
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: connectivity-utilities
+SPDXID: SPDXRef-8bec7b98583a40a73ee9e44dd0ae35a3437d970107694073fb657bab1e0953a4
+PackageVersion: release-v2.1.0
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/connectivity-utilities.git@3785cafc201f54cb45d16718f24aeed8d3f1ef47
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: core-lib
+SPDXID: SPDXRef-0a464dcc110c012f9dc8661671652e5555c94f9ce8c218c65a8e1e421701d4d4
+PackageVersion: release-v1.1.5
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/core-lib.git@59f1fc328a11af2da5cd30ae9abbb0daf3474405
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: kv-store
+SPDXID: SPDXRef-c7542a83e4b7d5493a2e6c523d8abef36fa17cd5c98ff3e57d9203b47adf286b
+PackageVersion: release-v1.0.0
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/kv-store.git@bcf66dc713f9763a63b8ff7736eab9509c69dd9e
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: lpa
+SPDXID: SPDXRef-211819065327065fb333ef357197bb09862094fcd470766aaa9646f58d854bc4
+PackageVersion: release-v3.0.0
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/lpa.git@47fe63b9f07acb4e50a63cb130523c54dfb2b02a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: psoc6cm0p
+SPDXID: SPDXRef-69cfe448d5eb47039090fab82265388b50e7d1fe9c8d5387f422b187fa31de7e
+PackageVersion: release-v1.2.0
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/psoc6cm0p.git@c91fa25bc5895a94d4181a5b5958b9b9c38da40d
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: psoc6hal
+SPDXID: SPDXRef-1a0ccd0e464ad3d2bcb65f14ff8f82711bd73b878fbe33f4aaa607c3eeb4037d
+PackageVersion: release-v1.4.0
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/psoc6hal.git@72abdecad39f41b326a74f65591af09ce6aec224
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: psoc6make
+SPDXID: SPDXRef-4e653c2ba03e048a50dcc3d98f40ade9c1bf14ab5ff6cf36234096a450c74540
+PackageVersion: release-v1.5.1
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/psoc6make.git@2d3816c69361e60c22a72f4f4424569e46370959
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: psoc6pdl
+SPDXID: SPDXRef-e92708bf254b6168feddf0bc81342a02d351cec875c38ced54e27c4089edcdd9
+PackageVersion: release-v1.6.1
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/psoc6pdl.git@16fda1156edf67d72b1d4af3f72528d607a4d4e0
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: retarget-io
+SPDXID: SPDXRef-f3c530a6aa4fb94881bce496a157a0b39d9631dc95d21cd2ee12f1703c9ff3c2
+PackageVersion: release-v1.1.1
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/retarget-io.git@6eb547f3ac50cd436fecefc50cb93380011f21cc
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: rgb-led
+SPDXID: SPDXRef-8550ec2a514eb43e1b288a0ab7f5606cb0fa43e92c2bf8e4fd5cfe4e1050d5fd
+PackageVersion: release-v1.1.1
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/rgb-led.git@432146fe700340767f46a588ae1787caa317c8ba
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: serial-flash
+SPDXID: SPDXRef-d80cc0c2f724cd8829259066a9a3bb4aeaee90fdf206b8d2a8fea9ee94dcedb7
+PackageVersion: release-v1.0.2
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/serial-flash.git@8558f203f1f20a81e96a9f5583da327d4b3f062d
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: udb-sdio-whd
+SPDXID: SPDXRef-7088da77d3639fcafaa419e9fd37e628f6a9ef218f3df11c0f6c0a1bc74d8896
+PackageVersion: release-v1.0.1
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/udb-sdio-whd.git@c0f0dc862725399997dc20544d61c80239c1155a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: whd-bsp-integration
+SPDXID: SPDXRef-070ec2066bb8ce3acd0beaba3736da5aed6ecf615b83624a0097317b1e38defc
+PackageVersion: release-v1.0.2
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/whd-bsp-integration.git@a4fae4095fe1e86ea5c495219f262339bc7a7f68
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: wifi-host-driver
+SPDXID: SPDXRef-859b4ee5a7d563dd9b3ed7d45613cb7dbc175ee4ee3046f1edf7dd69fbf237c3
+PackageVersion: release-v1.91.2
+PackageDownloadLocation: git+https://github.com/cypresssemiconductorco/wifi-host-driver.git@cd2e40856a7a4b7cbbdbdb854c028ebdac794155
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: cJSON
+SPDXID: SPDXRef-54e463eda52e93504e19f7346163f416dae99b4dba5135629cf1f7cb0321377c
+PackageVersion: v1.7.12
+PackageDownloadLocation: git+https://github.com/DaveGamble/cJSON.git@3c8935676a97c7c97bf006db8312875b4f292f6c
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: tinydtls
+SPDXID: SPDXRef-f83261d4d3494f0bfe28c04441306e3072c75a5b0e0b26a837c18865c2c3ff3a
+PackageVersion: 7f8c86e501e690301630029fa9bae22424adf618
+PackageDownloadLocation: git+https://github.com/eclipse/tinydtls.git@7f8c86e501e690301630029fa9bae22424adf618
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: asio
+SPDXID: SPDXRef-f64ed703a8e4c9efa5a38b1d9d2b59bdf797cbbe8bff101a06cd710a888eb15d
+PackageVersion: 3b66e5b051381fb70de9c2791df70a06181c64e3
+PackageDownloadLocation: git+https://github.com/espressif/asio.git@3b66e5b051381fb70de9c2791df70a06181c64e3
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esp-afr-sdk
+SPDXID: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1
+PackageVersion: f8af47e5ac4a0b8c3c7d7511b87f18500f6e699a
+PackageDownloadLocation: git+https://github.com/espressif/esp-afr-sdk.git@f8af47e5ac4a0b8c3c7d7511b87f18500f6e699a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esp-cryptoauthlib
+SPDXID: SPDXRef-a3c9fb865f000052dee4dc77e3e43c38b431eab881242ff70fe1271821c402bc
+PackageVersion: c3d3a69021cfec3236ca2c0b63be4048ec6643a4
+PackageDownloadLocation: git+https://github.com/espressif/esp-cryptoauthlib.git@c3d3a69021cfec3236ca2c0b63be4048ec6643a4
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esp-lwip
+SPDXID: SPDXRef-10051092c6b0de50e32bb76dea9a34f4282018be477ea9aec2bbc8f41c082fbe
+PackageVersion: 7285b846a22ebd02377bd9c67e7f9eaaf842492b
+PackageDownloadLocation: git+https://github.com/espressif/esp-lwip.git@7285b846a22ebd02377bd9c67e7f9eaaf842492b
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esp-mqtt
+SPDXID: SPDXRef-e6aa2ae2fb0bebefeef43663f13a4bee8a522a07ba757b7b38f778dbd6ede205
+PackageVersion: da850b0add1e71b3659bfac5d797cc834dc3e89b
+PackageDownloadLocation: git+https://github.com/espressif/esp-mqtt.git@da850b0add1e71b3659bfac5d797cc834dc3e89b
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esp-nimble
+SPDXID: SPDXRef-4352f8b0e271cb6c86f092491393d9142715d348afe6e7260c99bfc5d13b3187
+PackageVersion: 2d4f5b9365bca5d3e97abb83f6a5a23d3816695a
+PackageDownloadLocation: git+https://github.com/espressif/esp-nimble.git@2d4f5b9365bca5d3e97abb83f6a5a23d3816695a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esp32-bt-lib
+SPDXID: SPDXRef-ef29074fd2151cb47e0fe9bb5f4b96949c5006058b4a68885bec55c75e1203ad
+PackageVersion: c2e961d07cba8e5a08749e1f1d5c6ffe76d4b115
+PackageDownloadLocation: git+https://github.com/espressif/esp32-bt-lib.git@c2e961d07cba8e5a08749e1f1d5c6ffe76d4b115
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esp32-wifi-lib
+SPDXID: SPDXRef-42f01c1b7a67c0bddb5aa6be897e6b4edf283187d7fcd80a6d73c3dc6050ec77
+PackageVersion: 1c4c5396cab728b3524fc4a21b324307cd972d0c
+PackageDownloadLocation: git+https://github.com/espressif/esp32-wifi-lib.git@1c4c5396cab728b3524fc4a21b324307cd972d0c
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: esptool
+SPDXID: SPDXRef-d3c77a769c277183220679adebab5eeb0d59df72096f1d732ede6d73e4dd1871
+PackageVersion: v3.0
+PackageDownloadLocation: git+https://github.com/espressif/esptool.git@4fa0bd7b0d1f69f5ff22b043adc07c5e562a8931
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: tinyusb
+SPDXID: SPDXRef-36600a409ba3d79b688703c6e22e2b9eadf48f08b811b8f3c2ca8ed7262c600c
+PackageVersion: 28f89e13473d40637574bcbfe4142633b39899fd
+PackageDownloadLocation: git+https://github.com/espressif/tinyusb.git@28f89e13473d40637574bcbfe4142633b39899fd
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: backoffAlgorithm
+SPDXID: SPDXRef-f92cc9ccb6910b83dea132578ba230e12f78efe07674355f097ec0483ecbc9ac
+PackageVersion: v1.4.2
+PackageDownloadLocation: git+https://github.com/FreeRTOS/backoffAlgorithm.git@14f4c88b33dd554be30a00a312c88d3986d457d0
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: backoffAlgorithm
+SPDXID: SPDXRef-1653e0cdfd34c33cf7378435943114b499d758019d43a9a6677dd35db7c5bc5d
+PackageVersion: v1.4.1
+PackageDownloadLocation: git+https://github.com/FreeRTOS/backoffAlgorithm.git@3cc0bf8c4d41d7cd7aa2f1ded5075c87bf6b2bbb
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: backoffAlgorithm
+SPDXID: SPDXRef-f498dfdd14912663490d685c65f7be7138c073275b83559d19f6da1b39a9e040
+PackageVersion: v1.0.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/backoffAlgorithm.git@a70291444c556bc3392bf9b7b60626b93b120319
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreHTTP
+SPDXID: SPDXRef-378786cf95cb0d281d4b21fb93d3f13937c9db15b1e54484cd0fdbc1b512763c
+PackageVersion: v3.1.1
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreHTTP@12adee81ddef588abada91672b34fd997b2a27ac
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreHTTP
+SPDXID: SPDXRef-e566fd7a9b864441011f63b5b7990e53a0f2f990be582acc0a43ae71c28a2e32
+PackageVersion: v3.1.3
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreHTTP.git@3c4a5838658cd6d0ff8fb7c3a14e30baafcbcd28
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreHTTP
+SPDXID: SPDXRef-1ca3400d051c485887b9f2adf29f224a8034995ea1648e201da8c47a2b689766
+PackageVersion: v2.0.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreHTTP.git@b349f89e67f5feef51438dc09ed89959dedc18d5
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreJSON
+SPDXID: SPDXRef-8730a8189a708ce91eba0de084dae5b73fa2098ad6cb914cf7ea7cdfba7f710f
+PackageVersion: v3.0.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreJSON.git@26fe707548fc4e975c453aa4475ae056bb70247b
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreJSON
+SPDXID: SPDXRef-d0cefecad80c0ba88e5c0386000c4a7e3465b5844dc6aaf331b67f4e1eee0fe8
+PackageVersion: v3.2.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreJSON.git@5b31f4c37a034911a4992fd415f8177a75014946
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreJSON
+SPDXID: SPDXRef-f815502693444c45327dbecb523d9dabd170c108714640c31949a47e81555ce4
+PackageVersion: 97a906a2761b71434ffa9d838cd0500543b7dadc
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreJSON.git@97a906a2761b71434ffa9d838cd0500543b7dadc
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreJSON
+SPDXID: SPDXRef-5951d097ce197d76307208d766555f614a781e58987582cfa0388639cfb3cd72
+PackageVersion: v3.3.1
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreJSON.git@cffa492da18c890181d64462f8af63992a69d3b0
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreJSON
+SPDXID: SPDXRef-6f0c9d39944e5b94dee40fdfc96cb4cf145bc9d7231580ca289ae0d97fd45a89
+PackageVersion: v3.3.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreJSON@e3b7663f6392d8c10e8db57506ec37e4801b145a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreMQTT-Agent
+SPDXID: SPDXRef-1a5ab368c47b1617dd0f3cc700ab4194095e3f9a58ddd5a1d2a36796c7425408
+PackageVersion: v2.0.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreMQTT-Agent.git@2338d00db41196e4a1fce4bc3ab32f907e77f871
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreMQTT-Agent
+SPDXID: SPDXRef-d7f064184bc358dd63f80a38013a34cfc462baa231f4ee9665fe3e53ddf878e5
+PackageVersion: v1.0.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreMQTT-Agent.git@da70f0fcc3e135616d078bfb7b2ab883f561503c
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreMQTT-Agent
+SPDXID: SPDXRef-0ec10501d6ceda6939b2752c01acd977d518f95ca21e835a352df4f4b1bfb463
+PackageVersion: v1.3.1
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreMQTT-Agent.git@e977d70ee68c95f94d967ea18feadfffe5c7a584
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreMQTT
+SPDXID: SPDXRef-fd640019b7ca39c7924fc4b48154f446ab4cb138c0a990221cce86c5dba4c776
+PackageVersion: v5.0.2
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreMQTT.git@04845c6a8e5f9cf2d232f1c6e80baeb81302e690
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreMQTT
+SPDXID: SPDXRef-73f77c4cc843f7212deb104af70b8056a9801285b815e198376d45aaf4a49740
+PackageVersion: v2.3.1
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreMQTT@2beef04725328923e05e576b884212d53ec97af7
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreMQTT
+SPDXID: SPDXRef-3c80f558184fdcd8975da332ccdfd2399e0ddc86813982e3b64c43bedfb4e041
+PackageVersion: v1.1.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreMQTT.git@ff9830a338b6a759c5574f991b02d6f99abadc42
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: corePKCS11
+SPDXID: SPDXRef-7382d8aa76b3173f44320ff7374eeff08a498bdcaa175032da5ab2069f980dee
+PackageVersion: v3.6.2
+PackageDownloadLocation: git+https://github.com/FreeRTOS/corePKCS11.git@44fee0545d5bcaf6b4a106b8d17a69b9830e04f8
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: corePKCS11
+SPDXID: SPDXRef-e0a54ceac6b5bd16f54dde1d8bc7b4d20eee91ba45465f0488514c4cee368661
+PackageVersion: ccb8fb15b4bc0f369c7292b6c1b835e9b35cab15
+PackageDownloadLocation: git+https://github.com/FreeRTOS/corePKCS11.git@ccb8fb15b4bc0f369c7292b6c1b835e9b35cab15
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: corePKCS11
+SPDXID: SPDXRef-a4c12e15f98a25e2ccf4d0e3e3d6f471c14ce739e48087de6b3fea3482a6b412
+PackageVersion: v3.6.4
+PackageDownloadLocation: git+https://github.com/FreeRTOS/corePKCS11.git@ccc78afee1716436cca832dd3d9388ead2ba05b0
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreSNTP
+SPDXID: SPDXRef-b7e9ab41fc514056859da1733ef77cf596334b126b85004f54bdb01e5e1bde0d
+PackageVersion: v2.0.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreSNTP.git@50f5f96f4c33b14c0358f404ff4ff2a29d422ad7
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: coreSNTP
+SPDXID: SPDXRef-21af2d6d1bb12f7bc0812783e8ca21f7fea9dd64b350f15ac4f5b339342e3161
+PackageVersion: v1.3.1
+PackageDownloadLocation: git+https://github.com/FreeRTOS/coreSNTP.git@b492c223cdbebfb9335166d0e6fc47e93a94de75
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Cellular-Interface
+SPDXID: SPDXRef-88c5fce4ef8e8714f19eff047fe36eb1c8a6908f5a8eb094992456851d08a0d7
+PackageVersion: v1.4.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Cellular-Interface.git@b7494dcdd40aab2fed0bb992760e6cdeba0543d5
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Community-Supported-Demos
+SPDXID: SPDXRef-5912887c2237427431406f3297da2da8aa9393f4893f72eb061bfea5b1917bc0
+PackageVersion: 2f1866faf14759956fc5f26c67c4dba0f8bc6df8
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Community-Supported-Demos@2f1866faf14759956fc5f26c67c4dba0f8bc6df8
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel-Community-Supported-Ports
+SPDXID: SPDXRef-0dbd1e8e61be7cc74d186e30009cd87023c1da8785c591c6e7bc2dcfe29f3563
+PackageVersion: 9c5bad7b2f42b4e8420f12290b9bc085d3309e8b
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel-Community-Supported-Ports@9c5bad7b2f42b4e8420f12290b9bc085d3309e8b
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel-Community-Supported-Ports
+SPDXID: SPDXRef-fe21e83eb3b515bb43acb6142a4544c14336862b920bd3c7ddc6cfc721a578f4
+PackageVersion: bae4c7aa19009825ba48071a8fe25dcb8be84880
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel-Community-Supported-Ports@bae4c7aa19009825ba48071a8fe25dcb8be84880
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel-Community-Supported-Ports
+SPDXID: SPDXRef-ac9de7b1998bdd7a8e06bf5d94d32fa7dc34814277bddc3ffe85726dc210b278
+PackageVersion: f0618d9e2f4c5b0a3e472a2673a090e8ef836258
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel-Community-Supported-Ports@f0618d9e2f4c5b0a3e472a2673a090e8ef836258
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel-Partner-Supported-Ports
+SPDXID: SPDXRef-65028e5fe388c2d300ea61e2a8f6ef4c9f69fb5e2b422627df9a694643abe543
+PackageVersion: 91c87416f8810bb60090baf3abd351f997e8fab4
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel-Partner-Supported-Ports@91c87416f8810bb60090baf3abd351f997e8fab4
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel-Partner-Supported-Ports
+SPDXID: SPDXRef-13fc8b30187c7a3f252d3f3de4dfa114abfcdaaa1e854be06d1474e272a09fc2
+PackageVersion: abc22103e1e6634b33457d4127bff1ab62f27f90
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel-Partner-Supported-Ports@abc22103e1e6634b33457d4127bff1ab62f27f90
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel-Partner-Supported-Ports
+SPDXID: SPDXRef-b13803bdfa93c411a217b0ee03b884f1806ea545225a9d1823eb4e446c24b74c
+PackageVersion: dc3afc6e837426b4bda81bbb6cf45bfb6f34c7e9
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel-Partner-Supported-Ports@dc3afc6e837426b4bda81bbb6cf45bfb6f34c7e9
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel
+SPDXID: SPDXRef-360f37b88573e707459f0f8ebc73f18ab799474ccc73ea19f449c09f50da7129
+PackageVersion: V11.3.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel.git@9b777ae5c5b8e9e456065a00294d1e5f5f9facf5
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel
+SPDXID: SPDXRef-47c577815e0cea92baaade48dbfd16669d33e0598cda1ccb5447067e12eb20b3
+PackageVersion: V10.4.3
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel@9c048e0c71ee43630394981a86f5265bc57131e4
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel
+SPDXID: SPDXRef-396cd7ca9f46139bff98d077d242debc223f08045205c39d8ba7cf8d86455a30
+PackageVersion: V10.4.5
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel.git@cb0757ee0b8894090b82e75e83942e3c61a32245
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel
+SPDXID: SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218
+PackageVersion: V11.1.0
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel@dbf70559b27d39c1fdb68dfb9a32140b6a6777a0
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Kernel
+SPDXID: SPDXRef-a28614f8e716b4ef718a6bf3925a01a8c7087d16390024632d3552dc52906cfe
+PackageVersion: ef4c30524402b523005d9ab2312f8531ffeda6c4
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Kernel.git@ef4c30524402b523005d9ab2312f8531ffeda6c4
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Libraries-Integration-Tests
+SPDXID: SPDXRef-0dd7b34bf563483a69cf81aa8979113a158bbefbd6fe81262062b8516947c23b
+PackageVersion: 202406.00
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Libraries-Integration-Tests.git@0a0a92160a81c5cba008e472203513bd0cfb4c7a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Partner-Supported-Demos
+SPDXID: SPDXRef-e71f8e2b3316ca5fff076d6ee2644d0b8bd07397ab62cd1767a6198d388de9f2
+PackageVersion: f75c298b573984c52bbc374e9c7a5a836982dda6
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Partner-Supported-Demos@f75c298b573984c52bbc374e9c7a5a836982dda6
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Plus-TCP
+SPDXID: SPDXRef-52cd3b1dbe4be152685cdc6567b6b067321293929cc6f7c8855d61a368fa7c27
+PackageVersion: V2.3.2
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git@9a25860e761036a9eb780799c9db632e3eff60c9
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Plus-TCP
+SPDXID: SPDXRef-c4def6d95acd8f0394ad85d3b8d5c8da013c9749945df5d5bcbb2213d135bde9
+PackageVersion: V4.2.2
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Plus-TCP@abcb94c8768532a6cae3c39ffe37602640992a28
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS-Plus-TCP
+SPDXID: SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f
+PackageVersion: V4.4.1
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git@c12361095aca68aeed858f45d14395fbffa92c0d
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: FreeRTOS
+SPDXID: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857
+PackageVersion: 202411.00
+PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS.git@152cf36d6775bce6026a791845af12201aae703d
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: Lab-FreeRTOS-Cellular-Interface-Reference-Quectel-BG96
+SPDXID: SPDXRef-a3ce7952f919145cc14c85361a190470b5b7df3a3fa87e38e2b05da76a0e271f
+PackageVersion: 1c71555e690e24c4be3470c2734eee9a24ae07f7
+PackageDownloadLocation: git+https://github.com/FreeRTOS/Lab-FreeRTOS-Cellular-Interface-Reference-Quectel-BG96.git@1c71555e690e24c4be3470c2734eee9a24ae07f7
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Lab-FreeRTOS-Cellular-Interface-Reference-Sierra-Wireless-HL7802
+SPDXID: SPDXRef-f702555d22433f38bc29aa33f42ca975f2d3507b331255ff03dea89d80b75b7c
+PackageVersion: 889118ad01379fdba2398c39c52fd1d027895010
+PackageDownloadLocation: git+https://github.com/FreeRTOS/Lab-FreeRTOS-Cellular-Interface-Reference-Sierra-Wireless-HL7802.git@889118ad01379fdba2398c39c52fd1d027895010
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Lab-FreeRTOS-Cellular-Interface-Reference-ublox-SARA-R4
+SPDXID: SPDXRef-6475592965857f44d0544c1ba7b342a4bcba84d00afd16d6d9ee7deab55ac60d
+PackageVersion: 62ce0266697ccf3111d3daa932284d136c79ba94
+PackageDownloadLocation: git+https://github.com/FreeRTOS/Lab-FreeRTOS-Cellular-Interface-Reference-ublox-SARA-R4.git@62ce0266697ccf3111d3daa932284d136c79ba94
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: glib
+SPDXID: SPDXRef-8ad53c3386cf8fc0255dd3de66c58f281475edaca01f63d694c38948118d2fef
+PackageVersion: 2.78.1
+PackageDownloadLocation: git+https://github.com/GNOME/glib.git@21624e78f013ee8706483086e3086076d08fe242
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: gvdb
+SPDXID: SPDXRef-a605ac55617a6f014dc8f4e83b9d1a769c774ac15d8462044e09b46f62113fbb
+PackageVersion: 0854af0fdb6d527a8d1999835ac2c5059976c210
+PackageDownloadLocation: git+https://github.com/GNOME/gvdb.git@0854af0fdb6d527a8d1999835ac2c5059976c210
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: neverbleed
+SPDXID: SPDXRef-600d91c4d2ca727e022254ee42edb8bd481d3db26509e078156f5493b78ac408
+PackageVersion: da5c2ab419a3bb8a4cc6c37a6c7f3e4bd4b41134
+PackageDownloadLocation: git+https://github.com/h2o/neverbleed.git@da5c2ab419a3bb8a4cc6c37a6c7f3e4bd4b41134
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: wifi-host-driver
+SPDXID: SPDXRef-d3fc910de902d50b2d7a66e73d6471076b0451db82ced1fe5498feccdbe30807
+PackageVersion: release-v4.3.0
+PackageDownloadLocation: git+https://github.com/Infineon/wifi-host-driver.git@31247470af5b7d79b53458f51d06a89aa5fd41f6
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: wifi-resources
+SPDXID: SPDXRef-89b3ffb9f9e580f2bf6e53d16458b27648255f22fa443391dd4572fe8236118f
+PackageVersion: release-v2.0.0
+PackageDownloadLocation: git+https://github.com/Infineon/wifi-resources.git@e9b4a5bf07cb62736f1d420a75d27b45bc49d7bd
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
 PackageName: tinycbor
-SPDXID: SPDXRef-tinycbor
-PackageComment: <text>PURL is pkg:github/intel/tinycbor@0.5.2</text>
+SPDXID: SPDXRef-98ed390838c30edb052427e387c07d08ef15224ded46a0596cf9c7d907f153ed
+PackageVersion: v0.5.4
+PackageDownloadLocation: git+https://github.com/intel/tinycbor.git@11590e470dfc1a144eb5665655c7ff6627b8e0f6
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: tinycbor
+SPDXID: SPDXRef-6a8e1f35e02c0040ec431df33bb5d81fb5b11ae33540ecdfc1c106edb60111cd
+PackageVersion: 9924cfed3b95ad6de299ae675064430fdb886216
+PackageDownloadLocation: git+https://github.com/intel/tinycbor.git@9924cfed3b95ad6de299ae675064430fdb886216
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: tinycbor
+SPDXID: SPDXRef-050987ccdb6187f98e81e212a384ad6956332e6e2e5a490a901624727b564246
+PackageVersion: d2dd95cb8841d88d5a801e3ef9c328fd6200e7bd
+PackageDownloadLocation: git+https://github.com/intel/tinycbor.git@d2dd95cb8841d88d5a801e3ef9c328fd6200e7bd
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: tinycbor
+SPDXID: SPDXRef-d4fb64ae81300b6c28ed3afea2a8c1af473449b6a05d57a3bc50ee61a9de4522
+PackageVersion: v0.6-rc1
+PackageDownloadLocation: git+https://github.com/intel/tinycbor.git@d393c16f3eb30d0c47e6f9d92db62272f0ec4dc7
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: tinycbor
+SPDXID: SPDXRef-0ba6a7c9ebab7d41b70647d17103727f8a2d6635d70d3a83a58acbaf3a86936b
 PackageVersion: v0.5.2
-PackageSupplier: Organization:   Intel Corporation
-PackageDownloadLocation: https://github.com/intel/tinycbor/tree/v0.5.2
-PackageLicenseConcluded: MIT
-PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright (c) 2017 Intel Corporation</text>
-ExternalRef: PACKAGE-MANAGER purl pkg:github/intel/tinycbor@0.5.2
+PackageDownloadLocation: git+https://github.com/intel/tinycbor.git@d94ca09aa91f5b3c581527aa8bca179a82b79874
 FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-tinycbor
-
-## Package Information
-PackageName: wifi
-SPDXID: SPDXRef-wifi
-PackageComment: <text>This package did not originate from an existing submodule.</text>
-PackageVersion: v1
-PackageSupplier: Organization:  Amazon Web Services
-PackageDownloadLocation: NOASSERTION
-PackageLicenseConcluded: MIT
+PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: MIT
-PackageCopyrightText: <text>Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.</text>
-FilesAnalyzed: false
-## Relationships
-Relationship: SPDXRef-iotrefrx CONTAINS SPDXRef-wifi
+PackageCopyrightText: NOASSERTION
 
-## License Information
-LicenseID: LicenseRef-Renesas
-ExtractedText: <text>* DISCLAIMER
-* This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products.
-* No other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
-* applicable laws, including copyright laws. 
-* THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING THIS SOFTWARE, WHETHER EXPRESS, IMPLIED
-* OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-* NON-INFRINGEMENT.  ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED.TO THE MAXIMUM EXTENT PERMITTED NOT PROHIBITED BY
-* LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES SHALL BE LIABLE FOR ANY DIRECT,
-* INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO THIS SOFTWARE, EVEN IF RENESAS OR
-* ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-* Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability 
-* of this software. By using this software, you agree to the additional terms and conditions found by accessing the 
-* following link:
-* http://www.renesas.com/disclaimer</text>
-LicenseName: Renesas Proprietary License
+PackageName: tinycrypt
+SPDXID: SPDXRef-05f6b083b7f47385af8395d88cc330d73b31e19d70281430364dba5523d983e1
+PackageVersion: cf24c907a61c01bc2c4e1ee0ae24457c27a840a2
+PackageDownloadLocation: git+https://github.com/intel/tinycrypt.git@cf24c907a61c01bc2c4e1ee0ae24457c27a840a2
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: libsodium
+SPDXID: SPDXRef-27cc4012ace5671584862668cdd310650ec9f9fee5bdf9a54297adbbe5159a0d
+PackageVersion: 1.0.12
+PackageDownloadLocation: git+https://github.com/jedisct1/libsodium.git@70170c28c844a4786e75efc626e1aeebc93caebc
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: micro-ecc
+SPDXID: SPDXRef-615cb87faa8cbdb73c9bfba15cd991f22a5f9cb74071c18ac8b52b9426a70ea9
+PackageVersion: v1.0
+PackageDownloadLocation: git+https://github.com/kmackay/micro-ecc.git@d037ec89546fad14b5c4d5456c2e23a71e554966
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: tinyxml2
+SPDXID: SPDXRef-f5d53e56aa159c0499feaf195ada41f3b1f8e53aaab789d8621e35b1508d49fd
+PackageVersion: 7e8e249990ec491ec15990cf95b6d871a66cf64a
+PackageDownloadLocation: git+https://github.com/leethomason/tinyxml2.git@7e8e249990ec491ec15990cf95b6d871a66cf64a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: libexpat
+SPDXID: SPDXRef-241df806566a9c12714fc610f24a6ba9dce557e7e92fa98aa12d5099c66b2463
+PackageVersion: R_2_2_5
+PackageDownloadLocation: git+https://github.com/libexpat/libexpat.git@968b8cc46dbee47b83318d5f31a8e7907199614b
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: freertos-ota-pal-psa
+SPDXID: SPDXRef-169f2e5f89243b9c763d6e27d2ffec0e8ec55efe4520ff99755a7a5f30345671
+PackageVersion: 0b6db7d7cc0260fbb1e54a26ad6ff25cdcde3697
+PackageDownloadLocation: git+https://github.com/Linaro/freertos-ota-pal-psa.git@0b6db7d7cc0260fbb1e54a26ad6ff25cdcde3697
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: freertos-pkcs11-psa
+SPDXID: SPDXRef-a4fd95b604cffdfd6d5d2e7d7d448d416b908e26860917797ee847e509417434
+PackageVersion: 80292d24f4978891b0fd35feeb5f1d6f6f0fff06
+PackageDownloadLocation: git+https://github.com/Linaro/freertos-pkcs11-psa.git@80292d24f4978891b0fd35feeb5f1d6f6f0fff06
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: littlefs
+SPDXID: SPDXRef-5f6af1060b83b0a903e571c40a0fd687c7afcdd3fd410fa1bcdf913c4d69d21f
+PackageVersion: v2.11.3
+PackageDownloadLocation: git+https://github.com/littlefs-project/littlefs.git@6cb4e86540eca0d9ba62500a298385c9d863c8be
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: lwip
+SPDXID: SPDXRef-7626a56b6f36fe57afe05c1eee6064895f31339f3767bc9ed1bdbfc752bfad5b
+PackageVersion: 79cd89f99d1032cc5375569e5b24c375b9d230fa
+PackageDownloadLocation: git+https://github.com/lwip-tcpip/lwip.git@79cd89f99d1032cc5375569e5b24c375b9d230fa
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: mbedtls-framework
+SPDXID: SPDXRef-496daf02db420ada1d0d33aefa56c5511c0e227cde792a32cc161c961ede4a07
+PackageVersion: 2a3e2c5ea053c14b745dbdf41f609b1edc6a72fa
+PackageDownloadLocation: git+https://github.com/Mbed-TLS/mbedtls-framework@2a3e2c5ea053c14b745dbdf41f609b1edc6a72fa
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: mbedtls
+SPDXID: SPDXRef-a2bab480b9103bb15df4307cc61c3335932a31a2fa73dcfb67d6a0f0d3e34a14
+PackageVersion: v3.6.4
+PackageDownloadLocation: git+https://github.com/Mbed-TLS/mbedtls.git@c765c831e5c2a0971410692f92f7a81d6ec65ec2
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: mbedtls
+SPDXID: SPDXRef-0d05cfa7e3c8876804f435290838f388a15657891744d679153932d0747b5342
+PackageVersion: v3.5.1
+PackageDownloadLocation: git+https://github.com/Mbed-TLS/mbedtls.git@edb8fec9882084344a314368ac7fd957a187519c
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: mruby
+SPDXID: SPDXRef-a07236f63583511579bd7ff7fb3c13fcc92f8d7f27d516b8eb3e0d5ff5adf2b5
+PackageVersion: 1.2.0
+PackageDownloadLocation: git+https://github.com/mruby/mruby@22464fe5a0a10f2b077eaba109ce1e912e4a77de
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: cyw-fmac-nvram
+SPDXID: SPDXRef-5b0d6ba8a4a4c9985c1bca97a47d5f1e13547e6fae5bda2c9767c9b47de38020
+PackageVersion: 40a917f1a50f9e4df44a7ec63901771791d53f09
+PackageDownloadLocation: git+https://github.com/murata-wireless/cyw-fmac-nvram.git@40a917f1a50f9e4df44a7ec63901771791d53f09
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: nghttp2
+SPDXID: SPDXRef-001abe7314bbc6a720392e864b806e254bb58a84279be2d7f81c1e712a29d415
+PackageVersion: v1.24.0
+PackageDownloadLocation: git+https://github.com/nghttp2/nghttp2.git@3bcc416e13cc790e2fb45fcfe9111d38609c5032
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: http-parser
+SPDXID: SPDXRef-74a52c047a54263242a8285ce0b66b01484c75f78c4793b45b4814146feda3b7
+PackageVersion: ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d
+PackageDownloadLocation: git+https://github.com/nodejs/http-parser.git@ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: llhttp
+SPDXID: SPDXRef-8bcf16ebc5b5d3a0e01dc41ec7ab9733b9d8fe47a16c605fefbdb3301685b082
+PackageVersion: release/v6.1.1
+PackageDownloadLocation: git+https://github.com/nodejs/llhttp.git@0d2b990bbb70ffe82004a176794cecc5e53a4ddf
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: llhttp
+SPDXID: SPDXRef-cb1b17b2e963746d59a70de969ea1b0ca50d658e249f07a8a49f6cb991063ffd
+PackageVersion: release/v9.3.1
+PackageDownloadLocation: git+https://github.com/nodejs/llhttp.git@4fce8cac9433aa4728428bb3b26880d32ad05c88
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: pkcs11
+SPDXID: SPDXRef-0b8999257417960b7a72ddd250e53d326fa535c3a8db7de2ebef0250385223d8
+PackageVersion: 2-40-errata-1
+PackageDownloadLocation: git+https://github.com/oasis-tcs/pkcs11.git@478bfc5077901865993e3a193777c1a9f6516cdf
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: libcoap
+SPDXID: SPDXRef-cf7abe60a3f2b12b08259c1a754ead6d6436e83aa233b9ae050c24027d6aec97
+PackageVersion: 98954eb30a2e728e172a6cd29430ae5bc999b585
+PackageDownloadLocation: git+https://github.com/obgm/libcoap.git@98954eb30a2e728e172a6cd29430ae5bc999b585
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: spiffs
+SPDXID: SPDXRef-7750af928d553442af4368e8b99613480007981fa527aa00071e123afc5b2bdf
+PackageVersion: f5e26c4e933189593a71c6b82cda381a7b21e41c
+PackageDownloadLocation: git+https://github.com/pellepl/spiffs.git@f5e26c4e933189593a71c6b82cda381a7b21e41c
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: TraceRecorderSource
+SPDXID: SPDXRef-861b1ddeb1c340b3fbba737738ec2ff99d28fafe6bc355bd68492a202eb76951
+PackageVersion: Tz4/4.11/v4.11.0
+PackageDownloadLocation: git+https://github.com/percepio/TraceRecorderSource.git@2f888cb9e6240c88e33eacd5acd50555fb13fbf5
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: Apache-2.0
+PackageCopyrightText: NOASSERTION
+
+PackageName: TraceRecorderSource
+SPDXID: SPDXRef-5b5adf22b8a564ae7230e6fd813eea5085801b980fd7fdcd4fa809defd4c75a7
+PackageVersion: Tz4/4.8/v4.8.0.hotfix1
+PackageDownloadLocation: git+https://github.com/percepio/TraceRecorderSource.git@3aa03556bdb47641d6ff0c95416d16e42a8cdc02
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: protobuf-c
+SPDXID: SPDXRef-4b1616bdf8571549631d792201a38c57aa2a81212e5d4c7a95d8a79718d65725
+PackageVersion: v1.3.0
+PackageDownloadLocation: git+https://github.com/protobuf-c/protobuf-c.git@dac1a65feac4ad72f612aab99f487056fbcf5c1a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: rx-driver-package
+SPDXID: SPDXRef-5d8ecc2a43697f4fb5426b84a9b69f5615cb909fed9a20563e8537283859d550
+PackageVersion: bcc409d331b0bff68d4b09bf6fc41376f75d42bc
+PackageDownloadLocation: git+https://github.com/renesas/rx-driver-package.git@bcc409d331b0bff68d4b09bf6fc41376f75d42bc
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: cexception
+SPDXID: SPDXRef-6a921323421aff7bed9d35ad63061b7d11bcd4ea137df5dd393fd96431d3d00e
+PackageVersion: 632d980166cc74a93bf2376ba96cb7ec5e489c09
+PackageDownloadLocation: git+https://github.com/throwtheswitch/cexception.git@632d980166cc74a93bf2376ba96cb7ec5e489c09
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: cexception
+SPDXID: SPDXRef-3a972bca996518a9301652bc90c7bdb463a0739781a43f765319015fa625356e
+PackageVersion: 71b47be7c950f1bf5f7e5303779fa99a16224bb6
+PackageDownloadLocation: git+https://github.com/throwtheswitch/cexception.git@71b47be7c950f1bf5f7e5303779fa99a16224bb6
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: CMock
+SPDXID: SPDXRef-fcca71ee2dae26c252e2018795bfc2729d97cbea2ae666351f2e23e33196efc8
+PackageVersion: v2.5.2
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/CMock.git@150573c742ce15061a0b675aa0f8e29c85008062
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: CMock
+SPDXID: SPDXRef-e66d7e49830d94f7e882ad9800ab2cc3d7134d34fdc86afc887563d1bfc563fd
+PackageVersion: 3b443e551d538e93e86ec7bb56a0d7fde3715a3c
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/CMock.git@3b443e551d538e93e86ec7bb56a0d7fde3715a3c
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: CMock
+SPDXID: SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+PackageVersion: v2.5.3
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/CMock@9d092898ef26ece140d9225e037274b64d4f851e
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: CMock
+SPDXID: SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+PackageVersion: afa294982e8a28bc06f341cc77fd4276641b42bd
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/CMock@afa294982e8a28bc06f341cc77fd4276641b42bd
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: CMock
+SPDXID: SPDXRef-df240a74aba964a5b0e5b35bb53412354396408558e966e8c9bf1916df23169d
+PackageVersion: bd5fbc30eb3a448600eab761bb215835459dd174
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/CMock.git@bd5fbc30eb3a448600eab761bb215835459dd174
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Unity
+SPDXID: SPDXRef-df047855339a6801c7512b595812577779a1908f3f88bbdf4ea4f1363f70becd
+PackageVersion: 22777c4810de3e3a4cb521a05eca2752fccd00ea
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/Unity.git@22777c4810de3e3a4cb521a05eca2752fccd00ea
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
+PackageName: Unity
+SPDXID: SPDXRef-5390dc768f4a131a0c5b8ea37621e27b3e76a2b90cc07033ca82031e550839f9
+PackageVersion: 2939c420ed9f2697bcb82c1b193bb48c4a8ad7a9
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/Unity.git@2939c420ed9f2697bcb82c1b193bb48c4a8ad7a9
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Unity
+SPDXID: SPDXRef-75f012b4cd1b562fac77a2226f86827be74039a57c5e59334ce3071aa4024fc8
+PackageVersion: 386c540510929c0cf6f7b8d04cb4af40754bb822
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/Unity@386c540510929c0cf6f7b8d04cb4af40754bb822
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Unity
+SPDXID: SPDXRef-33e420b888118d3242c073ba1f13a60ae0957e6ef4e2b856c0a50743a811affd
+PackageVersion: 7d2bf62b7e6afaf38153041a9d53c21aeeca9a25
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/Unity.git@7d2bf62b7e6afaf38153041a9d53c21aeeca9a25
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Unity
+SPDXID: SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
+PackageVersion: v2.6.0
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/Unity@860062d51b2e8a75d150337b63ca2a472840d13c
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: Unity
+SPDXID: SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+PackageVersion: v2.5.1
+PackageDownloadLocation: git+https://github.com/ThrowTheSwitch/Unity@cf949f45ca6d172a177b00da21310607b97bc7a7
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: unity
+SPDXID: SPDXRef-0ec829d2c39f6efec089bc083a1d37b416e0af40c2e3a3adfaa5be4dcf8d54e5
+PackageVersion: e3132cdddd779cb5a813887b2d0d7facb7f3f90a
+PackageDownloadLocation: git+https://github.com/throwtheswitch/unity.git@e3132cdddd779cb5a813887b2d0d7facb7f3f90a
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: wolfssl
+SPDXID: SPDXRef-4149022a63854f703ade593c0cc30536f10e5d433815f0546eefa5ab7a26b74e
+PackageVersion: v5.6.4-stable
+PackageDownloadLocation: git+https://github.com/wolfSSL/wolfssl.git@37884f864d6fd9b04f44677cb04da15d0c9d6526
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: libslirp
+SPDXID: SPDXRef-f355e39fa8b56b625f3c40840630965228db26db8405c33f6c5e603422862274
+PackageVersion: v4.7.0
+PackageDownloadLocation: git+https://gitlab.com/qemu-project/libslirp.git@3ad1710a96678fe79066b1469cead4058713a1d9
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: submodule
+SPDXID: SPDXRef-6b4849c10f6656fba9dda73ad8a6659f1b7ba3700dfb45983f8fcdf3fe20ed6b
+PackageVersion: b46927ea19b6b0a3b69d4790c13ca50a67b9c155
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/bootloader/submodule.git@b46927ea19b6b0a3b69d4790c13ca50a67b9c155
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: r_cellular
+SPDXID: SPDXRef-18cf1397bd973e5579e45e77a520a33a8f16a8a22de75c25c09d670c52d1544b
+PackageVersion: 1.13.saffti-custom.8
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular.git@24452b4958c5b4f873a450e1f23beee04e2ab49e
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: r_flash_rx
+SPDXID: SPDXRef-50a99c7188629eb94d5dd28b2e70a07a4ad045b99607b5337f2ba9b3d40de516
+PackageVersion: 5.31.saffti-custom.1
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_flash_rx/r_flash_rx.git@5304d35e22002d0b0b0d24ae7773c64788ede5b3
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageSourceInfo: Version declared in README.md at the pinned commit.
+
+PackageName: r_sdio_rx
+SPDXID: SPDXRef-c1099eef41a9b334a6127fbff4cef9bbe1861956eeab39bf6cc7249972344110
+PackageVersion: cc94efa0a37db72a6fede1bc651a891a0a6e8bec
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_sdio_rx/r_sdio_rx.git@cc94efa0a37db72a6fede1bc651a891a0a6e8bec
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: r_simple_glcdc_config_rx
+SPDXID: SPDXRef-c0ba89bb5d0b6f4c2a7248db67781ae77d204ff4be90ff360893e5fe63094a3f
+PackageVersion: ade52ca9b3869c4d80855ee41a1bf63db70695db
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_simple_glcdc_config_rx/r_simple_glcdc_config_rx.git@ade52ca9b3869c4d80855ee41a1bf63db70695db
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: r_simple_graphic_rx
+SPDXID: SPDXRef-a3f21bd58000ee73c7f5bc74fb568216c79baf35e26282954ee3846ebcecd362
+PackageVersion: a7c3d736eab56aa622caabe0715ba290e1136f49
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_simple_graphic_rx/r_simple_graphic_rx.git@a7c3d736eab56aa622caabe0715ba290e1136f49
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: rm_littlefs_rx
+SPDXID: SPDXRef-b96fddbc0bcb835da34ba196e183e8a0909b8f2012aa628b6259455bc5d8f709
+PackageVersion: 60f93c8427ce88f70ea26aae7abc641f577a7765
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/rm_littlefs_rx/rm_littlefs_rx.git@60f93c8427ce88f70ea26aae7abc641f577a7765
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: rm_rtos_abstraction_rx
+SPDXID: SPDXRef-0d6867b2df4294f91d4f133518a65979c7a10bd4a4dc7eb952bb22b6eaf25ba8
+PackageVersion: 5818cdfbda661d098fd028bf6975847d5af2c491
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx.git@5818cdfbda661d098fd028bf6975847d5af2c491
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: provisioning
+SPDXID: SPDXRef-491ef09ea40082c7033f1ffa1cb73dec684dcc5899e6d99474862edd0670f187
+PackageVersion: 1fadbdf0a6da41166a844e64b925dcaa56fe7593
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/experiment/generic/scripts/python/provisioning.git@1fadbdf0a6da41166a844e64b925dcaa56fe7593
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: wifi-host-driver
+SPDXID: SPDXRef-80c3a86a8072a24273902dd58eb0534e88ea40495889c6296b68c91a243ac583
+PackageVersion: release-v1.70.0.saffti-custom.1
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver.git@13119afc1570ee2d97fae3d782db02db356f12a6
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+PackageName: mbedtls
+SPDXID: SPDXRef-bf81b2d154543d9220ad29b80251d05caca0a1479a6c4903814bdc894854884d
+PackageVersion: 76f3ee32997547592d325bcec3be478671e81e18
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/import/github/mbed-tls/mbedtls.git@76f3ee32997547592d325bcec3be478671e81e18
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+
+Relationship: SPDXRef-001abe7314bbc6a720392e864b806e254bb58a84279be2d7f81c1e712a29d415 CONTAINS SPDXRef-600d91c4d2ca727e022254ee42edb8bd481d3db26509e078156f5493b78ac408
+RelationshipComment: <text>third-party/neverbleed</text>
+
+Relationship: SPDXRef-001abe7314bbc6a720392e864b806e254bb58a84279be2d7f81c1e712a29d415 CONTAINS SPDXRef-a07236f63583511579bd7ff7fb3c13fcc92f8d7f27d516b8eb3e0d5ff5adf2b5
+RelationshipComment: <text>third-party/mruby</text>
+
+Relationship: SPDXRef-0ec10501d6ceda6939b2752c01acd977d518f95ca21e835a352df4f4b1bfb463 CONTAINS SPDXRef-73f77c4cc843f7212deb104af70b8056a9801285b815e198376d45aaf4a49740
+RelationshipComment: <text>source/dependency/coreMQTT</text>
+
+Relationship: SPDXRef-0ec10501d6ceda6939b2752c01acd977d518f95ca21e835a352df4f4b1bfb463 CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-1653e0cdfd34c33cf7378435943114b499d758019d43a9a6677dd35db7c5bc5d CONTAINS SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-1a5ab368c47b1617dd0f3cc700ab4194095e3f9a58ddd5a1d2a36796c7425408 CONTAINS SPDXRef-fd640019b7ca39c7924fc4b48154f446ab4cb138c0a990221cce86c5dba4c776
+RelationshipComment: <text>source/dependency/coreMQTT</text>
+
+Relationship: SPDXRef-1a5ab368c47b1617dd0f3cc700ab4194095e3f9a58ddd5a1d2a36796c7425408 CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-070ec2066bb8ce3acd0beaba3736da5aed6ecf615b83624a0097317b1e38defc
+RelationshipComment: <text>vendors/cypress/MTB/libraries/whd-bsp-integration</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-0a464dcc110c012f9dc8661671652e5555c94f9ce8c218c65a8e1e421701d4d4
+RelationshipComment: <text>vendors/cypress/MTB/libraries/core-lib</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-169f2e5f89243b9c763d6e27d2ffec0e8ec55efe4520ff99755a7a5f30345671
+RelationshipComment: <text>libraries/abstractions/ota_pal_psa</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-1a0ccd0e464ad3d2bcb65f14ff8f82711bd73b878fbe33f4aaa607c3eeb4037d
+RelationshipComment: <text>vendors/cypress/MTB/psoc6/psoc6hal</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-1c0e29dd7b3aaf35123f4293a40189a32d6a635dad341bdd038866920e5a2084
+RelationshipComment: <text>libraries/3rdparty/mbedtls</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-1ca3400d051c485887b9f2adf29f224a8034995ea1648e201da8c47a2b689766
+RelationshipComment: <text>libraries/coreHTTP</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-1ef95acada6f36a1fd7cf48cbd0210945b2a92912eed7fef4ba7663b6ffaee1c
+RelationshipComment: <text>libraries/device_shadow_for_aws</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-211819065327065fb333ef357197bb09862094fcd470766aaa9646f58d854bc4
+RelationshipComment: <text>vendors/cypress/MTB/libraries/lpa</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-24436db1d35866fb2382cc9992f445b9a707722cae0a796b59389d31a0289bf8
+RelationshipComment: <text>tools/litani</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1
+RelationshipComment: <text>vendors/espressif/esp-idf</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-3c80f558184fdcd8975da332ccdfd2399e0ddc86813982e3b64c43bedfb4e041
+RelationshipComment: <text>libraries/coreMQTT</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-42f4c6b95bc62025ee3cacd15792077816ce80c55b1f1c78af18dd797d79f37f
+RelationshipComment: <text>vendors/cypress/MTB/libraries/abstraction-rtos</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-4cb0df54242c9845db2e9b1bc973d30a70b1e19dc2afc8ff8bc7bb8da4b239ab
+RelationshipComment: <text>vendors/cypress/MTB/libraries/capsense</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-4e653c2ba03e048a50dcc3d98f40ade9c1bf14ab5ff6cf36234096a450c74540
+RelationshipComment: <text>vendors/cypress/MTB/psoc6/psoc6make</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-52cd3b1dbe4be152685cdc6567b6b067321293929cc6f7c8855d61a368fa7c27
+RelationshipComment: <text>libraries/freertos_plus/standard/freertos_plus_tcp</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-5390dc768f4a131a0c5b8ea37621e27b3e76a2b90cc07033ca82031e550839f9
+RelationshipComment: <text>libraries/3rdparty/unity</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-53967aef4a14fcbce642ed8a7dbc158ce69aba6b881fc3466473bb75d0dbae0e
+RelationshipComment: <text>libraries/3rdparty/pkcs11</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-610db3e28d1f7a324537fb5789cb641ac985e18ee78b92ba55eb0bfd86111628
+RelationshipComment: <text>libraries/ota_for_aws</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-69cfe448d5eb47039090fab82265388b50e7d1fe9c8d5387f422b187fa31de7e
+RelationshipComment: <text>vendors/cypress/MTB/psoc6/psoc6cm0p</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-7088da77d3639fcafaa419e9fd37e628f6a9ef218f3df11c0f6c0a1bc74d8896
+RelationshipComment: <text>vendors/cypress/MTB/psoc6/udb-sdio-whd</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-7626a56b6f36fe57afe05c1eee6064895f31339f3767bc9ed1bdbfc752bfad5b
+RelationshipComment: <text>libraries/3rdparty/lwip</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-8550ec2a514eb43e1b288a0ab7f5606cb0fa43e92c2bf8e4fd5cfe4e1050d5fd
+RelationshipComment: <text>vendors/cypress/MTB/libraries/rgb-led</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-859b4ee5a7d563dd9b3ed7d45613cb7dbc175ee4ee3046f1edf7dd69fbf237c3
+RelationshipComment: <text>vendors/cypress/MTB/libraries/wifi-host-driver</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-8730a8189a708ce91eba0de084dae5b73fa2098ad6cb914cf7ea7cdfba7f710f
+RelationshipComment: <text>libraries/coreJSON</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-8bec7b98583a40a73ee9e44dd0ae35a3437d970107694073fb657bab1e0953a4
+RelationshipComment: <text>vendors/cypress/MTB/libraries/connectivity-utilities</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-a28614f8e716b4ef718a6bf3925a01a8c7087d16390024632d3552dc52906cfe
+RelationshipComment: <text>freertos_kernel</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-a4fd95b604cffdfd6d5d2e7d7d448d416b908e26860917797ee847e509417434
+RelationshipComment: <text>libraries/abstractions/pkcs11/psa</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-c0d83d981d68fbf1bcc38771faf65b60fa3f9d0f6f0b76630abd7cf0a8967892
+RelationshipComment: <text>libraries/device_defender_for_aws</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-c2b89e8406f144b5011f01fab5a729ccd3e44aedb89f82baa01988da94096b66
+RelationshipComment: <text>vendors/cypress/MTB/libraries/clib-support</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-c7542a83e4b7d5493a2e6c523d8abef36fa17cd5c98ff3e57d9203b47adf286b
+RelationshipComment: <text>vendors/cypress/MTB/libraries/kv-store</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-cf0e4158a4631711d0a7597f179cd75a691b72ad73864e6a0c6c3d079a5db62a
+RelationshipComment: <text>libraries/jobs_for_aws</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-d7f064184bc358dd63f80a38013a34cfc462baa231f4ee9665fe3e53ddf878e5
+RelationshipComment: <text>libraries/coreMQTT-Agent</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-d80cc0c2f724cd8829259066a9a3bb4aeaee90fdf206b8d2a8fea9ee94dcedb7
+RelationshipComment: <text>vendors/cypress/MTB/libraries/serial-flash</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-df240a74aba964a5b0e5b35bb53412354396408558e966e8c9bf1916df23169d
+RelationshipComment: <text>libraries/3rdparty/CMock</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-e0a54ceac6b5bd16f54dde1d8bc7b4d20eee91ba45465f0488514c4cee368661
+RelationshipComment: <text>libraries/abstractions/pkcs11/corePKCS11</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-e92708bf254b6168feddf0bc81342a02d351cec875c38ced54e27c4089edcdd9
+RelationshipComment: <text>vendors/cypress/MTB/psoc6/psoc6pdl</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-f3c530a6aa4fb94881bce496a157a0b39d9631dc95d21cd2ee12f1703c9ff3c2
+RelationshipComment: <text>vendors/cypress/MTB/libraries/retarget-io</text>
+
+Relationship: SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7 CONTAINS SPDXRef-f498dfdd14912663490d685c65f7be7138c073275b83559d19f6da1b39a9e040
+RelationshipComment: <text>libraries/abstractions/backoff_algorithm</text>
+
+Relationship: SPDXRef-1ca3400d051c485887b9f2adf29f224a8034995ea1648e201da8c47a2b689766 CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-1ca3400d051c485887b9f2adf29f224a8034995ea1648e201da8c47a2b689766 CONTAINS SPDXRef-6c370ef5e2b64dd40032393efd6d9ca017c53b07afdc25aeb66f8be5f276c316
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-1ca3400d051c485887b9f2adf29f224a8034995ea1648e201da8c47a2b689766 CONTAINS SPDXRef-74a52c047a54263242a8285ce0b66b01484c75f78c4793b45b4814146feda3b7
+RelationshipComment: <text>source/dependency/3rdparty/http_parser</text>
+
+Relationship: SPDXRef-1ca3400d051c485887b9f2adf29f224a8034995ea1648e201da8c47a2b689766 CONTAINS SPDXRef-fcca71ee2dae26c252e2018795bfc2729d97cbea2ae666351f2e23e33196efc8
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-1ef95acada6f36a1fd7cf48cbd0210945b2a92912eed7fef4ba7663b6ffaee1c CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-1ef95acada6f36a1fd7cf48cbd0210945b2a92912eed7fef4ba7663b6ffaee1c CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-1ef95acada6f36a1fd7cf48cbd0210945b2a92912eed7fef4ba7663b6ffaee1c CONTAINS SPDXRef-7558cc1d2cad8d7d87f7dc0f3670d38427452da802632a6be2967c3b918744cb
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-21af2d6d1bb12f7bc0812783e8ca21f7fea9dd64b350f15ac4f5b339342e3161 CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-23ca5034017b8332f223792660d6f72dce5c277dc042ce7252c1b5b1a76b3921 CONTAINS SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-27d75d23e3b88bf3e16781e9ac04beced44063ccc1d4e1f92061ca47f61a407d CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-001abe7314bbc6a720392e864b806e254bb58a84279be2d7f81c1e712a29d415
+RelationshipComment: <text>components/nghttp/nghttp2</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-050987ccdb6187f98e81e212a384ad6956332e6e2e5a490a901624727b564246
+RelationshipComment: <text>components/cbor/tinycbor</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-10051092c6b0de50e32bb76dea9a34f4282018be477ea9aec2bbc8f41c082fbe
+RelationshipComment: <text>components/lwip/lwip</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-241df806566a9c12714fc610f24a6ba9dce557e7e92fa98aa12d5099c66b2463
+RelationshipComment: <text>components/expat/expat</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-27cc4012ace5671584862668cdd310650ec9f9fee5bdf9a54297adbbe5159a0d
+RelationshipComment: <text>components/libsodium/libsodium</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-33e420b888118d3242c073ba1f13a60ae0957e6ef4e2b856c0a50743a811affd
+RelationshipComment: <text>components/unity/unity</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-36600a409ba3d79b688703c6e22e2b9eadf48f08b811b8f3c2ca8ed7262c600c
+RelationshipComment: <text>components/tinyusb/tinyusb</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-42f01c1b7a67c0bddb5aa6be897e6b4edf283187d7fcd80a6d73c3dc6050ec77
+RelationshipComment: <text>components/esp_wifi/lib</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-4352f8b0e271cb6c86f092491393d9142715d348afe6e7260c99bfc5d13b3187
+RelationshipComment: <text>components/bt/host/nimble/nimble</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-4b1616bdf8571549631d792201a38c57aa2a81212e5d4c7a95d8a79718d65725
+RelationshipComment: <text>components/protobuf-c/protobuf-c</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-54e463eda52e93504e19f7346163f416dae99b4dba5135629cf1f7cb0321377c
+RelationshipComment: <text>components/json/cJSON</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-615cb87faa8cbdb73c9bfba15cd991f22a5f9cb74071c18ac8b52b9426a70ea9
+RelationshipComment: <text>components/bootloader/subproject/components/micro-ecc/micro-ecc</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-7750af928d553442af4368e8b99613480007981fa527aa00071e123afc5b2bdf
+RelationshipComment: <text>components/spiffs/spiffs</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-a3c9fb865f000052dee4dc77e3e43c38b431eab881242ff70fe1271821c402bc
+RelationshipComment: <text>examples/peripherals/secure_element/atecc608_ecdsa/components/esp-cryptoauthlib</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-cf7abe60a3f2b12b08259c1a754ead6d6436e83aa233b9ae050c24027d6aec97
+RelationshipComment: <text>components/coap/libcoap</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-d3c77a769c277183220679adebab5eeb0d59df72096f1d732ede6d73e4dd1871
+RelationshipComment: <text>components/esptool_py/esptool</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-e6aa2ae2fb0bebefeef43663f13a4bee8a522a07ba757b7b38f778dbd6ede205
+RelationshipComment: <text>components/mqtt/esp-mqtt</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-ef29074fd2151cb47e0fe9bb5f4b96949c5006058b4a68885bec55c75e1203ad
+RelationshipComment: <text>components/bt/controller/lib</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-f5d53e56aa159c0499feaf195ada41f3b1f8e53aaab789d8621e35b1508d49fd
+RelationshipComment: <text>examples/build_system/cmake/import_lib/main/lib/tinyxml2</text>
+
+Relationship: SPDXRef-2eba70706c5b65feef0957d6bebbfd22bcaedb058aff7e2aacd700029201d5a1 CONTAINS SPDXRef-f64ed703a8e4c9efa5a38b1d9d2b59bdf797cbbe8bff101a06cd710a888eb15d
+RelationshipComment: <text>components/asio/asio</text>
+
+Relationship: SPDXRef-360f37b88573e707459f0f8ebc73f18ab799474ccc73ea19f449c09f50da7129 CONTAINS SPDXRef-13fc8b30187c7a3f252d3f3de4dfa114abfcdaaa1e854be06d1474e272a09fc2
+RelationshipComment: <text>portable/ThirdParty/Partner-Supported-Ports</text>
+
+Relationship: SPDXRef-360f37b88573e707459f0f8ebc73f18ab799474ccc73ea19f449c09f50da7129 CONTAINS SPDXRef-fe21e83eb3b515bb43acb6142a4544c14336862b920bd3c7ddc6cfc721a578f4
+RelationshipComment: <text>portable/ThirdParty/Community-Supported-Ports</text>
+
+Relationship: SPDXRef-378786cf95cb0d281d4b21fb93d3f13937c9db15b1e54484cd0fdbc1b512763c CONTAINS SPDXRef-8bcf16ebc5b5d3a0e01dc41ec7ab9733b9d8fe47a16c605fefbdb3301685b082
+RelationshipComment: <text>source/dependency/3rdparty/llhttp</text>
+
+Relationship: SPDXRef-378786cf95cb0d281d4b21fb93d3f13937c9db15b1e54484cd0fdbc1b512763c CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-396cd7ca9f46139bff98d077d242debc223f08045205c39d8ba7cf8d86455a30 CONTAINS SPDXRef-65028e5fe388c2d300ea61e2a8f6ef4c9f69fb5e2b422627df9a694643abe543
+RelationshipComment: <text>portable/ThirdParty/Partner-Supported-Ports</text>
+
+Relationship: SPDXRef-396cd7ca9f46139bff98d077d242debc223f08045205c39d8ba7cf8d86455a30 CONTAINS SPDXRef-ac9de7b1998bdd7a8e06bf5d94d32fa7dc34814277bddc3ffe85726dc210b278
+RelationshipComment: <text>portable/ThirdParty/Community-Supported-Ports</text>
+
+Relationship: SPDXRef-3c227d3c49ffb22901730350912df5ba6d8e30fc50810b2e54bb132e99bd1e6e CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-3c80f558184fdcd8975da332ccdfd2399e0ddc86813982e3b64c43bedfb4e041 CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-3c80f558184fdcd8975da332ccdfd2399e0ddc86813982e3b64c43bedfb4e041 CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-3c80f558184fdcd8975da332ccdfd2399e0ddc86813982e3b64c43bedfb4e041 CONTAINS SPDXRef-6c370ef5e2b64dd40032393efd6d9ca017c53b07afdc25aeb66f8be5f276c316
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-52cd3b1dbe4be152685cdc6567b6b067321293929cc6f7c8855d61a368fa7c27 CONTAINS SPDXRef-47c577815e0cea92baaade48dbfd16669d33e0598cda1ccb5447067e12eb20b3
+RelationshipComment: <text>test/FreeRTOS-Kernel</text>
+
+Relationship: SPDXRef-52cd3b1dbe4be152685cdc6567b6b067321293929cc6f7c8855d61a368fa7c27 CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>tools/CMock</text>
+
+Relationship: SPDXRef-52cd3b1dbe4be152685cdc6567b6b067321293929cc6f7c8855d61a368fa7c27 CONTAINS SPDXRef-6c370ef5e2b64dd40032393efd6d9ca017c53b07afdc25aeb66f8be5f276c316
+RelationshipComment: <text>test/litani</text>
+
+Relationship: SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd CONTAINS SPDXRef-3a972bca996518a9301652bc90c7bdb463a0739781a43f765319015fa625356e
+RelationshipComment: <text>vendor/c_exception</text>
+
+Relationship: SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>vendor/unity</text>
+
+Relationship: SPDXRef-5951d097ce197d76307208d766555f614a781e58987582cfa0388639cfb3cd72 CONTAINS SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218 CONTAINS SPDXRef-0dbd1e8e61be7cc74d186e30009cd87023c1da8785c591c6e7bc2dcfe29f3563
+RelationshipComment: <text>portable/ThirdParty/Community-Supported-Ports</text>
+
+Relationship: SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218 CONTAINS SPDXRef-b13803bdfa93c411a217b0ee03b884f1806ea545225a9d1823eb4e446c24b74c
+RelationshipComment: <text>portable/ThirdParty/Partner-Supported-Ports</text>
+
+Relationship: SPDXRef-610db3e28d1f7a324537fb5789cb641ac985e18ee78b92ba55eb0bfd86111628 CONTAINS SPDXRef-6a8e1f35e02c0040ec431df33bb5d81fb5b11ae33540ecdfc1c106edb60111cd
+RelationshipComment: <text>source/dependency/3rdparty/tinycbor</text>
+
+Relationship: SPDXRef-610db3e28d1f7a324537fb5789cb641ac985e18ee78b92ba55eb0bfd86111628 CONTAINS SPDXRef-f815502693444c45327dbecb523d9dabd170c108714640c31949a47e81555ce4
+RelationshipComment: <text>source/dependency/coreJSON</text>
+
+Relationship: SPDXRef-610db3e28d1f7a324537fb5789cb641ac985e18ee78b92ba55eb0bfd86111628 CONTAINS SPDXRef-fcca71ee2dae26c252e2018795bfc2729d97cbea2ae666351f2e23e33196efc8
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-6f0c9d39944e5b94dee40fdfc96cb4cf145bc9d7231580ca289ae0d97fd45a89 CONTAINS SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-7382d8aa76b3173f44320ff7374eeff08a498bdcaa175032da5ab2069f980dee CONTAINS SPDXRef-0b8999257417960b7a72ddd250e53d326fa535c3a8db7de2ebef0250385223d8
+RelationshipComment: <text>source/dependency/3rdparty/pkcs11</text>
+
+Relationship: SPDXRef-73f77c4cc843f7212deb104af70b8056a9801285b815e198376d45aaf4a49740 CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-8257c5a448f1987eea4168e6f53ab43fbb9caec81fd68b1b69b76a1e5a63eb62 CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-84cd2636a503e98c0ca6a75d2f80d959fffc84996014324f54ee4a4cb09d8d6b CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>tools/CMock</text>
+
+Relationship: SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f CONTAINS SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218
+RelationshipComment: <text>test/FreeRTOS-Kernel</text>
+
+Relationship: SPDXRef-8730a8189a708ce91eba0de084dae5b73fa2098ad6cb914cf7ea7cdfba7f710f CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-8730a8189a708ce91eba0de084dae5b73fa2098ad6cb914cf7ea7cdfba7f710f CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-8730a8189a708ce91eba0de084dae5b73fa2098ad6cb914cf7ea7cdfba7f710f CONTAINS SPDXRef-6c370ef5e2b64dd40032393efd6d9ca017c53b07afdc25aeb66f8be5f276c316
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-88c5fce4ef8e8714f19eff047fe36eb1c8a6908f5a8eb094992456851d08a0d7 CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-8ad53c3386cf8fc0255dd3de66c58f281475edaca01f63d694c38948118d2fef CONTAINS SPDXRef-a605ac55617a6f014dc8f4e83b9d1a769c774ac15d8462044e09b46f62113fbb
+RelationshipComment: <text>subprojects/gvdb</text>
+
+Relationship: SPDXRef-9319af95123b6377b45b03d58cbc42e25e00a50fb69a7abb724137befe7f7c22 CONTAINS SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-0d05cfa7e3c8876804f435290838f388a15657891744d679153932d0747b5342
+RelationshipComment: <text>FreeRTOS-Plus/ThirdParty/mbedtls</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-0ec10501d6ceda6939b2752c01acd977d518f95ca21e835a352df4f4b1bfb463
+RelationshipComment: <text>FreeRTOS-Plus/Source/Application-Protocols/coreMQTT-Agent</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-1653e0cdfd34c33cf7378435943114b499d758019d43a9a6677dd35db7c5bc5d
+RelationshipComment: <text>FreeRTOS-Plus/Source/Utilities/backoff_algorithm</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-21af2d6d1bb12f7bc0812783e8ca21f7fea9dd64b350f15ac4f5b339342e3161
+RelationshipComment: <text>FreeRTOS-Plus/Source/Application-Protocols/coreSNTP</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-23ca5034017b8332f223792660d6f72dce5c277dc042ce7252c1b5b1a76b3921
+RelationshipComment: <text>FreeRTOS-Plus/Source/AWS/fleet-provisioning</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-378786cf95cb0d281d4b21fb93d3f13937c9db15b1e54484cd0fdbc1b512763c
+RelationshipComment: <text>FreeRTOS-Plus/Source/Application-Protocols/coreHTTP</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-3c227d3c49ffb22901730350912df5ba6d8e30fc50810b2e54bb132e99bd1e6e
+RelationshipComment: <text>FreeRTOS-Plus/Source/AWS/device-shadow</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-4149022a63854f703ade593c0cc30536f10e5d433815f0546eefa5ab7a26b74e
+RelationshipComment: <text>FreeRTOS-Plus/ThirdParty/wolfSSL</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-5912887c2237427431406f3297da2da8aa9393f4893f72eb061bfea5b1917bc0
+RelationshipComment: <text>FreeRTOS/Demo/ThirdParty/Community-Supported-Demos</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-5b5adf22b8a564ae7230e6fd813eea5085801b980fd7fdcd4fa809defd4c75a7
+RelationshipComment: <text>FreeRTOS-Plus/Source/FreeRTOS-Plus-Trace</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218
+RelationshipComment: <text>FreeRTOS/Source</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-6475592965857f44d0544c1ba7b342a4bcba84d00afd16d6d9ee7deab55ac60d
+RelationshipComment: <text>FreeRTOS-Plus/Source/FreeRTOS-Cellular-Modules/sara-r4</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-6f0c9d39944e5b94dee40fdfc96cb4cf145bc9d7231580ca289ae0d97fd45a89
+RelationshipComment: <text>FreeRTOS-Plus/Source/coreJSON</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-7382d8aa76b3173f44320ff7374eeff08a498bdcaa175032da5ab2069f980dee
+RelationshipComment: <text>FreeRTOS-Plus/Source/corePKCS11</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-73f77c4cc843f7212deb104af70b8056a9801285b815e198376d45aaf4a49740
+RelationshipComment: <text>FreeRTOS-Plus/Source/Application-Protocols/coreMQTT</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-8257c5a448f1987eea4168e6f53ab43fbb9caec81fd68b1b69b76a1e5a63eb62
+RelationshipComment: <text>FreeRTOS-Plus/Source/AWS/sigv4</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-88c5fce4ef8e8714f19eff047fe36eb1c8a6908f5a8eb094992456851d08a0d7
+RelationshipComment: <text>FreeRTOS-Plus/Source/FreeRTOS-Cellular-Interface</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-8ad53c3386cf8fc0255dd3de66c58f281475edaca01f63d694c38948118d2fef
+RelationshipComment: <text>FreeRTOS-Plus/ThirdParty/glib</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-a3ce7952f919145cc14c85361a190470b5b7df3a3fa87e38e2b05da76a0e271f
+RelationshipComment: <text>FreeRTOS-Plus/Source/FreeRTOS-Cellular-Modules/bg96</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-a447684300752e502bd76bd2ab217c2ee4e4b4b2a5c68d5f8565ef1d48b3569f
+RelationshipComment: <text>FreeRTOS-Plus/Source/AWS/jobs</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-c4def6d95acd8f0394ad85d3b8d5c8da013c9749945df5d5bcbb2213d135bde9
+RelationshipComment: <text>FreeRTOS-Plus/Source/FreeRTOS-Plus-TCP</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-c8ddc21c14768e711c9238ecd7a0390b684f2377c2aae4eed0b22cc2d4f1a98b
+RelationshipComment: <text>FreeRTOS-Plus/Source/AWS/ota</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-d4fb64ae81300b6c28ed3afea2a8c1af473449b6a05d57a3bc50ee61a9de4522
+RelationshipComment: <text>FreeRTOS-Plus/ThirdParty/tinycbor</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-e71f8e2b3316ca5fff076d6ee2644d0b8bd07397ab62cd1767a6198d388de9f2
+RelationshipComment: <text>FreeRTOS/Demo/ThirdParty/Partner-Supported-Demos</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-f355e39fa8b56b625f3c40840630965228db26db8405c33f6c5e603422862274
+RelationshipComment: <text>FreeRTOS-Plus/ThirdParty/libslirp</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-f51ac09780d2ddd03258a85c43cd9957fe6e9bc03cc29a3506dd381b6dfbb508
+RelationshipComment: <text>FreeRTOS-Plus/Source/AWS/device-defender</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-f702555d22433f38bc29aa33f42ca975f2d3507b331255ff03dea89d80b75b7c
+RelationshipComment: <text>FreeRTOS-Plus/Source/FreeRTOS-Cellular-Modules/hl7802</text>
+
+Relationship: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857 CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>FreeRTOS-Plus/Test/CMock, FreeRTOS/Test/CMock/CMock</text>
+
+Relationship: SPDXRef-a2bab480b9103bb15df4307cc61c3335932a31a2fa73dcfb67d6a0f0d3e34a14 CONTAINS SPDXRef-496daf02db420ada1d0d33aefa56c5511c0e227cde792a32cc161c961ede4a07
+RelationshipComment: <text>framework</text>
+
+Relationship: SPDXRef-a4c12e15f98a25e2ccf4d0e3e3d6f471c14ce739e48087de6b3fea3482a6b412 CONTAINS SPDXRef-0b8999257417960b7a72ddd250e53d326fa535c3a8db7de2ebef0250385223d8
+RelationshipComment: <text>source/dependency/3rdparty/pkcs11</text>
+
+Relationship: SPDXRef-b7e9ab41fc514056859da1733ef77cf596334b126b85004f54bdb01e5e1bde0d CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-b96fddbc0bcb835da34ba196e183e8a0909b8f2012aa628b6259455bc5d8f709 CONTAINS SPDXRef-5f6af1060b83b0a903e571c40a0fd687c7afcdd3fd410fa1bcdf913c4d69d21f
+RelationshipComment: <text>rm_littlefs_rx_vx.xx/rm_littlefs_rx/third_party/littlefs</text>
+
+Relationship: SPDXRef-bdd38b3fcea72d5964b62e30eadd4f57a95639b092bf93cf40794246fee6ecee CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-c0d83d981d68fbf1bcc38771faf65b60fa3f9d0f6f0b76630abd7cf0a8967892 CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-c0d83d981d68fbf1bcc38771faf65b60fa3f9d0f6f0b76630abd7cf0a8967892 CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-c0d83d981d68fbf1bcc38771faf65b60fa3f9d0f6f0b76630abd7cf0a8967892 CONTAINS SPDXRef-bee7f63f99b5f82745a1495eb20acd11a6f2cbfbc4dc01463c76986649fb34e6
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-c4def6d95acd8f0394ad85d3b8d5c8da013c9749945df5d5bcbb2213d135bde9 CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>tools/CMock</text>
+
+Relationship: SPDXRef-c4def6d95acd8f0394ad85d3b8d5c8da013c9749945df5d5bcbb2213d135bde9 CONTAINS SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218
+RelationshipComment: <text>test/FreeRTOS-Kernel</text>
+
+Relationship: SPDXRef-c8ddc21c14768e711c9238ecd7a0390b684f2377c2aae4eed0b22cc2d4f1a98b CONTAINS SPDXRef-396cd7ca9f46139bff98d077d242debc223f08045205c39d8ba7cf8d86455a30
+RelationshipComment: <text>test/cbmc/FreeRTOS-Kernel</text>
+
+Relationship: SPDXRef-c8ddc21c14768e711c9238ecd7a0390b684f2377c2aae4eed0b22cc2d4f1a98b CONTAINS SPDXRef-98ed390838c30edb052427e387c07d08ef15224ded46a0596cf9c7d907f153ed
+RelationshipComment: <text>source/dependency/3rdparty/tinycbor</text>
+
+Relationship: SPDXRef-c8ddc21c14768e711c9238ecd7a0390b684f2377c2aae4eed0b22cc2d4f1a98b CONTAINS SPDXRef-d0cefecad80c0ba88e5c0386000c4a7e3465b5844dc6aaf331b67f4e1eee0fe8
+RelationshipComment: <text>source/dependency/coreJSON</text>
+
+Relationship: SPDXRef-c8ddc21c14768e711c9238ecd7a0390b684f2377c2aae4eed0b22cc2d4f1a98b CONTAINS SPDXRef-fcca71ee2dae26c252e2018795bfc2729d97cbea2ae666351f2e23e33196efc8
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-cf0e4158a4631711d0a7597f179cd75a691b72ad73864e6a0c6c3d079a5db62a CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-cf0e4158a4631711d0a7597f179cd75a691b72ad73864e6a0c6c3d079a5db62a CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-cf0e4158a4631711d0a7597f179cd75a691b72ad73864e6a0c6c3d079a5db62a CONTAINS SPDXRef-bee7f63f99b5f82745a1495eb20acd11a6f2cbfbc4dc01463c76986649fb34e6
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-cf7abe60a3f2b12b08259c1a754ead6d6436e83aa233b9ae050c24027d6aec97 CONTAINS SPDXRef-f83261d4d3494f0bfe28c04441306e3072c75a5b0e0b26a837c18865c2c3ff3a
+RelationshipComment: <text>ext/tinydtls</text>
+
+Relationship: SPDXRef-d0cefecad80c0ba88e5c0386000c4a7e3465b5844dc6aaf331b67f4e1eee0fe8 CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-d7f064184bc358dd63f80a38013a34cfc462baa231f4ee9665fe3e53ddf878e5 CONTAINS SPDXRef-24436db1d35866fb2382cc9992f445b9a707722cae0a796b59389d31a0289bf8
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-d7f064184bc358dd63f80a38013a34cfc462baa231f4ee9665fe3e53ddf878e5 CONTAINS SPDXRef-3c80f558184fdcd8975da332ccdfd2399e0ddc86813982e3b64c43bedfb4e041
+RelationshipComment: <text>source/dependency/coreMQTT</text>
+
+Relationship: SPDXRef-d7f064184bc358dd63f80a38013a34cfc462baa231f4ee9665fe3e53ddf878e5 CONTAINS SPDXRef-e66d7e49830d94f7e882ad9800ab2cc3d7134d34fdc86afc887563d1bfc563fd
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-d7f064184bc358dd63f80a38013a34cfc462baa231f4ee9665fe3e53ddf878e5 CONTAINS SPDXRef-f7edaf53e64a39b02ba67f1867288515cfb68022ae2c33107ef7738698717c38
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-df240a74aba964a5b0e5b35bb53412354396408558e966e8c9bf1916df23169d CONTAINS SPDXRef-0ec829d2c39f6efec089bc083a1d37b416e0af40c2e3a3adfaa5be4dcf8d54e5
+RelationshipComment: <text>vendor/unity</text>
+
+Relationship: SPDXRef-df240a74aba964a5b0e5b35bb53412354396408558e966e8c9bf1916df23169d CONTAINS SPDXRef-6a921323421aff7bed9d35ad63061b7d11bcd4ea137df5dd393fd96431d3d00e
+RelationshipComment: <text>vendor/c_exception</text>
+
+Relationship: SPDXRef-e0a54ceac6b5bd16f54dde1d8bc7b4d20eee91ba45465f0488514c4cee368661 CONTAINS SPDXRef-53967aef4a14fcbce642ed8a7dbc158ce69aba6b881fc3466473bb75d0dbae0e
+RelationshipComment: <text>source/dependency/3rdparty/pkcs11</text>
+
+Relationship: SPDXRef-e0a54ceac6b5bd16f54dde1d8bc7b4d20eee91ba45465f0488514c4cee368661 CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-e0a54ceac6b5bd16f54dde1d8bc7b4d20eee91ba45465f0488514c4cee368661 CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-e0a54ceac6b5bd16f54dde1d8bc7b4d20eee91ba45465f0488514c4cee368661 CONTAINS SPDXRef-aea327612796429fab0edfb0c6a369b70cdb03fefea6336856aaa73057cbc6ce
+RelationshipComment: <text>source/dependency/3rdparty/mbedtls</text>
+
+Relationship: SPDXRef-e0a54ceac6b5bd16f54dde1d8bc7b4d20eee91ba45465f0488514c4cee368661 CONTAINS SPDXRef-bee7f63f99b5f82745a1495eb20acd11a6f2cbfbc4dc01463c76986649fb34e6
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-e566fd7a9b864441011f63b5b7990e53a0f2f990be582acc0a43ae71c28a2e32 CONTAINS SPDXRef-cb1b17b2e963746d59a70de969ea1b0ca50d658e249f07a8a49f6cb991063ffd
+RelationshipComment: <text>source/dependency/3rdparty/llhttp</text>
+
+Relationship: SPDXRef-e566fd7a9b864441011f63b5b7990e53a0f2f990be582acc0a43ae71c28a2e32 CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-e66d7e49830d94f7e882ad9800ab2cc3d7134d34fdc86afc887563d1bfc563fd CONTAINS SPDXRef-3a972bca996518a9301652bc90c7bdb463a0739781a43f765319015fa625356e
+RelationshipComment: <text>vendor/c_exception</text>
+
+Relationship: SPDXRef-e66d7e49830d94f7e882ad9800ab2cc3d7134d34fdc86afc887563d1bfc563fd CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>vendor/unity</text>
+
+Relationship: SPDXRef-f498dfdd14912663490d685c65f7be7138c073275b83559d19f6da1b39a9e040 CONTAINS SPDXRef-75f012b4cd1b562fac77a2226f86827be74039a57c5e59334ce3071aa4024fc8
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-f51ac09780d2ddd03258a85c43cd9957fe6e9bc03cc29a3506dd381b6dfbb508 CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-f815502693444c45327dbecb523d9dabd170c108714640c31949a47e81555ce4 CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-f815502693444c45327dbecb523d9dabd170c108714640c31949a47e81555ce4 CONTAINS SPDXRef-5ccc1380ef462e23f7a1ebc808afb15714422951acc51be001570f62351f063a
+RelationshipComment: <text>test/cbmc/aws-templates-for-cbmc-proofs</text>
+
+Relationship: SPDXRef-f815502693444c45327dbecb523d9dabd170c108714640c31949a47e81555ce4 CONTAINS SPDXRef-6c370ef5e2b64dd40032393efd6d9ca017c53b07afdc25aeb66f8be5f276c316
+RelationshipComment: <text>test/cbmc/litani</text>
+
+Relationship: SPDXRef-f92cc9ccb6910b83dea132578ba230e12f78efe07674355f097ec0483ecbc9ac CONTAINS SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
+RelationshipComment: <text>test/unit-test/Unity</text>
+
+Relationship: SPDXRef-fcca71ee2dae26c252e2018795bfc2729d97cbea2ae666351f2e23e33196efc8 CONTAINS SPDXRef-3a972bca996518a9301652bc90c7bdb463a0739781a43f765319015fa625356e
+RelationshipComment: <text>vendor/c_exception</text>
+
+Relationship: SPDXRef-fcca71ee2dae26c252e2018795bfc2729d97cbea2ae666351f2e23e33196efc8 CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>vendor/unity</text>
+
+Relationship: SPDXRef-fd640019b7ca39c7924fc4b48154f446ab4cb138c0a990221cce86c5dba4c776 CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>test/unit-test/CMock</text>
+
+Relationship: SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760 CONTAINS SPDXRef-3a972bca996518a9301652bc90c7bdb463a0739781a43f765319015fa625356e
+RelationshipComment: <text>vendor/c_exception</text>
+
+Relationship: SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760 CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
+RelationshipComment: <text>vendor/unity</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-05f6b083b7f47385af8395d88cc330d73b31e19d70281430364dba5523d983e1
+RelationshipComment: <text>Middleware/3rdparty/tinycrypt</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-0ba6a7c9ebab7d41b70647d17103727f8a2d6635d70d3a83a58acbaf3a86936b
+RelationshipComment: <text>Middleware/3rdparty/tinycbor</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-0d6867b2df4294f91d4f133518a65979c7a10bd4a4dc7eb952bb22b6eaf25ba8
+RelationshipComment: <text>Middleware/Renesas/rm_rtos_abstraction_rx</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-0dd7b34bf563483a69cf81aa8979113a158bbefbd6fe81262062b8516947c23b
+RelationshipComment: <text>Test/FreeRTOS-Libraries-Integration-Tests</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-18cf1397bd973e5579e45e77a520a33a8f16a8a22de75c25c09d670c52d1544b
+RelationshipComment: <text>Middleware/Renesas/r_cellular</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-1a5ab368c47b1617dd0f3cc700ab4194095e3f9a58ddd5a1d2a36796c7425408
+RelationshipComment: <text>Middleware/FreeRTOS/coreMQTT-Agent</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7
+RelationshipComment: <text>Middleware/freertos_plus</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-27d75d23e3b88bf3e16781e9ac04beced44063ccc1d4e1f92061ca47f61a407d
+RelationshipComment: <text>Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-2c5d2d4b63707b07b88adc0801e3f04716d27c43a1769a5318d8d9750cc9485f
+RelationshipComment: <text>Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-360f37b88573e707459f0f8ebc73f18ab799474ccc73ea19f449c09f50da7129
+RelationshipComment: <text>Middleware/FreeRTOS/FreeRTOS-Kernel</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-491ef09ea40082c7033f1ffa1cb73dec684dcc5899e6d99474862edd0670f187
+RelationshipComment: <text>tools/provisioning</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-50a99c7188629eb94d5dd28b2e70a07a4ad045b99607b5337f2ba9b3d40de516
+RelationshipComment: <text>Middleware/Renesas/r_flash_rx</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-5951d097ce197d76307208d766555f614a781e58987582cfa0388639cfb3cd72
+RelationshipComment: <text>Middleware/FreeRTOS/coreJSON</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-5b0d6ba8a4a4c9985c1bca97a47d5f1e13547e6fae5bda2c9767c9b47de38020
+RelationshipComment: <text>Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/cyw-fmac-nvram, Projects/aws_wifi_rx671_ek_tsip/external/type1yn-blobs/sources/cyw-fmac-nvram</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-5d8ecc2a43697f4fb5426b84a9b69f5615cb909fed9a20563e8537283859d550
+RelationshipComment: <text>Middleware/Renesas/rx-driver-package</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-5f6af1060b83b0a903e571c40a0fd687c7afcdd3fd410fa1bcdf913c4d69d21f
+RelationshipComment: <text>Middleware/3rdparty/littlefs</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-6b4849c10f6656fba9dda73ad8a6659f1b7ba3700dfb45983f8fcdf3fe20ed6b
+RelationshipComment: <text>Projects/boot_loader_ck_rx65n/e2studio_ccrx/lib/rx_bootloader, Projects/boot_loader_rx671_ek/e2studio_ccrx/lib/rx_bootloader, Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/lib/rx_bootloader</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-80c3a86a8072a24273902dd58eb0534e88ea40495889c6296b68c91a243ac583
+RelationshipComment: <text>Projects/aws_wifi_rx671_ek/external/wifi-host-driver, Projects/aws_wifi_rx671_ek_tsip/external/wifi-host-driver</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-84cd2636a503e98c0ca6a75d2f80d959fffc84996014324f54ee4a4cb09d8d6b
+RelationshipComment: <text>Middleware/AWS/Device-Defender-for-AWS-IoT-embedded-sdk</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f
+RelationshipComment: <text>Middleware/FreeRTOS/FreeRTOS-Plus-TCP</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-861b1ddeb1c340b3fbba737738ec2ff99d28fafe6bc355bd68492a202eb76951
+RelationshipComment: <text>Middleware/3rdparty/TraceRecorderSource</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-89b3ffb9f9e580f2bf6e53d16458b27648255f22fa443391dd4572fe8236118f
+RelationshipComment: <text>Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/wifi-resources, Projects/aws_wifi_rx671_ek_tsip/external/type1yn-blobs/sources/wifi-resources</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-9319af95123b6377b45b03d58cbc42e25e00a50fb69a7abb724137befe7f7c22
+RelationshipComment: <text>Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857
+RelationshipComment: <text>Middleware/FreeRTOS-Plus-CLI</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-a2bab480b9103bb15df4307cc61c3335932a31a2fa73dcfb67d6a0f0d3e34a14
+RelationshipComment: <text>Middleware/3rdparty/mbedtls</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-a3f21bd58000ee73c7f5bc74fb568216c79baf35e26282954ee3846ebcecd362
+RelationshipComment: <text>Middleware/Renesas/r_simple_graphic_rx</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-a4c12e15f98a25e2ccf4d0e3e3d6f471c14ce739e48087de6b3fea3482a6b412
+RelationshipComment: <text>Middleware/FreeRTOS/corePKCS11</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-b7e9ab41fc514056859da1733ef77cf596334b126b85004f54bdb01e5e1bde0d
+RelationshipComment: <text>Middleware/FreeRTOS/coreSNTP</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-b96fddbc0bcb835da34ba196e183e8a0909b8f2012aa628b6259455bc5d8f709
+RelationshipComment: <text>Middleware/Renesas/rm_littlefs_rx</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-bdd38b3fcea72d5964b62e30eadd4f57a95639b092bf93cf40794246fee6ecee
+RelationshipComment: <text>Middleware/AWS/Device-Shadow-for-AWS-IoT-embedded-sdk</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-bf81b2d154543d9220ad29b80251d05caca0a1479a6c4903814bdc894854884d
+RelationshipComment: <text>Middleware/3rdparty/mbedtls_with_TSIP</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-c0ba89bb5d0b6f4c2a7248db67781ae77d204ff4be90ff360893e5fe63094a3f
+RelationshipComment: <text>Middleware/Renesas/r_simple_glcdc_config_rx</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-c1099eef41a9b334a6127fbff4cef9bbe1861956eeab39bf6cc7249972344110
+RelationshipComment: <text>Middleware/Renesas/r_sdio_rx</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-d3fc910de902d50b2d7a66e73d6471076b0451db82ced1fe5498feccdbe30807
+RelationshipComment: <text>Projects/aws_wifi_rx671_ek/external/type1yn-blobs/sources/firmware-wifi-host-driver, Projects/aws_wifi_rx671_ek_tsip/external/type1yn-blobs/sources/firmware-wifi-host-driver</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-df047855339a6801c7512b595812577779a1908f3f88bbdf4ea4f1363f70becd
+RelationshipComment: <text>Test/Unity</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-e566fd7a9b864441011f63b5b7990e53a0f2f990be582acc0a43ae71c28a2e32
+RelationshipComment: <text>Middleware/FreeRTOS/coreHTTP</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-f92cc9ccb6910b83dea132578ba230e12f78efe07674355f097ec0483ecbc9ac
+RelationshipComment: <text>Middleware/FreeRTOS/backoffAlgorithm</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-fd640019b7ca39c7924fc4b48154f446ab4cb138c0a990221cce86c5dba4c776
+RelationshipComment: <text>Middleware/FreeRTOS/coreMQTT</text>
+
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-ffb5824a1c606a14f7e1b308b8a817c796e041cb212b65798ec36075d44de735
+RelationshipComment: <text>Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c</text>
