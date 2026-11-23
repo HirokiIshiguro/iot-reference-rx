@@ -919,7 +919,10 @@ static bool sdio_cmd53_dtc_open_once(void)
     {
         /* R_DTC_Open also returns DTC_ERR_OPENED when it cannot malloc its
          * vector table from the C heap, and the DTC then stays closed. Ask the
-         * driver (a read-only status query) whether it is really open. */
+         * driver whether it is really open. When it is open, the status query
+         * only reads the state. When it is not open, R_DTC_Control releases
+         * the DTC hardware lock; R_DTC_Open has already released it on this
+         * path, and no other code in this project opens the DTC. */
         dtc_stat_t stat;
 
         if (DTC_ERR_NOT_OPEN == R_DTC_Control(DTC_CMD_STATUS_GET, &stat, NULL))
