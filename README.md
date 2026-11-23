@@ -69,13 +69,15 @@ SessionTicketを発行しないため、resumption / 0-RTTはLANBENCHで確認�
 ## IoT Device Tester（IDT）
 
 IDTは3ターゲットが対象です。現在のCI（[CI/CD運用](docs/details/ci-pipeline.md)）は、IDTを流しません。
-IDTの実行方法と、ターゲットごとの準備条件・終了状態は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
+過去の結果、試験条件、終了状態は[IDT検証](docs/details/idt/idt-validation.md)を参照してください。
 
 | 環境 | `IDT_TARGET` | 実機IDTの証跡 |
 |---|---|---|
 | RX72N Envision Kit / Ethernet | `rx72n-ethernet` | 以下の限定試験 |
-| CK-RX65N V1 / BG96 | `rx65n-bg96` | 未検証 |
-| EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | 未検証 |
+| CK-RX65N V1 / BG96 | `rx65n-bg96` | 旧構成で PKCS #11 Core 10/10 PASS、Transport・MQTT・OTA PAL に FAIL |
+| EK-RX671 / Type 1YN Wi-Fi | `rx671-wifi` | 旧構成で Transport 9 件 PASS、必須 5 件の結果なし（未完走） |
+
+RX65N・RX671 は現行基盤での実機 IDT が未確認です。実行ごとの結果とソースのコミットは[RX65N・RX671 の過去の実機結果](docs/details/idt/idt-validation.md#rx65nrx671-の過去の実機結果)を参照してください。
 
 以下の実測環境: **RX72N Envision Kit / Ethernet / software TLS**、ishiguro-pc（Windows x86_64でビルド、
 Ubuntu WSL 2 / x86_64でIDT実行）、RPi #1（書込み・UART中継）、AWS東京リージョン。
