@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "upstream_repository": "https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver.git",
-  "upstream_commit": "df980438543fe5f368dc54a451d9e6d7fe717278",
+  "upstream_commit": "13119afc1570ee2d97fae3d782db02db356f12a6",
   "origin_repository": "https://github.com/Infineon/wifi-host-driver.git",
   "origin_commit": "769c855507365e9828b02c81f1590d671f49661d",
   "modification_purpose": "CC-RX packing syntax, private SDIO command encoding, caller WLAN sleep delay override and the CC-RX F2 block size (default 512)",
