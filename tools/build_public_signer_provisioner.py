@@ -157,9 +157,9 @@ def make_profile(text: str, source_sha: str = "0" * 40) -> str:
     if len(values) != 1:
         raise ValueError("Maintenance profile requires one application vector layout")
     start = values[0]
-    standalone = re.sub(r"EXCEPTVECT/0?[Ff]{3}[Bb][Ff]{2}80", "EXCEPTVECT/0FFFFFF80", start)
-    standalone = re.sub(r"RESETVECT/0?[Ff]{3}[Bb][Ff]{3}[Cc]", "RESETVECT/0FFFFFFFC", standalone)
-    if standalone == start or "RESETVECT/0FFFFFFFC" not in standalone:
+    standalone, exceptions = re.subn(r"EXCEPTVECT/0?[Ff]{3}[Ee][Ff]{2}80", "EXCEPTVECT/0FFFFFF80", start)
+    standalone, resets = re.subn(r"RESETVECT/0?[Ff]{3}[Ee][Ff]{3}[Cc]", "RESETVECT/0FFFFFFFC", standalone)
+    if exceptions != 1 or resets != 1:
         raise ValueError("Unsupported application vector layout")
     text = text.replace('value="' + start + '"', 'value="' + standalone + '"', 1)
     tree = ET.fromstring(text)
@@ -236,7 +236,7 @@ def validate_image(path: Path, target_id: str, source_sha: str) -> dict:
     if field(0xFE7F5D00) != bytes.fromhex("8FFFFFFF") or field(0xFE7F5D20) != bytes.fromhex("FFFFFFFF"):
         raise RuntimeError("Maintenance MOT must use dual/little-endian and initial bank0")
     vector = int.from_bytes(field(0xFFFFFFFC), "little")
-    if not CODE_FLASH_START[target_id]+0x300 <= vector <= 0xFFFBFFFF or vector not in memory:
+    if not CODE_FLASH_START[target_id]+0x300 <= vector < 0xFFFF0000 or vector not in memory:
         raise RuntimeError("Maintenance reset vector is outside its loaded application")
     marker = b"PUBLIC_SIGNER_PROVISIONER source_sha=" + source_sha.encode("ascii") + b"\r\n"
     runs, current, previous = [], bytearray(), None
@@ -302,7 +302,7 @@ def build(repo: Path, target_id: str, output: Path, workspace: Path, python: str
         effective = {path.relative_to(repo).as_posix(): hashlib.sha256(body).hexdigest()
                      for path, body in isolation.effective.items()}
         effective[(project / ".cproject").relative_to(repo).as_posix()] = sha256(project / ".cproject")
-        result = subprocess.run(command, cwd=repo, capture_output=True, timeout=1800, env=environment)
+        result = subprocess.run(command, cwd=repo, capture_output=True, timeout=3600, env=environment)
         (output / "launcher-private.log").write_bytes(result.stdout + result.stderr)
         if result.returncode:
             raise RuntimeError("Public signer provisioner build failed; inspect private build logs")

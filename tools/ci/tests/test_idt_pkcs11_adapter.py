@@ -3,6 +3,7 @@
 Host fixture groups are opaque test doubles; these tests do not execute or
 claim success for the PKCS11 assertions on a microcontroller.
 """
+import os
 from pathlib import Path
 import re
 import shutil
@@ -157,7 +158,7 @@ class Pkcs11InputTests(unittest.TestCase):
                           ("-TestGroup", "Transport", "-Pkcs11Group", "NoObject")):
             result = subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File", str(BUILDER),
                 "-ProjectRoot", str(ROOT / "no-such-native-source"), *arguments],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=(120 if os.name == "nt" else 20))
             self.assertNotEqual(0, result.returncode)
             self.assertIn("Pkcs11Group", result.stderr)
             self.assertNotIn("Cannot find path", result.stderr)

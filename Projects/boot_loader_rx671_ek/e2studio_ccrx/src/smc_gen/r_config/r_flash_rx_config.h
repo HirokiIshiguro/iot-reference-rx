@@ -81,4 +81,7 @@
 #define FLASH_CFG_CODE_FLASH_RUN_FROM_ROM   (1)
 
 
+/* The FCU ISR may be preempted in the bare-metal bootloader. */
+#define FLASH_CFG_FCU_EN_NESTED_INT   (1)
+
 #endif /* FLASH_CONFIG_HEADER_FILE */

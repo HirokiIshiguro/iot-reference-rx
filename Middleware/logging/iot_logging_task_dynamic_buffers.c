@@ -116,6 +116,7 @@ static void prvLoggingTask(void *pvParameters);
  * the message to the task that will performs the output.
  */
 static QueueHandle_t xQueue = NULL;
+static TaskHandle_t xLoggingTask = NULL;
 
 /*-----------------------------------------------------------*/
 
@@ -211,7 +212,7 @@ BaseType_t xLoggingTaskInitialize(uint16_t usStackSize,
 
         if (NULL != xQueue)
         {
-            if (xTaskCreate(prvLoggingTask, "Logging", usStackSize, NULL, uxPriority, NULL) == pdPASS)
+            if (xTaskCreate(prvLoggingTask, "Logging", usStackSize, NULL, uxPriority, &xLoggingTask) == pdPASS)
             {
                 xReturn = pdPASS;
             }
@@ -271,14 +272,17 @@ static void prvLoggingTask(void *pvParameters)
 *                fileLineNo - Line number in source file
 *                pcFormat - Format string for the log message
 *                args - Variable argument list containing values to be formatted
-* Return Value : None
+*                xBlockTime - Time to wait for space in the logging FIFO
+* Return Value : pdPASS if enqueued, pdFAIL otherwise
 *********************************************************************************************************************/
-static void prvLoggingPrintfCommon(uint8_t usLoggingLevel,
+static BaseType_t prvLoggingPrintfCommon(uint8_t usLoggingLevel,
                                    const char *pcFile,
                                    size_t fileLineNo,
                                    const char *pcFormat,
-                                   va_list args)
+                                   va_list args,
+                                   TickType_t xBlockTime)
 {
+    BaseType_t xReturn = pdFAIL;
     size_t xLength = 0;
     char *pcPrintString = NULL;
 
@@ -405,7 +409,8 @@ static void prvLoggingPrintfCommon(uint8_t usLoggingLevel,
         if (xLength > 0)
         {
             /* Send the string to the logging task for IO. */
-            if (xQueueSend(xQueue, &pcPrintString, loggingDONT_BLOCK) != pdPASS)
+            xReturn = xQueueSend(xQueue, &pcPrintString, xBlockTime);
+            if (xReturn != pdPASS)
             {
                 /* The buffer was not sent so must be freed again. */
                 vPortFree((void *)pcPrintString);
@@ -418,6 +423,7 @@ static void prvLoggingPrintfCommon(uint8_t usLoggingLevel,
             vPortFree((void *)pcPrintString);
         }
     }
+    return xReturn;
 }
 /**********************************************************************************************************************
  End of function prvLoggingPrintfCommon
@@ -438,7 +444,7 @@ void vLoggingPrintfError(const char *pcFormat,
     va_list args;
 
     va_start(args, pcFormat);
-    prvLoggingPrintfCommon(LOG_ERROR, NULL, 0, pcFormat, args);
+    (void)prvLoggingPrintfCommon(LOG_ERROR, NULL, 0, pcFormat, args, loggingDONT_BLOCK);
 
     va_end(args);
 }
@@ -461,7 +467,7 @@ void vLoggingPrintfWarn(const char *pcFormat,
     va_list args;
 
     va_start(args, pcFormat);
-    prvLoggingPrintfCommon(LOG_WARN, NULL, 0, pcFormat, args);
+    (void)prvLoggingPrintfCommon(LOG_WARN, NULL, 0, pcFormat, args, loggingDONT_BLOCK);
 
     va_end(args);
 }
@@ -484,7 +490,7 @@ void vLoggingPrintfInfo(const char *pcFormat,
     va_list args;
 
     va_start(args, pcFormat);
-    prvLoggingPrintfCommon(LOG_INFO, NULL, 0, pcFormat, args);
+    (void)prvLoggingPrintfCommon(LOG_INFO, NULL, 0, pcFormat, args, loggingDONT_BLOCK);
 
     va_end(args);
 }
@@ -507,7 +513,7 @@ void vLoggingPrintfDebug(const char *pcFormat,
     va_list args;
 
     va_start(args, pcFormat);
-    prvLoggingPrintfCommon(LOG_DEBUG, NULL, 0, pcFormat, args);
+    (void)prvLoggingPrintfCommon(LOG_DEBUG, NULL, 0, pcFormat, args, loggingDONT_BLOCK);
 
     va_end(args);
 }
@@ -536,7 +542,7 @@ void vLoggingPrintfWithFileAndLine(const char *pcFile,
     va_list args;
 
     va_start(args, pcFormat);
-    prvLoggingPrintfCommon(LOG_NONE, pcFile, fileLineNo, pcFormat, args);
+    (void)prvLoggingPrintfCommon(LOG_NONE, pcFile, fileLineNo, pcFormat, args, loggingDONT_BLOCK);
 
     va_end(args);
 }
@@ -561,7 +567,7 @@ void vLoggingPrintf(const char *pcFormat,
     va_list args;
 
     va_start(args, pcFormat);
-    prvLoggingPrintfCommon(LOG_NONE, NULL, 0, pcFormat, args);
+    (void)prvLoggingPrintfCommon(LOG_NONE, NULL, 0, pcFormat, args, loggingDONT_BLOCK);
 
     va_end(args);
 }
@@ -606,3 +612,19 @@ void vLoggingPrint(const char *pcMessage)
  *********************************************************************************************************************/
 
 /*-----------------------------------------------------------*/
+
+BaseType_t xLoggingPrintfWait(const char *pcFormat, ...)
+{
+    BaseType_t xReturn;
+    va_list args;
+
+    if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
+        (xTaskGetCurrentTaskHandle() == xLoggingTask))
+    {
+        return pdFAIL;
+    }
+    va_start(args, pcFormat);
+    xReturn = prvLoggingPrintfCommon(LOG_NONE, NULL, 0, pcFormat, args, portMAX_DELAY);
+    va_end(args);
+    return xReturn;
+}

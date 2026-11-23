@@ -108,6 +108,8 @@ def download_command(root, target):
         "180" if target["id"] == "rx65n-bg96" else "90", "--ready-message", 'send "userprog.rsu" via UART.',
         "--reset-cmd", shlex.join([*rfp_command(target), "-sig", "-run", "-noquery"]),
         "--success-message", "jump to user program", "--success-timeout", "90", "--strict-success"]
+    # Keep 32 KiB write-ACK pacing on RX65N/RX671. RX72N streams without
+    # receiver ACK waits to validate the guarded Flash interrupt nesting.
     if target["id"] in ("rx65n-bg96", "rx671-wifi"):
         command += ["--ack-each-chunk", "--send-chunk-size", "32768", "--ack-prefix", "installing firmware..."]
     return command
@@ -116,9 +118,19 @@ def download_command(root, target):
 def reset_and_quiet(target, call, check_owner):
     import serial
     check_owner()
-    trust._checked_call(call, check_owner, [*rfp_command(target), "-sig", "-reset", "-noquery"],
-                        budget.FLASH_ABORT_RESET_SECONDS)
-    with serial.Serial(target["uart"], target["baud"], timeout=0.1, exclusive=True) as observer:
+    reset = lambda: trust._checked_call(call, check_owner, [*rfp_command(target), "-sig", "-reset", "-noquery"],
+                                        budget.FLASH_ABORT_RESET_SECONDS)
+    # Prepare the USB/UART observer before reset, so reopening it cannot
+    # introduce delayed RX or control-line changes into the quiet interval.
+    try:
+        port = serial.Serial(target["uart"], target["baud"], timeout=0.1, exclusive=True)
+    except Exception:
+        # Without an observer the quiet interval stays unproven, but the stop
+        # reset is still attempted once before reporting the open failure.
+        reset()
+        raise
+    with port as observer:
+        reset()
         observer.reset_input_buffer()
         deadline, count = time.monotonic()+budget.END_STATE_QUIET_SECONDS, 0
         while time.monotonic() < deadline:

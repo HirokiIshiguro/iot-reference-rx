@@ -635,6 +635,11 @@ static BaseType_t prvCreateTLSConnection(NetworkContext_t *pxNetworkContext)
     xNetworkCredentials.pPrivateKeyLabel = pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS;
 
     xNetworkCredentials.disableSni = democonfigDISABLE_SNI;
+#if defined( democonfigDISABLE_MAX_FRAGMENT_LENGTH_EXTENSION )
+    /* Only a project that defines this (the RX671 TSIP project) changes the
+     * request; the TSIP TLS transport requests MFL 4096 by default. */
+    xNetworkCredentials.disableMaxFragmentLengthExtension = democonfigDISABLE_MAX_FRAGMENT_LENGTH_EXTENSION;
+#endif
     BackoffAlgorithm_InitializeParams(&xReconnectParams,
                                       RETRY_BACKOFF_BASE_MS,
                                       RETRY_MAX_BACKOFF_DELAY_MS,

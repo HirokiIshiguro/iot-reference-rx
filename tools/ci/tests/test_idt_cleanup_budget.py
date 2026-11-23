@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
 from pathlib import Path
 import subprocess
 import shlex
@@ -13,7 +14,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from tools.idt import cleanup_budget as budget
+from tools.idt import cleanup_budget as budget, oidc_job
 from tools.idt.targets import get_target, target_fingerprint
 
 
@@ -44,6 +45,18 @@ class CleanupBudgetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             budget.flash_transaction_seconds("")
 
+    def test_rfp_command_limit_matches_the_new_ci_and_fits_the_oidc_job(self):
+        # The new CI (tools/ci/rxci_board.py) allows 300 s per rfp-cli command. A smaller limit here
+        # stopped programming that would have succeeded and left the unsafe sentinel on the bench.
+        source = (Path(__file__).resolve().parents[1] / "rxci_board.py").read_text(encoding="utf-8")
+        ci_seconds = int(re.search(r"^RFP_SECONDS\s*=\s*(\d+)", source, re.MULTILINE).group(1))
+        self.assertEqual(ci_seconds, budget.FLASH_RFP_COMMAND_SECONDS)
+        # The chained worst-case waits must still fit the longest OIDC job (oidc_job.MAX_JOB_SECONDS).
+        self.assertLess(oidc_job.NATIVE_SECONDS + budget.owned_runtime_cleanup_seconds() +
+                        oidc_job.SIGNER_CLEANUP_SECONDS, oidc_job.MAX_JOB_SECONDS)
+        # Aborting after a failure is a separate, fixed reset and does not scale with one command.
+        self.assertEqual(90, budget.FLASH_ABORT_RESET_SECONDS)
+
     def test_other_boards_wait_for_the_longest_shared_lock_transaction(self):
         longest = max(budget.flash_transaction_seconds(name) for name in budget.FLASH_TRANSACTION_PHASES)
         self.assertGreaterEqual(budget.BRIDGE_SHUTDOWN_SECONDS,
@@ -71,17 +84,20 @@ class CleanupBudgetTests(unittest.TestCase):
             runtime = Path(directory)
             process = Mock()
             process.poll.return_value = None
-            process.communicate.return_value = ("cleanup complete\n", None)
+            process.communicate.return_value = (b"cleanup complete\n", None)
             host = {"wsl_distribution": "unit-test", "wsl_python": "python3"}
             with patch.dict(run_idt.HOST, host), patch.object(run_idt, "wsl_path", side_effect=str), \
                     patch.object(run_idt.subprocess, "run", return_value=Mock(returncode=0, stdout='{"signaled": 1}')):
-                run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
-                process.communicate.assert_called_once_with(
-                    timeout=budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS))
-                self.assertEqual("cleanup complete\n", (runtime / "console.log").read_text())
-                process.communicate.side_effect = subprocess.TimeoutExpired("mock WSL", 1)
-                with self.assertRaisesRegex(RuntimeError, "inspect the private runtime"):
-                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials)
+                drain = Mock()
+                with patch.object(run_idt.time, "monotonic", return_value=0):
+                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials, drain=drain)
+                drain.assert_called_once_with(budget.owned_runtime_cleanup_seconds(budget.NATIVE_CLEANUP_SECONDS))
+                process.communicate.assert_not_called()
+                self.assertFalse((runtime / "console.log").exists())
+                drain.side_effect = RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse")
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        self.assertRaisesRegex(RuntimeError, "inspect the private runtime"):
+                    run_idt.stop_hardware_runtime(process, runtime, {}, credentials, drain=drain)
             process.kill.assert_not_called()
             process.terminate.assert_not_called()
 

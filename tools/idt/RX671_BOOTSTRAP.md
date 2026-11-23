@@ -33,11 +33,11 @@ bootloaderはLittleFS公開鍵・ECDSA必須・built-in fallback無効・旧Data
 
 RSUは3環境とも従来の連続形式です。`0x200` byteのheaderに続く`0x100` byteのmetadataは、little endianの`sequence・application start・application end・reset vector address・hardware ID`の5語を持ち、残りのCode Flash領域を含めてheader以後の全byteをECDSA P-256/SHA-256で署名します。UARTはheader付き、OTA PALへの転送は同じ画像からheaderだけを除いたbyte列です。`r_fwup`の`count・address・size`形式、疎なsegment、raw Data Flashは使いません。既存CI・remote stagingとの呼出し互換のため残る`build_fwup_v2_rsu.py`と`build_rx671_fwup_v2_rsu.py`というファイル名は旧名で、生成する形式を示しません。生成器・初期trust検査・通常app検査・RX671 OTA検査はいずれも同じ従来形式を要求します。
 
-全3環境の共有領域は`0x00100000`から8KiB、littlefsは2.11.3です。RX72Nの旧開始位置とRX65N/RX72Nの旧容量から移行するため、初回formatと再provisionが必要です。既存設定がそのまま残るとは扱わず、実機での移行結果を記録してください。API・geometry・mutexのhost検証は[製品port](../../Common/littlefs_common/README.md)に記載しています。
+共有領域の開始位置は全3環境とも`0x00100000`、容量はRX65N/RX72Nが16KiB、RX671が8KiBで、littlefsは2.11.3です。RX72Nの旧開始位置とRX65N/RX72Nの旧容量から移行するため、初回formatと再provisionが必要です。既存設定がそのまま残るとは扱わず、実機での移行結果を記録してください。API・geometry・mutexのhost検証は[製品port](../../Common/littlefs_common/README.md)に記載しています。
 
 終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗・UART出力継続・privileged子processの終了不明では所有記録を保持して再利用を止めます。
 
-全3環境のtransaction上限は[cleanup_budget.py](cleanup_budget.py)が算出する1565秒で、公開鍵投入CLIの絶対上限は200秒です。中断時resetの90秒は別枠です。終了を確認できないRFP子processは`<rfp_lock>.unsafe.json`で再利用を停止し、失敗したSSH callbackのprivate stagingも保持します。個別scopeの成功を全IDT合格やAWS正式認定とは扱いません。
+全3環境のtransaction上限は[cleanup_budget.py](cleanup_budget.py)が算出する3245秒で、公開鍵投入CLIの絶対上限は200秒です。中断時resetの90秒は別枠(rfp-cli 1コマンドの上限300秒とは別)です。終了を確認できないRFP子processは`<rfp_lock>.unsafe.json`で再利用を停止し、失敗したSSH callbackのprivate stagingも保持します。個別scopeの成功を全IDT合格やAWS正式認定とは扱いません。
 
 RX671で確認した旧linear画像の起動不良は、現在の共通経路とは別の実機調査記録です。
 
@@ -46,6 +46,6 @@ RX671で確認した旧linear画像の起動不良は、現在の共通経路と
 
 [#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)では、OTA後の起動bank状態からlinear provisionerを一括書込みすると、verify成功後も旧bootloaderを指す現象を実機で再現しました。同じ通常FWもdual/000からの初回と2回目で配置が変わったため、2回書込みによる収束には依存せず、chip eraseを先に完了する経路を採用しました。
 
-この調査は過去のsourceと画像に対する証拠です。保守用を含む現在のdual-bank統一、新しいLittleFS領域、全3環境の初期trust経路の実機合格には流用しません。過去IDTの対象SHAと結果は[検証記録](../../docs/idt-validation.md)を参照してください。
+この調査は過去のsourceと画像に対する証拠です。保守用を含む現在のdual-bank統一、新しいLittleFS領域、全3環境の初期trust経路の実機合格には流用しません。過去IDTの対象SHAと結果は[検証記録](../../docs/details/idt/idt-validation.md)を参照してください。
 
 </details>

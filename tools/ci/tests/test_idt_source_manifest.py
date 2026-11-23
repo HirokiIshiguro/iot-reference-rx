@@ -94,6 +94,56 @@ class DependencyProvenanceTests(unittest.TestCase):
     def capture(self):
         return manifest.capture_dependency_provenance(self.source, self.target)
 
+    @unittest.skipUnless(os.name == "posix", "POSIX symlink checkout required")
+    def test_native_git_mode_checks_root_and_dependency_without_hiding_changes(self):
+        from tools.idt import run_idt
+
+        relative = manifest.dependency_paths(self.target)[0]
+        dependency = self.source / relative
+        link = dependency / "link.c"
+        link.symlink_to("source.c")
+        git(dependency, "add", "--", "link.c")
+        sha = commit_fixture_tree(dependency)
+        git(self.source, "update-index", "--cacheinfo", "160000," + sha + "," + relative)
+        commit_fixture_tree(self.source)
+        link.unlink()
+        link.write_bytes(b"source.c")  # Windows-style checkout of a tracked symlink.
+        self.assertIn("T link.c", git(dependency, "status", "--porcelain=v1"))
+
+        fixed = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        fixed.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+                     GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="core.symlinks",
+                     GIT_CONFIG_VALUE_0="false", GIT_TERMINAL_PROMPT="0")
+        with patch.dict(os.environ, fixed, clear=True), patch.object(run_idt, "SOURCE", self.source):
+            self.assertFalse(bool(run_idt.git("status", "--porcelain")))
+            self.assertEqual(self.capture()["submodule_shas"][relative], sha)
+
+            source_file = dependency / "source.c"
+            original = source_file.read_bytes()
+            source_file.write_bytes(b"real modification\n")
+            self.assertTrue(bool(run_idt.git("status", "--porcelain")))
+            with self.assertRaisesRegex(ValueError, "Dependency original sources changed"):
+                self.capture()
+            source_file.write_bytes(original)
+
+            extra = dependency / "untracked.c"
+            extra.write_text("untracked\n", encoding="utf-8")
+            self.assertTrue(bool(run_idt.git("status", "--porcelain")))
+            with self.assertRaisesRegex(ValueError, "Dependency original sources changed"):
+                self.capture()
+            extra.unlink()
+
+            link.write_bytes(b"different.c")
+            self.assertTrue(bool(run_idt.git("status", "--porcelain")))
+            with self.assertRaisesRegex(ValueError, "Dependency original sources changed"):
+                self.capture()
+            link.write_bytes(b"source.c")
+
+            link.unlink()
+            link.symlink_to("source.c")
+            with self.assertRaisesRegex(ValueError, "Linked dependency path is unsupported"):
+                self.capture()
+
     def snapshot(self):
         provenance = self.capture()
         destination = self.root / "copy"
@@ -188,6 +238,19 @@ class DependencyProvenanceTests(unittest.TestCase):
                 path = self.source / relative / filename
                 expected[path.relative_to(self.source).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(expected, provenance["dependency_files_sha256"])
+
+    def test_flash_leaf_is_required_for_all_targets_and_copied_bytes_are_verified(self):
+        flash = "Middleware/Renesas/r_flash_rx"
+        for target in manifest.BOOT:
+            self.assertIn(flash, manifest.dependency_paths(target))
+        destination, provenance = self.snapshot()
+        self.assertEqual(self.pins[flash], provenance["submodule_shas"][flash])
+        source = destination / flash / "source.c"
+        changed = source.read_bytes() + b"unexpected Flash driver change\n"
+        source.write_bytes(changed)
+        with self.assertRaisesRegex(ValueError, "differs from captured source"):
+            manifest.verify_dependency_provenance(destination, self.target, provenance)
+        self.assertEqual(changed, source.read_bytes())
 
     def test_all_targets_verify_after_copy_without_git(self):
         for target in manifest.BOOT:

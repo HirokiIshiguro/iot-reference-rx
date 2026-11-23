@@ -1,6 +1,11 @@
 #ifndef DEMO_CONFIG_H
 #define DEMO_CONFIG_H
 
+/* RX671 has no fixed external-RAM framebuffer beside the OTA buffers. */
+#ifndef OTA_STATIC_BUFFERS_IN_BSS
+#define OTA_STATIC_BUFFERS_IN_BSS 1
+#endif
+
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "aws_iot_config.h"

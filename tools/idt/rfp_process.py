@@ -224,7 +224,7 @@ def _stop(process, known, target, deadline, reserve):
 
 
 def run_guarded(command, *, target, timeout, quiet=False, privileged=True):
-    """Run argv with inherited stdio and check=True semantics under owned locks.
+    """Run noninteractive argv with check=True semantics under owned locks.
 
     timeout covers the entire command and cleanup. A portion (up to five seconds)
     is reserved for TERM, same-UID KILL, and reaping. An unsafe exception means
@@ -233,8 +233,9 @@ def run_guarded(command, *, target, timeout, quiet=False, privileged=True):
     always leaves a sentinel, even if all observed processes terminated: a sudo
     child could have changed sessions and reparented before the first snapshot.
     Success assumes the normally exiting sudo parent waited for its command.
-    This helper neither acquires nor releases either lock. quiet uses DEVNULL,
-    never PIPE, so output cannot block termination or persist command secrets.
+    This helper neither acquires nor releases either lock. stdin is always
+    DEVNULL. quiet also redirects stdout/stderr to DEVNULL, never PIPE, so output
+    cannot block termination or persist command secrets.
     """
     if isinstance(command, (str, bytes)) or not command:
         raise ValueError('RFP supervision requires a nonempty argv sequence')
@@ -253,8 +254,10 @@ def run_guarded(command, *, target, timeout, quiet=False, privileged=True):
         _proc_snapshot()  # Verify visibility before starting a hardware command.
     except (OSError, ValueError, IndexError, StopIteration):
         _unsafe(target, None, 'process-visibility-unknown')
-    output = {'stdin': subprocess.DEVNULL, 'stdout': subprocess.DEVNULL,
-              'stderr': subprocess.DEVNULL} if quiet else {}
+    # Programmer commands use -noquery and must not consume the CI shell input.
+    output = {'stdin': subprocess.DEVNULL}
+    if quiet:
+        output.update(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         process = subprocess.Popen(command, start_new_session=True, **output)
     except KeyboardInterrupt:

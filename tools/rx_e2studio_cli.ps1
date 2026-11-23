@@ -89,6 +89,134 @@ function Get-RxE2StudioProjectInputState {
     return $state
 }
 
+# Read the redirected bytes before any StreamReader can replace invalid UTF-8.
+# Buffers are private, bounded to 32 MiB per stream, and never written as artifacts.
+function Initialize-RxBuildOutputCapture {
+    if ('RxBuildOutputCapture' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using System.Runtime.InteropServices;
+public sealed class RxBuildOutputCapture {
+    [DllImport("kernel32.dll")] public static extern uint GetACP();
+    public byte[] Bytes;
+    public long ByteCount;
+    public bool LimitExceeded;
+    public static async Task<RxBuildOutputCapture> ReadAsync(Stream input) {
+        const int limit = 32 * 1024 * 1024;
+        var result = new RxBuildOutputCapture();
+        using (var buffer = new MemoryStream()) {
+            var block = new byte[8192];
+            int count;
+            while ((count = await input.ReadAsync(block, 0, block.Length).ConfigureAwait(false)) > 0) {
+                result.ByteCount += count;
+                int retained = (int)Math.Min(count, limit - buffer.Length);
+                buffer.Write(block, 0, retained);
+                if (retained != count) result.LimitExceeded = true;
+            }
+            result.Bytes = buffer.ToArray();
+        }
+        return result;
+    }
+    public string Text;
+    public int Utf8Lines, FallbackLines, UndecodableLines, UpstreamReplacementLines;
+    public void Decode(Encoding fallback) {
+        var strictUtf8 = new UTF8Encoding(false, true);
+        var text = new StringBuilder();
+        int start = Bytes.Length >= 3 && Bytes[0] == 0xEF && Bytes[1] == 0xBB && Bytes[2] == 0xBF ? 3 : 0;
+        for (int end = start; end < Bytes.Length; end++) {
+            if (Bytes[end] != 10 && end != Bytes.Length - 1) continue;
+            int length = end - start + 1;
+            string line;
+            try {
+                line = strictUtf8.GetString(Bytes, start, length);
+                Utf8Lines++;
+                if (line.IndexOf('\uFFFD') >= 0) UpstreamReplacementLines++;
+            } catch (DecoderFallbackException) {
+                try {
+                    line = fallback.GetString(Bytes, start, length);
+                    FallbackLines++;
+                } catch (DecoderFallbackException) {
+                    // The private text records the loss; the public summary only counts it.
+                    line = Encoding.UTF8.GetString(Bytes, start, length);
+                    UndecodableLines++;
+                }
+            }
+            text.Append(line);
+            start = end + 1;
+        }
+        Text = text.ToString();
+        Bytes = null;
+    }
+}
+'@
+}
+
+# This projection accepts no source contents and copies no diagnostic message.
+# A caller must review each public basename; unknown paths/names are omitted.
+function Get-RxBuildDiagnosticSummary {
+    param([object[]]$Streams, [string[]]$PublicFileNames, [int]$FallbackCodePage, [string]$FallbackSource)
+    $allowed = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($name in $PublicFileNames) { [void]$allowed.Add($name) }
+    $diagnostics = [Collections.Generic.List[object]]::new()
+    $metadata = [Collections.Generic.List[object]]::new()
+    $failure = $false
+    foreach ($stream in $Streams) {
+        $capture = $stream.capture
+        [void]$metadata.Add([ordered]@{
+            stream = $stream.name
+            byte_count = $capture.ByteCount
+            capture_limit_exceeded = $capture.LimitExceeded
+            fallback_code_page = $FallbackCodePage
+            fallback_source = $FallbackSource
+            utf8_line_count = $capture.Utf8Lines
+            fallback_line_count = $capture.FallbackLines
+            undecodable_line_count = $capture.UndecodableLines
+            upstream_replacement_line_count = $capture.UpstreamReplacementLines
+            encoding_status = if ($capture.UpstreamReplacementLines -gt 0) { 'upstream_replacement_present' }
+                elseif ($capture.UndecodableLines -gt 0) { 'undecodable_bytes' }
+                elseif ($capture.FallbackLines -gt 0) { 'fallback_used' } else { 'strict_utf8' }
+        })
+        foreach ($line in ($capture.Text -split '\r?\n')) {
+            $item = [ordered]@{ stream = $stream.name }
+            $filename = $null
+            if ($line -cmatch '^(?:"(?<file>[^"\r\n]+)"|(?<file>[^()\r\n]+))\((?<line>[1-9][0-9]*)\)\s*:\s*(?<code>[CEFWM]05[0-9]{5})\b' -or
+                $line -cmatch '^(?<code>[CEFWM]05[0-9]{5})\s*:') {
+                $item.code = $Matches.code
+                $item.category = switch ($Matches.code[0]) {
+                    'C' { 'ccrx_internal' } 'E' { 'ccrx_error' } 'F' { 'ccrx_fatal' }
+                    'W' { 'ccrx_warning' } 'M' { 'ccrx_message' }
+                }
+                if ($Matches.ContainsKey('file')) {
+                    $filename = ($Matches.file -split '[\\/]')[-1]
+                    $lineNumber = 0
+                    if ([int]::TryParse($Matches.line, [ref]$lineNumber)) { $item.line = $lineNumber }
+                }
+                if ($item.category -in @('ccrx_internal', 'ccrx_error', 'ccrx_fatal')) { $failure = $true }
+            } elseif ($line -cmatch '^make(?:\[[0-9]+\])?: \*\*\* \[(?<target>[^\]\r\n]+)\] Error (?<number>[1-9][0-9]*)\s*$') {
+                $goal = ($Matches.target -split ':')[-1].Trim()
+                $item.category = if ($goal -ceq 'clean') { 'make_clean_error' } else { 'make_error' }
+                $number = 0
+                if ([int]::TryParse($Matches.number, [ref]$number)) { $item.error_number = $number }
+                $filename = ($goal -split '[\\/]')[-1]
+                if ($item.category -eq 'make_error') { $failure = $true }
+            } elseif ($line -cmatch '^make(?:\[[0-9]+\])?: \*\*\* No rule to make target [\x27\x60]clean[\x27\x60]\.\s+Stop\.\s*$') {
+                $item.category = 'make_clean_missing_rule'
+            } else { continue }
+            if ($filename -and $allowed.Contains($filename)) { $item.file = $filename }
+            [void]$diagnostics.Add($item)
+        }
+    }
+    return [ordered]@{
+        schema_version = 1
+        classification = if ($failure) { 'failed' } else { 'no_failure_diagnostic' }
+        streams = @($metadata.ToArray())
+        diagnostics = @($diagnostics.ToArray())
+    }
+}
+
 function Invoke-RxE2StudioBuild {
     [CmdletBinding()]
     param(
@@ -99,6 +227,12 @@ function Invoke-RxE2StudioBuild {
         [Parameter(Mandatory = $true)][string]$OutputLog,
         [ValidateRange(1, 2147483)][int]$TimeoutSeconds = 600,
         [string[]]$ExpectedOutputs = @(),
+        # Opt-in public projection. The ordinary OutputLog remains private.
+        [string]$DiagnosticSummaryPath,
+        [string[]]$PublicDiagnosticFileNames = @(),
+        # Zero reads the actual Windows ACP. An explicit page is a caller contract,
+        # e.g. 932 for a verified Japanese native tool, never a locale-name guess.
+        [ValidateRange(0, 65535)][int]$DiagnosticFallbackCodePage = 0,
         # Accepted for caller compatibility; timeouts never permit make fallback.
         [switch]$AllowTimeoutExitCode
     )
@@ -114,6 +248,30 @@ function Invoke-RxE2StudioBuild {
     $log = [IO.Path]::GetFullPath($OutputLog)
     [void](New-Item -ItemType Directory -Force -Path (Split-Path -Parent $log))
     $utf8 = [Text.UTF8Encoding]::new($false)
+    Initialize-RxBuildOutputCapture
+    $fallbackSource = if ($DiagnosticFallbackCodePage -eq 0) { 'windows_acp' } else { 'explicit' }
+    $fallbackCodePage = if ($DiagnosticFallbackCodePage -eq 0) { [int][RxBuildOutputCapture]::GetACP() } else { $DiagnosticFallbackCodePage }
+    $fallback = [Text.Encoding]::GetEncoding($fallbackCodePage, [Text.EncoderExceptionFallback]::new(), [Text.DecoderExceptionFallback]::new())
+    if ([string]::Join(',', $fallback.GetBytes("`r`n")) -ne '13,10') {
+        throw 'RX diagnostic fallback must preserve ASCII line boundaries.'
+    }
+    foreach ($name in $PublicDiagnosticFileNames) {
+        if ($name -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:c|h|s|src|asm|obj|o|lib|mot|abs|map)$' -or $name.Contains('..')) {
+            throw 'Public RX diagnostic filenames must be reviewed basenames with a supported source/output extension.'
+        }
+    }
+    $summaryPath = if ($DiagnosticSummaryPath) { [IO.Path]::GetFullPath($DiagnosticSummaryPath) } else { $null }
+    if ($summaryPath) {
+        if ([IO.Path]::GetExtension($summaryPath) -ine '.json' -or $summaryPath -ieq $log -or $summaryPath -in $ExpectedOutputs) {
+            throw 'RX diagnostic summary must use a separate JSON output path.'
+        }
+        foreach ($project in $ProjectPaths) {
+            $root = (Resolve-Path -LiteralPath $project -ErrorAction Stop).Path.TrimEnd('\', '/')
+            if ($summaryPath.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'RX diagnostic summary must stay outside project source inputs.'
+            }
+        }
+    }
 
     $importArguments = [Collections.Generic.List[string]]::new()
     $projectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -196,8 +354,8 @@ function Invoke-RxE2StudioBuild {
     [IO.File]::AppendAllText($log, '+ e2studio-cli ' + ($arguments -join ' ') + [Environment]::NewLine, $utf8)
     Write-Host "e2studio-cli headless import/build; output: $log"
     $process = [Diagnostics.Process]::Start($psi)
-    $stdout = $process.StandardOutput.ReadToEndAsync()
-    $stderr = $process.StandardError.ReadToEndAsync()
+    $stdout = [RxBuildOutputCapture]::ReadAsync($process.StandardOutput.BaseStream)
+    $stderr = [RxBuildOutputCapture]::ReadAsync($process.StandardError.BaseStream)
     $timedOut = -not $process.WaitForExit([int]$remainingMs)
     if ($timedOut) {
         try { $process.Kill($true) }
@@ -218,8 +376,20 @@ function Invoke-RxE2StudioBuild {
         [IO.File]::AppendAllText($log, 'Output drain timed out; make fallback is unsafe.' + [Environment]::NewLine, $utf8)
         throw "e2studio-cli output drain timed out after $TimeoutSeconds seconds; make fallback is unsafe. See $log"
     }
-    $text = [string]::Join([Environment]::NewLine, @($stdout.Result, $stderr.Result))
+    $stdout.Result.Decode($fallback)
+    $stderr.Result.Decode($fallback)
+    $text = [string]::Join([Environment]::NewLine, @($stdout.Result.Text, $stderr.Result.Text))
     [IO.File]::AppendAllText($log, $text + [Environment]::NewLine, $utf8)
+    if ($summaryPath) {
+        $summary = Get-RxBuildDiagnosticSummary -Streams @(
+            @{ name = 'stdout'; capture = $stdout.Result }, @{ name = 'stderr'; capture = $stderr.Result }
+        ) -PublicFileNames $PublicDiagnosticFileNames -FallbackCodePage $fallbackCodePage -FallbackSource $fallbackSource
+        [void](New-Item -ItemType Directory -Force -Path (Split-Path -Parent $summaryPath))
+        [IO.File]::WriteAllText($summaryPath, (ConvertTo-Json -InputObject $summary -Depth 5), $utf8)
+    }
+    if ($stdout.Result.LimitExceeded -or $stderr.Result.LimitExceeded) {
+        throw "e2studio-cli output exceeded the private capture limit; diagnostics are incomplete. See $log"
+    }
     & $captureMetadata 'after-headless-run'
     $afterState = Get-RxE2StudioProjectInputState -ProjectPaths $ProjectPaths `
         -BuildDirectories $buildDirectories -ExcludedPaths (@($log) + $expected)

@@ -131,4 +131,16 @@ void vLoggingPrintfInfo( const char * pcFormat,
 void vLoggingPrintfDebug( const char * pcFormat,
                           ... );
 
+/**
+ * @brief Format and enqueue a result, waiting for space in the existing FIFO.
+ *
+ * Task context only: scheduler running, no critical section or held resource
+ * needed by the logging task. Must not be called by the logging task or an ISR.
+ * All records preceding this one stay ahead of it in the FIFO. This confirms
+ * enqueueing, not physical UART delivery. Existing non-waiting APIs are unchanged.
+ *
+ * @return pdPASS when enqueued, pdFAIL if no message was enqueued.
+ */
+BaseType_t xLoggingPrintfWait(const char *pcFormat, ...);
+
 #endif /* AWS_LOGGING_TASK_H */

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import codecs
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
@@ -10,6 +11,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import queue
+import threading
 import sys
 import tempfile
 import time
@@ -17,6 +20,7 @@ import csv
 import io
 import re
 import shutil
+import stat
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -43,6 +47,12 @@ except ImportError:
 
 VERSION = "4.9.0"
 SUITE = "FRQ_2.5.0"
+NATIVE_STATUS_SECONDS = 3
+NATIVE_CONSOLE_PHASES = (
+    "IDT_UART_READY", "Copying source code", "Provisioning cloud resources",
+    "Creating EC2 instance", "Starting echo server", "Building source code",
+    "Building device image", "Flashing", "Cleaning up test resources", "IDT_UART_END_STATE",
+)
 SCOPE_GROUPS = {"preflight": "FreeRTOSVersion", "transport": "FullTransportInterfaceTLS",
                 "mqtt": "FullCloudIoT", "ota-mqtt": "OTADataplaneMQTT", "pkcs11": "FullPKCS11_Core",
                 "ota-pal": "OTACore"}
@@ -62,8 +72,10 @@ WSL = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32/wsl.exe"
 HOST: dict = {}
 try:
     from .public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_ENVIRONMENT_INPUTS
+    from .oidc_job import check_child_budget
 except ImportError:
     from public_signer_provision import ENVIRONMENT_INPUTS as PUBLIC_SIGNER_ENVIRONMENT_INPUTS
+    from oidc_job import check_child_budget
 PUBLIC_SIGNER_BOOTSTRAP_INPUTS = {variable: name for name, variable in PUBLIC_SIGNER_ENVIRONMENT_INPUTS.items()}
 
 
@@ -115,6 +127,9 @@ def write_json(path: Path, value: object) -> None:
 
 
 def restrict_runtime(path: Path) -> None:
+    if os.name == "posix":
+        os.chmod(path, 0o700)
+        return
     system32 = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32"
     identity = subprocess.check_output([str(system32 / "whoami.exe"), "/user", "/fo", "csv", "/nh"], encoding="utf-8", errors="replace")
     sid = next(csv.reader(io.StringIO(identity)))[1]
@@ -128,7 +143,7 @@ def restrict_runtime(path: Path) -> None:
 
 
 def git(*args: str) -> str:
-    return subprocess.check_output(["git", "--no-optional-locks", "-c", "safe.directory=" + str(SOURCE), "-C", str(SOURCE), *args], encoding="utf-8").strip()
+    return subprocess.check_output(["git", "--no-optional-locks", "-c", "safe.directory=" + str(SOURCE), "-C", str(SOURCE), *args], encoding="utf-8").rstrip("\r\n")
 
 
 def manifest_version() -> str:
@@ -325,16 +340,18 @@ def wsl_path(path: Path) -> str:
     return subprocess.check_output([str(WSL), "-d", HOST["wsl_distribution"], "--exec", "wslpath", "-a", "-u", str(path.resolve())], encoding="utf-8").strip()
 
 
-def stop_hardware_runtime(process, runtime, env, credentials):
-    """Let the owned Linux supervisor clean AWS and reset the board on interruption."""
-    command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"],
-               wsl_path(Path(__file__).with_name("stop_runtime.py")), "--source", wsl_path(SOURCE),
-               "--runtime", wsl_path(runtime / "execution")]
-    # Account for interruption during WSL/Python startup, before the supervisor
-    # is visible. This is bounded startup recovery, not device-command polling.
+def stop_hardware_runtime(process, runtime, env, credentials, *, drain):
+    """Signal the owned Linux supervisor; the existing stdout owner drains it."""
+    if env.get("IDT_HOST_MODE") == "linux-arm64":
+        command = [sys.executable, str(Path(__file__).with_name("stop_runtime.py")),
+                   "--source", str(SOURCE), "--runtime", str(runtime / "execution")]
+    else:
+        command = [str(WSL), "-d", HOST["wsl_distribution"], "--exec", HOST["wsl_python"],
+                   wsl_path(Path(__file__).with_name("stop_runtime.py")), "--source", wsl_path(SOURCE),
+                   "--runtime", wsl_path(runtime / "execution")]
+    # Startup recovery is bounded. Launcher exit does not prove that its Linux
+    # supervisor or descendants have stopped, so always try the exact selector.
     for attempt in range(3):
-        if process.poll() is not None:
-            break
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20)
         if result.returncode != 0:
             raise RuntimeError("Could not signal the owned IDT supervisor")
@@ -342,15 +359,200 @@ def stop_hardware_runtime(process, runtime, env, credentials):
             break
         if attempt < 2:
             time.sleep(1)
+    # Never call communicate() here: it would compete with the reader thread.
+    drain(time.monotonic() + owned_runtime_cleanup_seconds(NATIVE_CLEANUP_SECONDS))
+
+
+def native_output_events(process):
+    """One reader owns stdout on Windows and POSIX, independent of newlines."""
+    if process.stdout is None:
+        raise RuntimeError("Native process must provide an output pipe")
+    events = queue.Queue()
+
+    def read_output():
+        try:
+            # read1 performs one underlying read and returns available bytes;
+            # BufferedReader.read(n) can wait for the entire buffer to fill.
+            read = getattr(process.stdout, "read1", None) or process.stdout.read
+            while True:
+                chunk = read(8192)
+                if not chunk:
+                    process.stdout.close()
+                    events.put(("eof", None))
+                    return
+                events.put(("data", chunk))
+        except Exception:
+            # Do not publish arbitrary I/O exception text or mark a failed
+            # read as a verified EOF. Keep the journal until explicit review.
+            events.put(("error", None))
+
+    reader = threading.Thread(target=read_output, name="idt-native-console", daemon=True)
+    reader.start()
+    return events, reader
+
+
+def observe_hardware_runtime(process, runtime, env, credentials, console):
+    """Stream complete redacted lines while supervising the owned native run."""
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    pending = ""
+    events = reader = None
+    eof = read_failed = False
+    next_status = time.monotonic() + NATIVE_STATUS_SECONDS
+    process._idt_output_drain_complete = False
+
+    def capture(chunk, *, final=False):
+        nonlocal pending, next_status
+        pending += decoder.decode(chunk, final=final)
+        lines = pending.splitlines(keepends=True)
+        pending = ""
+        if not final and lines and not lines[-1].endswith(("\r", "\n")):
+            pending = lines.pop()
+        for line in lines:
+            console.write(redact(line, credentials))
+            for phase in NATIVE_CONSOLE_PHASES:
+                if phase in line:
+                    print("IDT phase: " + phase, flush=True)
+                    next_status = time.monotonic() + NATIVE_STATUS_SECONDS
+                    break
+        console.flush()
+
+    def drain(deadline=None):
+        nonlocal eof, read_failed, next_status
+        while True:
+            now = time.monotonic()
+            if deadline is not None and now >= deadline:
+                raise RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse")
+            if events is None or read_failed:
+                raise RuntimeError("Native output could not be drained; retain the runtime journal")
+            if now >= next_status:
+                status = "owned runtime cleanup active" if deadline is not None else "native runtime active"
+                print("IDT phase: " + status, flush=True)
+                next_status = now + NATIVE_STATUS_SECONDS
+            wait_seconds = max(0.001, next_status - now)
+            if deadline is not None:
+                wait_seconds = min(wait_seconds, deadline - now)
+            if eof:
+                try:
+                    code = process.wait(timeout=wait_seconds)
+                except subprocess.TimeoutExpired:
+                    continue
+                capture(b"", final=True)
+                reader.join(timeout=0)
+                process._idt_output_drain_complete = True
+                return code
+            try:
+                kind, payload = events.get(timeout=wait_seconds)
+            except queue.Empty:
+                if deadline is None and process.poll() is not None:
+                    raise RuntimeError("Native process exited without closing its output pipe") from None
+                continue
+            if kind == "data":
+                capture(payload)
+            elif kind == "eof":
+                eof = True
+            else:
+                read_failed = True
+                raise RuntimeError("Native output could not be drained; retain the runtime journal")
+
     try:
-        remaining, _ = process.communicate(timeout=owned_runtime_cleanup_seconds(NATIVE_CLEANUP_SECONDS))
-    except subprocess.TimeoutExpired:
-        # Killing wsl.exe alone would abandon the Linux SDK and bench helper.
-        # Keep the ownership journal and fail rather than delete live signers.
-        raise RuntimeError("Owned IDT cleanup did not finish; inspect the private runtime before reuse") from None
-    if remaining:
-        with (runtime / "console.log").open("a", encoding="utf-8") as stream:
-            stream.write(redact(remaining, credentials))
+        events, reader = native_output_events(process)
+        return drain()
+    except BaseException:
+        if process._idt_output_drain_complete is not True:
+            stop_hardware_runtime(process, runtime, env, credentials, drain=drain)
+        raise
+
+
+def cleanup_signers_after_runtime(process, inputs, signer_session):
+    """Retain the signer journal when a native process or output drain is unfinished."""
+    try:
+        from .ota_aws_signers import cleanup_aws_signers
+    except ImportError:
+        from ota_aws_signers import cleanup_aws_signers
+    try:
+        if process is not None and (process.poll() is None or
+                                    process.stdout is None or not process.stdout.closed or
+                                    getattr(process, "_idt_output_drain_complete", None) is False):
+            raise RuntimeError("IDT must finish its native cleanup and output drain before signer deletion")
+        journal = cleanup_aws_signers(inputs, signer_session)
+        return {"state": journal["state"], "certificates": len(journal["certificates"]),
+                "certificates_deleted": sum(bool(item.get("deleted")) for item in journal["certificates"])}
+    except Exception as error:
+        return {"state": "cleanup_failed", "error_type": type(error).__name__}
+
+
+def transport_userdata() -> dict:
+    return {"freeRTOSVersion": manifest_version(), "retainModifiedSourceDirectories": True,
+            "freeRTOSTestParamConfigPath": "{{testData.sourcePath}}/Test/include/test_param_config.h",
+            "freeRTOSTestExecutionConfigPath": "{{testData.sourcePath}}/Test/include/test_execution_config.h",
+            "buildTool": {"name": "CC-RX/e2studio", "version": "3.07.00/2026-04.2", "command": []},
+            "flashTool": {"name": "rfp-cli", "version": "1.15", "command": []},
+            "testStartDelayms": 0, "echoServerConfiguration": {"keyGenerationMethod": "EC", "serverPort": 9000}}
+
+
+def copy_linux_bundle(source: Path, runtime: Path) -> Path:
+    """Keep each run's writable IDT installation inside its private runtime."""
+    verify_install(source, "linux")
+    destination = runtime / "vendor-idt"
+    shutil.copytree(source, destination)
+    # The installed bundle may be read-only.  Only the private copy becomes
+    # writable; retain executable bits needed by the unchanged vendor suite.
+    for directory, _subdirs, files in os.walk(destination):
+        path = Path(directory)
+        path.chmod(stat.S_IMODE(path.stat().st_mode) | stat.S_IRWXU)
+        for name in files:
+            file = path / name
+            file.chmod(stat.S_IMODE(file.stat().st_mode) | stat.S_IRUSR | stat.S_IWUSR)
+    verify_install(destination, "linux")
+    return destination
+
+
+def transport_linux(runtime: Path, region: str, credentials, provenance: dict, target: dict) -> tuple[Path, int]:
+    """Launch the unchanged vendor suite on Linux; the build callback is supplied separately."""
+    if target["id"] != "rx72n-ethernet" or os.environ.get("IDT_HOST_MODE") != "linux-arm64":
+        raise RuntimeError("Linux native transport requires RX72N Ethernet")
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives import serialization
+
+    source_root = Path(os.environ["IDT_LINUX_IDT_ROOT"]).resolve(strict=True)
+    root = copy_linux_bundle(source_root, runtime)
+    binary = root / "bin/devicetester_linux_x86-64"
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        raise RuntimeError("Verified Linux IDT executable is unavailable")
+    inputs = runtime / "inputs"
+    inputs.mkdir()
+    bootstrap = public_signer_bootstrap_environment(inputs, provenance["source_sha"], target)
+    private_path = inputs / "transport-private.pem"
+    public_path = inputs / "transport-public.hex"
+    key = ec.generate_private_key(ec.SECP256R1())
+    private_path.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                               serialization.NoEncryption()))
+    os.chmod(private_path, 0o600)
+    public_path.write_text(key.public_key().public_bytes(serialization.Encoding.DER,
+                           serialization.PublicFormat.SubjectPublicKeyInfo).hex(), encoding="ascii")
+    provenance_file = runtime / "source-provenance.json"
+    write_json(provenance_file, provenance)
+    write_json(inputs / "device.json", device_template(target, "transport", str(public_path)))
+    write_json(inputs / "userdata.json", transport_userdata())
+    execution = runtime / "execution"
+    env = os.environ.copy()
+    env.update(IDT_RUNTIME_DIR=str(execution), IDT_PRIVATE_KEY_FILE=str(private_path),
+               IDT_PROVENANCE_FILE=str(provenance_file), IDT_SCOPE="transport", IDT_TARGET=target["id"],
+               IDT_SOURCE_SHA=provenance["source_sha"], IDT_LINUX_PYTHON=sys.executable,
+               AWS_REGION=region, AWS_DEFAULT_REGION=region, **bootstrap)
+    command = [sys.executable, str(Path(__file__).with_name("run_transport.py")),
+               "--source-path", str(SOURCE), "--idt-root", str(root), "--output", str(execution),
+               "--userdata-template", str(inputs / "userdata.json"), "--device-template", str(inputs / "device.json"),
+               "--region", region, "--group", SCOPE_GROUPS["transport"], "--target", target["id"],
+               "--cleanup-timeout-seconds", str(NATIVE_CLEANUP_SECONDS)]
+    check_child_budget(env)
+    with (runtime / "console.log").open("w", encoding="utf-8") as console:
+        process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        code = observe_hardware_runtime(process, runtime, env, credentials, console)
+    reports = list((execution / "results").rglob("FRQ_Report.xml"))
+    if len(reports) != 1:
+        raise RuntimeError("IDT run did not produce exactly one JUnit report; inspect restricted runtime diagnostics")
+    return reports[0], code
 
 
 def transport(runtime: Path, region: str, credentials, provenance: dict, scope: str = "transport",
@@ -460,9 +662,9 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
         if scope == "ota-mqtt":
             import boto3
             try:
-                from .ota_aws_signers import prepare_aws_signers, cleanup_aws_signers
+                from .ota_aws_signers import prepare_aws_signers
             except ImportError:
-                from ota_aws_signers import prepare_aws_signers, cleanup_aws_signers
+                from ota_aws_signers import prepare_aws_signers
             signer_session = boto3.Session(aws_access_key_id=credentials.access_key,
                                            aws_secret_access_key=credentials.secret_key,
                                            aws_session_token=credentials.token, region_name=region)
@@ -471,35 +673,12 @@ def transport(runtime: Path, region: str, credentials, provenance: dict, scope: 
             write_json(inputs / "userdata.json", userdata)
             print("IDT phase: temporary AWS signing certificates prepared", flush=True)
         with (runtime / "console.log").open("w", encoding="utf-8") as console:
-            process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                       encoding="utf-8", errors="replace")
-            for line in process.stdout:
-                line = redact(line, credentials)
-                console.write(line)
-                console.flush()
-                # Keep the unrestricted raw log local, while CI shows phase progress.
-                for phase in ("IDT_UART_READY", "Copying source code", "Provisioning cloud resources",
-                              "Creating EC2 instance", "Starting echo server", "Building source code",
-                              "Building device image", "Flashing", "Cleaning up test resources", "IDT_UART_END_STATE"):
-                    if phase in line:
-                        print("IDT phase: " + phase, flush=True)
-                        break
-            code = process.wait()
-    except BaseException:
-        if process is not None and process.poll() is None:
-            stop_hardware_runtime(process, runtime, env, credentials)
-        raise
+            process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            code = observe_hardware_runtime(process, runtime, env, credentials, console)
     finally:
         if signer_session is not None:
-            try:
-                if process is not None and process.poll() is None:
-                    raise RuntimeError("IDT must finish its native cleanup before signer deletion")
-                journal = cleanup_aws_signers(inputs, signer_session)
-                status = {"state": journal["state"], "certificates": len(journal["certificates"]),
-                          "certificates_deleted": sum(bool(item.get("deleted")) for item in journal["certificates"])}
-            except Exception as error:
-                cleanup_failed = True
-                status = {"state": "cleanup_failed", "error_type": type(error).__name__}
+            status = cleanup_signers_after_runtime(process, inputs, signer_session)
+            cleanup_failed = status["state"] == "cleanup_failed"
             write_json(runtime / "ota-signers-cleanup.json", status)
             print("IDT phase: temporary signer cleanup " + status["state"], flush=True)
     if cleanup_failed:
@@ -561,12 +740,25 @@ def main() -> int:
         write_json(args.output / "plan.json", plan)
         print(json.dumps(plan, sort_keys=True))
         return 0
-    if os.name != "nt":
+    native_linux = os.environ.get("IDT_HOST_MODE") == "linux-arm64"
+    if native_linux:
+        if (sys.platform != "linux" or os.environ.get("CI", "").lower() != "true"
+                or not os.environ.get("RX_OIDC_EXPIRATION_UTC") or args.target != "rx72n-ethernet"
+                or args.scope != "transport" or args.region != "ap-northeast-1"):
+            parser.error("native Linux entry is restricted to the reviewed RX72N Transport CI")
+        check_child_budget(os.environ, before_run=True)
+    elif os.name != "nt":
         parser.error("Run this entry point on the Windows CC-RX/AWS runner")
     if args.scope in {"transport", "mqtt", "ota-mqtt"}:
         network_values(target)
-    HOST = load_host_profile()
-    INSTALL, RUNTIME = Path(HOST["install_root"]), Path(HOST["runtime_root"])
+    if native_linux:
+        RUNTIME = Path(os.environ["IDT_LINUX_RUNTIME_ROOT"]).resolve(strict=True)
+        source = SOURCE.resolve(strict=True)
+        if not RUNTIME.is_dir() or RUNTIME == source or source in RUNTIME.parents:
+            parser.error("native Linux runtime must be outside the source checkout")
+    else:
+        HOST = load_host_profile()
+        INSTALL, RUNTIME = Path(HOST["install_root"]), Path(HOST["runtime_root"])
     args.output.mkdir(parents=True, exist_ok=True)
     RUNTIME.mkdir(parents=True, exist_ok=True)
     runtime = Path(tempfile.mkdtemp(prefix="run-", dir=RUNTIME))
@@ -602,7 +794,10 @@ def main() -> int:
                 "manifest_sha256": hashlib.sha256(json.dumps(provenance["dependency_files_sha256"], sort_keys=True,
                                                              separators=(",", ":")).encode()).hexdigest(),
             }
-            report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id, args.diagnostic_only, target)
+            if native_linux:
+                report, idt_code = transport_linux(runtime, args.region, credentials, provenance, target)
+            else:
+                report, idt_code = transport(runtime, args.region, credentials, provenance, args.scope, args.test_id, args.diagnostic_only, target)
         else:
             report, idt_code = preflight(runtime, args.region, credentials, target)
     except (Exception, KeyboardInterrupt) as error:
@@ -662,6 +857,9 @@ def main() -> int:
             summary["passed"] = False
             summary["problems"].append("Private UART capture is missing or incomplete")
         manifests = list((runtime / "execution").rglob("build_manifest.json"))
+        if native_linux and len(manifests) != 1:
+            summary["passed"] = False
+            summary["problems"].append("Native RX72N Transport requires exactly one build manifest")
         ledger = runtime / "execution/ota-build-ledger.jsonl"
         if ledger.is_file():
             metadata["ota_builds"] = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -698,6 +896,10 @@ def main() -> int:
             if build.get("target_id") != target["id"] or build.get("target_sha256") != target_fingerprint(target):
                 summary["passed"] = False
                 summary["problems"].append("Firmware target provenance differs from this run")
+            if native_linux and (build.get("source_sha") != metadata["source_sha"] or
+                                 build.get("source_tree_dirty") != metadata["source_dirty"]):
+                summary["passed"] = False
+                summary["problems"].append("Firmware source provenance differs from this run")
             metadata["builds"].append({
                 "target_id": build.get("target_id"),
                 "target_sha256": build.get("target_sha256"),

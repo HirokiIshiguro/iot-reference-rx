@@ -357,12 +357,13 @@
             <Setting id="SCI_CFG_CH11_RX_DMACA_CH_NUM" value="1"/>
             <Setting id="SCI_CFG_CH2_TX_SIGNAL_TRANSITION_TIMING_INCLUDED" value="0"/>
         </Segment>
-        <Segment component="r_flash_rx5.30" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_flash_rx5.31.saffti-custom.1" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_BGO" value="1"/>
+            <Setting id="FLASH_CFG_FCU_EN_NESTED_INT" value="1"/>
         </Segment>
     </Segment>
 </QE>

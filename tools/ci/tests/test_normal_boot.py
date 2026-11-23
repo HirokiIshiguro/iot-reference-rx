@@ -92,13 +92,16 @@ class NormalBootTests(unittest.TestCase):
         self.assertTrue(receipt["end_state"]["reset_command_exit_zero"])
         self.assertTrue(receipt["end_state"]["fresh_uart_quiet_1s"])
 
-    def test_reset_only_retains_owner_when_reset_fails_without_opening_uart(self):
-        target, commands, _, _, serial, prepare, download = self.reset_only_transaction(return_code=7)
+    def test_reset_only_retains_owner_and_closes_uart_when_reset_fails(self):
+        target, commands, _, observer, serial, prepare, download = self.reset_only_transaction(return_code=7)
         with self.assertRaisesRegex(RuntimeError, "did not return success"):
             installer.install(self.root, target, SOURCE_SHA, reset_only=True)
         self.assertEqual(1, len(commands))
         self.assertTrue(Path(target["owner_file"]).exists())
-        serial.assert_not_called()
+        serial.assert_called_once()
+        serial.return_value.__exit__.assert_called_once()
+        observer.reset_input_buffer.assert_not_called()
+        observer.read.assert_not_called()
         prepare.assert_not_called()
         download.assert_not_called()
 
@@ -111,6 +114,63 @@ class NormalBootTests(unittest.TestCase):
         self.assertTrue(Path(target["owner_file"]).exists())
         prepare.assert_not_called()
         download.assert_not_called()
+
+    def test_reset_observer_does_not_reopen_a_transport_with_delayed_rx(self):
+        """A late open can expose queued bridge RX after the input flush."""
+        state = {"open": False, "late_open": False, "reset": False, "pending": False}
+        class Observer:
+            in_waiting = 0
+            def __enter__(self):
+                state["open"] = True
+                state["late_open"] = state["reset"]
+                return self
+            def __exit__(self, *_):
+                state["open"] = False
+            def reset_input_buffer(self):
+                # A bridge that was not receiving during reset can deliver
+                # queued bytes after a host-side input flush.
+                state["pending"] = state["late_open"]
+            def read(self, _):
+                data = b"queued RX" if state["pending"] else b""
+                state["pending"] = False
+                return data
+        def reset(command, **_):
+            state["reset"] = True
+            return subprocess.CompletedProcess(command, 0)
+        clock = itertools.count(step=0.1)
+        with patch("serial.Serial", return_value=Observer()), \
+                patch.object(installer.time, "monotonic", side_effect=lambda: next(clock)):
+            receipt = installer.reset_and_quiet(get_target("rx671-wifi"), reset, Mock())
+        self.assertTrue(receipt["fresh_uart_quiet_1s"])
+        self.assertFalse(state["late_open"])
+        self.assertFalse(state["open"])
+
+    def test_uart_open_failure_still_attempts_one_stop_reset_and_retains_owner(self):
+        target, commands, _, _, serial, _, _ = self.reset_only_transaction()
+        serial.side_effect = OSError("synthetic observer unavailable")
+        with self.assertRaisesRegex(OSError, "synthetic observer unavailable"):
+            installer.install(self.root, target, SOURCE_SHA, reset_only=True)
+        self.assertEqual(1, len(commands))
+        self.assertIn("-reset", commands[0])
+        self.assertTrue(Path(target["owner_file"]).exists())
+
+    def test_uart_open_failure_reports_a_failed_stop_reset(self):
+        target, commands, _, _, serial, _, _ = self.reset_only_transaction(return_code=7)
+        serial.side_effect = OSError("synthetic observer unavailable")
+        with self.assertRaisesRegex(RuntimeError, "did not return success") as raised:
+            installer.install(self.root, target, SOURCE_SHA, reset_only=True)
+        self.assertIsInstance(raised.exception.__context__, OSError)
+        self.assertEqual(1, len(commands))
+        self.assertTrue(Path(target["owner_file"]).exists())
+
+    def test_owner_refusal_precedes_uart_open_and_reset(self):
+        command = Mock()
+        with patch("serial.Serial") as serial:
+            with self.assertRaisesRegex(RuntimeError, "synthetic owner changed"):
+                installer.reset_and_quiet(get_target("rx671-wifi"), command,
+                                          Mock(side_effect=RuntimeError("synthetic owner changed")))
+        serial.assert_not_called()
+        command.assert_not_called()
 
     def test_reset_only_still_rejects_tampered_signed_bundle_before_hardware_io(self):
         root, fixture, _ = self.bundle()
@@ -282,12 +342,16 @@ class NormalBootTests(unittest.TestCase):
         call.assert_not_called()
         self.assertEqual("preserve",blocked.read_text())
 
-    def test_failed_reset_cannot_claim_zero_exit_or_open_uart_observer(self):
-        with patch("serial.Serial") as observer:
+    def test_failed_reset_cannot_claim_zero_exit_or_observe_a_quiet_interval(self):
+        with patch("serial.Serial") as serial:
             with self.assertRaisesRegex(RuntimeError,"did not return success"):
                 installer.reset_and_quiet(get_target("rx671-wifi"),
                     Mock(return_value=subprocess.CompletedProcess([],7)),Mock())
-        observer.assert_not_called()
+        serial.assert_called_once()
+        serial.return_value.__exit__.assert_called_once()
+        observer = serial.return_value.__enter__.return_value
+        observer.reset_input_buffer.assert_not_called()
+        observer.read.assert_not_called()
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Real inherited flock evidence requires Linux")
     def test_real_fdinfo_distinguishes_owned_descriptor_from_same_inode_without_lock(self):

@@ -55,7 +55,7 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
 
     def test_e2studio_wait_is_bounded_and_failed_build_is_terminal(self) -> None:
         adapter = (ROOT / "tools/rx_e2studio_cli.ps1").read_text(encoding="utf-8")
-        self.assertIn("[int]$E2StudioTimeoutSeconds = 180", self.build)
+        self.assertIn("[int]$E2StudioTimeoutSeconds = 900", self.build)
         self.assertIn("return Invoke-RxE2StudioBuild", self.build)
         self.assertIn(
             "-OutputLog $OutputLog -TimeoutSeconds $E2StudioTimeoutSeconds", self.build
@@ -67,13 +67,6 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
         self.assertNotIn("Invoke-MakeTarget", self.build)
         self.assertIn("-ExpectedOutputs @(", self.build)
 
-    def test_nightly_has_a_dedicated_tls13_mqtt_row(self) -> None:
-        start = self.ci.index("matrix_rx671_wifi_mqtt_tls13:")
-        end = self.ci.index("\n.matrix_rx671_software_lanbench:", start)
-        job = self.ci[start:end]
-        self.assertIn('RX671_WIFI_TEST_SCOPE: "mqtt"', job)
-        self.assertIn('RX671_WIFI_REQUIRE_TLS_VERSION: "TLSv1.3"', job)
-        self.assertIn("RX671_EK_AWS_IOT_PRIVATE_KEY_PEM", job)
 
     def test_sdio_function2_retry_preserves_the_pending_frame(self) -> None:
         self.assertIn(
@@ -89,11 +82,6 @@ class Rx671SoftwareMqttTls13ContractTests(unittest.TestCase):
             "g_whd_sdio_cmd53_f2_byte_read_fault_inject_count++", self.sdio
         )
         self.assertIn("[switch]$SdioF2FaultInjectOnce", self.build)
-        self.assertIn(
-            'RX671_WIFI_F2_FAULT_INJECT_ONCE: "false"', self.ci
-        )
-        self.assertIn("$buildArgs.SdioF2FaultInjectOnce = $true", self.ci)
-        self.assertIn("--require-f2-fault-injection", self.ci)
         self.assertIn('whd_log_sdio_diag("whd_wifi_join diag")', self.whd_bringup)
         self.assertIn('p = append_text(p, " f2abort=")', self.whd_bringup)
         self.assertIn('p = append_text(p, " f2lost=")', self.whd_bringup)

@@ -24,6 +24,23 @@ ROOT = Path(__file__).resolve().parents[3]
 PROJECT = ROOT / builder.PROJECT_RELATIVE
 
 
+class FailedBuildDiagnosticsTests(unittest.TestCase):
+    def test_copies_selected_project_map_and_linker_commands(self) -> None:
+        for name in ("aws_wifi_rx671_ek", "aws_wifi_rx671_ek_tsip"):
+            with self.subTest(project=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                project = root / name / "e2studio_ccrx"
+                debug = project / "HardwareDebug"
+                debug.mkdir(parents=True)
+                names = (f"{name}.map", f"Linker{name}.tmp", "LinkerSubCommand.tmp", "makefile")
+                for filename in names:
+                    (debug / filename).write_text(filename, encoding="utf-8")
+                artifact = root / "artifacts"
+                builder._copy_failed_build_diagnostics(project, artifact)
+                for filename in names:
+                    self.assertEqual(filename, (artifact / "failed-build-diagnostics" / filename).read_text(encoding="utf-8"))
+
+
 class VersionTests(unittest.TestCase):
     def test_accepts_fwup_version_domain(self) -> None:
         version = builder.parse_version("255.254.65535")
@@ -83,7 +100,7 @@ class ProfileTests(unittest.TestCase):
             result,
         )
         self.assertIn(
-            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=208"', result
+            'value="-define=RX671_FREERTOS_HEAP_SIZE_KB=224"', result
         )
         self.assertIn(
             'value="-define=RX671_NETWORK_BUFFER_DESCRIPTORS=24"', result
@@ -106,7 +123,7 @@ class ProfileTests(unittest.TestCase):
             'value="-define=OTA_MAX_NUM_DATA_BUFFERS=2"', result
         )
         self.assertIn(
-            'value="-define=OTA_MAX_NUM_FILE_BLOCKS=192"', result
+            'value="-define=OTA_MAX_NUM_FILE_BLOCKS=240"', result
         )
         self.assertIn(
             'value="-define=WHD_PORT_BUFFER_COUNT=8"', result
@@ -124,7 +141,7 @@ class ProfileTests(unittest.TestCase):
             "TYPE1YN_FW_BLOB,TYPE1YN_NVRAM_BLOB,TYPE1YN_CLM_BLOB/0FFF00300",
             result,
         )
-        self.assertIn("EXCEPTVECT/0FFFBFF80,RESETVECT/0FFFBFFFC", result)
+        self.assertIn("EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC", result)
 
     def test_tls13_profile_selects_only_the_tls13_define(self) -> None:
         result = builder.make_ota_cproject(
@@ -158,7 +175,7 @@ class ProfileTests(unittest.TestCase):
                     "#define BSP_CFG_CODE_FLASH_BANK_MODE    (1)", result
                 )
         fwup = builder.make_ota_fwup_config(self.fwup)
-        self.assertRegex(fwup, r"#define\s+RX_OTA_CFG_AREA_SIZE\s+\(0x0*C0000U\)")
+        self.assertRegex(fwup, r"#define\s+RX_OTA_CFG_AREA_SIZE\s+\(0x0*F0000U\)")
 
     def test_profile_restores_files_after_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

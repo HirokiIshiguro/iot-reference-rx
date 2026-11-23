@@ -34,6 +34,9 @@ Configuration Options
 /* The interrupt priority level to be used for CMT interrupts. */
 #define CMT_RX_CFG_IPR         (5)
 
+/* Let SCI7 preempt the LCD refresh callback during firmware reception. */
+#define CMT_CFG_CH0_EN_NESTED_INT (1)
+
 /* Reserve software trace timer channel(CMT1). */
 #define _RI_TRACE_TIMER 1
 

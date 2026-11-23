@@ -603,16 +603,7 @@ Step 8 の完了判定:
 - `main` ブランチは protected。直接 push 不可
 - ブランチを切って MR 経由でマージ
 - MR は `Draft:` プレフィックス付きで作成、assignee: @HirokiIshiguro
-- コミット author:
-
-| Operator | git author |
-|----------|-----------|
-| HirokiIshiguro（人間） | `HirokiIshiguro <ishiguro.hiroki@globe.ocn.ne.jp>` |
-| Claude Code | `Claude Code <claude-code@noreply.anthropic.com>` |
-
-```bash
-git commit --author="Claude Code <claude-code@noreply.anthropic.com>" -m "..."
-```
+- コミット author: [コミット author の対応表](https://gitlab.saffti.jp/oss/claude-codex-gemini-index/-/blob/main/docs/development/commit-author.md) のとおり
 
 ## Related Projects / 関連プロジェクト
 
@@ -788,7 +779,7 @@ SC 再生成後は **必ず** `.cproject` の `-start` オプションで上記�
   batch parse error を起こしていたため、前提チェックを単純な `goto` 形式へ修正
 - さらに host 環境では `flash.bat` が Step 1 後に復帰してしまう症状が残ったため、
   現在は `flash.bat` を薄い wrapper にし、実処理は `tools/flash.ps1` で順次実行する
-  - 詳細ログと実行コマンドは `docs/ja/step7_4_ota_attempt.md`
+  - 詳細ログと実行コマンドは `docs/details/records/step7_4_ota_attempt.md`
   - 次の論点は `OBE110020` で app path を再試行し、`test_mqtt.py` と provisioning へ戻すこと
 
 ### 2026-03-08: Step 7-4 final rerun — OTA happy path success

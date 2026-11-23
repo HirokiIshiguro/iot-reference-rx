@@ -1,0 +1,203 @@
+# TSIP連携取り込み計画
+
+## 目的
+
+RX72N Envision Kit と CK-RX65N + BG96 のリファレンスアプリで、TLS backend を
+ビルド時に選択できるようにする。
+
+- software mbedTLS / PKCS #11
+- TSIP連携 mbedTLS / TSIP鍵素材
+
+ブートローダは共有のままとし、アプリケーション側だけ backend 別の e2 studio
+プロジェクトに分ける。これにより、e2 studio 利用者がプロジェクト選択だけで
+システム構成を把握でき、CIで `.cproject` を都度書き換える必要もなくなる。
+
+## プロジェクト構成
+
+アプリケーションプロジェクトは次の4種へ増やす。
+
+| Board | Connectivity | Software TLS | TSIP TLS |
+|-------|--------------|--------------|----------|
+| RX72N Envision Kit | Ethernet | `Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/` | `Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/` |
+| CK-RX65N V1 | BG96 cellular | `Projects/aws_bg96_ck_rx65n/e2studio_ccrx/` | `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` |
+
+ブートローダプロジェクトは変更しない。
+
+- `Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/`
+- `Projects/boot_loader_ck_rx65n/e2studio_ccrx/`
+
+ただし、ブートローダ実装そのものは次の共通ブートローダプロジェクトを
+Git submoduleとして参照する構成へ寄せる。
+
+`https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/bootloader/submodule`
+
+アプリケーション側はTSIP有無で4プロジェクトへ分けるが、ブートローダは
+TSIP有無では分けない。RX72N / RX65N のボード差分だけを保ち、OTA署名検証や
+dual bank制御の実装は共通ブートローダsubmoduleへ集約する。
+
+## 共通プロビジョニング方針
+
+クレデンシャルのプロビジョニング方式は software TLS / TSIP TLS で共通化する。
+どちらも、デバイス秘密情報をアプリケーションイメージへビルド時に埋め込まず、
+UART CLI経由でデバイスローカルストレージへ投入する。
+
+software TLSでは平文のAWS IoT接続情報を投入する。
+
+- AWS IoT endpoint
+- thing name
+- Root CA
+- client certificate
+- client private key PEM
+
+TSIP TLSでは、同じ非秘密メタデータに加えてTSIP用wrapped素材を投入する。
+
+- AWS IoT endpoint
+- thing name
+- Root CA / TSIP検証に必要なRoot CA signer metadata
+- client certificate
+- TSIP wrapped Root CA signer public key blob
+- TSIP wrapped client public key blob
+- TSIP wrapped client private key blob
+- デバイス上で生成したTSIP KeyIndexレコード
+
+ホスト側スクリプトとデバイス側CLIは、可能な限り同じコマンドフローに揃える。
+backendの違いは、投入するpayload形式と最後のprepare処理だけに閉じ込める。
+
+RX65N/BG96とRX72NのLittleFSはData Flashの`0x00100000`から16 KiBを使う。
+software/TSIP app、Smart Configurator設定、bootloader、公開signer provisionerで
+同じ領域を共有し、署名信頼情報とTSIP素材・KeyIndexの同時保存量を確保する。
+旧8 KiBの端末ではappだけをOTA更新せず、bootloaderとappをそろえて書き直し、
+署名信頼情報・資格情報を再投入する。CIは全消去・再導入で検証する。
+RX72Nの追加rootca-derを使う構成も同じ領域を使い、appとbootloaderを揃える。
+RX671の既存8 KiB領域は維持する。
+
+## TSIP実装の参照元
+
+初期実装は次のTSIPベンチマークプロジェクトをベースにする。
+
+`https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls`
+
+再利用する主な部品は以下。
+
+- `Middleware/3rdparty/mbedtls_with_TSIP/` のTSIP版Mbed TLS
+- `Middleware/network_transport/using_mbedtls_pkcs11_with_tsip/` のTSIP版TLS transport
+- `aws_mbedtls_config_with_tsip.h`
+- `Demos/key_flash_wr_with_tsip/` のTSIP鍵書き込み補助
+- TSIPベンチマーク側のUART provisioning store / CLIモデル
+- CIホスト側のTSIP provisioningフロー
+
+通常版transportとTSIP版transportは同じtransport APIシンボルを提供するため、
+同一アプリケーション構成へ同時リンクしない。
+
+## CI設定
+
+CIではsoftware TLSをデフォルトとし、TSIPは明示的なpipeline variableで選択する。
+候補名は以下。
+
+- `RX72N_TLS_BACKEND=software|tsip`
+- `RX65N_BG96_TLS_BACKEND=software|tsip`
+
+通常のpipelineでは両方とも`software`を使う。TSIP確認時はpipeline variableで
+`tsip`を指定し、同じbuild scriptが対応するTSIP版e2 studioプロジェクトを
+import/buildする。後段ジョブが使うRSU/artifact名は従来名へ正規化し、通常版と
+TSIP版の切り替えをbuild profileの差分に閉じ込める。
+
+TSIP jobではruntime provisioning payload用のmasked CI/CD Variablesを追加で要求する。
+software TLS jobでは既存のAWS IoT証明書・秘密鍵変数を継続利用する。
+
+TSIP実機provisioningは次の2段に分ける。
+
+1. 既存CLIでAWS IoT endpoint / thing name / client certificate / OTA code
+   signer certificateを投入する。このときclient private key PEMは投入しない。
+2. `tools/provision_tsip_over_uart.py` で `tsipprov` CLIへTSIP素材を投入し、
+   `tsipprov prepare` でデバイス上のKeyIndexを生成する。
+
+Root CA signature、Root signer public key、client public key、client private keyの
+runtime provisioning payloadはGitには置かず、masked CI/CD Variablesまたは
+初期セットアップ時に指定するローカルファイルから読む。CIではこれらを
+`tools/provision_tsip_over_uart.py` でUART経由投入し、デバイス上でKeyIndexを生成する。
+
+RX72Nで既定参照するmasked variables:
+
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX`
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PRIVATE_HEX`
+
+RX65N/BG96で既定参照するmasked variables:
+
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX`
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_SIGNER_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PUBLIC_HEX`
+- `RENESAS_RX65N_SECURITY_IP_PROVISION_BLOB_TLS_CLIENT_RSA2048_PRIVATE_HEX`
+
+RX65N/BG96のTSIP経路では、AWS IoT証明書はwrapped client private keyと対応している
+必要がある。そのため、software経路で使う一時的なdynamic AWS IoT credentialsは
+TSIP経路では使わない。TSIP経路は静的なthing name / client certificateとmasked
+TSIP blobの組み合わせで検証する。
+
+## 実装メモ
+
+- `Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx/` は共有
+  `Demos/` / `Middleware/` を参照するRX72N TSIP版アプリケーションプロジェクト。
+- `Projects/aws_bg96_ck_rx65n_tsip/e2studio_ccrx/` は既存RX65N/BG96プロジェクトと
+  同じく自己完結型のTSIP版アプリケーションプロジェクト。
+- `Demos/tsip_provisioning/` にruntime provisioning store / CLIを置き、
+  TSIP版アプリケーションから`tsipprov` CLIとして登録する。
+- ブートローダはRX72N/RX65Nとも共通`rx_bootloader` submoduleを参照する。
+
+## 初期検証範囲
+
+最初のTSIP取り込みでは、次の順に検証する。
+
+1. software TLS版プロジェクトが既存どおりビルド・実機テストを通る
+2. TSIP版アプリケーションプロジェクトがビルドできる
+3. RX72N TSIP版firmwareへUARTでprovisioningできる
+4. RX72N TSIP版firmwareがTLS 1.2でAWS IoT Coreへ接続できる
+5. RX72N TSIP版firmwareで既存のMQTT / OTAフローが動く
+6. CK-RX65N + BG96 TSIP版も、対応するwrapped blobと静的証明書が用意できる
+   条件では同じCIフローでMQTT / OTAまで検証する
+
+CK-RX65N + BG96はBG96内部TCP/IPへソケット処理を委譲するため、Ethernet版と
+同じtransport切り替えだけで成立するかは実機で確認する。
+
+## 定期検証
+
+TSIP経路は通常のMR pipelineへ全直積で載せず、focused pipelineとscheduleで段階的に
+厚くする。
+
+現在の定期検証方針:
+
+1. software TLSの全体回帰は、毎日03:20 JSTのnightly scheduleで実行する。
+   `RX72N_TEST_SCOPE=full`、`RX65N_BG96_TEST_SCOPE=full` とし、MQTT / OTA /
+   Fleet Provisioningまで確認する。
+2. RX72N TSIPは、毎日04:20 JSTのfocused scheduleで実行する。
+   `RX72N_TLS_BACKEND=tsip`、`RX72N_TEST_SCOPE=ota` とし、RX65N/BG96側は
+   build / hardwareともskipして、Ethernet側のTSIP runtime provisioningとOTAを確認する。
+3. software TLS 1.3はTSIPとは分け、毎日05:20 JSTのfocused scheduleで
+   RX72N/Ether MQTTを確認する。`AWS_IOT_ENDPOINT` を
+   `IoTSecurityPolicy_TLS13_1_2_2022_10` のAWS IoT Core domain
+   (`d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com`) に切り替え、
+   `RX72N_REQUIRE_TLS_VERSION=TLSv1.3` を指定する。
+4. RX65N/BG96 TSIPは、focused pipeline
+   [#4744](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/4744)
+   でOTA完走確認済みのため、毎日06:20 JSTのfocused scheduleへ昇格済み。
+   GitLab schedule #7として登録している。
+   推奨変数は `RX65N_BG96_TLS_BACKEND=tsip`、
+   `RX65N_BG96_TEST_SCOPE=ota`、`RUN_RX72N_BUILD=false`、
+   `RX72N_SKIP_HW_TESTS=true`、`RX72N_TEST_SCOPE=build`。
+   このscheduleの変更にはprojectのMaintainer/Owner権限が必要。
+
+TSIPとTLS 1.3を同時に有効にする経路は別作業とし、ここではTSIP TLS 1.2系と
+software TLS 1.3系を別々に監視する。
+
+## スコープ外
+
+TSIPとTLS 1.3の連携は、この変更のスコープ外とする。今回のTSIP構成はまず
+TLS 1.2 backendとして安定化させる。TLS 1.3 + TSIPは、TLS 1.2のTSIP経路が
+安定した後に別issue / merge requestで扱う。
+
+ブートローダが使用するOTA署名検証用公開鍵のプロビジョニングも、この変更の
+スコープ外とする。初期実装では従来どおり公開鍵をソースコードへ埋め込む。
+公開鍵をデバイスへ後段プロビジョニングする方式は、共通ブートローダsubmodule化
+とTSIP連携が安定した後の将来課題として扱う。

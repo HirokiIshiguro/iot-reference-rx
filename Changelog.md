@@ -2,12 +2,14 @@
 
 safftiリリースで利用者から見える変更を、新しい順にまとめます。
 最初のsafftiタグはRenesas公式`v202406.04-LTS-rx-1.2.0`との差分、それ以降は直前のsafftiタグとの差分です。
-個別pipelineの一覧は[実機検証マトリクス](docs/validation-evidence.md)へ集約します。
+個別pipelineの一覧は[実機検証マトリクス](docs/details/validation/validation-evidence.md)へ集約します。
 
 ## リリース一覧
 
 | Tag | 主な内容 |
 |---|---|
+| [v202604.00-LTS-rx-1.0.0-saffti-1.5.1](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.1) | `r_cellular`を`1.13.saffti-custom.8`へ更新（GNSSのAPI、`+CME ERROR:`の扱い） |
+| [v202604.00-LTS-rx-1.0.0-saffti-1.5.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.5.0) | 実機CIの書き直し（36試験）、RX 3環境の共通化、BG96の`r_cellular`復帰、機能仕様書・実装仕様書・試験仕様書 |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.4.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.4.0) | EK-RX671 + Type 1YN、横断性能、fixed-SHA AWS IoT 5-run |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.3.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.3.0) | TLS 1.3 session resumption / 0-RTTとnightly matrix |
 | [v202604.00-LTS-rx-1.0.0-saffti-1.2.0](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/tags/v202604.00-LTS-rx-1.0.0-saffti-1.2.0) | TSIP + TLS 1.3 MQTT / OTA / Fleet Provisioning |
@@ -17,23 +19,78 @@ safftiリリースで利用者から見える変更を、新しい順にまと�
 
 ## 未リリース
 
-### 文書
-
-- root READMEを1分で概況把握できる構成へ再編し、Changelog、対応ターゲット、検証状態、
-  固定SHAの代表通信性能へ直接移動できるようにしました。
-- 代表通信性能はRX72N Ethernet、RX671 Wi-Fi、RX65N/BG96 Cellularについて、
-  TCP、software TLS、TSIP hardware TLSのSINK / SOURCEを同じ形式で示します。
-- `Getting_Started_Guide.md`を日本語化し、GitLabが生成する日本語見出しanchorへ
-  同一repository内の参照を追従させました。
-- CI運用と個別の実機証跡を、それぞれ`docs/ci-pipeline.md`と
-  `docs/validation-evidence.md`へ分離しました。
-
 ### 今後の課題
 
 - RX Ethernet TXのbusy pollをTX complete IRQ待機へ変更し、有限timeoutと
   EDMAC異常時の復帰を実機確認します。
 - SDIO / WHD / FreeRTOS+TCP境界の待ち時間を追加分析します。
 - RX72N経由でセカンダリMCUを更新するOTAリファレンスを追加します。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.5.1
+
+### 変更
+
+- RX65N/BG96の`r_cellular`を`1.13.saffti-custom.7`から`1.13.saffti-custom.8`へ更新しました。
+  - BG96のGNSSを使うAPI（`R_CELLULAR_GnssStart`、`R_CELLULAR_GnssGetLocation`、`R_CELLULAR_GnssStop`）が
+    増えました。このrepoのアプリは使っていません。
+  - BG96の`+CME ERROR:`応答で、待っているATコマンドがエラーとして終わるようになりました。
+    旧版はこの応答を認識せず、タイムアウトまで待つ可能性がありました。
+  - 変更の詳細は[`r_cellular`のREADME](https://gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/r_cellular/-/blob/v1.13.saffti-custom.8/README.md)にあります。
+
+## v202604.00-LTS-rx-1.0.0-saffti-1.5.0
+
+### 変更
+
+- RX72N・RX65N・RX671の3環境で、依存関係とビルド構成を共通化しました。原本のsubmodule、
+  dual-bank、CC-RXの最適化とlink順、用途別のMbed TLS設定をそろえ、bootloaderを
+  `lib/rx_bootloader`に置きました
+  （[!223](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/223)）。
+- RX65N/BG96の通信経路を、FreeRTOS Cellular Interfaceから`r_cellular`（submodule）へ戻しました
+  （[!225](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/225)）。
+- RX65N/BG96で、送信の拒否（`CELLULAR_ERR_SEND_REJECTED`）を共通の`TCP_SOCKETS_ERRNO_ERROR`へ、
+  未接続（`SOCKET_NOT_READY`）を`ENOTCONN`へ変換するようにしました。切断後の送信エラーが
+  送信0 byteとして隠れなくなります。`r_cellular`は`1.13.saffti-custom.7`です
+  （[!237](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/merge_requests/237)）。
+
+### CI
+
+- CIを全面的に書き直しました。基板3種（RX72N・RX65N・RX671）× TLS実装2種（software・TSIP）×
+  TLS 1.2 / 1.3 × 機能3種（MQTT・OTA・Fleet Provisioning）の36試験を、
+  `<基板>:<backend>:<tls>:<feature>`の名前で選んで流します。
+- **手でpipelineを起こす時の変数が変わりました。** `PROFILE`（`check` / `build` / `smoke` / `full` / `doctor`）、
+  `BOARD`、`BACKEND`、`TLS`、`FEATURE`、`REPEAT`、`REBUILD`、`TEST`を使います。
+  従来の`PIPELINE_PROFILE`、基板ごとの`*_TEST_SCOPE`・`*_TLS_BACKEND`、`RUN_*`は使いません。
+  指定しても読まれず、黙って無視されます。
+- 基板・機能ごとに分かれていた旧jobの名前（`build_…`、`flash_…`、`test_…`など）はありません。
+  子pipelineのjobは試験の名前で並びます。
+- IDT（IoT Device Tester）を流すjobは、新しいCIにありません。
+- 変数の値と動くjobの表、基板ごとの流れ、落ちた時に見るfileは[CI/CD運用](docs/details/ci-pipeline.md)にあります。
+
+### 文書
+
+- root READMEを1分で概況把握できる構成へ再編し、Changelog、対応ターゲット、検証状態、
+  固定SHAの代表通信性能へ直接移動できるようにしました。
+- 1.4.0で載せていた代表通信性能の複数の表を、ターゲット・接続・方式（TCP、software TLS、
+  TSIP hardware TLS）ごとのSINK / SOURCEの1つの表に再編しました。OTAのダウンロードと
+  更新確定までの時間の表を足しました。
+- `Getting_Started_Guide.md`を日本語化し、GitLabが生成する日本語見出しanchorへ
+  同一repository内の参照を追従させました。
+- CI運用と個別の実機証跡を、それぞれ`docs/details/ci-pipeline.md`と
+  `docs/details/validation/validation-evidence.md`へ分離しました。
+- 機能仕様書[`docs/architecture.md`](docs/architecture.md)を足しました。要求、機能と仕様書キー、
+  C4の2〜4段目、起動シーケンス、資源の配分を示します。
+- 機能ごとの実装仕様書（[MQTT](docs/details/mqtt.md)・[OTA](docs/details/ota.md)・
+  [Fleet Provisioning](docs/details/fleet-provisioning.md)）を足しました。UARTに出す行と、決まりと試験の対応を示します。
+- **試験の番号が変わりました。** `RXCI-001`〜`036`をやめ、`IREF-MQTT-001`の形のテスト番号を
+  `tools/ci/tests.json`の`ids`に固定しました。[試験仕様](docs/test-specification.md)は、
+  テスト番号・期待値・対象外・状態の一覧表にしました。
+- [全体の試験結果](docs/details/validation/all-test-results.md)を足しました。
+
+### 検証
+
+- 36試験を各3回流した[pipeline 17303](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/17303)で、108 jobすべてが成功しました
+  （うち2 jobは再試行で成功）。OTAの12試験は、修正の後の[pipeline 17336](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/17336)でも
+  すべて成功しました。詳細は[全体の試験結果](docs/details/validation/all-test-results.md)にあります。
 
 ## v202604.00-LTS-rx-1.0.0-saffti-1.4.0
 

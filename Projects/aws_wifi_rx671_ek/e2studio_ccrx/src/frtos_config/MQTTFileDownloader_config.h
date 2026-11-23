@@ -18,7 +18,7 @@
 #endif
 
 #ifndef OTA_MAX_NUM_FILE_BLOCKS
-#define OTA_MAX_NUM_FILE_BLOCKS                  (192U)
+#define OTA_MAX_NUM_FILE_BLOCKS                  (240U)
 #endif
 
 #endif /* MQTT_FILE_DOWNLOADER_CONFIG_H */

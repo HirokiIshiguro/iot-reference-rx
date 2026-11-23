@@ -51,18 +51,25 @@ def _file(path):
     return path
 
 
+class SourceVerificationError(RuntimeError):
+    """A fixed public diagnostic, without subprocess output or command arguments."""
+
+
 def _source_state(source):
     values = []
     environment={key:value for key,value in os.environ.items() if not key.upper().startswith("GIT_")}
     for arguments in (("status", "--porcelain=v1", "--untracked-files=all"), ("rev-parse", "HEAD")):
-        result = subprocess.run(["git", "--no-optional-locks", "-c", "safe.directory="+str(source),
-                                 "-C", str(source), *arguments], capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=30, env=environment)
+        try:
+            result = subprocess.run(["git", "--no-optional-locks", "-c", "safe.directory="+str(source),
+                                     "-C", str(source), *arguments], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=30, env=environment)
+        except subprocess.TimeoutExpired:
+            raise SourceVerificationError("Git source verification exceeded 30 seconds") from None
         if result.returncode:
-            raise RuntimeError("Cannot verify public signer source checkout")
+            raise SourceVerificationError("Cannot verify public signer source checkout")
         values.append(result.stdout.strip())
     if values[0] or not re.fullmatch(r"[a-f0-9]{40}", values[1]):
-        raise RuntimeError("Native public signer preparation requires a clean committed source checkout")
+        raise SourceVerificationError("Native public signer preparation requires a clean committed source checkout")
     return values[1]
 
 
@@ -182,6 +189,9 @@ def main(argv=None):
     try:
         paths=prepare(args.source,args.target,args.output,args.workspace,args.python,
                       signing_key=args.signing_key)
+    except SourceVerificationError as error:
+        print("Public signer preparation failed: " + str(error), file=sys.stderr)
+        return 1
     except Exception:
         print("Public signer preparation failed; inspect the requested private output directory.",file=sys.stderr)
         return 1

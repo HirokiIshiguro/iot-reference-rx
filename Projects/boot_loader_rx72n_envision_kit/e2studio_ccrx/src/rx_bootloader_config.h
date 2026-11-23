@@ -24,7 +24,7 @@
  * provisioned code signer public key without owning a second Data Flash format.
  */
 #define RX_BOOTLOADER_LITTLEFS_KEY_STORE_BASE_ADDRESS   (0x00100000UL)
-#define RX_BOOTLOADER_LITTLEFS_KEY_STORE_REGION_SIZE    (128U * 64U)
+#define RX_BOOTLOADER_LITTLEFS_KEY_STORE_REGION_SIZE    (128U * 128U)
 #define RX_BOOTLOADER_LITTLEFS_PUBLIC_KEY_FILE          "code_signer_public_key"
 #define RX_BOOTLOADER_LITTLEFS_CODE_SIGN_CERT_FILE      "code_sign_cert_id"
 #define RX_BOOTLOADER_LITTLEFS_PUBLIC_KEY_BUFFER_SIZE   (512U)

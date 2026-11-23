@@ -48,7 +48,7 @@ FWUP_HEADER_SIZE = 0x200
 FWUP_DESCRIPTOR_SIZE = 0x100
 FWUP_APPLICATION_OFFSET = FWUP_HEADER_SIZE + FWUP_DESCRIPTOR_SIZE
 FWUP_AREA_START = 0xFFF00000
-FWUP_AREA_SIZE = 0x000C0000
+FWUP_AREA_SIZE = 0x000F0000
 FWUP_APPLICATION_START = FWUP_AREA_START + FWUP_APPLICATION_OFFSET
 FWUP_APPLICATION_SIZE = FWUP_AREA_SIZE - FWUP_APPLICATION_OFFSET
 FWUP_SIGNATURE_TYPE = b"sig-sha256-ecdsa"
@@ -62,7 +62,6 @@ BOOTLOADER_SUBMODULE_RELATIVE = (
 )
 BOOTLOADER_PROVENANCE_PATHS = (
     BOOTLOADER_PROJECT_RELATIVE / ".cproject",
-    BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
     BOOTLOADER_PROJECT_RELATIVE / "src/smc_gen/r_config/r_bsp_config.h",
     BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
@@ -72,9 +71,9 @@ BOOTLOADER_PROVENANCE_PATHS = (
 OTA_MQTT_FILE_BLOCK_SIZE = 4096
 OTA_MQTT_NETWORK_BUFFER_SIZE = 8192
 OTA_MQTT_MAX_BLOCKS_PER_REQUEST = 1
-OTA_FREERTOS_HEAP_SIZE_KB = 208
+OTA_FREERTOS_HEAP_SIZE_KB = 224
 OTA_DATA_BUFFER_COUNT = 2
-OTA_MAX_FILE_BLOCKS = 192
+OTA_MAX_FILE_BLOCKS = 240
 OTA_SDIO_RUN_CLOCK_DIV = "SDHI_DIV_8"
 OTA_MQTT_JSON_AND_PROTOCOL_OVERHEAD = 1024
 
@@ -981,6 +980,12 @@ def _gitlink_sha(repo_root: Path, relative_path: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def _project_shadows_bootloader_config(project_dir: Path) -> bool:
+    # The layout comes from the submodule's config/rx671.h; a copy in the project's own src/
+    # would take precedence on the include path and silently override it.
+    return (project_dir / "src/rx671.h").exists()
+
+
 def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | None = None) -> Gate:
     project_dir = repo_root / BOOTLOADER_PROJECT_RELATIVE
     if not project_dir.is_dir():
@@ -991,12 +996,10 @@ def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | No
         )
     bsp_config = project_dir / "src/smc_gen/r_config/r_bsp_config.h"
     cproject = project_dir / ".cproject"
-    compiled_target_config = project_dir / "src/rx671.h"
     canonical_target_config = repo_root / BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h"
     if (
         not bsp_config.is_file()
         or not cproject.is_file()
-        or not compiled_target_config.is_file()
         or not canonical_target_config.is_file()
     ):
         return Gate(
@@ -1006,21 +1009,14 @@ def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | No
         )
     try:
         bsp_text = bsp_config.read_text(encoding="utf-8")
-        compiled_target_lines = compiled_target_config.read_text(
-            encoding="utf-8"
-        ).splitlines()
-        canonical_target_lines = canonical_target_config.read_text(
-            encoding="utf-8"
-        ).splitlines()
         mode, build_dir, artifact_name, anchors, _binaries = _parse_cproject(cproject)
     except (ET.ParseError, OSError, ValueError) as exc:
         return Gate("bootloader_layout", "FAIL", f"RX671 bootloader設定解析失敗: {exc}")
-    if compiled_target_lines != canonical_target_lines:
+    if _project_shadows_bootloader_config(project_dir):
         return Gate(
             "bootloader_layout",
             "FAIL",
-            "実際にcompileするsrc/rx671.hがbootloader submoduleの"
-            "config/rx671.hと一致しません",
+            "project内のsrc/rx671.hがbootloader submoduleのconfig/rx671.hを上書きします",
         )
     if _macro(bsp_text, "BSP_CFG_BOOTLOADER_PROJECT") != 1 or mode != "bank.dual":
         return Gate(
@@ -1029,7 +1025,7 @@ def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | No
             "RX671 bootloaderはBSP_CFG_BOOTLOADER_PROJECT=1かつbank.dualである必要があります",
         )
     expected_anchors = {
-        "PResetPRG": 0xFFFC0000,
+        "PResetPRG": 0xFFFF0000,
         "EXCEPTVECT": 0xFFFFFF80,
         "RESETVECT": 0xFFFFFFFC,
     }
@@ -1100,13 +1096,8 @@ def _bootloader_layout_gate(repo_root: Path, provenance_manifest_path: Path | No
             errors.append(f"hashなし: {relative.as_posix()}")
         elif not path.is_file() or expected_hash.lower() != _sha256(path):
             errors.append(f"hash不一致: {relative.as_posix()}")
-    parent_rx671 = repo_root / BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h"
-    canonical_rx671 = repo_root / BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h"
-    try:
-        if not _same_text_lines(parent_rx671, canonical_rx671):
-            errors.append("bootloader src/rx671.hとsubmodule config/rx671.hの内容不一致")
-    except (OSError, UnicodeError) as exc:
-        errors.append(f"bootloader rx671.h同期確認失敗: {exc}")
+    if _project_shadows_bootloader_config(repo_root / BOOTLOADER_PROJECT_RELATIVE):
+        errors.append("bootloader project内のsrc/rx671.hがsubmodule config/rx671.hを上書きします")
     indexed_sha = _gitlink_sha(repo_root, BOOTLOADER_SUBMODULE_RELATIVE)
     recorded_sha = gitlinks.get(BOOTLOADER_SUBMODULE_RELATIVE.as_posix())
     try:
@@ -1422,10 +1413,11 @@ def analyze(
     fwup_config = project_dir / "src/frtos_config/rx_ota_config.h"
     littlefs_config = project_dir / "src/frtos_config/rm_littlefs_flash_config.h"
     bsp_config = project_dir / "src/smc_gen/r_config/r_bsp_config.h"
-    mcu_info = project_dir / "src/smc_gen/r_bsp/mcu/rx671/mcu_info.h"
+    rdp_source = repo_root / "Middleware/Renesas/rx-driver-package/source"
+    mcu_info = rdp_source / "r_bsp/r_bsp_vx.xx/r_bsp/mcu/rx671/mcu_info.h"
     resource_source = project_dir / "src/whd_port/whd_port_resource.c"
     sdio_host = project_dir / "src/sdio_host.c"
-    flash_target = project_dir / "src/smc_gen/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
+    flash_target = repo_root / "Middleware/Renesas/r_flash_rx/r_flash_rx_vx.xx/r_flash_rx/src/targets/rx671/r_flash_rx671.h"
     layout_contract = project_dir / LAYOUT_CONTRACT_NAME
     bootloader_config = (
         repo_root

@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 
 
 FWUP_AREA_START = 0xFFF00000
-FWUP_AREA_SIZE = 0x000C0000
+FWUP_AREA_SIZE = 0x000F0000
 FWUP_AREA_END = FWUP_AREA_START + FWUP_AREA_SIZE - 1
 
 RSU_HEADER_SIZE = 0x200
