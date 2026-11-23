@@ -62,6 +62,10 @@
 #endif
 #define democonfigUSE_AWS_IOT_CORE_BROKER   (1)
 #define democonfigDISABLE_SNI               (0)
+/* Do not request the TLS Maximum Fragment Length: full 16 KiB records. On the
+ * EK-RX671 TSIP benchmark the 4 KiB records of MFL 4096 cut TLS SINK from
+ * 26.15 to 18.72 Mbps. */
+#define democonfigDISABLE_MAX_FRAGMENT_LENGTH_EXTENSION (1)
 
 #define democonfigFP_DEMO_ID                "RX671Type1YN"
 #define democonfigCLIENT_IDENTIFIER         AWS_IOT_THING_NAME

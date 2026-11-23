@@ -421,6 +421,11 @@ static TlsTransportStatus_t prvConnectToServerWithBackoffRetries(NetworkContext_
     xNetworkCredentials.pPrivateKeyLabel = pcPrivateKeyLabel;
 
     xNetworkCredentials.disableSni = pdFALSE;
+#if defined( democonfigDISABLE_MAX_FRAGMENT_LENGTH_EXTENSION )
+    /* Only a project that defines this (the RX671 TSIP project) changes the
+     * request; the TSIP TLS transport requests MFL 4096 by default. */
+    xNetworkCredentials.disableMaxFragmentLengthExtension = democonfigDISABLE_MAX_FRAGMENT_LENGTH_EXTENSION;
+#endif
 
     /* Initialize reconnect attempts and interval.*/
     BackoffAlgorithm_InitializeParams(&xReconnectParams,
