@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "upstream_repository": "https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver.git",
-  "upstream_commit": "825e78519c8becaaf388dd4845377ba22867b646",
+  "upstream_commit": "13119afc1570ee2d97fae3d782db02db356f12a6",
   "origin_repository": "https://github.com/Infineon/wifi-host-driver.git",
   "origin_commit": "769c855507365e9828b02c81f1590d671f49661d",
-  "modification_purpose": "CC-RX packing syntax, private SDIO command encoding and caller WLAN sleep delay override",
-  "reviewed_merge_request": "https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver/-/merge_requests/2",
+  "modification_purpose": "CC-RX packing syntax, private SDIO command encoding, caller WLAN sleep delay override and the CC-RX F2 block size (default 512)",
+  "reviewed_merge_request": "https://gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver/-/merge_requests/4",
   "files_sha256": {
     ".gitignore": "be091810b9a0f91199ea4b81d84af819934cdff588c5c41c0e97fb1fbd0a4a9f",
     ".gitlab-ci.yml": "a47381b81debe19c25afc28c4199557a948667dfd0b88f9d5b0be4c91f0c7943",
@@ -20,7 +20,7 @@
     "External/rtos/cyabs_rtos.h": "d64886eb2d219e491cc95f9465333704fdc66fe3e073ebd27f5345cddb1fd102",
     "External/rtos/cyabs_rtos_impl.h": "ff856527c69864cfff44220de3f96195e15fd78ec3a24357ef64599238a12962",
     "Makefile": "cb04b9901d1af7393d4bf15efa254e54f91b7bdc4e36956ff453a8f5401b5e77",
-    "README.md": "065f0cb0dbf4f4a70405a3ea32cf3bccdc1c8adcf8506697c78362d381b143a0",
+    "README.md": "4cc51b02e116917edf32642ab356ddbef6eb7792d414c67935f7a824b767a412",
     "RELEASE.md": "ecfe02facd92129586a0508fa98a68657bb80423bd4c3b10e4b60d6cb1c1070c",
     "WiFi_Host_Driver/inc/whd.h": "5732692a66b071a15c16f8adf8612aa5d1913aad115b413e2af4bb93009cb53e",
     "WiFi_Host_Driver/inc/whd_events.h": "508794c3645ead06ef1d9602e3231c987c3c0d87c2712831b1e26b69b923a1ed",
@@ -82,9 +82,9 @@
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_common.c": "706a905c4bd70a815ca29b319259579b4802220429d88a311d397d1cf8214392",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_common.h": "c613a1efd7fbe84654690a81d78c9af3ce54b067645cffd5e1df1559b554c8f8",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_protocol_interface.h": "7bbf60b8df6acb614c7e35bce065856f3a701681f57310559d5e4e06aa60fabf",
-    "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.c": "fe33ca005e52f3bf975c58f216e1681eee22b19411262d1fc3bac4e8181e40f0",
+    "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.c": "81d6362251dfcf172771b59fc5cc74cea174fceaa0bce48854e3712a2f51035c",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_protocol.h": "34cc01868cbd7829c8b0db0e952b7e54f5116ca12864c8ecb6b192481c03e8c5",
-    "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_wire.h": "e962aa72ca040c3e49378c4916a152f7f5fff18d51b51adcf21f29e6883e9463",
+    "WiFi_Host_Driver/src/bus_protocols/whd_bus_sdio_wire.h": "7d671db10fe525e4c1dd4dc4810bb754e358f503aaa0a9e22e8fdf02ecacc9fa",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.c": "e92ffc785c636906c9f11d214831cc3eee33a5701f769492caf41b6cfae9d6bd",
     "WiFi_Host_Driver/src/bus_protocols/whd_bus_spi_protocol.h": "a9250244cc17479470b8c187fc5d315424d359e2fbd6636c4cfe75e6bdd8bd6c",
     "WiFi_Host_Driver/src/bus_protocols/whd_chip_reg.h": "3fdc1f8ade47944c30eb20b4b203bf3a2534825d538b5516c84d90300174bd96",
@@ -438,7 +438,7 @@
     "docs/API/whd_rtos.c": "8881383652915454b3fbd5153a2d25b1e2404736495ef4cb6fd0d852ab96e2bb",
     "docs/upstream-readme.md": "91c7f8a3805883aa40af597ae4823fbeb01df0de9d5cc2b8b91a1fce854195a6",
     "generated_mac_address.txt": "9ab553d2a7775b9348595b084b016b16cb6f8d9f7ebc946f34cd9113243d224f",
-    "tools/verify_ccrx_port.py": "f20e7f1bc05435aa4713c5928122408e93a55f90e65420580d7bfd4f0e473b58",
+    "tools/verify_ccrx_port.py": "506ddac28c9181fd4ba9b8b29f8803f6886b7523167f8ff8975a360190093ea0",
     "tools/verify_upstream_port.py": "2fa78b87d54363650d5700210c13c16691d7319aaccdefcf60f26a4d3e1de513"
   }
 }
