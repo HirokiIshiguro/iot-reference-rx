@@ -204,7 +204,7 @@
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
       "ref": "align-iotref-main",
-      "measures": "TCP throughput, TSIP build (MR 59 on iot-reference-rx eb2b826e)",
+      "measures": "TCP sink and source, TSIP build (221 MR 59 on iot-reference-rx eb2b826e)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
         "RX671_BENCHMARK_PROFILE": "tcp"
@@ -220,7 +220,7 @@
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
       "ref": "align-iotref-main",
-      "measures": "TLS 1.2 sink throughput, TSIP (MR 59 on iot-reference-rx eb2b826e)",
+      "measures": "TLS 1.2 sink, TSIP (221 MR 59 on iot-reference-rx eb2b826e)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
         "RX671_BENCHMARK_PROFILE": "tls-sink"
@@ -236,7 +236,7 @@
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
       "ref": "align-iotref-main",
-      "measures": "TLS 1.2 source throughput, TSIP (MR 59 on iot-reference-rx eb2b826e)",
+      "measures": "TLS 1.2 source, TSIP (221 MR 59 on iot-reference-rx eb2b826e)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
         "RX671_BENCHMARK_PROFILE": "tls-source"
@@ -245,6 +245,69 @@
         "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
         "RX671_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
         "RX671_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
+      }
+    },
+    {
+      "name": "rx671:tsip:dual-sink-sink",
+      "board": "rx671",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
+      "ref": "align-iotref-main",
+      "measures": "Two TLS 1.2 sink sessions at once, TSIP (221 MR 59 on iot-reference-rx eb2b826e)",
+      "variables": {
+        "RX671_BENCHMARK_RUN_HARDWARE": "true",
+        "RX671_BENCHMARK_PROFILE": "dual-sink-sink"
+      },
+      "parent_variables": {
+        "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
+        "RX671_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
+      }
+    },
+    {
+      "name": "rx671:tsip:dual-source-source",
+      "board": "rx671",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
+      "ref": "align-iotref-main",
+      "measures": "Two TLS 1.2 source sessions at once, TSIP (221 MR 59 on iot-reference-rx eb2b826e)",
+      "variables": {
+        "RX671_BENCHMARK_RUN_HARDWARE": "true",
+        "RX671_BENCHMARK_PROFILE": "dual-source-source"
+      },
+      "parent_variables": {
+        "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
+        "RX671_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
+      }
+    },
+    {
+      "name": "rx671:tsip:dual-sink-source",
+      "board": "rx671",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
+      "ref": "align-iotref-main",
+      "measures": "TLS 1.2 sink and source sessions at once, TSIP (221 MR 59 on iot-reference-rx eb2b826e)",
+      "variables": {
+        "RX671_BENCHMARK_RUN_HARDWARE": "true",
+        "RX671_BENCHMARK_PROFILE": "dual-sink-source"
+      },
+      "parent_variables": {
+        "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
+        "RX671_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
+      }
+    },
+    {
+      "name": "rx671:sw:all",
+      "board": "rx671",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/mbedtls",
+      "ref": "38-align-iotref-eb2b826e",
+      "measures": "TCP and TLS sink and source, Mbed TLS in software (212 MR 53 on iot-reference-rx eb2b826e)",
+      "variables": {
+        "RX671_SOFTWARE_BENCHMARK_RUN_HARDWARE": "true"
+      },
+      "parent_variables": {
+        "RX671_SOFTWARE_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
+        "RX671_SOFTWARE_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_SOFTWARE_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
       }
     }
   ],
