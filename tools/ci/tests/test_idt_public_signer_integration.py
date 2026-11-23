@@ -191,7 +191,8 @@ class PublicSignerIntegrationTests(unittest.TestCase):
                 self.assertEqual(9,len(commands));self.assertIn("-erase-chip",commands[0])
                 self.assertFalse(any("-erase-chip" in command for command in commands[1:]))
                 self.assertIn("--strict-success",commands[6]);self.assertIn("-reset",commands[7]);self.assertIn("-run",commands[8])
-                self.assertEqual("conf commit",cli[-1]);self.assertEqual(4,len(cli));self.assertTrue(serial.closed)
+                self.assertEqual(b"conf commit\r\n",serial.writes)
+                self.assertEqual(3,len(cli));self.assertTrue(serial.closed)
                 self.assertIn("resume",events);close.assert_called_once_with(42)
                 self.assertEqual("IDT_FLASH_COMPLETE",output.getvalue().strip())
 

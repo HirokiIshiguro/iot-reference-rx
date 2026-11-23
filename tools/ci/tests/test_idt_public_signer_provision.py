@@ -64,11 +64,12 @@ class Fixture:
                         (0xFFFFFFFC, vector.to_bytes(4, "little")),
                         (0xFE7F5D00, bytes.fromhex("8FFFFFFF")), (0xFE7F5D20, bytes.fromhex("FFFFFFFF"))]
         self.files["public_signer_provisioner.mot"].write_text("".join(srecord(*entry) for entry in self.records))
-        boot = [(0xFFFC0000, b"BOOT"), (0xFFFFFF80, bytes(range(128))),
+        boot_start = controller.bootloader_start(self.target)
+        boot = [(boot_start, b"BOOT"), (0xFFFFFF80, bytes(range(128))),
                 (0xFE7F5D00, bytes.fromhex("8FFFFFFF")), (0xFE7F5D20, bytes.fromhex("FFFFFFFF"))]
         self.files["bootloader.mot"].write_text("".join(srecord(*entry) for entry in boot))
         self.files["bootloader_bank1.mot"].write_text("".join(srecord(address-shift, data)
-                            for address, data in boot if address >= 0xFFFC0000))
+                            for address, data in boot if address >= boot_start))
         self.metadata = {"schema_version": 1, "profile": controller.PROFILE, "target_id": target_id,
             "target_sha256": target_fingerprint(self.target), "source_sha": SOURCE_SHA, "source_tree_dirty": False,
             "formal": True, "tls_backend": "software", "bank_mode": "bank.dual", "cli_scope": "public_signer_only",
@@ -103,7 +104,8 @@ class Fixture:
     def rsu(self, key):
         target_id = self.target["id"]
         start, _ = controller.LAYOUTS[target_id]
-        payload = bytearray(b"\xff"*(0xFFFC0000-start-0x300))
+        boot_start = controller.bootloader_start(self.target)
+        payload = bytearray(b"\xff"*(boot_start-start-0x300))
         payload[:4] = b"CODE"; payload[-4:] = (start+0x300).to_bytes(4, "little")
         if target_id == "rx671-wifi":
             image = controller._tools_module("build_rx671_fwup_v2_rsu").build_image(bytes(payload), key)
@@ -121,7 +123,7 @@ class Fixture:
                         self.files["idt_transport.rsu"].write_bytes(image)
                     else:
                         mot = self.root/"synthetic-app.mot"
-                        mot.write_text(srecord(start+0x300,b"CODE") + srecord(0xFFFBFFFC,(start+0x300).to_bytes(4,"little")))
+                        mot.write_text(srecord(start+0x300,b"CODE") + srecord(boot_start-4,(start+0x300).to_bytes(4,"little")))
                         packager = controller._tools_module("create_bg96_rsu")
                         with patch.object(packager.sys if hasattr(packager,"sys") else __import__("sys"), "argv",
                                 ["create_bg96_rsu.py", "--mot", str(mot), "--key", str(synthetic_key),
@@ -145,14 +147,19 @@ class Fixture:
 
 class FakeSerial:
     timeout, write_timeout = .1, 10
-    def __init__(self):
+    def __init__(self, commit_reply=b"Configuration save\r\n"):
         self.responses = bytearray(); self.closed = False
+        self.writes = bytearray()
+        self.commit_reply = commit_reply
     @property
     def in_waiting(self):
         return len(self.responses)
     def read(self, size):
         result = bytes(self.responses[:size]); del self.responses[:size]; return result
     def write(self, data):
+        self.writes.extend(data)
+        if self.writes == b"conf commit\r\n":
+            self.responses.extend(self.commit_reply)
         return len(data)
     def flush(self):
         pass
@@ -191,7 +198,8 @@ class PublicSignerTests(unittest.TestCase):
                 start, _ = controller.LAYOUTS[target_id]
                 image = bytearray(fixture.files["idt_transport.rsu"].read_bytes())
                 image[0x200:0x300] = b"\xff" * 256
-                struct.pack_into("<III", image, 0x200, 1, start + 0x300, 0xFFFC0000 - start - 0x300)
+                boot_start = controller.bootloader_start(fixture.target)
+                struct.pack_into("<III", image, 0x200, 1, start + 0x300, boot_start - start - 0x300)
                 r, s = utils.decode_dss_signature(fixture.key.sign(
                     bytes(image[0x200:]), ec.ECDSA(hashes.SHA256())))
                 image[0x2c:0x6c] = r.to_bytes(32, "big") + s.to_bytes(32, "big")
@@ -248,7 +256,9 @@ class PublicSignerTests(unittest.TestCase):
     def test_mirror_substitution_and_rsu_signature_or_df_are_rejected(self):
         fixture=self.fixture()
         mirror=fixture.files["bootloader_bank1.mot"]; original=mirror.read_bytes()
-        mirror.write_text(srecord(0xFFEC0000,b"EVIL")+srecord(0xFFEFFF80,bytes(range(128))))
+        _, shift = controller.LAYOUTS[fixture.target["id"]]
+        mirror.write_text(srecord(controller.bootloader_start(fixture.target)-shift,b"EVIL")+
+                          srecord(0xFFFFFF80-shift,bytes(range(128))))
         with self.assertRaisesRegex(RuntimeError,"exact reviewed bank0 shift"):fixture.plan()
         mirror.write_bytes(original)
         rsu=fixture.files["idt_transport.rsu"]; original=rsu.read_bytes()
@@ -337,12 +347,14 @@ class PublicSignerTests(unittest.TestCase):
                 self.assertEqual(7,len(commands));self.assertEqual(["-erase-chip","-reset","-noquery"],commands[0][-3:])
                 self.assertTrue(all("-erase-chip" not in command for command in commands[1:]))
                 start,shift=controller.LAYOUTS[target]
-                self.assertEqual([f"{start-shift:08X},{0xFFFBFFFF-shift:08X}",f"{start:08X},FFFBFFFF"],
+                end = controller.bootloader_start(fixture.target) - 1
+                self.assertEqual([f"{start-shift:08X},{end-shift:08X}",f"{start:08X},{end:08X}"],
                     [commands[3][i+1] for i,value in enumerate(commands[3]) if value=="-range"])
-                self.assertEqual(["format","conf commit"],[cli[0],cli[-1]])
+                self.assertEqual("format",cli[0])
+                self.assertEqual(b"conf commit\r\n",serial.writes)
                 self.assertTrue(cli[1].startswith("conf set codesigncert "))
                 self.assertTrue(cli[2].startswith("conf set codesignpubkey "))
-                self.assertEqual(4,len(cli));self.assertTrue(serial.closed);self.assertGreater(owner.call_count,14)
+                self.assertEqual(3,len(cli));self.assertTrue(serial.closed);self.assertGreater(owner.call_count,14)
                 self.assertEqual("signature_checked_by_bootloader_on_initial_install",result["runtime_trust"])
                 log=(fixture.root/"public-signer-events/provision-events.log").read_text()
                 self.assertNotIn("-----BEGIN",log);self.assertNotIn("conf set",log)
@@ -360,18 +372,16 @@ class PublicSignerTests(unittest.TestCase):
 
     def test_failed_commit_stops_before_install_area_erase_and_closes_owned_uart(self):
         fixture=self.fixture();host=controller._tools_module("rx671_ota_host")
-        provisioner=controller._tools_module("provision_rx671_ota");serial=FakeSerial();commands=[]
+        provisioner=controller._tools_module("provision_rx671_ota")
+        serial=FakeSerial(commit_reply=b"\r\nError.\r\n");commands=[]
         def runner(command,**kwargs):
             commands.append(command)
             if "-sig" in command and "-run" in command:
                 serial.responses.extend(b"PUBLIC_SIGNER_PROVISIONER source_sha="+SOURCE_SHA.encode()+b"\r\n")
             return subprocess.CompletedProcess(command,0)
-        def send(_serial,command,**kwargs):
-            if command=="conf commit":raise RuntimeError("synthetic commit failure")
-            return b"OK"
         with patch.object(host,"open_serial",return_value=serial),patch.object(provisioner,"enter_cli"), \
-                patch.object(provisioner,"send_ascii_command",side_effect=send), \
-                self.assertRaisesRegex(RuntimeError,"synthetic commit failure"):
+                patch.object(provisioner,"send_ascii_command",return_value=b"OK"), \
+                self.assertRaisesRegex(RuntimeError,"target reported an error"):
             controller.provision_and_install(fixture.root,fixture.target,SOURCE_SHA,runner,fixture.download(),check_owner=Mock())
         self.assertEqual(3,len(commands));self.assertTrue(serial.closed)
         self.assertFalse(any("-erase" in command for command in commands))
