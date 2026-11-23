@@ -163,7 +163,10 @@ Configuration Options
       settings and choosing the Standard Library section. After that choose 'Contents' in e2 studio.
       This will present a list of modules that can be included. Uncheck the box for stdio.h.
    NOTE: This setting is available only when using CCRX and GNUC. */
-#define BSP_CFG_HEAP_BYTES              (0x2000)
+/* 16 KiB: R_DTC_Open mallocs its 2 KiB vector table from this heap after the
+ * WHD driver, littlefs and stdio allocations. With 8 KiB the malloc fails,
+ * the DTC stays closed and every SDIO CMD53 falls back to the CPU copy. */
+#define BSP_CFG_HEAP_BYTES              (0x4000)
 
 /* Initializes C input & output library functions.
    0 = Disable I/O library initialization in resetprg.c. If you are not using stdio then use this value.
