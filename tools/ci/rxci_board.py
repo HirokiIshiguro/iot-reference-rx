@@ -51,6 +51,13 @@ class Board:
             install_ranges=((start - size, APPLICATION_END - size), (start, APPLICATION_END)))
 
     # -- exclusive use ---------------------------------------------------
+    def check_rx72n_lease(self) -> None:
+        if self.name != "rx72n":
+            return
+        from install_normal_boot import check_bench_lease
+
+        check_bench_lease(self.target, self._lock.fileno())
+
     def try_lock(self) -> bool:
         """Take the board lock only if nobody holds it."""
         path = Path(self.target["bench_lock"])
@@ -696,6 +703,13 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
     signal.signal(signal.SIGTERM, lambda *_: sys.exit("the job was cancelled"))
     board.lock()
     try:
+        board.check_rx72n_lease()
+    except (RuntimeError, OSError) as error:
+        failure = str(error)
+        write_junit(logs / "junit.xml", test["name"], time.monotonic() - started, failure)
+        print(f"FAIL  {test['name']}  {failure}", flush=True)
+        return 1
+    try:
         recipe(registry, board, test, builds, logs)
     except subprocess.CalledProcessError as error:
         failure = f"step failed with exit code {error.returncode}: {Path(str(error.cmd[1])).name if len(error.cmd) > 1 else error.cmd[0]}"
@@ -734,8 +748,9 @@ def finish_test(registry: dict, test: dict, logs: Path, aws_session) -> int:
     board = Board(registry, test["board"])
     if board.try_lock():
         try:
+            board.check_rx72n_lease()
             board.park()
-        except (subprocess.SubprocessError, OSError) as error:
+        except (RuntimeError, subprocess.SubprocessError, OSError) as error:
             print(f"could not park the board: {error}", flush=True)
     else:
         print(f"{board.name} is in use by another job; it is not parked here.", flush=True)
