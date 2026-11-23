@@ -10,9 +10,15 @@
 #include "task.h"
 #include "demo_config.h"
 #include "platform.h"
-#include "r_cellular_if.h"
+#include "r_cellular_network.h"
+#include "tcp_sockets_wrapper.h"
 #include "r_sci_rx_if.h"
 #include "r_sci_rx_pinset.h"
+
+#define BG96_APN_NAME                  CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_NAME)
+#define BG96_APN_USER                  CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_USERID)
+#define BG96_APN_PASSWORD              CELLULAR_STRING_CONVERT(CELLULAR_CFG_AP_PASSWORD)
+#define BG96_PDN_AUTH_TYPE             CELLULAR_CFG_AUTH_TYPE
 
 #define BG96_UART_BAUDRATE             (115200U)
 #define BG96_RX_QUEUE_LENGTH           (512U)
@@ -28,16 +34,10 @@
 #define BG96_NETWORK_CMD_TIMEOUT_MS    (30000U)
 #define BG96_MQTT_CMD_TIMEOUT_MS       (30000U)
 
-#define BG96_APN_NAME                  "linksmate.jp"
-#define BG96_APN_USER                  "user"
-#define BG96_APN_PASSWORD              "mate"
-#define BG96_APN_AUTH_TYPE             (2)
 
 #define BG96_TEST_BROKER_HOST          "54.36.178.49"
 #define BG96_TEST_BROKER_PORT          (1883U)
 #define BG96_TEST_SOCKET_ID            (3U)
-#define BG96_RCELLULAR_PROTOCOL_TCP    (6U)
-#define BG96_RCELLULAR_IPV4            (4U)
 
 /* CK-RX65N V1 PMOD1 GPIO mapping from CK-RX65N_V1.03.bdf:
  *   PMOD1-GPIO1 -> P55  (user wired to BG96 RESET_N)
@@ -53,7 +53,7 @@ static QueueHandle_t s_bg96_rx_queue = NULL;
 static sci_hdl_t s_bg96_uart = NULL;
 static char s_bg96_text_response[BG96_RESPONSE_BUFFER_SIZE];
 static char s_bg96_hex_line[256];
-extern st_cellular_ctrl_t cellular_ctrl;
+
 
 static void bg96_uart_callback(void *p_args)
 {
@@ -764,54 +764,23 @@ static void bg96_mqtt_at_probe(void)
 
 static void bg96_r_cellular_smoke_test(void)
 {
-    int32_t socket_no = 0;
-    e_cellular_err_t ret = CELLULAR_SUCCESS;
-    static const uint8_t broker_ip[] = BG96_TEST_BROKER_HOST;
-
+    Socket_t socket = NULL;
+    BaseType_t result;
     if (NULL != s_bg96_uart)
     {
-        R_SCI_Close(s_bg96_uart);
+        (void)R_SCI_Close(s_bg96_uart);
         s_bg96_uart = NULL;
     }
-
-    configPRINTF(("BG96 r_cellular: opening driver\r\n"));
-    ret = R_CELLULAR_Open(&cellular_ctrl, NULL);
-    configPRINTF(("BG96 r_cellular: R_CELLULAR_Open -> %d\r\n", (int)ret));
-    if (CELLULAR_SUCCESS != ret)
+    if (!Connect2AP())
     {
+        configPRINTF(("BG96 r_cellular: network connection failed\r\n"));
         return;
     }
-
-    ret = R_CELLULAR_APConnect(&cellular_ctrl, NULL);
-    configPRINTF(("BG96 r_cellular: R_CELLULAR_APConnect -> %d\r\n", (int)ret));
-    if (CELLULAR_SUCCESS != ret)
-    {
-        (void)R_CELLULAR_Close(&cellular_ctrl);
-        return;
-    }
-
-    socket_no = R_CELLULAR_CreateSocket(&cellular_ctrl,
-                                        BG96_RCELLULAR_PROTOCOL_TCP,
-                                        BG96_RCELLULAR_IPV4);
-    configPRINTF(("BG96 r_cellular: R_CELLULAR_CreateSocket -> %ld\r\n", (long)socket_no));
-    if (socket_no <= 0)
-    {
-        (void)R_CELLULAR_Close(&cellular_ctrl);
-        return;
-    }
-
-    ret = R_CELLULAR_ConnectSocket(&cellular_ctrl,
-                                   (uint8_t)socket_no,
-                                   broker_ip,
-                                   (uint16_t)BG96_TEST_BROKER_PORT);
-    configPRINTF(("BG96 r_cellular: R_CELLULAR_ConnectSocket -> %d\r\n", (int)ret));
-
-    if (CELLULAR_SUCCESS == ret)
-    {
-        (void)R_CELLULAR_CloseSocket(&cellular_ctrl, (uint8_t)socket_no);
-    }
-
-    (void)R_CELLULAR_Close(&cellular_ctrl);
+    result = TCP_Sockets_Connect(&socket, BG96_TEST_BROKER_HOST,
+                                 (uint16_t)BG96_TEST_BROKER_PORT, 5000U, 5000U);
+    configPRINTF(("BG96 r_cellular: TCP connect result=%d\r\n", (int)result));
+    if (socket != NULL) { TCP_Sockets_Disconnect(socket); }
+    RCellular_NetworkCleanup();
 }
 
 static bool bg96_configure_apn(void)
@@ -824,7 +793,7 @@ static bool bg96_configure_apn(void)
                     BG96_APN_NAME,
                     BG96_APN_USER,
                     BG96_APN_PASSWORD,
-                    (unsigned int) BG96_APN_AUTH_TYPE);
+                    (unsigned int) BG96_PDN_AUTH_TYPE);
 
     return bg96_command(command, "OK");
 }

@@ -12,6 +12,7 @@ import tempfile
 from prepare_transport_key import validate_source, macro
 from flash_failure import record_flash_failure
 from targets import get_target, target_fingerprint
+from pkcs11_source_view import resolve_build_tree
 from cleanup_budget import flash_remote_seconds
 
 SSH=os.environ.get('IDT_WINDOWS_SSH','/mnt/c/Windows/System32/OpenSSH/ssh.exe')
@@ -56,18 +57,14 @@ def validated_inputs(source, target):
         'cleanup_budget.py': here / 'cleanup_budget.py',
         'rfp_process.py': here / 'rfp_process.py',
     }
-    provision_plan = None
-    if target['id'] == 'rx671-wifi':
-        # This is required for every bootloader-backed scope, including PKCS11
-        # and OTA PAL. No application can provision trust before its first boot.
-        from rx671_provision import source_inputs, validate_bundle
-        runtime = Path(os.environ['IDT_RUNTIME_DIR']).resolve(strict=True)
-        files.update(source_inputs(source, runtime, target, manifest.get('source_sha')))
-        policy_hashes = {'rx_bootloader_config.h': sha256(files['rx671_bootloader_config.h']),
-                         'rx671.h': sha256(files['rx671_target.h'])}
-        if manifest.get('bootloader_policy_sha256') != policy_hashes:
-            raise RuntimeError('RX671 bootloader policy differs from its effective build inputs')
-        provision_plan = validate_bundle(files, target, manifest.get('source_sha'))
+    # The secure bootloader needs public trust before the first application boot.
+    from public_signer_provision import source_inputs, validate_bundle, policy_hashes
+    runtime = Path(os.environ['IDT_RUNTIME_DIR']).resolve(strict=True)
+    files.update(source_inputs(source, runtime, target, manifest.get('source_sha')))
+    policy = policy_hashes(files, target)
+    if manifest.get('bootloader_policy_sha256') != policy:
+        raise RuntimeError('Bootloader policy differs from its effective build inputs')
+    provision_plan = validate_bundle(files, target, manifest.get('source_sha'))
     flash_manifest = {
         'schema_version': 1,
         'target_id': target['id'],
@@ -77,9 +74,8 @@ def validated_inputs(source, target):
         'files': {name: {'sha256': sha256(path), 'size_bytes': path.stat().st_size}
                   for name, path in files.items()},
     }
-    if provision_plan is not None:
-        flash_manifest['rx671_provision_plan'] = provision_plan
-        flash_manifest['bootloader_policy_sha256'] = policy_hashes
+    flash_manifest['public_signer_provision_plan'] = provision_plan
+    flash_manifest['bootloader_policy_sha256'] = policy
     return files, flash_manifest
 
 
@@ -88,11 +84,21 @@ def main():
     if not re.fullmatch('[a-f0-9]{32}',token):raise RuntimeError('No valid bench token')
     if len(sys.argv)!=2:raise RuntimeError('One IDT source path is required')
     target=get_target()
+    native_linux = os.environ.get('IDT_HOST_MODE') == 'linux-arm64'
+    if native_linux and target['id'] != 'rx72n-ethernet':
+        raise RuntimeError('Native Linux flash is restricted to RX72N Ethernet')
+    ssh = os.environ['IDT_LINUX_SSH'] if native_linux else SSH
+    scp = os.environ['IDT_LINUX_SCP'] if native_linux else SCP
     source=validate_source(sys.argv[1])
     runtime=Path(os.environ['IDT_RUNTIME_DIR']).resolve(strict=True)
+    if os.environ.get('IDT_SCOPE') == 'pkcs11':
+        source=resolve_build_tree(source,runtime,target['id'])
     if source.parent not in (runtime,runtime/'source'):
         raise RuntimeError('Flashed images must come from the private IDT runtime')
     files,flash_manifest=validated_inputs(source,target)
+    if native_linux and (not re.fullmatch('[0-9a-f]{40}', os.environ.get('IDT_SOURCE_SHA', '')) or
+                         flash_manifest['source_sha'] != os.environ['IDT_SOURCE_SHA']):
+        raise RuntimeError('Flash source differs from the reviewed Linux job')
     if os.environ.get('IDT_SCOPE','transport') not in {'pkcs11','ota-pal'}:
         params=(source/'Test/include/test_param_config.h').read_text().splitlines(keepends=True)
         prefix='TRANSPORT' if os.environ.get('IDT_SCOPE','transport') == 'transport' else 'MQTT'
@@ -110,14 +116,14 @@ def main():
         staged_manifest.write_text(json.dumps(flash_manifest,sort_keys=True)+'\n',encoding='utf-8')
         manifest_sha256=sha256(staged_manifest)
         files['flash_manifest.json']=staged_manifest
-        run([SSH,'-T','-o','BatchMode=yes',alias,'umask 077; mkdir '+shlex.quote(remote)],timeout=30)
+        run([ssh,'-T','-o','BatchMode=yes',alias,'umask 077; mkdir '+shlex.quote(remote)],timeout=30)
         completed = False
         try:
             for name,path in files.items():
-                windows=subprocess.check_output(['wslpath','-w',str(path)],text=True).strip()
-                run([SCP,'-q','-o','BatchMode=yes',windows,alias+':'+remote+'/'+name],timeout=60)
+                local_path = str(path) if native_linux else subprocess.check_output(['wslpath','-w',str(path)],text=True).strip()
+                run([scp,'-q','-o','BatchMode=yes',local_path,alias+':'+remote+'/'+name],timeout=60)
             command=shlex.join(['python3',remote+'/rpi_flash.py',token,remote,target['id'],manifest_sha256])
-            run([SSH,'-T','-o','BatchMode=yes',alias,command],timeout=flash_remote_seconds(target['id']))
+            run([ssh,'-T','-o','BatchMode=yes',alias,command],timeout=flash_remote_seconds(target['id']))
             completed = True
         finally:
             # SSH timeout/interruption does not prove the remote process exited.
@@ -133,7 +139,7 @@ def main():
                 "if resolved.parent != Path('/tmp') or resolved.name != expected: raise RuntimeError('Staging path escaped /tmp')",
                 "if resolved.exists(): shutil.rmtree(resolved)"])
             if completed:
-                run([SSH,'-T','-o','BatchMode=yes',alias,'python3 -c '+shlex.quote(cleanup)],timeout=30)
+                run([ssh,'-T','-o','BatchMode=yes',alias,'python3 -c '+shlex.quote(cleanup)],timeout=30)
 def run_callback():
     try:
         main()

@@ -96,7 +96,8 @@ As of the initial bring-up MR:
   - MQTT TLS connect
   - MQTT receive, subscribe, and publish runtime markers
 - GitLab CI Linux hardware jobs are present behind `RUN_RX72N_HW_TESTS=true`
-  and `RX72N_HW_RUNNER_PLATFORM=linux`, but the `iot-reference-rx` project must
+  on the RPi Linux bench (`RX72N_HW_RUNNER_PLATFORM=linux` only). Windows
+  direct hardware CI is retired; Windows builds remain available. The project must
   have access to the RX72N set #2 runner tags before those jobs can run
   automatically.
 

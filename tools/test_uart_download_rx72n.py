@@ -22,8 +22,7 @@ UART Protocol (from rx72n_boot_loader.c):
         "completed installing firmware."
         "integrity check scheme = sig-sha256-ecdsa"
         "bank1(temporary area) on code flash integrity check...OK"
-        "installing const data...N%(size/totalKB)."  (data flash progress)
-        "completed installing const data."
+        (Code Flash-only updates preserve independently provisioned Data Flash)
         "software reset..."
         (MCU resets)
         (boot loader starts again, verifies, bank swaps)
@@ -459,9 +458,13 @@ class UartDownloader:
                     return 1
                 return 0
 
-            # Success condition: firmware installed + verified + data flash + reset
+            # Strict success requires this installation and its integrity result.
             if sw_reset:
                 if success_message_seen:
+                    if self.strict_success and not (fw_completed and integrity_ok):
+                        print("\nERROR: Missing firmware-install completion or integrity-check success")
+                        self.close_port()
+                        return 1
                     if self.observe_after_success > 0:
                         if success_observe_start is None:
                             success_observe_start = time.time()

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- SAFFTI product configuration metadata for the pristine FreeRTOS V11.3.0 submodule. -->
 <refinfo>
-	<!-- only one package entry allowed -->
-	<package>
-		<type>rtosmodule</type>
-		<name>FreeRTOS_Kernel</name>
-		<version>11.1.0</version>
-		<application>FreeRTOSLTSLibrary</application>
-		<desc>FreeRTOS Kernel</desc>
-		<details>FreeRTOS kernel is a real-time operating system (RTOS) designed for building embedded microcontroller applications.</details>
-	</package>
+    <package>
+        <type>rtosmodule</type>
+        <name>FreeRTOS_Kernel</name>
+        <version>11.3.0</version>
+        <application>FreeRTOSLTSLibrary</application>
+        <desc>FreeRTOS Kernel</desc>
+        <details>Header configuration only. Kernel body is referenced from Middleware/FreeRTOS/FreeRTOS-Kernel.</details>
+    </package>
 </refinfo>

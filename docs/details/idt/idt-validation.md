@@ -1,0 +1,337 @@
+# RX72N・RX65N・RX671のIDT検証
+
+IDT の実機結果を試験時の構成とソースのコミットに対応付けて記録します。RX65N・RX671 は旧構成で一部を実施し、現行基盤での実機 IDT は未確認です。RPi #4 と Windows の分担構成で確認したのは RX72N Ethernet の Transport です。
+
+[現行 CI の運用](../ci-pipeline.md)は IDT を実行しません。旧 CI の IDT 入力とジョブ名は過去の証跡を読むための情報です。
+
+## RX65N・RX671 の過去の実機結果
+
+2026 年 10 月の旧構成（IDT 4.9.0 / FRQ_2.5.0、ソフトウェア TLS）の記録です。両機種とも全 IDT は未合格です。
+
+| 対象・試験範囲 | 結果 | ソースのコミット・ジョブ |
+|---|---|---|
+| RX65N / BG96 Transport | 必須 14 件完走。13 PASS、1 FAIL（`TransportSend_RemoteDisconnect`） | `7536258a`、[ジョブ #70856](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70856) |
+| RX65N / BG96 MQTT | 10 件完走。4 PASS、1 PASS_WITH_WARNINGS（TLS 暗号スイート）、5 FAIL | `7536258a`、[ジョブ #70858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70858) |
+| RX65N / BG96 OTA PAL | 15 件完走。14 PASS、1 FAIL（`otaPal_CloseFile_NonexistingCodeSignerCertificate`） | `44232ef6`、[ジョブ #70884](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70884) |
+| RX65N / BG96 PKCS #11 Core | 再試験で 10 PASS、FAIL・ERROR・SKIP は各 0。ECC オブジェクトと署名の別グループは範囲外 | `0b5ac82f`、[ジョブ #71028](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71028) |
+| RX671 / Type 1YN Wi-Fi Transport | 9 PASS。必須 14 件のうち 5 件が未報告で未完走。旧チェッカーではジョブ成功 | `44232ef6`、[ジョブ #70882](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70882) |
+| RX671 / Type 1YN Wi-Fi Transport 再試験 | 9 PASS、必須 5 件が未報告。完走を検査するチェッカーでジョブ失敗 | `0b5ac82f`、[ジョブ #71029](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71029) |
+
+RX671 の MQTT・PKCS #11・OTA PAL と、両機種の OTA MQTT の選択 3 ケース（新版更新・同版・信頼されない証明書）は、実機で成立・完了した結果が未確認です。現行基盤では両機種とも、表にある範囲を含め実機 IDT の結果が未確認です。
+
+<details>
+<summary>ソースのコミットと終了状態</summary>
+
+- RX65N Transport・MQTT は `7536258a58caec99d6aae004f4f720edd4e83782`、RX65N OTA PAL と RX671 Transport の初回は `44232ef62ea5be65161b95ae9741c6da555c7f3b`。この 2 コミットの Git ツリーは同一。RX65N PKCS #11 Core と RX671 Transport の再試験は `0b5ac82fe18f28a20bf815d8950e064f15ec0a35`。RX671 Transport の再試験を除く表の 5 実行について、パイプラインと試験・ビルドのソースのコミットが一致し、未コミット差分はなかったことが !222 の旧版レビューに記録されている。
+- RX65N の旧 MQTT 実装は MQTT 3.1.1。5 件の FAIL の原因はこの表では特定していない。RX671 Transport の初回は当時の報告どおり 9 PASS と記録し、必須 14 件の完走判定では不合格となる。
+- RX65N Transport・MQTT・OTA PAL と RX671 Transport の初回は、リセットコマンド成功、直後の観測 1 秒間で UART 受信 0 バイト、`cleanupError=null`。Transport で実行が所有した EC2 インスタンスは終了を確認した。
+- RX65N PKCS #11 Core の再試験は、リセットコマンド成功、直後の観測 1 秒間で UART 受信 0 バイト、IDT の後処理完了を確認した。先行試験は 5 PASS、1 ERROR で後続グループの書き込み中に停止し、終了処理も ERROR、`end_state` は空だった。表の成功回を含め、物理 RESET 端子の電圧と AWS 全体の残存資源は未確認。[先行ジョブ #70910](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70910)
+
+</details>
+
+## 旧 CI の 3 ターゲットの実行入口
+
+旧 CI では GitLab の Run pipeline / Pipelines API で、次の 3 入力を指定していました。
+
+| 入力 | 値 |
+|---|---|
+| `RUN_RX_IDT` | `true`（既定は`false`） |
+| `IDT_TARGET` | `rx72n-ethernet` / `rx65n-bg96` / `rx671-wifi` |
+| `IDT_SCOPE` | `plan` / `preflight` / `transport` / `mqtt` / `pkcs11` / `ota-pal` / `ota-mqtt` |
+
+選択した1ターゲットだけのnative jobを生成し、通常のboard / OTA / nightly jobは起動しません。
+RX72Nの旧入力`RUN_RX72N_IDT=true` / `RX72N_IDT_SCOPE`も保持します。新旧入力を同時に指定した場合は新入力を優先します。
+任意のOTA case選択は`IDT_TEST_ID`（旧`RX72N_IDT_TEST_ID`も可）で指定します。
+
+| ターゲット | native job | MCU側の接続 |
+|---|---|---|
+| `rx72n-ethernet` | `test_rx72n_idt` | RX72N Envision Kit Ethernet、RPi #1 |
+| `rx65n-bg96` | `test_rx65n_bg96_idt` | CK-RX65N V1 / BG96、RPi #3 |
+| `rx671-wifi` | `test_rx671_wifi_idt` | EK-RX671 / Type 1YN Wi-Fi、RPi #1 |
+
+同じWindows / WSL / CC-RX / AWSホストを使い、host preflightは選択したRPiのhostnameを確認します。
+共有ホスト設定は既存の`RX72N_IDT_RUNNER_TAG` / `RX72N_IDT_PYTHON` / `RX72N_IDT_HOST_PROFILE`を継承します。
+Wi-Fi / APNは既存のターゲット専用CI変数からprivate runtimeへ渡し、source・firmware・値を公開artifactに含めません。
+
+`plan`はホストの版・依存と固定されたboard identityを計画へ記録するだけで、AWS、compiler、UART、flashを操作しません。
+`preflight`はnative `FreeRTOSVersion`を実行します。FreeRTOS `202604.00-LTS`とIDT 4.9.0 / FRQ_2.5.0の不一致はNGとして保持し、環境整備の失敗と区別します。
+共通基盤のcoreMQTTは3ターゲットとも5.0.2（MQTT 5）へ統一しています。suiteのMQTT 3.1.1期待値との不一致はNGとして保持します。以前のRX65N/BG96の2.3.1による結果を新基盤のnative合格へ流用しません。
+失敗・ERROR・SKIPをPASSへ書き換えず、LTS / manifest / vendor suiteを変更しません。
+
+### 旧 CI の nightly における TLS Transport
+
+`PIPELINE_PROFILE=nightly_matrix`では、既存50回帰rowの完了後に`matrix_rx_idt_transport`が上記3ターゲットの`transport`を実行します。job内の選択値だけを設定し、専用IDT workflowや他scopeは有効にしません。Windowsのcanonical checkout・CC-RX resource group・既存実機lockと終了処理を共有します。通常push / MR / focusedではこのmatrixを生成しません。
+
+この3実行は`FullTransportInterfaceTLS`の回帰です。版照合、MQTT、PKCS #11、OTAを含む全IDT認定を意味せず、OTAのGreaterVersion / SameVersion / UntrustedCertificateは各ターゲットで別に検証します。今回のリリース判定でも必要な実jobと終了状態を対象main SHAに対応付け、未実行・skipや過去SHAの結果を合格の代わりにしません。
+
+既存report checkerは必須14ケースの名前と全件成功を確認し、0件・欠落・failure／error／skip・宣言件数の不整合を拒否します。nativeの終了処理とreportの成功の両方が必要です。reset／UART静止は通常FWへの復帰を証明しないため、復帰の証跡は別に確認します。
+
+MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検査、`idt_target_plans`は3ターゲットの計画を保存します。
+`idt_source_matrix`はWindows runnerで、Transport、DeviceAdvisor、OTAE2E、PKCS11 StartFinish、PKCS11 NoObject、OTAPALの6構成×3ターゲット＝18構成について、実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
+過去のローカル15構成compile成功は保存されたsourceに対する結果として保持し、このMRのclean SHA・runner・実機の合格へ流用しません。
+
+### 旧構成での実機試験の準備条件
+
+固定target identityがapplication、bootloader、packager、UART、debugger、bench lockを選びます。
+共有CC-RX resource groupに加え、実機の既存lockと通常CIとの排他を確認します。
+全3環境の実機scopeは、[共通初期boot trust](../../../tools/idt/RX671_BOOTSTRAP.md)を用意してから実行します。CIは[prepare_public_signer.py](../../../tools/idt/prepare_public_signer.py)で公開署名鍵投入用MOT・正式manifest・公開証明書・公開鍵を自動生成します。確認済み資料で置き換える場合は`IDT_PUBLIC_SIGNER_PROVISIONER_MOT_FILE`、`IDT_PUBLIC_SIGNER_PROVISIONER_MANIFEST_FILE`、`IDT_PUBLIC_SIGNER_CERT_FILE`、`IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE`の4入力を全て指定してください。部分指定は拒否し、host-only preflightでは生成しません。
+
+共通profileは`rx-dual-public-signer-provisioner-v1`です。IDT buildと同じsource SHAの`formal=true`・`source_tree_dirty=false`を要求し、private outputはcheckout外に新規作成します。保守用MOTの実設定とsource識別子、公開P-256鍵の一致、bootloader policy、両bankの正確な配置を検査します。初期RSUは署名付きCode Flashのみとし、Data Flashを同梱しません。
+
+既存lockを保持して、独立したRFP chip eraseを完了後に保守用dual-bank MOTを起動します。実機source識別子を確認し、LittleFSをformatして公開署名鍵を保存・commitした後、Data Flashを保持して両bankのbootloaderと署名付きapplicationを導入します。`runtime_trust`は実署名検査と起動成功が確認できるまで`not_established`です。built-in fallbackは有効にしません。
+
+共通LittleFSは2.11.3、領域の開始位置は`0x00100000`、容量はRX65N/RX72Nが16KiB、RX671が8KiBです。RX72Nの旧開始位置とRX65N/RX72Nの旧容量からの変更により、初回formatと再provisionが必要です。今回の部品・host検証を実機の移行確認やIDT合格へ流用しません。OTAのbuild ledger / 起動識別子はターゲットとfingerprintを照合し、通常firmwareへの復帰は既存flash / provision経路で確認します。
+
+[共有予算](../../../tools/idt/cleanup_budget.py)は3環境ともtransaction 3245秒、公開鍵投入CLIは絶対上限200秒です。終了時はresetコマンド成功と、新しい1秒間のUART静止を確認します。RESET端子の電圧測定は実行条件に含めません。reset失敗、UART出力継続、privileged子processの終了不明では所有記録を保持して再利用を止めます。
+
+過去のRX671起動不良は、現行のdual-bank共通経路と区別して保存しています。
+
+<details>
+<summary>過去のlinear画像・起動bank調査</summary>
+
+OTA後の起動バンク000からlinear provisionerを一括書込みすると、verify成功後も旧bootloaderを指す起動不良を実機で再現しました（[#168](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/168)）。同じ通常FWでもdual/000からの1回目は旧bootloaderのvectorが残り、2回目で正しい配置へ収束することを確認しました。2回書込みに依存せず、chip eraseを別コマンドで先に完了してから書き込む経路を採用しています。
+
+これらは当時のsourceに対する調査結果です。現在は通常application・native application・bootloader・保守用provisionerをdual-bankへ統一し、新基盤の実機再検証は未完了です。
+
+</details>
+
+## RX72Nの既存実測
+
+以下はそれぞれに記載された過去SHAの結果です。今回の追加2ターゲットや変更後sourceの合格として扱いません。
+
+RX72N Envision Kit / Ethernet / software TLSで、**TLS transportの14件が実機PASS**しました。
+OTA E2Eの**新しいバージョンへの更新と、1.9.1 → 1.9.2の起動識別子を、clean SHA `c9fcadb1`の実機CIで確認**しました。
+同版・非信頼証明書の試験もclean SHA `2e0c7a5b`でPASSしましたが、全13ケースは未完了です。
+MQTTのnative IDT試験は完走しましたが、IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致せず、6件がFAILです。
+FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリース要件充足には達していません**。
+新規リリースタグの保留方針を維持します。
+
+## 試験範囲と現在の結果
+
+2026-09-28時点。IDT 4.9.0 / FRQ_2.5.0を使用しています。
+
+| `RX72N_IDT_SCOPE` | native IDT group | 結果・確認範囲 |
+|---|---|---|
+| `preflight`（既定） | `FreeRTOSVersion` | Version ERROR / Library FAIL。202604.00-LTS未対応 |
+| `transport` | `FullTransportInterfaceTLS` | **14/14 PASS**。[clean SHAのpipeline #11247](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11247)で確認 |
+| `mqtt` | `FullCloudIoT` | native MQTT03: 10件完走、TLS 3 PASS・cipher 1 PASS_WITH_WARNINGS・MQTT 6 FAIL |
+| `pkcs11` | `FullPKCS11_Core` | **10件PASS / 0 FAIL / 0 ERROR / 0 SKIP**。capabilities、digest、random、初期化 / session |
+| `ota-pal` | `OTACore` | **14件のassertion PASS**、filesystem専用1件はIGNORE。native IDTはこのIGNOREをFAILと記録し、全体NG |
+| `ota-mqtt` | `OTADataplaneMQTT` | **GreaterVersion、SameVersion、UntrustedCertificateの3ケースPASS**。GreaterVersionは独立した起動判定もPASS。全13ケースは未完了。SHAと証跡は以下を参照 |
+
+TLSの確定証跡は[`9cadbfeb0a10a51a1f2953127346a58bd38805bf`](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/commit/9cadbfeb0a10a51a1f2953127346a58bd38805bf)のclean checkoutによるものです。
+他のscopeや対象SHAに、この14件の合格を流用しません。
+PKCS11 Coreの10件は基本APIの結果です。ECC object / signを検査する別group `FullPKCS11_Import_ECC`は未実行です。
+この10件の後でlabel設定をproductionと同じ`pkcs11configLABEL_*`参照へ統一しました。この変更後の実機再試験は未実施です。
+PKCS11試験終了時はreset保持成功とUART 0 bytesを確認しました。
+
+[MQTT03の証跡](https://gitlab.saffti.jp/-/project/38/uploads/de289e072658138a255bf5a54a1062b2/pilot-mqtt-03-sanitized-evidence.zip)と
+[PKCS11 Coreの証跡](https://gitlab.saffti.jp/-/project/38/uploads/814c9055ccc191fa8b63cabb5bdc564c/pilot-pkcs11-02-sanitized-evidence.zip)は、
+main `0dc57833`に実装中の差分を加えた試作の結果（`source_dirty=true`）です。リリース対象SHAの証跡には流用しません。
+[OTA PALの証跡](https://gitlab.saffti.jp/-/project/38/uploads/c40a51ac23d6972d57beb71b3d924dbb/pilot-otapal-01-sanitized-evidence.zip)では、
+実機Unity出力が`15 Tests 0 Failures 1 Ignored`、native JUnitが14 PASS / 1 FAILでした。これも`source_dirty=true`の試作結果です。署名検証、異常署名拒否、inactive bankへの書込み・状態APIのassertionを確認し、終了時のreset保持とUART 0 bytesも確認しました。
+
+**OTA E2E（最新）:** [job #70703](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70703)は未変更の`c9fcadb1d733e7116d6641661c3e94fe25264c78`で、native 3 PASS / 0 FAIL / 0 ERROR / 0 SKIPでした。UARTで初期image `3b0a915e…`（1.9.1）→更新image `5cedbf7d…`（1.9.2）を順に確認し、`native_junit_passed=true`と`ota_boot_verified=true`を別々に記録しています。各imageはbuild ledgerのpayload hash・source SHAと一致します。
+IDT終了時はreset保持 / UART 1秒0 bytesでした。AWS APIでもThing / job / OTA update / S3 bucketの不存在、実行時間帯のIDT用IAM role / policyと一致証明書の残存0、一時ACM証明書2件の不存在を確認しました。
+
+[#11262・#11264・#11265のsanitized証跡](https://gitlab.saffti.jp/-/project/38/uploads/539031949e04d575e3cc0e0ef84248ee/idt-ota-witness-11262-11265-sanitized-evidence.zip)は公開用JSON/XMLと説明だけを含みます。SHA-256は`2ba4766587b60b504a79021369df84bcc530bbd7b221b9ddf5d216e69cc4e3ba`です。raw UART、注入済みsource/firmware、秘密鍵は含めていません。
+
+**OTA E2E（同版・非信頼証明書）:** clean SHA `2e0c7a5bd6d990d364f20ccb7d7691f874d60689`の[pipeline #11272](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11272)は、setup / SameVersion / UntrustedCertificate / cleanupの4件がPASSしました。
+同版では同一imageの1.9.1 → 1.9.1、非信頼証明書では署名検証エラーと1.9.1の維持を実機で確認し、両ケースのAWS jobは期待どおり`FAILED`でした。
+新版1.9.2は起動していません。これらの起動観測はGreaterVersion単独実行の必須gateとは区別します。
+[sanitized証跡](https://gitlab.saffti.jp/-/project/38/uploads/53441e5d51c146715b283e80c9f3c628/idt-ota-negative-11272-sanitized-evidence.zip)のSHA-256は`4767ee5ae6a8ca333aae0ce72458aac99a8105835da03e84a5e4f236163892a2`です。
+GreaterVersionの`c9fcadb1`と異なるSHAの部分試験であり、合算してリリース対象SHAの全IDT合格にはしません。
+
+**異常系の途中結果:** 同じ`c9fcadb1`の[pipeline #11265](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11265)は、PreviousVersion → SameVersion → UntrustedCertificateの選択実行中に停止しました。
+
+| case | 確認結果 |
+|---|---|
+| PreviousVersion | 実機で1.9.1 → 1.9.0の起動と、AWS jobの`FAILED`を確認。このcase内で1.9.1への自律復帰は未観測 |
+| SameVersion | 初期firmwareのUART書込みでconst data 7/28KBまで進んだ後、bootloaderが`system error`。試験成立に至らず |
+| UntrustedCertificate | このrunでは未実行 |
+
+nativeは失敗したflash callbackの後も試験を継続しました。所有するsupervisorへ停止を要求したところ、IDTのCancel処理がnil-pointer panicで終了し、最終JUnitは生成されませんでした。従ってこのrunを合格件数に加えません。MCUはreset保持 / UART 1秒0 bytesで停止しました。CloudTrail作成履歴、IAMの不変ID・専用参照、試験用公開鍵との一致を確認して残存資源を回収し、Thing・証明書・S3 bucket・IAM role/policy等の残存0をAPIで確認しています。
+UART downloaderはCRの進捗行とCRLFのエラー行を個別に扱い、`R_FLASH_*`エラーや`system error`を即時不合格にします。flash callbackの失敗もprivate runtimeへ保持し、nativeが無視してもsupervisorが停止・不合格にするようにしています。これはconst-data書込み不具合や旧版rollback自体を修正したものではありません。
+旧版拒否・自律rollbackの設計と実機検証は[Issue #158](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/158)で追跡します。
+
+残る2ケースを指定した#11267は、native開始前のACM準備でWindowsの記録ファイル保存が`PermissionError`となり停止しました。ready状態の一時ファイルが残り、同じ権限で後処理時の保存は成功したため、一時的な置換拒否が疑われます。MCU書込みは行わず、ACM証明書2件は削除しました。対策としてWindowsの該当エラーだけ、同じ一時ファイルの置換を最大5回・合計0.75秒の待ち時間で試みます。AWS importや実機試験は再試行せず、恒久的な拒否は不合格のまま記録を保持します。
+
+**OTA E2E（旧記録）:** [job #70643](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70643)は未変更の`97e6c070bd51aa11f0a93cc3d4fbf50070554e01`で実行し、1.9.1と1.9.2のpayload（各1,834,496 bytes）を生成しました。
+nativeはAWS OTAジョブの`SUCCEEDED`を確認し、JUnitは3 PASS / 0 FAIL / 0 ERROR / 0 SKIPです。これは1つの更新ケースとsetup / cleanupの結果で、3種類の更新試験やgroup全体の合格を意味しません。
+[sanitized証跡](https://gitlab.saffti.jp/-/project/38/uploads/ebf169ff93dc2c741d3c88467abc937c/ota-greater-version-11255-sanitized-evidence.zip)のSHA-256は`681ab46a68bae10d77a49cd684a2e4fb463f58d20acebad4e70c88f954b70b60`です。payload hashと版数はmetadataに保持しています。
+bankの整合性検査・切替ログは得られましたが、更新後の`Application version 1.9.2`というUARTバナーはこのcaptureでは得られていません。nativeのPASSと、独立した起動版確認を区別します。
+IDT終了時はreset保持 / UART 0 bytes、AWSのThing / job / OTA updateの不存在、公開鍵が一致する証明書0件、一時ACM証明書2件削除を確認しました。その後、通常MR CIのjob #70641が通常firmwareを再書込み・provisionし、MQTT試験に成功しています。
+
+<details>
+<summary>OTA認証情報の接続方法と立上げ時の切り分け</summary>
+
+OTA setupでは`KeyProvisioning=Import`、ECC公開鍵を設定しても、対象ThingのprincipalはACTIVEなRSA証明書でした。
+既存EC証明書を指定する診断でも同じ不一致になったため、この追加証明書を作る試作コードは採用していません。
+その後、OTAスコープだけnativeの`KeyProvisioning=Onboard`で公開鍵を渡すと、ACTIVEなEC証明書1件と試験用秘密鍵の一致を確認できました。
+これはホスト生成鍵を試験firmwareへimportする開発用の接続方法です。マイコン上の鍵生成・secure elementの認定試験結果には扱いません。PKCS11スコープは`Import`のままです。
+証明書と秘密鍵の一致検査は維持し、診断だけでは更新成功・署名検証成功・復帰成功の証跡には扱いません。
+各試行の一時ACM証明書2件と、既存証明書指定の診断用IoT証明書は削除を確認しました。
+19:05頃の診断中にはRPi #1へのSSH接続も切れ、native cleanupがERRORになりました。CloudTrailで所有を確認して残存資源を回収しました。[診断・回収証跡](https://gitlab.saffti.jp/-/project/38/uploads/3902f283dfdc894cfc895060ce5d4d7e/ota-setup-sanitized-evidence.zip)はこの失敗を維持しています。
+再接続後のreset操作は成功しましたが、直後のUART2 bytesで静止検査はNGでした。その後、共有lock下の観測で3秒連続0 bytesを確認しました。
+
+</details>
+
+## 旧 CI の明示実行
+
+旧 CI では GitLab の Run pipeline または Pipelines API で、`RUN_RX72N_IDT=true` と上表の `RX72N_IDT_SCOPE` を指定していました。
+`RUN_RX72N_IDT`の既定は`false`です。
+IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指定しません。
+通常のpush、MR、main更新、tag作成ではnative IDT jobを生成しません。nightlyは上記の3ターゲットTLS transportだけを追加します。
+
+<details>
+<summary>OTAケースの選択と起動版の確認</summary>
+
+`RX72N_IDT_SCOPE=ota-mqtt`に限り、`RX72N_IDT_TEST_ID=OTAE2EGreaterVersion`で単一caseを選べます。
+カンマ区切りで複数caseを選べます。例えば`OTAE2ESameVersion,OTAE2EPreviousVersion,OTAE2EUntrustedCertificate`です。空要素、重複、固定suiteにないcaseは実行前に拒否します。
+通常は指定せず、選択group全体を実行します。
+選択caseは`metadata.json`と`summary.json`の`selected_test_ids`に部分実行として記録し、group全体の合格には扱いません。
+OTA imageごとに異なる識別子を埋め込み、実起動時に`[IDT_BOOT] image=... version=...`を出力します。build ledgerで識別子・コンパイル版・payload hash・source SHAを対応付けます。
+GreaterVersion単独実行では、native JUnitの合格に加え、初期imageと新版imageの起動を順に観測することを追加条件にします。`native_junit_passed`と`ota_boot_verified`は別々に保存し、起動証跡が欠けた場合はjobを不合格にします。native JUnit自体は書き換えません。
+この追加条件を導入した[pipeline #11262](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/11262)ではnative 3件PASSでも新版のUART起動情報がなく、jobを不合格にしました。実機フラッシュのreadbackは新版payloadのSHA-256と一致しましたが、これをUART起動確認の代用にはしていません。新版ではCLI案内文が途中で停止していました。IDT起動で対話CLIタスクを作らずUARTを同期初期化し、CLI削除による送信mutexの取り残しを避ける修正後、#11264で両imageの起動情報と追加判定PASSを確認しました。
+他case・group全体では観測したimageを記録しますが、GreaterVersion単独と同じ起動版判定を行ったとは扱いません。
+認証情報の切り分け用にlocal CLIの`--diagnostic-only`を指定すると、秘密情報を含む診断資料をprivate runtime内へ保存し、compiler / flash前に必ず停止します。これは合格試験ではなく、通常のpipeline引数には加えません。
+
+</details>
+
+## 運用・リリース要件
+
+専用のパイプライン引数は旧 CI の実行方法です。現行 CI の対象は[CI/CD 運用](../ci-pipeline.md)を参照してください。
+新規リリースタグの作成前に、タグ対象commit SHAの対象構成で必須試験がすべてPASSしていることを確認します。
+未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。通常のMQTT / OTA CI成功もIDT合格の代用にはなりません。
+自動gate整備まではOwner / Maintainerが証跡を確認し、要件を満たせない間は新規リリースタグを保留します。
+
+証跡はcommit / submodule SHA、ボード・TLS構成、firmware hash、IDT / suite版、pipeline、reportを対応付けて保存します。
+対象SHAや構成が変わった場合、以前の合格結果は流用しません。
+IDTによる検証と[AWSの正式認定](https://docs.aws.amazon.com/freertos/latest/qualificationguide/freertos-qualification.html)は区別します。
+
+実装時は動作検証を進め、通常運用ではコード変更ごとのIDT実行と無制限の自動再試行は行いません。
+[OTAにはIoT Device Management、接続・MQTTにはIoT Coreの料金](https://aws.amazon.com/freertos/pricing/)が発生します。
+1実行75分のhost timeoutを設け、中断・異常終了時は実機の停止と試験用AWS資源の回収を試みます。
+回収・終了状態の確認に失敗した場合は不合格とし、記録を保持して個別に復旧します。
+通常運用時は利用量・費用上限・停止条件を定めます。
+
+## 実行するコンピュータ
+
+| 場所 | 役割 |
+|---|---|
+| Windows x86_64（現在はishiguro-pc） | IDT版照合、CC-RXによるfirmwareビルド、AWS認証の引渡し |
+| 同ホストのUbuntu WSL 2 / x86_64 | native IDT suite、UART用PTY、AWS試験制御 |
+| RPi #1 | RX72NへのRFP書込み、CN6 / SCI7 UART転送、共有ベンチlock |
+| RX72N Envision Kit / Ethernet | production transport、MQTT / OTA、および選択した試験コード |
+| AWS / ap-northeast-1 | TLS echo server、IoT Core / Device Advisor、OTA試験資源 |
+
+この表は既存のWindows / WSL構成です。RPi #4への移行では、x86-64用のLinux版IDTをARM64上でQEMU経由で実行します。
+Windowsホストはprofileとrunner設定で移設可能にし、接続個体とツールの正本は[hardware-config](https://gitlab.saffti.jp/oss/infra/hardware-config)に従います。
+**既存PCの新規Windows / WSL venvでhost検査17項目PASS**を確認しました。e2 studioのproduct / release metadataとCC-RXの版も照合しています。新規PCでの再構築・実機完走は未検証です。
+
+### RPi #4への移行とWindowsビルドの役割分担
+
+| 場所 | GitLab Runner | RX72N Ethernetの移行構成で担当する処理 |
+|---|---|---|
+| RPi #4 | #26 | 汎用CI。IDT専用Runnerと同じホストで並行実行できる |
+| RPi #4 | #28 | QEMU経由でIDTを動かし、試験を進行する。AWS通信、ファームウェアのパッケージ化、結果集計も担当する |
+| Windows PC | #29 | IDTからの依頼を受け、e² studioとCC-RXでビルドし、成果物を返す。OSサービスは自動起動、GitLabでの受付は既定paused |
+| RPi #1 | 既存の実機ベンチ | UART中継とRFPによるRX72Nの書き込みを担当する |
+
+`gitlab-runner-idt-rx` はRPi #4とWindowsで付けたOS上のサービス名です。RPi #4のサービスはGitLabのRunner #28、WindowsのサービスはRunner #29に接続します。RPi #4の#28、#26、非公開グループ用の#27はCPUとメモリを共有します。
+
+Windowsの `gitlab-runner-idt-rx` は専用ユーザーで動く自動起動サービスです。GitLab Runner #29 は既定でpausedのため、OSサービスの起動とジョブ受付の状態を区別します。ビルド依頼と成果物をやり取りする処理は、Runnerが実行するプロジェクト側のコードが担当します。
+
+IDTは試験の実行中に設定を注入したソースを用意し、`buildTool.command` に渡します。ビルド用コマンドはWindowsへその入力を渡し、成果物が戻るまで待ちます。IDTは受け取った成果物を使って書き込みと試験を続けます。GitLab上でビルドを別ジョブとして実行する場合も、試験開始前に固定した `needs` だけでは、この時点で生成される入力と成果物を結び付けられません。実行中の要求と応答を結ぶ処理が必要です。 [AWSのビルド・書き込み設定](https://docs.aws.amazon.com/freertos/latest/userguide/config-settings-device.html)
+
+プロジェクト固有のCI定義、ビルド要求の受け渡し、Windowsでのビルド呼び出し、入力と成果物の検証は、このリポジトリのCI設定と `tools/idt/` で版管理します。各サービスが起動するGitLab Runner本体はGitLab公式配布を使います。認証トークンを含む `config.toml` とSSH秘密鍵は各ホストで管理します。 [GitLab Runnerのサービスコマンド](https://docs.gitlab.com/runner/commands/)
+
+Runner #28と#29の台帳への反映は未了です。現在の登録はプロジェクトのRunner設定で確認できます。 [プロジェクトのRunner設定](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/settings/ci_cd) · [hardware-configのRunner台帳](https://gitlab.saffti.jp/oss/infra/hardware-config/-/blob/main/docs/runner-inventory.md)
+
+Runner #28で公式サンプルが合格し、同時に#26で汎用処理が動くことを確認しました。公開ダミーの成果物往復はRPi #4の#26と既存Windows Runner #3で確認しました。[並行実行CI #15742](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/15742) · [成果物往復CI #15688](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/15688)
+
+[pipeline #16368](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16368) は !260 の clean source `ac56c5279598536e4270a0a7abce3ec2b2e17903` で、RPi #4 controller [#87443](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/87443) が成功しました。対となる [pipeline #16393](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16393) の Windows #29 worker [#87486](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/87486) も成功しました。RX72N Ethernet / software の native `FullTransportInterfaceTLS` は14/14 PASS、failure・error・skipは各0です。対象は `transport` のみで、`qualification=not-established` です。同SHAの通常FWを署名付きで導入し、bootloader handoff、reset成功とUART静穏1秒を確認しました。物理reset保持と復帰後のアプリ機能は未確認です。他の2機種、native OTA、製品nightlyの合格には扱いません。
+
+<details>
+<summary>ホストを再構築する手順と固定版の検査</summary>
+
+ホスト固有の配置は[非secret profile](../../../tools/idt/host-profile.example.json)で管理し、`RX72N_IDT_HOST_PROFILE`で選びます。
+別PCでもworkspace規約に合わせて`C:\ai\codex`配下を使用します。任意driveへの移設を保証する構成ではありません。
+Windows / WSLのPython依存は[Windows](../../../tools/idt/requirements-windows.txt)と[WSL](../../../tools/idt/requirements-wsl.txt)の固定版から専用venvへ導入します。
+PowerShell 7、Windows OpenSSH、WSL 2のx86_64 Linux、Python 3.11以降、e2 studio 2026-04.2 / CC-RX 3.07.00を事前に導入してください。
+検証ホストはWSL 2.6.3.0、Ubuntu 24.04.4 LTS、Linux Python 3.12.3です。
+Ubuntuで`python3-venv`が未導入の場合は、別途`sudo apt-get update && sudo apt-get install python3-venv`を実行します。
+
+```powershell
+python tools/idt/setup_host.py --profile tools/idt/host-profile.example.json `
+  --wsl-venv /mnt/c/ai/codex/tools/venvs/rx72n-idt-linux
+$env:RX72N_IDT_HOST_PROFILE = 'C:\ai\codex\tools\venvs\rx72n-idt-windows\host-profile.json'
+$idtPython = 'C:\ai\codex\tools\venvs\rx72n-idt-windows\Scripts\python.exe'
+& $idtPython tools/idt/check_host.py --check-aws --output artifacts/idt-host-check.json
+```
+
+[setup_host.py](../../../tools/idt/setup_host.py)は専用venvとprofileを作り、OS、Renesas製品、AWS認証、SSH鍵、既存Python環境を変更しません。
+[check_host.py](../../../tools/idt/check_host.py)は選択profileで実行ユーザー、ツール配置・版、Python依存、WSL / Linux版、SSH接続先hostnameを記録します。
+`--check-aws`はread-onlyのSTS照会です。UART、flash、試験用AWS資源には触れません。
+WSL、SSH、AWSはWindowsユーザーごとの設定なので、GitLab Runnerサービスの実行ユーザーでも検査します。
+CC-RXライセンスとリンク可能サイズは実際のfirmwareビルドで確認します。
+
+CIでは`RX72N_IDT_RUNNER_TAG`と`AWS_CLI_RUNNER_TAG`を配備先tagへ、`RX72N_IDT_PYTHON`を専用venvの`python.exe`へ設定します。
+CC-RXのresource groupは同ホストの既存ビルドとの排他を維持します。
+`RX72N_IDT_POWERSHELL`と`E2STUDIO_CLI`はprofileより優先し、buildにはPowerShell 7と`e2studio-cli.exe`を使用します。
+Windows PowerShell 5.1はe2 studio終了コードを取得できなかったため対象外です。
+ホストを変えても、RPi #1のhostname、UART by-id、E2 Lite serial、共有lockは変更しません。
+
+IDTは[AWS公式署名付きAPI](https://docs.aws.amazon.com/freertos/latest/userguide/idt-programmatic-download-process.html)から固定版を取得します。
+[manifest](../../../tools/idt/bundle-manifest.json)と[検証コード](../../../tools/idt/idt_bundle.py)でZIPのSHA-256および各OSの静的74ファイルを確認します。
+公式ZIPを再取得して既知hashと照合済みです。cached binaryの存在だけでは成功にせず、追加・欠落・改変された実行ファイルや試験定義を拒否します。
+可変のconfigs / logs / resultsはhash対象から除きます。
+`latestidt`が別版へ更新された場合は自動で追従せず停止します。固定版を再構築する場合は、保管した公式ZIPのhashをmanifestと照合してprofileの`install_root`へ展開し、`verify_install`で検査します。
+版を更新するときは公式bundleの版・suite・対応FreeRTOSを確認し、両OSのZIP hashと静的file一覧を再生成してMRでレビューし、実機scopeを再検証します。既存のPASSを新しいtoolへ流用しません。
+
+</details>
+
+## 判定と証跡
+
+IDT 4.9.0は試験不合格でもプロセス終了コード0を返します。
+[結果判定](../../../tools/idt/check_idt_report.py)は必須group、1件以上のtestcase、件数整合を確認し、failure / error / skipped / disabledのいずれかがあれば不合格とします。
+実行や終了処理の失敗も合格にしません。scope単位のPASSは全IDT合格ではありません。
+OTA PALのfilesystem専用IGNOREはnative IDTがFAILへ変換しました。これをPASSへ書き換えず、full groupの合格には扱いません。
+
+公開CI artifactは、診断本文を除いた`FRQ_Report.xml`、`summary.json`、`metadata.json`だけです。
+commit / submodule SHA、dirty状態、firmwareと試験設定のhash、IDT / suite版、部分実行の有無を対応付けます。
+UARTはnativeへの転送前にprivate runtimeの`uart-witness/uart.bin`へ保存します。nativeの読み取り終了後もSSH出力をEOFまで回収し、末尾の起動情報を残します。公開metadataにはrawのbyte数 / SHA-256と、識別子・版数・hash等の限定した観測情報だけを載せます。
+raw captureは128 MiBを上限とし、書込みエラー・上限超過は不合格にします。解析できない起動markerはカウントとして残し、native試験を途中で打ち切りません。GreaterVersion単独の追加判定では、欠落・不完全なmarkerを正常な起動証跡として扱いません。rawと`events.jsonl`はprivate runtimeと同じ保持・削除対象です。
+
+private runtimeと`<workspace_root>\idt-private-<run>`は、失敗解析とレビューのため保持します。MRの確認後、必要なsanitized証跡を保存し、当該runのプロセス終了・AWS cleanup・実機停止を確認してから両ディレクトリを削除対象にします。自動世代削除は行わず、調査中のrunや別runを一括削除しません。
+private runtime内の`diagnostic-*`資料も同じ保持・削除対象です。
+
+試験用秘密鍵、注入済みsource / firmware、元のIDTログ、e2 studio workspaceはアクセスを制限したcheckout外の領域に保持します。
+試験後は共有lockを保持したままresetコマンド成功と新しい1秒間のUART静止を確認し、試験用AWS資源とRPiの一時firmwareを片付けます。
+通常運用へ戻す際は既存のflash / provision CIで通常firmwareと認証情報を再設定します。
+
+<details>
+<summary>MQTT / OTAの制約と部分結果の解釈</summary>
+
+**MQTT:** native FRQはDevice Advisor suiteにprotocolを指定せず、定義version 1で実行します。userdataにprotocolのoverrideはありません。
+MQTT03の6件はすべて`ExpectedMqttV3_1_1`に対して`MqttV5`を受けた失敗です。
+MQTT 3.1.1へのdowngradeや試験経路の置換は行っていません。
+TLS cipherの`PASS_WITH_WARNINGS`もそのまま保持します。
+警告中の8 cipher suiteは[AWS IoTの現行対応表](https://docs.aws.amazon.com/iot/latest/developerguide/transport-security.html)にあり、`0x00FF`はSCSVです。警告を危険な暗号方式の使用確定として扱いません。
+
+**OTA署名:** 文書化された`customSignCommand`の波括弧placeholderがnative IDTの`GetUserData`による先行展開と衝突し、その経路では試験開始に至りませんでした。
+[AWS Signer用の準備・cleanup](../../../tools/idt/ota_aws_signers.py)を実装しています。初期のOTA02は認証情報の不一致でbuild前に停止しましたが、公開鍵の受渡し経路を修正したpipeline #11255ではGreaterVersionの単一ケースがPASSしました。署名不正・旧版・同版等を含むgroup全体は未実行です。
+一時ACM証明書は実行固有のtagとjournalで所有を確認し、IDT終了・native cleanup後に削除します。
+
+**OTA PAL:** inactive bankの実flashに対する既存assertionを実行するportです。
+15 nominal caseのうち14件がassertion可能で、`otaPal_CloseFile_NonexistingCodeSignerCertificate`はfilesystem専用のためIGNOREです。
+実機では14件のassertionが通り、1件がIGNOREでした。nativeがFAILとして記録したIGNOREをPASSへ置き換えません。
+
+**版照合と認定:** [AWS対応版](https://docs.aws.amazon.com/freertos/latest/userguide/dev-test-versions-afr.html)と実CLIは202210-LTSまでを示し、現行202604.00-LTSは未対応です。
+manifestの偽装や古いLTSへの巻戻しは行っていません。
+[AWS正式認定](https://docs.aws.amazon.com/freertos/latest/qualificationguide/freertos-qualification.html)と、本フォークの個別機能検証は区別します。
+[初期のTLS試作JUnit](https://gitlab.saffti.jp/-/project/38/uploads/24dd240b620cd68e6fba073c5054ce3a/rx72n-idt-transport-20260927.xml)は`source_tree_dirty=true`のため、clean SHAの証跡には使いません。
+
+</details>
+
+port / buildの詳細は[Test/ports](../../../Test/ports/README.md)、通常CIは[CI/CD運用](../ci-pipeline.md)を参照してください。

@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studioc.exe",
-    [string]$Workspace = "C:\Temp\e2ws_iot_ref_rx671_bootloader_2026_04_2",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
+    [string]$Workspace = "C:\ai\codex\ws\e2ws_iot_ref_rx671_bootloader_2026_04_2",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx671_bootloader_e2studio_build.log"),
     [string]$SourceProvenanceFile = "",
     [string]$Python = 'python',
@@ -9,11 +9,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "rx_e2studio_cli.ps1")
 
 $projectName = "boot_loader_rx671_ek"
 $relativeProject = "Projects\boot_loader_rx671_ek\e2studio_ccrx"
 $relativeSubmodule = "$relativeProject\lib\rx_bootloader"
-$expectedSubmoduleHead = "c31bac703e1406e7a94d398b7bcad108b5e8fdce"
+$relativeSubmoduleGit = $relativeSubmodule -replace '\\', '/'
+$expectedSubmoduleHead = $null
+$dependencyEvidence = [ordered]@{}
 
 function Remove-BuildDirectory {
     param(
@@ -34,6 +37,7 @@ function Remove-BuildDirectory {
     }
 }
 
+
 function Invoke-E2StudioBuild {
     param(
         [Parameter(Mandatory = $true)][string]$Executable,
@@ -41,46 +45,15 @@ function Invoke-E2StudioBuild {
         [Parameter(Mandatory = $true)][string]$ProjectPath,
         [Parameter(Mandatory = $true)][string]$OutputLog
     )
-
-    $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = $Executable
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.CreateNoWindow = $true
-    foreach ($argument in @(
-        "--launcher.suppressErrors",
-        "-nosplash",
-        "-application", "org.eclipse.cdt.managedbuilder.core.headlessbuild",
-        "-data", $WorkspacePath,
-        "-import", $ProjectPath,
-        "-build", "$projectName/HardwareDebug"
-    )) {
-        [void]$psi.ArgumentList.Add($argument)
-    }
-
-    $process = [System.Diagnostics.Process]::Start($psi)
-    $stdout = $process.StandardOutput.ReadToEndAsync()
-    $stderr = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-        try { $process.Kill($true) } catch { Write-Warning $_ }
-        throw "e2 studio build timed out after $TimeoutSeconds seconds"
-    }
-    $stdout.Wait()
-    $stderr.Wait()
-    $outputChunks = @($stdout.Result, $stderr.Result) |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    $text = [string]::Join([Environment]::NewLine, $outputChunks)
-    [System.IO.File]::WriteAllText(
-        [System.IO.Path]::GetFullPath($OutputLog),
-        $text,
-        [System.Text.UTF8Encoding]::new($false)
-    )
-    Write-Host $text
-    return $process.ExitCode
+    return Invoke-RxE2StudioBuild -Executable $Executable -WorkspacePath $WorkspacePath `
+        -ProjectPaths @($ProjectPath) -BuildTargets @("$projectName/HardwareDebug") `
+        -OutputLog $OutputLog -TimeoutSeconds $TimeoutSeconds `
+        -ExpectedOutputs @("$ProjectPath/HardwareDebug/$projectName.mot", "$ProjectPath/HardwareDebug/$projectName.abs", "$ProjectPath/HardwareDebug/$projectName.map")
 }
 
 $projectRootPath = (Resolve-Path -LiteralPath $ProjectRoot).Path
+Initialize-RxBuildDependencies -ProjectRoot $projectRootPath
+Assert-RxCommonKernel -ProjectRoot $projectRootPath
 $projectPath = Join-Path $projectRootPath $relativeProject
 $submodulePath = Join-Path $projectRootPath $relativeSubmodule
 $e2StudioPath = (Resolve-Path -LiteralPath $E2Studio).Path
@@ -116,10 +89,32 @@ if ($SourceProvenanceFile) {
     & $Python (Join-Path $PSScriptRoot 'idt_source_manifest.py') verify `
         --source $projectRootPath --target rx671-wifi --provenance $SourceProvenanceFile
     if ($LASTEXITCODE -ne 0) { throw 'RX671 boot-loader source-copy dependency verification failed.' }
+    $provenance = Get-Content -LiteralPath $SourceProvenanceFile -Raw | ConvertFrom-Json
+    $pin = $provenance.submodule_shas.PSObject.Properties[$relativeSubmoduleGit]
+    if (-not $pin -or [string]$pin.Value -notmatch '^[0-9a-fA-F]{40}$') {
+        throw 'RX671 boot-loader source-copy provenance has no fixed boot-loader pin.'
+    }
+    $expectedSubmoduleHead = ([string]$pin.Value).ToLowerInvariant()
+    $dependencyEvidence = [ordered]@{
+        verification = 'captured-source-dependency-files-and-pins'
+        bootloader_path = $relativeSubmoduleGit
+        bootloader_pin = $expectedSubmoduleHead
+        provenance_sha256 = (Get-FileHash -LiteralPath $SourceProvenanceFile -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
 }
 else {
+    $sourceTop = (& git -c "safe.directory=$projectRootPath" -C $projectRootPath rev-parse --show-toplevel).Trim()
+    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($sourceTop) -ne $projectRootPath) {
+        throw 'RX671 source Git root does not match the selected project root.'
+    }
+    $sourceHead = (& git -c "safe.directory=$projectRootPath" -C $projectRootPath rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot read the fixed RX671 source HEAD.' }
+    $row = & git -c "safe.directory=$projectRootPath" -C $projectRootPath ls-tree HEAD -- $relativeSubmoduleGit
+    if ($LASTEXITCODE -ne 0 -or $row -notmatch '^160000 commit ([0-9a-fA-F]{40})\t(.+)$' -or $Matches[2] -ne $relativeSubmoduleGit) {
+        throw 'The selected RX671 source HEAD has no fixed boot-loader gitlink.'
+    }
+    $expectedSubmoduleHead = $Matches[1].ToLowerInvariant()
 if (-not (Test-Path -LiteralPath (Join-Path $submodulePath ".git"))) {
-    $relativeSubmoduleGit = $relativeSubmodule -replace '\\', '/'
     & git -c "safe.directory=$projectRootPath" -C $projectRootPath submodule update --init --recursive -- $relativeSubmoduleGit
     if ($LASTEXITCODE -ne 0) {
         throw "RX671 boot-loader submodule initialization failed"
@@ -133,6 +128,13 @@ $actualSubmoduleHead = (& git -c "safe.directory=$submodulePath" -C $submodulePa
 if ($LASTEXITCODE -ne 0 -or $actualSubmoduleHead -ne $expectedSubmoduleHead) {
     throw "RX671 boot-loader submodule HEAD is '$actualSubmoduleHead'; expected '$expectedSubmoduleHead'"
 }
+    $dependencyEvidence = [ordered]@{
+        verification = 'fixed-source-HEAD-gitlink'
+        source_sha = $sourceHead
+        bootloader_path = $relativeSubmoduleGit
+        bootloader_pin = $expectedSubmoduleHead
+        bootloader_head = $actualSubmoduleHead
+    }
 }
 
 Remove-BuildDirectory `
@@ -141,6 +143,7 @@ Remove-BuildDirectory `
     -ExpectedLeaf "e2ws_iot_ref_rx671_bootloader_2026_04_2"
 Remove-BuildDirectory -Path $hardwareDebug -AllowedRoot $projectPath -ExpectedLeaf "HardwareDebug"
 [void](New-Item -ItemType Directory -Force -Path (Split-Path -Parent ([System.IO.Path]::GetFullPath($LogFile))))
+$dependencyEvidence | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath ($LogFile + '.dependencies.json') -Encoding UTF8
 
 $buildStart = Get-Date
 try {

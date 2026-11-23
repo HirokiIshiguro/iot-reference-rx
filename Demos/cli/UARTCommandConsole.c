@@ -48,6 +48,7 @@
 
 /* Demo Config */
 #include "demo_config.h"
+#include "config_command_value.h"
 
 /* Dimensions the buffer into which input characters are placed. */
 #define cmdMAX_INPUT_SIZE (4096)
@@ -279,10 +280,13 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
                 do
                 {
                     /* Get the next output string from the command interpreter. */
-                    xReturned = FreeRTOS_CLIProcessCommand(cInputString, pcOutputString, configCOMMAND_INT_MAX_OUTPUT_SIZE);
+                    pcOutputString[0] = '\0';
+                    xReturned = FreeRTOS_CLIProcessCommand(cInputString, pcOutputString,
+                                                          configCOMMAND_INT_MAX_OUTPUT_SIZE - 1U);
 
-                    /* Write the generated string to the UART. */
-                    vSerialPutString((signed char *)pcOutputString, (unsigned short)strlen(pcOutputString));
+                    /* The OSS interpreter may fill its entire supplied span. */
+                    size_t outputLength = Cli_TerminateOutput(pcOutputString, configCOMMAND_INT_MAX_OUTPUT_SIZE);
+                    vSerialPutString((signed char *)pcOutputString, (unsigned short)outputLength);
                     memset(pcOutputString, '\0', configCOMMAND_INT_MAX_OUTPUT_SIZE);
 
                 } while (pdFALSE != xReturned);

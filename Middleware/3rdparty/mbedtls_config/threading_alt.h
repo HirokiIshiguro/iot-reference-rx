@@ -36,6 +36,8 @@
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "semphr.h"
+/* Official mbedTLS3 aliases used by the unmodified legacy Crypto API. */
+#include "mbedtls/compat-2.x.h"
 
 /**
  * @brief mbed TLS mutex type.
@@ -46,7 +48,8 @@
  */
 typedef struct mbedtls_threading_mutex
 {
-    SemaphoreHandle_t mutexHandle;
+    SemaphoreHandle_t mutex;
+    char is_valid;
     StaticSemaphore_t mutexStorage;
 } mbedtls_threading_mutex_t;
 

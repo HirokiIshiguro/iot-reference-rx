@@ -6,40 +6,6 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$projectRootPath = (Resolve-Path -LiteralPath $ProjectRoot).Path
-$whdPath = Join-Path $projectRootPath "external\wifi-host-driver"
-$patchPath = Join-Path $projectRootPath "external\patches\whd-v1.70.0-ccrx-portability.patch"
-
-if (-not (Test-Path -LiteralPath (Join-Path $whdPath ".git"))) {
-    throw "WHD submodule is not initialized: $whdPath"
-}
-
-if (-not (Test-Path -LiteralPath $patchPath)) {
-    throw "WHD patch not found: $patchPath"
-}
-
-$checkArgs = @("-C", $whdPath, "apply", "--check", $patchPath)
-if ($Reverse.IsPresent) {
-    $checkArgs = @("-C", $whdPath, "apply", "--reverse", "--check", $patchPath)
-}
-
-& git @checkArgs
-if ($LASTEXITCODE -ne 0) {
-    throw "Patch check failed. It may already be applied or the submodule is at an unexpected revision."
-}
-
-$applyArgs = @("-C", $whdPath, "apply", $patchPath)
-if ($Reverse.IsPresent) {
-    $applyArgs = @("-C", $whdPath, "apply", "--reverse", $patchPath)
-}
-
-& git @applyArgs
-if ($LASTEXITCODE -ne 0) {
-    throw "Patch apply failed."
-}
-
-if ($Reverse.IsPresent) {
-    Write-Host "WHD patch reversed: $patchPath"
-} else {
-    Write-Host "WHD patch applied: $patchPath"
-}
+# Kept only as a migration error for existing callers. All CC-RX changes live
+# in the reviewed wifi-host-driver fork referenced by the root gitlink.
+throw 'WHD source patching is retired. Initialize the fixed wifi-host-driver fork submodule with git submodule update --init Projects/aws_wifi_rx671_ek/external/wifi-host-driver, then use tools/build_headless_rx671_wifi.ps1. Do not apply or reverse the former consumer-side patch.'

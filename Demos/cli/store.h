@@ -32,7 +32,7 @@
 /* Standard includes. */
 #include <stdio.h>
 #include <string.h>
-#include "../../../../../Common/littlefs_common/lfs_util_config.h"
+#include "lfs_common_data.h"
 
 #include "FreeRTOS.h"
 #include "lfs.h"
@@ -53,8 +53,14 @@
 #define RX671_WIFI_CREDENTIAL_KVS_ENABLE  (0)
 #endif
 
+#ifndef CELLULAR_APN_KVS_ENABLE
+#define CELLULAR_APN_KVS_ENABLE          (0)
+#endif
+#if (CELLULAR_APN_KVS_ENABLE != 0) && (CELLULAR_APN_KVS_ENABLE != 1)
+#error "CELLULAR_APN_KVS_ENABLE must be 0 or 1."
+#endif
 
-extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
+
 
 #define KVSTORE_KEY_MAX_LEN    32
 #define KVSTORE_VAL_MAX_LEN    2048
@@ -82,6 +88,12 @@ typedef enum KVStoreKey
 #if RX671_WIFI_CREDENTIAL_KVS_ENABLE == 1
     KVS_WIFI_SSID,
     KVS_WIFI_PASSPHRASE,
+#endif
+#if CELLULAR_APN_KVS_ENABLE == 1
+    KVS_CELLULAR_AP_NAME,
+    KVS_CELLULAR_AP_USERID,
+    KVS_CELLULAR_AP_PASSWORD,
+    KVS_CELLULAR_AP_AUTH_TYPE,
 #endif
     KVS_NUM_KEYS
 } KVStoreKey_t;
@@ -113,6 +125,22 @@ typedef struct KeyValueStore
 #define RX671_WIFI_CLICMD_ENTRIES
 #endif
 
+#if CELLULAR_APN_KVS_ENABLE == 1
+#define CELLULAR_APN_KVSTORE_ENTRIES                         \
+        [ KVS_CELLULAR_AP_NAME ] = "cellular_ap_name",     \
+        [ KVS_CELLULAR_AP_USERID ] = "cellular_ap_userid", \
+        [ KVS_CELLULAR_AP_PASSWORD ] = "cellular_ap_password", \
+        [ KVS_CELLULAR_AP_AUTH_TYPE ] = "cellular_ap_auth_type",
+#define CELLULAR_APN_CLICMD_ENTRIES                          \
+        [ KVS_CELLULAR_AP_NAME ] = "apn",                 \
+        [ KVS_CELLULAR_AP_USERID ] = "apnuser",           \
+        [ KVS_CELLULAR_AP_PASSWORD ] = "apnpass",         \
+        [ KVS_CELLULAR_AP_AUTH_TYPE ] = "apnauth",
+#else
+#define CELLULAR_APN_KVSTORE_ENTRIES
+#define CELLULAR_APN_CLICMD_ENTRIES
+#endif
+
 /* Array to map between strings and KVStoreKey_t IDs */
 #define KVSTORE_KEYS                                       \
     {                                                      \
@@ -132,6 +160,7 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsip_client_pub_id",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsip_client_pri_id",         \
         RX671_WIFI_KVSTORE_ENTRIES                          \
+        CELLULAR_APN_KVSTORE_ENTRIES                        \
 }
 #define CLICMDKEYS                                       \
     {                                                      \
@@ -151,6 +180,7 @@ typedef struct KeyValueStore
 		[ KVS_TSIP_CLIENT_PUBKEY_ID ] = "tsippubkey",         \
 		[ KVS_TSIP_CLIENT_PRIKEY_ID ] = "tsipprikey",         \
         RX671_WIFI_CLICMD_ENTRIES                           \
+        CELLULAR_APN_CLICMD_ENTRIES                         \
     }
 typedef enum KVStoreKeytype
 {

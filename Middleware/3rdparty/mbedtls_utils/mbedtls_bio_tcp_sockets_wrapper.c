@@ -74,6 +74,12 @@ int xMbedTLSBioTCPSocketsWrapperSend( void * ctx,
 
     switch( xReturnStatus )
     {
+        case 0:
+            xReturnStatus = MBEDTLS_ERR_SSL_WANT_WRITE;
+            break;
+        case TCP_SOCKETS_ERRNO_ECLOSED:
+            xReturnStatus = MBEDTLS_ERR_SSL_CONN_EOF;
+            break;
         /* Socket was closed or just got closed. */
         case TCP_SOCKETS_ERRNO_ENOTCONN:
         /* Not enough memory for the socket to create either an Rx or Tx stream. */
@@ -119,6 +125,9 @@ int xMbedTLSBioTCPSocketsWrapperRecv( void * ctx,
 
     switch( xReturnStatus )
     {
+        case TCP_SOCKETS_ERRNO_ECLOSED:
+            xReturnStatus = MBEDTLS_ERR_SSL_CONN_EOF;
+            break;
         /* No data could be sent because the socket was or just got closed. */
         case TCP_SOCKETS_ERRNO_ENOTCONN:
         /* No data could be sent because there was insufficient memory. */

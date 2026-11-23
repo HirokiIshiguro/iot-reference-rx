@@ -23,6 +23,7 @@
 #include "r_sdhi_rx_pinset.h"
 #include "r_sdio_rx_if.h"
 #include "sdio_host.h"
+#include "FreeRTOS.h"
 
 #define SDIO_HOST_CMD53_XFER_CPU   (0U)
 #define SDIO_HOST_CMD53_XFER_DTC   (1U)
@@ -705,8 +706,6 @@ static bool sdio_cmd53_read_bytes(uint8_t function, uint32_t address, bool incre
         return false;
     }
 
-    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_RESP, 0U);
-
     /* Wait for the receive buffer to fill (BRE = SDSTS2.RE). */
     g_cmd53_diag_stage = 2U;
     ok = sdhi_wait_status(0U, SDHI_SDIMSK2_RE, &sdsts1, &sdsts2);
@@ -721,7 +720,8 @@ static bool sdio_cmd53_read_bytes(uint8_t function, uint32_t address, bool incre
         sdhi_cmd53_force_stop(&sdsts2);
         return false;
     }
-    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, 0U,
+    /* Clear both statuses only after receive-buffer readiness was observed. */
+    (void)R_SDHI_ClearSdstsReg(SDHI_CH0, SDHI_SDIMSK1_RESP,
                                SDHI_SDIMSK2_RE | (relaxed_read_crc ? SDHI_SDSTS2_READ_CRC_ERR : 0U));
 
     byte_index = 0UL;
@@ -891,6 +891,20 @@ static sdhi_status_t sdio_cmd53_dtc_callback(void * p_context)
     return SDHI_SUCCESS;
 }
 
+static bool g_cmd53_dtc_unavailable_logged = false;
+
+/* Logged once: every CMD53 then uses the CPU copy, which is much slower. */
+static void sdio_cmd53_dtc_log_unavailable(void)
+{
+    if (!g_cmd53_dtc_unavailable_logged)
+    {
+        g_cmd53_dtc_unavailable_logged = true;
+        configPRINTF(("[SDIO] CMD53 DTC unavailable (error 0x%08lx); using the CPU copy. "
+                      "R_DTC_Open needs room for its vector table in the C heap (BSP_CFG_HEAP_BYTES).\r\n",
+                      (unsigned long)g_cmd53_dtc_error));
+    }
+}
+
 static bool sdio_cmd53_dtc_open_once(void)
 {
     dtc_err_t ret;
@@ -901,9 +915,25 @@ static bool sdio_cmd53_dtc_open_once(void)
     }
 
     ret = R_DTC_Open();
+    if (DTC_ERR_OPENED == ret)
+    {
+        /* R_DTC_Open also returns DTC_ERR_OPENED when it cannot malloc its
+         * vector table from the C heap, and the DTC then stays closed. Ask the
+         * driver whether it is really open. When it is open, the status query
+         * only reads the state. When it is not open, R_DTC_Control releases
+         * the DTC hardware lock; R_DTC_Open has already released it on this
+         * path, and no other code in this project opens the DTC. */
+        dtc_stat_t stat;
+
+        if (DTC_ERR_NOT_OPEN == R_DTC_Control(DTC_CMD_STATUS_GET, &stat, NULL))
+        {
+            ret = DTC_ERR_NOT_OPEN;
+        }
+    }
     if ((DTC_SUCCESS != ret) && (DTC_ERR_OPENED != ret))
     {
         g_cmd53_dtc_error = 0x01000000UL | (uint32_t)ret;
+        sdio_cmd53_dtc_log_unavailable();
         return false;
     }
 

@@ -819,10 +819,6 @@ CK_RV provisionPrivateKey(CK_SESSION_HANDLE session,
     mbedtls_pk_type_t mbedKeyType = MBEDTLS_PK_NONE;
     int mbedResult = 0;
     mbedtls_pk_context mbedPkContext = {0};
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000
-    mbedtls_entropy_context xEntropyContext;
-    mbedtls_ctr_drbg_context xDrbgContext;
-#endif
 
     mbedtls_pk_init(&mbedPkContext);
 
@@ -830,16 +826,8 @@ CK_RV provisionPrivateKey(CK_SESSION_HANDLE session,
 #if MBEDTLS_VERSION_NUMBER < 0x03000000
     mbedResult = mbedtls_pk_parse_key(&mbedPkContext, (const uint8_t *)privateKey, privateKeyLength, NULL, 0);
 #else
-    mbedtls_entropy_init(&xEntropyContext);
-    mbedtls_ctr_drbg_init(&xDrbgContext);
-    mbedResult = mbedtls_ctr_drbg_seed(&xDrbgContext, mbedtls_entropy_func, &xEntropyContext, NULL, 0);
-    if (0 == mbedResult)
-    {
-        mbedResult = mbedtls_pk_parse_key(&mbedPkContext, (const uint8_t *)privateKey, privateKeyLength, NULL, 0,
-                                          mbedtls_ctr_drbg_random, &xDrbgContext);
-    }
-    mbedtls_ctr_drbg_free(&xDrbgContext);
-    mbedtls_entropy_free(&xEntropyContext);
+    mbedResult = mbedtls_pk_parse_key(&mbedPkContext, (const uint8_t *)privateKey, privateKeyLength, NULL, 0,
+                                      lPKCS11RandomCallback, &session);
 #endif /* MBEDTLS_VERSION_NUMBER < 0x03000000 */
 
     if (0 != mbedResult)

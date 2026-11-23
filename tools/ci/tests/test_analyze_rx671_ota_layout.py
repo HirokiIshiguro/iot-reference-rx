@@ -150,15 +150,17 @@ TYPE1YN_FW_BLOB
 
 
 class GateTests(unittest.TestCase):
-    def test_runtime_default_stays_linear_until_ota_profile_is_applied(self):
+    def test_normal_signed_default_has_dual_bank_layout_without_ota_runtime_profile(self):
         repo_root = Path(__file__).resolve().parents[3]
         project_dir = repo_root / "Projects/aws_wifi_rx671_ek/e2studio_ccrx"
         with tempfile.TemporaryDirectory() as empty_build:
             gates = layout.analyze(project_dir, Path(empty_build))
         by_name = {gate.name: gate for gate in gates}
 
+        self.assertEqual("PASS", by_name["source_inputs"].status)
         self.assertEqual("UNKNOWN", by_name["bootloader_layout"].status)
         self.assertEqual("FAIL", by_name["mqtt_ota_buffer_fit"].status)
+        self.assertEqual("FAIL", by_name["ota_runtime_memory_profile"].status)
         self.assertEqual("FAIL", by_name["ota_sdio_run_clock"].status)
         self.assertEqual("PASS", by_name["rom_capacity"].status)
         self.assertEqual("PASS", by_name["fwup_data_flash_geometry"].status)
@@ -166,17 +168,20 @@ class GateTests(unittest.TestCase):
         self.assertEqual("PASS", by_name["data_flash_ownership_contract"].status)
         self.assertEqual("PASS", by_name["data_flash_non_overlap"].status)
         self.assertEqual("PASS", by_name["fwup_partition"].status)
-        self.assertEqual("FAIL", by_name["dual_bank_mode"].status)
-        self.assertEqual("FAIL", by_name["application_in_main_area"].status)
-        self.assertEqual("FAIL", by_name["static_image_single_area"].status)
-        self.assertEqual("FAIL", by_name["whd_resources_follow_application"].status)
+        self.assertEqual("PASS", by_name["dual_bank_mode"].status)
+        self.assertEqual("PASS", by_name["application_in_main_area"].status)
+        self.assertEqual("PASS", by_name["static_image_single_area"].status)
+        self.assertEqual("PASS", by_name["whd_resources_follow_application"].status)
         self.assertEqual("PASS", by_name["sdio_resource_addressing"].status)
-        self.assertEqual("FAIL", by_name["fwup_code_flash_layout"].status)
+        self.assertEqual("PASS", by_name["fwup_code_flash_layout"].status)
         self.assertEqual("UNKNOWN", by_name["artifact_provenance"].status)
+        self.assertEqual("UNKNOWN", by_name["rsu_image"].status)
         self.assertEqual("UNKNOWN", by_name["whd_blob_sizes"].status)
         self.assertEqual("UNKNOWN", by_name["ram_capacity"].status)
         self.assertEqual("UNKNOWN", by_name["map_image_single_area"].status)
         self.assertEqual("UNKNOWN", by_name["mot_image_single_area"].status)
+
+        self.assertEqual(1, layout.exit_code(gates))
 
     def test_unknown_is_fail_safe_exit(self):
         self.assertEqual(0, layout.exit_code([layout.Gate("a", "PASS", "")]))
@@ -259,33 +264,33 @@ class GateTests(unittest.TestCase):
 
     def test_ota_runtime_memory_profile_is_exact(self):
         passing = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=2,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
         stale_heap = layout._ota_runtime_memory_profile_gate(
             heap_size_kb=192,
             data_buffer_count=2,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
         stale_buffers = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=3,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
         stale_file_blocks = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=2,
             max_file_blocks=128,
         )
         missing = layout._ota_runtime_memory_profile_gate(
-            heap_size_kb=208,
+            heap_size_kb=224,
             data_buffer_count=None,
-            max_file_blocks=192,
+            max_file_blocks=240,
         )
 
         self.assertEqual("PASS", passing.status)
-        self.assertIn("heap=208 KiB", passing.detail)
+        self.assertIn("heap=224 KiB", passing.detail)
         self.assertEqual("FAIL", stale_heap.status)
         self.assertEqual("FAIL", stale_buffers.status)
         self.assertEqual("FAIL", stale_file_blocks.status)
@@ -316,26 +321,25 @@ class GateTests(unittest.TestCase):
         self.assertIn("DIV8", high_speed_override.detail)
         self.assertEqual("FAIL", missing.status)
 
-    def test_parent_bootloader_headers_are_required_provenance_inputs(self):
-        self.assertIn(
+    def test_bootloader_layout_comes_only_from_the_submodule_header(self):
+        self.assertNotIn(
             layout.BOOTLOADER_PROJECT_RELATIVE / "src/rx671.h",
+            layout.BOOTLOADER_PROVENANCE_PATHS,
+        )
+        self.assertIn(
+            layout.BOOTLOADER_SUBMODULE_RELATIVE / "config/rx671.h",
             layout.BOOTLOADER_PROVENANCE_PATHS,
         )
         self.assertIn(
             layout.BOOTLOADER_PROJECT_RELATIVE / "src/rx_bootloader_config.h",
             layout.BOOTLOADER_PROVENANCE_PATHS,
         )
-        parent = (
-            ROOT
-            / layout.BOOTLOADER_PROJECT_RELATIVE
-            / "src/rx671.h"
-        ).read_text(encoding="utf-8").splitlines()
-        canonical = (
-            ROOT
-            / layout.BOOTLOADER_SUBMODULE_RELATIVE
-            / "config/rx671.h"
-        ).read_text(encoding="utf-8").splitlines()
-        self.assertEqual(canonical, parent)
+        self.assertFalse(layout._project_shadows_bootloader_config(ROOT / layout.BOOTLOADER_PROJECT_RELATIVE))
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            (project / "src").mkdir()
+            (project / "src/rx671.h").write_text("", encoding="utf-8")
+            self.assertTrue(layout._project_shadows_bootloader_config(project))
 
     def test_fwup_geometry_rejects_equal_total_with_wrong_fit_blocks(self):
         gate = layout._fwup_data_flash_geometry_gate(
@@ -715,7 +719,7 @@ class RsuGateTests(unittest.TestCase):
             provenance_manifest_path=manifest_path,
         )
 
-    def test_accepts_strict_signed_single_segment_image(self):
+    def test_accepts_strict_signed_legacy_contiguous_image(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             rsu_path, certificate_path, manifest_path = self._fixture(root)
@@ -725,6 +729,36 @@ class RsuGateTests(unittest.TestCase):
         self.assertEqual("PASS", gate.status)
         self.assertIn("Data Flashなし", gate.detail)
         self.assertIn("version=1.2.3", gate.detail)
+
+    def test_rejects_old_segment_descriptor_even_with_valid_signature_and_hash(self):
+        import struct
+        from cryptography.hazmat.primitives.asymmetric import utils
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rsu_path, certificate_path, manifest_path = self._fixture(root)
+            image = bytearray(rsu_path.read_bytes())
+            image[0x200:0x300] = b"\xff" * 256
+            struct.pack_into("<III", image, 0x200, 1, rsu_builder.APPLICATION_START,
+                             rsu_builder.APPLICATION_SIZE)
+            key = ec.generate_private_key(ec.SECP256R1())
+            now = datetime.now(timezone.utc)
+            name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "old-v2-fixture")])
+            cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                    .public_key(key.public_key()).serial_number(2)
+                    .not_valid_before(now-timedelta(minutes=1)).not_valid_after(now+timedelta(days=1))
+                    .sign(key, hashes.SHA256()))
+            certificate_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+            r, s = utils.decode_dss_signature(key.sign(bytes(image[0x200:]), ec.ECDSA(hashes.SHA256())))
+            image[0x2c:0x6c] = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+            rsu_path.write_bytes(image)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for path in (rsu_path, certificate_path):
+                manifest["sha256"][path.relative_to(root).as_posix()] = layout._sha256(path)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            gate = self._gate(root, rsu_path, certificate_path, manifest_path)
+        self.assertEqual("FAIL", gate.status)
+        self.assertIn("legacy descriptor", gate.detail)
+        self.assertNotIn("ECDSA署名不一致", gate.detail)
 
     def test_rejects_signed_payload_tampering(self):
         with tempfile.TemporaryDirectory() as directory:

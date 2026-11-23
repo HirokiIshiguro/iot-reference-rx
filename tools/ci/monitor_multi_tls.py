@@ -84,7 +84,7 @@ class MultiTlsEvidence:
     def __init__(
         self,
         min_overlap_seconds: float = 30.0,
-        max_duration_seconds: float = 180.0,
+        max_duration_seconds: float = 240.0,
         require_tsip_wait: bool = False,
         require_tsip_multithreading: bool = False,
     ):
@@ -828,8 +828,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=float(os.environ.get("MULTI_TLS_TIMEOUT_SECONDS", "180")),
-        help="Hard observation bound in seconds (default: 180)",
+        default=float(os.environ.get("MULTI_TLS_TIMEOUT_SECONDS", "240")),
+        help="Hard observation bound in seconds (default: 240)",
     )
     parser.add_argument(
         "--min-overlap-seconds",

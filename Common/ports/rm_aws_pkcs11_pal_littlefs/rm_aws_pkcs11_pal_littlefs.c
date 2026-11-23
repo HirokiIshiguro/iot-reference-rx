@@ -59,7 +59,7 @@
 #include "mbedtls/sha256.h"
 
 #include "lfs.h"
-#include "lfs_util_config.h"
+#include "lfs_common_data.h"
 
 #include "transport_mbedtls_pkcs11.h"
 
@@ -67,7 +67,6 @@
     #define PKCS11_PAL_LITTLEFS_TRACE    (0)
 #endif
 
-extern lfs_t RM_STDIO_LITTLEFS_CFG_LFS;
 #if PKCS11_PAL_LITTLEFS_TRACE
 extern volatile uint32_t g_littlefs_flash_trace_enabled;
 extern void vOutputString(const char * pcMessage);
@@ -180,7 +179,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
 
     lfs_file_t file = { 0 };
 
-    volatile int lfs_err = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, pxLabel->pValue);
+    volatile int lfs_err = LfsCommon_Remove(LfsCommon_GetLfs(), pxLabel->pValue);
 #if PKCS11_PAL_LITTLEFS_TRACE
     LogInfo(("PKCS11 PAL trace: SaveObject remove ret=%ld.",
              (long)lfs_err));
@@ -194,7 +193,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
         return eInvalidHandle;
     }
 
-    lfs_err = lfs_file_open(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pxLabel->pValue, LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
+    lfs_err = LfsCommon_FileOpen(LfsCommon_GetLfs(), &file, pxLabel->pValue, LFS_O_WRONLY | LFS_O_TRUNC | LFS_O_CREAT);
 #if PKCS11_PAL_LITTLEFS_TRACE
     LogInfo(("PKCS11 PAL trace: SaveObject open ret=%ld.",
              (long)lfs_err));
@@ -208,7 +207,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
         return eInvalidHandle;
     }
 
-    lfs_err = lfs_file_write(&RM_STDIO_LITTLEFS_CFG_LFS, &file, pucData, ulDataSize);
+    lfs_err = LfsCommon_FileWrite(LfsCommon_GetLfs(), &file, pucData, ulDataSize);
 #if PKCS11_PAL_LITTLEFS_TRACE
     LogInfo(("PKCS11 PAL trace: SaveObject write ret=%ld.",
              (long)lfs_err));
@@ -227,7 +226,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
         vOutputString("PAL:DKEY before sync\r\n");
         LogInfo(("PKCS11 PAL trace: SaveObject sync enter for device private key."));
 #endif
-        lfs_err = lfs_file_sync(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+        lfs_err = LfsCommon_FileSync(LfsCommon_GetLfs(), &file);
 #if PKCS11_PAL_LITTLEFS_TRACE
         vOutputString("PAL:DKEY after sync\r\n");
         LogInfo(("PKCS11 PAL trace: SaveObject sync ret=%ld.",
@@ -242,7 +241,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_SaveObject(CK_ATTRIBUTE_PTR pxLabel, CK_BYTE_PTR puc
     }
 #endif
 
-    lfs_err = lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+    lfs_err = LfsCommon_FileClose(LfsCommon_GetLfs(), &file);
 
 #if PKCS11_PAL_LITTLEFS_TRACE
     if (0 == strcmp((char *)pxLabel->pValue, pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS))
@@ -293,7 +292,7 @@ CK_OBJECT_HANDLE PKCS11_PAL_FindObject(CK_BYTE_PTR pxLabel, CK_ULONG usLength)
         if (!strcmp((char *) &g_object_handle_dictionary[i], (char *)pxLabel))
         {
             struct lfs_info xFileInfo = { 0 };
-            if (lfs_stat(&RM_STDIO_LITTLEFS_CFG_LFS, (char *)pxLabel, &xFileInfo) == LFS_ERR_OK)
+            if (LfsCommon_Stat(LfsCommon_GetLfs(), (char *)pxLabel, &xFileInfo) == LFS_ERR_OK)
             {
                 xHandle = (CK_OBJECT_HANDLE) i;
                 break;
@@ -336,7 +335,7 @@ CK_RV PKCS11_PAL_GetObjectValue(CK_OBJECT_HANDLE xHandle,
         lfs_file_t file = { 0 };
 
         int lfs_ret =
-            lfs_file_open(  &RM_STDIO_LITTLEFS_CFG_LFS,
+            LfsCommon_FileOpen(  LfsCommon_GetLfs(),
                             &file,
                             (char *) g_object_handle_dictionary[xHandleStorage],
                             LFS_O_RDONLY);
@@ -346,14 +345,14 @@ CK_RV PKCS11_PAL_GetObjectValue(CK_OBJECT_HANDLE xHandle,
             return eInvalidHandle;
         }
 
-        lfs_ret = lfs_file_size(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+        lfs_ret = LfsCommon_FileSize(LfsCommon_GetLfs(), &file);
 
         *ppucData = pvPortMalloc((size_t)lfs_ret);
         configASSERT(ppucData);
 
         if ((lfs_ret >= 0) && (NULL != (*ppucData)))
         {
-            lfs_ret = lfs_file_read(&RM_STDIO_LITTLEFS_CFG_LFS, &file, *ppucData, (lfs_size_t)lfs_ret);
+            lfs_ret = LfsCommon_FileRead(LfsCommon_GetLfs(), &file, *ppucData, (lfs_size_t)lfs_ret);
 
             if (lfs_ret >= 0)
             {
@@ -372,7 +371,7 @@ CK_RV PKCS11_PAL_GetObjectValue(CK_OBJECT_HANDLE xHandle,
             }
         }
 
-        lfs_file_close(&RM_STDIO_LITTLEFS_CFG_LFS, &file);
+        LfsCommon_FileClose(LfsCommon_GetLfs(), &file);
     }
 
     return xReturn;
@@ -414,7 +413,7 @@ CK_RV PKCS11_PAL_DestroyObject(CK_OBJECT_HANDLE xHandle)
 
     if (eInvalidHandle != xHandle)
     {
-        volatile int lfs_err = lfs_remove(&RM_STDIO_LITTLEFS_CFG_LFS, (char *) g_object_handle_dictionary[xHandle]);
+        volatile int lfs_err = LfsCommon_Remove(LfsCommon_GetLfs(), (char *) g_object_handle_dictionary[xHandle]);
 
         if (LFS_ERR_OK == lfs_err)
         {

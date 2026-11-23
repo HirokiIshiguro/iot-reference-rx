@@ -43,7 +43,7 @@ class Rx671OtaBuildProfileContractTests(unittest.TestCase):
     def test_default_e2studio_matches_current_rx_ci_toolchain(self) -> None:
         self.assertIn(
             '[string]$E2Studio = '
-            '"C:\\Renesas\\e2_studio_2026_04_2\\eclipse\\e2studioc.exe"',
+            '"C:\\Renesas\\e2_studio_2026_04_2\\eclipse\\e2studio-cli.exe"',
             self.build,
         )
 

@@ -31,9 +31,9 @@ DEFAULT_RFP_CLI = os.environ.get("RX671_WIFI_LINUX_RFP_CLI", "./tools/rfp_cli_lo
 DEFAULT_RFP_TIMEOUT = 120.0
 DEFAULT_UART_BUFFER_LIMIT = 16 * 1024 * 1024
 RX671_TEMPORARY_INSTALL_START = 0xFFE00000
-RX671_TEMPORARY_INSTALL_END = 0xFFEBFFFF
+RX671_TEMPORARY_INSTALL_END = 0xFFEEFFFF
 RX671_EXECUTE_INSTALL_START = 0xFFF00000
-RX671_EXECUTE_INSTALL_END = 0xFFFBFFFF
+RX671_EXECUTE_INSTALL_END = 0xFFFEFFFF
 CLI_INPUT_BUFFER_BYTES = 4096
 CLI_PROMPT_TOKENS = (b"\r\n>", b"\n>")
 CLI_SET_SUCCESS_TOKENS = (
@@ -50,6 +50,10 @@ class RfpConfig:
     interface: str = "fine"
     speed: str = "500K"
     auth_id: str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+    install_ranges: tuple[tuple[int, int], ...] = (
+        (RX671_TEMPORARY_INSTALL_START, RX671_TEMPORARY_INSTALL_END),
+        (RX671_EXECUTE_INSTALL_START, RX671_EXECUTE_INSTALL_END),
+    )
 
     def common_command(self) -> list[str]:
         return [
@@ -82,20 +86,17 @@ class RfpConfig:
         return command
 
     def erase_ota_install_areas_command(self) -> list[str]:
-        """Erase both RX671 OTA install areas while preserving both boot loaders."""
+        """Erase the selected Code Flash install areas, preserving boot loaders."""
+        if (len(self.install_ranges) != 2 or any(
+                not isinstance(start, int) or isinstance(start, bool) or
+                not isinstance(end, int) or isinstance(end, bool) or
+                not 0xFFC00000 <= start < end <= 0xFFFEFFFF
+                for start, end in self.install_ranges)):
+            raise ValueError("Invalid reviewed OTA install ranges")
         command = self.common_command()
-        command.extend(
-            [
-                "-range",
-                f"{RX671_TEMPORARY_INSTALL_START:08X},"
-                f"{RX671_TEMPORARY_INSTALL_END:08X}",
-                "-range",
-                f"{RX671_EXECUTE_INSTALL_START:08X},"
-                f"{RX671_EXECUTE_INSTALL_END:08X}",
-                "-erase",
-                "-noquery",
-            ]
-        )
+        for start, end in self.install_ranges:
+            command.extend(("-range", f"{start:08X},{end:08X}"))
+        command.extend(("-erase", "-noquery"))
         if "-erase-chip" in command:
             raise AssertionError("RX671 OTA handoff must preserve non-install areas")
         return command

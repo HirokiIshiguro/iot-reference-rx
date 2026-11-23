@@ -64,9 +64,6 @@
 #include "pkcs11.h"
 #include "core_pki_utils.h"
 
-/* Mbedtls with TSIP */
-#include "key_write.h"
-
 /* strnlen includes for CC-RX compiler. */
 #if defined(__CCRX__)
 #include "strnlen.h"
@@ -205,11 +202,13 @@ static CK_RV readCertificateIntoContext( SSLContext_t * pSslContext,
                                          const char * pcLabelName,
                                          CK_OBJECT_CLASS xClass,
                                          mbedtls_x509_crt * pxCertificateContext );
+#if defined( MBEDTLS_DEBUG_C )
 static void tlsDebugCallback( void * pvContext,
                               int level,
                               const char * pcFile,
                               int line,
                               const char * pcMessage );
+#endif /* MBEDTLS_DEBUG_C */
 
 /**
  * @brief Helper for setting up potentially hardware-based cryptographic context
@@ -463,6 +462,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             mbedtls_ssl_conf_sig_algs( &( pTlsTransportParams->sslContext.config ),
                                        pNetworkCredentials->pSigAlgs );
         }
+#if defined( MBEDTLS_DEBUG_C )
         if( pNetworkCredentials->tlsDebugLevel > 0U )
         {
             mbedtls_debug_set_threshold( (int)pNetworkCredentials->tlsDebugLevel );
@@ -470,6 +470,7 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
                                   tlsDebugCallback,
                                   NULL );
         }
+#endif /* MBEDTLS_DEBUG_C */
 
         /* Parse the server root CA certificate into the SSL context. */
         mbedtlsError = mbedtls_x509_crt_parse( &( pTlsTransportParams->sslContext.rootCa ),
@@ -664,10 +665,10 @@ static TlsTransportStatus_t tlsSetup( NetworkContext_t * pNetworkContext,
             ( TSIP_SUCCESS != mbedtlsError ) )
         {
         #if ( TSIP_RUNTIME_ROOT_CA_VERIFY_REQUIRED == 1 )
-            LogError(("Failed to RootCA certificate verification"));
+            LogError(("Failed to RootCA certificate verification (tsip=%d)", (int)mbedtlsError));
             returnStatus = TLS_TRANSPORT_INVALID_CREDENTIALS;
         #else
-            LogWarn(("Failed to RootCA certificate verification; continuing with mbed TLS CA verification."));
+            LogWarn(("Failed to RootCA certificate verification (tsip=%d); continuing with mbed TLS CA verification.", (int)mbedtlsError));
         #endif
         }
         else if( returnStatus == TLS_TRANSPORT_SUCCESS )
@@ -891,6 +892,7 @@ static int generateRandomBytes( void * pvCtx,
     return xResult;
 }
 
+#if defined( MBEDTLS_DEBUG_C )
 static void tlsDebugCallback( void * pvContext,
                               int level,
                               const char * pcFile,
@@ -904,6 +906,7 @@ static void tlsDebugCallback( void * pvContext,
         LogInfo( ( "mbedTLS[%d] %s:%d %s", level, pcFile, line, pcMessage ) );
     }
 }
+#endif /* MBEDTLS_DEBUG_C */
 
 /*-----------------------------------------------------------*/
 

@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-    A["正規プロジェクト<br/>Linear / bank.single"] -->|"一時profile"| B["provisioner +<br/>baseline / candidate"]
+    A["正規プロジェクト<br/>Dual / bank.dual"] -->|"役割・版数profile"| B["dual provisioner +<br/>baseline / candidate"]
     B --> C["FWUP v2 RSU署名<br/>layout / provenance検査"]
     C --> D["runtime CSPをbuild入力としない<br/>formal artifact"]
     D --> E["SCI6 runtime provisioning<br/>LittleFS / Data Flash"]
@@ -16,11 +16,10 @@ flowchart LR
 固定フラッシュ配置、runtime CSPをbuild入力としない署名済み成果物、実行時
 provisioning、実機AWS OTAのCI証跡、および証明範囲を定義する。
 
-`Projects/aws_wifi_rx671_ek/e2studio_ccrx`の正規プロジェクトは、引き続きLinear
-mode / `bank.single`の通常アプリケーションである。OTA用設定をSmart
-Configuratorや`.cproject`へ恒久保存しない。OTA成果物生成時だけ
-`tools/build_rx671_ota_images.py`がdual-bank profileを一時適用し、処理の成否に
-かかわらず対象ファイルをバイト列単位（byte-for-byte）で復元する。
+`Projects/aws_wifi_rx671_ek/e2studio_ccrx`の正規プロジェクトは、通常ビルドから
+`bank.dual`を使用する。`tools/build_rx671_ota_images.py`はこの配置を検証したうえで、
+OTA用の役割・版数profileを一時適用する。保守用provisionerもdual-bankとし、
+処理の成否にかかわらず対象ファイルをバイト列単位（byte-for-byte）で復元する。
 
 package job単体は実機AWS OTA成功を証明しない。成果物生成、配置、provenance、
 署名の整合だけを検証する。
@@ -31,18 +30,20 @@ provisioning、OTA、cleanup jobを合わせて判定する。
 
 | 項目 | 正規プロジェクト / 通常ビルド | OTA成果物生成中だけ |
 |---|---|---|
-| CC-RX device mode | `bank.single` | `bank.dual` |
-| BSP bank mode | `BSP_CFG_CODE_FLASH_BANK_MODE=1` | `BSP_CFG_CODE_FLASH_BANK_MODE=0` |
-| FWUP area size | `0x00100000`（1 MiB） | `0x000C0000`（768 KiB） |
-| アプリ配置 | 従来のLinear配置 | main `0xFFF00000` + `0x300` = `0xFFF00300` |
-| WHD firmware / NVRAM / CLM | 従来の固定section | アプリに続く同一main image group |
-| RAM初期値section | 従来section | `PFRAM2=RPFRAM2`を追加し、`PFRAM2`をmain image groupへ含める |
+| CC-RX device mode | `bank.dual` | 同じ |
+| BSP bank mode | `BSP_CFG_CODE_FLASH_BANK_MODE=0` | 同じ |
+| FWUP area size | `0x000F0000`（960 KiB） | 同じ |
+| アプリ配置 | main `0xFFF00000` + `0x300` = `0xFFF00300` | 同じ |
+| WHD firmware / NVRAM / CLM | アプリに続く同一main image group | 同じ |
+| RAM初期値section | `PFRAM2=RPFRAM2`、`PFRAM2`はmain image group内 | 同じ |
 | image version | `demo_config.h`既定値 | `APP_VERSION_*`で`0.1.0` / `0.1.1`を明示 |
 | runtime | MQTT/Fleet/LANBENCHの通常分岐 | `RX671_OTA_RUNTIME_ENABLE=1`でMQTT Agent + OTA demoを自動起動 |
 | OTA download block | library既定値 | `4096` byte（8 KiB MQTT受信bufferにJSON/Base64応答も収容） |
 | SDHI run clock | `SDHI_DIV_2`（PCLKB 60 MHz / 2 = 30 MHz） | `SDIO_HOST_CFG_RUN_CLOCK_DIV=SDHI_DIV_8`（7.5 MHz） |
 
-別途、資格情報投入専用のprovisionerを正規`bank.single`配置で生成する。
+別途、資格情報投入専用のprovisionerを同じ`bank.dual`構成で生成する。
+初回に単独起動できるよう、その一時profileだけはexception/reset vectorを
+`0xFFFFFF80` / `0xFFFFFFFC`へ置く。通常appのvectorは`0xFFFEFF80` / `0xFFFEFFFC`である。
 `RX671_OTA_PROVISIONER_ENABLE=1`のときはWHD/IPを開始せず、LittleFS/KVS初期化後に
 共通CLIをSCI6へ常駐させる。`cert`、`key`、`thingname`、`endpoint`、
 `codesigncert`、`codesignpubkey`を`conf set` / `commit`で保存できる。Wi-Fiは
@@ -104,20 +105,20 @@ profileおよびOTA runtime profileではprovisioner CLI task自体を生成し�
 
 ### provisionerからbootloaderへのhandoff境界
 
-資格情報専用provisionerは通常の`bank.single` imageであり、dual-bank bootloaderが
-lifecycle stateを読む2個のinstall areaにもcodeを配置する。LittleFS/KVS commit後に
-bootloader MOTだけを書いても、そのMOTに含まれないprovisioner recordは消えない。
-この状態では両header先頭がblankではなく未知のlifecycle stateとなり、bootloaderは
-baseline RSUのUART受信へ進まず、provisioner codeを署名imageとして検証して停止する。
+旧`bank.single` provisionerでは、2個のinstall areaにcodeが残り、bootloader MOTだけを
+書くとheader先頭が未知のlifecycle stateとなってbaseline RSUの受信に進まない問題を
+確認した。これは過去のlinear profileでの記録である。現在のstandalone `bank.dual`
+provisionerもapp用Code Flashを使うため、LittleFS/KVS commit後のhandoffでは引き続き
+両install areaを消去し、provisionerと以前のappのrecordを除去してからlifecycle stateを読む。
 
 そのためhostはcommit成功後、bootloader MOT書込み前にRFPの複数`-range`と`-erase`を
 用いて、次の2領域だけを選択消去する。
 
-- temporary install area: `0xFFE00000-0xFFEBFFFF`
-- execute install area: `0xFFF00000-0xFFFBFFFF`
+- temporary install area: `0xFFE00000-0xFFEEFFFF`
+- execute install area: `0xFFF00000-0xFFFEFFFF`
 
 `-erase-chip`は使用しない。Data Flash/LittleFS、flash option、bootloader mirror
-`0xFFEC0000-0xFFEFFFFF`、bootloader `0xFFFC0000-0xFFFFFFFF`を保持する。次に
+`0xFFEF0000-0xFFEFFFFF`、bootloader `0xFFFF0000-0xFFFFFFFF`を保持する。次に
 bootloader MOTを書いてreset保持し、SCI6をopenしてからreleaseする。これにより
 bootloaderは両headerを`LIFECYCLE_STATE_BLANK`として認識し、baseline RSU受信へ進む。
 
@@ -163,12 +164,12 @@ RX/TX streamだけでも約138,208 bytesとなり、128 KiBを超える。malloc
 
 OTA profileは次のように固定する。
 
-- FreeRTOS heap: 208 KiB
+- FreeRTOS heap: 224 KiB（2026-11-18に208 KiBから拡張。理由は下の「2026-11-18のheap拡張」）
 - TCP RX stream: 32 KiB（TXは8 KiB）
 - MQTT Agent network buffer: 8 KiB
 - `mqttFileDownloader` block: 4 KiB
 - `mqttFileDownloader` blocks/request: 1、OTA event data buffer: 2
-- 受信済みblock管理上限: 192（最大transfer payload 785,920 bytesを4 KiBで網羅）
+- 受信済みblock管理上限: 240（最大transfer payload 982,528 bytesを4 KiBで網羅）
 - network buffer descriptor: 24、WHD port buffer: 8
 - mbedTLS minimum / maximum: ともにTLS 1.2
 
@@ -179,6 +180,45 @@ request直後に下位TCP/MQTT受信処理が3 blockをburst受信してheapを�
 旧map比の静的RAM増加は約8 KiBに抑えながら動的RAM余裕を16 KiB増やす。正式package
 jobではこの見積りではなく、再buildしたMAPの`ram_capacity` gate、effective
 `.cproject`の208/2/192 memory profile、および実機のminimum-ever-free heapを必須とする。
+
+### 2026-11-18のheap拡張
+
+208 KiBのprofileは、OTA jobの受信直後に`prvEnsureFlashResources`がOTA flash taskを
+生成する時点で`FreeRTOS malloc failed`となった（free 2,784 bytes、minimum-ever-free
+2,080 bytes。flash taskのstackは`configMINIMAL_STACK_SIZE * 2`）。TLS 1.2 / TLS 1.3の
+両方で再現した（[pipeline 16747](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16747)）。
+
+同じsourceのbaseline MAPは、RAM 393,216 bytesに対してhigh-water `0x0005484B`、
+mapped 346,181 bytes、未使用47,028 bytesを示した
+（[pipeline 16753](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16753)）。
+下の`ef69d76c`時点の記録（high-water `0x00058A5B`、minimum-ever-free heap 25,584 bytes）と
+比べると、静的RAMが約17 KiB減り、heapの使用量が同程度増えている。
+
+heapの使用量が増えた有力な原因は、commit `65c59407`（3台の共通化）でRX671の
+`configMINIMAL_STACK_SIZE`が140 wordsから768 wordsになったことである。この値の倍数で
+確保するtask stackが連動して増えた（1 word = 4 bytesで計算）。
+
+| task | stack（旧 → 新） | 増分 |
+|---|---:|---:|
+| logging（`configMINIMAL_STACK_SIZE * 6`） | 840 → 4,608 words | +15,072 bytes |
+| OTA demo（`* 3`） | 420 → 2,304 words | +7,536 bytes |
+| OTA flash（`* 2`） | 280 → 1,536 words | +5,024 bytes |
+
+loggingとOTA demoの増分の合計22,608 bytesは、minimum-ever-free heapの差
+（25,584 → 2,080 bytes、差23,504 bytes）に近い。ただし各taskのstackの使用量は測っておらず、
+これは計算からの推定である。静的RAMが減った原因は特定できていない。各taskのstackを
+high-waterの実測から決め直せば、heapを208 KiBへ戻せる可能性がある（未着手）。
+
+heapを16 KiB増やして224 KiBとした。当時のlayout analyzer固定値は224 / 2 / 192、現在は224 / 2 / 240である。
+[pipeline 16757](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/pipelines/16757)の
+実機2試験の`[RX671_OTA_CAPACITY]`は次のとおりで、判定の下限16,384 bytesを満たす。
+
+| TLS | minimum-ever-free heap | minimum network buffer | WHD maximum in-use |
+|---|---:|---:|---:|
+| 1.2 | 21,584 bytes | 19 | 1/8 |
+| 1.3 | 18,408 bytes | 14 | 1/8 |
+
+以下は208 KiB時点の記録であり、当時の値のまま残す。
 
 source SHA `ef69d76c`のpipeline #9581 / package job #61342では、candidateの
 effective `.cproject`から上記profileを一意に導出し、`mqtt_ota_buffer_fit`と
@@ -336,27 +376,26 @@ IoT Job、S3 source、一時Thing / policyの不存在まで完了した。clean
 failed判定はcleanup前snapshotのJob executionが`IN_PROGRESS`だったためであり、
 後始末処理の失敗を意味しない。
 
-通常プロジェクトがLinear / `bank.single`であることと、OTA成果物がdual-bank
-配置であることは両立させる。前者は開発・ネットワーク試験の既存動作を維持し、
-後者はbootloaderが扱う署名対象の固定配置を作る。
+通常profileとOTA成果物profileは、いずれも同じdual-bank配置を使う。
+OTA helperは版数と実行時の役割を選択し、署名対象の固定配置を検証する。
 
 ## 3. 固定code flash配置
 
 正本は`ota-layout-contract.json`である。RX671の2 MiB code flashを1 MiBずつの
-main / buffer bankとして扱い、各bank末尾256 KiBをbootloader予約相当として
+main / buffer bankとして扱い、各bank末尾64 KiBをbootloader予約相当として
 除外する。署名・更新対象となるinstall areaは各768 KiBである。
 
 | 範囲 / anchor | 値 | 用途 |
 |---|---:|---|
 | buffer bank start | `0xFFE00000` | download / swap対象bank |
 | main bank start | `0xFFF00000` | 現在実行する論理main bank |
-| install area size | `0x000C0000` | header、descriptor、applicationを含む768 KiB |
+| install area size | `0x000F0000` | header、descriptor、applicationを含む960 KiB |
 | FWUP header | main `+0x000`–`+0x1FF` | 512-byte FWUP header |
 | FWUP v2 descriptor | main `+0x200`–`+0x2FF` | 256-byte descriptor |
 | application start | `0xFFF00300` | main `+0x300` |
-| exception vector | `0xFFFBFF80` | install area末尾128-byte window |
-| reset vector | `0xFFFBFFFC` | install area末尾 |
-| bootloader reserved | `0xFFFC0000`–`0xFFFFFFFF` | RX671専用bootloaderと固定vector |
+| exception vector | `0xFFFEFF80` | install area末尾128-byte window |
+| reset vector | `0xFFFEFFFC` | install area末尾 |
+| bootloader reserved | `0xFFFF0000`–`0xFFFFFFFF` | RX671専用bootloaderと固定vector |
 
 OTA linker profileでは、アプリ、`TYPE1YN_FW_BLOB`、`TYPE1YN_NVRAM_BLOB`、
 `TYPE1YN_CLM_BLOB`を`0xFFF00300`から始まる同一groupに置く。Cコード側は
@@ -415,7 +454,7 @@ AWS cleanup境界として検証する。
 `tools/build_rx671_ota_images.py`は開始時に次の4ファイルをbytesとして保存する。
 
 1. `.cproject`
-2. `src/frtos_config/r_fwup_config.h`
+2. `src/frtos_config/rx_ota_config.h`
 3. `src/smc_gen/r_config/r_bsp_config.h`
 4. `src/smc_gen/r_bsp/board/generic_rx671/r_bsp_config_reference.h`
 
@@ -479,7 +518,7 @@ jobは同じ`build/rx671-ota/`を直接受け取り、firmwareのbuild後にSSID
 - `bootloader/`のMOT / ABS / MAP
 - `baseline-0.1.0/`と`candidate-0.1.1/`のMOT / ABS / MAP
 - 各versionのECDSA P-256署名済みFWUP v2 RSU
-- bank.single provisionerのMOT / ABS / MAP
+- bank.dual provisionerのMOT / ABS / MAP
 - signer certificateと公開鍵（秘密鍵はartifactへ収録しない）
 - candidateの`aws_wifi_rx671_ek.ota.bin`（full RSUの`0x200` byte以降）と、
   同payloadに対応するECDSA DER署名

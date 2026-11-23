@@ -42,7 +42,7 @@
 #define CELLULAR_CFG_NETWORK_NOTIFY_LEVEL   (2)         /* Network status notification level */
 #define CELLULAR_CFG_ATC_RETRY_CGATT        (600)       /* Connection retry limit */
 #define CELLULAR_CFG_EX_TIMEOUT             (0)         /* Exchange timeout (1sec,0~65535,0=no_limit) */
-#define CELLULAR_CFG_SCI_PRIORITY           (6)         /* SCI interrupt priority */
+#define CELLULAR_CFG_SCI_PRIORITY           (4)         /* SCI interrupt priority */
 #define CELLULAR_CFG_SEMAPHORE_BLOCK_TIME   (15000)     /* Maximum semaphore acquisition latency(msec) */
 #define CELLULAR_CFG_PSM_PREPARATION_TIME   (100)       /* Reception guard time before the module transitions to PSM(1msec,100~10000) */
 #define CELLULAR_CFG_PSM_WAKEUP_LATENCY     (5000)      /* Maximum authorized wake-up latency(1msec,0~10000) */
@@ -52,7 +52,11 @@
 #define CELLULAR_CFG_URC_CHARGET_ENABLED    (0)         /* Whether the callback function is invoked when a URC is received(0: No, 1: Yes)*/
 #define CELLULAR_CFG_URC_CHARGET_FUNCTION   my_sw_urc_charget_function  /* Name of the callback function to be invoked during ringline operation.*/
 
+#if PUBLIC_SIGNER_PROVISIONER_ENABLE == 1
+#define CELLULAR_CFG_DEBUGLOG               (0) /* Maintenance images disable driver logging. */
+#else
 #define CELLULAR_CFG_DEBUGLOG               (4) /* 0: OFF, 1: ERROR, 2: +WARN, 3: +INFO, 4: +DEBUG(AT command data) */
+#endif
                                                 /* This macro can be used with FreeRTOS logging task. https://www.freertos.org/logging.html */
 
 #define CELLULAR_CFG_RESET_SIGNAL_LOGIC     (1) /* 1: active high (in this case when user would use PMOD RYZ014A) 0: active low */
@@ -71,11 +75,12 @@
 #define CELLULAR_CFG_CTS_PORT               J
 #define CELLULAR_CFG_CTS_PIN                3
 #define CELLULAR_CFG_PFS_SET_VALUE          0x0BU
-#define CELLULAR_CFG_BG96_USE_HW_CTS        (1)
+#define CELLULAR_CFG_BG96_USE_HW_CTS        (0)
 #define CELLULAR_CFG_BG96_FLOW_CONTROL      (1)
+#define CELLULAR_CFG_BG96_RUNTIME_BAUDRATE  (921600)
 
-#define CELLULAR_CFG_RTS_PORT               0
-#define CELLULAR_CFG_RTS_PIN                2
+#define CELLULAR_CFG_RTS_PORT               J
+#define CELLULAR_CFG_RTS_PIN                3
 #define CELLULAR_CFG_BG96_RTS_IDLE_LEVEL    (0)
 
 #define CELLULAR_CFG_RESET_PORT             5
@@ -129,6 +134,14 @@ The E2 emulator can provide 200mA, but RYZ014A needs more current while connecti
 Note3:
 When you use RX66N Target Board, you need remodeling of the board to use SCI channel 5(TXD5/RXD5/CTS5) and GPIO(PC1).
 Please refer to User's Manual: https://www.renesas.com/products/microcontrollers-microprocessors/rx-32-bit-performance-efficiency-mcus/rtk5rx66n0c00000bj-target-board-rx66n
+
+Note4:
+When you use the Quectel BG96 (CELLULAR_TARGET_BG96) with flow control (CELLULAR_CFG_BG96_FLOW_CONTROL = 1),
+CELLULAR_CFG_RTS_PORT / CELLULAR_CFG_RTS_PIN must be the host pin that is wired to the BG96 RTS input.
+After AT+IFC=2,2 the BG96 stops transmitting while that line is not low, and R_CELLULAR_Open() fails at AT+IFC=2,2.
+On CK-RX65N v1 (PMOD1) with the BG96 that pin is PJ3 (CELLULAR_CFG_RTS_PORT = J, CELLULAR_CFG_RTS_PIN = 3),
+not P02 listed for board number 5 (that is for PMOD-RYZ014A). PJ3 is also the SCI CTS6# pin,
+so keep CELLULAR_CFG_BG96_USE_HW_CTS at 0 (not tested with 1).
 
 */
 

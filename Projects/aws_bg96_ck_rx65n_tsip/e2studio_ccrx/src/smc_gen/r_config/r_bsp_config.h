@@ -457,7 +457,7 @@ Configuration Options
    0 = ROM cache operation disabled.
    1 = ROM cache operation enabled.
 */
-#define BSP_CFG_ROM_CACHE_ENABLE        (0)
+#define BSP_CFG_ROM_CACHE_ENABLE        (1)
 
 /* Configure WDT and IWDT settings.
    OFS0 - Option Function Select Register 0
@@ -815,6 +815,15 @@ Configuration Options
    NOTE: Not normally used. Set this to "1" only in the bootloader project.
 */
 #define BSP_CFG_BOOTLOADER_PROJECT    (0)
+
+
+/* BSP common interface configuration. */
+#define BSP_CFG_LOW_LEVEL_INTERFACE_STDIO_ENABLE (1)
+#define BSP_CFG_LOW_LEVEL_INTERFACE_SBRK_ENABLE (1)
+#define BSP_CFG_LOW_LEVEL_INTERFACE_REENTRANT_LIB_ENABLE (1)
+#define BSP_CFG_USER_EXCLUSIVE_CONTROL_ENABLE (0)
+#define BSP_CFG_USER_ENTER_CRITICAL_FUNCTION my_enter_critical_function
+#define BSP_CFG_USER_EXIT_CRITICAL_FUNCTION my_exit_critical_function
 
 #endif /* R_BSP_CONFIG_REF_HEADER_FILE */
 

@@ -27,6 +27,7 @@
 #include "r_pinset.h"
 #include "r_flash_rx_if.h"
 #include "Pin.h"
+#include "r_sci_rx_if.h"
 
 /**********************************************************************************************************************
 Typedef definitions
@@ -39,6 +40,10 @@ Typedef definitions
 /******************************************************************************
  Private global variables
  ******************************************************************************/
+
+/* The product CLI owns its printf buffer independently of the modem driver. */
+static char cliTransmitBuffer[SCI_CFG_CH5_TX_BUFSIZ * 5U];
+char *txBuffer = cliTransmitBuffer;
 
 
 /******************************************************************************

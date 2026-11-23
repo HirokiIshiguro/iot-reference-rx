@@ -7,6 +7,10 @@ address-range operations that preserve Data Flash and both boot-loader regions,
 and the boot-loader MOT is then programmed.  The boot loader is deliberately
 left in reset; ``test_rx671_ota.py`` opens SCI6 before releasing it so no
 one-shot marker is lost and keeps that same UART open through the transaction.
+
+With ``--tsip`` the image is the TSIP provisioner: no plaintext device private key is
+entered. Right after the format the wrapped TLS keys are sent with ``tsipprov`` (the
+four slots of ``provision_tsip_over_uart.py``) and the board prepares them.
 """
 
 from __future__ import annotations
@@ -54,9 +58,10 @@ def _required_file(value: str) -> Path:
     return path
 
 
-def enter_cli(serial_port, *, timeout: float, char_delay: float) -> None:
+def enter_cli(serial_port, *, timeout: float, char_delay: float, boot_capture: bytearray | None = None) -> None:
     try:
-        read_until(serial_port, success_tokens=CLI_INVITES, timeout=timeout)
+        read_until(serial_port, success_tokens=CLI_INVITES, timeout=timeout,
+                   on_data=None if boot_capture is None else boot_capture.extend)
     except TimeoutError:
         # A quiet provisioner may already be in its command loop.
         pass
@@ -201,8 +206,74 @@ def _verify_value(
     )
 
 
-def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=None, serial_opener=None) -> dict:
-    """Run the linear provisioner, optionally storing only public signer trust.
+def _thing_name(args: argparse.Namespace) -> str:
+    """The Thing name: given directly, or read from an environment variable so that it stays off the command line."""
+    if getattr(args, "thing_name_env", None):
+        value = os.environ.get(args.thing_name_env, "")
+        if not value:
+            raise ValueError(f"Thing name environment variable is empty: {args.thing_name_env}")
+        return value
+    return args.thing_name
+
+
+def _printable(data: bytes, limit: int = 2000) -> str:
+    """Printable ASCII of a UART capture, bounded. Only used for the commit, whose command carries no secret."""
+    text = "".join(chr(b) if 32 <= b < 127 or b in (10, 13) else "." for b in data)
+    return text[-limit:]
+
+
+def _commit(serial_port, args: argparse.Namespace, event_log) -> None:
+    """Send ``conf commit`` and wait for its success line; keep what the board answered if it does not come.
+
+    The command has no value in it, so the board's answer can be written to the event log without
+    exposing anything that was stored before.
+    """
+    captured = bytearray()
+    serial_port.reset_input_buffer()
+    for byte in b"conf commit":
+        serial_port.write(bytes((byte,)))
+        if args.char_delay:
+            time.sleep(args.char_delay)
+    serial_port.write(b"\r\n")
+    serial_port.flush()
+    try:
+        read_until(
+            serial_port,
+            success_tokens=(b"Configuration save",),
+            error_tokens=(b"\r\nError", b"\nError", b"Error.", b"Format NG"),
+            timeout=args.commit_timeout,
+            on_data=captured.extend,
+        )
+    except (TimeoutError, RuntimeError):
+        event_log.write(f"conf commit answer ({len(captured)} bytes): {_printable(bytes(captured))!r}\n")
+        raise
+
+
+def _provision_tsip_keys(serial_port, args: argparse.Namespace, event_log, completed: list[str]) -> str | None:
+    """Send the wrapped TLS keys through the TSIP CLI of the provisioner. Nothing secret is logged."""
+    import provision_tsip_over_uart as tsip
+
+    payloads = tsip.load_payloads(argparse.Namespace(
+        only=None, target="rx671", rootca_sig_hex_env=None, rootca_der_hex_env=None,
+        root_signer_hex_env=None, client_pub_hex_env=None, client_pri_hex_env=None))
+    tsip.send_payloads(serial_port, payloads, args.tsip_chunk_size, args.command_timeout, args.char_delay,
+                       prepare=False)
+    completed.append("tsip_keys")
+    event_log.write("wrapped TLS keys stored by the board (payloads redacted)\n")
+    # The answer of prepare names no key material. A failure is kept and raised after conf commit,
+    # so that one run shows both the prepare answer and whether conf commit answers.
+    try:
+        answer = tsip.send_command(serial_port, "tsipprov prepare", args.command_timeout, args.char_delay)
+    except RuntimeError as exc:
+        event_log.write(f"tsipprov prepare failed: {_printable(str(exc).encode('ascii', 'replace'), 400)!r}\n")
+        return str(exc)
+    event_log.write(f"tsipprov prepare answer: {_printable(answer.encode('ascii', 'replace'), 400)!r}\n")
+    return None
+
+
+def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=None, serial_opener=None,
+              rfp_config=None, ready_source_sha: str | None = None) -> dict:
+    """Run the standalone dual-bank provisioner, optionally storing only public signer trust.
 
     IDT must establish boot trust before its first dual-bank application boot.
     That caller supplies a guarded runner while already owning UART and the
@@ -221,7 +292,11 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
     artifact_dir = args.artifact_dir.resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
     event_log = TimestampLog(artifact_dir / "provision-events.log")
-    rfp = RfpConfig(
+    if ready_source_sha is not None:
+        import re
+        if not signer_only or not re.fullmatch(r"[a-f0-9]{40}", ready_source_sha):
+            raise ValueError("Public maintenance source witness requires an exact source SHA")
+    rfp = rfp_config or RfpConfig(
         executable=args.rfp_cli,
         device=args.rfp_device,
         tool=args.rfp_tool,
@@ -230,6 +305,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
         auth_id=args.rfp_auth_id,
     )
     completed: list[str] = []
+    prepare_error: str | None = None
     event_log.write("program provisioner MOT without chip erase; leave target reset\n")
     execute(
         rfp.program_command(args.provisioner_mot, leave_reset=True),
@@ -242,13 +318,23 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
     try:
         serial_port.reset_input_buffer()
         serial_port.reset_output_buffer()
-        event_log.write("release provisioner after SCI6 is open\n")
+        event_log.write("release provisioner after the selected UART is open\n")
         execute(
             rfp.run_command(),
             label="provisioner run",
             timeout=args.rfp_timeout,
         )
-        enter_cli(serial_port, timeout=args.boot_timeout, char_delay=args.char_delay)
+        if ready_source_sha is not None:
+            read_until(serial_port,
+                       success_tokens=(b"PUBLIC_SIGNER_PROVISIONER source_sha=" +
+                                       ready_source_sha.encode("ascii") + b"\r\n",),
+                       error_tokens=(b"PUBLIC_SIGNER_PROVISIONER ERROR", b"fatal error"),
+                       timeout=args.boot_timeout)
+            completed.append("maintenance_source_witness")
+        boot_capture = bytearray()
+        enter_cli(serial_port, timeout=args.boot_timeout, char_delay=args.char_delay, boot_capture=boot_capture)
+        # Boot text of the provisioner: no secret is in it (no command has been sent yet).
+        event_log.write(f"provisioner boot text: {_printable(bytes(boot_capture), 600)!r}\n")
         completed.append("cli_ready")
 
         # Never log command strings or UART responses: a CLI echo can contain PEM.
@@ -262,6 +348,11 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
         completed.append("format")
         event_log.write("LittleFS format OK\n")
 
+        if getattr(args, "tsip", False) and not signer_only:
+            # The wrapped keys go first. tsipprov prepare opens the TSIP driver; conf commit then starts
+            # PKCS #11, whose entropy source needs that driver to be open (first run: no answer to conf commit).
+            prepare_error = _provision_tsip_keys(serial_port, args, event_log, completed)
+
         verification_values = {}
         pem_values = []
         if not signer_only:
@@ -274,7 +365,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             )
             completed.append("wifi_credentials")
             event_log.write("Wi-Fi SSID/passphrase stored (values redacted)\n")
-            for name, value in (("endpoint", args.endpoint), ("thingname", args.thing_name)):
+            for name, value in (("endpoint", args.endpoint), ("thingname", _thing_name(args))):
                 send_ascii_command(
                     serial_port, f"conf set {name} {value}",
                     timeout=args.command_timeout, char_delay=args.char_delay,
@@ -282,7 +373,9 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
                 verification_values[name] = value
             completed.extend(("endpoint", "thing"))
             event_log.write("endpoint and Thing name stored (values redacted)\n")
-            pem_values.extend((("cert", args.certificate), ("key", args.private_key)))
+            pem_values.append(("cert", args.certificate))
+            if not getattr(args, "tsip", False):
+                pem_values.append(("key", args.private_key))
         pem_values.extend((
             ("codesigncert", args.codesigner_certificate),
             ("codesignpubkey", args.codesigner_public_key),
@@ -299,13 +392,7 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             event_log.write(f"{name} stored (payload redacted)\n")
 
         event_log.write("commit LittleFS/KVS changes\n")
-        send_ascii_command(
-            serial_port,
-            "conf commit",
-            timeout=args.commit_timeout,
-            char_delay=args.char_delay,
-            success_tokens=(b"Configuration save",),
-        )
+        _commit(serial_port, args, event_log)
         completed.append("commit")
         event_log.write("LittleFS commit OK\n")
         for name, expected in verification_values.items():
@@ -318,13 +405,14 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
             )
         if verification_values:
             completed.append("public_config_readback_verified")
+        if prepare_error:
+            raise RuntimeError(prepare_error)
         event_log.write("PEM persistence requires bootloader key loading and signature proof\n")
     finally:
         serial_port.close()
 
     event_log.write(
-        "erase RX671 OTA install ranges 0xFFE00000-0xFFEBFFFF and "
-        "0xFFF00000-0xFFFBFFFF; preserve Data Flash, flash options, "
+        "erase selected OTA install ranges; preserve Data Flash, flash options, "
         "and both boot-loader regions\n"
     )
     execute(
@@ -348,14 +436,14 @@ def provision(args: argparse.Namespace, *, signer_only: bool = False, runner=Non
     return {
         "success": True,
         "signer_only": signer_only,
+        "tsip": bool(getattr(args, "tsip", False)),
         "classification": "provisioned_and_bootloader_left_reset",
         "completed_steps": completed,
         "data_flash_preserved_during_rfp_programming": True,
         "data_flash_preserved_during_rfp_operations": True,
         "ota_install_areas_erased_after_provisioning": True,
         "ota_install_area_erase_ranges": [
-            "0xFFE00000-0xFFEBFFFF",
-            "0xFFF00000-0xFFFBFFFF",
+            f"0x{start:08X}-0x{end:08X}" for start, end in rfp.install_ranges
         ],
         "pem_readback_performed": False,
         "wifi_passphrase_readback_performed": False,
@@ -372,9 +460,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--provisioner-mot", type=_required_file, required=True)
     parser.add_argument("--bootloader-mot", type=_required_file, required=True)
     parser.add_argument("--endpoint", required=True)
-    parser.add_argument("--thing-name", required=True)
+    thing = parser.add_mutually_exclusive_group(required=True)
+    thing.add_argument("--thing-name")
+    thing.add_argument("--thing-name-env", help="environment variable that holds the Thing name")
     parser.add_argument("--certificate", type=_required_file, required=True)
-    parser.add_argument("--private-key", type=_required_file, required=True)
+    parser.add_argument("--private-key", type=_required_file)
+    parser.add_argument("--tsip", action="store_true",
+                        help="TSIP provisioner: no plaintext private key; send the wrapped TLS keys with tsipprov")
+    parser.add_argument("--tsip-chunk-size", type=int, default=128)
     parser.add_argument("--codesigner-certificate", type=_required_file, required=True)
     parser.add_argument("--codesigner-public-key", type=_required_file, required=True)
     parser.add_argument("--wifi-ssid-env", default="RX671_EK_WIFI_SSID")
@@ -401,6 +494,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.rfp_timeout <= 0:
         parser.error("--rfp-timeout must be positive")
+    if args.tsip and args.private_key is not None:
+        parser.error("--private-key must not be given with --tsip")
+    if not args.tsip and args.private_key is None:
+        parser.error("--private-key is required without --tsip")
+    if args.tsip_chunk_size <= 0:
+        parser.error("--tsip-chunk-size must be positive")
     if args.cleanup_plaintext and args.cleanup_root is None:
         parser.error("--cleanup-root is required with --cleanup-plaintext")
     return args

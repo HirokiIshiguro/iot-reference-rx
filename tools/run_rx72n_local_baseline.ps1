@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
-    [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
-    [string]$Workspace = "C:\iotref-rx72n-ws",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
+    [string]$Workspace = "C:\ai\codex\ws\iotref-rx72n",
     [string]$RfpCli = "C:\Program Files (x86)\Renesas Electronics\Programming Tools\Renesas Flash Programmer V3.22\rfp-cli.exe",
     [string]$Tool = "e2l:OBE110008",
     [string]$LogPort = "COM7",

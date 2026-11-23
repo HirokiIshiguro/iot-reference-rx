@@ -23,12 +23,14 @@ except ImportError:
 
 from tools.idt.targets import get_target, target_fingerprint, target_ids
 from tools.build_rx671_fwup_v2_rsu import APPLICATION_SIZE, build_image
+from tools.ci.tests import test_idt_public_signer_provision as generic_fixtures
+from tools.idt import public_signer_provision as public_controller
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def stack_source_fixture(source):
-    """Model project-local BG96 and linked shared MQTT sources without Gitlinks.
+    """Model all three projects' shared MQTT sources without Gitlinks.
 
     The source-only CI job intentionally initializes no production submodules.
     Actual project metadata is independently checked by the builder/plans; this
@@ -42,17 +44,11 @@ def stack_source_fixture(source):
     write("tools/idt/bundle-manifest.json", json.dumps({"idt_version": "4.9.0", "suite": "FRQ_2.5.0"}))
     for target_id in target_ids():
         project = get_target(target_id)["application_project"]
-        shared = target_id != "rx65n-bg96"
         links = ("<linkedResources><link><name>Middleware</name><type>2</type>"
                  "<locationURI>AWS_IOT_MCU_ROOT/Middleware</locationURI></link></linkedResources>"
                  "<variableList><variable><name>AWS_IOT_MCU_ROOT</name>"
-                 "<value>$%7BPARENT-3-PROJECT_LOC%7D</value></variable></variableList>" if shared else "")
+                 "<value>$%7BPARENT-3-PROJECT_LOC%7D</value></variable></variableList>")
         write(project + "/.project", "<projectDescription>" + links + "</projectDescription>")
-        if not shared:
-            mqtt = project + "/Middleware/FreeRTOS/coreMQTT/source"
-            write(mqtt + "/include/core_mqtt.h", '#define MQTT_LIBRARY_VERSION "v2.3.1"\n')
-            write(mqtt + "/core_mqtt_serializer.c", "#define MQTT_VERSION_3_1_1 ((uint8_t) 4U)\n"
-                  "void serializeConnectPacket(void) { *pIndexLocal = MQTT_VERSION_3_1_1; }\n")
     mqtt = "Middleware/FreeRTOS/coreMQTT/source"
     write(mqtt + "/include/core_mqtt.h", '#define MQTT_LIBRARY_VERSION "v5.0.2"\n')
     write(mqtt + "/core_mqtt_serializer.c", "/* MQTT 5 CONNECT uses the private serializer. */\n")
@@ -72,33 +68,32 @@ class StackMetadataTests(unittest.TestCase):
             with self.subTest(target=target_id):
                 metadata = ota_support.source_stack_metadata(self.source, target_id)
                 mqtt = metadata["core_mqtt"]
-                bg96 = target_id == "rx65n-bg96"
-                self.assertEqual(mqtt["version"], "v2.3.1" if bg96 else "v5.0.2")
-                self.assertEqual(mqtt["protocol"], "3.1.1" if bg96 else "5.0")
-                self.assertEqual(mqtt["wire_level"], 4 if bg96 else 5)
+                self.assertEqual(mqtt["version"], "v5.0.2")
+                self.assertEqual(mqtt["protocol"], "5.0")
+                self.assertEqual(mqtt["wire_level"], 5)
                 self.assertEqual(metadata["source_manifest_version"], "202604.00-LTS")
                 self.assertEqual(metadata["idt"]["freertos_version_check"]["status"], "unsupported")
                 self.assertEqual(metadata["idt"]["mqtt_protocol_check"]["status"],
-                                 "protocol-match-only" if bg96 else "protocol-mismatch")
+                                 "protocol-mismatch")
                 self.assertEqual(metadata["qualification"], "not-established")
                 for field in ("header", "connect_serializer"):
                     evidence = mqtt[field]
                     self.assertEqual(evidence["sha256"],
                                      hashlib.sha256((self.source / evidence["path"]).read_bytes()).hexdigest())
                 self.assertTrue(mqtt["header"]["path"].startswith(
-                    get_target(target_id)["application_project"] + "/Middleware/" if bg96 else "Middleware/"))
+                    "Middleware/"))
 
     def test_changed_connect_serializer_cannot_reuse_a_protocol_assessment(self):
         target = get_target("rx65n-bg96")
         metadata = ota_support.source_stack_metadata(self.source, target)
         serializer = self.source / metadata["core_mqtt"]["connect_serializer"]["path"]
         serializer.write_text(serializer.read_text(encoding="utf-8").replace(
-            "*pIndexLocal = MQTT_VERSION_3_1_1;", "*pIndexLocal = 5U;"), encoding="utf-8")
+            "*pIndexLocal = MQTT_VERSION_5;", "*pIndexLocal = 4U;"), encoding="utf-8")
         with self.assertRaisesRegex(RuntimeError, "unreviewed protocol level"):
             ota_support.source_stack_metadata(self.source, target)
 
     def test_changed_shared_project_mapping_cannot_assess_unreviewed_sources(self):
-        for target_id in ("rx72n-ethernet", "rx671-wifi"):
+        for target_id in target_ids():
             with self.subTest(target=target_id):
                 project = self.source / get_target(target_id)["application_project"] / ".project"
                 project.write_text(project.read_text(encoding="utf-8").replace(
@@ -124,9 +119,12 @@ class OtaSupportTests(unittest.TestCase):
         header = self.source / "Projects/boot_loader_rx72n_envision_kit/e2studio_ccrx/src/key/code_signer_public_key.h"
         header.parent.mkdir(parents=True)
         header.write_text("#define CODE_SIGNER_PUBLIC_KEY_PEM " + json.dumps(public.decode()) + "\n")
-        self.config = ota_support.make_ota_config(self.inputs, self.source, str)
+        self.target, self.source_sha, self.bootstrap = self.public_bootstrap("rx72n-ethernet")
+        self.config = ota_support.make_ota_config(self.inputs, self.source, str, target=self.target,
+            bootstrap_environment=self.bootstrap, source_sha=self.source_sha)
         self.environment = ota_support.ota_environment(self.inputs, str)
-        self.environment.update(IDT_RUNTIME_DIR=str(self.runtime), IDT_SOURCE_PATH=str(self.source))
+        self.environment.update(self.bootstrap)
+        self.environment.update(IDT_RUNTIME_DIR=str(self.runtime), IDT_SOURCE_PATH=str(self.source), IDT_SOURCE_SHA=self.source_sha)
         self.env_patch = patch.dict(os.environ, self.environment)
         self.env_patch.start()
         self.addCleanup(self.env_patch.stop)
@@ -138,24 +136,25 @@ class OtaSupportTests(unittest.TestCase):
             ota_support.load_signer(self.inputs / ota_support.SIGNING_KEY,
                                     self.inputs / ota_support.UNTRUSTED_CERT)
 
-    def test_bg96_uses_its_own_bootloader_signer_before_writing_credentials(self):
-        target = get_target("rx65n-bg96")
-        header = self.source / target["bootloader_project"] / "src/key/code_signer_public_key.h"
-        header.parent.mkdir(parents=True)
-        wrong_key = ec.generate_private_key(ec.SECP256R1())
-        def public(key):
-            return key.public_key().public_bytes(serialization.Encoding.PEM,
-                                                 serialization.PublicFormat.SubjectPublicKeyInfo).decode()
-        header.write_text("#define CODE_SIGNER_PUBLIC_KEY_PEM " + json.dumps(public(wrong_key)) + "\n")
-        inputs = self.inputs.parent / "bg96-inputs"
-        with self.assertRaisesRegex(ValueError, "does not match"):
-            ota_support.make_ota_config(inputs, self.source, str, target=target)
-        self.assertFalse((inputs / ota_support.SIGNING_KEY).exists())
-        header.write_text("#define CODE_SIGNER_PUBLIC_KEY_PEM " + json.dumps(public(self.key)) + "\n")
-        config = ota_support.make_ota_config(inputs, self.source, str, target=target)
-        self.assertTrue((inputs / ota_support.SIGNING_KEY).is_file())
-        self.assertEqual(config["otaE2EFirmwarePath"], "{{testData.sourcePath}}/" +
-                         ota_support.payload_relative_path(target))
+    def test_all_three_prepared_signers_are_required_before_writing_credentials(self):
+        for target_id in target_ids():
+            target, source_sha, bootstrap=self.public_bootstrap(target_id)
+            inputs=self.inputs.parent/(target_id+"-separate-inputs")
+            wrong_key=ec.generate_private_key(ec.SECP256R1())
+            certificate=Path(bootstrap["IDT_PUBLIC_SIGNER_CERT_FILE"])
+            public=Path(bootstrap["IDT_PUBLIC_SIGNER_PUBLIC_KEY_FILE"])
+            expected_cert,expected_public=certificate.read_bytes(),public.read_bytes()
+            certificate.write_bytes(ota_support._certificate(wrong_key,"wrong synthetic public signer"))
+            public.write_bytes(wrong_key.public_key().public_bytes(serialization.Encoding.PEM,
+                                                                serialization.PublicFormat.SubjectPublicKeyInfo))
+            with self.assertRaisesRegex(ValueError,"does not match"):
+                ota_support.make_ota_config(inputs,self.source,str,target=target,
+                    bootstrap_environment=bootstrap,source_sha=source_sha)
+            self.assertFalse((inputs/ota_support.SIGNING_KEY).exists())
+            certificate.write_bytes(expected_cert);public.write_bytes(expected_public)
+            config=ota_support.make_ota_config(inputs,self.source,str,target=target,
+                bootstrap_environment=bootstrap,source_sha=source_sha)
+            self.assertEqual(config["otaE2EFirmwarePath"],"{{testData.sourcePath}}/"+ota_support.payload_relative_path(target))
 
     def test_payload_paths_keep_rx72n_compatibility_and_selected_target_contract(self):
         self.assertEqual(ota_support.payload_relative_path(get_target("rx72n-ethernet")),
@@ -168,82 +167,65 @@ class OtaSupportTests(unittest.TestCase):
                              "artifacts/idt/build_transport/" + target["artifact_basename"] +
                              "_ota_payload.bin")
 
-    def test_rx671_runtime_trust_is_required_before_writing_credentials(self):
-        inputs = self.inputs.parent / "rx671-inputs"
-        with self.assertRaisesRegex(ValueError, "verified LittleFS code_signer_public_key"):
-            ota_support.make_ota_config(inputs, self.source, str, target="rx671-wifi")
-        self.assertFalse((inputs / ota_support.SIGNING_KEY).exists())
+    def test_all_three_bootstrap_source_is_required_before_writing_credentials(self):
+        for target_id in target_ids():
+            inputs=self.inputs.parent/(target_id+"-no-bootstrap")
+            with self.assertRaisesRegex(ValueError,"LittleFS public signer inputs"):
+                ota_support.make_ota_config(inputs,self.source,str,target=target_id)
+            self.assertFalse((inputs/ota_support.SIGNING_KEY).exists())
 
-    def rx671_public_bootstrap(self, key=None):
-        target = get_target("rx671-wifi")
-        root = self.runtime / "bootstrap"
-        root.mkdir()
-        key = self.key if key is None else key
-        certificate, public = root / "signer.crt.pem", root / "signer.pub.pem"
-        certificate.write_bytes(ota_support._certificate(key, "ephemeral unit bootstrap signer"))
-        public.write_bytes(key.public_key().public_bytes(serialization.Encoding.PEM,
-                                                        serialization.PublicFormat.SubjectPublicKeyInfo))
-        def record(address, data):
-            encoded = bytes([len(data) + 5]) + address.to_bytes(4, "big") + data
-            return "S3" + (encoded + bytes([(~sum(encoded)) & 0xFF])).hex().upper() + "\n"
-        mot = root / "provisioner.mot"
-        mot.write_text(record(0xFFE00000, b"ephemeral-linear-fixture") +
-                       record(0xFFFFFFFC, b"\x00\x00\xe0\xff"), encoding="ascii")
-        source_sha = "a" * 40
-        manifest = root / "manifest.json"
-        manifest.write_text(json.dumps({"schema_version": 1,
-            "profile": "rx671-bank-single-ota-provisioner-v1", "bank_mode": "bank.single",
-            "credentials_embedded": False, "source_sha": source_sha,
-            "sha256": {"aws_wifi_rx671_ek.mot": hashlib.sha256(mot.read_bytes()).hexdigest()}}))
-        policy_dir = self.source / target["bootloader_project"] / "src"
-        policy_dir.mkdir(parents=True)
-        (policy_dir / "rx_bootloader_config.h").write_text(
-            "#define RX_BOOTLOADER_USE_LITTLEFS_KEY_STORE (1)\n"
-            "#define RX_BOOTLOADER_USE_DATAFLASH_KEY_STORE (0)\n"
-            "#define RX_BOOTLOADER_ALLOW_BUILTIN_PUBLIC_KEY_FALLBACK (0)\n"
-            "#define RX_BOOTLOADER_REQUIRE_ECDSA_SIGNATURE (1)\n")
-        (policy_dir / "rx671.h").write_text("#define RX_BOOTLOADER_INSTALL_DATA_FLASH (0)\n")
-        return target, source_sha, {
-            "IDT_RX671_PROVISIONER_MOT_FILE": str(mot),
-            "IDT_RX671_PROVISIONER_MANIFEST_FILE": str(manifest),
-            "IDT_RX671_SIGNER_CERT_FILE": str(certificate),
-            "IDT_RX671_SIGNER_PUBLIC_KEY_FILE": str(public)}
+    def public_bootstrap(self,target_id,key=None):
+        root=self.runtime/("bootstrap-"+target_id)
+        if root.exists():
+            # Existing fixture is retained; a second case uses its own directory.
+            root=self.runtime/("bootstrap-"+target_id+"-"+str(len(list(self.runtime.iterdir()))))
+        fixture=generic_fixtures.Fixture(root,target_id)
+        key=self.key if key is None else key
+        fixture.files["signer.crt.pem"].write_bytes(ota_support._certificate(key,"ephemeral unit public signer"))
+        fixture.files["signer.pub.pem"].write_bytes(key.public_key().public_bytes(serialization.Encoding.PEM,
+                                                      serialization.PublicFormat.SubjectPublicKeyInfo))
+        target=get_target(target_id)
+        boot=self.source/target["bootloader_project"]
+        (boot/"src").mkdir(parents=True,exist_ok=True)
+        (boot/"src/rx_bootloader_config.h").write_bytes(fixture.files["public_signer_bootloader_config.h"].read_bytes())
+        chip=public_controller.CHIP_HEADERS[target_id]
+        chip_dir=boot/"lib/rx_bootloader/config";chip_dir.mkdir(parents=True,exist_ok=True)
+        (chip_dir/chip).write_bytes(fixture.files["public_signer_target.h"].read_bytes())
+        for name in ("rx671_ota_host.py","provision_rx671_ota.py","build_rx671_fwup_v2_rsu.py"):
+            output=self.source/"tools"/name;output.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(ROOT/"tools"/name,output)
+        return target,generic_fixtures.SOURCE_SHA,{variable:str(fixture.files[name])
+            for name,variable in public_controller.ENVIRONMENT_INPUTS.items()}
 
-    def test_rx671_prepared_public_signer_is_bound_to_custom_signer_and_rechecked_at_build(self):
-        target, source_sha, bootstrap = self.rx671_public_bootstrap()
-        inputs = self.runtime / "rx671-ota-inputs"
-        config = ota_support.make_ota_config(inputs, self.source, str, target=target,
-                                             bootstrap_environment=bootstrap, source_sha=source_sha)
-        self.assertEqual((inputs / ota_support.TRUSTED_CERT).read_bytes(),
-                         Path(bootstrap["IDT_RX671_SIGNER_CERT_FILE"]).read_bytes())
-        self.assertEqual(config["otaE2EFirmwarePath"], "{{testData.sourcePath}}/" +
-                         ota_support.payload_relative_path(target))
-        source = self.runtime / "rx671-123456"
-        shutil.copytree(self.source, source)
-        (source / "Test/include").mkdir(parents=True)
-        (source / "Test/include/test_execution_config.h").write_text("#define OTA_E2E_TEST_ENABLED 1\n")
-        (source / "Test/include/test_param_config.h").write_text("#define OTA_APP_VERSION_MAJOR 0\n"
-            "#define OTA_APP_VERSION_MINOR 9\n#define OTA_APP_VERSION_BUILD 3\n")
-        environment = {**bootstrap, **ota_support.ota_environment(inputs, str), "IDT_SOURCE_SHA": source_sha}
-        with patch.dict(os.environ, environment), contextlib.redirect_stdout(io.StringIO()):
-            ota_support.prepare_source(source, target)
-        self.assertTrue((source / "Test/include/idt_ota_signer.h").is_file())
-        Path(bootstrap["IDT_RX671_PROVISIONER_MANIFEST_FILE"]).write_text("{}")
-        with patch.dict(os.environ, environment):
-            with self.assertRaisesRegex(RuntimeError, "manifest/hash/source mismatch"):
-                ota_support.prepare_source(source, target)
+    def test_all_three_prepared_public_signer_is_rechecked_before_build(self):
+        for target_id in target_ids():
+            target,source_sha,bootstrap=self.public_bootstrap(target_id)
+            inputs=self.runtime/(target_id+"-ota-inputs")
+            config=ota_support.make_ota_config(inputs,self.source,str,target=target,
+                bootstrap_environment=bootstrap,source_sha=source_sha)
+            self.assertEqual((inputs/ota_support.TRUSTED_CERT).read_bytes(),
+                             Path(bootstrap["IDT_PUBLIC_SIGNER_CERT_FILE"]).read_bytes())
+            source=self.runtime/(target_id+"-prepared-source")
+            shutil.copytree(self.source,source)
+            (source/"Test/include").mkdir(parents=True)
+            (source/"Test/include/test_execution_config.h").write_text("#define OTA_E2E_TEST_ENABLED 1\n")
+            (source/"Test/include/test_param_config.h").write_text("#define OTA_APP_VERSION_MAJOR 0\n#define OTA_APP_VERSION_MINOR 9\n#define OTA_APP_VERSION_BUILD 3\n")
+            environment={**bootstrap,**ota_support.ota_environment(inputs,str),"IDT_SOURCE_SHA":source_sha}
+            with patch.dict(os.environ,environment),contextlib.redirect_stdout(io.StringIO()):
+                ota_support.prepare_source(source,target)
+            self.assertTrue((source/"Test/include/idt_ota_signer.h").is_file())
+            Path(bootstrap["IDT_PUBLIC_SIGNER_PROVISIONER_MANIFEST_FILE"]).write_text("{}")
+            with patch.dict(os.environ,environment),self.assertRaisesRegex(RuntimeError,"formal manifest/source/target/profile mismatch"):
+                ota_support.prepare_source(source,target)
 
-    def test_rx671_prepared_wrong_signer_or_source_cannot_write_private_credentials(self):
-        target, source_sha, bootstrap = self.rx671_public_bootstrap(ec.generate_private_key(ec.SECP256R1()))
-        inputs = self.inputs.parent / "rx671-inputs"
-        with self.assertRaisesRegex(ValueError, "does not match the prepared RX671 public signer"):
-            ota_support.make_ota_config(inputs, self.source, str, target=target,
-                                         bootstrap_environment=bootstrap, source_sha=source_sha)
-        self.assertFalse((inputs / ota_support.SIGNING_KEY).exists())
-        with self.assertRaisesRegex(RuntimeError, "manifest/hash/source mismatch"):
-            ota_support.make_ota_config(inputs, self.source, str, target=target,
-                                         bootstrap_environment=bootstrap, source_sha="b" * 40)
-        self.assertFalse((inputs / ota_support.SIGNING_KEY).exists())
+    def test_prepared_wrong_source_cannot_write_private_credentials(self):
+        for target_id in target_ids():
+            target,source_sha,bootstrap=self.public_bootstrap(target_id)
+            inputs=self.inputs.parent/(target_id+"-wrong-source")
+            with self.assertRaisesRegex(RuntimeError,"formal manifest/source/target/profile mismatch"):
+                ota_support.make_ota_config(inputs,self.source,str,target=target,
+                    bootstrap_environment=bootstrap,source_sha="b"*40)
+            self.assertFalse((inputs/ota_support.SIGNING_KEY).exists())
 
     def test_manifest_identity_and_fingerprint_reject_other_target_and_stale_config(self):
         for target_id in target_ids():
@@ -274,31 +256,30 @@ class OtaSupportTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Data Flash"):
             ota_support.rx671_transfer_payload(bytes(modified), self.key)
 
-    def test_bg96_uart_trailer_and_flash_hashes_cover_actual_staged_files(self):
-        target = get_target("rx65n-bg96")
-        source = self.runtime / "abc-123456"
-        (source / "Test/include").mkdir(parents=True)
-        (source / "Test/include/test_param_config.h").write_text("/* source validation fixture */\n")
-        output = source / "artifacts/idt/build_transport"
-        output.mkdir(parents=True)
-        def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
-        mot, bootloader = output / "rx72n_idt_transport.mot", output / "bootloader.mot"
-        mot.write_bytes(b"application MOT fixture")
-        bootloader.write_bytes(b"bootloader MOT fixture")
-        bank1 = output / "bootloader_bank1.mot"
-        bank1.write_bytes(b"shifted bootloader fixture")
-        rsu = output / "rx72n_idt_transport.rsu"
-        rsu.write_bytes(b"R" * 0xC0000)
-        (output / "build_manifest.json").write_text(json.dumps({
-            "target_id": target["id"], "target_sha256": target_fingerprint(target),
-            "outputs": {"mot": {"sha256": sha(mot)}, "bootloader": {"sha256": sha(bootloader)}}}))
-        ota_support.record_packaging(source, target)
-        self.assertEqual(rsu.read_bytes(), b"R" * 0xC0000 + b"\xff" * 32768)
-        manifest = json.loads((output / "build_manifest.json").read_text())
-        self.assertEqual(manifest["outputs"]["rsu"]["sha256"], sha(rsu))
-        self.assertEqual(manifest["outputs"]["bootloader_bank1"]["sha256"], sha(bank1))
-        ota_support.record_packaging(source, target)
-        self.assertEqual(rsu.stat().st_size, 0xC8000)
+    def test_all_three_uart_code_flash_only_images_and_hashes_cover_staged_files(self):
+        for target_id in target_ids():
+            target=get_target(target_id);fixture=generic_fixtures.Fixture(self.runtime/(target_id+"-package"),target_id)
+            source=self.runtime/(target_id+"-packaged-source")
+            (source/"Test/include").mkdir(parents=True)
+            (source/"Test/include/test_param_config.h").write_text("/* source validation fixture */\n")
+            output=source/"artifacts/idt/build_transport";output.mkdir(parents=True)
+            mot=output/(target["artifact_basename"]+".mot");mot.write_bytes(b"application MOT fixture")
+            bootloader=output/"bootloader.mot";bootloader.write_bytes(fixture.files["bootloader.mot"].read_bytes())
+            bank1=output/"bootloader_bank1.mot";bank1.write_bytes(fixture.files["bootloader_bank1.mot"].read_bytes())
+            rsu=output/(target["artifact_basename"]+".rsu");original=fixture.files["idt_transport.rsu"].read_bytes();rsu.write_bytes(original)
+            def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+            (output/"build_manifest.json").write_text(json.dumps({"target_id":target_id,"target_sha256":target_fingerprint(target),
+                "outputs":{"mot":{"sha256":sha(mot)},"bootloader":{"sha256":sha(bootloader)}}}))
+            ota_support.record_packaging(source,target)
+            self.assertEqual(original,rsu.read_bytes());manifest=json.loads((output/"build_manifest.json").read_text())
+            self.assertEqual(0,manifest["uart_trailer_bytes"])
+            self.assertEqual(manifest["outputs"]["rsu"]["sha256"],sha(rsu))
+            self.assertEqual(manifest["outputs"]["bootloader_bank1"]["sha256"],sha(bank1))
+            ota_support.record_packaging(source,target);self.assertEqual(original,rsu.read_bytes())
+            for invalid in (original+b"\xff"*32768,original[:0x12C]+b"\x01"+original[0x12D:]):
+                rsu.write_bytes(invalid)
+                with self.assertRaisesRegex(RuntimeError,"signed Code Flash image"):
+                    ota_support.record_packaging(source,target)
 
     def test_detached_der_signature_rejects_modified_payload(self):
         image, signature = self.runtime / "payload.bin", self.runtime / "payload.sig"
@@ -366,7 +347,7 @@ class OtaSupportTests(unittest.TestCase):
                 reset_vector = app_start.to_bytes(4, "little")
                 mot.write_text(srecord(app_start, b"\x12\x34\x56\x78") +
                                srecord(0xFFFBFFFC, reset_vector), encoding="ascii")
-                for relative in (target["packager"], target["prm"]):
+                for relative in (target["packager"], target["prm"], "tools/build_rx671_fwup_v2_rsu.py"):
                     if relative:
                         destination = source / relative
                         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -387,7 +368,9 @@ class OtaSupportTests(unittest.TestCase):
                 payload = source / ota_support.payload_relative_path(target)
                 image = payload.read_bytes()
                 app_size = 0xFFFC0000 - app_start
-                self.assertEqual(struct.unpack_from("<III", image), (1, app_start, app_size))
+                self.assertEqual(struct.unpack_from("<IIIII", image),
+                                 (1, app_start, app_start + app_size - 1,
+                                  app_start + app_size - 4, 9))
                 self.assertEqual(len(image), 0x100 + app_size)
                 self.assertEqual(image[0x100:0x104], b"\x12\x34\x56\x78")
                 self.assertEqual(image[-4:], reset_vector)

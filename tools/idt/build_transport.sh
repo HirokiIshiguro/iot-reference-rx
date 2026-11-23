@@ -7,6 +7,17 @@ here="$(cd -- "$(dirname -- "$0")" && pwd)"
 linux_py="${IDT_LINUX_PYTHON:-python3}"
 target="$("$linux_py" "$here/targets.py" --field id)"
 export IDT_TARGET="$target"
+pkcs11_arguments=()
+if [[ "${IDT_SCOPE:-transport}" == pkcs11 ]]; then
+  source_view="$src"
+  routing="$("$linux_py" "$here/pkcs11_source_view.py" prepare --view "$source_view" \
+    --source "${IDT_SOURCE_PATH:?Original source inputs are required}" \
+    --runtime "${IDT_RUNTIME_DIR:?Private runtime directory is required}" --target "$target" \
+    --provenance "$(wslpath -u "${IDT_PROVENANCE_FILE:?Source provenance is required}")")"
+  src="$(printf '%s' "$routing" | "$linux_py" -c 'import json,sys; print(json.load(sys.stdin)["build_source"])')"
+  pkcs11_group="$(printf '%s' "$routing" | "$linux_py" -c 'import json,sys; print(json.load(sys.stdin)["selection"]["argument"])')"
+  pkcs11_arguments=(-Pkcs11Group "$pkcs11_group")
+fi
 target_field() { "$linux_py" "$here/targets.py" --target "$target" --field "$1"; }
 artifact="$(target_field artifact_basename)"
 packager="$(target_field packager)"
@@ -28,6 +39,11 @@ runtime="${IDT_RUNTIME_DIR:?Private runtime directory is required}"
 run_name="$(basename -- "$(dirname -- "$runtime")")"
 [[ "$run_name" =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'Invalid runtime directory name' >&2; exit 2; }
 workspace="${IDT_WORKSPACE_ROOT:?Windows workspace root is required}\\${target}-idt-build-${run_name}"
+if [[ "${IDT_SCOPE:-transport}" == pkcs11 ]]; then
+  # Each native Core execution owns a different private source tree; e2 studio
+  # must not reuse the previous execution's imported project location.
+  workspace="${workspace}-$(basename -- "$src")"
+fi
 case "${IDT_SCOPE:-transport}" in
   transport) test_group=Transport ;;
   mqtt) test_group=DeviceAdvisor ;;
@@ -42,7 +58,10 @@ fi
 "$pwsh" -NoProfile -ExecutionPolicy Bypass -File "$win\tools\build_rx72n_idt_transport.ps1" \
   -ProjectRoot "$win" -Workspace "$workspace" -TestGroup "$test_group" -Target "$target" \
   -E2Studio "${IDT_E2STUDIO_CLI:?e2 studio executable is required}" \
-  -ProvenanceFile "${IDT_PROVENANCE_FILE:?Source provenance is required}"
+  -ProvenanceFile "${IDT_PROVENANCE_FILE:?Source provenance is required}" "${pkcs11_arguments[@]}"
+if [[ "$test_group" == PKCS11 ]]; then
+  "$linux_py" "$here/pkcs11_source_view.py" record --view "$source_view" --runtime "$runtime" --target "$target"
+fi
 out="$win\artifacts\idt\build_transport"
 "$linux_py" "$here/ota_support.py" validate-packaging "$src" --target "$target"
 package_args=("$(wslpath -w "$src/$packager")" --mot "${out}/${artifact}.mot"

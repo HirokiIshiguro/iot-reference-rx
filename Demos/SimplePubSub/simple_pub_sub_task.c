@@ -394,13 +394,15 @@ static void prvUnsubscribeCommandCallback(MQTTAgentCommandContext_t *pxCommandCo
 
     if (NULL != pxCommandContext->xTaskToNotify)
     {
+        if (MQTTSuccess == pxReturnInfo->returnCode)
+        {
+            /* Read task-local arguments before releasing the waiting task. */
+            vRemoveMQTTTopicFilterCallback(pxSubscribeArgs->pSubscribeInfo->pTopicFilter,
+                                           pxSubscribeArgs->pSubscribeInfo->topicFilterLength);
+        }
         (void)xTaskNotify(pxCommandContext->xTaskToNotify,
                           pxReturnInfo->returnCode,
                           eSetValueWithOverwrite);
-
-        /* Remove the topic filter callback */
-        vRemoveMQTTTopicFilterCallback(pxSubscribeArgs->pSubscribeInfo->pTopicFilter,
-                                       pxSubscribeArgs->pSubscribeInfo->topicFilterLength);
     }
 }
 /**********************************************************************************************************************
@@ -474,6 +476,7 @@ static MQTTStatus_t prvSubscribeToTopic(MQTTQoS_t xQoS,
     xSubscribeInfo.qos = xQoS;
     xSubscribeArgs.pSubscribeInfo = &xSubscribeInfo;
     xSubscribeArgs.numSubscriptions = 1;
+    xSubscribeArgs.pProperties = NULL;
 
     /* Complete an application defined context associated with this subscribe message.
      * This gets updated in the callback function so the variable must persist until
@@ -505,10 +508,10 @@ static MQTTStatus_t prvSubscribeToTopic(MQTTQoS_t xQoS,
              * persistent sessions or cancel the operation and invokes the callback for failed response.
              * Hence the caller task wait indefinitely for a success or failure response from agent.
              */
-            (void)xTaskNotifyWait(0UL,
-                                  UINT32_MAX,
-                                  &ulNotifiedValue,
-                                  portMAX_DELAY);
+            while (pdTRUE != xTaskNotifyWait(0U, UINT32_MAX, &ulNotifiedValue, portMAX_DELAY))
+            {
+                /* Keep the command arguments alive until its callback runs. */
+            }
             xCommandStatus = (MQTTStatus_t)(ulNotifiedValue);
         }
 
@@ -557,6 +560,7 @@ static MQTTStatus_t prvUnsubscribeToTopic(MQTTQoS_t xQoS,
     xSubscribeInfo.qos = xQoS;
     xSubscribeArgs.pSubscribeInfo = &xSubscribeInfo;
     xSubscribeArgs.numSubscriptions = 1;
+    xSubscribeArgs.pProperties = NULL;
 
     /* Complete an application defined context associated with this subscribe message.
      * This gets updated in the callback function so the variable must persist until
@@ -587,10 +591,10 @@ static MQTTStatus_t prvUnsubscribeToTopic(MQTTQoS_t xQoS,
              * persistent sessions or cancel the operation and invokes the callback for failed response.
              * Hence the caller task wait indefinitely for a success or failure response from agent.
              */
-            (void)xTaskNotifyWait(0UL,
-                                  UINT32_MAX,
-                                  &ulNotifiedValue,
-                                  portMAX_DELAY);
+            while (pdTRUE != xTaskNotifyWait(0U, UINT32_MAX, &ulNotifiedValue, portMAX_DELAY))
+            {
+                /* Keep the command arguments alive until its callback runs. */
+            }
             xCommandStatus = (MQTTStatus_t)(ulNotifiedValue);
         }
         else if (ulUnsubscribeCount < mqttexampleUNSUBSCRIBE_RETRIES)
@@ -634,6 +638,7 @@ static MQTTStatus_t prvPublishToTopic(MQTTQoS_t xQoS,
                                       int32_t lNumRetries)
 {
     MQTTPublishInfo_t xPublishInfo = {0UL};
+    MQTTAgentPublishArgs_t xPublishArgs = { .pPublishInfo = &xPublishInfo, .pProperties = NULL };
     MQTTAgentCommandContext_t xCommandContext = {0};
     MQTTStatus_t xCommandStatus;
     MQTTAgentCommandInfo_t xCommandParams = {0UL};
@@ -657,7 +662,7 @@ static MQTTStatus_t prvPublishToTopic(MQTTQoS_t xQoS,
     do
     {
         xCommandStatus = MQTTAgent_Publish(&xGlobalMqttAgentContext,
-                                           &xPublishInfo,
+                                           &xPublishArgs,
                                            &xCommandParams);
 
         if (MQTTSuccess == xCommandStatus)
@@ -668,10 +673,10 @@ static MQTTStatus_t prvPublishToTopic(MQTTQoS_t xQoS,
              * (only for persistent sessions) or cancel the operation and invokes the callback for failed response.
              * Hence the caller task wait indefinitely for a success or failure response from agent.
              */
-            (void)xTaskNotifyWait(0UL,
-                                  UINT32_MAX,
-                                  &ulNotifiedValue,
-                                  portMAX_DELAY);
+            while (pdTRUE != xTaskNotifyWait(0U, UINT32_MAX, &ulNotifiedValue, portMAX_DELAY))
+            {
+                /* Keep the command arguments alive until its callback runs. */
+            }
             xCommandStatus = (MQTTStatus_t)(ulNotifiedValue);
         }
 

@@ -85,7 +85,8 @@ class PublicFixture:
         self.files['rx671_signer.pub.pem'].write_bytes(key.public_key().public_bytes(
             serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
         self.files['idt_transport.rsu'].write_bytes(packager.build_image(b'\xff' * packager.APPLICATION_SIZE, key))
-        self.files['rx671_provisioner.mot'].write_text(srecord(0xFFE00000, b'linear') + srecord(0xFFFFFFFC, b'\x00\x00\xe0\xff'))
+        self.files['rx671_provisioner.mot'].write_text(srecord(0xFFF00300, b'dual') + srecord(0xFFFFFFFC, b'\x00\x03\xf0\xff') +
+            srecord(0xFE7F5D00, bytes.fromhex('8FFFFFFF')) + srecord(0xFE7F5D20, bytes.fromhex('FFFFFFFF')))
         self.files['bootloader.mot'].write_text(srecord(0xFFFC0000, b'boot') + srecord(0xFFFFFF80, bytes(range(128))))
         self.files['bootloader_bank1.mot'].write_text(srecord(0xFFEC0000, b'boot') + srecord(0xFFEFFF80, bytes(range(128))))
         self.files['rx671_bootloader_config.h'].write_text(
@@ -102,8 +103,8 @@ class PublicFixture:
         boot_project.mkdir(parents=True)
         (boot_project / 'rx_bootloader_config.h').write_bytes(self.files['rx671_bootloader_config.h'].read_bytes())
         (boot_project / 'rx671.h').write_bytes(self.files['rx671_target.h'].read_bytes())
-        self.metadata = {'schema_version': 1, 'profile': 'rx671-bank-single-ota-provisioner-v1',
-                         'bank_mode': 'bank.single', 'credentials_embedded': False, 'source_sha': SOURCE_SHA,
+        self.metadata = {'schema_version': 1, 'profile': 'rx671-bank-dual-ota-provisioner-v2',
+                         'bank_mode': 'bank.dual', 'credentials_embedded': False, 'source_sha': SOURCE_SHA,
                          'sha256': {'aws_wifi_rx671_ek.mot': hashlib.sha256(self.files['rx671_provisioner.mot'].read_bytes()).hexdigest()}}
         self.write_metadata()
 
@@ -184,67 +185,10 @@ class Rx671TrustTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'private IDT runtime'):
             controller.source_inputs(ROOT, runtime, get_target('rx671-wifi'), SOURCE_SHA, environ=environment)
 
-    def test_native_missing_bootstrap_is_rejected_before_idt_install(self):
-        with patch.object(run_idt, 'HOST', {'windows_powershell': str(self.fixture.files['rx671_signer.crt.pem'])}), \
-             patch.object(run_idt.subprocess, 'check_output', return_value='7'), \
-             patch.object(run_idt, 'install_idt') as install, patch.dict(os.environ, {}, clear=True):
-            with self.assertRaisesRegex(RuntimeError, 'requires reviewed public bootstrap input'):
-                run_idt.transport(self.fixture.root, 'unit-region', Mock(), {'source_sha': SOURCE_SHA},
-                                  'pkcs11', target=get_target('rx671-wifi'))
-        install.assert_not_called()
 
-    def test_native_private_pem_is_rejected_before_any_bootstrap_copy(self):
-        inputs = self.fixture.root / 'inputs'
-        inputs.mkdir()
-        self.fixture.files['rx671_signer.crt.pem'].write_bytes(b'-----BEGIN PRIVATE KEY-----\nsynthetic\n')
-        environment = {variable: str(self.fixture.files[name])
-                       for name, variable in controller.ENVIRONMENT_INPUTS.items()}
-        with self.assertRaisesRegex(RuntimeError, 'exactly one public PEM'):
-            run_idt.rx671_bootstrap_environment(inputs, SOURCE_SHA, environ=environment)
-        self.assertFalse((inputs / 'rx671-bootstrap').exists())
 
-    def test_failed_prepared_validation_removes_only_its_input_copies(self):
-        inputs = self.fixture.root / 'inputs'
-        inputs.mkdir()
-        unrelated = inputs / 'preserved.txt'
-        unrelated.write_text('preserved')
-        self.fixture.metadata['bank_mode'] = 'bank.dual'
-        self.fixture.write_metadata()
-        environment = {variable: str(self.fixture.files[name])
-                       for name, variable in controller.ENVIRONMENT_INPUTS.items()}
-        with patch.object(run_idt, 'SOURCE', self.fixture.source):
-            with self.assertRaisesRegex(RuntimeError, 'manifest/hash/source mismatch'):
-                run_idt.rx671_bootstrap_environment(inputs, SOURCE_SHA, environ=environment)
-        self.assertFalse((inputs / 'rx671-bootstrap').exists())
-        self.assertEqual('preserved', unrelated.read_text())
 
-    def test_staged_boot_policy_requires_effective_input_hash_binding(self):
-        hashes = {'rx_bootloader_config.h': hashlib.sha256(self.fixture.files['rx671_bootloader_config.h'].read_bytes()).hexdigest(),
-                  'rx671.h': hashlib.sha256(self.fixture.files['rx671_target.h'].read_bytes()).hexdigest()}
-        rpi_flash.validate_rx671_policy_binding(self.fixture.root, {'bootloader_policy_sha256': hashes})
-        with self.assertRaisesRegex(RuntimeError, 'effective build inputs'):
-            rpi_flash.validate_rx671_policy_binding(self.fixture.root, {'bootloader_policy_sha256': {}})
 
-    def test_ssh_timeout_keeps_remote_staging_until_process_exit_is_proved(self):
-        source = self.fixture.root / 'runtime-source'
-        source.mkdir()
-        calls = []
-        def execute(command, **kwargs):
-            calls.append(command)
-            if 'rpi_flash.py' in command[-1]:
-                raise subprocess.TimeoutExpired(['synthetic-ssh'], kwargs['timeout'])
-            return Mock(returncode=0)
-        with patch.dict(os.environ, {'IDT_BENCH_TOKEN': 'c' * 32,
-                                     'IDT_RUNTIME_DIR': str(self.fixture.root),
-                                     'IDT_TARGET': 'rx72n-ethernet', 'IDT_SCOPE': 'pkcs11'}, clear=True), \
-             patch.object(sys, 'argv', ['synthetic-flash', str(source)]), \
-             patch.object(flash_transport, 'validate_source', return_value=source), \
-             patch.object(flash_transport, 'validated_inputs', return_value=({'dummy.mot': self.fixture.files['bootloader.mot']}, {})), \
-             patch.object(flash_transport.subprocess, 'check_output', return_value='synthetic-path'), \
-             patch.object(flash_transport.subprocess, 'run', side_effect=execute):
-            with self.assertRaises(subprocess.TimeoutExpired):
-                flash_transport.main()
-        self.assertFalse(any('shutil.rmtree' in command[-1] for command in calls))
 
     def test_different_certificate_or_rsu_signature_fails_before_io(self):
         other = self.fixture.root / 'other'
@@ -266,7 +210,7 @@ class Rx671TrustTests(unittest.TestCase):
 
     def test_sample_or_self_attested_provisioner_metadata_is_insufficient(self):
         for name, value in (('profile', 'idt-dualbank'), ('source_sha', 'b' * 40),
-                            ('bank_mode', 'bank.dual'), ('credentials_embedded', True)):
+                            ('bank_mode', 'bank.single'), ('credentials_embedded', True)):
             old = self.fixture.metadata[name]
             self.fixture.metadata[name] = value
             self.fixture.write_metadata()
@@ -276,6 +220,15 @@ class Rx671TrustTests(unittest.TestCase):
         self.fixture.write_metadata()
         self.fixture.files['rx671_provisioner.mot'].write_text('changed')
         with self.assertRaisesRegex(RuntimeError, 'manifest/hash/source mismatch'):
+            self.fixture.plan()
+
+    def test_linear_option_bytes_are_rejected_even_if_manifest_claims_dual(self):
+        path = self.fixture.files['rx671_provisioner.mot']
+        path.write_text(srecord(0xFFF00300, b'dual') + srecord(0xFFFFFFFC, bytes.fromhex('0003F0FF')) +
+                        srecord(0xFE7F5D00, bytes.fromhex('FFFFFFFF')) + srecord(0xFE7F5D20, bytes.fromhex('FFFFFFFF')))
+        self.fixture.metadata['sha256']['aws_wifi_rx671_ek.mot'] = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.fixture.write_metadata()
+        with self.assertRaisesRegex(RuntimeError, 'dual-bank little-endian mode'):
             self.fixture.plan()
 
     def test_programming_data_flash_is_refused_even_with_matching_manifest_hash(self):

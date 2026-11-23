@@ -2,7 +2,7 @@ param(
     [string]$ProjectRoot = (Split-Path $PSScriptRoot -Parent),
     [ValidateSet('rx72n-ethernet', 'rx65n-bg96', 'rx671-wifi')]
     [string]$Target = 'rx72n-ethernet',
-    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studioc.exe",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
     [string]$Workspace = "",
     [string]$Python = 'python',
     [string]$OutputDirectory = "",
@@ -10,6 +10,8 @@ param(
     [string]$ValidationReportFile = "",
     [ValidateSet('Transport', 'DeviceAdvisor', 'OTAE2E', 'PKCS11', 'OTAPAL')]
     [string]$TestGroup = 'Transport',
+    [ValidateSet('', 'StartFinish', 'NoObject')]
+    [string]$Pkcs11Group = '',
     [int]$E2StudioTimeoutSeconds = 900,
     [switch]$ValidateOnly
 )
@@ -19,6 +21,19 @@ param(
 # transport. Do not downgrade or rewrite the manifest to satisfy IDT versions.
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+if ($TestGroup -eq 'PKCS11' -and -not $Pkcs11Group) {
+    throw 'PKCS11 requires an explicit -Pkcs11Group StartFinish or NoObject; do not infer it from edits to borrowed sources.'
+}
+if ($TestGroup -ne 'PKCS11' -and $Pkcs11Group) {
+    throw '-Pkcs11Group applies only to -TestGroup PKCS11.'
+}
+$pkcs11Selection = switch ($Pkcs11Group) {
+    'StartFinish' { [ordered]@{ definition=1; native_test_id='Full_PKCS11_StartFinish'; assertion_cases=6;
+        groups=@('Full_PKCS11_StartFinish', 'Full_PKCS11_Capabilities') } }
+    'NoObject' { [ordered]@{ definition=2; native_test_id='Full_PKCS11_NoObject'; assertion_cases=5;
+        groups=@('Full_PKCS11_Capabilities', 'Full_PKCS11_NoObject') } }
+    default { $null }
+}
 
 $idtRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $targetManifestPath = Join-Path $idtRoot 'tools/idt/targets.json'
@@ -127,8 +142,8 @@ $testLibrarySha = $provenance.test_library_sha.ToLowerInvariant()
 $sourceWasDirty = $provenance.source_tree_dirty
 
 # Capture at the original initialized Git tree. Runtime copies must match the
-# captured file list and bytes. PKCS11 alone permits the pinned native suite's
-# verified runner-group selection, without permitting other code changes.
+# captured file list and bytes. Test selection belongs to the product adapter;
+# no selector, line-ending or body changes are permitted in dependencies.
 $dependencyTool = Join-Path $PSScriptRoot 'idt_source_manifest.py'
 $dependencyVerification = $null
 if ($ProvenanceFile) {
@@ -186,7 +201,7 @@ foreach ($flag in $testFlags.Keys) {
 $testSources = [ordered]@{
     "rx72n_idt_platform.c" = "Test/ports/rx72n_idt_platform.c"
     "rx72n_idt_transport.c" = "Test/ports/rx72n_idt_transport.c"
-    "test_framework.c" = "Test/Common/test_framework.c"
+    "rx_idt_unity_output.c" = "Test/ports/rx_idt_unity_output.c"
     "transport_interface_test.c" = "Test/FreeRTOS-Libraries-Integration-Tests/src/transport_interface/transport_interface_test.c"
     "unity.c" = "Test/Unity/src/unity.c"
     "unity_fixture.c" = "Test/Unity/extras/fixture/src/unity_fixture.c"
@@ -325,6 +340,74 @@ function Get-IdtLinkerOptions {
     return $options
 }
 
+function Add-IdtSelectedSources {
+    param([System.Xml.XmlDocument]$ProjectMetadata,
+          [System.Xml.XmlDocument]$BuildMetadata,
+          [System.Collections.IDictionary]$Sources,
+          [string]$RepositoryVariable, [string]$SourceRoot)
+
+    $order = @($BuildMetadata.SelectNodes("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.useCustomLinkageOrder']"))
+    $manual = @($BuildMetadata.SelectNodes("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.noneLinkageOrderList']"))
+    if ($order.Count -ne 1 -or $order[0].GetAttribute('value') -ne 'false' -or $manual.Count -ne 0) {
+        throw 'IDT requires the reviewed generated input order without a manual linkage list.'
+    }
+    $resources = $ProjectMetadata.SelectSingleNode('/projectDescription/linkedResources')
+    $entries = @($BuildMetadata.SelectNodes('//sourceEntries'))
+    if (-not $resources -or $entries.Count -ne 1 -or $Sources.Count -eq 0) { throw 'Missing unique IDT source-selection metadata.' }
+    $rootEntries = @($entries[0].SelectNodes("entry[@kind='sourcePath' and @name='']"))
+    if ($rootEntries.Count -ne 1) { throw 'Expected one default project source entry.' }
+    if ($ProjectMetadata.SelectSingleNode("/projectDescription/linkedResources/link[name='IdtTestSources' or starts-with(name, 'IdtTestSources/')]") -or
+        $entries[0].SelectSingleNode("entry[@name='IdtTestSources' or starts-with(@name, 'IdtTestSources/')]") -or
+        $ProjectMetadata.SelectSingleNode("/projectDescription/filteredResources/filter[name='IdtTestSources' or starts-with(name, 'IdtTestSources/')]") -or
+        @($rootEntries[0].GetAttribute('excluding').Split('|') | Where-Object { $_ -eq 'IdtTestSources/' }).Count -ne 0) {
+        throw 'IDT source selection is already present or filtered; concurrent/pre-existing metadata mutation.'
+    }
+    $sourcePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($sourceName in $Sources.Keys) {
+        $relative = [string]$Sources[$sourceName]
+        if ([IO.Path]::GetFileName($relative) -cne $sourceName -or
+            $ProjectMetadata.SelectSingleNode("/projectDescription/linkedResources/link[name='$sourceName']")) {
+            throw "IDT source basename is mismatched or already linked: $sourceName"
+        }
+        $physical = [IO.Path]::GetFullPath((Join-Path $SourceRoot $relative))
+        if (-not $physical.StartsWith($SourceRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $physical -PathType Leaf) -or -not $sourcePaths.Add($physical)) {
+            throw "IDT source link is missing, duplicated or outside the selected source tree: $sourceName"
+        }
+    }
+    # A pure Eclipse virtual folder exposes exactly the selected source files.
+    # No complete Test/ directory, extra stdlib provider or manual object list
+    # enters the managed build. CDT generates these objects and links them.
+    $folder = $ProjectMetadata.CreateElement('link')
+    foreach ($field in @('name', 'type', 'locationURI')) {
+        $element = $ProjectMetadata.CreateElement($field)
+        $element.InnerText = switch ($field) {
+            'name' { 'IdtTestSources' }; 'type' { '2' }; 'locationURI' { 'virtual:/virtual' }
+        }
+        [void]$folder.AppendChild($element)
+    }
+    [void]$resources.AppendChild($folder)
+    foreach ($sourceName in $Sources.Keys) {
+        $link = $ProjectMetadata.CreateElement('link')
+        foreach ($field in @('name', 'type', 'locationURI')) {
+            $element = $ProjectMetadata.CreateElement($field)
+            $element.InnerText = switch ($field) {
+                'name' { 'IdtTestSources/' + $sourceName }; 'type' { '1' }
+                'locationURI' { $RepositoryVariable + '/' + $Sources[$sourceName] }
+            }
+            [void]$link.AppendChild($element)
+        }
+        [void]$resources.AppendChild($link)
+    }
+    $exclusions = @($rootEntries[0].GetAttribute('excluding').Split('|') | Where-Object { $_ }) + 'IdtTestSources/'
+    $rootEntries[0].SetAttribute('excluding', ($exclusions -join '|'))
+    $entry = $BuildMetadata.CreateElement('entry')
+    $entry.SetAttribute('flags', 'VALUE_WORKSPACE_PATH')
+    $entry.SetAttribute('kind', 'sourcePath')
+    $entry.SetAttribute('name', 'IdtTestSources')
+    [void]$entries[0].AppendChild($entry)
+}
+
 $linkedResources = $projectXml.SelectSingleNode('/projectDescription/linkedResources')
 $repositoryVariables = @($projectXml.SelectNodes('/projectDescription/variableList/variable') |
     Where-Object { $_.SelectSingleNode('value').InnerText -eq '$%7BPARENT-3-PROJECT_LOC%7D' })
@@ -339,8 +422,7 @@ $defineOption = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesas
 if (-not $defineOption) {
     $defineOption = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.userBefore']")
 }
-$linkOption = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesas.cdt.managedbuild.renesas.ccrx.linker.option.noneLinkageOrderList']")
-if (-not $linkedResources -or -not $includeOption -or -not $defineOption -or -not $linkOption) {
+if (-not $linkedResources -or -not $includeOption -or -not $defineOption) {
     throw "$Target project metadata does not match the expected CCRX HardwareDebug layout."
 }
 $targetDefine = 'IDT_TARGET_' + $Target.ToUpperInvariant().Replace('-', '_') + '=1'
@@ -356,7 +438,7 @@ $linkerSection = $cprojectXml.SelectSingleNode("//option[@superClass='com.renesa
 if (-not $linkerSection) { throw 'Missing target linker flash layout.' }
 $effectiveLinkerSection = $linkerSection.GetAttribute('value')
 $bspRelative = 'src/smc_gen/r_config/r_bsp_config.h'
-$fwupRelative = $(if ($Target -eq 'rx671-wifi') { 'src/frtos_config/r_fwup_config.h' } else { 'src/smc_gen/r_config/r_fwup_config.h' })
+$fwupRelative = 'src/frtos_config/rx_ota_config.h'
 $bspText = $(if ($null -ne $profileFiles) { $profileFiles.$bspRelative } else { [IO.File]::ReadAllText((Join-Path $idtProject $bspRelative)) })
 $fwupText = $(if ($null -ne $profileFiles) { $profileFiles.$fwupRelative } else { [IO.File]::ReadAllText((Join-Path $idtProject $fwupRelative)) })
 function Get-IdtNumericDefine {
@@ -369,48 +451,28 @@ function Get-IdtNumericDefine {
 }
 $expectedAreaSize = switch ($Target) {
     'rx72n-ethernet' { 0x1C0000 }
-    'rx65n-bg96' { 0xF0000 }
+    'rx65n-bg96' { 0xC0000 }
     'rx671-wifi' { 0xC0000 }
 }
-$fwupAreaSize = Get-IdtNumericDefine $fwupText 'FWUP_CFG_AREA_SIZE'
+$fwupAreaSize = Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_AREA_SIZE'
 if ((Get-IdtNumericDefine $bspText 'BSP_CFG_CODE_FLASH_BANK_MODE') -ne 0 -or
-    (Get-IdtNumericDefine $fwupText 'FWUP_CFG_UPDATE_MODE') -ne 0 -or
-    (Get-IdtNumericDefine $fwupText 'FWUP_CFG_FUNCTION_MODE') -ne 1 -or
-    (Get-IdtNumericDefine $fwupText 'FWUP_CFG_SIGNATURE_VERIFICATION') -ne 0 -or
+    (Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_UPDATE_MODE') -ne 0 -or
+    (Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_FUNCTION_MODE') -ne 1 -or
+    (Get-IdtNumericDefine $fwupText 'RX_OTA_CFG_SIGNATURE_VERIFICATION') -ne 0 -or
     $fwupAreaSize -ne $expectedAreaSize) {
     throw "$Target requires the reviewed dual-bank/ECDSA FWUP profile with area size $expectedAreaSize."
 }
 
-foreach ($sourceName in $testSources.Keys) {
-    if ($projectXml.SelectSingleNode("/projectDescription/linkedResources/link[name='$sourceName']")) {
-        throw "IDT source is already linked; concurrent/pre-existing metadata mutation: $sourceName"
-    }
-    $linkedSource = [IO.Path]::GetFullPath((Join-Path $resolvedRepositoryRoot $testSources[$sourceName]))
-    if (-not $linkedSource.StartsWith($idtRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -or
-        -not (Test-Path -LiteralPath $linkedSource -PathType Leaf)) {
-        throw "IDT source link does not resolve inside the selected source tree: $sourceName"
-    }
-    $link = $projectXml.CreateElement('link')
-    foreach ($field in @('name', 'type', 'locationURI')) {
-        $element = $projectXml.CreateElement($field)
-        switch ($field) {
-            'name' { $element.InnerText = $sourceName }
-            'type' { $element.InnerText = '1' }
-            'locationURI' { $element.InnerText = $repositoryVariable + '/' + $testSources[$sourceName] }
-        }
-        [void]$link.AppendChild($element)
-    }
-    [void]$linkedResources.AppendChild($link)
-    # Link name must also match the physical basename: the Renesas plugin
-    # regenerates linker options using the link, but the compiler uses the file.
-    Add-OptionValue $linkOption ('".\' + [System.IO.Path]::GetFileNameWithoutExtension($testSources[$sourceName]) + '.obj"')
-}
+Add-IdtSelectedSources $projectXml $cprojectXml $testSources $repositoryVariable $resolvedRepositoryRoot
 foreach ($include in $testIncludes) {
     Add-OptionValue $includeOption ('"' + (Join-Path $idtRoot $include) + '"')
 }
 if ($TestGroup -in @('Transport', 'PKCS11', 'OTAPAL')) {
     if ($TestGroup -eq 'Transport') { Add-OptionValue $defineOption 'ENABLE_IDT_TRANSPORT_TEST=1' }
-    elseif ($TestGroup -eq 'PKCS11') { Add-OptionValue $defineOption 'ENABLE_IDT_PKCS11_TEST=1' }
+    elseif ($TestGroup -eq 'PKCS11') {
+        Add-OptionValue $defineOption 'ENABLE_IDT_PKCS11_TEST=1'
+        Add-OptionValue $defineOption ('RX_IDT_PKCS11_SELECTED_GROUP=' + $pkcs11Selection.definition)
+    }
     else { Add-OptionValue $defineOption 'ENABLE_IDT_OTAPAL_TEST=1' }
     Add-OptionValue $defineOption 'UNITY_INCLUDE_CONFIG_H'
 }
@@ -468,12 +530,15 @@ if ($ValidateOnly) {
         $sourceLinks = [ordered]@{}
         foreach ($sourceName in $testSources.Keys) {
             $sourceLinks[$sourceName] = [ordered]@{
-                location_uri = $projectXml.SelectSingleNode("/projectDescription/linkedResources/link[name='$sourceName']/locationURI").InnerText
+                location_uri = $projectXml.SelectSingleNode("/projectDescription/linkedResources/link[name='IdtTestSources/$sourceName']/locationURI").InnerText
+                virtual_path = 'IdtTestSources/' + $sourceName
                 resolved_path = [IO.Path]::GetFullPath((Join-Path $resolvedRepositoryRoot $testSources[$sourceName]))
             }
         }
         [ordered]@{ target_id=$Target; target_sha256=$targetSha256; group=$TestGroup;
                     repository_variable=$repositoryVariable; source_links=$sourceLinks;
+                    pkcs11_selection=$pkcs11Selection;
+                    source_entry='IdtTestSources'; link_input_policy='generated';
                     qualification='not-established'; compiler_invoked=$false } |
             ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ValidationReportFile -Encoding UTF8
     }
@@ -537,15 +602,8 @@ try {
             -E2StudioTimeoutSeconds $E2StudioTimeoutSeconds
     }
     elseif ($Target -eq 'rx65n-bg96') {
-        # The production BG96 helper otherwise reuses existing makefiles and
-        # misses this run's added sources/defines. Regenerate them every run.
-        foreach ($project in @($idtProject, $idtBootProject)) {
-            $buildDirectory = [IO.Path]::GetFullPath((Join-Path $project 'HardwareDebug'))
-            if (-not $buildDirectory.StartsWith($idtRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
-                throw 'Generated build directory is outside the source tree.'
-            }
-            if (Test-Path -LiteralPath $buildDirectory) { Remove-Item -LiteralPath $buildDirectory -Recurse -Force }
-        }
+        # The BG96 helper always regenerates build inputs from this run's
+        # .project/.cproject profile, including added native sources/defines.
         & (Join-Path $PSScriptRoot 'build_headless_rx65n_bg96.ps1') `
             -ProjectRoot $idtRoot -E2Studio $E2Studio -Workspace $idtWorkspace `
             -TlsBackend software -RequireTlsVersion '' -LogFile $buildLog `
@@ -603,6 +661,7 @@ try {
         }
         mode = $(if ($TestGroup -eq 'Transport') { 'idt-transport-only' } else { "idt-$($TestGroup.ToLowerInvariant())" })
         suite = $suiteName
+        pkcs11_selection = $pkcs11Selection
         application_version = $appVersion
         image_id = $otaImageId
         signer_header_sha256 = $otaSignerHeaderHash
@@ -624,12 +683,22 @@ try {
         dependency_file_count = @($provenance.dependency_files_sha256.PSObject.Properties).Count
         dependency_pkcs11_runner = $(if ($null -ne $dependencyVerification) { $dependencyVerification.pkcs11_runner } else { $null })
         production_stack = $productionStack
-        bootloader_policy_sha256 = $(if ($Target -eq 'rx671-wifi') {
+        bootloader_policy_sha256 = $(
+            $chipHeader = switch ($Target) {
+                'rx72n-ethernet' { 'rx72n.h' }
+                'rx65n-bg96' { 'rx65n.h' }
+                'rx671-wifi' { 'rx671.h' }
+                default { throw 'Unknown bootloader target policy' }
+            }
+            $chipPath = Join-Path $idtBootProject "src/$chipHeader"
+            if (-not (Test-Path -LiteralPath $chipPath)) {
+                $chipPath = Join-Path $idtBootProject "lib/rx_bootloader/config/$chipHeader"
+            }
             @{
                 'rx_bootloader_config.h' = (Get-FileHash -LiteralPath (Join-Path $idtBootProject 'src/rx_bootloader_config.h') -Algorithm SHA256).Hash.ToLowerInvariant()
-                'rx671.h' = (Get-FileHash -LiteralPath (Join-Path $idtBootProject 'src/rx671.h') -Algorithm SHA256).Hash.ToLowerInvariant()
+                $chipHeader = (Get-FileHash -LiteralPath $chipPath -Algorithm SHA256).Hash.ToLowerInvariant()
             }
-        } else { $null })
+        )
         execution_config_sha256 = (Get-FileHash -LiteralPath $executionPath -Algorithm SHA256).Hash.ToLowerInvariant()
         parameter_config_sha256 = (Get-FileHash -LiteralPath (Join-Path $idtRoot 'Test/include/test_param_config.h') -Algorithm SHA256).Hash.ToLowerInvariant()
         outputs = $outputs

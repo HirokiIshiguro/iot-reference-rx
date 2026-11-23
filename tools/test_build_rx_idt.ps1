@@ -4,7 +4,8 @@ param(
     [ValidateSet('rx72n-ethernet', 'rx65n-bg96', 'rx671-wifi')]
     [string[]]$CompileTargets = @(),
     [string]$OutputDirectory = '',
-    [string]$WorkspaceRoot = ''
+    [string]$WorkspaceRoot = '',
+    [ref]$DiagnosticStage
 )
 
 # Exercises real project/source metadata with inert runtime headers. No compiler,
@@ -13,7 +14,12 @@ param(
 # only. These images must never be flashed or reported as native IDT results.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if ($null -ne $DiagnosticStage) { $DiagnosticStage.Value = 'metadata' }
 $root = (Resolve-Path -LiteralPath $ProjectRoot).Path
+. (Join-Path $PSScriptRoot 'rx_e2studio_cli.ps1')
+# Runner's normal submodule strategy updates only the top-level pins. Resolve
+# their reviewed nested pins before the pristine-source capture guard runs.
+Initialize-RxBuildDependencies -ProjectRoot $root
 $builder = Join-Path $PSScriptRoot 'build_rx72n_idt_transport.ps1'
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('idt-builder-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporary | Out-Null
@@ -57,6 +63,16 @@ $groups = [ordered]@{
     PKCS11 = 'CORE_PKCS11_TEST_ENABLED'
     OTAPAL = 'OTA_PAL_TEST_ENABLED'
 }
+$metadataProfiles = @(
+    foreach ($group in $groups.Keys) {
+        if ($group -eq 'PKCS11') {
+            foreach ($selection in @('StartFinish', 'NoObject')) {
+                [pscustomobject]@{ group=$group; pkcs11_group=$selection; name="$group-$selection" }
+            }
+        }
+        else { [pscustomobject]@{ group=$group; pkcs11_group=''; name=$group } }
+    }
+)
 $flags = @($groups.Values) + 'MQTT_TEST_ENABLED'
 $parameters = @'
 #define PKCS11_TEST_RSA_KEY_SUPPORT 0
@@ -83,15 +99,18 @@ try {
 #define IDT_CELLULAR_APN_PASSWORD ""
 #define IDT_CELLULAR_APN_AUTH "0"
 '@)
-    foreach ($group in $groups.Keys) {
+    foreach ($profile in $metadataProfiles) {
+        $group = $profile.group
+        $pkcs11Arguments = @{}
+        if ($group -eq 'PKCS11') { $pkcs11Arguments.Pkcs11Group = $profile.pkcs11_group }
         $execution = ($flags | ForEach-Object { '#define ' + $_ + ' (' + [int]($_ -eq $groups[$group]) + ')' }) -join "`n"
         [IO.File]::WriteAllText($runtimePaths[0], $execution + "`n")
         foreach ($target in $manifest.targets.PSObject.Properties.Name) {
-            $validationReport = Join-Path $temporary ("links-$target-$group.json")
+            $validationReport = Join-Path $temporary ("links-$target-$($profile.name).json")
             & $builder -ProjectRoot $root -Target $target -TestGroup $group -Python $Python `
-                -ProvenanceFile $provenances[$target] -ValidateOnly -ValidationReportFile $validationReport
+                -ProvenanceFile $provenances[$target] -ValidateOnly -ValidationReportFile $validationReport @pkcs11Arguments
             $validated = [IO.File]::ReadAllText($validationReport) | ConvertFrom-Json
-            $expectedVariable = $(if ($target -eq 'rx65n-bg96') { 'AWS_IOT_MCU_REPO_ROOT' } else { 'AWS_IOT_MCU_ROOT' })
+            $expectedVariable = 'AWS_IOT_MCU_ROOT'
             if ($validated.repository_variable -ne $expectedVariable -or $validated.compiler_invoked -ne $false) {
                 throw 'IDT source links select the wrong repository root or claim compilation.'
             }
@@ -106,13 +125,28 @@ try {
                     throw "IDT source link does not resolve to the real supplied source file: $($link.Name)"
                 }
             }
+            if ($group -eq 'PKCS11') {
+                $expectedDefinition = $(if ($profile.pkcs11_group -eq 'StartFinish') { 1 } else { 2 })
+                $expectedCases = $(if ($profile.pkcs11_group -eq 'StartFinish') { 6 } else { 5 })
+                $expectedGroups = $(if ($profile.pkcs11_group -eq 'StartFinish') {
+                    @('Full_PKCS11_StartFinish', 'Full_PKCS11_Capabilities')
+                } else { @('Full_PKCS11_Capabilities', 'Full_PKCS11_NoObject') })
+                if ($validated.pkcs11_selection.definition -ne $expectedDefinition -or
+                    $validated.pkcs11_selection.native_test_id -ne ('Full_PKCS11_' + $profile.pkcs11_group) -or
+                    $validated.pkcs11_selection.assertion_cases -ne $expectedCases -or
+                    (@($validated.pkcs11_selection.groups) -join '|') -ne ($expectedGroups -join '|')) {
+                    throw 'IDT PKCS11 report does not match the explicitly selected native group.'
+                }
+            }
             $count++
         }
     }
+    $expectedCount = $metadataProfiles.Count * @($manifest.targets.PSObject.Properties).Count
+    if ($count -ne $expectedCount) { throw 'IDT metadata validation matrix is incomplete.' }
     $rejected = $false
     try {
         & $builder -ProjectRoot $root -Target 'rx72n-ethernet' -TestGroup Transport `
-            -ProvenanceFile $provenances['rx72n-ethernet'] -ValidateOnly
+            -Python $Python -ProvenanceFile $provenances['rx72n-ethernet'] -ValidateOnly
     }
     catch {
         if ($_.Exception.Message -notmatch 'build requires') { throw }
@@ -126,6 +160,7 @@ try {
     }
     Write-Host "PASS: $count target/group metadata validations, suite mismatch rejected, production metadata unchanged. Hardware qualification is not established."
     if ($CompileTargets.Count -gt 0) {
+        if ($null -ne $DiagnosticStage) { $DiagnosticStage.Value = 'placeholder-prepare' }
         if (-not $OutputDirectory -or -not $WorkspaceRoot) {
             throw 'CompileTargets requires explicit OutputDirectory and WorkspaceRoot.'
         }
@@ -141,6 +176,7 @@ try {
         $execution = ($flags | ForEach-Object { '#define ' + $_ + ' (' + [int]($_ -eq $groups['Transport']) + ')' }) -join "`n"
         [IO.File]::WriteAllText($runtimePaths[0], $execution + "`n")
         foreach ($target in $CompileTargets) {
+            if ($null -ne $DiagnosticStage) { $DiagnosticStage.Value = 'target-build' }
             & $builder -ProjectRoot $root -Target $target -TestGroup Transport -Python $Python `
                 -ProvenanceFile $provenances[$target] `
                 -Workspace (Join-Path $WorkspaceRoot $target) `

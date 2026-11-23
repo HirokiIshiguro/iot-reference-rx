@@ -16,7 +16,7 @@ from targets import get_target, target_fingerprint
 from rfp_process import raise_if_rfp_unsafe, run_guarded
 from cleanup_budget import (FLASH_ABORT_RESET_SECONDS, FLASH_CONTROL_SECONDS,
                             FLASH_DOWNLOAD_SECONDS, FLASH_LOCK_WAIT_SECONDS,
-                            FLASH_RFP_COMMAND_SECONDS, RX671_SIGNER_PROVISION_SECONDS,
+                            FLASH_RFP_COMMAND_SECONDS, PUBLIC_SIGNER_PROVISION_SECONDS,
                             flash_transaction_seconds)
 
 FLASH_INPUTS = frozenset(('bootloader.mot', 'bootloader_bank1.mot', 'idt_transport.rsu',
@@ -24,12 +24,11 @@ FLASH_INPUTS = frozenset(('bootloader.mot', 'bootloader_bank1.mot', 'idt_transpo
                           'cleanup_budget.py', 'rfp_process.py'))
 
 
-def validate_rx671_policy_binding(root, manifest):
-    hashes = {name: hashlib.sha256((root / staged).read_bytes()).hexdigest()
-              for name, staged in (('rx_bootloader_config.h', 'rx671_bootloader_config.h'),
-                                   ('rx671.h', 'rx671_target.h'))}
-    if manifest.get('bootloader_policy_sha256') != hashes:
-        raise RuntimeError('RX671 bootloader policy differs from its effective build inputs')
+def validate_public_signer_policy_binding(root, target, manifest):
+    from public_signer_provision import PUBLIC_SIGNER_INPUTS, policy_hashes
+    files = {name: root / name for name in PUBLIC_SIGNER_INPUTS}
+    if manifest.get('bootloader_policy_sha256') != policy_hashes(files, target):
+        raise RuntimeError('Bootloader policy differs from its effective build inputs')
 
 
 def validate_flash_manifest(root, target, expected_sha256):
@@ -44,12 +43,15 @@ def validate_flash_manifest(root, target, expected_sha256):
             manifest.get('target_sha256') != target_fingerprint(target)):
         raise RuntimeError('Flash manifest target mismatch')
     files = manifest.get('files', {})
-    expected = FLASH_INPUTS
-    if target['id'] == 'rx671-wifi':
-        from rx671_provision import RX671_INPUTS
-        expected = expected | RX671_INPUTS
+    from public_signer_provision import PUBLIC_SIGNER_INPUTS, validate_bundle
+    expected = FLASH_INPUTS | PUBLIC_SIGNER_INPUTS
     if not isinstance(files, dict) or set(files) != expected:
         raise RuntimeError('Unexpected flash input set')
+    # Validate public-only PEM boundaries before generic hashing can read bodies.
+    validate_public_signer_policy_binding(root, target, manifest)
+    plan = validate_bundle({name: root / name for name in expected}, target, manifest.get('source_sha'))
+    if plan != manifest.get('public_signer_provision_plan'):
+        raise RuntimeError('Public signer plan does not match validated flash inputs')
     for name, metadata in files.items():
         path = root / name
         if path.is_symlink() or not path.is_file():
@@ -58,12 +60,6 @@ def validate_flash_manifest(root, target, expected_sha256):
         if (not isinstance(metadata, dict) or len(raw) != metadata.get('size_bytes') or
                 hashlib.sha256(raw).hexdigest() != metadata.get('sha256')):
             raise RuntimeError('Flash input hash mismatch: ' + name)
-    if target['id'] == 'rx671-wifi':
-        validate_rx671_policy_binding(root, manifest)
-        from rx671_provision import validate_bundle
-        plan = validate_bundle({name: root / name for name in expected}, target, manifest.get('source_sha'))
-        if plan != manifest.get('rx671_provision_plan'):
-            raise RuntimeError('RX671 provisioning plan does not match validated flash inputs')
     return manifest
 
 
@@ -165,17 +161,15 @@ def open_rfp_lock(path):
 
 
 def flash(root, target, token, manifest=None):
-    if target['id'] == 'rx671-wifi':
-        # Fail before opening a lock, UART, or programmer when callers omit
-        # initial signer inputs. A locally written receipt cannot enable flash.
-        if manifest is None:
-            raise RuntimeError('RX671 initial public signer provisioning inputs are required')
-        validate_rx671_policy_binding(root, manifest)
-        from rx671_provision import RX671_INPUTS, validate_bundle
-        plan = validate_bundle({name: root / name for name in FLASH_INPUTS | RX671_INPUTS},
-                               target, manifest.get('source_sha'))
-        if plan != manifest.get('rx671_provision_plan'):
-            raise RuntimeError('RX671 initial signer plan mismatch')
+    from public_signer_provision import PUBLIC_SIGNER_INPUTS, validate_bundle, provision_and_install
+    # Every bootloader-backed target establishes trust before any board I/O.
+    if manifest is None:
+        raise RuntimeError('Initial public signer provisioning inputs are required')
+    validate_public_signer_policy_binding(root, target, manifest)
+    plan = validate_bundle({name: root / name for name in FLASH_INPUTS | PUBLIC_SIGNER_INPUTS},
+                           target, manifest.get('source_sha'))
+    if plan != manifest.get('public_signer_provision_plan'):
+        raise RuntimeError('Initial public signer plan mismatch')
     raise_if_rfp_unsafe(target)
     import fcntl
     descriptor = open_rfp_lock(Path(target['rfp_lock']))
@@ -211,17 +205,10 @@ def flash(root, target, token, manifest=None):
         control(target, token, 'mark-flashed')
         try:
             download = download_command(root, target, [*base, '-sig', '-run', '-noquery'])
-            if target['id'] == 'rx671-wifi':
-                from rx671_provision import provision_and_install
-                if transaction_deadline - time.monotonic() < RX671_SIGNER_PROVISION_SECONDS:
-                    raise RuntimeError('Insufficient RX671 signer provisioning budget')
-                provision_and_install(root, target, manifest['source_sha'], call, download,
-                                      check_owner=lambda: validate_owner(target, token))
-            else:
-                call([*base, '-erase-chip', '-noquery'])
-                call([*base, '-p', str(root / 'bootloader.mot'), '-v', '-noquery'])
-                call([*base, '-p', str(root / 'bootloader_bank1.mot'), '-v', '-noquery'])
-                call(download, timeout=FLASH_DOWNLOAD_SECONDS)
+            if transaction_deadline - time.monotonic() < PUBLIC_SIGNER_PROVISION_SECONDS:
+                raise RuntimeError('Insufficient public signer provisioning budget')
+            provision_and_install(root, target, manifest['source_sha'], call, download,
+                                  check_owner=lambda: validate_owner(target, token))
             call([*base, '-sig', '-reset', '-noquery'])
             control(target, token, 'resume')
             call([*base, '-sig', '-run', '-noquery'])

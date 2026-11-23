@@ -20,6 +20,7 @@ Includes   <System Includes> , "Project Includes"
 #include "platform.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "trcRecorder.h"
 #include "freertos_start.h"
 
 #if defined(FREERTOS_ENABLE_UNIT_TESTS)
@@ -248,8 +249,8 @@ void vApplicationSetupTimerInterrupt(void)
 ******************************************************************************/
 void vAssertCalled(void)
 {
-#if defined(CONFIG_FREERTOS_ASSERT_FAIL_ABORT)
-    /* Assert call defined for debug builds. */
+#if !defined(ENABLE_UNIT_TESTS) && !defined(FREERTOS_ENABLE_UNIT_TESTS)
+    /* A failing kernel assertion always stops normal application execution. */
     /* debugging with E1/E2/E2L emulator */
     /* if not using a emulator, you can use LED on/off or serial terminal */
     volatile unsigned long ul = 0;
@@ -270,9 +271,6 @@ void vAssertCalled(void)
     /* TEST_ABORT() of unity_internal.h (and also TEST_PASS() of unity.h)
     jumps to the place where TEST_PROTECT() was executed. */
     TEST_ABORT();
-#else /* defined(CONFIG_FREERTOS_ASSERT_DISABLE) || defined(NDEBUG) or nothing */
-    /* Disable Assert call for release builds. */
-    /* nothing to do */
 #endif
 } /* End of function vAssertCalled() */
 
@@ -326,6 +324,8 @@ void vApplicationTickHook(void)
 void Processing_Before_Start_Kernel(void)
 {
     BaseType_t ret;
+
+    (void)xTraceInitialize();
 
 /** Make sure to manually set/clear this macro in freertos_start.h **/
 #if (RTOS_USB_SUPPORT == 1)

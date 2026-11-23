@@ -71,6 +71,7 @@
 
 /* jobs Library include. */
 #include "jobs.h"
+#include "ota_jobs_topic.h"
 
 /* OTA job parser include. */
 #include "job_parser.h"
@@ -134,28 +135,35 @@
       'c', 'd', 'e', 'f',
  };
 
-static MqttFileDownloaderContext_t mqttFileDownloaderContext = {0};
+/* Products opt in only when their BSS layout can hold these buffers. */
+#if defined(OTA_STATIC_BUFFERS_IN_BSS) && (OTA_STATIC_BUFFERS_IN_BSS == 1)
+#define OTA_STATIC_BUFFER_ZERO_INITIALIZER
+#else
+#define OTA_STATIC_BUFFER_ZERO_INITIALIZER = {0}
+#endif
+
+static MqttFileDownloaderContext_t mqttFileDownloaderContext OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 static uint32_t numOfBlocksRemaining = 0;
 static uint32_t currentBlockOffset = 0;
 static uint32_t totalNumOfBlocks = 0;
 static uint32_t nextBlockOffsetToRequest = 0;
 static uint8_t currentFileId = 0;
 static uint32_t totalBytesReceived = 0;
-char globalJobId[MAX_JOB_ID_LENGTH] = {0};
+char globalJobId[MAX_JOB_ID_LENGTH] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 
 /* The topic buffer to wait for job event */
-char jobEventTopicBuffer[TOPIC_BUFFER_SIZE + 1] = {0};
+char jobEventTopicBuffer[TOPIC_BUFFER_SIZE + 1] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 size_t jobEventTopicBufferLength = 0U;
 
 /* The topic buffer for new job notifications */
-char   notifyTopicBuffer[TOPIC_BUFFER_SIZE+1] = {0};
+char   notifyTopicBuffer[TOPIC_BUFFER_SIZE+1] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 size_t notifyTopicBufferLength                = 0U;
 
-static OtaDataEvent_t dataBuffers[MAX_NUM_OF_OTA_DATA_BUFFERS] = {0};
-static uint8_t receivedBlockBitmap[MAX_NUM_OF_OTA_FILE_BLOCKS] = {0};
-static OtaJobEventData_t jobDocBuffer = {0};
-static AfrOtaJobDocumentFields_t jobFields = {0};
-static uint8_t OtaImageSingatureDecoded[OTA_MAX_SIGNATURE_SIZE] = {0};
+static OtaDataEvent_t dataBuffers[MAX_NUM_OF_OTA_DATA_BUFFERS] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static uint8_t receivedBlockBitmap[MAX_NUM_OF_OTA_FILE_BLOCKS] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static OtaJobEventData_t jobDocBuffer OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static AfrOtaJobDocumentFields_t jobFields OTA_STATIC_BUFFER_ZERO_INITIALIZER;
+static uint8_t OtaImageSingatureDecoded[OTA_MAX_SIGNATURE_SIZE] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
 static SemaphoreHandle_t bufferSemaphore;
 
 static OtaState_t otaAgentState = OtaAgentStateInit;
@@ -309,7 +317,6 @@ const AppVersion32_t appFirmwareVersion =
  * @brief The topic filter that AWS IoT Jobs service publishes to
  * when a job is canceled.
  */
-const char *jobCancelTopic = "/cancellation_in_progress";
 
 /*
  * @brief The thing name used for creating OTA job topics.
@@ -768,12 +775,11 @@ static OtaPalJobDocProcessingResult_t receivedJobDocumentHandler(OtaJobEventData
         if (handled)
         {
             /* Populate the Jobs CANCELED event reserved topic ($aws/events/job/<jobId>/cancellation_in_progress) */
-            JobsStatus_t ret = Jobs_Events(jobEventTopicBuffer,
-                                           TOPIC_BUFFER_SIZE,
-                                           jobId,
-                                           (uint16_t)jobIdLength,
-                                           &jobEventTopicBufferLength);
-            if (JobsSuccess == ret)
+            bool topicReady = otaJobs_BuildCancellationTopic(jobEventTopicBuffer,
+                                                              sizeof(jobEventTopicBuffer),
+                                                              jobId, jobIdLength,
+                                                              &jobEventTopicBufferLength);
+            if (topicReady)
             {
                 /* SUBSCRIBE to the Jobs CANCELED event reserved topic ($aws/events/job/<jobId>/cancellation_in_progress) */
                 /* Make sure to subscribe to Events topic before mqtt-file-stream as a precaution against Job cancellation. */
@@ -1004,15 +1010,16 @@ bool otaDemo_handleIncomingMQTTMessage(char *topic,
         {
             /* The MQTT-agent gets an update in $aws/events topic. */
             /* Checks if a message comes from the $aws/events/job/<jobId>/cancellation_in_progress reserved topic. */
-            if ((NULL != strstr(topic, jobCancelTopic)) &&
-                (NULL != strstr(topic, JOBS_EVENTS_PREFIX)) &&
-                (NULL != strstr(topic, globalJobId)))
+            if ((globalJobId[0] != '\0') && (jobEventTopicBufferLength != 0U) &&
+                (topicLength == jobEventTopicBufferLength) &&
+                (memcmp(topic, jobEventTopicBuffer, topicLength) == 0))
             {
                 LogInfo(("The job is canceled\n"));
 
                 /* Send 'Canceled' event to OTA-agent. */
                 nextEvent.eventId = OtaAgentEventJobCanceled;
                 OtaSendEvent_FreeRTOS(&nextEvent);
+                handled = true;
             }
         }
         return handled;
@@ -1224,6 +1231,7 @@ static void processOTAEvents(void)
         {
             /* No current event and we have not received the new block
              * trying sending request for new block again */
+            nextBlockOffsetToRequest = currentBlockOffset;
             recvEventId = lastRecvEventId;
 
             /* It is likely that the network was disconnected and reconnected,
@@ -1387,7 +1395,7 @@ static void processOTAEvents(void)
             break;
         }
 
-        static uint8_t decodedData[mqttFileDownloader_CONFIG_BLOCK_SIZE] = {0};
+        static uint8_t decodedData[mqttFileDownloader_CONFIG_BLOCK_SIZE] OTA_STATIC_BUFFER_ZERO_INITIALIZER;
         size_t decodedDataLength = 0;
         MQTTFileDownloaderStatus_t xReturnStatus;
         int16_t result = -1;

@@ -255,6 +255,11 @@ def monitor_uart(port, baud, timeout, reset_cmd=None, app_startup_timeout=45.0):
     return results, infos, errors, tls_versions, total_bytes, total_lines, boot_lines, app_output_seen
 
 
+def tls_requirement_ok(require_tls_version, tls_versions):
+    """At least one handshake line, and every handshake line is of exactly the required version."""
+    return bool(tls_versions) and all(version == require_tls_version for version in tls_versions)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Verify phase8b MQTT baseline from dedicated log UART"
@@ -273,7 +278,7 @@ def main():
     parser.add_argument("--no-reset", action="store_true",
                         help="Skip reset and only monitor the current UART stream")
     parser.add_argument("--require-tls-version",
-                        help="Require the logged TLS handshake version to contain this string")
+                        help="Require every logged TLS handshake to use exactly this version (and at least one to be logged)")
     args = parser.parse_args()
 
     if args.device_id:
@@ -331,7 +336,7 @@ def main():
 
     tls_ok = True
     if args.require_tls_version:
-        tls_ok = any(args.require_tls_version in tls_version for tls_version in tls_versions)
+        tls_ok = tls_requirement_ok(args.require_tls_version, tls_versions)
         status = "PASS" if tls_ok else "FAIL"
         print(f"[{status}] Required TLS version: {args.require_tls_version}")
 

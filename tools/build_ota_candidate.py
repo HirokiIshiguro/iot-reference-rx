@@ -62,12 +62,12 @@ def main():
     parser.add_argument(
         "--output-prefix",
         required=True,
-        help="Output prefix for image-gen.py (e.g. C:\\temp\\ck-rx65n-01_0_9_3)",
+        help="Output prefix for the legacy RSU builder (e.g. C:\\temp\\ck-rx65n-01_0_9_3)",
     )
     parser.add_argument(
         "--signing-key",
         default=None,
-        help="Private key for image-gen.py; defaults to sample_keys/secp256r1.privatekey",
+        help="Private key for RSU signing; defaults to sample_keys/secp256r1.privatekey",
     )
     parser.add_argument(
         "--e2studio-cli",

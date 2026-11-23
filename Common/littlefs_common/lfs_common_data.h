@@ -1,77 +1,32 @@
-/*
-* Copyright (c) 2023-2025 Renesas Electronics Corporation and/or its affiliates
-*
-* SPDX-License-Identifier: BSD-3-Clause
-*/
+/* Copyright (c) 2026 SAFFTI and contributors. SPDX-License-Identifier: BSD-3-Clause */
+#ifndef LFS_COMMON_DATA_H
+#define LFS_COMMON_DATA_H
 
-/***********************************************************************************************************************
- * File Name    : lfs_common_data.h
- * Description  : This header file declares common API functions and data structures for managing LittleFS
- *                and Flash memory operations.
- **********************************************************************************************************************/
-
-/**********************************************************************************************************************
- Includes   <System Includes> , "Project Includes"
- *********************************************************************************************************************/
 #include <stdint.h>
-#include "r_bsp/mcu/all/fsp_common_api.h"
+#include "rm_littlefs_rx_if.h"
 
-#ifdef __TEST__
-#include "dev_mode_key_provisioning.h"
-#else
-#include "aws_dev_mode_key_provisioning.h"
+#ifdef __cplusplus
+extern "C" {
 #endif
-#include "mbedtls/platform.h"
-#include "psa/crypto.h"
-#include "psa/crypto_extra.h"
-#include "r_flash_rx_if.h"
-#include "rm_littlefs_api.h"
-#include "rm_littlefs_flash.h"
-#include "lfs_util.h"
-#include "mbedtls_pk_pkcs11.h"
-#include "core_mqtt.h"
 
-#ifndef COMMON_DATA_H_
-#define COMMON_DATA_H_
+/* Application storage operations are serialized here. The pristine RX adapter
+ * is built without LFS_THREADSAFE, whose lock hooks it does not implement.
+ * Initialize storage during application startup before other users run. */
+int32_t littlFs_init(void);
+int32_t littlFs_format(void);
+lfs_t * LfsCommon_GetLfs(void);
+int LfsCommon_Remove(lfs_t *lfs, const char *path);
+int LfsCommon_Rename(lfs_t *lfs, const char *oldpath, const char *newpath);
+int LfsCommon_Stat(lfs_t *lfs, const char *path, struct lfs_info *info);
+int LfsCommon_FileOpen(lfs_t *lfs, lfs_file_t *file, const char *path, int flags);
+int LfsCommon_FileClose(lfs_t *lfs, lfs_file_t *file);
+int LfsCommon_FileSync(lfs_t *lfs, lfs_file_t *file);
+lfs_ssize_t LfsCommon_FileRead(lfs_t *lfs, lfs_file_t *file, void *buffer, lfs_size_t size);
+lfs_ssize_t LfsCommon_FileWrite(lfs_t *lfs, lfs_file_t *file, const void *buffer, lfs_size_t size);
+lfs_soff_t LfsCommon_FileSeek(lfs_t *lfs, lfs_file_t *file, lfs_soff_t offset, int whence);
+lfs_soff_t LfsCommon_FileSize(lfs_t *lfs, lfs_file_t *file);
 
-FSP_HEADER
-/* Flash on Flash HP Instance */
-
-
-/** Access the Flash HP instance using these structures when calling API functions directly (::p_api is not used). */
-
-
-#ifndef NULL
-void NULL(flash_callback_args_t *p_args);
+#ifdef __cplusplus
+}
 #endif
-/** LittleFS on Flash Instance. */
-extern const rm_littlefs_instance_t g_rm_littlefs0;
-extern rm_littlefs_flash_instance_ctrl_t g_rm_littlefs0_ctrl;
-extern const rm_littlefs_cfg_t g_rm_littlefs0_cfg;
-
-extern struct lfs g_rm_littlefs0_lfs;
-extern const struct lfs_config g_rm_littlefs0_lfs_cfg;
-extern lfs_t g_lfs;
-
-/**********************************************************************************************************************
- * Function Name: littlFs_init
- * Description  : .
- * Return Value : .
- *********************************************************************************************************************/
-int32_t littlFs_init (void);
-
-/**********************************************************************************************************************
- * Function Name: littlFs_format
- * Description  : .
- * Return Value : .
- *********************************************************************************************************************/
-int32_t littlFs_format (void);
-
-/**********************************************************************************************************************
- * Function Name: g_common_init
- * Description  : .
- * Return Value : .
- *********************************************************************************************************************/
-void g_common_init (void);
-FSP_FOOTER
-#endif /* COMMON_DATA_H_ */
+#endif /* LFS_COMMON_DATA_H */

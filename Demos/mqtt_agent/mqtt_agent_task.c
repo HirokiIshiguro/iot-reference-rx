@@ -481,8 +481,10 @@ static MQTTStatus_t prvMQTTInit(void)
                              &xTransport,
                              prvGetTimeMs,
                              prvIncomingPublishCallback,
-                             /* Context to pass into the callback. Passing the pointer to subscription array. */
-                             NULL);
+                             /* Incoming callback context and optional MQTT5 ACK properties. */
+                             NULL,
+                             NULL,
+                             0U);
 
     return xReturn;
 }
@@ -633,6 +635,11 @@ static BaseType_t prvCreateTLSConnection(NetworkContext_t *pxNetworkContext)
     xNetworkCredentials.pPrivateKeyLabel = pkcs11configLABEL_DEVICE_PRIVATE_KEY_FOR_TLS;
 
     xNetworkCredentials.disableSni = democonfigDISABLE_SNI;
+#if defined( democonfigDISABLE_MAX_FRAGMENT_LENGTH_EXTENSION )
+    /* Only a project that defines this (the RX671 TSIP project) changes the
+     * request; the TSIP TLS transport requests MFL 4096 by default. */
+    xNetworkCredentials.disableMaxFragmentLengthExtension = democonfigDISABLE_MAX_FRAGMENT_LENGTH_EXTENSION;
+#endif
     BackoffAlgorithm_InitializeParams(&xReconnectParams,
                                       RETRY_BACKOFF_BASE_MS,
                                       RETRY_MAX_BACKOFF_DELAY_MS,
@@ -761,6 +768,7 @@ static MQTTStatus_t prvHandleResubscribe(void)
     {
         xSubArgs.pSubscribeInfo = xSubInfo;
         xSubArgs.numSubscriptions = usNumSubscriptions;
+        xSubArgs.pProperties = NULL;
 
         /* The block time can be 0 as the command loop is not running at this point. */
         xCommandParams.blockTimeMs = 0U;
@@ -936,6 +944,10 @@ void prvMQTTAgentTask(void *pvParameters)
 #if defined(__TEST__)
     pcThingName = clientcredentialIOT_THING_NAME;
     pcBrokerEndpoint = clientcredentialMQTT_BROKER_ENDPOINT;
+    pcRootCA = (char *)democonfigROOT_CA_PEM;
+#elif defined(BG96_CI_MQTT_CREDENTIALS)
+    pcThingName = democonfigCLIENT_IDENTIFIER;
+    pcBrokerEndpoint = democonfigMQTT_BROKER_ENDPOINT;
     pcRootCA = (char *)democonfigROOT_CA_PEM;
 #else
     /* Load broker endpoint and thing name for client connection, from the key store. */
@@ -1553,7 +1565,8 @@ MQTTStatus_t MqttAgent_SubscribeSync(const char *pcTopicFilter,
         MQTTAgentSubscribeArgs_t xSubArgs =
             {
                 .pSubscribeInfo = &xSubInfo,
-                .numSubscriptions = 1};
+                .numSubscriptions = 1,
+                .pProperties = NULL};
 
         /* The block time can be 0 as the command loop is not running at this point. */
         MQTTAgentCommandInfo_t xCommandParams =
@@ -1572,22 +1585,16 @@ MQTTStatus_t MqttAgent_SubscribeSync(const char *pcTopicFilter,
         {
             uint32_t ulNotifyValue = 0;
 
-            if (xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX,
-                                       0x0,
-                                       0xFFFFFFFF,
-                                       &ulNotifyValue,
-                                       portMAX_DELAY))
+            while (pdTRUE != xTaskNotifyWaitIndexed(MQTT_AGENT_NOTIFY_IDX, 0U,
+                                                    UINT32_MAX, &ulNotifyValue, portMAX_DELAY))
             {
-                xResult = (MQTTStatus_t)(ulNotifyValue & 0x00FFFFFFU);
-                if ((MQTTSuccess == xResult) &&
-                    (((ulNotifyValue >> 24) & 0xFFU) >= (uint32_t)MQTTSubAckFailure))
-                {
-                    xResult = MQTTServerRefused;
-                }
+                /* The queued subscribe still refers to xSubArgs/xSubInfo. */
             }
-            else
+            xResult = (MQTTStatus_t)(ulNotifyValue & 0x00FFFFFFU);
+            if ((MQTTSuccess == xResult) &&
+                (((ulNotifyValue >> 24) & 0xFFU) >= (uint32_t)MQTTSubAckFailure))
             {
-                xResult = MQTTKeepAliveTimeout;
+                xResult = MQTTServerRefused;
             }
         }
     }

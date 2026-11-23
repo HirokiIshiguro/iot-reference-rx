@@ -59,10 +59,10 @@
 #endif
 
 #define LFS_THREAD_SAFE (1)
-/* Define LFS_THREADSAFE project-wide when enabling LittleFS public API locking. */
+/* Public application storage operations are locked in lfs_common_data.c. */
 
 /* Defines the LittleFS instance control block to be the stdio wrapper. */
-#define RM_STDIO_LITTLEFS_CFG_LFS (g_rm_littlefs0_lfs)
+/* Obtain the initialized instance via LfsCommon_GetLfs(). */
 
 #ifdef __cplusplus
         }

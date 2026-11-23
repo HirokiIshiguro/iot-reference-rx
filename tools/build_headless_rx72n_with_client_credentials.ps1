@@ -4,8 +4,8 @@ param(
     [string]$Endpoint = $env:AWS_IOT_ENDPOINT,
     [string]$CertInput = $env:AWS_IOT_CERT,
     [string]$KeyInput = $env:AWS_IOT_PRIVKEY,
-    [string]$E2Studio = "C:\Renesas\e2_studio_2025_12\eclipse\e2studioc.exe",
-    [string]$Workspace = "C:\iotref-rx72n-ws",
+    [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
+    [string]$Workspace = "C:\ai\codex\ws\iotref-rx72n-ws",
     [string]$LogFile = $(Join-Path (Split-Path $PSScriptRoot -Parent) "rx72n_e2studio_build_mqtt_candidate.log"),
     [int]$E2StudioTimeoutSeconds = 600,
     [string]$TlsBackend = $(if ($env:RX72N_TLS_BACKEND) { $env:RX72N_TLS_BACKEND } else { "software" }),
@@ -15,6 +15,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "rx_e2studio_cli.ps1")
 Set-StrictMode -Version Latest
 
 function Resolve-PemInput {
@@ -45,6 +46,8 @@ function Resolve-PemInput {
 }
 
 $projectRoot = (Resolve-Path $ProjectRoot).Path
+Initialize-RxBuildDependencies -ProjectRoot $projectRoot
+Assert-RxCommonKernel -ProjectRoot $projectRoot
 $renderScript = Join-Path $projectRoot "tools\render_rx72n_client_credentials.py"
 $buildScript = Join-Path $projectRoot "tools\build_headless_rx72n.ps1"
 $credentialHeader = Join-Path $projectRoot "Demos\include\aws_clientcredential.h"

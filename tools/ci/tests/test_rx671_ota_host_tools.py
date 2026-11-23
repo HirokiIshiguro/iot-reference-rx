@@ -564,7 +564,7 @@ class RfpContractTests(unittest.TestCase):
         command = host.RfpConfig().erase_ota_install_areas_command()
         self.assertIn("-erase", command)
         self.assertEqual(
-            ["FFE00000,FFEBFFFF", "FFF00000,FFFBFFFF"],
+            ["FFE00000,FFEEFFFF", "FFF00000,FFFEFFFF"],
             [
                 command[index + 1]
                 for index, token in enumerate(command)
@@ -573,8 +573,8 @@ class RfpContractTests(unittest.TestCase):
         )
         self.assertNotIn("-erase-chip", command)
         self.assertNotIn("-run", command)
-        self.assertNotIn("FFEC0000,FFEFFFFF", command)
-        self.assertNotIn("FFFC0000,FFFFFFFF", command)
+        self.assertNotIn("FFEF0000,FFEFFFFF", command)
+        self.assertNotIn("FFFF0000,FFFFFFFF", command)
 
     def test_cli_echo_containing_ng_is_not_a_false_error(self):
         serial = FakeSerial(
@@ -883,7 +883,7 @@ class ProvisioningContractTests(unittest.TestCase):
             self.assertIn("-p", commands[0])
             self.assertIn("-run", commands[1])
             self.assertEqual(
-                ["FFE00000,FFEBFFFF", "FFF00000,FFFBFFFF"],
+                ["FFE00000,FFEEFFFF", "FFF00000,FFFEFFFF"],
                 [
                     commands[2][index + 1]
                     for index, token in enumerate(commands[2])
@@ -938,7 +938,7 @@ class ProvisioningContractTests(unittest.TestCase):
             self.assertTrue(summary["ota_install_areas_erased_after_provisioning"])
             self.assertTrue(summary["data_flash_preserved_during_rfp_operations"])
             self.assertEqual(
-                ["0xFFE00000-0xFFEBFFFF", "0xFFF00000-0xFFFBFFFF"],
+                ["0xFFE00000-0xFFEEFFFF", "0xFFF00000-0xFFFEFFFF"],
                 summary["ota_install_area_erase_ranges"],
             )
             self.assertIn(
@@ -1107,7 +1107,7 @@ class OtaTransactionContractTests(unittest.TestCase):
                 require_tls_version="TLSv1.2",
             )
             transaction = ota_test.Rx671OtaTransaction(args)
-            with self.assertRaisesRegex(ValueError, "exactly 0xC0000"):
+            with self.assertRaisesRegex(ValueError, "exactly 0xF0000"):
                 transaction.run()
 
     def test_baseline_stream_waits_for_each_flash_block_progress(self):

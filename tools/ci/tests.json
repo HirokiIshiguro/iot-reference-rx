@@ -1,0 +1,256 @@
+{
+  "schema": 1,
+  "boards": {
+    "rx72n": {
+      "title": "RX72N Envision Kit (Ethernet)",
+      "target": "rx72n-ethernet",
+      "runner_tags": [
+        "exec-shell",
+        "os-linux",
+        "hw-raspi",
+        "dev-ek-rx72n-set2"
+      ],
+      "resource_group": "board-rx72n",
+      "keep_running_after_test": true,
+      "thing": "rx72n-02",
+      "certificate_variable": "AWS_CLIENT_CERT_RX72N_02",
+      "private_key_variable": "AWS_PRIVATE_KEY_RX72N_02",
+      "fleet_template_variable": "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+      "claim_certificate_variable": "AWS_FLEET_CLAIM_CERT_RX72N_02",
+      "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
+      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_RX72N_02",
+      "ota_signing_profile_variable": "AWS_OTA_SIGNING_PROFILE_RX72N_02",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_candidate_version": "0.9.3"
+    },
+    "rx65n": {
+      "title": "CK-RX65N V1 + BG96 (cellular)",
+      "target": "rx65n-bg96",
+      "runner_tags": [
+        "exec-shell",
+        "os-linux",
+        "hw-raspi",
+        "dev-ck-rx65n-bg96"
+      ],
+      "resource_group": "board-rx65n",
+      "iot_policy": "ck-rx65n-policy",
+      "fleet_demo_id": "rx65n-bg96-fp",
+      "ota_bucket": "rx65n-ota",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_candidate_version": "0.9.99",
+      "thing_variable": "AWS_IOT_THING_NAME_CK_RX65N_01"
+    },
+    "rx671": {
+      "title": "EK-RX671 + Type 1YN (Wi-Fi)",
+      "target": "rx671-wifi",
+      "runner_tags": [
+        "exec-shell",
+        "os-linux",
+        "hw-raspi",
+        "dev-ek-rx671"
+      ],
+      "resource_group": "board-rx671",
+      "software_build_per_tls": true,
+      "fleet_template_variable": "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+      "claim_certificate_variable": "AWS_FLEET_CLAIM_CERT_RX72N_02",
+      "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
+      "image_secret_variable": {
+        "app": "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM",
+        "fleet": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02"
+      },
+      "iot_policy": "ck-rx65n-policy",
+      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_RX72N_02",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_baseline_version": "0.1.0",
+      "ota_candidate_version": "0.1.1",
+      "ota_is_self_contained": true,
+      "tsip_thing_variable": "RX671_TSIP_AWS_IOT_THING_NAME",
+      "tsip_certificate_variable": "RX671_TSIP_LANBENCH_CLIENT_CERT_PEM",
+      "tsip_mqtt_from_ota_bundle": true
+    }
+  },
+  "runners": {
+    "check": [
+      "exec-shell",
+      "os-linux",
+      "ef-saffti-001-rpi-linux-004"
+    ],
+    "build": [
+      "exec-shell",
+      "os-windows",
+      "ccrx",
+      "ef-saffti-001-pc-windows-001"
+    ]
+  },
+  "build_resource_group": "windows-ccrx-build",
+  "e2studio_cli": "C:/Renesas/e2_studio_2026_04_2/eclipse/e2studio-cli.exe",
+  "workspace_root": "C:/ai/codex/ws",
+  "endpoints": {
+    "tls12": {
+      "variable": "AWS_IOT_ENDPOINT"
+    },
+    "tls13": {
+      "value": "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"
+    }
+  },
+  "axes": {
+    "board": [
+      "rx72n",
+      "rx65n",
+      "rx671"
+    ],
+    "backend": [
+      "sw",
+      "tsip"
+    ],
+    "tls": [
+      "tls12",
+      "tls13"
+    ],
+    "feature": [
+      "mqtt",
+      "ota",
+      "fleet"
+    ]
+  },
+  "ids": {
+    "rx72n:sw:tls12:mqtt": "IREF-MQTT-001",
+    "rx72n:sw:tls13:mqtt": "IREF-MQTT-002",
+    "rx72n:tsip:tls12:mqtt": "IREF-MQTT-003",
+    "rx72n:tsip:tls13:mqtt": "IREF-MQTT-004",
+    "rx65n:sw:tls12:mqtt": "IREF-MQTT-005",
+    "rx65n:sw:tls13:mqtt": "IREF-MQTT-006",
+    "rx65n:tsip:tls12:mqtt": "IREF-MQTT-007",
+    "rx65n:tsip:tls13:mqtt": "IREF-MQTT-008",
+    "rx671:sw:tls12:mqtt": "IREF-MQTT-009",
+    "rx671:sw:tls13:mqtt": "IREF-MQTT-010",
+    "rx671:tsip:tls12:mqtt": "IREF-MQTT-011",
+    "rx671:tsip:tls13:mqtt": "IREF-MQTT-012",
+    "rx72n:sw:tls12:ota": "IREF-OTA-001",
+    "rx72n:sw:tls13:ota": "IREF-OTA-002",
+    "rx72n:tsip:tls12:ota": "IREF-OTA-003",
+    "rx72n:tsip:tls13:ota": "IREF-OTA-004",
+    "rx65n:sw:tls12:ota": "IREF-OTA-005",
+    "rx65n:sw:tls13:ota": "IREF-OTA-006",
+    "rx65n:tsip:tls12:ota": "IREF-OTA-007",
+    "rx65n:tsip:tls13:ota": "IREF-OTA-008",
+    "rx671:sw:tls12:ota": "IREF-OTA-009",
+    "rx671:sw:tls13:ota": "IREF-OTA-010",
+    "rx671:tsip:tls12:ota": "IREF-OTA-011",
+    "rx671:tsip:tls13:ota": "IREF-OTA-012",
+    "rx72n:sw:tls12:fleet": "IREF-FLEET-001",
+    "rx72n:sw:tls13:fleet": "IREF-FLEET-002",
+    "rx72n:tsip:tls12:fleet": "IREF-FLEET-003",
+    "rx72n:tsip:tls13:fleet": "IREF-FLEET-004",
+    "rx65n:sw:tls12:fleet": "IREF-FLEET-005",
+    "rx65n:sw:tls13:fleet": "IREF-FLEET-006",
+    "rx65n:tsip:tls12:fleet": "IREF-FLEET-007",
+    "rx65n:tsip:tls13:fleet": "IREF-FLEET-008",
+    "rx671:sw:tls12:fleet": "IREF-FLEET-009",
+    "rx671:sw:tls13:fleet": "IREF-FLEET-010",
+    "rx671:tsip:tls12:fleet": "IREF-FLEET-011",
+    "rx671:tsip:tls13:fleet": "IREF-FLEET-012"
+  },
+  "benchmarks": [
+    {
+      "name": "rx72n:sw:speed",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/mbedtls",
+      "measures": "TCP and TLS 1.2 throughput (sink, source) and CPU load, Mbed TLS in software",
+      "variables": {
+        "RUN_HW_TESTS": "true"
+      }
+    },
+    {
+      "name": "rx72n:tsip:speed",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls",
+      "measures": "TCP and TLS 1.2 throughput (sink, source) and CPU load, TSIP",
+      "variables": {
+        "RUN_HW_TESTS": "true"
+      }
+    },
+    {
+      "name": "rx72n:sw:tls13-0rtt",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13",
+      "measures": "TLS 1.3 session resumption and 0-RTT early data, Mbed TLS in software",
+      "variables": {
+        "MBEDTLS_BUILD_VARIANT": "software-0rtt",
+        "RUN_HW_TESTS": "true",
+        "RUN_LANBENCH_MBEDTLS_0RTT_SERVER": "true"
+      }
+    },
+    {
+      "name": "rx72n:tsip:tls13-0rtt",
+      "board": "rx72n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/rx72n_envision_kit/benchmark/tsip_mbedtls13",
+      "measures": "TLS 1.3 session resumption and 0-RTT early data, TSIP",
+      "variables": {
+        "MBEDTLS_BUILD_VARIANT": "tsip-0rtt",
+        "RUN_HW_TESTS": "true",
+        "RUN_LANBENCH_MBEDTLS_0RTT_SERVER": "true"
+      }
+    },
+    {
+      "name": "rx65n:r_cellular-test",
+      "board": "rx65n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/fitmodules/r_cellular/test",
+      "measures": "tests of the r_cellular driver (tick rates and the API) on the CK-RX65N with BG96",
+      "variables": {}
+    },
+    {
+      "name": "rx65n:bg96-speed",
+      "board": "rx65n",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ck-rx65n/bg96-bench",
+      "measures": "TCP throughput (sink, source) over the BG96 cellular link on the CK-RX65N; the peer is an EC2 server made per pipeline",
+      "variables": {
+        "RX65N_BG96_RUN_HARDWARE": "true"
+      }
+    }
+  ],
+  "ready": [
+    "rx72n:sw:tls12:mqtt",
+    "rx72n:sw:tls13:mqtt",
+    "rx671:sw:tls12:mqtt",
+    "rx671:sw:tls13:mqtt",
+    "rx65n:sw:tls12:mqtt",
+    "rx65n:sw:tls13:mqtt",
+    "rx72n:sw:tls12:fleet",
+    "rx72n:sw:tls13:fleet",
+    "rx65n:sw:tls12:fleet",
+    "rx65n:sw:tls13:fleet",
+    "rx671:sw:tls12:fleet",
+    "rx671:sw:tls13:fleet",
+    "rx72n:sw:tls12:ota",
+    "rx72n:sw:tls13:ota",
+    "rx65n:sw:tls12:ota",
+    "rx65n:sw:tls13:ota",
+    "rx671:sw:tls12:ota",
+    "rx671:sw:tls13:ota",
+    "rx671:tsip:tls12:fleet",
+    "rx671:tsip:tls13:fleet",
+    "rx671:tsip:tls12:mqtt",
+    "rx671:tsip:tls13:mqtt",
+    "rx671:tsip:tls12:ota",
+    "rx671:tsip:tls13:ota",
+    "rx72n:tsip:tls12:mqtt",
+    "rx72n:tsip:tls13:mqtt",
+    "rx72n:tsip:tls12:fleet",
+    "rx72n:tsip:tls13:fleet",
+    "rx72n:tsip:tls12:ota",
+    "rx72n:tsip:tls13:ota",
+    "rx65n:tsip:tls12:mqtt",
+    "rx65n:tsip:tls13:mqtt",
+    "rx65n:tsip:tls12:fleet",
+    "rx65n:tsip:tls13:fleet",
+    "rx65n:tsip:tls12:ota",
+    "rx65n:tsip:tls13:ota"
+  ],
+  "smoke": [
+    "rx72n:sw:tls12:mqtt",
+    "rx65n:sw:tls12:mqtt",
+    "rx671:sw:tls12:mqtt"
+  ],
+  "build_lanes": 5
+}

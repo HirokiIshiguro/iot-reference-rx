@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Reset the BG96 app into CLI and provision the OTA code signer certificate."""
+"""Reset the BG96 app into CLI and provision its OTA certificate/public key."""
 
 from __future__ import annotations
 
 import argparse
 import os
 from pathlib import Path
+import re
 
 import serial
 
@@ -35,10 +36,51 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def code_signer_material(path: Path) -> tuple[str, str]:
+    """Read one public certificate without consuming any appended private body."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError("code signer certificate must be a regular public PEM file")
+    invalid = "code signer input must contain exactly one public certificate PEM"
+    with path.open("rb", buffering=0) as stream:
+        first = stream.readline(80)
+        if first.rstrip(b"\r\n") != b"-----BEGIN CERTIFICATE-----":
+            raise RuntimeError(invalid)
+        encoded = bytearray(first)
+        while True:
+            line = stream.readline(4097 - len(encoded))
+            if not line or len(encoded) + len(line) > 4096:
+                raise RuntimeError(invalid)
+            content = line.rstrip(b"\r\n")
+            if content != b"-----END CERTIFICATE-----" and not re.fullmatch(b"[A-Za-z0-9+/=]*", content):
+                raise RuntimeError(invalid)
+            encoded.extend(line)
+            if content == b"-----END CERTIFICATE-----":
+                break
+        while True:
+            extra = stream.read(1)
+            if not extra:
+                break
+            if extra not in b" \t\r\n\v\f" or len(encoded) >= 4096:
+                raise RuntimeError(invalid)
+            encoded.extend(extra)
+    try:
+        certificate = x509.load_pem_x509_certificate(bytes(encoded).strip())
+    except ValueError:
+        raise RuntimeError("code signer input is not a valid public certificate") from None
+    public = certificate.public_key()
+    if not isinstance(public, ec.EllipticCurvePublicKey) or not isinstance(public.curve, ec.SECP256R1):
+        raise RuntimeError("code signer certificate must use ECDSA P-256")
+    public_pem = public.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+    return bytes(encoded).strip().decode("ascii"), public_pem.decode("ascii")
+
+
 def main() -> int:
     args = parse_args()
-    if not args.code_signer_cert.is_file():
-        raise RuntimeError(f"code signer certificate not found: {args.code_signer_cert}")
+    certificate, public_key = code_signer_material(args.code_signer_cert)
 
     port = serial.Serial(
         port=args.uart_port,
@@ -60,7 +102,14 @@ def main() -> int:
         send_cli_pem(
             port,
             "codesigncert",
-            args.code_signer_cert.read_text(encoding="utf-8"),
+            certificate,
+            char_delay=args.provision_char_delay,
+            line_delay=args.provision_line_delay,
+        )
+        send_cli_pem(
+            port,
+            "codesignpubkey",
+            public_key,
             char_delay=args.provision_char_delay,
             line_delay=args.provision_line_delay,
         )
@@ -72,7 +121,7 @@ def main() -> int:
             timeout=30.0,
             success_tokens=("Configuration save",),
         )
-        print("[OTA] Code signer certificate provisioned; device is parked in CLI mode.")
+        print("[OTA] Code signer certificate and public key provisioned; device is parked in CLI mode.")
     finally:
         port.close()
     return 0

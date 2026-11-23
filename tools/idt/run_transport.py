@@ -24,10 +24,18 @@ from test_selection import parse_test_ids
 from check_idt_report import check_report
 from ota_witness import UartWitness
 from flash_failure import raise_if_flash_failed
+from pkcs11_source_view import create_source_view
 from targets import get_target, target_ids, target_fingerprint, load_manifest
 from cleanup_budget import (NATIVE_CLEANUP_SECONDS, NATIVE_TERMINATE_SECONDS, NATIVE_KILL_SECONDS,
                             BRIDGE_SHUTDOWN_SECONDS, REMOTE_TERMINATE_SECONDS, REMOTE_KILL_SECONDS,
                             CAPTURE_DRAIN_SECONDS, BRIDGE_THREAD_JOIN_SECONDS)
+
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
+from tools.aws.oidc_session import OidcError, wsl_child_environment
+from tools.idt.oidc_job import check_child_budget, check_native_timeouts, IDT_LINUX_INPUTS
+from tools.idt.rpi4_pair import READY_SECONDS, RESPONSE_SECONDS
 
 GROUPS = ("FullTransportInterfaceTLS", "FullCloudIoT", "OTADataplaneMQTT", "FullPKCS11_Core", "OTACore")
 SUITE = "FRQ_2.5.0"
@@ -145,8 +153,9 @@ class Bridge:
         self.capture = None
         try:
             self.capture = UartWitness(capture_dir)
+            ssh = os.environ["IDT_LINUX_SSH"] if os.environ.get("IDT_HOST_MODE") == "linux-arm64" else SSH
             self.remote = subprocess.Popen(
-                [SSH, "-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10",
+                [ssh, "-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=10",
                  "-o", "ServerAliveCountMax=3", target["ssh_alias"], command],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 bufsize=0, env=env)
@@ -285,6 +294,14 @@ def interrupted(_signum, _frame):
 
 
 def main():
+    native_linux = os.environ.get("IDT_HOST_MODE") == "linux-arm64"
+    if native_linux:
+        if os.environ.get("CI", "").lower() != "true" or not os.environ.get("RX_OIDC_EXPIRATION_UTC"):
+            raise RuntimeError("native Linux execution requires a fixed CI OIDC session")
+        isolated = wsl_child_environment(dict(os.environ), allow_names=IDT_LINUX_INPUTS)
+        os.environ.clear()
+        os.environ.update(isolated)
+        check_child_budget(os.environ)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--idt-root", required=True)
     parser.add_argument("--target", choices=target_ids(), default=os.getenv("IDT_TARGET", "rx72n-ethernet"))
@@ -308,12 +325,20 @@ def main():
     args.test_id = ",".join(selected_test_ids) if selected_test_ids else None
     if args.test_id and args.group != "OTADataplaneMQTT":
         parser.error("The selected test ID belongs to OTADataplaneMQTT")
-    if sys.platform != "linux" or not Path(SSH).is_file():
-        parser.error("this prototype requires WSL and Windows OpenSSH")
+    ssh = os.environ.get("IDT_LINUX_SSH", "") if native_linux else SSH
+    if sys.platform != "linux" or not Path(ssh).is_file():
+        parser.error("the reviewed SSH executable is unavailable")
+    if native_linux and (args.target != "rx72n-ethernet" or args.group != "FullTransportInterfaceTLS" or args.test_id):
+        parser.error("native Linux execution is limited to the RX72N Transport group")
     if not args.region or not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
         parser.error("AWS region and inherited AWS credential environment variables are required")
     if args.timeout_seconds <= 0 or args.cleanup_timeout_seconds <= 0:
         parser.error("timeouts must be positive")
+    if native_linux:
+        try:
+            check_native_timeouts(os.environ, args.timeout_seconds, args.cleanup_timeout_seconds)
+        except OidcError:
+            parser.error("native timeouts exceed the checked OIDC budget")
     idt_root = Path(args.idt_root).resolve(strict=True)
     source = Path(args.source_path).resolve(strict=True)
     run_dir = Path(args.output).resolve()
@@ -323,9 +348,31 @@ def main():
         parser.error("runtime files must be outside the source repository")
     if any(any(char.isspace() for char in str(path)) for path in (idt_root, source, run_dir)):
         parser.error("FRQ paths must not contain whitespace")
-    for key in ("IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_WINDOWS_PYTHON", "IDT_WINDOWS_PWSH"):
+    required = ("IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_LINUX_BUILD_CALLBACK", "IDT_LINUX_SCP",
+                "IDT_LINUX_RUNTIME_ROOT", "IDT_PAIR_BASELINE", "IDT_PAIR_SOCKET", "IDT_PAIR_BUILD_SECONDS",
+                "IDT_PAIR_QUEUE_SECONDS") if native_linux else (
+        "IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_WINDOWS_PYTHON", "IDT_WINDOWS_PWSH")
+    for key in required:
         if not os.getenv(key):
-            parser.error(key + " must be inherited from the Windows launcher")
+            parser.error(key + (" must be inherited from the Linux launcher" if native_linux else
+                                " must be inherited from the Windows launcher"))
+    if native_linux:
+        try:
+            runtime_root = Path(os.environ["IDT_LINUX_RUNTIME_ROOT"]).resolve(strict=True)
+            for key in ("IDT_PROVENANCE_FILE", "IDT_PRIVATE_KEY_FILE", "IDT_PAIR_BASELINE"):
+                path = Path(os.environ[key])
+                if path.is_symlink() or not path.is_file() or runtime_root not in path.resolve(strict=True).parents:
+                    raise ValueError
+            baseline = json.loads(Path(os.environ["IDT_PAIR_BASELINE"]).read_text(encoding="utf-8"))
+            seconds = int(os.environ["IDT_PAIR_BUILD_SECONDS"])
+            queue_seconds = int(os.environ["IDT_PAIR_QUEUE_SECONDS"])
+            if (not isinstance(baseline, dict) or not baseline or seconds <= 0 or queue_seconds <= 0
+                    or queue_seconds + READY_SECONDS + seconds + RESPONSE_SECONDS > args.timeout_seconds
+                    or not Path(os.environ["IDT_PAIR_SOCKET"]).is_socket()
+                    or not Path(os.environ["IDT_LINUX_SCP"]).is_file()):
+                raise ValueError
+        except (OSError, ValueError, TypeError):
+            parser.error("native Linux build inputs or paired socket are unavailable")
     binary = idt_root / "bin/devicetester_linux_x86-64"
     if not binary.is_file() or not source.is_dir():
         parser.error("IDT binary or source checkout is missing")
@@ -345,7 +392,8 @@ def main():
         parser.error("Device template SKU differs from selected target")
     userdata["sourcePath"] = str(source)
     userdata["retainModifiedSourceDirectories"] = True
-    for field, wrapper in (("buildTool", Path(__file__).with_name("build_transport.sh")),
+    build_wrapper = Path(os.environ["IDT_LINUX_BUILD_CALLBACK"]) if native_linux else Path(__file__).with_name("build_transport.sh")
+    for field, wrapper in (("buildTool", build_wrapper),
                            ("flashTool", Path(__file__).with_name("flash_transport.py"))):
         userdata.setdefault(field, {})["command"] = [wrapper_command(wrapper)]
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -353,6 +401,12 @@ def main():
         (run_dir / folder).mkdir()
     temporary_sources = run_dir / "source"
     temporary_sources.mkdir()
+    if args.group == "FullPKCS11_Core":
+        # FRQ's selector edits target only this product configuration facade.
+        # Full original dependencies are supplied separately to the callback.
+        source_view = run_dir / "pkcs11-sdk-source"
+        create_source_view(source, source_view)
+        userdata["sourcePath"] = str(source_view)
     config_path = idt_root / "configs/config.json"
     package_lock = open(idt_root / ".codex-prototype.lock", "a+b")
     bridge = process = None
@@ -395,6 +449,8 @@ def main():
             command += ["--test-id", args.test_id]
         print("Starting development-only " + args.group + "; this cannot qualify a release.", flush=True)
         sensitive = [env[key] for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN") if env.get(key)]
+        if native_linux:
+            check_child_budget(env)
         process = subprocess.Popen(command, cwd=idt_root / "bin", env=env,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    start_new_session=True)

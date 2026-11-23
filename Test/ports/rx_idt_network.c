@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * IDT network parameters enter the normal production KVS path. This file is
+ * IDT network parameters enter the production KVS and r_cellular AP paths. This file is
  * linked only for RX65N/BG96 and RX671/Type 1YN network test profiles.
  */
 #include <string.h>
@@ -15,7 +15,7 @@
 #endif
 
 #if ( IDT_TARGET_RX65N_BG96 == 1 )
-    #include "r_cellular_if.h"
+    #include "r_cellular_network.h"
     #if !defined( IDT_CELLULAR_APN ) || !defined( IDT_CELLULAR_APN_USER ) || \
         !defined( IDT_CELLULAR_APN_PASSWORD ) || !defined( IDT_CELLULAR_APN_AUTH )
         #error "The runtime header must supply all four cellular parameters."
@@ -48,15 +48,27 @@ static BaseType_t prvWriteNetworkValue( char * key, const char * value )
 BaseType_t xProvisionIdtNetworkCredentials( void )
 {
 #if ( IDT_TARGET_RX65N_BG96 == 1 )
-    if( ( strlen( IDT_CELLULAR_APN ) == 0U ) ||
-        ( strlen( IDT_CELLULAR_APN ) > CELLULAR_MAX_AP_NAME_LENGTH ) ||
-        ( strlen( IDT_CELLULAR_APN_USER ) > CELLULAR_MAX_AP_ID_LENGTH ) ||
-        ( strlen( IDT_CELLULAR_APN_PASSWORD ) > CELLULAR_MAX_AP_PASS_LENGTH ) ||
+    st_cellular_ap_cfg_t ap = { 0 };
+
+    if( RCellular_IsOpen() ||
+        ( strlen( IDT_CELLULAR_APN ) == 0U ) ||
+        ( strlen( IDT_CELLULAR_APN ) >= sizeof( ap.ap_name ) ) ||
+        ( strlen( IDT_CELLULAR_APN_USER ) >= sizeof( ap.ap_user_name ) ) ||
+        ( strlen( IDT_CELLULAR_APN_PASSWORD ) >= sizeof( ap.ap_pass ) ) ||
         ( strlen( IDT_CELLULAR_APN_AUTH ) != 1U ) ||
         ( IDT_CELLULAR_APN_AUTH[ 0 ] < '0' ) || ( IDT_CELLULAR_APN_AUTH[ 0 ] > '2' ) )
     {
         return pdFALSE;
     }
+    switch( IDT_CELLULAR_APN_AUTH[ 0 ] )
+    {
+        case '0': ap.auth_type = CELLULAR_AUTH_TYPE_NONE; break;
+        case '1': ap.auth_type = CELLULAR_AUTH_TYPE_PAP; break;
+        default: ap.auth_type = CELLULAR_AUTH_TYPE_CHAP; break;
+    }
+    strcpy( ( char * ) ap.ap_name, IDT_CELLULAR_APN );
+    strcpy( ( char * ) ap.ap_user_name, IDT_CELLULAR_APN_USER );
+    strcpy( ( char * ) ap.ap_pass, IDT_CELLULAR_APN_PASSWORD );
     if( ( prvWriteNetworkValue( "apn", IDT_CELLULAR_APN ) != pdTRUE ) ||
         ( prvWriteNetworkValue( "apnuser", IDT_CELLULAR_APN_USER ) != pdTRUE ) ||
         ( prvWriteNetworkValue( "apnpass", IDT_CELLULAR_APN_PASSWORD ) != pdTRUE ) ||
@@ -74,5 +86,15 @@ BaseType_t xProvisionIdtNetworkCredentials( void )
     {
         return pdFALSE;
     }
-    return KVStore_xCommitChanges();
+    if( KVStore_xCommitChanges() != pdTRUE )
+    {
+        return pdFALSE;
+    }
+#if ( IDT_TARGET_RX65N_BG96 == 1 )
+    /* Install only a successfully committed profile. Connect2AP() uses this
+     * copied public r_cellular AP config instead of ignoring native inputs. */
+    return RCellular_SetRuntimeApConfig( &ap ) ? pdTRUE : pdFALSE;
+#else
+    return pdTRUE;
+#endif
 }

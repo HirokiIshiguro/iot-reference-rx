@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import unittest
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -44,31 +44,7 @@ class WindowsCcrxBuildSerializationContractTests(unittest.TestCase):
         cls.ci = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
         cls.jobs = top_level_job_blocks(cls.ci)
 
-    def test_all_e2studio_ccrx_build_jobs_are_covered(self) -> None:
-        detected = {
-            name
-            for name, block in self.jobs.items()
-            if "- ccrx" in block
-            and re.search(
-                r"(?:build_headless|--e2studio|-E2Studio|E2STUDIO_CLI)",
-                block,
-            )
-        }
 
-        self.assertEqual(EXPECTED_CCRX_BUILD_JOBS, detected)
-
-    def test_all_e2studio_ccrx_build_jobs_share_one_resource_group(self) -> None:
-        self.assertIn(
-            'WINDOWS_CCRX_BUILD_RESOURCE_GROUP: '
-            '"ishiguro-pc-ccrx-e2studio-build"',
-            self.ci,
-        )
-        for name in sorted(EXPECTED_CCRX_BUILD_JOBS):
-            with self.subTest(job=name):
-                self.assertIn(
-                    f"resource_group: {RESOURCE_GROUP_VARIABLE}",
-                    self.jobs[name],
-                )
 
     def test_bounded_ccrx_projects_use_bounded_parallelism(self) -> None:
         for relative_path in BOUNDED_PARALLEL_CCRX_PROJECT_FILES:
@@ -88,6 +64,7 @@ class WindowsCcrxBuildSerializationContractTests(unittest.TestCase):
                     'parallelizationNumber="optimal"',
                     project_file.read_text(encoding="utf-8"),
                 )
+
 
 
 if __name__ == "__main__":

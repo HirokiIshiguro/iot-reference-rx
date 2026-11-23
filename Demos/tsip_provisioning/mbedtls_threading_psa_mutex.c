@@ -112,7 +112,7 @@ void user_unlock_function( void )
     if( taskSCHEDULER_NOT_STARTED != xTaskGetSchedulerState() )
     {
         TaskHandle_t xCurrentTask = xTaskGetCurrentTaskHandle();
-        TaskHandle_t xHolder = xSemaphoreGetMutexHolder( mutexUseTsip.mutexHandle );
+        TaskHandle_t xHolder = xSemaphoreGetMutexHolder( mutexUseTsip.mutex );
 
         if( xHolder != xCurrentTask )
         {
