@@ -336,7 +336,8 @@ TLS の実装（software・TSIP）は軸に入れず、列で分けます。TCP 
 
 | 状態 | 意味 |
 |---|---|
-| 計測あり | その project の CI が、速度の値を出して記録する |
+| 計測あり | その project の CI が、今も速度の値を出して記録する |
+| 過去に計測 | その project で以前に測った記録が文書にあるが、今の CI は測らない |
 | 無し | 測る project も試験も無い（穴） |
 
 ### 条件の一覧
@@ -351,9 +352,9 @@ TLS の実装（software・TSIP）は軸に入れず、列で分けます。TCP 
 | `BENCH-06` | RX72N（Ethernet） | TLS 1.2 | SINK | 2 本 | 無し | 計測あり（`rx72n:tsip:speed`） |
 | `BENCH-07` | RX72N（Ethernet） | TLS 1.2 | SOURCE | 1 本 | 計測あり（`rx72n:sw:speed`） | 計測あり（`rx72n:tsip:speed`） |
 | `BENCH-08` | RX72N（Ethernet） | TLS 1.2 | SOURCE | 2 本 | 無し | 計測あり（`rx72n:tsip:speed`） |
-| `BENCH-09` | RX72N（Ethernet） | TLS 1.3 | SINK | 1 本 | 無し | 無し |
+| `BENCH-09` | RX72N（Ethernet） | TLS 1.3 | SINK | 1 本 | 過去に計測（rx72n_envision_kit/benchmark/tsip_mbedtls13） | 過去に計測（rx72n_envision_kit/benchmark/tsip_mbedtls13） |
 | `BENCH-10` | RX72N（Ethernet） | TLS 1.3 | SINK | 2 本 | 無し | 無し |
-| `BENCH-11` | RX72N（Ethernet） | TLS 1.3 | SOURCE | 1 本 | 無し | 無し |
+| `BENCH-11` | RX72N（Ethernet） | TLS 1.3 | SOURCE | 1 本 | 過去に計測（rx72n_envision_kit/benchmark/tsip_mbedtls13） | 過去に計測（rx72n_envision_kit/benchmark/tsip_mbedtls13） |
 | `BENCH-12` | RX72N（Ethernet） | TLS 1.3 | SOURCE | 2 本 | 無し | 無し |
 | `BENCH-13` | RX65N（Cellular） | TCP | SINK | 1 本 | 計測あり（`rx65n:bg96-speed`） | 無し |
 | `BENCH-14` | RX65N（Cellular） | TCP | SINK | 2 本 | 無し | 無し |
@@ -384,18 +385,19 @@ TLS の実装（software・TSIP）は軸に入れず、列で分けます。TCP 
 
 ### 条件の数
 
-| 回線（基板） | 条件 | software の版で計測あり | TSIP の版で計測あり |
-|---|---:|---:|---:|
-| RX72N（Ethernet） | 12 | 4 | 6 |
-| RX65N（Cellular） | 12 | 2 | 0 |
-| RX671（Wi-Fi） | 12 | 4 | 6 |
-| 合計 | 36 | 10 | 12 |
+| 回線（基板） | 条件 | software の版で計測あり | software の版で過去に計測 | TSIP の版で計測あり | TSIP の版で過去に計測 |
+|---|---:|---:|---:|---:|---:|
+| RX72N（Ethernet） | 12 | 4 | 2 | 6 | 2 |
+| RX65N（Cellular） | 12 | 2 | 0 | 0 | 0 |
+| RX671（Wi-Fi） | 12 | 4 | 0 | 6 | 0 |
+| 合計 | 36 | 10 | 2 | 12 | 2 |
 
 ### 表の補足
 
 - RX72N の TSIP の 2 本（`BENCH-06`・`BENCH-08`）は、TLS の 2 session の同時の試験です。TCP の 2 本は、その試験が意図して省いています。
 - RX671 の TSIP の 2 本（`BENCH-30`・`BENCH-32`）は、TLS の 2 session の同時の試験（`dual-sink-sink`・`dual-source-source`）です。この project には、向きの違う 2 本を同時に流す試験（`dual-sink-source`）もあります。この条件は、4 つの軸の組み合わせに入らないので、表に載せていません。
-- TLS 1.3 の 12 条件は、どれも無しです。RX72N の `rx72n:sw:tls13-0rtt`・`rx72n:tsip:tls13-0rtt` と、RX671 の software の版の TLS 1.3 の試験は、session の再開と 0-RTT の early data の合否を見る試験で、速度の値を出しません。
+- TLS 1.3 の速度を今の CI で測っている条件はありません。RX72N の `rx72n:sw:tls13-0rtt`・`rx72n:tsip:tls13-0rtt` と、RX671 の software の版の TLS 1.3 の試験は、session の再開と 0-RTT の early data の合否を見る試験で、速度の値を出しません。
+- RX72N の TLS 1.3 の 1 本（`BENCH-09`・`BENCH-11`）は、2026-07 に rx72n_envision_kit/benchmark/tsip_mbedtls13 で測った記録が、その project の README にあります（software は pipeline 7966、TSIP は pipeline 8030）。今の CI の変種（`software-0rtt`・`tsip-0rtt`）は速度を出さないので、「過去に計測」としています。
 - RX65N の `rx65n:bg96-speed` は、TCP だけを測ります。SOURCE は、基板の側で受けた payload の速度を記録し、相手の側の速度は記録していません。TSIP の版のベンチマークの project は有りません。
 
 ## 試験結果の置き場
