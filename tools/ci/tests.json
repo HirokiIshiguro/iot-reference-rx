@@ -200,14 +200,46 @@
       "variables": {}
     },
     {
+      "name": "rx671:tsip:tcp",
+      "board": "rx671",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
+      "ref": "align-iotref-main",
+      "measures": "TCP throughput, TSIP build (MR 59 on iot-reference-rx eb2b826e)",
+      "variables": {
+        "RX671_BENCHMARK_RUN_HARDWARE": "true",
+        "RX671_BENCHMARK_PROFILE": "tcp"
+      },
+      "parent_variables": {
+        "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
+        "RX671_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
+      }
+    },
+    {
       "name": "rx671:tsip:tls-sink",
       "board": "rx671",
       "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
-      "ref": "iotref-54-exp-final-aesrom",
-      "measures": "TLS 1.2 sink throughput, TSIP (C heap 16 KiB, WHD MR 4, AES ROM tables, no MFL request, Issue 54)",
+      "ref": "align-iotref-main",
+      "measures": "TLS 1.2 sink throughput, TSIP (MR 59 on iot-reference-rx eb2b826e)",
       "variables": {
         "RX671_BENCHMARK_RUN_HARDWARE": "true",
         "RX671_BENCHMARK_PROFILE": "tls-sink"
+      },
+      "parent_variables": {
+        "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
+        "RX671_BENCHMARK_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "RX671_BENCHMARK_WIFI_PASSWORD": "RX671_EK_WIFI_PASSWORD"
+      }
+    },
+    {
+      "name": "rx671:tsip:tls-source",
+      "board": "rx671",
+      "project": "oss/experiment/embedded/mcu/renesas/rx/example/ek-rx671/benchmark/tsip_mbedtls",
+      "ref": "align-iotref-main",
+      "measures": "TLS 1.2 source throughput, TSIP (MR 59 on iot-reference-rx eb2b826e)",
+      "variables": {
+        "RX671_BENCHMARK_RUN_HARDWARE": "true",
+        "RX671_BENCHMARK_PROFILE": "tls-source"
       },
       "parent_variables": {
         "RX671_BENCHMARK_WIFI_SSID": "RX671_EK_WIFI_SSID",
