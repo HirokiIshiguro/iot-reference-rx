@@ -1,10 +1,37 @@
 # RX72N・RX65N・RX671のIDT検証
 
-3環境の実行入口と、対象SHAごとの検証結果を記録します。RPi #4とWindowsの分担構成ではRX72N EthernetのTransportを実機で確認しました。RX65NとRX671は新基盤での実機IDTが未確認です。他のターゲットやscopeへ結果を流用しません。
+IDT の実機結果を試験時の構成とソースのコミットに対応付けて記録します。RX65N・RX671 は旧構成で一部を実施し、現行基盤での実機 IDT は未確認です。RPi #4 と Windows の分担構成で確認したのは RX72N Ethernet の Transport です。
 
-## 3ターゲットのCI入口
+[現行 CI の運用](../ci-pipeline.md)は IDT を実行しません。旧 CI の IDT 入力とジョブ名は過去の証跡を読むための情報です。
 
-GitLabのRun pipeline / Pipelines APIで、次の3入力を指定します。
+## RX65N・RX671 の過去の実機結果
+
+2026 年 10 月の旧構成（IDT 4.9.0 / FRQ_2.5.0、ソフトウェア TLS）の記録です。両機種とも全 IDT は未合格です。
+
+| 対象・試験範囲 | 結果 | ソースのコミット・ジョブ |
+|---|---|---|
+| RX65N / BG96 Transport | 必須 14 件完走。13 PASS、1 FAIL（`TransportSend_RemoteDisconnect`） | `7536258a`、[ジョブ #70856](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70856) |
+| RX65N / BG96 MQTT | 10 件完走。4 PASS、1 PASS_WITH_WARNINGS（TLS 暗号スイート）、5 FAIL | `7536258a`、[ジョブ #70858](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70858) |
+| RX65N / BG96 OTA PAL | 15 件完走。14 PASS、1 FAIL（`otaPal_CloseFile_NonexistingCodeSignerCertificate`） | `44232ef6`、[ジョブ #70884](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70884) |
+| RX65N / BG96 PKCS #11 Core | 再試験で 10 PASS、FAIL・ERROR・SKIP は各 0。ECC オブジェクトと署名の別グループは範囲外 | `0b5ac82f`、[ジョブ #71028](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71028) |
+| RX671 / Type 1YN Wi-Fi Transport | 9 PASS。必須 14 件のうち 5 件が未報告で未完走。旧チェッカーではジョブ成功 | `44232ef6`、[ジョブ #70882](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70882) |
+| RX671 / Type 1YN Wi-Fi Transport 再試験 | 9 PASS、必須 5 件が未報告。完走を検査するチェッカーでジョブ失敗 | `0b5ac82f`、[ジョブ #71029](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/71029) |
+
+RX671 の MQTT・PKCS #11・OTA PAL と、両機種の OTA MQTT の選択 3 ケース（新版更新・同版・信頼されない証明書）は、実機で成立・完了した結果が未確認です。現行基盤では両機種とも、表にある範囲を含め実機 IDT の結果が未確認です。
+
+<details>
+<summary>ソースのコミットと終了状態</summary>
+
+- RX65N Transport・MQTT は `7536258a58caec99d6aae004f4f720edd4e83782`、RX65N OTA PAL と RX671 Transport の初回は `44232ef62ea5be65161b95ae9741c6da555c7f3b`。この 2 コミットの Git ツリーは同一。RX65N PKCS #11 Core と RX671 Transport の再試験は `0b5ac82fe18f28a20bf815d8950e064f15ec0a35`。RX671 Transport の再試験を除く表の 5 実行について、パイプラインと試験・ビルドのソースのコミットが一致し、未コミット差分はなかったことが !222 の旧版レビューに記録されている。
+- RX65N の旧 MQTT 実装は MQTT 3.1.1。5 件の FAIL の原因はこの表では特定していない。RX671 Transport の初回は当時の報告どおり 9 PASS と記録し、必須 14 件の完走判定では不合格となる。
+- RX65N Transport・MQTT・OTA PAL と RX671 Transport の初回は、リセットコマンド成功、直後の観測 1 秒間で UART 受信 0 バイト、`cleanupError=null`。Transport で実行が所有した EC2 インスタンスは終了を確認した。
+- RX65N PKCS #11 Core の再試験は、リセットコマンド成功、直後の観測 1 秒間で UART 受信 0 バイト、IDT の後処理完了を確認した。先行試験は 5 PASS、1 ERROR で後続グループの書き込み中に停止し、終了処理も ERROR、`end_state` は空だった。表の成功回を含め、物理 RESET 端子の電圧と AWS 全体の残存資源は未確認。[先行ジョブ #70910](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/jobs/70910)
+
+</details>
+
+## 旧 CI の 3 ターゲットの実行入口
+
+旧 CI では GitLab の Run pipeline / Pipelines API で、次の 3 入力を指定していました。
 
 | 入力 | 値 |
 |---|---|
@@ -31,7 +58,7 @@ Wi-Fi / APNは既存のターゲット専用CI変数からprivate runtimeへ渡�
 共通基盤のcoreMQTTは3ターゲットとも5.0.2（MQTT 5）へ統一しています。suiteのMQTT 3.1.1期待値との不一致はNGとして保持します。以前のRX65N/BG96の2.3.1による結果を新基盤のnative合格へ流用しません。
 失敗・ERROR・SKIPをPASSへ書き換えず、LTS / manifest / vendor suiteを変更しません。
 
-### nightlyのTLS transport
+### 旧 CI の nightly における TLS Transport
 
 `PIPELINE_PROFILE=nightly_matrix`では、既存50回帰rowの完了後に`matrix_rx_idt_transport`が上記3ターゲットの`transport`を実行します。job内の選択値だけを設定し、専用IDT workflowや他scopeは有効にしません。Windowsのcanonical checkout・CC-RX resource group・既存実機lockと終了処理を共有します。通常push / MR / focusedではこのmatrixを生成しません。
 
@@ -43,7 +70,7 @@ MRの`idt_ci_contract`は共有host・target・終了処理・報告の単体検
 `idt_source_matrix`はWindows runnerで、Transport、DeviceAdvisor、OTAE2E、PKCS11 StartFinish、PKCS11 NoObject、OTAPALの6構成×3ターゲット＝18構成について、実project/source URI・依存pin・metadata復元を確認します。続いて3ターゲットのTransportをplaceholderのみでcompile/linkします。実機・native試験は実行せず、生成imageは書き込めません。
 過去のローカル15構成compile成功は保存されたsourceに対する結果として保持し、このMRのclean SHA・runner・実機の合格へ流用しません。
 
-### 実機scopeの準備条件
+### 旧構成での実機試験の準備条件
 
 固定target identityがapplication、bootloader、packager、UART、debugger、bench lockを選びます。
 共有CC-RX resource groupに加え、実機の既存lockと通常CIとの排他を確認します。
@@ -77,7 +104,7 @@ OTA E2Eの**新しいバージョンへの更新と、1.9.1 → 1.9.2の起動�
 同版・非信頼証明書の試験もclean SHA `2e0c7a5b`でPASSしましたが、全13ケースは未完了です。
 MQTTのnative IDT試験は完走しましたが、IDT側のMQTT 3.1.1期待値と本実装のMQTT 5が一致せず、6件がFAILです。
 FreeRTOS `202604.00-LTS`の版照合も不合格で、**全IDT合格・リリース要件充足には達していません**。
-新規リリースタグの保留方針を維持し、IDTは明示したパイプラインだけで実行します。
+新規リリースタグの保留方針を維持します。
 
 ## 試験範囲と現在の結果
 
@@ -149,9 +176,9 @@ OTA setupでは`KeyProvisioning=Import`、ECC公開鍵を設定しても、対�
 
 </details>
 
-## 明示実行
+## 旧 CI の明示実行
 
-GitLabのRun pipelineまたはPipelines APIで、`RUN_RX72N_IDT=true`と上表の`RX72N_IDT_SCOPE`を指定します。
+旧 CI では GitLab の Run pipeline または Pipelines API で、`RUN_RX72N_IDT=true` と上表の `RX72N_IDT_SCOPE` を指定していました。
 `RUN_RX72N_IDT`の既定は`false`です。
 IDT用引数と既存のboard build / hardware / OTA / nightly引数は同時指定しません。
 通常のpush、MR、main更新、tag作成ではnative IDT jobを生成しません。nightlyは上記の3ターゲットTLS transportだけを追加します。
@@ -173,7 +200,7 @@ GreaterVersion単独実行では、native JUnitの合格に加え、初期image�
 
 ## 運用・リリース要件
 
-IDTは専用のパイプライン引数を明示した場合だけ実行します。
+専用のパイプライン引数は旧 CI の実行方法です。現行 CI の対象は[CI/CD 運用](../ci-pipeline.md)を参照してください。
 新規リリースタグの作成前に、タグ対象commit SHAの対象構成で必須試験がすべてPASSしていることを確認します。
 未実行・失敗・必須試験のskip・一部試験のみの成功はOKとして扱いません。通常のMQTT / OTA CI成功もIDT合格の代用にはなりません。
 自動gate整備まではOwner / Maintainerが証跡を確認し、要件を満たせない間は新規リリースタグを保留します。
