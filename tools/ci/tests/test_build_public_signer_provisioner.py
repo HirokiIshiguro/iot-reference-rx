@@ -96,6 +96,7 @@ class PublicSignerProfileTests(unittest.TestCase):
         original={'PATH':'TOOLS','BIN_RX':'COMPILER','SSL_CERT_FILE':'CA',
                   'GITLAB_API_TOKEN_FOR_CODEX':'dummy-tool-auth','AWS_IOT_PRIVATE_KEY_FILE':'dummy-key',
                   'RX671_EK_WIFI_SSID':'dummy-wifi','IDT_PRIVATE_KEY':'dummy-key','CPATH':'overlay',
+                  'SAFFTI_001_WIFI_SSID':'sample-ssid','SAFFTI_001_WIFI_PASSPHRASE':'sample-passphrase',
                   'RX65N_BG96_TLS_BACKEND':'tsip','AWS_SECRET_ACCESS_KEY':'dummy-cloud'}
         isolated=builder.isolated_environment(original)
         self.assertEqual(set(isolated), {'PATH','BIN_RX','SSL_CERT_FILE','GITLAB_API_TOKEN_FOR_CODEX'})

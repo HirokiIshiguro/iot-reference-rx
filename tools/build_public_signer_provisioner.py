@@ -65,7 +65,7 @@ FORBIDDEN_DEFINES = ("WHD_JOIN_CONFIG_USE_LOCAL", "WHD_JOIN_USE_LOCAL_CONFIG", "
 def isolated_environment(source: Mapping[str, str]) -> dict[str, str]:
     """Exclude injection/overrides, retaining legitimate compiler/license paths."""
     return {key: value for key, value in source.items() if not (
-        key.upper().startswith(("AWS_IOT_", "RX671_EK_WIFI_", "RX671_EK_AWS_", "IDT_", "LANBENCH_")) or
+        key.upper().startswith(("AWS_IOT_", "RX671_EK_WIFI_", "RX671_EK_AWS_", "IDT_", "LANBENCH_", "SAFFTI_001_WIFI_")) or
         re.search(r"(?:CLIENT_CERT|PRIVATE_KEY|PRIVKEY|CLAIM|PASSPHRASE|WIFI_PASSWORD|SIGNING_KEY)", key.upper()) or
         key.upper() in {"RX72N_TLS_BACKEND", "RX72N_REQUIRE_TLS_VERSION", "RX65N_BG96_TLS_BACKEND",
                         "RX65N_BG96_REQUIRE_TLS_VERSION", "CPATH", "C_INCLUDE_PATH", "CFLAGS", "CPPFLAGS",

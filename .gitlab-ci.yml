@@ -122,6 +122,7 @@ plan:
 
 # The child pipeline is complete by itself. Variables of this file must not reach it:
 # forwarded variables would override the settings of its jobs (for example the checkout).
+# Child jobs receive the /oss Wi-Fi variables directly from the group.
 run:
   stage: run
   needs:

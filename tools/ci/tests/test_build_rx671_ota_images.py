@@ -396,6 +396,8 @@ class WifiCredentialIsolationTests(unittest.TestCase):
             "RX671_EK_WIFI_SSID": "secret-ssid",
             "RX671_EK_WIFI_PASSPHRASE": "secret-passphrase",
             "RX671_EK_WIFI_PASSWORD": "legacy-secret",
+            "SAFFTI_001_WIFI_SSID": "sample-ssid",
+            "SAFFTI_001_WIFI_PASSPHRASE": "sample-passphrase",
             "RX671_EK_SDIO_RUN_CLOCK_DIV": "SDHI_DIV_2",
             "RX671_EK_SDIO_USE_HIGH_SPEED_CLOCK": "1",
         }
@@ -404,6 +406,8 @@ class WifiCredentialIsolationTests(unittest.TestCase):
         self.assertEqual("true", result["CI"])
         for variable in (
             *builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES,
+            "SAFFTI_001_WIFI_SSID",
+            "SAFFTI_001_WIFI_PASSPHRASE",
             *builder.OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES,
         ):
             self.assertNotIn(variable, result)
