@@ -10,10 +10,10 @@ dependencies:
       url: "https://github.com/FreeRTOS/FreeRTOS-Kernel.git"
       path: "/Middleware/FreeRTOS/FreeRTOS-Kernel"
   - name: "FreeRTOS-Plus-TCP"
-    version: "V4.4.1"
+    version: "release-v4.4.1.saffti-custom.1"
     repository:
       type: "git"
-      url: "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git"
+      url: "https://gitlab.saffti.jp/oss/import/github/freertos/FreeRTOS-Plus-TCP.git"
       path: "/Middleware/FreeRTOS/FreeRTOS-Plus-TCP"
   - name: "coreJSON"
     version: "v3.3.1"

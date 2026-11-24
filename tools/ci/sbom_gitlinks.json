@@ -1,5 +1,5 @@
 {
-  "created": "2026-11-23T11:04:41Z",
+  "created": "2026-11-24T09:22:57Z",
   "repositories": {
     "github.com/amazon-freertos/pkcs11@9304ef6842d08d881ccd1daa8d3a428f3a9671ee": {
       "children": {},
@@ -1118,22 +1118,6 @@
         "V4.2.2"
       ]
     },
-    "github.com/freertos/freertos-plus-tcp@c12361095aca68aeed858f45d14395fbffa92c0d": {
-      "children": {
-        "test/FreeRTOS-Kernel": [
-          "https://github.com/FreeRTOS/FreeRTOS-Kernel",
-          "dbf70559b27d39c1fdb68dfb9a32140b6a6777a0"
-        ],
-        "tools/CMock": [
-          "https://github.com/ThrowTheSwitch/CMock",
-          "afa294982e8a28bc06f341cc77fd4276641b42bd"
-        ]
-      },
-      "license": "MIT",
-      "tags": [
-        "V4.4.1"
-      ]
-    },
     "github.com/freertos/freertos@152cf36d6775bce6026a791845af12201aae703d": {
       "children": {
         "FreeRTOS-Plus/Source/AWS/device-defender": [
@@ -1645,6 +1629,22 @@
     "gitlab.saffti.jp/oss/experiment/generic/scripts/python/provisioning@1fadbdf0a6da41166a844e64b925dcaa56fe7593": {
       "children": {},
       "tags": []
+    },
+    "gitlab.saffti.jp/oss/import/github/freertos/freertos-plus-tcp@2fe4ab4add4ad39c16575716feb011400f54b044": {
+      "children": {
+        "test/FreeRTOS-Kernel": [
+          "https://github.com/FreeRTOS/FreeRTOS-Kernel",
+          "dbf70559b27d39c1fdb68dfb9a32140b6a6777a0"
+        ],
+        "tools/CMock": [
+          "https://github.com/ThrowTheSwitch/CMock",
+          "afa294982e8a28bc06f341cc77fd4276641b42bd"
+        ]
+      },
+      "license": "MIT",
+      "tags": [
+        "release-v4.4.1.saffti-custom.1"
+      ]
     },
     "gitlab.saffti.jp/oss/import/github/infineon/wifi-host-driver@13119afc1570ee2d97fae3d782db02db356f12a6": {
       "children": {},
