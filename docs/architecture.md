@@ -404,7 +404,7 @@ OTA で面を切り替えたあとは、手順 1 から同じ流れで、新し�
 | boot loader が公開鍵を読む領域 | 128 B × 128（先頭から） | 128 B × 128 | 128 B × 64 |
 | 持ち主 | LittleFS（鍵・証明書・KVS の設定・公開鍵） | 同左 | LittleFS だけ（`ota-layout-contract.json` の `owner`） |
 
-RX72N と RX65N の linker 設定には、`C_LITTLEFS_MANAGEMENT_AREA` を `0x00100000`、`C_FIRMWARE_UPDATE_CONTROL_BLOCK` と mirror を `0x00102000`、`C_USER_APPLICATION_AREA` を `0x00102300` に置く指定があります。この 3 つの section を、アプリが何に使うかは未記載です。
+RX72N と RX65N の software・TSIP 両構成では、linker の配置指定で `C_LITTLEFS_MANAGEMENT_AREA` を `0x00100000` に指定しています。RX72N には、`C_FIRMWARE_UPDATE_CONTROL_BLOCK` と `C_FIRMWARE_UPDATE_CONTROL_BLOCK_MIRROR` を `0x00102000`、`C_USER_APPLICATION_AREA` を `0x00102300` に置く指定も残っています。RX65N では、LittleFS の領域内にあったこれら 3 セクションの未使用の配置指定を [#189](https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/-/issues/189) で削除しました。
 
 ### 7.4 RAM と heap
 
