@@ -164,8 +164,8 @@ $useAwsIotLocalConfigForBuild = (-not $useFleetConfigForBuild) -and
     (Test-Path -LiteralPath $defaultAwsIotConfigDir) -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotEndpoint)) -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotThingName)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_ENDPOINT)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_ENDPOINT)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX671_EK1)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX72N_EK2)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM)) -or
     (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_AWS_IOT_CERT_PEM_FILE)) -or
     (-not [string]::IsNullOrWhiteSpace($env:AWS_IOT_CERT_PEM)) -or
@@ -591,7 +591,7 @@ function Read-AwsIotConfig {
     }
 
     Write-Host "AWS IoT config source: environment"
-    $endpoint = Get-FirstNonEmpty @($EndpointOverride, $env:RX671_EK_AWS_IOT_ENDPOINT, $env:AWS_IOT_ENDPOINT)
+    $endpoint = Get-FirstNonEmpty @($EndpointOverride, $env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX671_EK1, $env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX72N_EK2)
     $thingName = Get-FirstNonEmpty @($ThingNameOverride, $env:RX671_EK_AWS_IOT_THING_NAME, $env:AWS_IOT_THING_NAME)
     $certValue = Get-FirstNonEmpty @(
         $env:RX671_EK_AWS_IOT_CERT_PEM,
@@ -657,8 +657,8 @@ function Read-FleetConfig {
         $FleetEndpoint,
         $env:RX671_EK_FLEET_ENDPOINT,
         $AwsIotEndpoint,
-        $env:RX671_EK_AWS_IOT_ENDPOINT,
-        $env:AWS_IOT_ENDPOINT
+        $env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX671_EK1,
+        $env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX72N_EK2
     )
     $templateName = Get-FirstNonEmpty @(
         $FleetTemplateName,
