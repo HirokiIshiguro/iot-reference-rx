@@ -330,6 +330,7 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             jobs[f"build {variant}"]["before_script"] = [
                 "$env:RX671_EK_WIFI_SSID = $env:SAFFTI_001_WIFI_SSID",
                 "$env:RX671_EK_WIFI_PASSPHRASE = $env:SAFFTI_001_WIFI_PASSPHRASE",
+                "$env:RX671_EK_WIFI_PASSWORD = $null",
             ]
     for test in run:
         board = registry["boards"][test["board"]]
