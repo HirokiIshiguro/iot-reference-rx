@@ -21,7 +21,7 @@
 	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
 [submodule "Middleware/FreeRTOS/FreeRTOS-Plus-TCP"]
 	path = Middleware/FreeRTOS/FreeRTOS-Plus-TCP
-	url = https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git
+	url = https://gitlab.saffti.jp/oss/import/github/freertos/FreeRTOS-Plus-TCP.git
 [submodule "Middleware/FreeRTOS/backoffAlgorithm"]
 	path = Middleware/FreeRTOS/backoffAlgorithm
 	url = https://github.com/FreeRTOS/backoffAlgorithm.git
