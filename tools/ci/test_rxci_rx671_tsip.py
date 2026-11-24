@@ -17,16 +17,11 @@ class Rx671GroupWifiTests(unittest.TestCase):
         registry = rxci.load_registry()
         jobs, _ = rxci.child_pipeline(registry, "full", r"^(rx671|rx72n):tsip:tls12:(fleet|ota)$", 1,
                                       benchmarks=["rx72n"])
-        powershell = [
-            "$env:RX671_EK_WIFI_SSID = $env:SAFFTI_001_WIFI_SSID",
-            "$env:RX671_EK_WIFI_PASSPHRASE = $env:SAFFTI_001_WIFI_PASSPHRASE",
-            "$env:RX671_EK_WIFI_PASSWORD = $null",
-        ]
         bash = [
-            'export RX671_EK_WIFI_SSID="${SAFFTI_001_WIFI_SSID:?SAFFTI_001_WIFI_SSID is required}"',
-            'export RX671_EK_WIFI_PASSPHRASE="${SAFFTI_001_WIFI_PASSPHRASE:?SAFFTI_001_WIFI_PASSPHRASE is required}"',
+            ': "${SAFFTI_001_WIFI_SSID:?SAFFTI_001_WIFI_SSID is required}"',
+            ': "${SAFFTI_001_WIFI_PASSPHRASE:?SAFFTI_001_WIFI_PASSPHRASE is required}"',
         ]
-        self.assertEqual(powershell, jobs["build rx671/tsip-tls12/fleet"].get("before_script"))
+        self.assertNotIn("before_script", jobs["build rx671/tsip-tls12/fleet"])
         self.assertNotIn("before_script", jobs["build rx671/tsip-tls12/ota"])
         for feature in ("fleet", "ota"):
             self.assertEqual(bash, jobs[f"rx671:tsip:tls12:{feature}"].get("before_script"))
@@ -124,7 +119,7 @@ class Rx671TsipFleetTests(unittest.TestCase):
                          "claim_private_key_variable": "UNIT_KEY"}
                 data = {"boards": {"rx671": board}, "endpoints": {"tls13": {"value": "test.invalid"}},
                         "e2studio_cli": "e2studio-cli"}
-                env = {"RX671_EK_WIFI_SSID": "test", "RX671_EK_WIFI_PASSPHRASE": "test",
+                env = {"SAFFTI_001_WIFI_SSID": "test", "SAFFTI_001_WIFI_PASSPHRASE": "test",
                        "UNIT_TEMPLATE": "test-template", "UNIT_CERT": "test-certificate", "UNIT_KEY": "test-key"}
                 commands = []
                 def run(command, *, timeout, env=None):

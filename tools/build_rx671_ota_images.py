@@ -63,9 +63,6 @@ WHD_SUBMODULE_RELATIVE = Path(
     "Projects/aws_wifi_rx671_ek/external/wifi-host-driver"
 )
 WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES = (
-    "RX671_EK_WIFI_SSID",
-    "RX671_EK_WIFI_PASSPHRASE",
-    "RX671_EK_WIFI_PASSWORD",
     "SAFFTI_001_WIFI_SSID",
     "SAFFTI_001_WIFI_PASSPHRASE",
 )
@@ -634,7 +631,9 @@ def _run(
 def ota_build_environment(
     source: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    environment = dict(os.environ if source is None else source)
+    inputs = os.environ if source is None else source
+    # Drop legacy inputs by name while projects remove their old variables.
+    environment = {name: inputs[name] for name in inputs if not name.upper().startswith("RX671_EK_WIFI_")}
     for variable in (
         *WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES,
         *OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES,

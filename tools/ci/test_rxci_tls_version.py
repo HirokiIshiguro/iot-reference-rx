@@ -110,7 +110,7 @@ class EndpointTests(unittest.TestCase):
                              "claim_private_key_variable": "UNIT_KEY"}
                     data = {"boards": {"rx671": board}, "endpoints": self.REGISTRY["endpoints"],
                             "e2studio_cli": "e2studio-cli"}
-                    env = {"RX671_EK_WIFI_SSID": "test", "RX671_EK_WIFI_PASSPHRASE": "test",
+                    env = {"SAFFTI_001_WIFI_SSID": "test", "SAFFTI_001_WIFI_PASSPHRASE": "test",
                            "RX671_EK_AWS_IOT_THING_NAME": "test", "RX671_EK_AWS_IOT_CERT_PEM": "test",
                            "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM": "test", "UNIT_TEMPLATE": "test",
                            "UNIT_CERT": "test", "UNIT_KEY": "test", GROUP_TLS12_ENDPOINT: "tls12.example.test",

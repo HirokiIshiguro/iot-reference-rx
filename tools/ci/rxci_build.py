@@ -277,7 +277,7 @@ def build_rx65n_ota(registry: dict, backend: str, tls: str, out: Path) -> None:
 def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path) -> None:
     """Application of EK-RX671. The Wi-Fi and AWS credentials are compiled in from CI variables."""
     board = registry["boards"]["rx671"]
-    required = ["RX671_EK_WIFI_SSID", "RX671_EK_WIFI_PASSPHRASE"]
+    required = ["SAFFTI_001_WIFI_SSID", "SAFFTI_001_WIFI_PASSPHRASE"]
     if kind == "app":
         required += ["RX671_EK_AWS_IOT_THING_NAME", "RX671_EK_AWS_IOT_CERT_PEM", "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM"]
     else:

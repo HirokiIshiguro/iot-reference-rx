@@ -155,9 +155,8 @@ if ($UseKvsJoinConfig.IsPresent -and $explicitWifiConfigRequested) {
 $useLocalJoinConfigForBuild = (-not $SkipWifiConfig.IsPresent) -and
     (-not $UseKvsJoinConfig.IsPresent) -and (
     $explicitWifiConfigRequested -or
-    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
-    (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD)))
+    (-not [string]::IsNullOrWhiteSpace($env:SAFFTI_001_WIFI_SSID)) -or
+    (-not [string]::IsNullOrWhiteSpace($env:SAFFTI_001_WIFI_PASSPHRASE)))
 $useAwsIotLocalConfigForBuild = (-not $useFleetConfigForBuild) -and
     (-not $SkipAwsIotConfig.IsPresent) -and ($UseAwsIotLocalConfig.IsPresent -or
     (-not [string]::IsNullOrWhiteSpace($AwsIotConfigDir)) -or
@@ -313,15 +312,11 @@ function Read-WifiConfig {
 }
 
 function Read-WifiConfigFromEnvironment {
-    $ssid = $env:RX671_EK_WIFI_SSID
-    $passphrase = $env:RX671_EK_WIFI_PASSPHRASE
-
-    if ([string]::IsNullOrWhiteSpace($passphrase)) {
-        $passphrase = $env:RX671_EK_WIFI_PASSWORD
-    }
+    $ssid = $env:SAFFTI_001_WIFI_SSID
+    $passphrase = $env:SAFFTI_001_WIFI_PASSPHRASE
 
     if ([string]::IsNullOrWhiteSpace($ssid) -or [string]::IsNullOrWhiteSpace($passphrase)) {
-        throw "Wi-Fi config environment must contain RX671_EK_WIFI_SSID and RX671_EK_WIFI_PASSPHRASE."
+        throw "Wi-Fi config environment must contain SAFFTI_001_WIFI_SSID and SAFFTI_001_WIFI_PASSPHRASE."
     }
 
     return @{
@@ -1268,9 +1263,8 @@ try {
             $generatedLocalJoinConfig = $true
             Write-LocalJoinConfig -Path $localJoinConfig -Ssid $wifi["Ssid"] -Passphrase $wifi["Passphrase"] -PollMs $SoftIrqPollMs
             Write-Host "Generated ignored local JOIN header: $localJoinConfig"
-        } elseif ((-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_SSID)) -or
-                  (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSPHRASE)) -or
-                  (-not [string]::IsNullOrWhiteSpace($env:RX671_EK_WIFI_PASSWORD))) {
+        } elseif ((-not [string]::IsNullOrWhiteSpace($env:SAFFTI_001_WIFI_SSID)) -or
+                  (-not [string]::IsNullOrWhiteSpace($env:SAFFTI_001_WIFI_PASSPHRASE))) {
             $wifi = Read-WifiConfigFromEnvironment
             $generatedLocalJoinConfig = $true
             Write-LocalJoinConfig -Path $localJoinConfig -Ssid $wifi["Ssid"] -Passphrase $wifi["Passphrase"] -PollMs $SoftIrqPollMs

@@ -325,13 +325,6 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             "artifacts": {"when": "always", "paths": [f"out/{variant}/"], "expire_in": "3 days"},
             "timeout": "50 minutes",
         }
-        if variant.startswith("rx671/") and variant.endswith(("/app", "/fleet")):
-            # Assign inside the job so the old project variables cannot take precedence.
-            jobs[f"build {variant}"]["before_script"] = [
-                "$env:RX671_EK_WIFI_SSID = $env:SAFFTI_001_WIFI_SSID",
-                "$env:RX671_EK_WIFI_PASSPHRASE = $env:SAFFTI_001_WIFI_PASSPHRASE",
-                "$env:RX671_EK_WIFI_PASSWORD = $null",
-            ]
     for test in run:
         board = registry["boards"][test["board"]]
         for index in range(1, repeat + 1):
@@ -353,8 +346,8 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             }
             if test["board"] == "rx671":
                 jobs[f"{test['name']}{suffix}"]["before_script"] = [
-                    'export RX671_EK_WIFI_SSID="${SAFFTI_001_WIFI_SSID:?SAFFTI_001_WIFI_SSID is required}"',
-                    'export RX671_EK_WIFI_PASSPHRASE="${SAFFTI_001_WIFI_PASSPHRASE:?SAFFTI_001_WIFI_PASSPHRASE is required}"',
+                    ': "${SAFFTI_001_WIFI_SSID:?SAFFTI_001_WIFI_SSID is required}"',
+                    ': "${SAFFTI_001_WIFI_PASSPHRASE:?SAFFTI_001_WIFI_PASSPHRASE is required}"',
                 ]
     if run:
         # Removes the AWS resources of this pipeline even when a test job was cancelled, and

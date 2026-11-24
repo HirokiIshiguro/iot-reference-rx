@@ -19,8 +19,8 @@ except ImportError:
 
 INPUTS = {
     "rx671-wifi": {
-        "IDT_WIFI_SSID": "RX671_EK_WIFI_SSID",
-        "IDT_WIFI_PASSPHRASE": "RX671_EK_WIFI_PASSPHRASE",
+        "IDT_WIFI_SSID": "SAFFTI_001_WIFI_SSID",
+        "IDT_WIFI_PASSPHRASE": "SAFFTI_001_WIFI_PASSPHRASE",
     },
     "rx65n-bg96": {
         "IDT_CELLULAR_APN": "AWS_IOT_CELLULAR_APN_CK_RX65N_01",
@@ -36,7 +36,7 @@ def network_values(target, environ=None):
     values = {macro: env.get(variable, "") for macro, variable in INPUTS.get(target["id"], {}).items()}
     if target["id"] == "rx671-wifi":
         if not values["IDT_WIFI_SSID"] or not values["IDT_WIFI_PASSPHRASE"]:
-            raise RuntimeError("RX671 IDT requires existing RX671_EK_WIFI_SSID and RX671_EK_WIFI_PASSPHRASE runner inputs")
+            raise RuntimeError("RX671 IDT requires existing SAFFTI_001_WIFI_SSID and SAFFTI_001_WIFI_PASSPHRASE runner inputs")
         if len(values["IDT_WIFI_SSID"].encode("utf-8")) > 32:
             raise ValueError("Wi-Fi SSID exceeds 32 bytes")
         phrase = values["IDT_WIFI_PASSPHRASE"]

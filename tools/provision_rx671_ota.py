@@ -470,10 +470,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--tsip-chunk-size", type=int, default=128)
     parser.add_argument("--codesigner-certificate", type=_required_file, required=True)
     parser.add_argument("--codesigner-public-key", type=_required_file, required=True)
-    parser.add_argument("--wifi-ssid-env", default="RX671_EK_WIFI_SSID")
+    parser.add_argument("--wifi-ssid-env", default="SAFFTI_001_WIFI_SSID")
     parser.add_argument(
         "--wifi-passphrase-env",
-        default="RX671_EK_WIFI_PASSPHRASE",
+        default="SAFFTI_001_WIFI_PASSPHRASE",
     )
     parser.add_argument("--port", default=DEFAULT_PORT)
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD)

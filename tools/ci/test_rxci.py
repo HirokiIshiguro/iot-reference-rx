@@ -267,7 +267,7 @@ class RetiredVariableTests(unittest.TestCase):
         environment = {"PROFILE": "full", "BOARD": "rx671", "BACKEND": "sw", "TLS": "tls12", "FEATURE": "ota",
                        "REPEAT": "2", "REBUILD": "true", "TEST": "^rx72n:", "KEEP": "true", "CI_PIPELINE_SOURCE": "web",
                        "AWS_ROLE_ARN": "x", "AWS_IOT_ENDPOINT": "x", "RUNNER_TEMP": "x", "E2STUDIO_CLI": "x",
-                       "RX671_EK_WIFI_SSID": "x", "RX671_TSIP_AWS_IOT_THING_NAME": "x", "GIT_SUBMODULE_STRATEGY": "none"}
+                       "SAFFTI_001_WIFI_SSID": "x", "RX671_TSIP_AWS_IOT_THING_NAME": "x", "GIT_SUBMODULE_STRATEGY": "none"}
         self.assertEqual(rxci.retired_variables(environment), [])
 
     def test_an_empty_old_variable_does_not_stop_the_plan(self):
