@@ -13,14 +13,14 @@
       "resource_group": "board-rx72n",
       "keep_running_after_test": true,
       "thing": "rx72n-02",
-      "certificate_variable": "AWS_CLIENT_CERT_RX72N_02",
+      "certificate_variable": "AWS_IOT_CLIENT_CERT_PEM_RX72N_EK2_FILE",
       "private_key_variable": "AWS_PRIVATE_KEY_RX72N_02",
-      "fleet_template_variable": "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+      "fleet_template_variable": "AWS_IOT_FLEET_PROVISIONING_TEMPLATE_OSS",
       "claim_certificate_variable": "AWS_FLEET_CLAIM_CERT_RX72N_02",
       "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
-      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_RX72N_02",
+      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_OSS",
       "ota_signing_profile_variable": "AWS_OTA_SIGNING_PROFILE_RX72N_02",
-      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_OSS",
       "ota_candidate_version": "0.9.3"
     },
     "rx65n": {
@@ -36,7 +36,7 @@
       "iot_policy": "ck-rx65n-policy",
       "fleet_demo_id": "rx65n-bg96-fp",
       "ota_bucket": "rx65n-ota",
-      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_OSS",
       "ota_candidate_version": "0.9.99",
       "thing_variable": "AWS_IOT_THING_NAME_CK_RX65N_01"
     },
@@ -51,7 +51,7 @@
       ],
       "resource_group": "board-rx671",
       "software_build_per_tls": true,
-      "fleet_template_variable": "AWS_FLEET_PROVISIONING_TEMPLATE_RX72N_02",
+      "fleet_template_variable": "AWS_IOT_FLEET_PROVISIONING_TEMPLATE_OSS",
       "claim_certificate_variable": "AWS_FLEET_CLAIM_CERT_RX72N_02",
       "claim_private_key_variable": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02",
       "image_secret_variable": {
@@ -59,8 +59,8 @@
         "fleet": "AWS_FLEET_CLAIM_PRIVATE_KEY_RX72N_02"
       },
       "iot_policy": "ck-rx65n-policy",
-      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_RX72N_02",
-      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_RX72N_02",
+      "ota_bucket_variable": "AWS_OTA_S3_BUCKET_OSS",
+      "ota_service_role_variable": "AWS_OTA_SERVICE_ROLE_ARN_OSS",
       "ota_baseline_version": "0.1.0",
       "ota_candidate_version": "0.1.1",
       "ota_is_self_contained": true,
@@ -87,7 +87,7 @@
   "workspace_root": "C:/ai/codex/ws",
   "endpoints": {
     "tls12": {
-      "variable": "AWS_IOT_ENDPOINT"
+      "variable": "AWS_IOT_MQTT_BROKER_ENDPOINT_RX72N_EK2"
     },
     "tls13": {
       "value": "d095604912rj95htx1mal-ats.iot.ap-northeast-1.amazonaws.com"

@@ -1,7 +1,7 @@
 param(
     [string]$ProjectRoot = $(Split-Path $PSScriptRoot -Parent),
     [string]$ThingName = $env:AWS_IOT_THING_NAME,
-    [string]$Endpoint = $env:AWS_IOT_ENDPOINT,
+    [string]$Endpoint = $env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX72N_EK2,
     [string]$CertInput = $env:AWS_IOT_CERT,
     [string]$KeyInput = $env:AWS_IOT_PRIVKEY,
     [string]$E2Studio = "C:\Renesas\e2_studio_2026_04_2\eclipse\e2studio-cli.exe",
