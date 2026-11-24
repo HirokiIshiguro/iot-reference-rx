@@ -12,6 +12,33 @@ import rxci
 import rxci_build
 
 
+class Rx671GroupWifiTests(unittest.TestCase):
+    def test_child_job_shells_read_group_wifi_without_forwarding(self):
+        registry = rxci.load_registry()
+        jobs, _ = rxci.child_pipeline(registry, "full", r"^(rx671|rx72n):tsip:tls12:(fleet|ota)$", 1,
+                                      benchmarks=["rx72n"])
+        powershell = [
+            "$env:RX671_EK_WIFI_SSID = $env:SAFFTI_001_WIFI_SSID",
+            "$env:RX671_EK_WIFI_PASSPHRASE = $env:SAFFTI_001_WIFI_PASSPHRASE",
+        ]
+        bash = [
+            'export RX671_EK_WIFI_SSID="${SAFFTI_001_WIFI_SSID:?SAFFTI_001_WIFI_SSID is required}"',
+            'export RX671_EK_WIFI_PASSPHRASE="${SAFFTI_001_WIFI_PASSPHRASE:?SAFFTI_001_WIFI_PASSPHRASE is required}"',
+        ]
+        self.assertEqual(powershell, jobs["build rx671/tsip-tls12/fleet"].get("before_script"))
+        self.assertNotIn("before_script", jobs["build rx671/tsip-tls12/ota"])
+        for feature in ("fleet", "ota"):
+            self.assertEqual(bash, jobs[f"rx671:tsip:tls12:{feature}"].get("before_script"))
+            self.assertNotIn("before_script", jobs[f"rx72n:tsip:tls12:{feature}"])
+
+        bridges = [job for job in jobs.values() if isinstance(job, dict) and "trigger" in job]
+        self.assertTrue(bridges)
+        for bridge in bridges:
+            self.assertFalse(bridge["trigger"]["forward"]["pipeline_variables"])
+            self.assertNotIn("WIFI_SSID", str(bridge["variables"]))
+            self.assertNotIn("WIFI_PASS", str(bridge["variables"]))
+
+
 class Rx671TsipFleetTests(unittest.TestCase):
     def test_generated_local_credentials_are_ignored_for_both_projects(self):
         root = Path(__file__).resolve().parents[2]
