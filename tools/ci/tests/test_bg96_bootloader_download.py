@@ -1,4 +1,5 @@
 """Exercise the CF-only UART protocol without opening a device."""
+import os
 from pathlib import Path
 import struct
 import tempfile
@@ -7,6 +8,7 @@ import unittest
 from unittest import mock
 
 from tools import bg96_bootloader_integration as boot
+from tools import configure_bg96_mqtt_credentials as bg96_credentials
 
 INTEGRITY_OK = b"bank1(temporary area) on code flash integrity check...OK"
 SWAP = b"swap bank"
@@ -63,6 +65,23 @@ class FakeSerial:
 
     def flush(self):
         self.flushes += 1
+
+
+class GroupAwsInputTests(unittest.TestCase):
+    def test_bg96_endpoint_uses_the_group_default_and_keeps_explicit_override(self):
+        endpoint_variable = "AWS_IOT_MQTT_BROKER_ENDPOINT_RX72N_EK2"
+        for module, read in ((boot, boot.env_text), (bg96_credentials, bg96_credentials.env_value)):
+            with self.subTest(module=module.__name__):
+                with mock.patch.dict(os.environ, {endpoint_variable: "group.example.test"}, clear=True):
+                    self.assertEqual(read(module.ENDPOINT_VARS), ("group.example.test", endpoint_variable))
+                    override = "RX65N_BG96_AWS_IOT_ENDPOINT_OVERRIDE"
+                    os.environ[override] = "override.example.test"
+                    self.assertEqual(read(module.ENDPOINT_VARS), ("override.example.test", override))
+
+    def test_bg96_fleet_fallback_reads_the_group_template(self):
+        variable = "AWS_IOT_FLEET_PROVISIONING_TEMPLATE_OSS"
+        with mock.patch.dict(os.environ, {variable: "group-template"}, clear=True):
+            self.assertEqual(boot.env_text(boot.FLEET_TEMPLATE_VARS), ("group-template", variable))
 
 
 class Bg96BootloaderDownloadTests(unittest.TestCase):

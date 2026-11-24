@@ -20,6 +20,9 @@ import rxci_aws  # noqa: E402
 import rxci_board  # noqa: E402
 import rxci_build  # noqa: E402
 
+ROOT = Path(__file__).resolve().parents[2]
+GROUP_TLS12_ENDPOINT = "AWS_IOT_MQTT_BROKER_ENDPOINT_RX72N_EK2"
+
 # Number of build outputs each flow receives (rxci.py hands them over in this order).
 BUILDS = {rxci_board.mqtt_rx72n: 2, rxci_board.fleet_rx72n: 2, rxci_board.ota_rx72n: 3,
           rxci_board.mqtt_rx65n: 2, rxci_board.fleet_rx65n: 2, rxci_board.ota_rx65n: 3,
@@ -45,7 +48,7 @@ def commands_of(test: dict, registry: dict) -> list[list[str]]:
         builds = builds[:1]
     thing = {"certificate": "certificate", "private_key": "key"}
     with tempfile.TemporaryDirectory() as folder, \
-         mock.patch.dict(os.environ, {"RXCI_TEST_VARIABLE": "value", "AWS_IOT_ENDPOINT": "tls12.example.test"}), \
+         mock.patch.dict(os.environ, {"RXCI_TEST_VARIABLE": "value", GROUP_TLS12_ENDPOINT: "tls12.example.test"}), \
          mock.patch.object(rxci_board, "required_file", return_value="file"), \
          mock.patch.object(rxci_board, "install_rx671"), mock.patch.object(rxci_board, "erase_application"), \
          mock.patch.object(rxci_board, "cleanup_ota"), mock.patch.object(rxci_board, "provision_tsip_keys"), \
@@ -85,13 +88,14 @@ class ObservedVersionTests(unittest.TestCase):
 
 
 class EndpointTests(unittest.TestCase):
-    REGISTRY = {"endpoints": {"tls12": {"variable": "AWS_IOT_ENDPOINT"}, "tls13": {"value": "tls13.example.test"}}}
+    REGISTRY = {"endpoints": {"tls12": {"variable": GROUP_TLS12_ENDPOINT}, "tls13": {"value": "tls13.example.test"}}}
 
     def test_each_version_has_its_own_endpoint(self):
-        with mock.patch.dict(os.environ, {"AWS_IOT_ENDPOINT": "tls12.example.test"}):
-            self.assertEqual(rxci.endpoint(self.REGISTRY, "tls12"), "tls12.example.test")
+        registry = rxci.load_registry()
+        with mock.patch.dict(os.environ, {GROUP_TLS12_ENDPOINT: "tls12.example.test"}, clear=True):
+            self.assertEqual(rxci.endpoint(registry, "tls12"), "tls12.example.test")
             self.assertEqual(rxci.endpoint(self.REGISTRY, "tls13"), "tls13.example.test")
-            self.assertEqual(rxci_board.endpoint(self.REGISTRY, "tls12"), "tls12.example.test")
+            self.assertEqual(rxci_board.endpoint(registry, "tls12"), "tls12.example.test")
 
     def test_a_missing_variable_stops_the_job(self):
         with mock.patch.dict(os.environ, {}, clear=True), self.assertRaises(SystemExit):
@@ -109,9 +113,9 @@ class EndpointTests(unittest.TestCase):
                     env = {"RX671_EK_WIFI_SSID": "test", "RX671_EK_WIFI_PASSPHRASE": "test",
                            "RX671_EK_AWS_IOT_THING_NAME": "test", "RX671_EK_AWS_IOT_CERT_PEM": "test",
                            "RX671_EK_AWS_IOT_PRIVATE_KEY_PEM": "test", "UNIT_TEMPLATE": "test",
-                           "UNIT_CERT": "test", "UNIT_KEY": "test", "AWS_IOT_ENDPOINT": "tls12.example.test",
-                           # The variable that used to win over the endpoint of the version.
-                           "RX671_EK_AWS_IOT_ENDPOINT": "tls13.example.test"}
+                           "UNIT_CERT": "test", "UNIT_KEY": "test", GROUP_TLS12_ENDPOINT: "tls12.example.test",
+                           # The standalone default must not override the selected TLS version.
+                           "AWS_IOT_MQTT_BROKER_ENDPOINT_RX671_EK1": "standalone.example.test"}
                     commands = []
 
                     def run(command, *, timeout, env=None):
@@ -134,6 +138,36 @@ class EndpointTests(unittest.TestCase):
     def test_no_ci_tool_reads_the_variable_that_overrode_the_endpoint(self):
         for path in Path(__file__).resolve().parent.glob("rxci*.py"):
             self.assertNotIn("RX671_EK_AWS_IOT_ENDPOINT", path.read_text(encoding="utf-8"), path.name)
+
+
+class GroupAwsInputTests(unittest.TestCase):
+    def test_board_aws_variable_names(self):
+        boards = rxci.load_registry()["boards"]
+        for board in ("rx72n", "rx671"):
+            with self.subTest(board=board):
+                self.assertEqual(boards[board]["fleet_template_variable"], "AWS_IOT_FLEET_PROVISIONING_TEMPLATE_OSS")
+                self.assertEqual(boards[board]["ota_bucket_variable"], "AWS_OTA_S3_BUCKET_OSS")
+        for board in ("rx72n", "rx65n", "rx671"):
+            with self.subTest(board=board):
+                self.assertEqual(boards[board]["ota_service_role_variable"], "AWS_OTA_SERVICE_ROLE_ARN_OSS")
+
+    def test_rx72n_certificate_is_read_as_a_file_path(self):
+        variable = rxci.load_registry()["boards"]["rx72n"]["certificate_variable"]
+        with tempfile.TemporaryDirectory() as tmp:
+            certificate = Path(tmp) / "certificate.pem"
+            certificate.write_text("certificate fixture", encoding="utf-8")
+            env = {"AWS_IOT_CLIENT_CERT_PEM_RX72N_EK2_FILE": str(certificate)}
+            with mock.patch.dict(os.environ, env, clear=True):
+                self.assertEqual(rxci_board.required_file(variable), str(certificate))
+
+    def test_standalone_builds_use_group_endpoint_defaults(self):
+        rx671 = (ROOT / "tools/build_headless_rx671_wifi.ps1").read_text(encoding="utf-8")
+        rx72n = (ROOT / "tools/build_headless_rx72n_with_client_credentials.ps1").read_text(encoding="utf-8")
+        endpoint = "$env:AWS_IOT_MQTT_BROKER_ENDPOINT_RX671_EK1"
+        self.assertIn(f"IsNullOrWhiteSpace({endpoint})", rx671)
+        self.assertIn(f"@($EndpointOverride, {endpoint}, $env:{GROUP_TLS12_ENDPOINT})", rx671)
+        self.assertIn(f"$AwsIotEndpoint,\n        {endpoint},\n        $env:{GROUP_TLS12_ENDPOINT}", rx671)
+        self.assertIn(f"[string]$Endpoint = $env:{GROUP_TLS12_ENDPOINT}", rx72n)
 
 
 if __name__ == "__main__":
