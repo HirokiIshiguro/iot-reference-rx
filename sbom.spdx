@@ -2,9 +2,9 @@ SPDXVersion: SPDX-2.3
 DataLicense: CC0-1.0
 SPDXID: SPDXRef-DOCUMENT
 DocumentName: iot-reference-rx-submodules
-DocumentNamespace: https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/spdx/6f0ad4b180c67954d8dc6a9dd19a99560799920cf3f1d977e8ede96ff88bc7b3
+DocumentNamespace: https://gitlab.saffti.jp/oss/import/github/renesas/iot-reference-rx/spdx/0f7d740086aca99e2c76a0205d31545aec2fcc3515eed97798d4abf1cc9e816d
 Creator: Tool: tools/ci/generate_sbom.py
-Created: 2026-11-23T11:04:41Z
+Created: 2026-11-24T09:22:57Z
 DocumentComment: <text>Git submodule inventory for the source checkout, including nested test and example repositories. CONTAINS follows Git links. Vendored files and dependencies selected by individual firmware builds are outside this inventory.</text>
 
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-iot-reference-rx
@@ -865,15 +865,6 @@ PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: NOASSERTION
 PackageCopyrightText: NOASSERTION
 
-PackageName: FreeRTOS-Plus-TCP
-SPDXID: SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f
-PackageVersion: V4.4.1
-PackageDownloadLocation: git+https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git@c12361095aca68aeed858f45d14395fbffa92c0d
-FilesAnalyzed: false
-PackageLicenseConcluded: NOASSERTION
-PackageLicenseDeclared: MIT
-PackageCopyrightText: NOASSERTION
-
 PackageName: FreeRTOS
 SPDXID: SPDXRef-93c2534c7548486b31c05453aa7c88b66c5629ae6891a9ae18b5c68a5341b857
 PackageVersion: 202411.00
@@ -1451,6 +1442,15 @@ PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: NOASSERTION
 PackageCopyrightText: NOASSERTION
 
+PackageName: FreeRTOS-Plus-TCP
+SPDXID: SPDXRef-27236ef459142c64861ace801ca3aa205c734d100987cb8ca04aa983ad668ac5
+PackageVersion: release-v4.4.1.saffti-custom.1
+PackageDownloadLocation: git+https://gitlab.saffti.jp/oss/import/github/freertos/FreeRTOS-Plus-TCP.git@2fe4ab4add4ad39c16575716feb011400f54b044
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: MIT
+PackageCopyrightText: NOASSERTION
+
 PackageName: wifi-host-driver
 SPDXID: SPDXRef-80c3a86a8072a24273902dd58eb0534e88ea40495889c6296b68c91a243ac583
 PackageVersion: release-v1.70.0.saffti-custom.1
@@ -1631,6 +1631,12 @@ RelationshipComment: <text>test/unit-test/CMock</text>
 Relationship: SPDXRef-23ca5034017b8332f223792660d6f72dce5c277dc042ce7252c1b5b1a76b3921 CONTAINS SPDXRef-9993940dd0a7aa63e83211c833ee5fc47fbb8d0b03d9d4421693d821a4a8b019
 RelationshipComment: <text>test/unit-test/Unity</text>
 
+Relationship: SPDXRef-27236ef459142c64861ace801ca3aa205c734d100987cb8ca04aa983ad668ac5 CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
+RelationshipComment: <text>tools/CMock</text>
+
+Relationship: SPDXRef-27236ef459142c64861ace801ca3aa205c734d100987cb8ca04aa983ad668ac5 CONTAINS SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218
+RelationshipComment: <text>test/FreeRTOS-Kernel</text>
+
 Relationship: SPDXRef-27d75d23e3b88bf3e16781e9ac04beced44063ccc1d4e1f92061ca47f61a407d CONTAINS SPDXRef-fef5700f6ff65942cd9af4e374fcb71df64ebdd35a17eb847c4cb030dbdb4760
 RelationshipComment: <text>test/unit-test/CMock</text>
 
@@ -1771,12 +1777,6 @@ RelationshipComment: <text>test/unit-test/CMock</text>
 
 Relationship: SPDXRef-84cd2636a503e98c0ca6a75d2f80d959fffc84996014324f54ee4a4cb09d8d6b CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
 RelationshipComment: <text>test/unit-test/Unity</text>
-
-Relationship: SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f CONTAINS SPDXRef-590327520802078f7d69d78c4eb8d20cad1894675cc7601e879c542e9ec5f6fd
-RelationshipComment: <text>tools/CMock</text>
-
-Relationship: SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f CONTAINS SPDXRef-5cb3ec399350715cdafa236cc87d43cc6b9a45728366a994c9a719bd21a97218
-RelationshipComment: <text>test/FreeRTOS-Kernel</text>
 
 Relationship: SPDXRef-8730a8189a708ce91eba0de084dae5b73fa2098ad6cb914cf7ea7cdfba7f710f CONTAINS SPDXRef-548d96c90b2a6df366bc8697060e731954b36ab78d4e660c230edfaa4350297d
 RelationshipComment: <text>test/unit-test/Unity</text>
@@ -2036,6 +2036,9 @@ RelationshipComment: <text>Middleware/FreeRTOS/coreMQTT-Agent</text>
 Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-1ad0b0ac0e7465c55697720863a9b85c564da1c3c11df5eefffdef9ce2de8ba7
 RelationshipComment: <text>Middleware/freertos_plus</text>
 
+Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-27236ef459142c64861ace801ca3aa205c734d100987cb8ca04aa983ad668ac5
+RelationshipComment: <text>Middleware/FreeRTOS/FreeRTOS-Plus-TCP</text>
+
 Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-27d75d23e3b88bf3e16781e9ac04beced44063ccc1d4e1f92061ca47f61a407d
 RelationshipComment: <text>Middleware/AWS/SigV4-for-AWS-IoT-embedded-sdk</text>
 
@@ -2071,9 +2074,6 @@ RelationshipComment: <text>Projects/aws_wifi_rx671_ek/external/wifi-host-driver,
 
 Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-84cd2636a503e98c0ca6a75d2f80d959fffc84996014324f54ee4a4cb09d8d6b
 RelationshipComment: <text>Middleware/AWS/Device-Defender-for-AWS-IoT-embedded-sdk</text>
-
-Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-84eed54ba5ae49d17334625aa364bcc2e0c3af3cb12eff07e53195a621ee5e0f
-RelationshipComment: <text>Middleware/FreeRTOS/FreeRTOS-Plus-TCP</text>
 
 Relationship: SPDXRef-iot-reference-rx CONTAINS SPDXRef-861b1ddeb1c340b3fbba737738ec2ff99d28fafe6bc355bd68492a202eb76951
 RelationshipComment: <text>Middleware/3rdparty/TraceRecorderSource</text>
