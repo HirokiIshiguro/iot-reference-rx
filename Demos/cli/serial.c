@@ -151,6 +151,15 @@ static sci_err_t prvEnsureSerialPortOpen( void )
                               vSerialSciCallback,
                               &xSerialSciHandle );
 
+    if( SCI_SUCCESS == xOpenResult )
+    {
+        /* Pin.c sets TX idle high as GPIO. Route TX only after SCI enables TE. */
+#if defined(BSP_MCU_RX72N) && (BSP_CFG_SCI_UART_TERMINAL_CHANNEL == 7)
+        PORT9.PMR.BIT.B0 = 1U; /* P90, TXD7 */
+#elif defined(BSP_MCU_RX65N) && (BSP_CFG_SCI_UART_TERMINAL_CHANNEL == 0)
+        PORT3.PMR.BIT.B2 = 1U; /* P32, TXD0 */
+#endif
+    }
 
     return xOpenResult;
 }
