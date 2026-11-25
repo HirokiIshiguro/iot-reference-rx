@@ -405,7 +405,9 @@ class WifiCredentialIsolationTests(unittest.TestCase):
         self.assertEqual("safe", result["PATH"])
         self.assertEqual("true", result["CI"])
         for variable in (
-            *builder.WIFI_CREDENTIAL_ENVIRONMENT_VARIABLES,
+            "RX671_EK_WIFI_SSID",
+            "RX671_EK_WIFI_PASSPHRASE",
+            "RX671_EK_WIFI_PASSWORD",
             "SAFFTI_001_WIFI_SSID",
             "SAFFTI_001_WIFI_PASSPHRASE",
             *builder.OTA_SDIO_OVERRIDE_ENVIRONMENT_VARIABLES,
@@ -452,16 +454,16 @@ class WifiCredentialIsolationTests(unittest.TestCase):
             output.write_bytes(b"binary-prefixsecret-passphrase\0suffix")
             with self.assertRaisesRegex(
                 RuntimeError,
-                r"image\.abs \(RX671_EK_WIFI_PASSPHRASE\)",
+                r"image\.abs \(SAFFTI_001_WIFI_PASSPHRASE\)",
             ):
                 builder.assert_wifi_credentials_absent(
                     [output],
-                    {"RX671_EK_WIFI_PASSPHRASE": "secret-passphrase"},
+                    {"SAFFTI_001_WIFI_PASSPHRASE": "secret-passphrase"},
                 )
             output.write_bytes(b"credential-free image")
             builder.assert_wifi_credentials_absent(
                 [output],
-                {"RX671_EK_WIFI_PASSPHRASE": "secret-passphrase"},
+                {"SAFFTI_001_WIFI_PASSPHRASE": "secret-passphrase"},
             )
 
 

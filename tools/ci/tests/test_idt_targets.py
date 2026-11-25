@@ -96,18 +96,20 @@ class TargetIdentityTests(unittest.TestCase):
 class NetworkInputTests(unittest.TestCase):
     def test_established_board_inputs_only_and_values_not_printed(self):
         wifi = get_target("rx671-wifi")
-        values = network_values(wifi, {"RX671_EK_WIFI_SSID": "unit-network", "RX671_EK_WIFI_PASSPHRASE": "test-only-pass"})
+        values = network_values(wifi, {"SAFFTI_001_WIFI_SSID": "unit-network", "SAFFTI_001_WIFI_PASSPHRASE": "test-only-pass"})
         self.assertEqual("unit-network", values["IDT_WIFI_SSID"])
         with self.assertRaises(RuntimeError):
             network_values(wifi, {"WIFI_SSID": "wrong-shared-name", "WIFI_PASSWORD": "test-only-pass"})
+        with self.assertRaisesRegex(RuntimeError, "SAFFTI_001_WIFI_SSID and SAFFTI_001_WIFI_PASSPHRASE"):
+            network_values(wifi, {"RX671_EK_WIFI_SSID": "legacy-test", "RX671_EK_WIFI_PASSPHRASE": "test-only-pass"})
         cellular = network_values(get_target("rx65n-bg96"), {"AWS_IOT_CELLULAR_APN_CK_RX65N_01": "unit.invalid"})
         self.assertEqual("0", cellular["IDT_CELLULAR_APN_AUTH"])
         self.assertEqual("", cellular["IDT_CELLULAR_APN_USER"])
 
     def test_invalid_credentials_are_rejected_without_echoing_values(self):
-        for env in ({"RX671_EK_WIFI_SSID": "unit", "RX671_EK_WIFI_PASSPHRASE": "short"},
-                    {"RX671_EK_WIFI_SSID": "a" * 33, "RX671_EK_WIFI_PASSPHRASE": "test-only-pass"},
-                    {"RX671_EK_WIFI_SSID": "unit\nnetwork", "RX671_EK_WIFI_PASSPHRASE": "test-only-pass"}):
+        for env in ({"SAFFTI_001_WIFI_SSID": "unit", "SAFFTI_001_WIFI_PASSPHRASE": "short"},
+                    {"SAFFTI_001_WIFI_SSID": "a" * 33, "SAFFTI_001_WIFI_PASSPHRASE": "test-only-pass"},
+                    {"SAFFTI_001_WIFI_SSID": "unit\nnetwork", "SAFFTI_001_WIFI_PASSPHRASE": "test-only-pass"}):
             with self.assertRaises(ValueError):
                 network_values(get_target("rx671-wifi"), env)
         with self.assertRaises(ValueError):
@@ -144,7 +146,7 @@ class NetworkInputTests(unittest.TestCase):
     def test_hex_psk_exceeding_firmware_passphrase_bound_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "8–63 bytes"):
             network_values(get_target("rx671-wifi"),
-                           {"RX671_EK_WIFI_SSID": "unit-network", "RX671_EK_WIFI_PASSPHRASE": "a" * 64})
+                           {"SAFFTI_001_WIFI_SSID": "unit-network", "SAFFTI_001_WIFI_PASSPHRASE": "a" * 64})
 
 
 @unittest.skipUnless(os.name == "posix" and shutil.which("bash"), "requires POSIX bash")

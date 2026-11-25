@@ -51,7 +51,7 @@ RX72Nの旧入力`RUN_RX72N_IDT=true` / `RX72N_IDT_SCOPE`も保持します。�
 
 同じWindows / WSL / CC-RX / AWSホストを使い、host preflightは選択したRPiのhostnameを確認します。
 共有ホスト設定は既存の`RX72N_IDT_RUNNER_TAG` / `RX72N_IDT_PYTHON` / `RX72N_IDT_HOST_PROFILE`を継承します。
-Wi-Fi / APNは既存のターゲット専用CI変数からprivate runtimeへ渡し、source・firmware・値を公開artifactに含めません。
+RX671 の Wi-Fi は /oss の `SAFFTI_001_WIFI_SSID` と `SAFFTI_001_WIFI_PASSPHRASE` を実行環境から WSL へ渡します。RX65N の APN はターゲット専用 CI 変数を使います。これらの値を使うソースとファームウェアは非公開の実行用ディレクトリに置きます。
 
 `plan`はホストの版・依存と固定されたboard identityを計画へ記録するだけで、AWS、compiler、UART、flashを操作しません。
 `preflight`はnative `FreeRTOSVersion`を実行します。FreeRTOS `202604.00-LTS`とIDT 4.9.0 / FRQ_2.5.0の不一致はNGとして保持し、環境整備の失敗と区別します。

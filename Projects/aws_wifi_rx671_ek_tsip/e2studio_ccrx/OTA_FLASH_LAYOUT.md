@@ -457,8 +457,7 @@ WHD portability patchがgitlinkへ未収録の場合はcleanなWHDへ既知patch
 適用し、各buildの成否にかかわらず逆適用する。別のsubmodule差分が残れば失敗する。
 
 OTA成果物へ実機ネットワーク秘密を混入させないため、OTA helperは子buildから
-`RX671_EK_WIFI_SSID` / `RX671_EK_WIFI_PASSPHRASE` /
-`RX671_EK_WIFI_PASSWORD`を除外し、Wi-Fi/AWS local configを明示的に無効化する。
+`SAFFTI_001_WIFI_SSID` / `SAFFTI_001_WIFI_PASSPHRASE`を除外し、Wi-Fi/AWS local configを明示的に無効化する。
 一方で`WHD_JOIN_USE_KVS=1`を一時設定し、値をcompileせずLittleFSから読むruntime
 経路をbaseline/candidateの双方へ入れる。
 共有Runnerに残ったignored JOIN headerはbuild中に隔離して終了時に削除し、生成した

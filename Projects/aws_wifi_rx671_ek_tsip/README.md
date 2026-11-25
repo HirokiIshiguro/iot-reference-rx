@@ -535,8 +535,8 @@ The command above always creates formal firmware without Wi-Fi credentials.
 Both baseline and candidate are compiled with the LittleFS KVS JOIN profile;
 their manifests record `formal=true`, `credentials_embedded=false`, and
 `wifi_credentials_source=littlefs_kvs_runtime_provisioning`. The focused
-hardware job passes only the names of `RX671_EK_WIFI_SSID` and
-`RX671_EK_WIFI_PASSPHRASE` to the host provisioner. It hex-encodes the values,
+hardware job passes only the names of `SAFFTI_001_WIFI_SSID` and
+`SAFFTI_001_WIFI_PASSPHRASE` to the host provisioner. It hex-encodes the values,
 sends them over SCI6 with `conf sethex`, and commits them to LittleFS before the
 credential-free baseline is installed. The host uses mutable value/command
 buffers, never logs their contents, and zeroes them after SCI6 transfer.
