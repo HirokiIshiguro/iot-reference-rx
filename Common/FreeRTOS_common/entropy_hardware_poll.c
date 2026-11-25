@@ -29,6 +29,7 @@
 #include "r_tsip_rx_if.h"
 #include "r_tsip_rx_config.h"
 #include "r_common_api_tsip.h"
+#include "mbedtls/entropy.h"
 
 tsip_tls_ca_certification_public_key_index_t s_inst1 =
 {
@@ -60,24 +61,22 @@ int mbedtls_hardware_poll(void *data,
     INTERNAL_NOT_USED(data);
     INTERNAL_NOT_USED(len);
     #if BSP_CFG_MCU_PART_ENCRYPTION_INCLUDED == true
-        e_tsip_err_t error_code = TSIP_SUCCESS;
-
-        static uint32_t gs_random_number_buffer[4] =
-        {
-            0
-        };
-
+        /* FIT writes four words. Keep them private until they have been copied,
+         * including after FIT releases its driver lock in threaded builds. */
+        uint32_t random_number[4];
         size_t num_bytes = (len < sizeof(uint32_t)) ? len : sizeof(uint32_t);
 
-        R_Demo_Common_API_TSIP_Open(&s_inst1, &s_inst2);
-        R_TSIP_GenerateRandomNumber((uint32_t *) &gs_random_number_buffer);
         *olen = 0;
+        if (COMMONAPI_SUCCESS != R_Demo_Common_API_TSIP_Open(&s_inst1, &s_inst2) ||
+            TSIP_SUCCESS != R_TSIP_GenerateRandomNumber(random_number))
+        {
+            return MBEDTLS_ERR_ENTROPY_SOURCE_FAILED;
+        }
 
-        memcpy(output, &gs_random_number_buffer, num_bytes);
+        memcpy(output, random_number, num_bytes);
         *olen = num_bytes;
 
-
-        return error_code;
+        return 0;
     #else
         uint32_t random_number = 0;
         size_t num_bytes = (len < sizeof(uint32_t)) ? len : sizeof(uint32_t);
