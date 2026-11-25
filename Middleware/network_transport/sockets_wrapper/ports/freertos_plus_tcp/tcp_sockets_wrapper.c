@@ -59,6 +59,8 @@ extern void vLoggingPrintf (const char *pcFormatString,
 #include "FreeRTOS_IP.h"
 #include "FreeRTOS_Sockets.h"
 #include "FreeRTOS_DNS.h"
+#include "FreeRTOS_DNS_Cache.h"
+#include "FreeRTOS_ARP.h"
 
 /* TCP Sockets Wrapper include.*/
 /* Let sockets wrapper know that Socket_t is defined already. */
@@ -181,13 +183,63 @@ static BaseType_t prvWaitForConnect(Socket_t tcpSocket,
     return socketStatus;
 }
 
+#if ( ipconfigUSE_IPv6 == 0 ) && ( ipconfigUSE_MDNS == 0 ) && ( ipconfigUSE_LLMNR == 0 )
+/* Called by the blocking socket wrapper in task context. Prime only the
+ * first server selected by FreeRTOS+TCP's unicast IPv4 resolver. */
+static void prvPrepareDnsArp(void)
+{
+    NetworkEndPoint_t *endpoint;
+
+    for (endpoint = FreeRTOS_FirstEndPoint(NULL);
+         endpoint != NULL;
+         endpoint = FreeRTOS_NextEndPoint(NULL, endpoint))
+    {
+        if (ENDPOINT_IS_IPv4(endpoint))
+        {
+            const uint8_t index = endpoint->ipv4_settings.ucDNSIndex;
+
+            if (index < ipconfigENDPOINT_DNS_ADDRESS_COUNT)
+            {
+                const uint32_t dns = endpoint->ipv4_settings.ulDNSServerAddresses[index];
+
+                if ((dns != 0U) && (dns != FREERTOS_INADDR_BROADCAST))
+                {
+                    if (FreeRTOS_IsEndPointUp(endpoint) != pdFALSE)
+                    {
+                        /* The IPv4 stack resolves the gateway if DNS is off-link.
+                         * A failed ARP wait leaves normal DNS retries in charge. */
+                        (void)xARPWaitResolution(dns, pdMS_TO_TICKS(1000U));
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+}
+#endif
+
 static uint32_t prvResolveIPv4Address(const char *pHostName)
 {
     uint32_t ipAddress = FreeRTOS_inet_addr(pHostName);
 
     if (0U == ipAddress)
     {
+        const TickType_t start = xTaskGetTickCount();
+
+#if ( ipconfigUSE_IPv6 == 0 ) && ( ipconfigUSE_MDNS == 0 ) && ( ipconfigUSE_LLMNR == 0 )
+    #if ( ipconfigUSE_DNS_CACHE != 0 )
+        if (FreeRTOS_dnslookup(pHostName) == 0U)
+    #endif
+        {
+            prvPrepareDnsArp();
+        }
+#endif
         ipAddress = (uint32_t)FreeRTOS_gethostbyname(pHostName);
+        LogInfo(("IPv4 DNS lookup completed: elapsed_ms=%lu resolved=%u",
+                 (unsigned long)pdTICKS_TO_MS(xTaskGetTickCount() - start),
+                 (unsigned int)(ipAddress != 0U)));
+        (void)start;
     }
 
     return ipAddress;
