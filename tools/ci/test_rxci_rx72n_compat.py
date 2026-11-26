@@ -172,3 +172,127 @@ int main(void)
             headers=headers,
             extra_includes=[app, host.ROOT / "Demos/tsip_provisioning"],
         )
+
+    def test_tsip_uart_hides_payload_and_clears_command_history(self):
+        headers = {
+            "FreeRTOS.h": """#include <assert.h>
+#include <stdint.h>
+typedef int BaseType_t;
+typedef unsigned UBaseType_t;
+typedef unsigned TickType_t;
+#define portBASE_TYPE int
+#define pdTRUE 1
+#define pdFALSE 0
+#define pdPASS 1
+#define pdMS_TO_TICKS(ms) (ms)
+#define portMAX_DELAY 0
+#define configASSERT(expr) assert(expr)
+#define configCOMMAND_INT_MAX_OUTPUT_SIZE 128
+""",
+            "task.h": """typedef void *TaskHandle_t;
+void xTaskCreate(void (*task)(void *), const char *, uint16_t, void *, UBaseType_t, TaskHandle_t *);
+""",
+            "semphr.h": """typedef void *SemaphoreHandle_t;
+SemaphoreHandle_t xSemaphoreCreateMutex(void);
+BaseType_t xSemaphoreTake(SemaphoreHandle_t, unsigned);
+void xSemaphoreGive(SemaphoreHandle_t);
+void vSemaphoreDelete(SemaphoreHandle_t);
+""",
+            "FreeRTOS_CLI.h": """char *FreeRTOS_CLIGetOutputBuffer(void);
+BaseType_t FreeRTOS_CLIProcessCommand(const char *, char *, size_t);
+""",
+            "demo_config.h": "",
+        }
+        host.ProductApiTests().compile_run(r"""
+#include <setjmp.h>
+#include "Demos/cli/UARTCommandConsole.c"
+
+static jmp_buf done;
+static const char *input;
+static const char *expected;
+static char transcript[4096];
+static size_t transcript_len;
+static char output[configCOMMAND_INT_MAX_OUTPUT_SIZE];
+static unsigned writes, history_probes, blank_commands;
+
+void xTaskCreate(void (*task)(void *), const char *name, uint16_t depth,
+                 void *arg, UBaseType_t priority, TaskHandle_t *handle)
+{
+    (void)task; (void)name; (void)depth; (void)arg; (void)priority; (void)handle;
+}
+
+SemaphoreHandle_t xSemaphoreCreateMutex(void) { return &transcript_len; }
+BaseType_t xSemaphoreTake(SemaphoreHandle_t lock, unsigned ticks)
+{ (void)lock; (void)ticks; return pdPASS; }
+void xSemaphoreGive(SemaphoreHandle_t lock) { (void)lock; }
+void vSemaphoreDelete(SemaphoreHandle_t lock) { (void)lock; }
+
+xComPortHandle xSerialPortInitMinimal(unsigned long baud, unsigned queue_size)
+{ (void)baud; (void)queue_size; return 0; }
+
+BaseType_t xSerialGetChar(xComPortHandle port, signed char *character, unsigned ticks)
+{
+    (void)port; (void)ticks;
+    if (*input == '\0') longjmp(done, 1);
+    *character = *input++;
+    return pdPASS;
+}
+
+BaseType_t xSerialPutChar(xComPortHandle port, signed char character, unsigned ticks)
+{
+    (void)port; (void)ticks;
+    assert(transcript_len + 1 < sizeof(transcript));
+    transcript[transcript_len++] = character;
+    transcript[transcript_len] = '\0';
+    return pdPASS;
+}
+
+void vSerialPutString(const signed char *message, unsigned short length)
+{
+    while (length--) xSerialPutChar(0, *message++, 0);
+}
+
+char *FreeRTOS_CLIGetOutputBuffer(void) { return output; }
+
+BaseType_t FreeRTOS_CLIProcessCommand(const char *command, char *reply, size_t length)
+{
+    if (strcmp(command, "help") == 0) {
+        ++history_probes;
+    } else if (*command == '\0') {
+        ++blank_commands;
+    } else {
+        assert(strcmp(command, expected) == 0);
+        ++writes;
+        snprintf(reply, length, "OK: write 4/4\r\n");
+    }
+    return pdFALSE;
+}
+
+int main(void)
+{
+    const char *cases[] = {
+        "tsipprov w 0 0123abcd", "tsipprov wri 0 0123abcd",
+        "tsipprov  write 0 0123abcd", "tsipprov write 0 0123abcd",
+    };
+    unsigned failures = 0;
+    char commands[128];
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expected = cases[i];
+        snprintf(commands, sizeof(commands), "help\r\n\r\n%s\r\n\r\n", expected);
+        input = commands;
+        transcript_len = writes = history_probes = blank_commands = 0;
+        if (setjmp(done) == 0) prvUARTCommandConsoleTask(NULL);
+        if (strstr(transcript, "0123abcd")) {
+            fprintf(stderr, "case %zu echoed dummy data\n", i);
+            ++failures;
+        }
+        if (writes != 1 || blank_commands != 1 || history_probes != 2) {
+            fprintf(stderr, "case %zu did not clear only the sensitive command history\n", i);
+            ++failures;
+        }
+        assert(strstr(transcript, "OK: write 4/4\r\n") != NULL);
+    }
+    return failures != 0;
+}
+""", headers=headers, extra_defines=["RX72N_TSIP_COMPAT"])
