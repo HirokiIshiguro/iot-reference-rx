@@ -13,6 +13,7 @@
 #include "r_tsip_rx_if.h"
 #include "tsip_provisioning_store.h"
 
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 #define SKMT_WUFPK_SIZE                                (32U)
 #define SKMT_IV_SIZE                                   (16U)
 #define SKMT_CRC_SIZE                                  (4U)
@@ -42,6 +43,8 @@ typedef struct SkmtWrappedKeyView
     uint8_t * pucEncryptedKey;
 } SkmtWrappedKeyView_t;
 
+#endif
+
 typedef struct TsipProvisioningSlotInfo
 {
     const char * pcCliName;
@@ -53,6 +56,7 @@ static BaseType_t prvReadFile(const char * pcStorageName,
                               uint8_t * pucBuffer,
                               uint32_t ulBufferSize,
                               uint32_t * pulActualSize);
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 static BaseType_t prvWriteFile(const char * pcStorageName,
                                const uint8_t * pucBuffer,
                                uint32_t ulBufferSize);
@@ -63,6 +67,8 @@ static BaseType_t prvParseSkmtWrappedKey(uint8_t * pucStoredData,
 static BaseType_t prvImportRootSignerPublicKey(void);
 static BaseType_t prvLoadOrImportClientPublicKey(void);
 static BaseType_t prvLoadOrImportClientPrivateKey(void);
+
+#endif
 
 static const TsipProvisioningSlotInfo_t xSlotInfo[TSIP_PROVISIONING_SLOT_COUNT] =
 {
@@ -76,6 +82,7 @@ static const TsipProvisioningSlotInfo_t xSlotInfo[TSIP_PROVISIONING_SLOT_COUNT] 
     { "kuk-cbc-mac", "tsip_kuk_cbc_mac_id", 92U },
 };
 
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 /* Where the last prepare failed (see tsipprov prepare): a stage number and the TSIP driver result. */
 static uint32_t ulPrepareFailureStage = 0U;
 static int32_t lPrepareFailureCode = 0;
@@ -98,6 +105,8 @@ static uint8_t ucClientPrivateBlob[CLIENT_PRIVATE_MAX_STORED_SIZE];
 
 extern tsip_rsa2048_private_key_index_t rsa2048_private_key;
 extern tsip_rsa2048_public_key_index_t rsa2048_public_key;
+
+#endif
 
 const char * pcTsipProvisioningSlotCliName(TsipProvisioningSlot_t xSlot)
 {
@@ -167,6 +176,7 @@ void vTsipProvisioningEraseSlot(TsipProvisioningSlot_t xSlot)
     }
 }
 
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 BaseType_t xTsipProvisioningReadRootCaSignature(uint8_t * pucBuffer,
                                                 uint32_t ulBufferSize,
                                                 uint32_t * pulActualSize)
@@ -274,6 +284,8 @@ BaseType_t xTsipProvisioningLoadClientRsa2048KeyPair(void)
             (pdTRUE == prvLoadOrImportClientPrivateKey())) ? pdTRUE : pdFALSE;
 }
 
+#endif
+
 static BaseType_t prvReadFile(const char * pcStorageName,
                               uint8_t * pucBuffer,
                               uint32_t ulBufferSize,
@@ -312,6 +324,7 @@ static BaseType_t prvReadFile(const char * pcStorageName,
     return pdTRUE;
 }
 
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 static BaseType_t prvWriteFile(const char * pcStorageName,
                                const uint8_t * pucBuffer,
                                uint32_t ulBufferSize)
@@ -512,5 +525,7 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
 
     return xResult;
 }
+
+#endif
 
 #endif
