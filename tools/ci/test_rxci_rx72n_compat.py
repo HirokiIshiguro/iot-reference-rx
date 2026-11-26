@@ -20,6 +20,10 @@ class Rx72nCompatTests(unittest.TestCase):
                 "#define MBEDTLS_ERR_GCM_BAD_INPUT (-3)\n#define MBEDTLS_ERR_GCM_AUTH_FAILED (-4)\n"
                 "#define MBEDTLS_GCM_ENCRYPT 1\n#define MBEDTLS_GCM_DECRYPT 0\n"
             ),
+            "mbedtls/platform.h": (
+                "#include <stdlib.h>\n#define mbedtls_calloc calloc\n#define mbedtls_free free\n"
+                "#define MBEDTLS_ERR_CIPHER_ALLOC_FAILED (-6)\n"
+            ),
             "mbedtls/platform_util.h": (
                 "#include <string.h>\n"
                 "static inline void mbedtls_platform_zeroize(void *p, size_t n) { memset(p, 0, n); }\n"
@@ -34,7 +38,7 @@ class Rx72nCompatTests(unittest.TestCase):
 #define TEST_TSIP_H
 #include <stdint.h>
 typedef int e_tsip_err_t;
-typedef int tsip_aes_key_index_t;
+typedef struct tsip_aes_key_index { int index; } tsip_aes_key_index_t;
 typedef int tsip_update_key_ring_t;
 typedef int tsip_aes_handle_t;
 typedef int tsip_gcm_handle_t;
@@ -93,32 +97,32 @@ BaseType_t xTsipProvisioningReadSlot(TsipProvisioningSlot_t slot, uint8_t *buffe
 }
 static int check_blob(uint8_t *w, uint8_t *iv, uint8_t *e, int *index)
 { assert(w[0] == 8 && iv[0] == 40 && e[0] == 56); *index = 1; return 0; }
-e_tsip_err_t R_TSIP_GenerateAes128KeyIndex(uint8_t *w, uint8_t *v, uint8_t *e, int *k)
-{ return check_blob(w, v, e, k); }
+e_tsip_err_t R_TSIP_GenerateAes128KeyIndex(uint8_t *w, uint8_t *v, uint8_t *e, tsip_aes_key_index_t *k)
+{ return check_blob(w, v, e, &k->index); }
 e_tsip_err_t R_TSIP_GenerateUpdateKeyRingKeyIndex(uint8_t *w, uint8_t *v, uint8_t *e, int *k)
 { return check_blob(w, v, e, k); }
 int R_Demo_Common_API_TSIP_Open(void *root, int *ring)
 { assert(mutex_locked && root == NULL && (!ring || *ring == 1)); return 0; }
 int R_Demo_Common_API_TSIP_Close(void) { assert(mutex_locked); return 0; }
-e_tsip_err_t R_TSIP_UpdateAes128KeyIndex(uint8_t *v, uint8_t *e, int *k)
+e_tsip_err_t R_TSIP_UpdateAes128KeyIndex(uint8_t *v, uint8_t *e, tsip_aes_key_index_t *k)
 { (void)v; (void)e; (void)k; return TSIP_ERR_FAIL; }
 e_tsip_err_t R_TSIP_GenerateRandomNumber(uint32_t *words)
 { (void)words; return TSIP_ERR_FAIL; }
-e_tsip_err_t R_TSIP_Aes128EcbEncryptInit(int *h, int *k)
+e_tsip_err_t R_TSIP_Aes128EcbEncryptInit(int *h, tsip_aes_key_index_t *k)
 { (void)h; (void)k; return TSIP_ERR_FAIL; }
 e_tsip_err_t R_TSIP_Aes128EcbEncryptUpdate(int *h, uint8_t *p, uint8_t *c, uint32_t n)
 { (void)h; (void)p; (void)c; (void)n; return TSIP_ERR_FAIL; }
 e_tsip_err_t R_TSIP_Aes128EcbEncryptFinal(int *h, uint8_t *b, uint32_t *n)
 { (void)h; (void)b; (void)n; return TSIP_ERR_FAIL; }
-e_tsip_err_t R_TSIP_Aes128CbcEncryptInit(int *h, int *k, uint8_t *v)
+e_tsip_err_t R_TSIP_Aes128CbcEncryptInit(int *h, tsip_aes_key_index_t *k, uint8_t *v)
 { (void)h; (void)k; (void)v; return TSIP_ERR_FAIL; }
 e_tsip_err_t R_TSIP_Aes128CbcEncryptUpdate(int *h, uint8_t *p, uint8_t *c, uint32_t n)
 { return R_TSIP_Aes128EcbEncryptUpdate(h,p,c,n); }
 e_tsip_err_t R_TSIP_Aes128CbcEncryptFinal(int *h, uint8_t *b, uint32_t *n)
 { return R_TSIP_Aes128EcbEncryptFinal(h,b,n); }
-e_tsip_err_t R_TSIP_Aes128GcmEncryptInit(int *h, int *k, uint8_t *v, uint32_t n)
-{ assert(mutex_locked && n == 12 && v && *k == 1); *h = 1; bytes = calls = 0; return 0; }
-e_tsip_err_t R_TSIP_Aes128GcmDecryptInit(int *h, int *k, uint8_t *v, uint32_t n)
+e_tsip_err_t R_TSIP_Aes128GcmEncryptInit(int *h, tsip_aes_key_index_t *k, uint8_t *v, uint32_t n)
+{ assert(mutex_locked && n == 12 && v && k->index == 1); *h = 1; bytes = calls = 0; return 0; }
+e_tsip_err_t R_TSIP_Aes128GcmDecryptInit(int *h, tsip_aes_key_index_t *k, uint8_t *v, uint32_t n)
 { return R_TSIP_Aes128GcmEncryptInit(h,k,v,n); }
 e_tsip_err_t R_TSIP_Aes128GcmEncryptUpdate(int *h, uint8_t *p, uint8_t *c, uint32_t n,
                                           uint8_t *ad, uint32_t na)
@@ -148,8 +152,10 @@ int main(void)
                      (1u << TSIP_PROVISIONING_SLOT_KEY_UPDATE_CBC_MAC_AES128)));
     mbedtls_gcm_init(&ctx);
     assert(mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, record, 128) != 0);
-    assert(!ctx.key_ready && !mutex_locked);
-    ctx.key_index = ctx.key_ready = 1;
+    assert(ctx.key_index == NULL && !mutex_locked);
+    ctx.key_index = calloc(1, sizeof(*ctx.key_index));
+    assert(ctx.key_index != NULL);
+    ctx.key_index->index = 1;
     assert(mbedtls_gcm_crypt_and_tag(&ctx, MBEDTLS_GCM_ENCRYPT, 275, nonce, 12,
                                      aad, 13, record, record, 16, tag) == 0);
     assert(calls == 2 && bytes == 275 && tag[0] == 0x10);
@@ -158,7 +164,8 @@ int main(void)
     assert(mbedtls_gcm_auth_decrypt(&ctx, 275, nonce, 12, aad, 13, tag, 16,
                                     record, record) == MBEDTLS_ERR_GCM_AUTH_FAILED);
     for (unsigned i = 0; i < sizeof(record); ++i) assert(record[i] == 0);
-    assert(!mutex_locked);
+    mbedtls_gcm_free(&ctx);
+    assert(!mutex_locked && ctx.key_index == NULL);
     return 0;
 }
 """,

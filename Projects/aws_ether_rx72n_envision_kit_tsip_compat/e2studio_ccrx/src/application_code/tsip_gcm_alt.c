@@ -5,6 +5,7 @@
 #include "FreeRTOS.h"
 #include "mbedtls/error.h"
 #include "mbedtls/gcm.h"
+#include "mbedtls/platform.h"
 #include "mbedtls/platform_util.h"
 #include "mbedtls/threading.h"
 #include "r_common_api_tsip.h"
@@ -89,9 +90,11 @@ void mbedtls_gcm_init(mbedtls_gcm_context *ctx)
 
 void mbedtls_gcm_free(mbedtls_gcm_context *ctx)
 {
-    if (ctx != NULL)
+    if (ctx != NULL && ctx->key_index != NULL)
     {
-        mbedtls_platform_zeroize(ctx, sizeof(*ctx));
+        mbedtls_platform_zeroize(ctx->key_index, sizeof(*ctx->key_index));
+        mbedtls_free(ctx->key_index);
+        ctx->key_index = NULL;
     }
 }
 
@@ -99,6 +102,7 @@ int mbedtls_gcm_setkey(mbedtls_gcm_context *ctx, mbedtls_cipher_id_t cipher,
                        const unsigned char *key, unsigned int keybits)
 {
     tsip_aes_handle_t aes;
+    tsip_aes_key_index_t *key_index;
     uint32_t iv_words[4];
     uint32_t plain_words[8];
     uint32_t encrypted_words[8];
@@ -116,6 +120,13 @@ int mbedtls_gcm_setkey(mbedtls_gcm_context *ctx, mbedtls_cipher_id_t cipher,
     if (xProvisioned != pdTRUE || mbedtls_platform_mutex_lock(&mutexUseTsip) != 0)
     {
         return MBEDTLS_ERR_PLATFORM_HW_ACCEL_FAILED;
+    }
+
+    key_index = mbedtls_calloc(1, sizeof(*key_index));
+    if (key_index == NULL)
+    {
+        (void)mbedtls_platform_mutex_unlock(&mutexUseTsip);
+        return MBEDTLS_ERR_CIPHER_ALLOC_FAILED;
     }
 
     /* R20AN0371 §7.5: for a one-block key, CBC-MAC is one ECB encryption
@@ -153,15 +164,21 @@ int mbedtls_gcm_setkey(mbedtls_gcm_context *ctx, mbedtls_cipher_id_t cipher,
 
     if (status == TSIP_SUCCESS)
     {
-        status = R_TSIP_UpdateAes128KeyIndex((uint8_t *)iv_words, (uint8_t *)encrypted_words, &ctx->key_index);
+        status = R_TSIP_UpdateAes128KeyIndex((uint8_t *)iv_words, (uint8_t *)encrypted_words, key_index);
     }
     mbedtls_platform_zeroize(encrypted_words, sizeof(encrypted_words));
     mbedtls_platform_zeroize(iv_words, sizeof(iv_words));
     mbedtls_platform_zeroize(&aes, sizeof(aes));
     (void)mbedtls_platform_mutex_unlock(&mutexUseTsip);
 
-    ctx->key_ready = (status == TSIP_SUCCESS);
-    return ctx->key_ready ? 0 : MBEDTLS_ERR_PLATFORM_HW_ACCEL_FAILED;
+    if (status != TSIP_SUCCESS)
+    {
+        mbedtls_platform_zeroize(key_index, sizeof(*key_index));
+        mbedtls_free(key_index);
+        return MBEDTLS_ERR_PLATFORM_HW_ACCEL_FAILED;
+    }
+    ctx->key_index = key_index;
+    return 0;
 }
 
 static int prvGcmRecord(mbedtls_gcm_context *ctx, int mode, size_t length,
@@ -183,7 +200,7 @@ static int prvGcmRecord(mbedtls_gcm_context *ctx, int mode, size_t length,
     size_t tail = length % AES_BLOCK_BYTES;
     const int encrypt = (mode == MBEDTLS_GCM_ENCRYPT);
 
-    if (!ctx->key_ready || iv == NULL || iv_len != GCM_IV_BYTES ||
+    if (ctx->key_index == NULL || iv == NULL || iv_len != GCM_IV_BYTES ||
         add_len > 13U || (add_len != 0 && add == NULL) ||
         tag == NULL || tag_len != AES_BLOCK_BYTES || length > TLS_RECORD_BYTES ||
         (length != 0 && (input == NULL || output == NULL)) ||
@@ -208,8 +225,8 @@ static int prvGcmRecord(mbedtls_gcm_context *ctx, int mode, size_t length,
         memcpy(tag_words, tag, tag_len);
     }
     status = encrypt ?
-        R_TSIP_Aes128GcmEncryptInit(&handle, &ctx->key_index, (uint8_t *)iv_words, GCM_IV_BYTES) :
-        R_TSIP_Aes128GcmDecryptInit(&handle, &ctx->key_index, (uint8_t *)iv_words, GCM_IV_BYTES);
+        R_TSIP_Aes128GcmEncryptInit(&handle, ctx->key_index, (uint8_t *)iv_words, GCM_IV_BYTES) :
+        R_TSIP_Aes128GcmDecryptInit(&handle, ctx->key_index, (uint8_t *)iv_words, GCM_IV_BYTES);
     if (status == TSIP_SUCCESS)
     {
         e_tsip_err_t final_status;
