@@ -1,7 +1,7 @@
 /*
  * Runtime accessors for TSIP provisioning blobs stored in littlefs.
  */
-#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE) || defined(RX72N_TSIP_COMPAT)
 
 #include <stdint.h>
 #include <string.h>
@@ -513,4 +513,4 @@ static BaseType_t prvLoadOrImportClientPrivateKey(void)
     return xResult;
 }
 
-#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
+#endif

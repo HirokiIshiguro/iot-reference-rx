@@ -6,7 +6,7 @@
  * define them in the application project and let the existing threading_alt
  * hooks initialize them from corePKCS11.
  */
-#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE) || defined(RX72N_TSIP_COMPAT)
 
 #include <stdint.h>
 
@@ -205,4 +205,4 @@ void vTsipWaitLoopGetStats( uint32_t * pulCalls,
     }
 }
 
-#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
+#endif
