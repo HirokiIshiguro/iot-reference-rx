@@ -713,7 +713,7 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
         failure = str(error)
     finally:
         try:
-            if test["backend"] == "compat":
+            if test["board"] == "rx72n" and test.get("backend") == "compat":
                 board.park()
             else:
                 board.rest()

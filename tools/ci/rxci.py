@@ -125,6 +125,7 @@ def assume_role(sts, sleep=None, **request) -> dict:
 
 
 RX72N_COMPAT_MQTT = "rx72n:compat:tls12:mqtt"
+RX72N_COMPAT_PATTERN = f"^{RX72N_COMPAT_MQTT}$"
 
 
 def load_registry(path: Path | None = None) -> dict:
@@ -220,7 +221,7 @@ def build_variants(test: dict, registry: dict | None = None) -> list[str]:
 def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list[dict]]:
     """Return (tests to run, tests that matched but are not implemented yet)."""
     tests = registry["tests"]
-    if pattern == f"^{RX72N_COMPAT_MQTT}$":
+    if pattern == RX72N_COMPAT_PATTERN:
         return registry.get("experimental_tests", []), []
     if pattern:
         regex = re.compile(pattern)
@@ -291,7 +292,9 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
         names = ", ".join(test["name"] for test in pending)
         raise SystemExit(f"Selected tests are not implemented yet: {names}")
 
-    if pattern or profile == "smoke":
+    if profile == "build" and pattern == RX72N_COMPAT_PATTERN:
+        variants = [build_variant(test, registry) for test in run]
+    elif pattern or profile == "smoke":
         variants = sorted({variant for test in run for variant in build_variants(test, registry)})
     elif profile in ("build", "full"):
         variants = sorted({variant for test in registry["tests"] if test["ready"]
@@ -299,7 +302,10 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
     else:
         variants = []
     if profile == "build":
-        variants.extend(build_variant(test, registry) for test in registry.get("experimental_tests", []))
+        # A focused build checks the experiment before any board reservation.
+        run = []
+        if not pattern:
+            variants.extend(build_variant(test, registry) for test in registry.get("experimental_tests", []))
 
     jobs: dict = {
         "stages": ["check", "build", "test", "benchmark", "cleanup"],
@@ -461,7 +467,7 @@ def command_plan(args: argparse.Namespace) -> int:
             raise SystemExit("PROFILE=benchmark runs the benchmarks of whole boards: choose them with BOARD, "
                              "and leave BACKEND, TLS and FEATURE at all and TEST empty.")
         pattern = ""
-    elif pattern and args.profile != "full":
+    elif pattern and args.profile != "full" and not (args.profile == "build" and pattern == RX72N_COMPAT_PATTERN):
         raise SystemExit(f"BOARD/BACKEND/TLS/FEATURE or TEST select tests, and only PROFILE=full runs a "
                          f"selection (got PROFILE={args.profile}). Set PROFILE=full, or clear the selection.")
     if args.benchmark not in ("true", "false"):

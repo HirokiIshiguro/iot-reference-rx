@@ -6,8 +6,8 @@
 # The variables below are the form of Build > Pipelines > New pipeline.
 # The values to choose for each purpose, and the jobs that then run, are in docs/details/ci-pipeline.md.
 #
-# A selection (BOARD, BACKEND, TLS, FEATURE or TEST) with a PROFILE other than full stops in the
-# plan job with the reason, and so does a value that is not in a list.
+# Selection normally requires PROFILE=full. The explicitly selected RX72N compatibility
+# experiment also accepts PROFILE=build to compile without starting a board job.
 
 stages:
   - plan
