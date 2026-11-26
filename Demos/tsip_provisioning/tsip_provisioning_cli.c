@@ -62,6 +62,9 @@ static const TsipProvisioningCliSlot_t xSlots[TSIP_PROVISIONING_SLOT_COUNT] =
     { TSIP_PROVISIONING_SLOT_CLIENT_PUBLIC_KEY, "client-pub", "tsip_client_pub_wrapped_id", 0U },
     { TSIP_PROVISIONING_SLOT_CLIENT_PRIVATE_KEY, "client-pri", "tsip_client_pri_wrapped_id", 0U },
     { TSIP_PROVISIONING_SLOT_ROOT_CA_DER, "rootca-der", "tsip_rootca_der_id", 0U },
+    { TSIP_PROVISIONING_SLOT_KEY_UPDATE_KEY, "kuk", "tsip_kuk_id", 108U },
+    { TSIP_PROVISIONING_SLOT_KEY_UPDATE_CBC_AES128, "kuk-cbc", "tsip_kuk_cbc_id", 92U },
+    { TSIP_PROVISIONING_SLOT_KEY_UPDATE_CBC_MAC_AES128, "kuk-cbc-mac", "tsip_kuk_cbc_mac_id", 92U },
 };
 
 static const CLI_Command_Definition_t xTsipProvisioningCommand =
@@ -69,7 +72,7 @@ static const CLI_Command_Definition_t xTsipProvisioningCommand =
     "tsipprov",
     "\r\ntsipprov:\r\n"
     "    Provision TSIP blobs into littlefs.\r\n"
-    "    Usage: tsipprov begin {rootca-sig|root-signer|client-pub|client-pri|rootca-der} <size>\r\n"
+    "    Usage: tsipprov begin {rootca-sig|root-signer|client-pub|client-pri|rootca-der|kuk|kuk-cbc|kuk-cbc-mac} <size>\r\n"
     "           tsipprov write <offset> <hex-bytes>\r\n"
     "           tsipprov end\r\n"
     "           tsipprov status\r\n"

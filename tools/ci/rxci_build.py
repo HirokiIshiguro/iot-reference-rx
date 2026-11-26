@@ -339,7 +339,11 @@ def build_rx671_app(registry: dict, backend: str, tls: str, kind: str, out: Path
 
 
 def build_rx72n_app(registry: dict, backend: str, tls: str, kind: str, out: Path) -> None:
-    project = "aws_ether_rx72n_envision_kit" if backend == "software" else "aws_ether_rx72n_envision_kit_tsip"
+    project = {
+        "software": "aws_ether_rx72n_envision_kit",
+        "tsip": "aws_ether_rx72n_envision_kit_tsip",
+        "compat": "aws_ether_rx72n_envision_kit_tsip_compat",
+    }[backend]
     work = workspace(registry, f"rx72n-{backend}{tls}-{kind}")
     log = ROOT / "rx72n_e2studio_build.log"
     boot_dir = ROOT / "Projects" / "boot_loader_rx72n_envision_kit" / "e2studio_ccrx" / "HardwareDebug"
@@ -465,6 +469,9 @@ def build_from_source(registry: dict, variant: str, out: Path) -> None:
     flavor, _, kind = name.partition("/")
     backend, _, tls = flavor.partition("-")
     # RX72N and RX65N: "software" serves both TLS versions; "tsip-tls12" and "tsip-tls13" differ.
+    if (board, flavor, kind) == ("rx72n", "compat-tls12", "app"):
+        build_rx72n_app(registry, backend, tls, kind, out)
+        return
     if board in ("rx72n", "rx65n") and (flavor == "software" or (backend == "tsip" and tls in ("tls12", "tls13"))):
         app, ota = ((build_rx72n_app, build_rx72n_ota) if board == "rx72n" else (build_rx65n_app, build_rx65n_ota))
         if kind in ("app", "fleet"):

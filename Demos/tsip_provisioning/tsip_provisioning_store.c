@@ -71,6 +71,9 @@ static const TsipProvisioningSlotInfo_t xSlotInfo[TSIP_PROVISIONING_SLOT_COUNT] 
     { "client-pub", "tsip_client_pub_wrapped_id", 0U },
     { "client-pri", "tsip_client_pri_wrapped_id", 0U },
     { "rootca-der", "tsip_rootca_der_id", 0U },
+    { "kuk", "tsip_kuk_id", 108U },
+    { "kuk-cbc", "tsip_kuk_cbc_id", 92U },
+    { "kuk-cbc-mac", "tsip_kuk_cbc_mac_id", 92U },
 };
 
 /* Where the last prepare failed (see tsipprov prepare): a stage number and the TSIP driver result. */

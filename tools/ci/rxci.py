@@ -124,6 +124,9 @@ def assume_role(sts, sleep=None, **request) -> dict:
     raise AssertionError("unreachable")
 
 
+RX72N_COMPAT_MQTT = "rx72n:compat:tls12:mqtt"
+
+
 def load_registry(path: Path | None = None) -> dict:
     registry = json.loads((path or HERE / "tests.json").read_text(encoding="utf-8"))
     axes = registry["axes"]
@@ -145,6 +148,10 @@ def load_registry(path: Path | None = None) -> dict:
             "smoke": name in registry["smoke"],
         })
     registry["tests"] = tests
+    registry["experimental_tests"] = [{
+        "id": "IREF-EXP-226", "name": RX72N_COMPAT_MQTT, "board": "rx72n",
+        "backend": "compat", "tls": "tls12", "feature": "mqtt", "ready": True, "smoke": False,
+    }]
     return registry
 
 
@@ -176,7 +183,7 @@ def build_variant(test: dict, registry: dict | None = None) -> str:
     if test["backend"] == "sw":
         backend = f"software-{test['tls']}" if per_tls else "software"
     else:
-        backend = f"tsip-{test['tls']}"
+        backend = f"{test['backend']}-{test['tls']}"
     kind = {"mqtt": "app", "ota": "ota", "fleet": "fleet"}[test["feature"]]
     if test["feature"] == "mqtt" and mqtt_from_ota_bundle(test, registry):
         kind = "ota"
@@ -213,6 +220,8 @@ def build_variants(test: dict, registry: dict | None = None) -> list[str]:
 def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list[dict]]:
     """Return (tests to run, tests that matched but are not implemented yet)."""
     tests = registry["tests"]
+    if pattern == f"^{RX72N_COMPAT_MQTT}$":
+        return registry.get("experimental_tests", []), []
     if pattern:
         regex = re.compile(pattern)
         matched = [test for test in tests if regex.search(test["name"])]
@@ -289,6 +298,8 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
                            for variant in build_variants(test, registry)})
     else:
         variants = []
+    if profile == "build":
+        variants.extend(build_variant(test, registry) for test in registry.get("experimental_tests", []))
 
     jobs: dict = {
         "stages": ["check", "build", "test", "benchmark", "cleanup"],
@@ -533,7 +544,8 @@ def command_test(args: argparse.Namespace) -> int:
     import rxci_board
 
     registry = load_registry()
-    matches = [test for test in registry["tests"] if test["name"] == args.name]
+    matches = [test for test in [*registry["tests"], *registry["experimental_tests"]]
+               if test["name"] == args.name]
     if not matches:
         raise SystemExit(f"Unknown test: {args.name}")
     test = matches[0]
@@ -547,7 +559,8 @@ def command_finish(args: argparse.Namespace) -> int:
     import rxci_board
 
     registry = load_registry()
-    test = next(test for test in registry["tests"] if test["name"] == args.name)
+    test = next(test for test in [*registry["tests"], *registry["experimental_tests"]]
+                if test["name"] == args.name)
     return rxci_board.finish_test(registry, test, Path(args.log_dir).resolve(), aws_session)
 
 
