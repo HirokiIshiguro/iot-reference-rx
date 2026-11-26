@@ -136,7 +136,8 @@ static BaseType_t prvCommandHasSensitiveValue(const char * pcCommand)
         "conf sethex wifissid ",
         "conf sethex wifipass ",
 #if defined( RX72N_TSIP_COMPAT )
-        "tsipprov write "
+        /* Suppress before parsing any subcommand or its arguments. */
+        "tsipprov "
 #endif
     };
     size_t xIndex;
