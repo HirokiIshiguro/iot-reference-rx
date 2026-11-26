@@ -713,7 +713,10 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
         failure = str(error)
     finally:
         try:
-            board.rest()
+            if test["backend"] == "compat":
+                board.park()
+            else:
+                board.rest()
         except (subprocess.SubprocessError, OSError) as error:
             failure = failure or f"could not park the board: {error}"
     seconds = time.monotonic() - started

@@ -203,10 +203,15 @@ def load_payloads(args: argparse.Namespace) -> list[tuple[str, bytes, str]]:
         env_names = custom_env_names.get(slot) or TARGET_ENV_NAMES[args.target].get(slot)
         if not env_names:
             raise ValueError(f"{slot} is unavailable for {args.target}")
-        data, source = read_env_bytes(env_names)
         expected_size = KEY_UPDATE_SLOT_SIZES.get(slot)
-        if expected_size is not None and len(data) != expected_size:
-            raise ValueError(f"{source} must contain {expected_size} bytes")
+        if expected_size is None:
+            data, source = read_env_bytes(env_names)
+        else:
+            source = env_names[0]
+            value = os.environ.get(source, "").strip()
+            if not re.fullmatch(rf"[0-9a-fA-F]{{{2 * expected_size}}}", value):
+                raise ValueError(f"{source} must contain {expected_size} bytes as one hex line")
+            data = bytes.fromhex(value)
         payloads.append((slot, data, source))
 
     return payloads
