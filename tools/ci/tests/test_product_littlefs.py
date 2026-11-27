@@ -124,6 +124,8 @@ rm_littlefs_err_t RM_LITTLEFS_Format(rm_littlefs_ctrl_t *ctrl) {
 int main(void) {
     const char key[]="PUBLIC-SIGNER-KEY"; char output[32]={0}; lfs_file_t file={0}; struct lfs_info info;
     lfs_t *lfs;
+    const unsigned char version=3, cipher[4]={1,2,3,4}; unsigned char attr_out[4]={0};
+    struct lfs_attr attrs[1]; struct lfs_file_config file_cfg;
     memset(flash,255,sizeof(flash));
     assert(LfsCommon_Remove(NULL,"none")==LFS_ERR_IO && !held);
     assert(littlFs_init()==LFS_ERR_IO && !held && created==1 && adapter_open_count==0);
@@ -141,6 +143,28 @@ int main(void) {
     assert(LfsCommon_FileRead(lfs,&file,output,sizeof(key))==sizeof(key) && !memcmp(output,key,sizeof(key)));
     assert(!LfsCommon_FileClose(lfs,&file));
     assert(!LfsCommon_Stat(lfs,"code_signer_public_key",&info) && info.size==sizeof(key));
+    assert(LfsCommon_SetAttr(NULL,"code_signer_public_key",1,&version,1)==LFS_ERR_BADF && !held);
+    assert(LfsCommon_GetAttr(NULL,"code_signer_public_key",1,attr_out,1)==LFS_ERR_BADF && !held);
+    assert(LfsCommon_RemoveAttr(NULL,"code_signer_public_key",1)==LFS_ERR_BADF && !held);
+    assert(LfsCommon_GetAttr(lfs,"code_signer_public_key",1,attr_out,1)==LFS_ERR_NOATTR && !held);
+    assert(!LfsCommon_SetAttr(lfs,"code_signer_public_key",1,&version,1) && !held);
+    assert(LfsCommon_GetAttr(lfs,"code_signer_public_key",1,attr_out,sizeof(attr_out))==1 && attr_out[0]==3 && !held);
+    assert(!LfsCommon_RemoveAttr(lfs,"code_signer_public_key",1) && !held);
+    assert(LfsCommon_GetAttr(lfs,"code_signer_public_key",1,attr_out,1)==LFS_ERR_NOATTR && !held);
+    /* Attributes given to opencfg are committed with the contents on close and read back on open. */
+    memset(&file_cfg,0,sizeof(file_cfg)); attrs[0].type=2; attrs[0].buffer=(void *)cipher; attrs[0].size=sizeof(cipher);
+    file_cfg.attrs=attrs; file_cfg.attr_count=1;
+    assert(LfsCommon_FileOpenCfg(NULL,&file,"setting",LFS_O_CREAT|LFS_O_WRONLY,&file_cfg)==LFS_ERR_BADF && !held);
+    assert(!LfsCommon_FileOpenCfg(lfs,&file,"setting",LFS_O_CREAT|LFS_O_WRONLY,&file_cfg) && !held);
+    assert(LfsCommon_FileWrite(lfs,&file,key,sizeof(key))==sizeof(key));
+    assert(LfsCommon_GetAttr(lfs,"setting",2,attr_out,sizeof(attr_out))==LFS_ERR_NOATTR && !held);
+    assert(!LfsCommon_FileClose(lfs,&file) && !held);
+    memset(attr_out,0,sizeof(attr_out));
+    assert(LfsCommon_GetAttr(lfs,"setting",2,attr_out,sizeof(attr_out))==sizeof(cipher) && !memcmp(attr_out,cipher,sizeof(cipher)));
+    memset(attr_out,0,sizeof(attr_out)); attrs[0].buffer=attr_out;
+    assert(!LfsCommon_FileOpenCfg(lfs,&file,"setting",LFS_O_RDONLY,&file_cfg) && !memcmp(attr_out,cipher,sizeof(cipher)) && !held);
+    assert(LfsCommon_FileSize(lfs,&file)==sizeof(key)); assert(!LfsCommon_FileClose(lfs,&file));
+    assert(!LfsCommon_Remove(lfs,"setting") && !held);
     assert(!LfsCommon_Rename(lfs,"code_signer_public_key","code_sign_cert_id"));
     read_error=1; assert(LfsCommon_FileOpen(lfs,&file,"code_sign_cert_id",LFS_O_RDONLY)==LFS_ERR_IO && !held);
     read_error=0; assert(!LfsCommon_Remove(lfs,"code_sign_cert_id") && !held);
@@ -160,7 +184,7 @@ int main(void) {
                  "Common/ports/rm_aws_pkcs11_pal_littlefs/rm_aws_pkcs11_pal_littlefs.c"]
         for name in paths:
             source=(ROOT/name).read_text(encoding="utf-8")
-            self.assertNotRegex(source,r"\blfs_(?:file_\w+|remove|rename|stat|format|mount|unmount)\s*\(",name)
+            self.assertNotRegex(source,r"\blfs_(?:file_\w+|remove|rename|stat|getattr|setattr|removeattr|format|mount|unmount)\s*\(",name)
             self.assertNotIn("RM_LITTLEFS_FLASH_Open",source,name)
             self.assertNotIn("fsp_common_api.h",source,name)
         for name in ("Common/littlefs_common/rm_littlefs_api.h", "Common/littlefs_common/rm_littlefs_flash.h",

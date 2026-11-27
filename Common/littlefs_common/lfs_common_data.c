@@ -155,12 +155,59 @@ int LfsCommon_Stat(lfs_t *lfs, const char *path, struct lfs_info *info)
     return result;
 }
 
+lfs_ssize_t LfsCommon_GetAttr(lfs_t *lfs, const char *path, uint8_t type, void *buffer, lfs_size_t size)
+{
+    lfs_ssize_t result = prvLock(lfs);
+    if (LFS_ERR_OK == result)
+    {
+        result = lfs_getattr(lfs, path, type, buffer, size);
+        (void) xSemaphoreGive(s_mutex);
+    }
+    return result;
+}
+
+int LfsCommon_SetAttr(lfs_t *lfs, const char *path, uint8_t type, const void *buffer, lfs_size_t size)
+{
+    int result = prvLock(lfs);
+    if (LFS_ERR_OK == result)
+    {
+        result = lfs_setattr(lfs, path, type, buffer, size);
+        (void) xSemaphoreGive(s_mutex);
+    }
+    return result;
+}
+
+int LfsCommon_RemoveAttr(lfs_t *lfs, const char *path, uint8_t type)
+{
+    int result = prvLock(lfs);
+    if (LFS_ERR_OK == result)
+    {
+        result = lfs_removeattr(lfs, path, type);
+        (void) xSemaphoreGive(s_mutex);
+    }
+    return result;
+}
+
 int LfsCommon_FileOpen(lfs_t *lfs, lfs_file_t *file, const char *path, int flags)
 {
     int result = prvLock(lfs);
     if (LFS_ERR_OK == result)
     {
         result = lfs_file_open(lfs, file, path, flags);
+        (void) xSemaphoreGive(s_mutex);
+    }
+    return result;
+}
+
+/* The attributes in config are read on open and written on sync and close,
+ * together with the file contents. config must stay valid until the file is closed. */
+int LfsCommon_FileOpenCfg(lfs_t *lfs, lfs_file_t *file, const char *path, int flags,
+                          const struct lfs_file_config *config)
+{
+    int result = prvLock(lfs);
+    if (LFS_ERR_OK == result)
+    {
+        result = lfs_file_opencfg(lfs, file, path, flags, config);
         (void) xSemaphoreGive(s_mutex);
     }
     return result;
