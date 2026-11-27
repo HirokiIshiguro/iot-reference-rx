@@ -161,5 +161,19 @@ class Bg96BootloaderDownloadTests(unittest.TestCase):
                 rfp.assert_not_called()
 
 
+class ProbePorts(unittest.TestCase):
+    PRIMARY = "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AV0KOE92-if00-port0"
+    OTHER = "/dev/ttyACM1"
+
+    def probe(self, environment):
+        with mock.patch.dict(os.environ, environment, clear=True),              mock.patch.object(boot, "auto_probe_ports", return_value=[self.OTHER]):
+            return boot.parse_probe_ports(self.PRIMARY)
+
+    def test_only_the_given_uart_is_opened_by_default(self):
+        self.assertEqual(self.probe({}), [self.PRIMARY])
+
+    def test_other_uarts_are_opened_only_when_asked_for(self):
+        self.assertEqual(self.probe({"BG96_BOOTLOADER_AUTO_PROBE": "true"}), [self.PRIMARY, self.OTHER])
+
 if __name__ == "__main__":
     unittest.main()
