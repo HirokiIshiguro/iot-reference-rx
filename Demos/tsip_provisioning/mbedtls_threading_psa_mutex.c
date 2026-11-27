@@ -6,7 +6,7 @@
  * define them in the application project and let the existing threading_alt
  * hooks initialize them from corePKCS11.
  */
-#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE) || defined(RX72N_TSIP_COMPAT)
 
 #include <stdint.h>
 
@@ -32,7 +32,7 @@ static TaskHandle_t xTsipMtTasks[TSIP_MT_TRACKED_TASKS_MAX];
  */
 #if defined(MBEDTLS_THREADING_C) && defined(MBEDTLS_PSA_CRYPTO_C) && \
     !defined(LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE) && \
-    !defined(LANBENCH_TLS13_0RTT_TSIP_ENABLE)
+    !defined(LANBENCH_TLS13_0RTT_TSIP_ENABLE) && !defined(RX72N_TSIP_COMPAT)
 mbedtls_threading_mutex_t mbedtls_threading_key_slot_mutex;
 mbedtls_threading_mutex_t mbedtls_threading_psa_globaldata_mutex;
 mbedtls_threading_mutex_t mbedtls_threading_psa_rngdata_mutex;
@@ -85,7 +85,7 @@ void vTsipMbedtlsThreadingCompatInit( void )
     {
     #if defined(MBEDTLS_PSA_CRYPTO_C) && \
         !defined(LANBENCH_TLS13_0RTT_SOFTWARE_ENABLE) && \
-        !defined(LANBENCH_TLS13_0RTT_TSIP_ENABLE)
+        !defined(LANBENCH_TLS13_0RTT_TSIP_ENABLE) && !defined(RX72N_TSIP_COMPAT)
         mbedtls_platform_mutex_init( &mbedtls_threading_key_slot_mutex );
         mbedtls_platform_mutex_init( &mbedtls_threading_psa_globaldata_mutex );
         mbedtls_platform_mutex_init( &mbedtls_threading_psa_rngdata_mutex );
@@ -205,4 +205,4 @@ void vTsipWaitLoopGetStats( uint32_t * pulCalls,
     }
 }
 
-#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
+#endif

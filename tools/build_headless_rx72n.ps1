@@ -29,7 +29,11 @@ $normalizedRequireTlsVersion = $RequireTlsVersion.ToLowerInvariant()
 switch ($normalizedTlsBackend) {
     "software" { $appProjectName = "aws_ether_rx72n_envision_kit" }
     "tsip" { $appProjectName = "aws_ether_rx72n_envision_kit_tsip" }
-    default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software' or 'tsip'." }
+    "compat" { $appProjectName = "aws_ether_rx72n_envision_kit_tsip_compat" }
+    default { throw "Unsupported RX72N TLS backend: $TlsBackend. Use 'software', 'tsip', or 'compat'." }
+}
+if ($normalizedTlsBackend -eq "compat" -and $normalizedRequireTlsVersion -notin @("", "tlsv1.2", "tls1.2", "tls12")) {
+    throw "RX72N TSIP compatibility supports TLS 1.2 only."
 }
 $useTsipTls13Config = ($normalizedTlsBackend -eq "tsip") -and ($normalizedRequireTlsVersion -in @("tlsv1.3", "tls1.3", "tls13"))
 $useTsipTls13ZeroRttConfig = $Tls13ZeroRtt.IsPresent

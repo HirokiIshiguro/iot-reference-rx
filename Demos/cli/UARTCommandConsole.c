@@ -125,7 +125,7 @@ signed char cRxedChar;
 
 /*-----------------------------------------------------------*/
 
-#if RX671_OTA_PROVISIONER_ENABLE == 1
+#if ( RX671_OTA_PROVISIONER_ENABLE == 1 ) || defined( RX72N_TSIP_COMPAT )
 static BaseType_t prvCommandHasSensitiveValue(const char * pcCommand)
 {
     static const char * const ppcSensitivePrefixes[] =
@@ -134,7 +134,11 @@ static BaseType_t prvCommandHasSensitiveValue(const char * pcCommand)
         "conf set claimkey ",
         "conf set tsipprikey ",
         "conf sethex wifissid ",
-        "conf sethex wifipass "
+        "conf sethex wifipass ",
+#if defined( RX72N_TSIP_COMPAT )
+        /* Suppress before parsing any subcommand or its arguments. */
+        "tsipprov "
+#endif
     };
     size_t xIndex;
 
@@ -247,7 +251,7 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
         /* Ensure exclusive access to the UART Tx. */
         if (xSemaphoreTake(xTxMutex, cmdMAX_MUTEX_WAIT) == pdPASS)
         {
-#if RX671_OTA_PROVISIONER_ENABLE == 1
+#if ( RX671_OTA_PROVISIONER_ENABLE == 1 ) || defined( RX72N_TSIP_COMPAT )
             /* Echo only the command prefix. Once a private value begins, keep
              * the payload out of UART captures and terminal scrollback. */
             if (pdFALSE == prvCommandHasSensitiveValue(cInputString))
@@ -295,7 +299,7 @@ static void prvUARTCommandConsoleTask(void *pvParameters)
                 sent.  Clear the input string ready to receive the next command.
                 Remember the command that was just processed first in case it is
                 to be processed again. */
-#if RX671_OTA_PROVISIONER_ENABLE == 1
+#if ( RX671_OTA_PROVISIONER_ENABLE == 1 ) || defined( RX72N_TSIP_COMPAT )
                 if (pdTRUE == prvCommandHasSensitiveValue(cInputString))
                 {
                     /* A blank line must never repeat a credential command. */

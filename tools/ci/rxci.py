@@ -124,6 +124,10 @@ def assume_role(sts, sleep=None, **request) -> dict:
     raise AssertionError("unreachable")
 
 
+RX72N_COMPAT_MQTT = "rx72n:compat:tls12:mqtt"
+RX72N_COMPAT_PATTERN = f"^{RX72N_COMPAT_MQTT}$"
+
+
 def load_registry(path: Path | None = None) -> dict:
     registry = json.loads((path or HERE / "tests.json").read_text(encoding="utf-8"))
     axes = registry["axes"]
@@ -145,6 +149,10 @@ def load_registry(path: Path | None = None) -> dict:
             "smoke": name in registry["smoke"],
         })
     registry["tests"] = tests
+    registry["experimental_tests"] = [{
+        "id": "IREF-EXP-226", "name": RX72N_COMPAT_MQTT, "board": "rx72n",
+        "backend": "compat", "tls": "tls12", "feature": "mqtt", "ready": True, "smoke": False,
+    }]
     return registry
 
 
@@ -176,7 +184,7 @@ def build_variant(test: dict, registry: dict | None = None) -> str:
     if test["backend"] == "sw":
         backend = f"software-{test['tls']}" if per_tls else "software"
     else:
-        backend = f"tsip-{test['tls']}"
+        backend = f"{test['backend']}-{test['tls']}"
     kind = {"mqtt": "app", "ota": "ota", "fleet": "fleet"}[test["feature"]]
     if test["feature"] == "mqtt" and mqtt_from_ota_bundle(test, registry):
         kind = "ota"
@@ -213,6 +221,8 @@ def build_variants(test: dict, registry: dict | None = None) -> list[str]:
 def select(registry: dict, profile: str, pattern: str) -> tuple[list[dict], list[dict]]:
     """Return (tests to run, tests that matched but are not implemented yet)."""
     tests = registry["tests"]
+    if pattern == RX72N_COMPAT_PATTERN:
+        return registry.get("experimental_tests", []), []
     if pattern:
         regex = re.compile(pattern)
         matched = [test for test in tests if regex.search(test["name"])]
@@ -282,13 +292,20 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
         names = ", ".join(test["name"] for test in pending)
         raise SystemExit(f"Selected tests are not implemented yet: {names}")
 
-    if pattern or profile == "smoke":
+    if profile == "build" and pattern == RX72N_COMPAT_PATTERN:
+        variants = [build_variant(test, registry) for test in run]
+    elif pattern or profile == "smoke":
         variants = sorted({variant for test in run for variant in build_variants(test, registry)})
     elif profile in ("build", "full"):
         variants = sorted({variant for test in registry["tests"] if test["ready"]
                            for variant in build_variants(test, registry)})
     else:
         variants = []
+    if profile == "build":
+        # A focused build checks the experiment before any board reservation.
+        run = []
+        if not pattern:
+            variants.extend(build_variant(test, registry) for test in registry.get("experimental_tests", []))
 
     jobs: dict = {
         "stages": ["check", "build", "test", "benchmark", "cleanup"],
@@ -450,7 +467,7 @@ def command_plan(args: argparse.Namespace) -> int:
             raise SystemExit("PROFILE=benchmark runs the benchmarks of whole boards: choose them with BOARD, "
                              "and leave BACKEND, TLS and FEATURE at all and TEST empty.")
         pattern = ""
-    elif pattern and args.profile != "full":
+    elif pattern and args.profile != "full" and not (args.profile == "build" and pattern == RX72N_COMPAT_PATTERN):
         raise SystemExit(f"BOARD/BACKEND/TLS/FEATURE or TEST select tests, and only PROFILE=full runs a "
                          f"selection (got PROFILE={args.profile}). Set PROFILE=full, or clear the selection.")
     if args.benchmark not in ("true", "false"):
@@ -533,7 +550,8 @@ def command_test(args: argparse.Namespace) -> int:
     import rxci_board
 
     registry = load_registry()
-    matches = [test for test in registry["tests"] if test["name"] == args.name]
+    matches = [test for test in [*registry["tests"], *registry["experimental_tests"]]
+               if test["name"] == args.name]
     if not matches:
         raise SystemExit(f"Unknown test: {args.name}")
     test = matches[0]
@@ -547,7 +565,8 @@ def command_finish(args: argparse.Namespace) -> int:
     import rxci_board
 
     registry = load_registry()
-    test = next(test for test in registry["tests"] if test["name"] == args.name)
+    test = next(test for test in [*registry["tests"], *registry["experimental_tests"]]
+                if test["name"] == args.name)
     return rxci_board.finish_test(registry, test, Path(args.log_dir).resolve(), aws_session)
 
 

@@ -209,6 +209,26 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(len(groups), 4)
         self.assertEqual(sorted(set(groups)), ["windows-ccrx-build-1", "windows-ccrx-build-2", "windows-ccrx-build-3"])
 
+    def test_rx72n_compatibility_build_is_in_mr_and_hardware_is_opt_in(self):
+        data = rxci.load_registry()
+        name = "rx72n:compat:tls12:mqtt"
+        build = "build rx72n/compat-tls12/app"
+        jobs, _ = rxci.child_pipeline(data, "build", "", 1)
+        self.assertIn(build, jobs)
+        self.assertNotIn(name, jobs)
+        for profile in ("smoke", "full"):
+            jobs, _ = rxci.child_pipeline(data, profile, "", 1)
+            self.assertNotIn(name, jobs)
+            self.assertNotIn(build, jobs)
+        jobs, summary = rxci.child_pipeline(data, "build", f"^{name}$", 1)
+        self.assertIn(build, jobs)
+        self.assertNotIn(name, jobs)
+        self.assertEqual(summary["tests"], [])
+        jobs, summary = rxci.child_pipeline(data, "full", f"^{name}$", 1)
+        self.assertEqual(summary["tests"], [name])
+        self.assertIn(build, [need["job"] for need in jobs[name]["needs"]])
+        self.assertFalse(jobs[name]["interruptible"])
+
     def test_unknown_pattern_is_an_error(self):
         with self.assertRaises(SystemExit):
             rxci.child_pipeline(registry(), "check", "^no-such-test$", 1)

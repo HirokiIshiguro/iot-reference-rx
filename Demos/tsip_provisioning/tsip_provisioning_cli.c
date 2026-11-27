@@ -4,7 +4,7 @@
  * The command writes TSIP provisioning blobs delivered over UART into the
  * littlefs-backed key-value store used by iot-reference-rx.
  */
-#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE) || defined(RX72N_TSIP_COMPAT)
 
 #include <stdint.h>
 #include <stdio.h>
@@ -48,12 +48,15 @@ static BaseType_t prvWriteTempChunk(const uint8_t * pucData,
 static BaseType_t prvCommitTempFile(const char * pcStorageName);
 static uint32_t prvGetStoredLength(const char * pcStorageName);
 static void prvEraseFileIfExists(const char * pcStorageName);
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 static BaseType_t prvRefreshAwsCredentialMetadata(void);
 extern int32_t xprvWriteCacheEntry(size_t KeyLength,
                                    char * Key,
                                    size_t ValueLength,
                                    char * pvNewValue);
 extern BaseType_t KVStore_xCommitChanges(void);
+
+#endif
 
 static const TsipProvisioningCliSlot_t xSlots[TSIP_PROVISIONING_SLOT_COUNT] =
 {
@@ -62,6 +65,9 @@ static const TsipProvisioningCliSlot_t xSlots[TSIP_PROVISIONING_SLOT_COUNT] =
     { TSIP_PROVISIONING_SLOT_CLIENT_PUBLIC_KEY, "client-pub", "tsip_client_pub_wrapped_id", 0U },
     { TSIP_PROVISIONING_SLOT_CLIENT_PRIVATE_KEY, "client-pri", "tsip_client_pri_wrapped_id", 0U },
     { TSIP_PROVISIONING_SLOT_ROOT_CA_DER, "rootca-der", "tsip_rootca_der_id", 0U },
+    { TSIP_PROVISIONING_SLOT_KEY_UPDATE_KEY, "kuk", "tsip_kuk_id", 108U },
+    { TSIP_PROVISIONING_SLOT_KEY_UPDATE_CBC_AES128, "kuk-cbc", "tsip_kuk_cbc_id", 92U },
+    { TSIP_PROVISIONING_SLOT_KEY_UPDATE_CBC_MAC_AES128, "kuk-cbc-mac", "tsip_kuk_cbc_mac_id", 92U },
 };
 
 static const CLI_Command_Definition_t xTsipProvisioningCommand =
@@ -69,12 +75,14 @@ static const CLI_Command_Definition_t xTsipProvisioningCommand =
     "tsipprov",
     "\r\ntsipprov:\r\n"
     "    Provision TSIP blobs into littlefs.\r\n"
-    "    Usage: tsipprov begin {rootca-sig|root-signer|client-pub|client-pri|rootca-der} <size>\r\n"
+    "    Usage: tsipprov begin {rootca-sig|root-signer|client-pub|client-pri|rootca-der|kuk|kuk-cbc|kuk-cbc-mac} <size>\r\n"
     "           tsipprov write <offset> <hex-bytes>\r\n"
     "           tsipprov end\r\n"
     "           tsipprov status\r\n"
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     "           tsipprov prepare\r\n"
     "           tsipprov credentials\r\n"
+#endif
     "           tsipprov erase <slot>\r\n",
     prvTsipProvisioningCommand,
     -1
@@ -228,6 +236,7 @@ static BaseType_t prvTsipProvisioningCommand(char * pcWriteBuffer,
         prvEraseFileIfExists(pxSlot->pcStorageName);
         sprintf(pcWriteBuffer, "OK: erased %s.\r\n", pxSlot->pcCliName);
     }
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
     else if (0 == strncmp(pcRequest, "prepare", (size_t)xRequestLength))
     {
         if ((pdTRUE == xTsipProvisioningPrepareTlsRootCaTrustAnchor()) &&
@@ -253,6 +262,7 @@ static BaseType_t prvTsipProvisioningCommand(char * pcWriteBuffer,
             sprintf(pcWriteBuffer, "Error: AWS credential metadata refresh failed.\r\n");
         }
     }
+#endif
     else
     {
         sprintf(pcWriteBuffer, "Error: unknown request.\r\n");
@@ -261,6 +271,7 @@ static BaseType_t prvTsipProvisioningCommand(char * pcWriteBuffer,
     return pdFALSE;
 }
 
+#if defined(TSIP_RUNTIME_PROVISIONING_ENABLE)
 static BaseType_t prvRefreshAwsCredentialMetadata(void)
 {
     BaseType_t xCommitResult;
@@ -302,6 +313,8 @@ static BaseType_t prvRefreshAwsCredentialMetadata(void)
     xCommitResult = KVStore_xCommitChanges();
     return xCommitResult;
 }
+
+#endif
 
 static const TsipProvisioningCliSlot_t * prvFindSlot(const char * pcName,
                                                      BaseType_t xNameLength)
@@ -453,4 +466,4 @@ static void prvEraseFileIfExists(const char * pcStorageName)
     (void)result;
 }
 
-#endif /* TSIP_RUNTIME_PROVISIONING_ENABLE */
+#endif

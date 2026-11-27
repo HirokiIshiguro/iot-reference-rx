@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>aws_ether_rx72n_envision_kit_tsip_compat</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>com.renesas.smc.ui.pgsupport.SCContentBuilder</name>
+			<triggers/>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.genmakebuilder</name>
+			<triggers>clean,full,incremental,</triggers>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.ScannerConfigBuilder</name>
+			<triggers>full,incremental,</triggers>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>com.renesas.cdt.managedbuild.renesas.misrachecker.builder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.eclipse.cdt.core.cnature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
+	</natures>
+	<linkedResources>
+		<link>
+			<name>Common</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Common</locationURI>
+		</link>
+		<link>
+			<name>Demos</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Demos</locationURI>
+		</link>
+		<link>
+			<name>Middleware</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware</locationURI>
+		</link>
+		<link>
+			<name>src/application_code/include</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Demos/include</locationURI>
+		</link>
+		<link>
+			<name>src/application_code/ports</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Common/ports</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_byteq</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_byteq/r_byteq_vx.xx/r_byteq</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_tsip_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_tsip_rx_lib/r_tsip_rx_vx.xx/r_tsip_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_s12ad_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_s12ad_rx/r_s12ad_rx_vx.xx/r_s12ad_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_bsp</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_bsp/r_bsp_vx.xx/r_bsp</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_flash_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/r_flash_rx/r_flash_rx_vx.xx/r_flash_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_sci_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_sci_rx/r_sci_rx_vx.xx/r_sci_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_irq_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_irq_rx/r_irq_rx_vx.xx/r_irq_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_ether_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_ether_rx/r_ether_rx_vx.xx/r_ether_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_cmt_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_cmt_rx/r_cmt_rx_vx.xx/r_cmt_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_glcdc_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_glcdc_rx/r_glcdc_rx_vx.xx/r_glcdc_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_simple_glcdc_config_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/r_simple_glcdc_config_rx/r_simple_glcdc_config_rx_vx.xx/r_simple_glcdc_config_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/r_simple_graphic_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/r_simple_graphic_rx/r_simple_graphic_rx_vx.xx/r_simple_graphic_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/rm_littlefs_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_littlefs_rx/rm_littlefs_rx_vx.xx/rm_littlefs_rx</locationURI>
+		</link>
+		<link>
+			<name>Vendor/rm_rtos_abstraction_rx</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx_vx.xx/rm_rtos_abstraction_rx</locationURI>
+		</link>
+		<link>
+			<name>TraceRecorder</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Middleware/3rdparty/TraceRecorderSource</locationURI>
+		</link>
+		<link>
+			<name>TraceProduct</name>
+			<type>2</type>
+			<locationURI>AWS_IOT_MCU_ROOT/Common/ports/trace_recorder</locationURI>
+		</link>
+	</linkedResources>
+	<filteredResources>
+		<filter>
+			<id>1723799128611</id>
+			<name>Common</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-ports</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1734330077562</id>
+			<name>Demos</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-include|key_flash_wr_with_tsip</arguments>
+			</matcher>
+		</filter>
+
+
+
+
+
+
+		<filter>
+			<id>1725446610074</id>
+			<name>Demos/Fleet_Provisioning_With_CSR_Demo</name>
+			<type>5</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-FleetProvisioningDemoExample.c|pkcs11_operations.c|pkcs11_operations.h|tinycbor_serializer.c|tinycbor_serializer.h</arguments>
+			</matcher>
+		</filter>
+
+
+
+
+
+
+		<filter>
+			<id>1723799128598</id>
+			<name>Common/FreeRTOS_common/compiler_support</name>
+			<type>9</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-ccrx</arguments>
+			</matcher>
+		</filter>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		<filter>
+			<id>1734330946832</id>
+			<name>src/application_code/ports</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-false-pkcs11</arguments>
+			</matcher>
+		</filter>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	</filteredResources>
+	<variableList>
+		<variable>
+			<name>AWS_IOT_MCU_ROOT</name>
+			<value>$%7BPARENT-3-PROJECT_LOC%7D</value>
+		</variable>
+		<variable>
+			<name>SMC_GENERATED_LOC</name>
+			<value>$%7BPROJECT_LOC%7D/src/smc_gen</value>
+		</variable>
+	</variableList>
+</projectDescription>

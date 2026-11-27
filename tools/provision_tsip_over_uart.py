@@ -19,6 +19,9 @@ except ImportError:
 
 TARGET_ENV_NAMES = {
     "rx72n": {
+        "kuk": ("RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_KEY_UPDATE_KEY_HEX",),
+        "kuk-cbc": ("RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_KEY_UPDATE_CBC_AES128_HEX",),
+        "kuk-cbc-mac": ("RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_KEY_UPDATE_CBC_MAC_AES128_HEX",),
         "rootca-sig": (
             "RENESAS_RX72N_SECURITY_IP_PROVISION_BLOB_TLS_ROOT_CA_SIGNATURE_RSA_PSS_SHA256_HEX",
             "RX72N_TSIP_ROOT_CA_SIGNATURE_HEX",
@@ -90,9 +93,10 @@ TARGET_ENV_NAMES = {
     },
 }
 
-ALL_SLOTS = ("rootca-sig", "rootca-der", "root-signer", "client-pub", "client-pri")
+KEY_UPDATE_SLOT_SIZES = {"kuk": 108, "kuk-cbc": 92, "kuk-cbc-mac": 92}
+ALL_SLOTS = ("rootca-sig", "rootca-der", "root-signer", "client-pub", "client-pri", *KEY_UPDATE_SLOT_SIZES)
 DEFAULT_SLOTS = ("rootca-sig", "root-signer", "client-pub", "client-pri")
-SENSITIVE_SLOTS = {"root-signer", "client-pub", "client-pri"}
+SENSITIVE_SLOTS = {"root-signer", "client-pub", "client-pri", *KEY_UPDATE_SLOT_SIZES}
 LONG_HEX_RE = re.compile(r"\b[0-9a-fA-F]{64,}\b")
 WRITE_COMMAND_RE = re.compile(r"(tsipprov\s+write\s+\d+\s+)([0-9a-fA-F]+)")
 
@@ -196,8 +200,18 @@ def load_payloads(args: argparse.Namespace) -> list[tuple[str, bytes, str]]:
         if slot not in selected:
             continue
 
-        env_names = custom_env_names[slot] or TARGET_ENV_NAMES[args.target][slot]
-        data, source = read_env_bytes(env_names)
+        env_names = custom_env_names.get(slot) or TARGET_ENV_NAMES[args.target].get(slot)
+        if not env_names:
+            raise ValueError(f"{slot} is unavailable for {args.target}")
+        expected_size = KEY_UPDATE_SLOT_SIZES.get(slot)
+        if expected_size is None:
+            data, source = read_env_bytes(env_names)
+        else:
+            source = env_names[0]
+            value = os.environ.get(source, "").strip()
+            if not re.fullmatch(rf"[0-9a-fA-F]{{{2 * expected_size}}}", value):
+                raise ValueError(f"{source} must contain {expected_size} bytes as one hex line")
+            data = bytes.fromhex(value)
         payloads.append((slot, data, source))
 
     return payloads

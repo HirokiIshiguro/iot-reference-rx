@@ -236,7 +236,13 @@ def mqtt_rx72n(registry: dict, board: Board, test: dict, builds: list, logs: Pat
                  "--cli-timeout", 25, "--attempts", 3, "--no-reset",
                  "--summary-json", logs / "provision_summary.json"]
     board.run(provision, timeout=400, label="provision the device credentials")
-    provision_tsip_keys(board, test, reset_after=True)
+    if test["backend"] == "compat":
+        board.run([sys.executable, TOOLS / "provision_tsip_over_uart.py", "--target", board.name,
+                   "--port", board.uart, "--baud", board.baud, "--no-enter-cli", "--skip-prepare",
+                   "--only", "kuk", "--only", "kuk-cbc", "--only", "kuk-cbc-mac"],
+                  timeout=600, label="provision the TSIP key update slots")
+    else:
+        provision_tsip_keys(board, test, reset_after=True)
     observe = [sys.executable, TOOLS / "test_mqtt_rx72n.py", "--log-port", board.uart, "--log-baud", board.baud,
                "--timeout", 600, "--reset-cmd", board.reset_command()]
     observe += require_tls(test)
@@ -707,7 +713,10 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
         failure = str(error)
     finally:
         try:
-            board.rest()
+            if test["board"] == "rx72n" and test.get("backend") == "compat":
+                board.park()
+            else:
+                board.rest()
         except (subprocess.SubprocessError, OSError) as error:
             failure = failure or f"could not park the board: {error}"
     seconds = time.monotonic() - started
