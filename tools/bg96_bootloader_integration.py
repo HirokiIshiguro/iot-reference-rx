@@ -593,7 +593,10 @@ def parse_probe_ports(primary: str) -> list[str]:
         if entry:
             candidates.append(entry)
 
-    if os.environ.get("BG96_BOOTLOADER_AUTO_PROBE", "true").lower() in ("1", "true", "yes", "on"):
+    # Off unless asked for: a Runner may hold other boards whose UARTs must not be opened.
+    # Renesas on-board USB serials (045b:8111) all report serial number 0000000000001, so the
+    # by-id names cannot tell them apart; the CI passes the FTDI by-id path of its own board.
+    if os.environ.get("BG96_BOOTLOADER_AUTO_PROBE", "false").lower() in ("1", "true", "yes", "on"):
         candidates.extend(auto_probe_ports())
 
     deduped: list[str] = []
