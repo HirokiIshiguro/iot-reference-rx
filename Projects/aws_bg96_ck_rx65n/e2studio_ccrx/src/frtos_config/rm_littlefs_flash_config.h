@@ -20,7 +20,7 @@
 #define LFS_FLASH_READ_SIZE				(4)
 #define LFS_FLASH_PROGRAM_SIZE			(4)
 #define LFS_FLASH_BLOCK_SIZE			(128)
-#define LFS_FLASH_BLOCK_COUNT			(128)
+#define LFS_FLASH_BLOCK_COUNT			(256)
 /*
  * The application and bootloader share this 16 KiB LittleFS region from the
  * start of Data Flash. Code-Flash-only UART/OTA installation preserves it.

@@ -79,5 +79,5 @@ class Rx72nTsipCapacityTests(unittest.TestCase):
     def test_smart_configurator_retains_the_new_geometry(self):
         for app in ('aws_ether_rx72n_envision_kit','aws_ether_rx72n_envision_kit_tsip'):
             tree=ET.parse(ROOT/'Projects'/app/'e2studio_ccrx'/(app+'.scfg'))
-            self.assertEqual(['128'],[n.get('selectedIndex') for n in tree.iter('gridItem')
+            self.assertEqual(['256'],[n.get('selectedIndex') for n in tree.iter('gridItem')
                                       if n.get('id')=='LFS_FLASH_BLOCK_COUNT'])
