@@ -11,19 +11,25 @@ APP = ROOT / "Projects/aws_ether_rx72n_envision_kit/e2studio_ccrx/src"
 
 @unittest.skipUnless(product_api.GCC or product_api.MSVC, "Host C compiler required")
 class ProductLittlefsTests(unittest.TestCase):
-    def test_all_application_and_bootloader_partition_headers_match(self):
+    def test_all_application_partitions_fit_the_bootloader_region(self):
         pairs = [
             ("aws_wifi_rx671_ek", "boot_loader_rx671_ek"),
+            ("aws_wifi_rx671_ek_tsip", "boot_loader_rx671_ek"),
             ("aws_bg96_ck_rx65n", "boot_loader_ck_rx65n"),
             ("aws_bg96_ck_rx65n_tsip", "boot_loader_ck_rx65n"),
             ("aws_ether_rx72n_envision_kit", "boot_loader_rx72n_envision_kit"),
             ("aws_ether_rx72n_envision_kit_tsip", "boot_loader_rx72n_envision_kit"),
+            ("aws_ether_rx72n_envision_kit_tsip_compat", "boot_loader_rx72n_envision_kit"),
         ]
         for application, bootloader in pairs:
             with self.subTest(application=application):
                 self_path = f"Projects/{application}/e2studio_ccrx/src"
                 boot_path = f"Projects/{bootloader}/e2studio_ccrx/src"
-                block_count = 64 if "rx671" in application else 128
+                flash_size = 8192 if "rx671" in application else 32768
+                block_count = flash_size // 128
+                scfg = ROOT / f"Projects/{application}/e2studio_ccrx/{application}.scfg"
+                self.assertIn(f'"LFS_FLASH_BLOCK_COUNT" selectedIndex="{block_count}"',
+                              scfg.read_text(encoding="utf-8"))
                 source = f'''
 #include <assert.h>
 #include "platform.h"
@@ -34,7 +40,8 @@ int main(void) {{
     assert(RM_LITTLEFS_FLASH_DATA_START == 0x00100000UL);
     assert(RX_BOOTLOADER_LITTLEFS_KEY_STORE_BASE_ADDRESS == RM_LITTLEFS_FLASH_DATA_START);
     assert(LFS_FLASH_BLOCK_SIZE == 128 && LFS_FLASH_BLOCK_COUNT == {block_count});
-    assert(RX_BOOTLOADER_LITTLEFS_KEY_STORE_REGION_SIZE == LFS_FLASH_BLOCK_SIZE*LFS_FLASH_BLOCK_COUNT);
+    assert(RX_BOOTLOADER_LITTLEFS_KEY_STORE_REGION_SIZE == BSP_DATA_FLASH_SIZE_BYTES);
+    assert(RX_BOOTLOADER_LITTLEFS_KEY_STORE_REGION_SIZE >= LFS_FLASH_BLOCK_SIZE*LFS_FLASH_BLOCK_COUNT);
     assert(LFS_FLASH_READ_SIZE == 4 && LFS_FLASH_READ_SIZE == RM_LITTLEFS_CFG_READ_SIZE);
     assert(LFS_FLASH_PROGRAM_SIZE == 4 && LFS_FLASH_PROGRAM_SIZE == RM_LITTLEFS_CFG_PROG_SIZE);
     assert(LFS_FLASH_BLOCK_SIZE == RM_LITTLEFS_CFG_BLOCK_SIZE);
@@ -44,9 +51,42 @@ int main(void) {{
 }}
 '''
                 product_api.ProductApiTests.compile_run(self, source,
-                    headers={"platform.h":"#define BSP_DATA_FLASH_SIZE_BYTES 32768U\n",
+                    headers={"platform.h":f"#define BSP_DATA_FLASH_SIZE_BYTES {flash_size}U\n",
                              "rx65n.h":"", "rx671.h":"", "rx72n.h":"", "r_flash_rx_if.h":""},
                     extra_includes=(ROOT/"Common/littlefs_common/rm_littlefs_df/targets/rx65n",))
+
+    def test_real_adapter_preserves_existing_flash_geometry(self):
+        source = Path(__file__).with_name("product_littlefs_flash_fixture.c").read_text(encoding="utf-8")
+        headers = {
+            "platform.h": "#define BSP_DATA_FLASH_SIZE_BYTES 32768U\n",
+            "rx65n.h": "", "rx72n.h": "",
+            "r_flash_rx_if.h": """
+#ifndef DFL1_HOST_FLASH_H
+#define DFL1_HOST_FLASH_H
+#include <stdint.h>
+#define FLASH_CFG_DATA_FLASH_BGO 0
+#define FLASH_DF_BLOCK_SIZE 64u
+#define FLASH_DF_MIN_PGM_SIZE 4u
+#define FLASH_CMD_STATUS_GET 0
+typedef uint32_t flash_block_address_t;
+typedef enum { FLASH_SUCCESS, FLASH_ERR_ALREADY_OPEN, FLASH_ERR_BUSY } flash_err_t;
+flash_err_t R_FLASH_Open(void);
+flash_err_t R_FLASH_Close(void);
+flash_err_t R_FLASH_Write(uint32_t source, uint32_t destination, uint32_t size);
+flash_err_t R_FLASH_Erase(flash_block_address_t address, uint32_t blocks);
+flash_err_t R_FLASH_Control(int command, void *argument);
+#endif
+""",
+        }
+        for bootloader in ("boot_loader_ck_rx65n", "boot_loader_rx72n_envision_kit"):
+            with self.subTest(bootloader=bootloader):
+                boot = ROOT / f"Projects/{bootloader}/e2studio_ccrx/src"
+                product_api.ProductApiTests.compile_run(
+                    self, source, headers=headers,
+                    extra_sources=(RX / "src/rm_littlefs_rx.c", LFS / "lfs.c", LFS / "lfs_util.c"),
+                    extra_includes=(RX, LFS, boot, boot / "smc_gen/r_config", APP / "frtos_config",
+                                    ROOT / "Common/littlefs_common/rm_littlefs_df/targets/rx65n"),
+                )
 
     def test_real_filesystem_roundtrip_geometry_mutex_and_retry(self):
         headers = {

@@ -130,7 +130,7 @@ class TsipLittlefsCapacityTests(unittest.TestCase):
             tree = ET.parse(base / (app + ".scfg"))
             selected = [n.attrib["selectedIndex"] for n in tree.iter("gridItem")
                         if n.get("id") == "LFS_FLASH_BLOCK_COUNT"]
-            self.assertEqual(["128"], selected)
+            self.assertEqual(["256"], selected)
 
     def test_index_size_fixture_is_bound_to_the_registered_driver_pin(self):
         value = subprocess.check_output(["git", "ls-tree", "HEAD", "--", "Middleware/Renesas/rx-driver-package"], cwd=ROOT).decode().strip()
