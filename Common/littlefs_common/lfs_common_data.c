@@ -199,8 +199,7 @@ int LfsCommon_FileOpen(lfs_t *lfs, lfs_file_t *file, const char *path, int flags
     return result;
 }
 
-/* The attributes in config are read on open and written on sync and close,
- * together with the file contents. config must stay valid until the file is closed. */
+/* See lfs_common_data.h for the lifetime of config and its buffers. */
 int LfsCommon_FileOpenCfg(lfs_t *lfs, lfs_file_t *file, const char *path, int flags,
                           const struct lfs_file_config *config)
 {

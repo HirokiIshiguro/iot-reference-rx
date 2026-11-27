@@ -22,6 +22,12 @@ lfs_ssize_t LfsCommon_GetAttr(lfs_t *lfs, const char *path, uint8_t type, void *
 int LfsCommon_SetAttr(lfs_t *lfs, const char *path, uint8_t type, const void *buffer, lfs_size_t size);
 int LfsCommon_RemoveAttr(lfs_t *lfs, const char *path, uint8_t type);
 int LfsCommon_FileOpen(lfs_t *lfs, lfs_file_t *file, const char *path, int flags);
+/* Opens a file with LittleFS custom attributes (lfs_file_opencfg). With a readable
+ * mode, the attributes in config->attrs are read into their buffers on open. With a
+ * writable mode, the attribute buffers are written on LfsCommon_FileSync and
+ * LfsCommon_FileClose, together with the file contents. The caller must keep config,
+ * the attrs array, every attribute buffer and config->buffer (if set) valid and
+ * unchanged in place until LfsCommon_FileClose returns. */
 int LfsCommon_FileOpenCfg(lfs_t *lfs, lfs_file_t *file, const char *path, int flags,
                           const struct lfs_file_config *config);
 int LfsCommon_FileClose(lfs_t *lfs, lfs_file_t *file);

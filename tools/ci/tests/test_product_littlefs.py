@@ -163,7 +163,9 @@ int main(void) {
     assert(LfsCommon_GetAttr(lfs,"setting",2,attr_out,sizeof(attr_out))==sizeof(cipher) && !memcmp(attr_out,cipher,sizeof(cipher)));
     memset(attr_out,0,sizeof(attr_out)); attrs[0].buffer=attr_out;
     assert(!LfsCommon_FileOpenCfg(lfs,&file,"setting",LFS_O_RDONLY,&file_cfg) && !memcmp(attr_out,cipher,sizeof(cipher)) && !held);
-    assert(LfsCommon_FileSize(lfs,&file)==sizeof(key)); assert(!LfsCommon_FileClose(lfs,&file));
+    assert(LfsCommon_FileSize(lfs,&file)==sizeof(key)); memset(output,0,sizeof(output));
+    assert(LfsCommon_FileRead(lfs,&file,output,sizeof(key))==sizeof(key) && !memcmp(output,key,sizeof(key)) && !held);
+    assert(!LfsCommon_FileClose(lfs,&file));
     assert(!LfsCommon_Remove(lfs,"setting") && !held);
     assert(!LfsCommon_Rename(lfs,"code_signer_public_key","code_sign_cert_id"));
     read_error=1; assert(LfsCommon_FileOpen(lfs,&file,"code_sign_cert_id",LFS_O_RDONLY)==LFS_ERR_IO && !held);
