@@ -20,8 +20,9 @@ REQUIRED = {
             "r_flash_rx_vx.xx/r_config/r_flash_rx_config.h",
             "r_flash_rx_vx.xx/r_flash_rx/r_flash_rx_if.h")),
     "Middleware/Renesas/rm_littlefs_rx": (
-        "60f93c8427ce88f70ea26aae7abc641f577a7765", (
-            "rm_littlefs_rx_vx.xx/rm_littlefs_rx/rm_littlefs_rx_if.h",)),
+        "85d3dbb719138e4e677a66767e8776e762b3643e", (
+            "rm_littlefs_rx_vx.xx/rm_littlefs_rx/rm_littlefs_rx_if.h",
+            "rm_littlefs_rx_vx.xx/rm_littlefs_rx/src/rm_littlefs_rx.c",)),
     "Middleware/Renesas/rm_rtos_abstraction_rx": (
         "5818cdfbda661d098fd028bf6975847d5af2c491", (
             "rm_rtos_abstraction_rx_vx.xx/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx_if.h",)),

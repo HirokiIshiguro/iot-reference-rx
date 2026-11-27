@@ -1,5 +1,5 @@
 {
-  "created": "2026-11-24T09:22:57Z",
+  "created": "2026-11-27T13:50:33Z",
   "repositories": {
     "github.com/amazon-freertos/pkcs11@9304ef6842d08d881ccd1daa8d3a428f3a9671ee": {
       "children": {},
@@ -1613,7 +1613,7 @@
       "children": {},
       "tags": []
     },
-    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/rm_littlefs_rx/rm_littlefs_rx@60f93c8427ce88f70ea26aae7abc641f577a7765": {
+    "gitlab.saffti.jp/oss/experiment/embedded/mcu/renesas/rx/fitmodules/rm_littlefs_rx/rm_littlefs_rx@85d3dbb719138e4e677a66767e8776e762b3643e": {
       "children": {
         "rm_littlefs_rx_vx.xx/rm_littlefs_rx/third_party/littlefs": [
           "https://github.com/littlefs-project/littlefs.git",
