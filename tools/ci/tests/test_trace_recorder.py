@@ -19,12 +19,35 @@ RECORDER = ROOT / "Middleware/3rdparty/TraceRecorderSource"
 KERNEL = ROOT / "Middleware/FreeRTOS/FreeRTOS-Kernel"
 COMMON = ROOT / "Common/ports/trace_recorder"
 LINK = "AWS_IOT_MCU_ROOT/Middleware/3rdparty/TraceRecorderSource"
+RECORDER_PATH = "Middleware/3rdparty/TraceRecorderSource"
+PRODUCT_PATH = "src/application_code/ports/trace_recorder"
+
+
+def filter_excludes(description, path):
+    folders = path.split("/")
+    for depth, name in enumerate(folders):
+        parent = "/".join(folders[:depth])
+        kind = 4 if depth == len(folders) - 1 else 8
+        for rule in description.findall("filteredResources/filter"):
+            if rule.findtext("name") != parent or not (int(rule.findtext("type")) & kind):
+                continue
+            arguments = rule.findtext("matcher/arguments", "")
+            prefix = "1.0-name-matches-false-true-"
+            if arguments.startswith(prefix) and re.fullmatch(arguments.removeprefix(prefix), name):
+                return True
+    return False
 
 
 def selected_recorder_sources(project):
     metadata = ET.parse(project / ".cproject").getroot()
     description = ET.parse(project / ".project").getroot()
     links = description.findall("linkedResources/link[name='TraceRecorder']")
+    if not links:
+        middleware = description.findall("linkedResources/link[name='Middleware']")
+        if links or len(middleware) != 1 or middleware[0].findtext("locationURI") != "AWS_IOT_MCU_ROOT/Middleware":
+            raise ValueError("Recorder must use the original submodule through Middleware")
+        return [path.relative_to(RECORDER).as_posix() for path in RECORDER.rglob("*.c")
+                if not filter_excludes(description, f"{RECORDER_PATH}/{path.relative_to(RECORDER).as_posix()}")]
     if len(links) != 1 or links[0].findtext("locationURI") != LINK:
         raise ValueError("Recorder must use the single original submodule")
     selected = []
@@ -56,11 +79,16 @@ class TraceMetadataTests(unittest.TestCase):
                 metadata = ET.parse(project / ".cproject").getroot()
                 roots = [x for x in metadata.iter("entry") if x.get("kind") == "sourcePath" and x.get("name") == ""]
                 self.assertEqual(len(roots), 1)
-                self.assertIn("TraceRecorder/", roots[0].get("excluding", "").split("|"))
+                modern = not ET.parse(project / ".project").findall("linkedResources/link[name='TraceRecorder']")
+                if modern:
+                    self.assertNotIn(RECORDER_PATH, roots[0].get("excluding", ""))
+                else:
+                    self.assertIn("TraceRecorder/", roots[0].get("excluding", "").split("|"))
                 includes = [x.get("value") for o in metadata.iter("option")
                     if o.get("superClass") == "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.include"
                     for x in o.findall("listOptionValue")]
-                facade = '"${workspace_loc:/${ProjName}/TraceProduct/freertos_wrap}"'
+                product_path = PRODUCT_PATH if modern else "TraceProduct"
+                facade = '"${workspace_loc:/${ProjName}/' + product_path + '/freertos_wrap}"'
                 kernel = '"${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Kernel/include}"'
                 self.assertLess(includes.index(facade), includes.index(kernel))
                 self.assertFalse(any((project / "src/TraceRecorder").rglob("*.c")))
@@ -74,9 +102,16 @@ class TraceMetadataTests(unittest.TestCase):
                 project = ROOT / "Projects" / name / "e2studio_ccrx"
                 description = ET.parse(project / ".project").getroot()
                 links = description.findall("linkedResources/link[name='TraceProduct']")
-                self.assertEqual(len(links), 1)
-                self.assertEqual(links[0].findtext("locationURI"),
-                                 "AWS_IOT_MCU_ROOT/Common/ports/trace_recorder")
+                if not links:
+                    self.assertFalse(description.findall("linkedResources/link[name='TraceRecorder']"))
+                    ports = description.find("linkedResources/link[name='src/application_code/ports']")
+                    self.assertEqual(ports.findtext("locationURI"), "AWS_IOT_MCU_ROOT/Common/ports")
+                    product_path = PRODUCT_PATH
+                else:
+                    self.assertEqual(len(links), 1)
+                    self.assertEqual(links[0].findtext("locationURI"),
+                                     "AWS_IOT_MCU_ROOT/Common/ports/trace_recorder")
+                    product_path = "TraceProduct"
                 filters = description.findall("filteredResources/filter")
                 self.assertFalse(any((f.findtext("name") or "").startswith("TraceProduct") for f in filters))
                 common_filters = [f for f in filters if f.findtext("name") == "Common"]
@@ -87,7 +122,7 @@ class TraceMetadataTests(unittest.TestCase):
                     if o.get("superClass") == "com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.include"
                     for x in o.findall("listOptionValue")]
                 for leaf in ("config", "freertos_wrap"):
-                    self.assertIn('"${workspace_loc:/${ProjName}/TraceProduct/' + leaf + '}"', includes)
+                    self.assertIn('"${workspace_loc:/${ProjName}/' + product_path + "/" + leaf + '}"', includes)
                     self.assertFalse(any("Common/ports/trace_recorder/" + leaf in value for value in includes))
 
     def test_startup_initializes_before_objects_and_starts_all_main_profiles(self):

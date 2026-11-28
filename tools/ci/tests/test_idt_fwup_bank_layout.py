@@ -126,23 +126,34 @@ class IdtFwupBankLayoutTests(unittest.TestCase):
                 roots = [source for source in sources if source.get("name") == ""]
                 self.assertEqual(len(roots), 1)
                 exclusions = roots[0].get("excluding", "").split("|")
-                self.assertIn("Common/ports/", exclusions)
-                self.assertIn("src/application_code/ports/", exclusions)
+                if len(sources) == 1:
+                    filters = resources.findall(".//filteredResources/filter")
+                    self.assertTrue(any(rule.findtext("name") == "Common" and
+                                        rule.findtext("matcher/arguments", "").endswith("-ports")
+                                        for rule in filters))
+                    self.assertTrue(any(rule.findtext("name") == "src/application_code/ports" and
+                                        "tinycrypt" in rule.findtext("matcher/arguments", "")
+                                        for rule in filters))
+                else:
+                    self.assertIn("Common/ports/", exclusions)
+                    self.assertIn("src/application_code/ports/", exclusions)
         for target in self.targets.values():
             project = ROOT / target["bootloader_project"]
             with self.subTest(bootloader=project.parent.name):
                 links = {link.findtext("name"): link.findtext("locationURI")
                          for link in ET.parse(project / ".project").findall(
                              ".//linkedResources/link")}
-                self.assertIn("Vendor/tinycrypt", links)
+                generated = "src/tinycrypt" in links
+                self.assertIn("src/tinycrypt" if generated else "Vendor/tinycrypt", links)
                 self.assertTrue(links["src/tinycrypt_rx_port.c"].endswith(
                     "/Common/ports/tinycrypt/tinycrypt_rx_port.c"))
                 sources = ET.parse(project / ".cproject").findall(
                     ".//sourceEntries/entry")
-                self.assertIn("Vendor/tinycrypt/lib/source",
-                              [source.get("name") for source in sources])
+                if not generated:
+                    self.assertIn("Vendor/tinycrypt/lib/source",
+                                  [source.get("name") for source in sources])
                 selected_src = [source for source in sources
-                                if source.get("name") == "src"]
+                                if source.get("name") == ("" if generated else "src")]
                 self.assertEqual(len(selected_src), 1)
                 self.assertNotIn("tinycrypt_rx_port.c",
                                  selected_src[0].get("excluding", ""))
