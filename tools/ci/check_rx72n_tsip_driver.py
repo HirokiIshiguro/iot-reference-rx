@@ -19,7 +19,8 @@ DRIVER_PATH = LIBRARY_PATH + "/r_tsip_rx_vx.xx/r_tsip_rx"
 MDF_PATH = LIBRARY_PATH + "/r_tsip_rx_vx.xx_extend.mdf"
 PACKAGE_PATH = LIBRARY_PATH + "/r_tsip_rx_vx.xx.xml"
 CONFIG_TEMPLATE_PATH = LIBRARY_PATH + "/r_tsip_rx_vx.xx/r_config/r_tsip_rx_config.h"
-SOURCE_ENTRY = "Vendor/r_tsip_rx/src/targets/rx72m_rx72n_rx66n"
+GENERATED_DRIVER = "src/smc_gen/r_tsip_rx"
+TARGET = "rx72m_rx72n_rx66n"
 
 
 def require(condition: bool, message: str) -> None:
@@ -89,9 +90,19 @@ def check(root: Path) -> dict[str, int | str]:
     project = root / "Projects/aws_ether_rx72n_envision_kit_tsip/e2studio_ccrx"
     rdp = root / RDP_PATH
     driver = rdp / DRIVER_PATH
-    legacy = project / "src/smc_gen/r_tsip_rx"
-    require(not any(p.is_file() for p in legacy.rglob("*")), "legacy copied TSIP driver remains")
-    interface = (driver / "r_tsip_rx_if.h").read_text(encoding="utf-8")
+    generated = project / GENERATED_DRIVER
+    expected = {p.relative_to(driver) for p in driver.rglob("*") if p.is_file()
+                and p.relative_to(driver).parts[0] != "doc"
+                and (p.relative_to(driver).parts[:2] != ("src", "targets")
+                     or p.relative_to(driver).parts[2] == TARGET)}
+    selected_files = {p.relative_to(generated) for p in generated.rglob("*") if p.is_file()
+                      and p.relative_to(generated).parts[0] != "doc"}
+    require(selected_files == expected, "generated driver must contain only the official RX72N TSIP target")
+    for relative in expected:
+        original = (driver / relative).read_bytes().replace(b"\r\n", b"\n")
+        copied = (generated / relative).read_bytes().replace(b"\r\n", b"\n")
+        require(copied == original, "generated TSIP file differs from the pinned RDP: " + relative.as_posix())
+    interface = (generated / "r_tsip_rx_if.h").read_text(encoding="utf-8")
     require_pattern(interface, r"^#define\s+TSIP_VERSION_MAJOR\s+\(1u\)$", "TSIP major version 1")
     require_pattern(interface, r"^#define\s+TSIP_VERSION_MINOR\s+\(24u\)$", "official TSIP minor version 24")
     config = (project / "src/smc_gen/r_config/r_tsip_rx_config.h").read_text(encoding="utf-8")
@@ -102,16 +113,15 @@ def check(root: Path) -> dict[str, int | str]:
         require_pattern(config, r"^#define\s+" + name + r"\s+\(" + value + r"\)$", name + "=" + value)
 
     links = ET.parse(project / ".project").getroot()
-    selected = [n for n in links.findall("linkedResources/link") if n.findtext("name") == "Vendor/r_tsip_rx"]
-    require(len(selected) == 1 and selected[0].findtext("locationURI") ==
-            "AWS_IOT_MCU_ROOT/" + RDP_PATH + "/" + DRIVER_PATH,
-            "project does not link the canonical official TSIP source")
+    require(not any(n.findtext("name") == "Vendor/r_tsip_rx" for n in links.findall("linkedResources/link")),
+            "duplicate linked official TSIP source")
     cproject = ET.parse(project / ".cproject").getroot()
-    entries = [n.get("name") for n in cproject.findall(".//sourceEntries/entry")
-               if "r_tsip_rx" in n.get("name", "")]
-    require(entries == [SOURCE_ENTRY], "compiler does not select only the official RX72N TSIP target")
-    require(any("/Vendor/r_tsip_rx}" in n.get("value", "")
-                for n in cproject.findall(".//listOptionValue")), "missing canonical TSIP include path")
+    entries = cproject.findall(".//sourceEntries/entry[@kind='sourcePath']")
+    require(len(entries) == len(cproject.findall(".//cconfiguration")) and
+            all(n.get("name") == "" and GENERATED_DRIVER not in n.get("excluding", "") for n in entries),
+            "compiler does not select the generated TSIP source from the project root")
+    require(any("/" + GENERATED_DRIVER + "}" in n.get("value", "")
+                for n in cproject.findall(".//listOptionValue")), "missing generated TSIP include path")
 
     official = {n.get("id") for n in ET.parse(rdp / MDF_PATH).getroot().iter("property")}
     scfg = ET.parse(project / "aws_ether_rx72n_envision_kit_tsip.scfg").getroot()

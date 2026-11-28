@@ -71,8 +71,18 @@ def validate_flash(repo: Path) -> dict:
         description = ET.parse(project / '.project').getroot()
         links = [link for link in description.findall('linkedResources/link')
                  if link.findtext('name') == 'Vendor/r_flash_rx']
-        require(len(links) == 1 and links[0].findtext('locationURI') == FLASH_URI,
-                name + ': Flash no longer uses the reviewed leaf')
+        generated = 'rx72n' in name
+        if generated:
+            require(not links, name + ': duplicate linked Flash source')
+            interface = FLASH_INPUTS[3].rsplit('/', 1)[1]
+            selected = project / 'src/smc_gen/r_flash_rx' / interface
+            original = repo / FLASH_LEAF / FLASH_INPUTS[3]
+            require(selected.is_file() and selected.read_text(encoding='utf-8') ==
+                    original.read_text(encoding='utf-8'),
+                    name + ': generated Flash interface differs from the reviewed leaf')
+        else:
+            require(len(links) == 1 and links[0].findtext('locationURI') == FLASH_URI,
+                    name + ': Flash no longer uses the reviewed leaf')
         scfg = ET.parse(project / (name + '.scfg')).getroot()
         components = scfg.findall('.//configuration[@name="r_flash_rx"]/component')
         require(len(components) == 1 and components[0].get('display') == 'r_flash_rx' and
@@ -95,14 +105,20 @@ def validate_flash(repo: Path) -> dict:
                 name + ': generated FCU nested interrupt setting reverted')
         cproject = ET.parse(project / '.cproject').getroot()
         entries = cproject.findall('.//sourceEntries/entry[@kind="sourcePath"]')
-        require(any(entry.get('name') == 'Vendor/r_flash_rx/src' for entry in entries),
-                name + ': compiler no longer selects the Flash leaf')
-        source = [entry for entry in entries if entry.get('name') in ('', 'src')]
-        require(bool(source) and all(
-                ('src/smc_gen/r_flash_rx' if entry.get('name') == '' else 'smc_gen/r_flash_rx') in
-                {item.rstrip('/') for item in entry.get('excluding', '').split('|')} for entry in source) and
-                not any('smc_gen/r_flash_rx' in entry.get('name', '') for entry in entries),
-                name + ': generated Flash body entered compiler inputs')
+        if generated:
+            require(len(entries) == len(cproject.findall('.//cconfiguration')) and
+                    all(entry.get('name') == '' and
+                        'src/smc_gen/r_flash_rx' not in entry.get('excluding', '') for entry in entries),
+                    name + ': compiler no longer selects generated Flash from the project root')
+        else:
+            require(any(entry.get('name') == 'Vendor/r_flash_rx/src' for entry in entries),
+                    name + ': compiler no longer selects the Flash leaf')
+            source = [entry for entry in entries if entry.get('name') in ('', 'src')]
+            require(bool(source) and all(
+                    ('src/smc_gen/r_flash_rx' if entry.get('name') == '' else 'smc_gen/r_flash_rx') in
+                    {item.rstrip('/') for item in entry.get('excluding', '').split('|')} for entry in source) and
+                    not any('smc_gen/r_flash_rx' in entry.get('name', '') for entry in entries),
+                    name + ': generated Flash body entered compiler inputs')
     return {'fit_version': FLASH_VERSION, 'project_count': len(FLASH_PROJECTS),
             'boot_nested_interrupts': True, 'app_nested_interrupts': False}
 

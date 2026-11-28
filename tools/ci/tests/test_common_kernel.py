@@ -14,9 +14,12 @@ def copy_flash_configuration(root):
         destination.write_bytes((ROOT / relative).read_bytes())
     for name in guard.FLASH_PROJECTS:
         base = 'Projects/' + name + '/e2studio_ccrx/'
-        for relative in (base + '.project', base + '.cproject', base + name + '.scfg',
-                         base + '.settings/com.renesas.smc.e2studio.qe.xml',
-                         base + 'src/smc_gen/r_config/r_flash_rx_config.h'):
+        paths = [base + '.project', base + '.cproject', base + name + '.scfg',
+                 base + '.settings/com.renesas.smc.e2studio.qe.xml',
+                 base + 'src/smc_gen/r_config/r_flash_rx_config.h']
+        if 'rx72n' in name:
+            paths.append(base + 'src/smc_gen/r_flash_rx/r_flash_rx_if.h')
+        for relative in paths:
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes((ROOT / relative).read_bytes())

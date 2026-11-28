@@ -57,6 +57,9 @@ class Rx72nTsipDriverTests(unittest.TestCase):
         interface.parent.mkdir(parents=True)
         interface.write_text("#define TSIP_VERSION_MAJOR (1u)\n#define TSIP_VERSION_MINOR (24u)\n",
                              encoding="utf-8")
+        generated = project / checker.GENERATED_DRIVER
+        generated.mkdir(parents=True)
+        shutil.copyfile(interface, generated / interface.name)
         return project
 
     def test_pinned_file_bytes_preserve_original_line_endings(self):
@@ -103,13 +106,12 @@ class Rx72nTsipDriverTests(unittest.TestCase):
         self.assertEqual(result["qe_settings"], 72)
         self.assertEqual(result["custom_wait_hook_present"], 0)
 
-    def test_legacy_source_copy_is_rejected(self):
+    def test_extra_generated_source_is_rejected(self):
         project = self.metadata_fixture()
         legacy = project / "src/smc_gen/r_tsip_rx/copied.c"
-        legacy.parent.mkdir(parents=True)
         legacy.write_bytes(b"old source")
         with patch.object(checker, "verify_original_driver"):
-            with self.assertRaisesRegex(RuntimeError, "legacy copied"):
+            with self.assertRaisesRegex(RuntimeError, "only the official RX72N TSIP target"):
                 checker.check(self.root)
 
     def test_custom_config_and_stale_qe_component_are_rejected(self):
@@ -127,20 +129,21 @@ class Rx72nTsipDriverTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "QE TSIP component"):
                 checker.check(self.root)
 
-    def test_wrong_source_link_and_target_selection_are_rejected(self):
+    def test_duplicate_link_and_wrong_root_selection_are_rejected(self):
         project = self.metadata_fixture()
-        link = project / ".project"
-        original = link.read_bytes()
-        link.write_bytes(original.replace(checker.DRIVER_PATH.encode(), b"old-copy"))
+        path = project / ".project"
+        original = path.read_bytes()
+        path.write_bytes(original.replace(b"</linkedResources>",
+                         b"<link><name>Vendor/r_tsip_rx</name></link></linkedResources>"))
         with patch.object(checker, "verify_original_driver"):
-            with self.assertRaisesRegex(RuntimeError, "canonical official"):
+            with self.assertRaisesRegex(RuntimeError, "duplicate linked official TSIP"):
                 checker.check(self.root)
-        link.write_bytes(original)
+        path.write_bytes(original)
         cproject = project / ".cproject"
-        cproject.write_bytes(cproject.read_bytes().replace(checker.SOURCE_ENTRY.encode(),
-                              b"Vendor/r_tsip_rx/src/targets/rx65n"))
+        cproject.write_bytes(cproject.read_bytes().replace(b'kind="sourcePath" name=""',
+                              b'kind="sourcePath" name="src"'))
         with patch.object(checker, "verify_original_driver"):
-            with self.assertRaisesRegex(RuntimeError, "only the official RX72N TSIP target"):
+            with self.assertRaisesRegex(RuntimeError, "from the project root"):
                 checker.check(self.root)
 
 
