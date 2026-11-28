@@ -1378,6 +1378,7 @@
                 <gridItem id="ipconfigUSE_DHCP_HOOK" selectedIndex="0"/>
                 <gridItem id="ipconfigSUPPORT_OUTGOING_PINGS" selectedIndex="0"/>
                 <gridItem id="ipconfigUSE_IPv6" selectedIndex="0"/>
+                <gridItem id="ipconfigIPv4_BACKWARD_COMPATIBLE" selectedIndex="1"/>
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>
@@ -1529,6 +1530,10 @@
                 <gridItem id="configPLATFORM_NAME" selectedIndex="&quot;RenesasRX65N&quot;"/>
                 <gridItem id="configINCLUDE_PLATFORM_H_INSTEAD_OF_IODEFINE_H" selectedIndex="1"/>
                 <gridItem id="configUSE_TIME_SLICING" selectedIndex="1"/>
+                <gridItem id="configAPPLICATION_ALLOCATED_HEAP" selectedIndex="1"/>
+                <gridItem id="configHEAP_CLEAR_MEMORY_ON_FREE" selectedIndex="1"/>
+                <gridItem id="configTASK_NOTIFICATION_ARRAY_ENTRIES" selectedIndex="4"/>
+                <gridItem id="CONFIG_USE_PERCEPIO_TRACE_RECORDER" selectedIndex="1"/>
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>

@@ -618,5 +618,20 @@ Disable: omit platform.h</description>
             <description>Enable: Enable time-slicing
 Disable: Disable time-slicing</description>
         </property>
+        <property id="configAPPLICATION_ALLOCATED_HEAP" display="Application supplies heap storage" default="0" type="checkbox" category="category3">
+            <option id="configAPPLICATION_ALLOCATED_HEAP.0" display="Disable" value="0"/>
+            <option id="configAPPLICATION_ALLOCATED_HEAP.1" display="Enable" value="1"/>
+        </property>
+        <property id="configHEAP_CLEAR_MEMORY_ON_FREE" display="Clear heap blocks when freed" default="0" type="checkbox" category="category3">
+            <option id="configHEAP_CLEAR_MEMORY_ON_FREE.0" display="Disable" value="0"/>
+            <option id="configHEAP_CLEAR_MEMORY_ON_FREE.1" display="Enable" value="1"/>
+        </property>
+        <property id="configTASK_NOTIFICATION_ARRAY_ENTRIES" display="Number of task notification slots" default="1" type="textbox" category="category1">
+            <constraint display="Value must be a positive integer">testInteger("${configTASK_NOTIFICATION_ARRAY_ENTRIES}") &amp;&amp; ("${configTASK_NOTIFICATION_ARRAY_ENTRIES}" &gt; 0)</constraint>
+        </property>
+        <property id="CONFIG_USE_PERCEPIO_TRACE_RECORDER" display="Enable Percepio TraceRecorder" default="0" type="checkbox" category="category9">
+            <option id="CONFIG_USE_PERCEPIO_TRACE_RECORDER.0" display="Disable" value="0"/>
+            <option id="CONFIG_USE_PERCEPIO_TRACE_RECORDER.1" display="Enable" value="1"/>
+        </property>
     </configuration>
 </module>

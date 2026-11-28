@@ -128,5 +128,9 @@ FreeRTOS_SendPingRequest() API function is available.</description>
             <description>If enabled, the IPv6 protocol is supported.
 If disabled, the application must enable IPv4.</description>
         </property>
+        <property id="ipconfigIPv4_BACKWARD_COMPATIBLE" display="Use IPv4-compatible network hook signatures" default="ipconfigDISABLE" type="combobox">
+            <option id="ipconfigIPv4_BACKWARD_COMPATIBLE.0" display="Disable" value="ipconfigDISABLE"/>
+            <option id="ipconfigIPv4_BACKWARD_COMPATIBLE.1" display="Enable" value="ipconfigENABLE"/>
+        </property>
     </configuration>
 </module>
