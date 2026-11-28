@@ -441,7 +441,7 @@
             <Setting id="TSIP_SHA_256_HMAC" value="1"/>
         </Segment>
         <Segment component="r_simple_graphic_rx1.00.saffti-original" id="r_simple_graphic_rx" source="com.renesas.smc.tools.swcomponent.fit.source"/>
-        <Segment component="LittleFS202604.00-LTS-saffti-1.0.0[aws_ether_rx72n_envision_kit]" id="LittleFS" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="LittleFS202604.00-LTS-saffti-1.0.0" id="LittleFS" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         <Segment component="r_sci_rx5.61" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="SCI_CFG_CH9_FIFO_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH4_INCLUDED" value="0"/>
@@ -763,7 +763,7 @@
             <Setting id="BYTEQ_CFG_PROTECT_QUEUE" value="0"/>
         </Segment>
         <Segment component="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.objectfreertoslts202604.00-LTS-saffti-1.0.0" id="FreeRTOS Object" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
-        <Segment component="FreeRTOS_IP202604.00-LTS-saffti-1.0.0[aws_ether_rx72n_envision_kit]" id="FreeRTOS_IP" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="FreeRTOS_IP202604.00-LTS-saffti-1.0.0" id="FreeRTOS_IP" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         <Segment component="r_flash_rx5.31.saffti-custom.1" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
@@ -772,6 +772,6 @@
             <Setting id="FLASH_CFG_CODE_FLASH_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_BGO" value="1"/>
         </Segment>
-        <Segment component="FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0[aws_ether_rx72n_envision_kit]" id="FreeRTOS_Kernel" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0" id="FreeRTOS_Kernel" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
     </Segment>
 </QE>

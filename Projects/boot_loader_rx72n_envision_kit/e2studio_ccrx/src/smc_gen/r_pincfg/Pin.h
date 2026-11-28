@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+* Copyright (c) 2016 - 2026 Renesas Electronics Corporation and/or its affiliates
 *
 * SPDX-License-Identifier: BSD-3-Clause
 */
@@ -23,7 +23,7 @@ Macro definitions
 ***********************************************************************************************************************/
 
 /* User's guide for symbolic name.
- * The generated symbolic names can be used in the user application as follows:
+ * The generated symbolic names can be used in the user application as follows: 
  *
  * Example: Toggle LED1 at Pin P54.
  *  There are 2 ways to toggle LED1
