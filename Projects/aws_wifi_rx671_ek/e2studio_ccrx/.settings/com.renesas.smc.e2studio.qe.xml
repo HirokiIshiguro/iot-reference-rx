@@ -35,18 +35,21 @@
     </Segment>
     <Segment id="Component">
         <Setting id="r_bsp" value="FIT"/>
-        <Setting id="r_s12ad_rx" value="FIT"/>
         <Setting id="r_dmaca_rx" value="FIT"/>
+        <Setting id="rm_rtos_abstraction_rx" value="FIT"/>
         <Setting id="r_sdhi_rx" value="FIT"/>
+        <Setting id="r_tsip_rx" value="FIT"/>
+        <Setting id="LittleFS" value=""/>
+        <Setting id="r_sci_rx" value="FIT"/>
+        <Setting id="r_s12ad_rx" value="FIT"/>
+        <Setting id="rm_littlefs_rx" value="FIT"/>
         <Setting id="r_sdio_rx" value="FIT"/>
         <Setting id="r_dtc_rx" value="FIT"/>
         <Setting id="FreeRTOS_Object" value=""/>
-        <Setting id="r_tsip_rx" value="FIT"/>
         <Setting id="r_byteq" value="FIT"/>
-        <Setting id="r_sci_rx" value="FIT"/>
         <Setting id="FreeRTOS_Kernel" value=""/>
         <Setting id="r_flash_rx" value="FIT"/>
-        <Segment component="r_bsp7.70" id="r_bsp" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_bsp7.71" id="r_bsp" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="BSP_CFG_SWINT_UNIT1_ENABLE" value="0"/>
             <Setting id="BSP_CFG_LOW_LEVEL_INTERFACE_STDIO_ENABLE" value="1"/>
             <Setting id="BSP_CFG_ONCHIP_DEBUGGER_CONECT_ENABLE" value="1"/>
@@ -100,7 +103,7 @@
             <Setting id="BSP_CFG_INTERNAL_EXPANSION_BUS_PRIORITY" value="0"/>
             <Setting id="BSP_CFG_USER_EXIT_CRITICAL_FUNCTION" value="my_exit_critical_function"/>
             <Setting id="BSP_CFG_USER_LOCKING_TYPE" value="bsp_lock_t"/>
-            <Setting id="BSP_CFG_HEAP_BYTES" value="0x2000"/>
+            <Setting id="BSP_CFG_HEAP_BYTES" value="0x4000"/>
             <Setting id="BSP_CFG_HOCO_TRIMMING_ENABLE" value="0"/>
             <Setting id="BSP_CFG_FIT_IPL_MAX" value="0xF"/>
             <Setting id="BSP_CFG_BOOTLOADER_PROJECT" value="0"/>
@@ -120,15 +123,15 @@
             <Setting id="BSP_CFG_USER_WARM_START_CALLBACK_POST_INITC_ENABLED" value="0"/>
             <Setting id="BSP_CFG_USER_EXCLUSIVE_CONTROL_ENABLE" value="0"/>
         </Segment>
-        <Segment component="r_s12ad_rx5.50" id="r_s12ad_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
-            <Setting id="ADC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
-        </Segment>
-        <Segment component="r_dmaca_rx3.42" id="r_dmaca_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_dmaca_rx3.43" id="r_dmaca_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="DMACA_CFG_USE_DTC_FIT_MODULE" value="0"/>
             <Setting id="DMACA_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
             <Setting id="DMACA_CFG_EN_NESTED_INT" value="0"/>
         </Segment>
-        <Segment component="r_sdhi_rx2.20" id="r_sdhi_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="rm_rtos_abstraction_rx1.00.saffti-original" id="rm_rtos_abstraction_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="RM_RTOS_ABSTRACTION_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+        </Segment>
+        <Segment component="r_sdhi_rx2.21" id="r_sdhi_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="SDHI_CFG_CH0_CD_ACTIVE" value="1"/>
             <Setting id="SDHI_CFG_CH1_INT_LEVEL" value="10"/>
             <Setting id="SDHI_CFG_LONGQ_ENABLE" value="/* #define"/>
@@ -149,22 +152,7 @@
             <Setting id="SDHI_CFG_SDOPT_CTOP" value="0x000eu"/>
             <Setting id="SDHI_CFG_CH0_WP_ACTIVE" value="1"/>
         </Segment>
-        <Segment component="r_sdio_rx1.00.saffti-original" id="r_sdio_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
-            <Setting id="SDIO_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
-            <Setting id="SDIO_CFG_CMD53_MAX_BYTE_COUNT" value="512"/>
-            <Setting id="SDIO_CFG_BACKPLANE_WINDOW_CACHE_ENABLE" value="1"/>
-            <Setting id="SDIO_CFG_IO_READY_POLL_COUNT" value="1000"/>
-        </Segment>
-        <Segment component="r_dtc_rx4.60" id="r_dtc_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
-            <Setting id="DTC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
-            <Setting id="DTC_CFG_DISABLE_ALL_ACT_SOURCE" value="DTC_ENABLE"/>
-            <Setting id="DTC_CFG_USE_DMAC_FIT_MODULE" value="DTC_ENABLE"/>
-            <Setting id="DTC_CFG_TRANSFER_DATA_READ_SKIP_EN" value="DTC_ENABLE"/>
-            <Setting id="DTC_CFG_USE_SEQUENCE_TRANSFER" value="DTC_DISABLE"/>
-            <Setting id="DTC_CFG_SHORT_ADDRESS_MODE" value="DTC_DISABLE"/>
-        </Segment>
-        <Segment component="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.objectfreertos11.1.0-rx-1.0.0" id="FreeRTOS_Object" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
-        <Segment component="r_tsip_rx1.23" id="r_tsip_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_tsip_rx1.24" id="r_tsip_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="TSIP_ECDH_P256" value="0"/>
             <Setting id="TSIP_AES_256_CBC_ENCRYPT" value="0"/>
             <Setting id="TSIP_RSAES_2048" value="0"/>
@@ -238,14 +226,8 @@
             <Setting id="TDES-CBC" value="0"/>
             <Setting id="TSIP_SHA_256_HMAC" value="0"/>
         </Segment>
-        <Segment component="r_byteq2.20" id="r_byteq" source="com.renesas.smc.tools.swcomponent.fit.source">
-            <Setting id="BYTEQ_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
-            <Setting id="BYTEQ_CFG_MAX_CTRL_BLKS" value="32"/>
-            <Setting id="BYTEQ_CFG_USE_HEAP_FOR_CTRL_BLKS" value="0"/>
-            <Setting id="BYTEQ_CFG_CRITICAL_SECTION" value="0"/>
-            <Setting id="BYTEQ_CFG_PROTECT_QUEUE" value="0"/>
-        </Segment>
-        <Segment component="r_sci_rx5.60" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="LittleFS202604.00-LTS-saffti-1.0.0[aws_wifi_rx671_ek]" id="LittleFS" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="r_sci_rx5.61" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="SCI_CFG_CH9_FIFO_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH4_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH8_EN_TXI_NESTED_INT" value="0"/>
@@ -453,14 +435,51 @@
             <Setting id="SCI_CFG_CH11_RX_DMACA_CH_NUM" value="1"/>
             <Setting id="SCI_CFG_CH2_TX_SIGNAL_TRANSITION_TIMING_INCLUDED" value="0"/>
         </Segment>
-        <Segment component="FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0" id="FreeRTOS_Kernel" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="r_s12ad_rx5.51" id="r_s12ad_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="ADC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+        </Segment>
+        <Segment component="rm_littlefs_rx1.00.saffti-original" id="rm_littlefs_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="RM_LITTLEFS_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+            <Setting id="RM_LITTLEFS_CFG_BLOCK_CYCLES" value="500"/>
+            <Setting id="RM_LITTLEFS_CFG_READ_SIZE" value="4"/>
+            <Setting id="RM_LITTLEFS_CFG_FORMAT_IF_MOUNT_FAILED" value="0"/>
+            <Setting id="RM_LITTLEFS_CFG_PROVIDE_ABORT" value="1"/>
+            <Setting id="RM_LITTLEFS_CFG_BLOCK_SIZE" value="128"/>
+            <Setting id="RM_LITTLEFS_CFG_CACHE_SIZE" value="64"/>
+            <Setting id="RM_LITTLEFS_CFG_LOOKAHEAD_SIZE" value="16"/>
+            <Setting id="RM_LITTLEFS_CFG_FLASH_WAIT_TASK_ID" value="0"/>
+            <Setting id="RM_LITTLEFS_CFG_PROG_SIZE" value="4"/>
+        </Segment>
+        <Segment component="r_sdio_rx1.00.saffti-original" id="r_sdio_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="SDIO_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+            <Setting id="SDIO_CFG_CMD53_MAX_BYTE_COUNT" value="512"/>
+            <Setting id="SDIO_CFG_BACKPLANE_WINDOW_CACHE_ENABLE" value="1"/>
+            <Setting id="SDIO_CFG_IO_READY_POLL_COUNT" value="1000"/>
+        </Segment>
+        <Segment component="r_dtc_rx4.61" id="r_dtc_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="DTC_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+            <Setting id="DTC_CFG_DISABLE_ALL_ACT_SOURCE" value="DTC_ENABLE"/>
+            <Setting id="DTC_CFG_USE_DMAC_FIT_MODULE" value="DTC_ENABLE"/>
+            <Setting id="DTC_CFG_TRANSFER_DATA_READ_SKIP_EN" value="DTC_ENABLE"/>
+            <Setting id="DTC_CFG_USE_SEQUENCE_TRANSFER" value="DTC_DISABLE"/>
+            <Setting id="DTC_CFG_SHORT_ADDRESS_MODE" value="DTC_DISABLE"/>
+        </Segment>
+        <Segment component="com.renesas.smc.tools.swcomponent.rtosconfigurator.freertos.objectfreertoslts202604.00-LTS-saffti-1.0.0" id="FreeRTOS_Object" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
+        <Segment component="r_byteq2.21" id="r_byteq" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="BYTEQ_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
+            <Setting id="BYTEQ_CFG_MAX_CTRL_BLKS" value="32"/>
+            <Setting id="BYTEQ_CFG_USE_HEAP_FOR_CTRL_BLKS" value="0"/>
+            <Setting id="BYTEQ_CFG_CRITICAL_SECTION" value="0"/>
+            <Setting id="BYTEQ_CFG_PROTECT_QUEUE" value="0"/>
+        </Segment>
+        <Segment component="FreeRTOS_Kernel202604.00-LTS-saffti-1.0.0[aws_wifi_rx671_ek]" id="FreeRTOS_Kernel" source="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         <Segment component="r_flash_rx5.31.saffti-custom.1" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
+            <Setting id="FLASH_CFG_FCU_EN_NESTED_INT" value="0"/>
             <Setting id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_BGO" value="1"/>
-            <Setting id="FLASH_CFG_FCU_EN_NESTED_INT" value="0"/>
         </Segment>
     </Segment>
     <Segment id="Clock">

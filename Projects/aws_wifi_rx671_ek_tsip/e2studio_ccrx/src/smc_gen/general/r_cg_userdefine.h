@@ -1,12 +1,12 @@
 /*
-* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+* Copyright (c) 2016 - 2026 Renesas Electronics Corporation and/or its affiliates
 *
 * SPDX-License-Identifier: BSD-3-Clause
 */
 
 /***********************************************************************************************************************
 * File Name        : r_cg_userdefine.h
-* Version          : 1.0.100
+* Version          : 1.0.101
 * Device(s)        : R5F5671EHxFB
 * Description      : User header file for code generation.
 ***********************************************************************************************************************/

@@ -453,7 +453,7 @@ extern void vLoggingPrint( const char * pcMessage );
 #define configPRINT( X )     vLoggingPrint( X )
 
 extern void vOutputString( const char * pcMessage );
-#define configPRINT_STRING( x )    vOutputString( x )
+#define configPRINT_STRING( x )    vOutputString(x)
 #define configOUTPUT_STRING_USES_DEBUG_UART    1
 
 #define configLOGGING_MAX_MESSAGE_LENGTH            192
