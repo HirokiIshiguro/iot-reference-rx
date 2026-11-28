@@ -281,6 +281,11 @@ def benchmark_jobs(registry: dict, boards: list[str]) -> dict:
     return jobs
 
 
+def needs_aws_cleanup(test: dict) -> bool:
+    """RX72N MQTT uses existing device credentials and creates no AWS resources."""
+    return (test["board"], test["feature"]) != ("rx72n", "mqtt")
+
+
 def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
                    keep: bool = False, rebuild: bool = False, benchmarks: list[str] | None = None) -> tuple[dict, dict]:
     """Build the child pipeline (a dict that is dumped as JSON, which GitLab reads as YAML).
@@ -351,7 +356,6 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
                 "tags": board["runner_tags"],
                 "resource_group": board["resource_group"],
                 "needs": [{"job": f"build {variant}", "artifacts": True} for variant in build_variants(test, registry)],
-                "id_tokens": OIDC,
                 "variables": {"GIT_STRATEGY": "fetch", "GIT_SUBMODULE_STRATEGY": "none", "GIT_DEPTH": "1"},
                 "script": [f"python3 {TOOL} test {test['name']} --out out --log-dir out/logs"],
                 # Runs also after a cancelled or timed-out script: parks the board and deletes AWS resources.
@@ -361,12 +365,14 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
                 "timeout": f"{(LOCK_WAIT_SECONDS + TEST_SECONDS) // 60} minutes",
                 "interruptible": False,     # never stop a job that is writing to a board
             }
+            if needs_aws_cleanup(test):
+                jobs[f"{test['name']}{suffix}"]["id_tokens"] = OIDC
             if test["board"] == "rx671":
                 jobs[f"{test['name']}{suffix}"]["before_script"] = [
                     ': "${SAFFTI_001_WIFI_SSID:?SAFFTI_001_WIFI_SSID is required}"',
                     ': "${SAFFTI_001_WIFI_PASSPHRASE:?SAFFTI_001_WIFI_PASSPHRASE is required}"',
                 ]
-    if run:
+    if any(needs_aws_cleanup(test) for test in run):
         # Removes the AWS resources of this pipeline even when a test job was cancelled, and
         # whatever older pipelines left behind.
         jobs["sweep"] = {

@@ -133,6 +133,7 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(jobs["sweep"]["rules"], [{"when": "always"}])
         self.assertEqual(jobs["sweep"]["stage"], jobs["stages"][-1])
         self.assertIn("GITLAB_OIDC_TOKEN", jobs["sweep"]["id_tokens"])
+        self.assertFalse(jobs["sweep"]["interruptible"])
         without_tests, _ = rxci.child_pipeline(registry(), "check", "", 1)
         self.assertNotIn("sweep", without_tests)
 
@@ -159,7 +160,8 @@ class PlanTests(unittest.TestCase):
         self.assertNotIn("interruptible", normal["build rx72n/software/app"])
         full, _ = rxci.child_pipeline(registry([name]), "full", "", 1)
         self.assertFalse(full[name]["interruptible"])
-        self.assertFalse(full["sweep"]["interruptible"])
+        self.assertNotIn("sweep", full)
+        self.assertNotIn("id_tokens", full[name])
 
     def test_ota_needs_the_normal_application_and_the_candidate(self):
         name = "rx72n:sw:tls12:ota"
