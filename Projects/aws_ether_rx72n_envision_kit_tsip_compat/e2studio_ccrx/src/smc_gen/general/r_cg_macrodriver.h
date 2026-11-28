@@ -1,12 +1,12 @@
 /*
-* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+* Copyright (c) 2016 - 2026 Renesas Electronics Corporation and/or its affiliates
 *
 * SPDX-License-Identifier: BSD-3-Clause
 */
 
 /***********************************************************************************************************************
 * File Name        : r_cg_macrodriver.h
-* Version          : 1.0.200
+* Version          : 1.0.201
 * Device(s)        : R5F572NNHxFB
 * Description      : Macro header file for code generation.
 ***********************************************************************************************************************/

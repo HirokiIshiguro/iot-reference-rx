@@ -41,6 +41,10 @@ void ${Function_Name}()
                     <#if pin.portNum != "E">
     PORT${pin.portNum}.PDR.BYTE &= ~(1U<<${pin.pinBitNum});
                     </#if>
+                <#elseif headerInfo.device?contains("R5F514T")>
+                    <#if pin.portNum != "E">
+    PORT${pin.portNum}.PDR.BYTE &= ~(1U<<${pin.pinBitNum});
+                    </#if>
                 <#else> 
     PORT${pin.portNum}.PDR.BYTE &= ~(1U<<${pin.pinBitNum});
                 </#if>
