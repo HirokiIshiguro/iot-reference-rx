@@ -145,7 +145,13 @@ def validate(repo: Path) -> dict:
     for name in PROJECTS:
         project = repo / 'Projects' / name / 'e2studio_ccrx'
         settings = project / '.settings/smartconfigurator/rtos'
-        require((settings/'nopg_freertos.xml').read_bytes() == canonical.read_bytes(), name + ': local LTS descriptor drifted')
+        local_lts = settings / 'nopg_freertos.xml'
+        # SC removes this package-level copy when FreeRTOSLTS is not a selected
+        # component. The shared descriptor and the project's selection below
+        # still identify the package, and the local Kernel descriptor is required.
+        if name != 'aws_wifi_rx671_ek' or local_lts.exists():
+            require(local_lts.is_file() and local_lts.read_bytes() == canonical.read_bytes(),
+                    name + ': local LTS descriptor missing or drifted')
         require((settings/'FreeRTOS_Kernel.xml').read_bytes() == kernel.read_bytes(), name + ': local Kernel descriptor drifted')
         scfg = ET.parse(project / (name + '.scfg')).getroot()
         selectors = scfg.findall('.//option[@id="com.renesas.smc.toolchain.option.rtos"]')

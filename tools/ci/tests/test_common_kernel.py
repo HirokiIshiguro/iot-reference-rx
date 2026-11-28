@@ -32,8 +32,10 @@ class CommonKernelTests(unittest.TestCase):
         for name in guard.PROJECTS:
             base = 'Projects/' + name + '/e2studio_ccrx/'
             paths += [base+'.project', base+name+'.scfg',
-                      base+'.settings/smartconfigurator/rtos/nopg_freertos.xml',
                       base+'.settings/smartconfigurator/rtos/FreeRTOS_Kernel.xml']
+            local_lts = base+'.settings/smartconfigurator/rtos/nopg_freertos.xml'
+            if (ROOT / local_lts).is_file():
+                paths.append(local_lts)
         for relative in paths:
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -67,6 +69,21 @@ class CommonKernelTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'local Kernel body copy'):
                 guard.validate(root)
             self.assertEqual(b'synthetic generated Kernel body', body.read_bytes())
+
+    def test_regenerated_rx671_can_omit_only_the_local_lts_descriptor(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = self.fixture(folder)
+            settings = root/'Projects/aws_wifi_rx671_ek/e2studio_ccrx/.settings/smartconfigurator/rtos'
+            local_lts = settings/'nopg_freertos.xml'
+            local_lts.unlink(missing_ok=True)
+            guard.validate(root)
+            local_lts.write_bytes(b'unexpected package descriptor')
+            with self.assertRaisesRegex(ValueError, 'local LTS descriptor missing or drifted'):
+                guard.validate(root)
+            local_lts.unlink()
+            (settings/'FreeRTOS_Kernel.xml').unlink()
+            with self.assertRaises(FileNotFoundError):
+                guard.validate(root)
 
     def test_source_copy_directive_cannot_be_added_even_to_all_matching_backups(self):
         with tempfile.TemporaryDirectory() as folder:
