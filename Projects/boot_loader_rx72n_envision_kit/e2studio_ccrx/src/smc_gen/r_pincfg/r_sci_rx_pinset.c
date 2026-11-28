@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+* Copyright (c) 2016 - 2026 Renesas Electronics Corporation and/or its affiliates
 *
 * SPDX-License-Identifier: BSD-3-Clause
 */
@@ -32,11 +32,11 @@ void R_SCI_PinSet_SCI2()
 {
     R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
 
-    /* Set RXD2/SMISO2 pin */
+    /* Set RXD2/SMISO2/SSCL2 pin */
     MPC.P12PFS.BYTE = 0x0AU;
     PORT1.PMR.BIT.B2 = 1U;
 
-    /* Set TXD2/SMOSI2 pin */
+    /* Set TXD2/SMOSI2/SSDA2 pin */
     MPC.P13PFS.BYTE = 0x0AU;
     PORT1.PMR.BIT.B3 = 1U;
 
@@ -53,11 +53,11 @@ void R_SCI_PinSet_SCI7()
 {
     R_BSP_RegisterProtectDisable(BSP_REG_PROTECT_MPC);
 
-    /* Set RXD7/SMISO7 pin */
+    /* Set RXD7/SMISO7/SSCL7 pin */
     MPC.P92PFS.BYTE = 0x0AU;
     PORT9.PMR.BIT.B2 = 1U;
 
-    /* Set TXD7/SMOSI7 pin */
+    /* Set TXD7/SMOSI7/SSDA7 pin */
     MPC.P90PFS.BYTE = 0x0AU;
     PORT9.PMR.BIT.B0 = 1U;
 
