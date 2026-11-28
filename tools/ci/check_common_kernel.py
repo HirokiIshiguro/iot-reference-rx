@@ -11,6 +11,7 @@ PROJECTS = (
     'aws_ether_rx72n_envision_kit', 'aws_ether_rx72n_envision_kit_tsip',
     'aws_bg96_ck_rx65n', 'aws_bg96_ck_rx65n_tsip', 'aws_wifi_rx671_ek',
 )
+SC_REGENERATED_PROJECTS = ('aws_bg96_ck_rx65n', 'aws_bg96_ck_rx65n_tsip')
 FLASH_PROJECTS = PROJECTS + (
     'boot_loader_ck_rx65n', 'boot_loader_rx671_ek', 'boot_loader_rx72n_envision_kit',
 )
@@ -145,7 +146,11 @@ def validate(repo: Path) -> dict:
     for name in PROJECTS:
         project = repo / 'Projects' / name / 'e2studio_ccrx'
         settings = project / '.settings/smartconfigurator/rtos'
-        require((settings/'nopg_freertos.xml').read_bytes() == canonical.read_bytes(), name + ': local LTS descriptor drifted')
+        lts_descriptor = settings / 'nopg_freertos.xml'
+        # SC 2.29 removes the local copy when regenerating these projects.
+        if name not in SC_REGENERATED_PROJECTS or lts_descriptor.exists() or lts_descriptor.is_symlink():
+            require(lts_descriptor.is_file() and lts_descriptor.read_bytes() == canonical.read_bytes(),
+                    name + ': local LTS descriptor drifted')
         require((settings/'FreeRTOS_Kernel.xml').read_bytes() == kernel.read_bytes(), name + ': local Kernel descriptor drifted')
         scfg = ET.parse(project / (name + '.scfg')).getroot()
         selectors = scfg.findall('.//option[@id="com.renesas.smc.toolchain.option.rtos"]')
