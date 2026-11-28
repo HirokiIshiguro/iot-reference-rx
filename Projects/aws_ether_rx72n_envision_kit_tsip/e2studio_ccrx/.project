@@ -437,7 +437,7 @@
 			<type>10</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
-				<arguments>1.0-name-matches-false-true-generic_rx110|generic_rx111|generic_rx113|generic_rx130|generic_rx13t|generic_rx140|generic_rx14t|generic_rx230|generic_rx231|generic_rx23e\-a|generic_rx23e\-b|generic_rx23t|generic_rx23w|generic_rx24t|generic_rx24u|generic_rx260|generic_rx261|generic_rx26t|generic_rx64m|generic_rx65n|generic_rx660|generic_rx66n|generic_rx66t|generic_rx671|generic_rx71m|generic_rx72m|generic_rx72t</arguments>
+				<arguments>1.0-name-matches-false-true-user|generic_rx110|generic_rx111|generic_rx113|generic_rx130|generic_rx13t|generic_rx140|generic_rx14t|generic_rx230|generic_rx231|generic_rx23e\-a|generic_rx23e\-b|generic_rx23t|generic_rx23w|generic_rx24t|generic_rx24u|generic_rx260|generic_rx261|generic_rx26t|generic_rx64m|generic_rx65n|generic_rx660|generic_rx66n|generic_rx66t|generic_rx671|generic_rx71m|generic_rx72m|generic_rx72t</arguments>
 			</matcher>
 		</filter>
 		<filter>
@@ -500,7 +500,7 @@
 			<type>10</type>
 			<matcher>
 				<id>org.eclipse.ui.ide.multiFilter</id>
-				<arguments>1.0-name-matches-false-true-sample</arguments>
+				<arguments>1.0-name-matches-false-true-sample|third_party</arguments>
 			</matcher>
 		</filter>
 		<filter>
