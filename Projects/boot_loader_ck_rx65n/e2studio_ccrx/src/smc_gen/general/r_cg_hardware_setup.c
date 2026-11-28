@@ -1,12 +1,12 @@
 /*
-* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+* Copyright (c) 2016 - 2026 Renesas Electronics Corporation and/or its affiliates
 *
 * SPDX-License-Identifier: BSD-3-Clause
 */
 
 /***********************************************************************************************************************
 * File Name        : r_cg_hardware_setup.c
-* Version          : 1.2.200
+* Version          : 1.2.201
 * Device(s)        : R5F565NEHxFB
 * Description      : Initialization file for code generation configurations.
 ***********************************************************************************************************************/

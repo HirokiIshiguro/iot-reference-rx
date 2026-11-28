@@ -39,11 +39,13 @@
     </Segment>
     <Segment id="Component">
         <Setting id="r_bsp" value="FIT"/>
+        <Setting id="rm_littlefs_rx" value="FIT"/>
+        <Setting id="rm_rtos_abstraction_rx" value="FIT"/>
         <Setting id="r_cmt_rx" value="FIT"/>
         <Setting id="r_byteq" value="FIT"/>
         <Setting id="r_sci_rx" value="FIT"/>
         <Setting id="r_flash_rx" value="FIT"/>
-        <Segment component="r_bsp7.70" id="r_bsp" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_bsp7.71" id="r_bsp" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="BSP_CFG_SWINT_UNIT1_ENABLE" value="0"/>
             <Setting id="BSP_CFG_LOW_LEVEL_INTERFACE_STDIO_ENABLE" value="1"/>
             <Setting id="BSP_CFG_SWINT_UNIT2_ENABLE" value="0"/>
@@ -62,7 +64,7 @@
             <Setting id="BSP_CFG_MEMORY_BUS2_PRIORITY" value="0"/>
             <Setting id="BSP_CFG_INTERNAL_PERIPHERAL_BUS4_5_PRIORITY" value="0"/>
             <Setting id="BSP_CFG_EXTERNAL_BUS_PRIORITY" value="0"/>
-            <Setting id="BSP_CFG_IO_LIB_ENABLE" value="1"/>
+            <Setting id="BSP_CFG_IO_LIB_ENABLE" value="0"/>
             <Setting id="BSP_CFG_MEMORY_BUS1_3_PRIORITY" value="0"/>
             <Setting id="BSP_CFG_BUS_PRIORITY_INITIALIZE_ENABLE" value="0"/>
             <Setting id="BSP_CFG_ID_CODE_LONG_4" value="0xFFFFFFFF"/>
@@ -85,7 +87,7 @@
             <Setting id="BSP_CFG_USER_LOCKING_HW_LOCK_FUNCTION" value="my_hw_locking_function"/>
             <Setting id="BSP_CFG_EBMAPCR_3RD_PRIORITY" value="1"/>
             <Setting id="BSP_CFG_ROMCODE_REG_VALUE" value="0xFFFFFFFF"/>
-            <Setting id="BSP_CFG_ROM_CACHE_ENABLE" value="0"/>
+            <Setting id="BSP_CFG_ROM_CACHE_ENABLE" value="1"/>
             <Setting id="BSP_CFG_USER_EXIT_CRITICAL_FUNCTION" value="my_exit_critical_function"/>
             <Setting id="BSP_CFG_USER_LOCKING_TYPE" value="bsp_lock_t"/>
             <Setting id="BSP_CFG_HEAP_BYTES" value="0x400"/>
@@ -105,21 +107,36 @@
             <Setting id="BSP_CFG_USER_EXCLUSIVE_CONTROL_ENABLE" value="0"/>
             <Setting id="BSP_CFG_EBMAPCR_1ST_PRIORITY" value="0"/>
         </Segment>
-        <Segment component="r_cmt_rx5.80" id="r_cmt_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="rm_littlefs_rx1.00.saffti-original" id="rm_littlefs_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="RM_LITTLEFS_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+            <Setting id="RM_LITTLEFS_CFG_BLOCK_CYCLES" value="500"/>
+            <Setting id="RM_LITTLEFS_CFG_READ_SIZE" value="4"/>
+            <Setting id="RM_LITTLEFS_CFG_FORMAT_IF_MOUNT_FAILED" value="0"/>
+            <Setting id="RM_LITTLEFS_CFG_PROVIDE_ABORT" value="1"/>
+            <Setting id="RM_LITTLEFS_CFG_BLOCK_SIZE" value="128"/>
+            <Setting id="RM_LITTLEFS_CFG_CACHE_SIZE" value="64"/>
+            <Setting id="RM_LITTLEFS_CFG_LOOKAHEAD_SIZE" value="16"/>
+            <Setting id="RM_LITTLEFS_CFG_FLASH_WAIT_TASK_ID" value="0"/>
+            <Setting id="RM_LITTLEFS_CFG_PROG_SIZE" value="4"/>
+        </Segment>
+        <Segment component="rm_rtos_abstraction_rx1.00.saffti-original" id="rm_rtos_abstraction_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+            <Setting id="RM_RTOS_ABSTRACTION_CFG_PARAM_CHECKING_ENABLE" value="1"/>
+        </Segment>
+        <Segment component="r_cmt_rx5.81" id="r_cmt_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="CMT_CFG_CH2_EN_NESTED_INT" value="0"/>
             <Setting id="CMT_CFG_CH1_EN_NESTED_INT" value="0"/>
             <Setting id="CMT_CFG_CH3_EN_NESTED_INT" value="0"/>
             <Setting id="CMT_CFG_CH0_EN_NESTED_INT" value="0"/>
             <Setting id="CMT_RX_CFG_IPR" value="5"/>
         </Segment>
-        <Segment component="r_byteq2.20" id="r_byteq" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_byteq2.21" id="r_byteq" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="BYTEQ_CFG_PARAM_CHECKING_ENABLE" value="BSP_CFG_PARAM_CHECKING_ENABLE"/>
             <Setting id="BYTEQ_CFG_MAX_CTRL_BLKS" value="32"/>
             <Setting id="BYTEQ_CFG_USE_HEAP_FOR_CTRL_BLKS" value="0"/>
             <Setting id="BYTEQ_CFG_CRITICAL_SECTION" value="0"/>
             <Setting id="BYTEQ_CFG_PROTECT_QUEUE" value="0"/>
         </Segment>
-        <Segment component="r_sci_rx5.60" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
+        <Segment component="r_sci_rx5.61" id="r_sci_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="SCI_CFG_CH9_FIFO_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH4_INCLUDED" value="0"/>
             <Setting id="SCI_CFG_CH8_EN_TXI_NESTED_INT" value="0"/>
@@ -330,10 +347,10 @@
         <Segment component="r_flash_rx5.31.saffti-custom.1" id="r_flash_rx" source="com.renesas.smc.tools.swcomponent.fit.source">
             <Setting id="FLASH_CFG_PARAM_CHECKING_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_DATA_FLASH_BGO" value="1"/>
+            <Setting id="FLASH_CFG_FCU_EN_NESTED_INT" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_RUN_FROM_ROM" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_ENABLE" value="1"/>
             <Setting id="FLASH_CFG_CODE_FLASH_BGO" value="1"/>
-            <Setting id="FLASH_CFG_FCU_EN_NESTED_INT" value="1"/>
         </Segment>
     </Segment>
 </QE>

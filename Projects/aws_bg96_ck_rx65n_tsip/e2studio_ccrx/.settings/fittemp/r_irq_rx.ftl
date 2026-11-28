@@ -1,10 +1,9 @@
 <#--
-  Copyright(C) 2015 Renesas Electronics Corporation
-  RENESAS ELECTRONICS CONFIDENTIAL AND PROPRIETARY
-  This program must be used solely for the purpose for which it was furnished 
-  by Renesas Electronics Corporation. No part of this program may be reproduced
-  or disclosed to others, in any form, without the prior written permission of 
-  Renesas Electronics Corporation.
+/***********************************************************************************************************************
+* Copyright (c) 2015 - 2025 Renesas Electronics Corporation and/or its affiliates
+*
+* SPDX-License-Identifier: BSD-3-Clause
+***********************************************************************************************************************/
 -->
 <#-- = DECLARE FUNCTION INFORMATION HERE =================== -->
 <#assign Function_Base_Name = "R_ICU_PinSet">
@@ -39,6 +38,10 @@ void ${Function_Name}()
     PORT${pin.portNum}.PMR.BYTE &= ~(1U<<${pin.pinBitNum});
                 </#if>
                 <#if headerInfo.device?contains("R5F513T")>
+                    <#if pin.portNum != "E">
+    PORT${pin.portNum}.PDR.BYTE &= ~(1U<<${pin.pinBitNum});
+                    </#if>
+                <#elseif headerInfo.device?contains("R5F514T")>
                     <#if pin.portNum != "E">
     PORT${pin.portNum}.PDR.BYTE &= ~(1U<<${pin.pinBitNum});
                     </#if>

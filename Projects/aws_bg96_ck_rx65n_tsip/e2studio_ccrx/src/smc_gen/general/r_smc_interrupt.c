@@ -1,12 +1,12 @@
 /*
-* Copyright (c) 2016 - 2025 Renesas Electronics Corporation and/or its affiliates
+* Copyright (c) 2016 - 2026 Renesas Electronics Corporation and/or its affiliates
 *
 * SPDX-License-Identifier: BSD-3-Clause
 */
 
 /***********************************************************************************************************************
 * File Name        : r_smc_interrupt.c
-* Version          : 1.2.100
+* Version          : 1.2.101
 * Device(s)        : R5F565NEHxFB
 * Description      : This file implements interrupt setting.
 ***********************************************************************************************************************/
