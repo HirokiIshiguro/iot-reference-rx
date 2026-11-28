@@ -780,10 +780,10 @@
                 <gridItem id="configMAX_PRIORITIES" selectedIndex="7"/>
                 <gridItem id="configMINIMAL_STACK_SIZE" selectedIndex="768"/>
                 <gridItem id="configRECORD_STACK_HIGH_ADDRESS" selectedIndex="1"/>
-                <gridItem id="configUSE_16_BIT_TICKS" selectedIndex="0"/>
+
                 <gridItem id="configMAX_TASK_NAME_LEN" selectedIndex="12"/>
                 <gridItem id="configTICK_VECTOR" selectedIndex="0"/>
-                <gridItem id="configTICK_TYPE_WIDTH_IN_BITS" selectedIndex="1"/>
+                <gridItem id="configTICK_TYPE_WIDTH_IN_BITS" selectedIndex="TICK_TYPE_WIDTH_32_BITS"/>
                 <gridItem id="configIDLE_SHOULD_YIELD" selectedIndex="1"/>
                 <gridItem id="configTASK_NOTIFICATION_ARRAY_ENTRIES" selectedIndex="4"/>
                 <gridItem id="configQUEUE_REGISTRY_SIZE" selectedIndex="0"/>
@@ -792,7 +792,7 @@
                 <gridItem id="configUSE_MINI_LIST_ITEM" selectedIndex="1"/>
                 <gridItem id="configSTACK_DEPTH_TYPE" selectedIndex="StackType_t"/>
                 <gridItem id="configMESSAGE_BUFFER_LENGTH_TYPE" selectedIndex="size_t"/>
-                <gridItem id="configSTATS_BUFFER_MAX_LENGTH" selectedIndex="0xFFFF"/>
+                <gridItem id="configSTATS_BUFFER_MAX_LENGTH" selectedIndex="65535"/>
                 <gridItem id="configUSE_NEWLIB_REENTRANT" selectedIndex="0"/>
                 <gridItem id="configUSE_TIMERS" selectedIndex="1"/>
                 <gridItem id="configTIMER_TASK_PRIORITY" selectedIndex="6"/>
@@ -802,7 +802,7 @@
                 <gridItem id="configUSE_STREAM_BUFFERS" selectedIndex="1"/>
                 <gridItem id="configSUPPORT_STATIC_ALLOCATION" selectedIndex="1"/>
                 <gridItem id="configSUPPORT_DYNAMIC_ALLOCATION" selectedIndex="1"/>
-                <gridItem id="configTOTAL_HEAP_SIZE_N" selectedIndex="256"/>
+                <gridItem id="configTOTAL_HEAP_SIZE_N" selectedIndex="RX671_FREERTOS_HEAP_SIZE_KB"/>
                 <gridItem id="configTOTAL_HEAP_SIZE" selectedIndex="( size_t ) ( configTOTAL_HEAP_SIZE_N * 1024 )"/>
                 <gridItem id="configAPPLICATION_ALLOCATED_HEAP" selectedIndex="0"/>
                 <gridItem id="configSTACK_ALLOCATION_FROM_SEPARATE_HEAP" selectedIndex="0"/>
@@ -841,10 +841,15 @@
                 <gridItem id="INCLUDE_xTaskGetIdleTaskHandle" selectedIndex="0"/>
                 <gridItem id="INCLUDE_eTaskGetState" selectedIndex="1"/>
                 <gridItem id="INCLUDE_xEventGroupSetBitFromISR" selectedIndex="1"/>
-                <gridItem id="INCLUDE_xTimerPendFunctionCall" selectedIndex="0"/>
-                <gridItem id="INCLUDE_xTaskAbortDelay" selectedIndex="0"/>
+                <gridItem id="INCLUDE_xTimerPendFunctionCall" selectedIndex="1"/>
+                <gridItem id="INCLUDE_xTaskAbortDelay" selectedIndex="1"/>
                 <gridItem id="INCLUDE_xTaskGetHandle" selectedIndex="0"/>
                 <gridItem id="INCLUDE_xTaskResumeFromISR" selectedIndex="1"/>
+                <gridItem id="configCOMMAND_INT_MAX_OUTPUT_SIZE" selectedIndex="850"/>
+                <gridItem id="CONFIG_USE_PERCEPIO_TRACE_RECORDER" selectedIndex="1"/>
+                <gridItem id="RX671_FREERTOS_HEAP_SIZE_KB" selectedIndex="256"/>
+                <gridItem id="configHEAP_CLEAR_MEMORY_ON_FREE" selectedIndex="1"/>
+                <gridItem id="configOUTPUT_STRING_USES_DEBUG_UART" selectedIndex="1"/>
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>

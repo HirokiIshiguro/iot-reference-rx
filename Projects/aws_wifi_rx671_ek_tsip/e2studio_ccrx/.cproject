@@ -25,7 +25,7 @@
 				<option id="board.device" value="R5F5671EHxFB_DUAL"/>
 			</storageModule>
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactExtension="abs" artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug" description="Debug on hardware" id="com.renesas.cdt.managedbuild.renesas.ccrx.hardwaredebug.configuration.206570365" name="HardwareDebug" parent="com.renesas.cdt.managedbuild.renesas.ccrx.hardwaredebug.configuration">
+				<configuration artifactExtension="abs" artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug" description="Debug on hardware" id="com.renesas.cdt.managedbuild.renesas.ccrx.hardwaredebug.configuration.206570365" name="HardwareDebug" parent="com.renesas.cdt.managedbuild.renesas.ccrx.hardwaredebug.configuration" prebuildStep="powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ../../external/type1yn-blobs/stage_type1yn_blobs.ps1">
 					<folderInfo id="com.renesas.cdt.managedbuild.renesas.ccrx.hardwaredebug.configuration.206570365." name="/" resourcePath="">
 						<toolChain id="com.renesas.cdt.managedbuild.renesas.ccrx.hardwaredebug.toolChain.937644859" name="Renesas CCRX Toolchain" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.hardwaredebug.toolChain">
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF;org.eclipse.cdt.core.PE" id="com.renesas.cdt.managedbuild.renesas.ccrx.base.targetPlatform.1485630941" osList="win32" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.base.targetPlatform"/>
@@ -57,11 +57,11 @@
 								<option id="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.fpu.1239717208" name="浮動小数点演算命令を使用する (-fpu/-nofpu)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.fpu" useByScannerDiscovery="false" value="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.fpu.yes" valueType="enumerated"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.include.17788742" name="インクルード・ファイルを検索するフォルダ (-include)" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.include" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="${TCINSTALL}/include"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/TraceProduct/freertos_wrap}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/TraceProduct/config}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/TraceRecorder/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/TraceRecorder/kernelports/FreeRTOS/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/TraceRecorder/streamports/Jlink_RTT/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/trace_recorder/freertos_wrap}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/trace_recorder/config}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/3rdparty/TraceRecorderSource/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/3rdparty/TraceRecorderSource/kernelports/FreeRTOS/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/3rdparty/TraceRecorderSource/streamports/Jlink_RTT/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Kernel/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS/FreeRTOS-Plus-TCP/source/include}&quot;"/>
@@ -92,31 +92,31 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/general}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_pincfg}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/board_config}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sci_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_byteq/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_byteq}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sdhi_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sci_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sdio_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sdio_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sci_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_byteq/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_byteq}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sdhi_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sci_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sdio_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sdio_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_core}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_core/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_core/bus_protocols}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_port}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/whd_inc}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/whd_external/hal}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/whd_external/rtos}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_3}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_5}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/targets}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_4}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_1}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_tsip_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_inc}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_external/hal}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_external/rtos}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_3}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_5}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/targets}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_4}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_1}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_s12ad_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_s12ad_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_tsip_rx}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Common/common_api}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/cli}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Demos/mqtt_agent}&quot;"/>
@@ -147,16 +147,16 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/3rdparty/mbedtls_with_TSIP/include/mbedtls}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/ota_pal}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/application_code/ports/rm_aws_pkcs11_pal_littlefs}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dmaca_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dtc_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dtc_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dmaca_rx}&quot;"/>
-																	<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_bsp}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dmaca_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dtc_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dtc_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dmaca_rx}&quot;"/>
+																	<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_bsp}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Common/FreeRTOS_common/posix/include}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/rm_littlefs_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/rm_littlefs_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/rm_rtos_abstraction_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/rm_rtos_abstraction_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/rm_littlefs_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/rm_littlefs_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/rm_rtos_abstraction_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/rm_rtos_abstraction_rx/src}&quot;"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.userBefore.1701475645" name="追加するオプション（すべての指定オプションの前に追加）" superClass="com.renesas.cdt.managedbuild.renesas.ccrx.compiler.option.userBefore" useByScannerDiscovery="false" valueType="stringList">
 									<listOptionValue builtIn="false" value="-define=__FUNCTION__=__func__"/>
@@ -194,36 +194,36 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/general}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_pincfg}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/board_config}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sci_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_byteq/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_byteq}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sdhi_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sci_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sdio_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_sdio_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sci_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_byteq/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_byteq}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sdhi_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sci_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sdio_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_sdio_rx/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_core}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_core/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_core/bus_protocols}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_port}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/whd_inc}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/whd_external/hal}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/whd_external/rtos}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_3}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_5}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/targets}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_4}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_flash_rx/src/flash_type_1}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dmaca_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dtc_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_tsip_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dtc_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_s12ad_rx}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_dmaca_rx}&quot;"/>
-																	<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Vendor/r_bsp}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_inc}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_external/hal}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/whd_external/rtos}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_3}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_5}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/targets}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_4}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_flash_rx/src/flash_type_1}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dmaca_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dtc_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_s12ad_rx/src}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_tsip_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dtc_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_s12ad_rx}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_dmaca_rx}&quot;"/>
+																	<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/src/smc_gen/r_bsp}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Common/FreeRTOS_common/posix/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middleware/freertos_plus/libraries/freertos_plus/standard/crypto/include}&quot;"/>
@@ -289,75 +289,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Common/FreeRTOS_common/compiler_support/ccrx/exit.c|Common/ports/|src/application_code/ports/|src/whd_core/bus_protocols/whd_bus_spi_protocol.c|Common/FreeRTOS_common/network_support|Vendor/|src/smc_gen/r_bsp/|src/smc_gen/r_sci_rx/|src/smc_gen/r_byteq/|src/smc_gen/r_sdhi_rx/|src/smc_gen/r_flash_rx/|src/smc_gen/r_s12ad_rx/|src/smc_gen/r_tsip_rx/|src/smc_gen/r_dtc_rx/|src/smc_gen/r_dmaca_rx/|src/smc_gen/r_sdio_rx/|Middleware/|TraceRecorder/|src/tracealyzer_recorder/" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
-
-						<entry excluding="iar_call_inits.s|reset_program.S" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_bsp/mcu/all"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_bsp/mcu/rx671"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_bsp/board/generic_rx671"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_sci_rx/src"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_sci_rx/src/targets/rx671"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_byteq/src"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_sdhi_rx/src"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_sdhi_rx/src/targets/rx671"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_flash_rx/src"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_s12ad_rx/src"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_s12ad_rx/src/targets/rx671"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_tsip_rx/src/targets/rx671"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_dtc_rx/src"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_dtc_rx/src/targets/rx671"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_dmaca_rx/src"/>
-
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_dmaca_rx/src/targets/rx671"/>
-
-						<entry excluding="targets/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/r_sdio_rx/src"/>
-
-						<entry excluding=".github/|examples/|include/|portable/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Kernel"/>
-						<entry excluding="include/|interface/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/coreMQTT/source"/>
-						<entry excluding="dependency/|include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/coreMQTT-Agent/source"/>
-						<entry excluding="include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/coreJSON/source"/>
-						<entry excluding="include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/backoffAlgorithm/source"/>
-						<entry excluding="dependency/|include/|portable/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/corePKCS11/source"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/corePKCS11/source/portable/mbedtls"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/corePKCS11/source/dependency/3rdparty/mbedtls_utils"/>
-						<entry excluding="include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk/source"/>
-						<entry excluding="include/|otaJobParser/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk/source"/>
-						<entry excluding="include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk/source/otaJobParser"/>
-						<entry excluding="include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c/source"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Source/FreeRTOS-Plus-CLI"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/freertos_plus/libraries/freertos_plus/standard/crypto/src"/>
-						<entry excluding="cborparser_dup_string.c|cborpretty_stdio.c|cbortojson.c|cborvalidation.c|open_memstream.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/3rdparty/tinycbor/src"/>
-						<entry excluding=".github/|bd/|scripts/|tests/|benches/|runners/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/3rdparty/littlefs"/>
-						<entry excluding="mbedtls_bio_freertos_plus_cellular.c|mbedtls_bio_freertos_plus_wifi_da16600.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/3rdparty/mbedtls_utils"/>
-						<entry excluding="include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/logging"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas/RX700v3_DPFPU"/>
-						<entry excluding="heap_1.c|heap_2.c|heap_3.c|heap_5.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Kernel/portable/MemMang"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/3rdparty/mbedtls_with_TSIP/library"/>
-						<entry excluding="transport_mbedtls_pkcs11.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/network_transport/using_mbedtls_pkcs11"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/network_transport/using_mbedtls_pkcs11_with_tsip"/>
-						<entry excluding="include/|portable/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Plus-TCP/source"/>
-						<entry excluding="BufferAllocation_1.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/FreeRTOS/FreeRTOS-Plus-TCP/source/portable/BufferManagement"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Middleware/network_transport/sockets_wrapper/ports/freertos_plus_tcp"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/rm_littlefs_rx/src"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Vendor/rm_rtos_abstraction_rx/src"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/ota_pal"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src/application_code/ports/rm_aws_pkcs11_pal_littlefs"/>
-						<entry excluding="config/|docs/|extras/|include/|kernelports/|streamports/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder"/>
-						<entry excluding="config/|include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder/kernelports/FreeRTOS"/>
-						<entry excluding="config/|include/" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="TraceRecorder/streamports/Jlink_RTT"/>
+						<entry excluding="trash/" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

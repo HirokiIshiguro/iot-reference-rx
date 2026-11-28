@@ -735,7 +735,7 @@ def run_test(registry: dict, test: dict, builds: list, logs: Path) -> int:
 
 def finish_test(registry: dict, test: dict, logs: Path, aws_session) -> int:
     """after_script of a test job. Does the cleanup again when the test process could not finish it."""
-    import rxci_aws
+    from rxci import needs_aws_cleanup
 
     if (logs / "finished").is_file():
         return 0
@@ -748,6 +748,11 @@ def finish_test(registry: dict, test: dict, logs: Path, aws_session) -> int:
             print(f"could not park the board: {error}", flush=True)
     else:
         print(f"{board.name} is in use by another job; it is not parked here.", flush=True)
+    if not needs_aws_cleanup(test):
+        return 0
+
+    import rxci_aws
+
     try:
         session = aws_session()
         deleted = rxci_aws.sweep(session, prefix=rxci_aws.owner())

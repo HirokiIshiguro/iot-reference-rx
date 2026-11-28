@@ -1,0 +1,347 @@
+/*
+ * Copyright (c) 2015 Renesas Electronics Corporation and/or its affiliates
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/**********************************************************************************************************************
+ * History : DD.MM.YYYY Version  Description
+ *         : 27.06.2015 1.00     First Release
+ *         : 15.05.2017 1.01     Add AES-CMAC
+ *         : 30.09.2017 1.03     Add Init/Update/Final API and SHA, RSA
+ *         : 28.02.2018 1.04     Change Init/Update/Final API for RX231, add TLS function and 
+ *         :                     return values change FIT rules.
+ *         : 30.04.2018 1.05     Add TDES, MD5 and RSAES-PKCS1-v1_5 API
+ *         : 28.09.2018 1.06     Add RSA Key Generation, AES, TDES, RSA Key update features, RX66T support
+ *         : 28.12.2018 1.07     Add RX72T support
+ *         : 30.09.2019 1.08     Added support for GCC and IAR compiler, ECC API, RX23W and RX72M
+ *         : 31.03.2020 1.09     Added support for AES-CCM, HMAC key generation, ECDH, Key Wrap API, RX66N and RX72N
+ *         : 30.06.2020 1.10     Added support for ARC4, ECC(P-384) API
+ *         : 30.09.2020 1.11     Added support for DH, ECDHE P-512r1 API, and generalization of KDF.
+ *         :                     Added support for Key wrap API with TSIP-Lite.
+ *         : 30.06.2021 1.12     Added support for RX23W chip version D
+ *         : 31.08.2021 1.13     Added support for RX671
+ *         : 22.10.2021 1.14     Added support for TLS1.3
+ *         : 31.03.2022 1.15     Added support for TLS1.3(RX72M_RX72N_RX66N)
+ *         : 15.09.2022 1.16     Added support for RSA 3k/4k and updated support for TLS1.3
+ *         : 20.01.2023 1.17     Added support for TLS1.3 server
+ *         : 24.05.2023 1.18     Added support for RX26T
+ *         : 30.11.2023 1.19     Update example of Secure Bootloader / Firmware Update
+ *         : 28.02.2024 1.20     Applied software workaround of AES-CCM decryption
+ *         : 28.06.2024 1.21     Added support for TLS1.2 server
+ *         : 10.04.2025 1.22     Added support for RSAES-OAEP, SSH
+ *         :                     Updated Firmware Update API
+ *         : 15.10.2025 1.23     Updated Open/Close API to store the driver status
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ Includes   <System Includes> , "Project Includes"
+ *********************************************************************************************************************/
+#include "../r_tsip_rx_private.h"
+
+#if (TSIP_ECDSA_P192 | TSIP_ECDSA_P224 | TSIP_ECDSA_P256) != 0
+/**********************************************************************************************************************
+ Macro definitions
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ Typedef definitions
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ Imported global variables and functions (from other files)
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ Exported global variables (to be accessed by other files)
+ *********************************************************************************************************************/
+
+/**********************************************************************************************************************
+ Private global variables and functions
+ *********************************************************************************************************************/
+
+/***********************************************************************************************************************
+* Function Name: R_TSIP_EcdsaSigunatureVerificationSub
+*******************************************************************************************************************/ /**
+* @details       RX671 Signature verification of ECDSA-192/224/256
+* @param[in]     InData_Cmd
+* @param[in]     InData_KeyIndex
+* @param[in]     InData_MsgDgst
+* @param[in]     InData_Signature
+* @param[in]     InData_DomainParam
+* @retval        TSIP_SUCCESS
+* @retval        TSIP_ERR_FAIL
+* @retval        TSIP_ERR_RESOURCE_CONFLICT
+* @retval        TSIP_ERR_KEY_SET
+* @note          None
+*/
+e_tsip_err_t R_TSIP_EcdsaSigunatureVerificationSub(uint32_t *InData_Cmd, uint32_t *InData_KeyIndex, uint32_t *InData_MsgDgst, uint32_t *InData_Signature, const uint32_t *InData_DomainParam)
+{
+    int32_t iLoop = 0u, jLoop = 0u, kLoop = 0u, oLoop1 = 0u, oLoop2 = 0u, iLoop2 = 0u;
+    uint32_t KEY_ADR = 0u, OFS_ADR = 0u;
+    (void)iLoop;
+    (void)jLoop;
+    (void)kLoop;
+    (void)iLoop2;
+    (void)oLoop1;
+    (void)oLoop2;
+    (void)KEY_ADR;
+    (void)OFS_ADR;
+    #if TSIP_MULTI_THREADING == 1
+    TSIP_MULTI_THREADING_LOCK_FUNCTION();
+    #endif /* TSIP_MULTI_THREADING == 1 */
+    if (0x0u != (TSIP.REG_1BCH.WORD & 0x1fu))
+    {
+        #if TSIP_MULTI_THREADING == 1
+        TSIP_MULTI_THREADING_UNLOCK_FUNCTION();
+        #endif /* TSIP_MULTI_THREADING == 1 */
+        return TSIP_ERR_RESOURCE_CONFLICT;
+    }
+    TSIP.REG_84H.WORD = 0x0000f101u;
+    TSIP.REG_108H.WORD = 0x00000000u;
+    TSIP.REG_104H.WORD = 0x00000068u;
+    TSIP.REG_E0H.WORD = 0x80010380u;
+    /* WAIT_LOOP */
+    while (1u != TSIP.REG_104H.BIT.B31)
+    {
+        /* waiting */
+    }
+    TSIP.REG_100H.WORD = InData_Cmd[0];
+    RX671_func402();
+    TSIP.REG_ECH.WORD = 0x00000bdeu;
+    TSIP.REG_104H.WORD = 0x00001768u;
+    TSIP.REG_E0H.WORD = 0x8098001eu;
+    for (iLoop = 0; iLoop < 16; iLoop = iLoop + 1)
+    {
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_Signature[iLoop + 0];
+    }
+    for (iLoop = 0; iLoop < 8; iLoop = iLoop + 1)
+    {
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_MsgDgst[iLoop + 0];
+    }
+    for (iLoop = 0; iLoop < 3; iLoop = iLoop + 1)
+    {
+        TSIP.REG_ECH.WORD = 0x00000bffu;
+        TSIP.REG_ECH.WORD = 0x30003380u;
+        TSIP.REG_ECH.WORD = 0x00070020u;
+        TSIP.REG_ECH.WORD = 0x0000d3e0u;
+        TSIP.REG_ECH.WORD = 0x00030040u;
+        TSIP.REG_ECH.WORD = 0x0000381eu;
+        TSIP.REG_ECH.WORD = 0x38000c00u;
+        TSIP.REG_ECH.WORD = 0x1000d3e0u;
+        TSIP.REG_ECH.WORD = 0x00050040u;
+        TSIP.REG_ECH.WORD = 0x0000381eu;
+        TSIP.REG_ECH.WORD = 0x000037beu;
+        TSIP.REG_ECH.WORD = 0x0000a7a0u;
+        TSIP.REG_ECH.WORD = 0x00000004u;
+        TSIP.REG_ECH.WORD = 0x0000383du;
+        TSIP.REG_ECH.WORD = 0x38001001u;
+        TSIP.REG_ECH.WORD = 0x1000d3e0u;
+        TSIP.REG_ECH.WORD = 0x00000080u;
+        TSIP.REG_ECH.WORD = 0x38000fffu;
+        TSIP.REG_E0H.WORD = 0x00000080u;
+        TSIP.REG_1CH.WORD = 0x00260000u;
+        TSIP.REG_ECH.WORD = 0x0000a7c0u;
+        TSIP.REG_ECH.WORD = 0x00000020u;
+    }
+    RX671_func100(change_endian_long(0x2811722cu), change_endian_long(0xea2abaefu), change_endian_long(0xc6664c67u), change_endian_long(0xe9d31f95u));
+    TSIP.REG_1CH.WORD = 0x00400000u;
+    TSIP.REG_1D0H.WORD = 0x00000000u;
+    if (1u == (TSIP.REG_1CH.BIT.B22))
+    {
+        RX671_func102(change_endian_long(0xe6486c60u), change_endian_long(0x68e9fa78u), change_endian_long(0x2d660735u), change_endian_long(0x65d08ff2u));
+        TSIP.REG_1BCH.WORD = 0x00000040u;
+        /* WAIT_LOOP */
+        while (0u != TSIP.REG_18H.BIT.B12)
+        {
+            /* waiting */
+        }
+        #if TSIP_MULTI_THREADING == 1
+        TSIP_MULTI_THREADING_UNLOCK_FUNCTION();
+        #endif /* TSIP_MULTI_THREADING == 1 */
+        return TSIP_ERR_FAIL;
+    }
+    else
+    {
+        TSIP.REG_28H.WORD = 0x00870001u;
+        TSIP.REG_C4H.WORD = 0x200c3b0du;
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_KeyIndex[0];
+        TSIP.REG_100H.WORD = InData_KeyIndex[1];
+        TSIP.REG_100H.WORD = InData_KeyIndex[2];
+        TSIP.REG_100H.WORD = InData_KeyIndex[3];
+        RX671_func023();
+        TSIP.REG_104H.WORD = 0x00000b62u;
+        TSIP.REG_D0H.WORD = 0x00000200u;
+        TSIP.REG_C4H.WORD = 0x02f0888fu;
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_KeyIndex[4];
+        TSIP.REG_100H.WORD = InData_KeyIndex[5];
+        TSIP.REG_100H.WORD = InData_KeyIndex[6];
+        TSIP.REG_100H.WORD = InData_KeyIndex[7];
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_KeyIndex[8];
+        TSIP.REG_100H.WORD = InData_KeyIndex[9];
+        TSIP.REG_100H.WORD = InData_KeyIndex[10];
+        TSIP.REG_100H.WORD = InData_KeyIndex[11];
+        TSIP.REG_00H.WORD = 0x00003223u;
+        TSIP.REG_2CH.WORD = 0x0000009bu;
+        /* WAIT_LOOP */
+        while (0u != TSIP.REG_00H.BIT.B25)
+        {
+            /* waiting */
+        }
+        TSIP.REG_1CH.WORD = 0x00001800u;
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_KeyIndex[12];
+        TSIP.REG_100H.WORD = InData_KeyIndex[13];
+        TSIP.REG_100H.WORD = InData_KeyIndex[14];
+        TSIP.REG_100H.WORD = InData_KeyIndex[15];
+        TSIP.REG_C4H.WORD = 0x0045094cu;
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = change_endian_long(0x00000000u);
+        TSIP.REG_C4H.WORD = 0x00f0088du;
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_KeyIndex[16];
+        TSIP.REG_100H.WORD = InData_KeyIndex[17];
+        TSIP.REG_100H.WORD = InData_KeyIndex[18];
+        TSIP.REG_100H.WORD = InData_KeyIndex[19];
+        TSIP.REG_00H.WORD = 0x00003223u;
+        TSIP.REG_2CH.WORD = 0x00000091u;
+        /* WAIT_LOOP */
+        while (0u != TSIP.REG_00H.BIT.B25)
+        {
+            /* waiting */
+        }
+        TSIP.REG_1CH.WORD = 0x00001800u;
+        TSIP.REG_104H.WORD = 0x00000362u;
+        TSIP.REG_C4H.WORD = 0x00000885u;
+        /* WAIT_LOOP */
+        while (1u != TSIP.REG_104H.BIT.B31)
+        {
+            /* waiting */
+        }
+        TSIP.REG_100H.WORD = InData_KeyIndex[20];
+        TSIP.REG_100H.WORD = InData_KeyIndex[21];
+        TSIP.REG_100H.WORD = InData_KeyIndex[22];
+        TSIP.REG_100H.WORD = InData_KeyIndex[23];
+        TSIP.REG_C4H.WORD = 0x00900c45u;
+        TSIP.REG_00H.WORD = 0x00002213u;
+        /* WAIT_LOOP */
+        while (0u != TSIP.REG_00H.BIT.B25)
+        {
+            /* waiting */
+        }
+        TSIP.REG_1CH.WORD = 0x00001800u;
+        RX671_func100(change_endian_long(0xab6c4f5eu), change_endian_long(0xa0475e50u), change_endian_long(0xecc75721u), change_endian_long(0xd9d6720du));
+        TSIP.REG_1CH.WORD = 0x00400000u;
+        TSIP.REG_1D0H.WORD = 0x00000000u;
+        if (1u == (TSIP.REG_1CH.BIT.B22))
+        {
+            RX671_func102(change_endian_long(0xd2708c9au), change_endian_long(0x5f5bfdb8u), change_endian_long(0xe79d6b24u), change_endian_long(0x2b091ed1u));
+            TSIP.REG_1BCH.WORD = 0x00000040u;
+            /* WAIT_LOOP */
+            while (0u != TSIP.REG_18H.BIT.B12)
+            {
+                /* waiting */
+            }
+            #if TSIP_MULTI_THREADING == 1
+            TSIP_MULTI_THREADING_UNLOCK_FUNCTION();
+            #endif /* TSIP_MULTI_THREADING == 1 */
+            return TSIP_ERR_KEY_SET;
+        }
+        else
+        {
+            TSIP.REG_7CH.WORD = 0x00000011u;
+            TSIP.REG_ECH.WORD = 0x0000b7c0u;
+            TSIP.REG_ECH.WORD = 0x00000040u;
+            TSIP.REG_E0H.WORD = 0x8188001eu;
+            TSIP.REG_00H.WORD = 0x00005823u;
+            TSIP.REG_74H.WORD = 0x00000004u;
+            /* WAIT_LOOP */
+            while (0u != TSIP.REG_00H.BIT.B25)
+            {
+                /* waiting */
+            }
+            TSIP.REG_1CH.WORD = 0x00001800u;
+            TSIP.REG_104H.WORD = 0x00000058u;
+            TSIP.REG_E0H.WORD = 0x800103a0u;
+            /* WAIT_LOOP */
+            while (1u != TSIP.REG_104H.BIT.B31)
+            {
+                /* waiting */
+            }
+            TSIP.REG_100H.WORD = change_endian_long(0x000000f1u);
+            RX671_func101(change_endian_long(0x5d758e5bu), change_endian_long(0xbe09b8a8u), change_endian_long(0x08762146u), change_endian_long(0xeb7969f2u));
+            RX671_func010(InData_DomainParam);
+            RX671_func100(change_endian_long(0x7924a400u), change_endian_long(0x8a6c269du), change_endian_long(0xe9be60ceu), change_endian_long(0x28a2e7b6u));
+            TSIP.REG_1CH.WORD = 0x00400000u;
+            TSIP.REG_1D0H.WORD = 0x00000000u;
+            if (1u == (TSIP.REG_1CH.BIT.B22))
+            {
+                RX671_func102(change_endian_long(0xdd6698e1u), change_endian_long(0x72ae2dc3u), change_endian_long(0xb2006b69u), change_endian_long(0x83a2e183u));
+                TSIP.REG_1BCH.WORD = 0x00000040u;
+                /* WAIT_LOOP */
+                while (0u != TSIP.REG_18H.BIT.B12)
+                {
+                    /* waiting */
+                }
+                #if TSIP_MULTI_THREADING == 1
+                TSIP_MULTI_THREADING_UNLOCK_FUNCTION();
+                #endif /* TSIP_MULTI_THREADING == 1 */
+                return TSIP_ERR_FAIL;
+            }
+            else
+            {
+                RX671_func102(change_endian_long(0x67fad4bfu), change_endian_long(0x68e3a3e9u), change_endian_long(0x40b0698du), change_endian_long(0xc011d01fu));
+                TSIP.REG_1BCH.WORD = 0x00000040u;
+                /* WAIT_LOOP */
+                while (0u != TSIP.REG_18H.BIT.B12)
+                {
+                    /* waiting */
+                }
+                #if TSIP_MULTI_THREADING == 1
+                TSIP_MULTI_THREADING_UNLOCK_FUNCTION();
+                #endif /* TSIP_MULTI_THREADING == 1 */
+                return TSIP_SUCCESS;
+            }
+        }
+    }
+}
+/**********************************************************************************************************************
+ End of function ./input_dir/RX671/RX671_pf1_r1.prc
+ *********************************************************************************************************************/
+#endif /* #if (TSIP_ECDSA_P192 | TSIP_ECDSA_P224 | TSIP_ECDSA_P256) != 0 */

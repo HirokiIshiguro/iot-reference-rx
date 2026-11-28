@@ -76,9 +76,9 @@ A high tick rate frequency will have the effect of reducing the 'time slice' giv
 The stack size is specified in words, not bytes.</description>
         </property>
         <property id="configTOTAL_HEAP_SIZE_N" display="The total amount of RAM available in the FreeRTOS heap" default="256" type="textbox" category="category3">
-            <constraint display="Value must be an integer">testInteger("${configTOTAL_HEAP_SIZE_N}")</constraint>
-            <constraint display="Heap size must be greater than 0">("${configTOTAL_HEAP_SIZE_N}" &gt; 0)</constraint>
-            <constraint display="Heap size must be less than RAM capacity">("${configTOTAL_HEAP_SIZE_N}" &lt;= ${Device.ramSize})</constraint>
+            <constraint display="Value must be an integer">("${configTOTAL_HEAP_SIZE_N}" == "RX671_FREERTOS_HEAP_SIZE_KB") || (testInteger("${configTOTAL_HEAP_SIZE_N}"))</constraint>
+            <constraint display="Heap size must be greater than 0">("${configTOTAL_HEAP_SIZE_N}" == "RX671_FREERTOS_HEAP_SIZE_KB") || (("${configTOTAL_HEAP_SIZE_N}" &gt; 0))</constraint>
+            <constraint display="Heap size must be less than RAM capacity">("${configTOTAL_HEAP_SIZE_N}" == "RX671_FREERTOS_HEAP_SIZE_KB") || (("${configTOTAL_HEAP_SIZE_N}" &lt;= ${Device.ramSize}))</constraint>
             <description>This value will only be used if configSUPPORT_DYNAMIC_ALLOCATION is set to 1 and the application makes use of one of the sample memory allocation schemes provided in the FreeRTOS source code download.</description>
         </property>
         <property id="configMAX_TASK_NAME_LEN" display="The maximum permissible length of name" default="12" type="textbox" category="category2">
@@ -92,13 +92,6 @@ The length is specified in the number of characters including the NULL terminati
             <option id="configUSE_TRACE_FACILITY.1" display="Enable" value="1"/>
             <description>Enable: include additional structure members and functions to assist with execution visualisation and tracing. 
 Disable: omit.</description>
-        </property>
-        <property id="configUSE_16_BIT_TICKS" display="Use 16bit ticks" default="0" type="checkbox" category="category1">
-            <option id="configUSE_16_BIT_TICKS.0" display="Disable" value="0"/>
-            <option id="configUSE_16_BIT_TICKS.1" display="Enable" value="1"/>
-            <description>Time is measured in 'ticks' - which is the number of times the tick interrupt has executed since the RTOS kernel was started. The tick count is held in a variable of type TickType_t. 
-Enable: use 16bit_ticks
-Disable: use 32bit_ticks</description>
         </property>
         <property id="configIDLE_SHOULD_YIELD" display="Idle should yield" default="1" type="checkbox" category="category1">
             <option id="configIDLE_SHOULD_YIELD.0" display="Disable" value="0"/>
@@ -618,5 +611,26 @@ Disable: omit platform.h</description>
             <description>Enable: Enable time-slicing
 Disable: Disable time-slicing</description>
         </property>
+        <property id="CONFIG_USE_PERCEPIO_TRACE_RECORDER" display="CONFIG_USE_PERCEPIO_TRACE_RECORDER" default="1" type="textbox" category="category3"/>
+        <property id="INCLUDE_xTaskGetHandle" display="INCLUDE_xTaskGetHandle" default="0" type="textbox" category="category3"/>
+        <property id="INCLUDE_xTaskResumeFromISR" display="INCLUDE_xTaskResumeFromISR" default="1" type="textbox" category="category3"/>
+        <property id="RX671_FREERTOS_HEAP_SIZE_KB" display="RX671_FREERTOS_HEAP_SIZE_KB" default="256" type="textbox" category="category3"/>
+        <property id="configAPPLICATION_ALLOCATED_HEAP" display="configAPPLICATION_ALLOCATED_HEAP" default="0" type="textbox" category="category3"/>
+        <property id="configENABLE_HEAP_PROTECTOR" display="configENABLE_HEAP_PROTECTOR" default="0" type="textbox" category="category3"/>
+        <property id="configHEAP_CLEAR_MEMORY_ON_FREE" display="configHEAP_CLEAR_MEMORY_ON_FREE" default="1" type="textbox" category="category3"/>
+        <property id="configMESSAGE_BUFFER_LENGTH_TYPE" display="configMESSAGE_BUFFER_LENGTH_TYPE" default="size_t" type="textbox" category="category3"/>
+        <property id="configOUTPUT_STRING_USES_DEBUG_UART" display="configOUTPUT_STRING_USES_DEBUG_UART" default="1" type="textbox" category="category3"/>
+        <property id="configSTACK_ALLOCATION_FROM_SEPARATE_HEAP" display="configSTACK_ALLOCATION_FROM_SEPARATE_HEAP" default="0" type="textbox" category="category3"/>
+        <property id="configSTACK_DEPTH_TYPE" display="configSTACK_DEPTH_TYPE" default="StackType_t" type="textbox" category="category3"/>
+        <property id="configSTATS_BUFFER_MAX_LENGTH" display="configSTATS_BUFFER_MAX_LENGTH" default="65535" type="textbox" category="category3"/>
+        <property id="configTASK_NOTIFICATION_ARRAY_ENTRIES" display="configTASK_NOTIFICATION_ARRAY_ENTRIES" default="4" type="textbox" category="category3"/>
+        <property id="configTICK_TYPE_WIDTH_IN_BITS" display="configTICK_TYPE_WIDTH_IN_BITS" default="TICK_TYPE_WIDTH_32_BITS" type="textbox" category="category3"/>
+        <property id="configUSE_MINI_LIST_ITEM" display="configUSE_MINI_LIST_ITEM" default="1" type="textbox" category="category3"/>
+        <property id="configUSE_NEWLIB_REENTRANT" display="configUSE_NEWLIB_REENTRANT" default="0" type="textbox" category="category3"/>
+        <property id="configUSE_SB_COMPLETED_CALLBACK" display="configUSE_SB_COMPLETED_CALLBACK" default="0" type="textbox" category="category3"/>
+        <property id="configUSE_STREAM_BUFFERS" display="configUSE_STREAM_BUFFERS" default="1" type="textbox" category="category3"/>
+        <property id="configUSE_TASK_DPFPU_SUPPORT" display="configUSE_TASK_DPFPU_SUPPORT" default="1" type="textbox" category="category3"/>
+        <property id="configUSE_TASK_NOTIFICATIONS" display="configUSE_TASK_NOTIFICATIONS" default="1" type="textbox" category="category3"/>
+        <property id="configUSE_TICKLESS_IDLE" display="configUSE_TICKLESS_IDLE" default="0" type="textbox" category="category3"/>
     </configuration>
 </module>

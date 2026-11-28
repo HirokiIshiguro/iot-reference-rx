@@ -103,6 +103,22 @@ class FlashConfigurationTests(unittest.TestCase):
         self.assertEqual(8, result['project_count'])
 
     def test_regeneration_rollbacks_are_rejected_and_preserved(self):
+        modern = (ROOT / 'Projects/boot_loader_rx671_ek/e2studio_ccrx/src/smc_gen/r_flash_rx').is_dir()
+        if modern:
+            flash_layout_cases = (
+                ('.project', b'<linkedResources>',
+                 b'<linkedResources><link><name>Vendor/r_flash_rx</name></link>',
+                 'duplicate linked Flash source'),
+                ('.cproject', b'excluding="trash/"',
+                 b'excluding="trash/|src/smc_gen/r_flash_rx/"',
+                 'compiler no longer selects generated Flash'),
+            )
+        else:
+            flash_layout_cases = (
+                ('.project', b'Middleware/Renesas/r_flash_rx/r_flash_rx_vx.xx',
+                 b'Middleware/Renesas/rx-driver-package/source/r_flash_rx/r_flash_rx_vx.xx', 'reviewed leaf'),
+                ('.cproject', b'smc_gen/r_flash_rx/', b'smc_gen/unrelated/', 'generated Flash body'),
+            )
         cases = (
             ('boot_loader_rx671_ek.scfg', b'FLASH_CFG_FCU_EN_NESTED_INT" selectedIndex="1"',
              b'FLASH_CFG_FCU_EN_NESTED_INT" selectedIndex="0"', 'SC FCU'),
@@ -110,10 +126,7 @@ class FlashConfigurationTests(unittest.TestCase):
              b'r_flash_rx5.31', 'QE Flash package'),
             ('src/smc_gen/r_config/r_flash_rx_config.h', b'FLASH_CFG_FCU_EN_NESTED_INT   (1)',
              b'FLASH_CFG_FCU_EN_NESTED_INT   (0)', 'generated FCU'),
-            ('.project', b'Middleware/Renesas/r_flash_rx/r_flash_rx_vx.xx',
-             b'Middleware/Renesas/rx-driver-package/source/r_flash_rx/r_flash_rx_vx.xx', 'reviewed leaf'),
-            ('.cproject', b'smc_gen/r_flash_rx/', b'smc_gen/unrelated/', 'generated Flash body'),
-        )
+        ) + flash_layout_cases
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             copy_flash_configuration(root)

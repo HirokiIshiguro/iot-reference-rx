@@ -36,7 +36,7 @@
 	</natures>
 	<filteredResources>
 		<filter>
-			<id>1723799128611</id>
+			<id>1790000000000</id>
 			<name>Common</name>
 			<type>10</type>
 			<matcher>
@@ -45,7 +45,7 @@
 			</matcher>
 		</filter>
 		<filter>
-			<id>1734330077562</id>
+			<id>1790000000001</id>
 			<name>Demos</name>
 			<type>10</type>
 			<matcher>
@@ -53,14 +53,8 @@
 				<arguments>1.0-name-matches-false-true-include|key_flash_wr_with_tsip</arguments>
 			</matcher>
 		</filter>
-
-
-
-
-
-
 		<filter>
-			<id>1725446610074</id>
+			<id>1790000000002</id>
 			<name>Demos/Fleet_Provisioning_With_CSR_Demo</name>
 			<type>5</type>
 			<matcher>
@@ -68,14 +62,8 @@
 				<arguments>1.0-name-matches-false-true-FleetProvisioningDemoExample.c|pkcs11_operations.c|pkcs11_operations.h|tinycbor_serializer.c|tinycbor_serializer.h</arguments>
 			</matcher>
 		</filter>
-
-
-
-
-
-
 		<filter>
-			<id>1723799128598</id>
+			<id>1790000000003</id>
 			<name>Common/FreeRTOS_common/compiler_support</name>
 			<type>9</type>
 			<matcher>
@@ -83,26 +71,8 @@
 				<arguments>1.0-name-matches-false-true-ccrx</arguments>
 			</matcher>
 		</filter>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 		<filter>
-			<id>1734330946832</id>
+			<id>1790000000004</id>
 			<name>src/application_code/ports</name>
 			<type>10</type>
 			<matcher>
@@ -110,22 +80,483 @@
 				<arguments>1.0-name-matches-false-false-pkcs11</arguments>
 			</matcher>
 		</filter>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		<filter>
+			<id>1790000000005</id>
+			<name>Middleware</name>
+			<type>26</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-\.github|\.clusterfuzzlite</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000006</id>
+			<name>Common</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-ports</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000007</id>
+			<name>Common/FreeRTOS_common</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-network_support</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000008</id>
+			<name>Demos</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-key_flash_wr_with_tsip</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000009</id>
+			<name>Middleware</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-Renesas|wifi</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000010</id>
+			<name>Middleware/3rdparty</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-mbedtls_with_TSIP|tinycrypt</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000011</id>
+			<name>Middleware/3rdparty/TraceRecorderSource</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-extras</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000012</id>
+			<name>Middleware/3rdparty/TraceRecorderSource/kernelports</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-BareMetal|ESP\-IDF_FreeRTOS|ThreadX|Zephyr</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000013</id>
+			<name>Middleware/3rdparty/TraceRecorderSource/streamports</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-ARM_ITM|File|RingBuffer|STM32_USB_CDC|TCPIP|TCPIP_Win32|UDP|XMOS_xScope</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000014</id>
+			<name>Middleware/3rdparty/littlefs</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-bd|runners</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000015</id>
+			<name>Middleware/3rdparty/mbedtls</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-3rdparty|framework|programs|tests</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000016</id>
+			<name>Middleware/3rdparty/tinycbor</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-examples|tests|tools</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000017</id>
+			<name>Middleware/AWS</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-Device\-Defender\-for\-AWS\-IoT\-embedded\-sdk|Device\-Shadow\-for\-AWS\-IoT\-embedded\-sdk|SigV4\-for\-AWS\-IoT\-embedded\-sdk</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000018</id>
+			<name>Middleware/AWS/Fleet-Provisioning-for-AWS-IoT-embedded-sdk</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000019</id>
+			<name>Middleware/AWS/Jobs-for-AWS-IoT-embedded-sdk</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000020</id>
+			<name>Middleware/AWS/aws-iot-core-mqtt-file-streams-embedded-c</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000021</id>
+			<name>Middleware/FreeRTOS</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-coreHTTP|coreSNTP</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000022</id>
+			<name>Middleware/FreeRTOS-Plus-CLI</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-FreeRTOS</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000023</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-Demo|Test|VisualStudio_StaticProjects</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000024</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Source</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-Application\-Protocols|FreeRTOS\-Cellular\-Interface|FreeRTOS\-Plus\-TCP|FreeRTOS\-Plus\-Trace|Reliance\-Edge|coreJSON|corePKCS11</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000025</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Source/AWS</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-device\-defender|device\-shadow|fleet\-provisioning|jobs|ota|sigv4</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000026</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Source/FreeRTOS-Cellular-Modules</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-bg96|hl7802|sara\-r4</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000027</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Source/Utilities</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-backoff_algorithm</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000028</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/ThirdParty</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-glib|libslirp|mbedtls|tinycbor|wolfSSL</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000029</id>
+			<name>Middleware/FreeRTOS/FreeRTOS-Kernel</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-examples</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000030</id>
+			<name>Middleware/FreeRTOS/FreeRTOS-Kernel/portable</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-ARMv8M|BCC|CCRH|CCS|CodeWarrior|Common|GCC|IAR|MPLAB|MSVC\-MingW|MikroC|Paradigm|RVDS|Rowley|SDCC|Softune|Tasking|ThirdParty|WizC|oWatcom|template</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000031</id>
+			<name>Middleware/FreeRTOS/FreeRTOS-Kernel/portable/Renesas</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-RX100|RX200|RX600|RX600v2|SH2A_FPU</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000032</id>
+			<name>Middleware/FreeRTOS/FreeRTOS-Plus-TCP</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test|tools</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000033</id>
+			<name>Middleware/FreeRTOS/FreeRTOS-Plus-TCP/source/portable</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-NetworkInterface</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000034</id>
+			<name>Middleware/FreeRTOS/backoffAlgorithm</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-docs|test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000035</id>
+			<name>Middleware/FreeRTOS/coreJSON</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000036</id>
+			<name>Middleware/FreeRTOS/coreMQTT</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000037</id>
+			<name>Middleware/FreeRTOS/coreMQTT-Agent</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000038</id>
+			<name>Middleware/FreeRTOS/coreMQTT-Agent/source</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-dependency</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000039</id>
+			<name>Middleware/FreeRTOS/corePKCS11</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000040</id>
+			<name>Middleware/FreeRTOS/corePKCS11/source/portable</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-os</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000041</id>
+			<name>Middleware/freertos_plus</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-demos|freertos_kernel|projects|tests|tools|vendors</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000042</id>
+			<name>Middleware/freertos_plus/libraries</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-3rdparty|abstractions|ble|c_sdk|coreHTTP|coreJSON|coreMQTT|coreMQTT\-Agent|device_defender_for_aws|device_shadow_for_aws|jobs_for_aws|logging|ota_for_aws</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000043</id>
+			<name>Middleware/freertos_plus/libraries/freertos_plus</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-aws</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000044</id>
+			<name>Middleware/freertos_plus/libraries/freertos_plus/standard</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-freertos_plus_cli|freertos_plus_posix|freertos_plus_tcp|tls|utils</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000045</id>
+			<name>Middleware/freertos_plus/libraries/freertos_plus/standard/crypto</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-test</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000046</id>
+			<name>Middleware/network_transport</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-using_mbedtls_pkcs11_with_tsip</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000047</id>
+			<name>Middleware/network_transport/sockets_wrapper/ports</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-cellular_ryz014a|wifi_da16600</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000048</id>
+			<name>src/application_code/ports</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-r_cellular|tinycrypt</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000049</id>
+			<name>src/smc_gen/r_bsp/board</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-user</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000050</id>
+			<name>src/smc_gen/rm_littlefs_rx</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-sample|third_party</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000051</id>
+			<name>src/smc_gen/rm_rtos_abstraction_rx</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-sample</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000052</id>
+			<name>Common/FreeRTOS_common/compiler_support/ccrx</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-exit\.c</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000053</id>
+			<name>Middleware/3rdparty/mbedtls_utils</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-mbedtls_bio_freertos_plus_cellular\.c|mbedtls_bio_freertos_plus_wifi_da16600\.c</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000054</id>
+			<name>Middleware/3rdparty/tinycbor/src</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-cborparser_dup_string\.c|cborpretty_stdio\.c|cbortojson\.c|cborvalidation\.c|open_memstream\.c</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000055</id>
+			<name>Middleware/FreeRTOS/FreeRTOS-Kernel/portable/MemMang</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-heap_1\.c|heap_2\.c|heap_3\.c|heap_5\.c</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000056</id>
+			<name>Middleware/FreeRTOS/FreeRTOS-Plus-TCP/source/portable/BufferManagement</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-BufferAllocation_1\.c</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000057</id>
+			<name>src/whd_core/bus_protocols</name>
+			<type>6</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-whd_bus_spi_protocol\.c</arguments>
+			</matcher>
+		</filter>
 	</filteredResources>
 	<variableList>
 		<variable>
@@ -169,84 +600,14 @@
 			<locationURI>PARENT-1-PROJECT_LOC/external/wifi-host-driver/WiFi_Host_Driver/src</locationURI>
 		</link>
 		<link>
-			<name>whd_inc</name>
+			<name>src/whd_inc</name>
 			<type>2</type>
 			<locationURI>PARENT-1-PROJECT_LOC/external/wifi-host-driver/WiFi_Host_Driver/inc</locationURI>
 		</link>
 		<link>
-			<name>whd_external</name>
+			<name>src/whd_external</name>
 			<type>2</type>
 			<locationURI>PARENT-1-PROJECT_LOC/external/wifi-host-driver/External</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_bsp</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_bsp/r_bsp_vx.xx/r_bsp</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_sci_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_sci_rx/r_sci_rx_vx.xx/r_sci_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_byteq</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_byteq/r_byteq_vx.xx/r_byteq</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_sdhi_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_sdhi_rx/r_sdhi_rx_vx.xx/r_sdhi_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_flash_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/r_flash_rx/r_flash_rx_vx.xx/r_flash_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_s12ad_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_s12ad_rx/r_s12ad_rx_vx.xx/r_s12ad_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_tsip_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_tsip_rx_lib/r_tsip_rx_vx.xx/r_tsip_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_dtc_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_dtc_rx/r_dtc_rx_vx.xx/r_dtc_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_dmaca_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rx-driver-package/source/r_dmaca_rx/r_dmaca_rx_vx.xx/r_dmaca_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/r_sdio_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/r_sdio_rx/r_sdio_rx_vx.xx/r_sdio_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/rm_littlefs_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_littlefs_rx/rm_littlefs_rx_vx.xx/rm_littlefs_rx</locationURI>
-		</link>
-		<link>
-			<name>Vendor/rm_rtos_abstraction_rx</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/Renesas/rm_rtos_abstraction_rx/rm_rtos_abstraction_rx_vx.xx/rm_rtos_abstraction_rx</locationURI>
-		</link>
-		<link>
-			<name>TraceRecorder</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Middleware/3rdparty/TraceRecorderSource</locationURI>
-		</link>
-		<link>
-			<name>TraceProduct</name>
-			<type>2</type>
-			<locationURI>AWS_IOT_MCU_ROOT/Common/ports/trace_recorder</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

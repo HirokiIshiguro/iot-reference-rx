@@ -136,6 +136,14 @@ class PlanTests(unittest.TestCase):
         without_tests, _ = rxci.child_pipeline(registry(), "check", "", 1)
         self.assertNotIn("sweep", without_tests)
 
+    def test_rx671_mqtt_pipelines_do_not_require_the_aws_control_plane(self):
+        names = ["rx671:sw:tls12:mqtt", "rx671:tsip:tls12:mqtt"]
+        jobs, _ = rxci.child_pipeline(registry(names), "full", "^rx671:(sw|tsip):tls12:mqtt$", 1)
+        self.assertNotIn("sweep", jobs)
+        for name in names:
+            self.assertNotIn("id_tokens", jobs[name])
+            self.assertFalse(jobs[name]["interruptible"])
+
     def test_every_job_has_rules_so_a_merge_request_pipeline_gets_jobs(self):
         names = ["rx72n:sw:tls12:mqtt", "rx65n:sw:tls12:mqtt"]
         for profile, pattern in (("build", ""), ("full", ""), ("doctor", ""), ("check", "^rx72n:sw:tls12:mqtt$")):

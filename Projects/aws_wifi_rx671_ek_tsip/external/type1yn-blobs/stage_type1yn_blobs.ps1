@@ -27,7 +27,17 @@ function Assert-FileHash {
         throw "Required Type 1YN blob source is missing: $Path"
     }
 
-    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $file = [System.IO.File]::OpenRead($Path)
+        try {
+            $actual = [System.BitConverter]::ToString($algorithm.ComputeHash($file)).Replace("-", "")
+        } finally {
+            $file.Dispose()
+        }
+    } finally {
+        $algorithm.Dispose()
+    }
     if ($actual -ne $ExpectedSha256.ToUpperInvariant()) {
         throw "SHA256 mismatch for $Path. Expected $ExpectedSha256, got $actual."
     }
