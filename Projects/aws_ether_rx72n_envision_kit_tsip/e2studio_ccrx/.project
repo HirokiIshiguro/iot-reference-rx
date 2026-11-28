@@ -584,6 +584,60 @@
 				<arguments>1.0-name-matches-false-true-iar_call_inits\.s|reset_program\.S</arguments>
 			</matcher>
 		</filter>
+		<filter>
+			<id>1790000000101</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-ThirdParty</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000102</id>
+			<name>Middleware/FreeRTOS-Plus-CLI/FreeRTOS-Plus/Source</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-AWS|FreeRTOS\-Cellular\-Interface|FreeRTOS\-Cellular\-Modules|FreeRTOS\-Plus\-TCP|FreeRTOS\-Plus\-Trace|Utilities|coreJSON|corePKCS11</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000103</id>
+			<name>Middleware/FreeRTOS/coreMQTT-Agent/source</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-dependency</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000104</id>
+			<name>Middleware/freertos_plus</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-freertos_kernel</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000105</id>
+			<name>Middleware/freertos_plus/libraries</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-coreHTTP|coreJSON|coreMQTT|coreMQTT\-Agent|device_defender_for_aws|device_shadow_for_aws|jobs_for_aws|ota_for_aws</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1790000000106</id>
+			<name>Middleware/freertos_plus/libraries/freertos_plus/standard</name>
+			<type>10</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-true-freertos_plus_tcp</arguments>
+			</matcher>
+		</filter>
 	</filteredResources>
 	<variableList>
 		<variable>
