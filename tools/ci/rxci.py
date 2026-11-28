@@ -347,6 +347,11 @@ def child_pipeline(registry: dict, profile: str, pattern: str, repeat: int,
             "artifacts": {"when": "always", "paths": [f"out/{variant}/"], "expire_in": "3 days"},
             "timeout": "50 minutes",
         }
+        if variant == "rx72n/compat-tls12/app":
+            # Keep the TSIP header paths short for CC-RX and isolate concurrent checkouts.
+            jobs[f"build {variant}"]["variables"]["GIT_CLONE_PATH"] = (
+                "$CI_BUILDS_DIR/rx-$CI_PROJECT_ID/$CI_RUNNER_ID-$CI_CONCURRENT_ID"
+            )
     for test in run:
         board = registry["boards"][test["board"]]
         for index in range(1, repeat + 1):
