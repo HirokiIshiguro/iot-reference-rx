@@ -13,8 +13,11 @@ class FlashLayoutTests(unittest.TestCase):
             with self.subTest(project=name):
                 project = ROOT / "Projects" / name / "e2studio_ccrx"
                 self.assertIn("EXCEPTVECT/0FFFEFF80,RESETVECT/0FFFEFFFC", (project / ".cproject").read_text(encoding="utf-8"))
-                self.assertIn(size, (project / "src/frtos_config/rx_ota_config.h").read_text(encoding="utf-8"))
-                self.assertIn(size, (project / ".settings/com.renesas.smc.e2studio.qe.xml").read_text(encoding="utf-8"))
+                ota_config = (project / "src/frtos_config/rx_ota_config.h").read_text(encoding="utf-8")
+                self.assertRegex(ota_config, rf"(?m)^#define\s+RX_OTA_CFG_AREA_SIZE\s+\({size}\)")
+                # RX65N uses the application OTA header. SC no longer emits its legacy FWUP settings.
+                if name.startswith("aws_ether_rx72n_"):
+                    self.assertIn(size, (project / ".settings/com.renesas.smc.e2studio.qe.xml").read_text(encoding="utf-8"))
 
     def test_ota_block_bitmap_covers_the_whole_signed_image(self):
         import re
