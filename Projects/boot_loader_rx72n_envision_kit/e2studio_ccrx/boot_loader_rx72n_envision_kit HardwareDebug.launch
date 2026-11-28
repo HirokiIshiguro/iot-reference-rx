@@ -67,9 +67,9 @@
     <intAttribute key="com.renesas.hardwaredebug.rx.e2lite.hook_work_ram_Addr" value="523072"/>
     <intAttribute key="com.renesas.hardwaredebug.rx.e2lite.hook_work_ram_Size" value="1216"/>
     <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.id_code" value="FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"/>
-    <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.inputclock" value="16.0000"/>
+    <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.inputclock" value="16"/>
     <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.jtag.clock.freq" value="6.00"/>
-    <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.jtag.or.fine" value="1"/>
+    <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.jtag.or.fine" value="0"/>
     <booleanAttribute key="com.renesas.hardwaredebug.rx.e2lite.le" value="true"/>
     <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.mode" value="0"/>
     <stringAttribute key="com.renesas.hardwaredebug.rx.e2lite.mode_pin" value="0"/>
