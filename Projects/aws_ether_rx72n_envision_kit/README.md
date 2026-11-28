@@ -32,6 +32,12 @@ small steps.
 5. Port board features from [rx72n-envision-kit] in separate MRs: GUI/touch,
    SD card, serial flash, audio, and firmware update UI.
 
+## CC-RX linker optimization
+
+アプリ 3 版では、タスクのスタックを復元する処理をインラインのまま保ちます。
+`BSR` は復元後のスタックに戻り先を書き込むため、リンカーの同一コード抽出は
+`-samecode_forbid=_xPortStartScheduler,_vSoftwareInterruptISR,_vTickISR` で禁止します。
+
 ## Tracealyzer SPI Output Experiment
 
 Tracealyzer over RTT/FINE is not the preferred transport for this workload.
