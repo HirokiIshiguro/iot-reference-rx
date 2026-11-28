@@ -589,12 +589,12 @@
     <tool id="Pins" version="1.0.1.0">
         <pinItem allocation="20" comments="" direction="None" id="XTAL" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="84$B" comments="" direction="None" id="LCD_TCON3" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="131" comments="" direction="None" id="TXD7" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="131" comments="" direction="None" id="TXD7" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="83$B" comments="" direction="None" id="LCD_TCON2" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="45" comments="" direction="None" id="RXD2" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="45" comments="" direction="None" id="RXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="81$B" comments="" direction="None" id="LCD_TCON0" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="87$B" comments="" direction="None" id="LCD_DATA0" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="44" comments="" direction="None" id="TXD2" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="44" comments="" direction="None" id="TXD2" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="88$B" comments="" direction="None" id="LCD_DATA1" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="89$B" comments="" direction="None" id="LCD_DATA2" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="90$B" comments="" direction="None" id="LCD_DATA3" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
@@ -606,7 +606,7 @@
         <pinItem allocation="96$B" comments="" direction="None" id="LCD_DATA7" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="97$B" comments="" direction="None" id="LCD_DATA8" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="101$B" comments="" direction="None" id="LCD_DATA9" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
-        <pinItem allocation="128" comments="" direction="None" id="RXD7" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
+        <pinItem allocation="128" comments="" direction="None" id="RXD7" isUsedBySoftware="true" locked="false" operationMode="" status="0"/>
         <pinItem allocation="102$B" comments="" direction="None" id="LCD_DATA10" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="109$B" comments="" direction="None" id="LCD_DATA14" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
         <pinItem allocation="108$B" comments="" direction="None" id="LCD_DATA13" isUsedBySoftware="false" locked="false" operationMode="" status="0"/>
