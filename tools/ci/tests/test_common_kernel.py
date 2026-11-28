@@ -29,11 +29,12 @@ class CommonKernelTests(unittest.TestCase):
         root = Path(folder)
         paths = ['Configuration/sc_freertos_lts.xml', 'Configuration/sc_freertos_kernel.xml',
                  'Middleware/FreeRTOS/FreeRTOS-Kernel/include/task.h']
-        for name in guard.PROJECTS:
+        for name in guard.KERNEL_PROJECTS:
             base = 'Projects/' + name + '/e2studio_ccrx/'
             paths += [base+'.project', base+name+'.scfg',
-                      base+'.settings/smartconfigurator/rtos/nopg_freertos.xml',
                       base+'.settings/smartconfigurator/rtos/FreeRTOS_Kernel.xml']
+            if name not in guard.RX72N_REGENERATED_PROJECTS:
+                paths.append(base+'.settings/smartconfigurator/rtos/nopg_freertos.xml')
         for relative in paths:
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -41,12 +42,26 @@ class CommonKernelTests(unittest.TestCase):
         copy_flash_configuration(root)
         return root
 
-    def test_current_five_projects_keep_pristine_kernel_113_source(self):
+    def test_current_projects_keep_pristine_kernel_113_source(self):
         result = guard.validate(ROOT)
         self.assertEqual('V11.3.0', result['kernel_version'])
-        self.assertEqual(5, result['project_count'])
+        self.assertEqual(6, result['project_count'])
         self.assertFalse(result['source_copy_enabled'])
         self.assertFalse(result['gui_generation_observed'])
+
+    def test_optional_rx72n_lts_descriptor_is_checked_when_present(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = self.fixture(folder)
+            for name in guard.RX72N_REGENERATED_PROJECTS:
+                descriptor = (root / 'Projects' / name / 'e2studio_ccrx' /
+                              '.settings/smartconfigurator/rtos/nopg_freertos.xml')
+                with self.subTest(project=name):
+                    descriptor.write_bytes((root / 'Configuration/sc_freertos_lts.xml').read_bytes())
+                    guard.validate(root)
+                    descriptor.write_bytes(b'drifted descriptor')
+                    with self.assertRaisesRegex(ValueError, name + ': local LTS descriptor drifted'):
+                        guard.validate(root)
+                    descriptor.unlink()
 
     def test_regenerated_111_selection_or_kernel_body_copy_is_rejected_without_deleting(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -74,8 +89,9 @@ class CommonKernelTests(unittest.TestCase):
             canonical = root/'Configuration/sc_freertos_lts.xml'
             changed = canonical.read_bytes().replace(b'</package>', b'<sourcecopy>src/FreeRTOS</sourcecopy></package>')
             canonical.write_bytes(changed)
-            for name in guard.PROJECTS:
-                (root/'Projects'/name/'e2studio_ccrx/.settings/smartconfigurator/rtos/nopg_freertos.xml').write_bytes(changed)
+            for name in guard.KERNEL_PROJECTS:
+                descriptor = root/'Projects'/name/'e2studio_ccrx/.settings/smartconfigurator/rtos/nopg_freertos.xml'
+                descriptor.write_bytes(changed)
             with self.assertRaisesRegex(ValueError, 'configuration headers only'):
                 guard.validate(root)
 

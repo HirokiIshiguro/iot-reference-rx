@@ -11,6 +11,11 @@ PROJECTS = (
     'aws_ether_rx72n_envision_kit', 'aws_ether_rx72n_envision_kit_tsip',
     'aws_bg96_ck_rx65n', 'aws_bg96_ck_rx65n_tsip', 'aws_wifi_rx671_ek',
 )
+RX72N_REGENERATED_PROJECTS = (
+    'aws_ether_rx72n_envision_kit', 'aws_ether_rx72n_envision_kit_tsip',
+    'aws_ether_rx72n_envision_kit_tsip_compat',
+)
+KERNEL_PROJECTS = PROJECTS + ('aws_ether_rx72n_envision_kit_tsip_compat',)
 FLASH_PROJECTS = PROJECTS + (
     'boot_loader_ck_rx65n', 'boot_loader_rx671_ek', 'boot_loader_rx72n_envision_kit',
 )
@@ -142,10 +147,14 @@ def validate(repo: Path) -> dict:
             kxml.findtext('package/version') == KERNEL_VERSION and
             kxml.findtext('package/application') == 'FreeRTOSLTSLibrary', 'SC Kernel descriptor must remain 11.3.0')
     require(all(item.tag in CONFIG_TAGS for item in kxml.iter()), 'SC Kernel descriptor cannot copy sources')
-    for name in PROJECTS:
+    for name in KERNEL_PROJECTS:
         project = repo / 'Projects' / name / 'e2studio_ccrx'
         settings = project / '.settings/smartconfigurator/rtos'
-        require((settings/'nopg_freertos.xml').read_bytes() == canonical.read_bytes(), name + ': local LTS descriptor drifted')
+        lts_descriptor = settings / 'nopg_freertos.xml'
+        # SC 2.29 removes the local copy when regenerating these projects.
+        if name not in RX72N_REGENERATED_PROJECTS or lts_descriptor.exists():
+            require(lts_descriptor.is_file() and lts_descriptor.read_bytes() == canonical.read_bytes(),
+                    name + ': local LTS descriptor drifted')
         require((settings/'FreeRTOS_Kernel.xml').read_bytes() == kernel.read_bytes(), name + ': local Kernel descriptor drifted')
         scfg = ET.parse(project / (name + '.scfg')).getroot()
         selectors = scfg.findall('.//option[@id="com.renesas.smc.toolchain.option.rtos"]')
@@ -174,7 +183,7 @@ def validate(repo: Path) -> dict:
                     continue
                 require(False, name + ': SC created a local Kernel body copy: ' + filename)
     flash = validate_flash(repo)
-    return {'kernel_version': 'V'+KERNEL_VERSION, 'project_count': len(PROJECTS),
+    return {'kernel_version': 'V'+KERNEL_VERSION, 'project_count': len(KERNEL_PROJECTS),
             'sc_product_config_version': version, 'source_copy_enabled': False,
             'gui_generation_observed': False, 'flash': flash}
 
