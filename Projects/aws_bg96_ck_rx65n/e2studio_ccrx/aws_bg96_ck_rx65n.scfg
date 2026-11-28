@@ -718,7 +718,73 @@
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
         <configuration inuse="true" name="r_tsip_rx">
-            <component description="依存モジュール: r_bsp バージョン 7.30&#10;Support functions: AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA, ECC, Random number generate, Key management, secure boot/secure firmware update." detailDescription="TSIP(Trusted Secure IP) driver." display="r_tsip_rx" id="r_tsip_rx1.24" version="1.24"/>
+            <component description="依存モジュール: r_bsp バージョン 7.30&#10;Support functions: AES, GCM, CCM, CMAC, SHA, MD5, Triple-DES, ARC4, RSA, ECC, Random number generate, Key management, secure boot/secure firmware update." detailDescription="TSIP(Trusted Secure IP) driver." display="r_tsip_rx" id="r_tsip_rx1.24" version="1.24">
+                <gridItem id="AES128" selectedIndex="1"/>
+                <gridItem id="AES128-ECB" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_ECB_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_ECB_DECRYPT" selectedIndex="1"/>
+                <gridItem id="AES128-CBC" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CBC_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CBC_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CTR" selectedIndex="1"/>
+                <gridItem id="AES128-GCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_GCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_GCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CMAC" selectedIndex="1"/>
+                <gridItem id="AES128-CCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_CCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_128_KEY_WRAP" selectedIndex="1"/>
+                <gridItem id="AES256" selectedIndex="1"/>
+                <gridItem id="AES256-ECB" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_ECB_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_ECB_DECRYPT" selectedIndex="1"/>
+                <gridItem id="AES256-CBC" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CBC_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CBC_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CTR" selectedIndex="1"/>
+                <gridItem id="AES256-GCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_GCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_GCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CMAC" selectedIndex="1"/>
+                <gridItem id="AES256-CCM" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CCM_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_CCM_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_AES_256_KEY_WRAP" selectedIndex="1"/>
+                <gridItem id="TDES" selectedIndex="1"/>
+                <gridItem id="TDES-ECB" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_ECB_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_ECB_DECRYPT" selectedIndex="1"/>
+                <gridItem id="TDES-CBC" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_CBC_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_TDES_CBC_DECRYPT" selectedIndex="1"/>
+                <gridItem id="ARC4" selectedIndex="1"/>
+                <gridItem id="TSIP_ARC4_ENCRYPT" selectedIndex="1"/>
+                <gridItem id="TSIP_ARC4_DECRYPT" selectedIndex="1"/>
+                <gridItem id="RSAES-PKCS1" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_1024" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_2048" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_3072" selectedIndex="1"/>
+                <gridItem id="TSIP_RSAES_4096" selectedIndex="1"/>
+                <gridItem id="RSASSA-PKCS1" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_1024" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_2048" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_3072" selectedIndex="1"/>
+                <gridItem id="TSIP_RSASSA_4096" selectedIndex="1"/>
+                <gridItem id="ECDSA" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P192" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P224" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P256" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDSA_P384" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_1" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_256" selectedIndex="1"/>
+                <gridItem id="TSIP_MD5" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_1_HMAC" selectedIndex="1"/>
+                <gridItem id="TSIP_SHA_256_HMAC" selectedIndex="1"/>
+                <gridItem id="TSIP_ECDH_P256" selectedIndex="1"/>
+                <gridItem id="TSIP_TLS" selectedIndex="1"/>
+                <gridItem id="TSIP_FIRMWARE_UPDATE" selectedIndex="1"/>
+            </component>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
             <source description="Components supporting Firmware Integration Technology" display="Firmware Integration Technology" id="com.renesas.smc.tools.swcomponent.fit.source"/>
         </configuration>
@@ -1122,7 +1188,7 @@
                 <gridItem id="configTOTAL_HEAP_SIZE_N" selectedIndex="256"/>
                 <gridItem id="configMAX_TASK_NAME_LEN" selectedIndex="12"/>
                 <gridItem id="configUSE_TRACE_FACILITY" selectedIndex="1"/>
-                <gridItem id="configUSE_16_BIT_TICKS" selectedIndex="0"/>
+
                 <gridItem id="configIDLE_SHOULD_YIELD" selectedIndex="1"/>
                 <gridItem id="configUSE_CO_ROUTINES" selectedIndex="0"/>
                 <gridItem id="configUSE_MUTEXES" selectedIndex="1"/>
@@ -1213,6 +1279,10 @@
                 <gridItem id="configPLATFORM_NAME" selectedIndex="&quot;RenesasRX65N&quot;"/>
                 <gridItem id="configINCLUDE_PLATFORM_H_INSTEAD_OF_IODEFINE_H" selectedIndex="1"/>
                 <gridItem id="configUSE_TIME_SLICING" selectedIndex="1"/>
+                <gridItem id="CONFIG_USE_PERCEPIO_TRACE_RECORDER" selectedIndex="1"/>
+                <gridItem id="configHEAP_CLEAR_MEMORY_ON_FREE" selectedIndex="1"/>
+                <gridItem id="configTASK_NOTIFICATION_ARRAY_ENTRIES" selectedIndex="4"/>
+                <gridItem id="configTICK_TYPE_WIDTH_IN_BITS" selectedIndex="TICK_TYPE_WIDTH_32_BITS"/>
             </component>
             <source description="Code generator for Real-time OS" display="RTOS Configurator" id="com.renesas.smc.tools.swcomponent.rtosconfigurator.source"/>
         </configuration>

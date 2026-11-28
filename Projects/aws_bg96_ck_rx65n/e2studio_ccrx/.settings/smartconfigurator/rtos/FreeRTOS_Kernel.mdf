@@ -93,13 +93,6 @@ The length is specified in the number of characters including the NULL terminati
             <description>Enable: include additional structure members and functions to assist with execution visualisation and tracing. 
 Disable: omit.</description>
         </property>
-        <property id="configUSE_16_BIT_TICKS" display="Use 16bit ticks" default="0" type="checkbox" category="category1">
-            <option id="configUSE_16_BIT_TICKS.0" display="Disable" value="0"/>
-            <option id="configUSE_16_BIT_TICKS.1" display="Enable" value="1"/>
-            <description>Time is measured in 'ticks' - which is the number of times the tick interrupt has executed since the RTOS kernel was started. The tick count is held in a variable of type TickType_t. 
-Enable: use 16bit_ticks
-Disable: use 32bit_ticks</description>
-        </property>
         <property id="configIDLE_SHOULD_YIELD" display="Idle should yield" default="1" type="checkbox" category="category1">
             <option id="configIDLE_SHOULD_YIELD.0" display="Disable" value="0"/>
             <option id="configIDLE_SHOULD_YIELD.1" display="Enable" value="1"/>
@@ -618,5 +611,9 @@ Disable: omit platform.h</description>
             <description>Enable: Enable time-slicing
 Disable: Disable time-slicing</description>
         </property>
+        <property id="CONFIG_USE_PERCEPIO_TRACE_RECORDER" display="CONFIG_USE_PERCEPIO_TRACE_RECORDER" default="1" type="textbox" category="category3"/>
+        <property id="configHEAP_CLEAR_MEMORY_ON_FREE" display="configHEAP_CLEAR_MEMORY_ON_FREE" default="1" type="textbox" category="category3"/>
+        <property id="configTASK_NOTIFICATION_ARRAY_ENTRIES" display="configTASK_NOTIFICATION_ARRAY_ENTRIES" default="4" type="textbox" category="category3"/>
+        <property id="configTICK_TYPE_WIDTH_IN_BITS" display="configTICK_TYPE_WIDTH_IN_BITS" default="TICK_TYPE_WIDTH_32_BITS" type="textbox" category="category3"/>
     </configuration>
 </module>
